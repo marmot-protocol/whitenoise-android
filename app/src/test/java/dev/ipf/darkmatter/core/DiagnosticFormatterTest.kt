@@ -2,9 +2,9 @@ package dev.ipf.darkmatter.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import org.marmotprotocol.marmotkit.MarmotEventFfi
-import org.marmotprotocol.marmotkit.ReceivedMessageFfi
-import org.marmotprotocol.marmotkit.RuntimeMessageReceivedFfi
+import dev.ipf.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.ReceivedMessageFfi
+import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
 
 class DiagnosticFormatterTest {
     @Test
@@ -19,7 +19,8 @@ class DiagnosticFormatterTest {
                     sender = "0123456789abcdef",
                     senderDisplayName = null,
                     plaintext = "hello",
-                    appMessage = null,
+                    kind = 9uL,
+                    tags = emptyList(),
                 ),
             ),
         )

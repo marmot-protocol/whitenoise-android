@@ -1,6 +1,6 @@
 package dev.ipf.darkmatter.core
 
-import org.marmotprotocol.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 
 object DiagnosticFormatter {
     fun describe(event: MarmotEventFfi): String {

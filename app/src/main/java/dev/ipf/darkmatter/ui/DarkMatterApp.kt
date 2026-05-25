@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -113,6 +115,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -136,6 +139,7 @@ import dev.ipf.darkmatter.state.ChatsController
 import dev.ipf.darkmatter.state.ConversationController
 import dev.ipf.darkmatter.state.DarkMatterAppState
 import dev.ipf.darkmatter.state.MessageStatus
+import dev.ipf.darkmatter.state.RelayListKind
 import dev.ipf.darkmatter.state.TimelineMessage
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -148,15 +152,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.LifecycleOwner
-import org.marmotprotocol.marmotkit.AppGroupRecordFfi
-import org.marmotprotocol.marmotkit.AppGroupMemberRecordFfi
-import org.marmotprotocol.marmotkit.AppGroupMlsStateFfi
-import org.marmotprotocol.marmotkit.AppMessagePayloadFfi
-import org.marmotprotocol.marmotkit.AppMessageRecordFfi
-import org.marmotprotocol.marmotkit.AccountRelayListsFfi
-import org.marmotprotocol.marmotkit.RelayHealthFfi
-import org.marmotprotocol.marmotkit.RelayListFfi
-import org.marmotprotocol.marmotkit.UserProfileMetadataFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupMlsStateFfi
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.AccountRelayListsFfi
+import dev.ipf.marmotkit.RelayHealthFfi
+import dev.ipf.marmotkit.RelayListFfi
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 
 private enum class MainSection {
     Chats,
@@ -524,9 +527,9 @@ private fun ChatRow(
         group = item.group,
         otherMemberAccount = item.otherMemberAccount,
         memberCount = item.memberCount,
-        displayName = { appState.displayName(it) },
+        memberTitle = { appState.chatMemberTitle(it) },
     )
-    val avatarAccount = item.otherMemberAccount.takeIf { item.group.name.isBlank() }
+    val avatarAccount = item.otherMemberAccount.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
         leadingContent = {
@@ -721,10 +724,17 @@ private fun ConversationScreen(
     val controller = remember(group.groupIdHex) { ConversationController(appState, group) }
     var menuOpen by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(controller) {
         controller.start()
+    }
+    LaunchedEffect(controller.timeline.lastOrNull()?.id, imeBottom) {
+        if (controller.timeline.isNotEmpty()) {
+            listState.scrollToItem(controller.timeline.size + 1)
+        }
     }
 
     Scaffold(
@@ -780,6 +790,16 @@ private fun ConversationScreen(
                 },
             )
         },
+        bottomBar = {
+            if (controller.error == null) {
+                ComposerBar(
+                    replyingTo = controller.replyingTo,
+                    sendInFlight = controller.sendInFlight,
+                    onCancelReply = { controller.replyingTo = null },
+                    onSend = { scope.launch { controller.send(it) } },
+                )
+            }
+        },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
@@ -789,9 +809,10 @@ private fun ConversationScreen(
                     Text("No messages yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 else -> LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(bottom = 112.dp),
+                    contentPadding = PaddingValues(bottom = 8.dp),
                 ) {
                     item { Spacer(Modifier.height(4.dp)) }
                     items(controller.timeline, key = { it.id }) { item ->
@@ -804,13 +825,6 @@ private fun ConversationScreen(
                     item { Spacer(Modifier.height(8.dp)) }
                 }
             }
-            ComposerBar(
-                replyingTo = controller.replyingTo,
-                sendInFlight = controller.sendInFlight,
-                onCancelReply = { controller.replyingTo = null },
-                onSend = { scope.launch { controller.send(it) } },
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
         }
     }
 
@@ -1321,7 +1335,7 @@ private fun SettingsHomeScreen(
                     SettingsRow("Profile", "Publish your Nostr kind:0 profile") { onOpenDetail(SettingsDetail.Profile) }
                     SettingsRow("Accounts", "${appState.accounts.size} identities on this device") { onOpenDetail(SettingsDetail.Accounts) }
                     SettingsRow("Identity & Keys", "Public key, npub, signing status") { onOpenDetail(SettingsDetail.Identity) }
-                    SettingsRow("Relays", "${appState.defaultRelays.size} default relays") { onOpenDetail(SettingsDetail.Relays) }
+                    SettingsRow("Relays", "Dark Matter-managed relay lists") { onOpenDetail(SettingsDetail.Relays) }
                 }
             }
             item {
@@ -2069,7 +2083,8 @@ private fun CopyableValueRow(
 private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
     var pendingUrl by remember { mutableStateOf("") }
     var lists by remember(appState.activeAccountRef) { mutableStateOf<AccountRelayListsFfi?>(null) }
-    var publishing by remember { mutableStateOf(false) }
+    var selectedKind by remember { mutableStateOf(RelayListKind.Nip65) }
+    var saving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     fun reloadLists() {
@@ -2099,13 +2114,33 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                SectionCard(title = "Default Relays") {
-                    appState.defaultRelays.forEach { relay ->
+                SectionCard(title = "Account Relay Lists") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        relayListKinds.forEach { option ->
+                            FilterChip(
+                                selected = selectedKind == option,
+                                onClick = { selectedKind = option },
+                                label = { Text(option.label) },
+                            )
+                        }
+                    }
+
+                    val currentRelays = lists?.relaysFor(selectedKind).orEmpty()
+                    if (currentRelays.isEmpty()) {
+                        Text("No relays", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    currentRelays.forEach { relay ->
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(relay, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace)
                             IconButton(
-                                onClick = { appState.replaceDefaultRelays(appState.defaultRelays - relay) },
-                                enabled = appState.defaultRelays.size > 1,
+                                onClick = {
+                                    saving = true
+                                    scope.launch {
+                                        lists = appState.setAccountRelays(selectedKind, currentRelays - relay) ?: appState.accountRelayLists()
+                                        saving = false
+                                    }
+                                },
+                                enabled = !saving && currentRelays.size > 1,
                             ) {
                                 Icon(Icons.Default.Close, contentDescription = "Remove relay")
                             }
@@ -2128,12 +2163,18 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
                         IconButton(
                             onClick = {
                                 val trimmed = pendingUrl.trim()
-                                appState.replaceDefaultRelays(appState.defaultRelays + trimmed)
-                                pendingUrl = ""
+                                saving = true
+                                scope.launch {
+                                    lists = appState.setAccountRelays(selectedKind, currentRelays + trimmed) ?: appState.accountRelayLists()
+                                    pendingUrl = ""
+                                    saving = false
+                                }
                             },
                             modifier = Modifier.size(48.dp),
                             enabled = pendingUrl.trim().let {
-                                (it.startsWith("wss://") || it.startsWith("ws://")) && !appState.defaultRelays.contains(it)
+                                !saving && appState.activeAccountRef != null &&
+                                    (it.startsWith("wss://") || it.startsWith("ws://")) &&
+                                    !currentRelays.contains(it)
                             },
                         ) {
                             Icon(Icons.Default.Add, contentDescription = "Add relay")
@@ -2142,30 +2183,30 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
                 }
             }
             item {
-                SectionCard(title = "Announce") {
-                    Button(
-                        onClick = {
-                            publishing = true
-                            scope.launch {
-                                appState.republishRelayLists()
-                                reloadLists()
-                                publishing = false
-                            }
-                        },
-                        enabled = !publishing && appState.activeAccountRef != null,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (publishing) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Default.Refresh, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (publishing) "Publishing" else "Republish to Relays")
-                    }
-                }
-            }
-            item {
                 PublishedRelayLists(lists)
             }
         }
+    }
+}
+
+private val relayListKinds = listOf(
+    RelayListKind.Nip65,
+    RelayListKind.Inbox,
+    RelayListKind.KeyPackage,
+)
+
+private val RelayListKind.label: String
+    get() = when (this) {
+        RelayListKind.Nip65 -> "NIP-65"
+        RelayListKind.Inbox -> "Inbox"
+        RelayListKind.KeyPackage -> "Key Package"
+    }
+
+private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> {
+    return when (kind) {
+        RelayListKind.Nip65 -> nip65.relays
+        RelayListKind.Inbox -> inbox.relays
+        RelayListKind.KeyPackage -> keyPackage.relays
     }
 }
 
@@ -2312,7 +2353,7 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onOpenDrawer: () -> 
                 SectionCard(title = "Runtime") {
                     DiagnosticRow("Active account", appState.activeAccountRef ?: "none")
                     DiagnosticRow("Accounts", appState.accounts.size.toString())
-                    DiagnosticRow("Relays", appState.defaultRelays.size.toString())
+                    DiagnosticRow("Bootstrap relays", appState.bootstrapRelayCount().toString())
                 }
             }
             item {

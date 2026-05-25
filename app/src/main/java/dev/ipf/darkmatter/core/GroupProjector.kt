@@ -1,18 +1,34 @@
 package dev.ipf.darkmatter.core
 
-import org.marmotprotocol.marmotkit.AppGroupMemberRecordFfi
-import org.marmotprotocol.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
 
 object GroupProjector {
     fun displayTitle(
         group: AppGroupRecordFfi,
         otherMemberAccount: String?,
         memberCount: Int,
-        displayName: (String) -> String,
+        memberTitle: (String) -> String,
     ): String {
         group.name.takeIf { it.isNotBlank() }?.let { return it }
-        otherMemberAccount?.takeIf { it.isNotBlank() }?.let { return displayName(it) }
-        return if (memberCount > 1) "${memberCount} members" else IdentityFormatter.short(group.groupIdHex)
+        if (memberCount > 2) return "$memberCount person group"
+        if (memberCount == 2) {
+            otherMemberAccount?.takeIf { it.isNotBlank() }?.let { return memberTitle(it) }
+        }
+        return IdentityFormatter.short(group.groupIdHex)
+    }
+
+    fun otherMemberAccount(
+        members: List<AppGroupMemberRecordFfi>,
+        activeAccountIdHex: String?,
+    ): String? {
+        if (members.any { it.local }) {
+            members.firstOrNull { !it.local && !it.account.isNullOrBlank() }?.account?.let { return it }
+        }
+        return members.firstOrNull { member ->
+            val account = member.account
+            account != null && account.isNotBlank() && account != activeAccountIdHex
+        }?.account
     }
 
     fun memberRef(member: AppGroupMemberRecordFfi): String {

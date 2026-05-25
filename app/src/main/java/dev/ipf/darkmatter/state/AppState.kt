@@ -14,10 +14,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.marmotprotocol.marmotkit.AccountRelayListsFfi
-import org.marmotprotocol.marmotkit.AccountSummaryFfi
-import org.marmotprotocol.marmotkit.Marmot
-import org.marmotprotocol.marmotkit.UserProfileMetadataFfi
+import dev.ipf.marmotkit.AccountRelayListsFfi
+import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 
 sealed interface AppPhase {
     data object Bootstrapping : AppPhase
@@ -31,6 +31,19 @@ data class ToastMessage(
     val detail: String? = null,
 )
 
+enum class RelayListKind {
+    Nip65,
+    Inbox,
+    KeyPackage,
+}
+
+internal fun normalizeRelayUrls(relays: Iterable<String>): List<String> {
+    return relays
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+}
+
 class DarkMatterAppState(context: Context) {
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("darkmatter", Context.MODE_PRIVATE)
@@ -43,9 +56,6 @@ class DarkMatterAppState(context: Context) {
         private set
 
     var activeAccountRef by mutableStateOf(preferences.getString(ACTIVE_ACCOUNT_KEY, null))
-        private set
-
-    var defaultRelays by mutableStateOf(loadRelays())
         private set
 
     var developerMode by mutableStateOf(preferences.getBoolean(DEVELOPER_MODE_KEY, false))
@@ -73,7 +83,7 @@ class DarkMatterAppState(context: Context) {
         phase = AppPhase.Bootstrapping
         try {
             val opened = withContext(Dispatchers.IO) {
-                client ?: MarmotClient(appContext, defaultRelays).also { client = it }
+                client ?: MarmotClient(appContext).also { client = it }
             }
             opened.marmot.start()
             refreshAccounts()
@@ -93,7 +103,7 @@ class DarkMatterAppState(context: Context) {
 
     suspend fun createIdentity() {
         try {
-            val summary = marmot().createIdentity(defaultRelays, defaultRelays)
+            val summary = marmot().createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
             refreshAccounts()
             setActiveAccount(summary.label)
             phase = AppPhase.Ready
@@ -108,7 +118,7 @@ class DarkMatterAppState(context: Context) {
         val trimmed = identity.trim()
         if (trimmed.isEmpty()) return
         try {
-            val summary = marmot().login(trimmed, defaultRelays, defaultRelays)
+            val summary = marmot().login(trimmed, MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
             refreshAccounts()
             setActiveAccount(summary.label)
             phase = AppPhase.Ready
@@ -142,40 +152,34 @@ class DarkMatterAppState(context: Context) {
         }
     }
 
-    fun updateRelays(text: String) {
-        val next = text
-            .lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .distinct()
-            .toList()
-        replaceDefaultRelays(next)
-    }
-
-    fun replaceDefaultRelays(relays: List<String>) {
-        val next = relays
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .distinct()
-        if (next.isEmpty()) return
-        defaultRelays = next
-        preferences.edit().putString(RELAYS_KEY, next.joinToString("\n")).apply()
-    }
-
-    suspend fun republishRelayLists() {
-        val account = activeAccountRef ?: return
-        runCatching {
-            marmot().publishRelayLists(account, defaultRelays, defaultRelays)
-            present("Relay lists republished")
-        }.onFailure {
-            present("Republish failed", it.readableMessage())
-        }
-    }
-
     fun accountRelayLists(): AccountRelayListsFfi? {
         val account = activeAccountRef ?: return null
         return runCatching { marmot().accountRelayLists(account) }.getOrNull()
     }
+
+    suspend fun setAccountRelays(kind: RelayListKind, relays: List<String>): AccountRelayListsFfi? {
+        val account = activeAccountRef ?: return null
+        val next = normalizeRelayUrls(relays)
+        if (next.isEmpty()) {
+            present("Relay list can't be empty")
+            return accountRelayLists()
+        }
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                when (kind) {
+                    RelayListKind.Nip65 -> marmot().setAccountNip65Relays(account, next, MarmotClient.bootstrapRelays)
+                    RelayListKind.Inbox -> marmot().setAccountInboxRelays(account, next, MarmotClient.bootstrapRelays)
+                    RelayListKind.KeyPackage -> marmot().setAccountKeyPackageRelays(account, next, MarmotClient.bootstrapRelays)
+                }
+            }
+        }.onSuccess {
+            present("Relay list updated")
+        }.onFailure {
+            present("Relay update failed", it.readableMessage())
+        }.getOrNull()
+    }
+
+    fun bootstrapRelayCount(): Int = MarmotClient.bootstrapRelays.size
 
     fun updateDeveloperMode(enabled: Boolean) {
         developerMode = enabled
@@ -183,21 +187,30 @@ class DarkMatterAppState(context: Context) {
     }
 
     fun displayName(accountIdHex: String): String {
-        profiles[accountIdHex]?.let { profile ->
-            ProfileSanitizer.displayName(profile.displayName)?.let { return it }
-            ProfileSanitizer.displayName(profile.name)?.let { return it }
-        }
-        displayNames[accountIdHex]?.let { return it }
-        runCatching { marmot().displayName(accountIdHex) }
-            .getOrNull()
-            ?.let { ProfileSanitizer.displayName(it) }
-            ?.also { displayNames[accountIdHex] = it }
-            ?.let { return it }
+        profileDisplayName(accountIdHex)?.let { return it }
         requestProfile(accountIdHex)
         accounts.firstOrNull { it.accountIdHex == accountIdHex }?.let {
             return it.label.ifBlank { IdentityFormatter.short(accountIdHex) }
         }
         return IdentityFormatter.short(accountIdHex)
+    }
+
+    fun chatMemberTitle(accountIdHex: String): String {
+        profileDisplayName(accountIdHex)?.let { return it }
+        requestProfile(accountIdHex)
+        return shortNpub(accountIdHex)
+    }
+
+    private fun profileDisplayName(accountIdHex: String): String? {
+        profiles[accountIdHex]?.let { profile ->
+            ProfileSanitizer.displayName(profile.displayName)?.let { return it }
+            ProfileSanitizer.displayName(profile.name)?.let { return it }
+        }
+        displayNames[accountIdHex]?.let { return it }
+        return runCatching { marmot().displayName(accountIdHex) }
+            .getOrNull()
+            ?.let { ProfileSanitizer.displayName(it) }
+            ?.also { displayNames[accountIdHex] = it }
     }
 
     fun shortNpub(accountIdHex: String): String {
@@ -246,7 +259,11 @@ class DarkMatterAppState(context: Context) {
     suspend fun refreshProfile(accountIdHex: String) {
         val profile = runCatching {
             withContext(Dispatchers.IO) {
-                marmot().refreshProfile(accountIdHex, defaultRelays)
+                val relays = activeAccountRef
+                    ?.let { runCatching { marmot().accountNip65Relays(it) }.getOrNull() }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: MarmotClient.bootstrapRelays
+                marmot().refreshProfile(accountIdHex, relays)
                 marmot().userProfile(accountIdHex)
             }
         }.getOrNull()
@@ -284,9 +301,14 @@ class DarkMatterAppState(context: Context) {
     suspend fun publishProfile(profile: UserProfileMetadataFfi) {
         val account = activeAccountRef ?: return
         runCatching {
-            val published = marmot().publishUserProfile(account, profile, defaultRelays, defaultRelays)
+            val relayLists = marmot().accountRelayLists(account)
+            val profileRelays = marmot().accountNip65Relays(account).ifEmpty {
+                relayLists.defaultRelays.ifEmpty { MarmotClient.bootstrapRelays }
+            }
+            val bootstrapRelays = relayLists.bootstrapRelays.ifEmpty { MarmotClient.bootstrapRelays }
+            val published = marmot().publishUserProfile(account, profile, profileRelays, bootstrapRelays)
             activeAccount?.accountIdHex?.let { cacheProfile(it, published) }
-            present("Profile published", "Your kind:0 metadata is live on ${defaultRelays.size} relays.")
+            present("Profile published", "Your kind:0 metadata is live on ${profileRelays.size} relays.")
         }.onFailure {
             present("Couldn't publish profile", it.readableMessage())
         }
@@ -312,24 +334,12 @@ class DarkMatterAppState(context: Context) {
         if (name != null) displayNames[accountIdHex] = name
     }
 
-    private fun loadRelays(): List<String> {
-        val stored = preferences.getString(RELAYS_KEY, null)
-        return stored
-            ?.lineSequence()
-            ?.map { it.trim() }
-            ?.filter { it.isNotEmpty() }
-            ?.toList()
-            ?.takeIf { it.isNotEmpty() }
-            ?: MarmotClient.defaultRelays
-    }
-
     private fun Throwable.readableMessage(): String {
         return message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
     }
 
     companion object {
         private const val ACTIVE_ACCOUNT_KEY = "active_account"
-        private const val RELAYS_KEY = "default_relays"
         private const val DEVELOPER_MODE_KEY = "developer_mode"
     }
 }

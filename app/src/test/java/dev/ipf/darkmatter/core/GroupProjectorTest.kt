@@ -4,8 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.marmotprotocol.marmotkit.AppGroupMemberRecordFfi
-import org.marmotprotocol.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
 
 class GroupProjectorTest {
     @Test
@@ -38,12 +38,12 @@ class GroupProjectorTest {
         val unnamed = group(name = "")
 
         assertEquals(
-            "Alice",
+            "Bob",
             GroupProjector.displayTitle(
                 group = unnamed,
-                otherMemberAccount = "alice",
+                otherMemberAccount = "bob",
                 memberCount = 2,
-                displayName = { "Alice" },
+                memberTitle = { "Bob" },
             ),
         )
     }
@@ -58,9 +58,59 @@ class GroupProjectorTest {
                 group = named,
                 otherMemberAccount = "alice",
                 memberCount = 2,
-                displayName = { "Alice" },
+                memberTitle = { "Alice" },
             ),
         )
+    }
+
+    @Test
+    fun unnamedChatTitleUsesGroupSizeBeforeMemberNameForLargerGroups() {
+        val unnamed = group(name = "")
+
+        assertEquals(
+            "3 person group",
+            GroupProjector.displayTitle(
+                group = unnamed,
+                otherMemberAccount = "alice",
+                memberCount = 3,
+                memberTitle = { "Alice" },
+            ),
+        )
+    }
+
+    @Test
+    fun unnamedTwoPersonChatTitleCanFallBackToOtherMemberNpub() {
+        val unnamed = group(name = "")
+
+        assertEquals(
+            "npub1other",
+            GroupProjector.displayTitle(
+                group = unnamed,
+                otherMemberAccount = "other",
+                memberCount = 2,
+                memberTitle = { "npub1other" },
+            ),
+        )
+    }
+
+    @Test
+    fun otherMemberExcludesLocalRosterEntryBeforeAccountComparison() {
+        val members = listOf(
+            member(memberId = "credential-self", account = "alice", local = true),
+            member(memberId = "credential-other", account = "bob", local = false),
+        )
+
+        assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = "unknown-active-id"))
+    }
+
+    @Test
+    fun otherMemberFallsBackToActiveAccountComparisonWhenLocalFlagIsUnavailable() {
+        val members = listOf(
+            member(memberId = "credential-self", account = "alice", local = false),
+            member(memberId = "credential-other", account = "bob", local = false),
+        )
+
+        assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = "alice"))
     }
 
     private fun member(
