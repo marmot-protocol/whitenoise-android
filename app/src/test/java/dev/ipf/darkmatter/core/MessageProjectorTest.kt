@@ -4,17 +4,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.marmotprotocol.marmotkit.AppMessagePayloadFfi
-import org.marmotprotocol.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MessageTagFfi
 
 class MessageProjectorTest {
     @Test
-    fun reactionTalliesNetAddsAndRemovalsBySender() {
+    fun reactionTalliesNetAddsAndDeleteTombstonesBySender() {
         val records = listOf(
-            reaction("r1", sender = "alice", target = "m1", emoji = "👍", removed = false, at = 1u),
-            reaction("r2", sender = "bob", target = "m1", emoji = "👍", removed = false, at = 2u),
-            reaction("r3", sender = "alice", target = "m1", emoji = "", removed = true, at = 3u),
-            reaction("r4", sender = "alice", target = "m1", emoji = "❤️", removed = false, at = 4u),
+            reaction("r1", sender = "alice", target = "m1", emoji = "👍", at = 1u),
+            reaction("r2", sender = "bob", target = "m1", emoji = "👍", at = 2u),
+            delete("d1", sender = "alice", target = "r1", at = 3u),
+            reaction("r4", sender = "alice", target = "m1", emoji = "❤️", at = 4u),
         )
 
         val tallies = MessageProjector.reactionTallies(records, targetMessageId = "m1", myAccountId = "bob")
@@ -29,25 +29,58 @@ class MessageProjectorTest {
     }
 
     @Test
-    fun displayBodyUsesStructuredReplyTextAndMediaCaption() {
+    fun displayBodyUsesTextAndMediaTagsFromCurrentBindings() {
         val reply = message(
             id = "reply",
-            plaintext = """{"kind":"reply"}""",
-            payload = AppMessagePayloadFfi.Reply(targetMessageId = "m0", text = "Visible reply"),
+            plaintext = "Visible reply",
+            tags = listOf(eventTag("m0"), quoteTag("m0")),
         )
         val media = message(
             id = "media",
-            plaintext = "",
-            payload = AppMessagePayloadFfi.Media(
-                fileName = "scan.png",
-                mediaType = "image/png",
-                sizeBytes = 2048u,
-                caption = "Lab capture",
+            plaintext = "Lab capture",
+            tags = listOf(
+                MessageTagFfi(
+                    listOf(
+                        "imeta",
+                        "url https://example.invalid/scan.png",
+                        "m image/png",
+                        "filename scan.png",
+                    ),
+                ),
             ),
+        )
+        val mediaWithoutCaption = message(
+            id = "media-no-caption",
+            plaintext = "",
+            tags = listOf(MessageTagFfi(listOf("imeta", "filename fallback.png"))),
         )
 
         assertEquals("Visible reply", MessageProjector.displayBody(reply))
         assertEquals("Lab capture", MessageProjector.displayBody(media))
+        assertEquals("fallback.png", MessageProjector.displayBody(mediaWithoutCaption))
+    }
+
+    @Test
+    fun previewTextRecognizesStreamStartAndFinalMessages() {
+        val start = message(
+            id = "start",
+            plaintext = "",
+            kind = 1200uL,
+            tags = listOf(MessageProjector.streamTag("abc123")),
+        )
+        val final = message(
+            id = "final",
+            plaintext = "Final transcript",
+            kind = 9uL,
+            tags = listOf(
+                MessageProjector.streamTag("abc123"),
+                MessageTagFfi(listOf("stream-start", "start")),
+            ),
+        )
+
+        assertEquals("Agent stream started", MessageProjector.previewText(start))
+        assertEquals("Final transcript", MessageProjector.previewText(final))
+        assertTrue(MessageProjector.isStreamFinal(final))
     }
 
     @Test
@@ -66,16 +99,27 @@ class MessageProjectorTest {
         sender: String,
         target: String,
         emoji: String,
-        removed: Boolean,
         at: UInt,
     ) = message(
         id = id,
         sender = sender,
-        payload = AppMessagePayloadFfi.Reaction(
-            targetMessageId = target,
-            emoji = emoji,
-            removed = removed,
-        ),
+        plaintext = emoji,
+        kind = 7uL,
+        tags = listOf(eventTag(target)),
+        at = at,
+    )
+
+    private fun delete(
+        id: String,
+        sender: String,
+        target: String,
+        at: UInt,
+    ) = message(
+        id = id,
+        sender = sender,
+        plaintext = "",
+        kind = 5uL,
+        tags = listOf(eventTag(target)),
         at = at,
     )
 
@@ -84,7 +128,8 @@ class MessageProjectorTest {
         direction: String = "received",
         sender: String = "alice",
         plaintext: String = "hello",
-        payload: AppMessagePayloadFfi? = null,
+        kind: ULong = 9uL,
+        tags: List<MessageTagFfi> = emptyList(),
         at: UInt = 1u,
     ) = AppMessageRecordFfi(
         messageIdHex = id,
@@ -92,8 +137,13 @@ class MessageProjectorTest {
         groupIdHex = "group",
         sender = sender,
         plaintext = plaintext,
-        appMessage = payload,
+        kind = kind,
+        tags = tags,
         recordedAt = at.toULong(),
         receivedAt = at.toULong(),
     )
+
+    private fun eventTag(target: String) = MessageProjector.eventTag(target)
+
+    private fun quoteTag(target: String) = MessageProjector.quoteTag(target)
 }
