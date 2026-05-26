@@ -7,3 +7,5 @@
 - [x] we should remove the + from the top right of the chat list screen
 - [x] the new chat bottom sheet should show an icon to open the QR code scanner.
 - [x] we aren't fetching and displaying user's display names or avatars, we need to everywhere we show user data.
+- [ ] Replace Android's temporary profile presentation memo with a Marmot-side batch profile summary or warm directory-cache API so chat lists can resolve names/avatars in one fast binding call.
+- [ ] Improve group management around the newer bindings: make add/remove member flows explicit, expose admin promote/demote/self-demote status clearly, show MLS/admin state without requiring a manual diagnostics button, and refresh members/state after each mutation.

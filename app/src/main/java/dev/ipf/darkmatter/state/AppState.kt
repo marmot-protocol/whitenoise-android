@@ -15,6 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.ipf.marmotkit.AccountRelayListsFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -29,6 +30,11 @@ sealed interface AppPhase {
 data class ToastMessage(
     val title: String,
     val detail: String? = null,
+)
+
+private data class ProfilePresentation(
+    val displayName: String?,
+    val avatarUrl: String?,
 )
 
 enum class RelayListKind {
@@ -67,9 +73,12 @@ class DarkMatterAppState(context: Context) {
     var pendingProfileNpub by mutableStateOf<String?>(null)
         private set
 
-    private val profiles = mutableStateMapOf<String, UserProfileMetadataFfi>()
-    private val displayNames = mutableStateMapOf<String, String>()
     private val npubs = mutableStateMapOf<String, String>()
+    private var profileRevision by mutableStateOf(0)
+    private val profilePresentations = mutableMapOf<String, ProfilePresentation>()
+    private val profilePresentationLock = Any()
+    private val groupMemberSnapshots = mutableMapOf<String, GroupMemberSnapshot>()
+    private val groupMemberSnapshotLock = Any()
 
     private val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val requestedProfiles = mutableSetOf<String>()
@@ -202,15 +211,7 @@ class DarkMatterAppState(context: Context) {
     }
 
     private fun profileDisplayName(accountIdHex: String): String? {
-        profiles[accountIdHex]?.let { profile ->
-            ProfileSanitizer.displayName(profile.displayName)?.let { return it }
-            ProfileSanitizer.displayName(profile.name)?.let { return it }
-        }
-        displayNames[accountIdHex]?.let { return it }
-        return runCatching { marmot().displayName(accountIdHex) }
-            .getOrNull()
-            ?.let { ProfileSanitizer.displayName(it) }
-            ?.also { displayNames[accountIdHex] = it }
+        return profilePresentation(accountIdHex).displayName
     }
 
     fun shortNpub(accountIdHex: String): String {
@@ -229,20 +230,23 @@ class DarkMatterAppState(context: Context) {
     }
 
     fun userProfile(accountIdHex: String): UserProfileMetadataFfi? {
-        profiles[accountIdHex]?.let { return it }
-        val profile = runCatching { marmot().userProfile(accountIdHex) }.getOrNull()
-        if (profile != null) cacheProfile(accountIdHex, profile)
-        else requestProfile(accountIdHex)
-        return profile
+        return profileRevision.let {
+            cachedUserProfile(accountIdHex) ?: run {
+                requestProfile(accountIdHex)
+                null
+            }
+        }
     }
 
     fun avatarUrl(accountIdHex: String): String? {
-        return ProfileSanitizer.imageUrl(userProfile(accountIdHex)?.picture)
+        val avatar = profilePresentation(accountIdHex).avatarUrl
+        if (avatar == null) requestProfile(accountIdHex)
+        return avatar
     }
 
     fun requestProfile(accountIdHex: String) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
-        if (profiles.containsKey(id)) return
+        if (cachedUserProfile(id) != null) return
         val shouldFetch = synchronized(requestedProfiles) {
             requestedProfiles.add(id)
         }
@@ -254,6 +258,26 @@ class DarkMatterAppState(context: Context) {
 
     fun requestProfiles(accountIdHexes: Iterable<String>) {
         accountIdHexes.forEach { requestProfile(it) }
+    }
+
+    fun cachedGroupMemberSnapshot(accountRef: String?, groupIdHex: String): GroupMemberSnapshot? {
+        val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return null
+        return synchronized(groupMemberSnapshotLock) {
+            groupMemberSnapshots[key]
+        }
+    }
+
+    fun cacheGroupMemberSnapshot(
+        accountRef: String?,
+        groupIdHex: String,
+        members: List<AppGroupMemberRecordFfi>,
+    ): GroupMemberSnapshot {
+        val snapshot = GroupMemberSnapshot(members)
+        val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return snapshot
+        synchronized(groupMemberSnapshotLock) {
+            groupMemberSnapshots[key] = snapshot
+        }
+        return snapshot
     }
 
     suspend fun refreshProfile(accountIdHex: String) {
@@ -268,7 +292,7 @@ class DarkMatterAppState(context: Context) {
             }
         }.getOrNull()
         if (profile != null) {
-            cacheProfile(accountIdHex, profile)
+            notifyProfilesChanged()
         }
     }
 
@@ -306,8 +330,8 @@ class DarkMatterAppState(context: Context) {
                 relayLists.defaultRelays.ifEmpty { MarmotClient.bootstrapRelays }
             }
             val bootstrapRelays = relayLists.bootstrapRelays.ifEmpty { MarmotClient.bootstrapRelays }
-            val published = marmot().publishUserProfile(account, profile, profileRelays, bootstrapRelays)
-            activeAccount?.accountIdHex?.let { cacheProfile(it, published) }
+            marmot().publishUserProfile(account, profile, profileRelays, bootstrapRelays)
+            notifyProfilesChanged()
             present("Profile published", "Your kind:0 metadata is live on ${profileRelays.size} relays.")
         }.onFailure {
             present("Couldn't publish profile", it.readableMessage())
@@ -327,11 +351,36 @@ class DarkMatterAppState(context: Context) {
         requestProfile(accountIdHex)
     }
 
-    fun cacheProfile(accountIdHex: String, profile: UserProfileMetadataFfi) {
-        profiles[accountIdHex] = profile
-        val name = ProfileSanitizer.displayName(profile.displayName)
-            ?: ProfileSanitizer.displayName(profile.name)
-        if (name != null) displayNames[accountIdHex] = name
+    private fun cachedUserProfile(accountIdHex: String): UserProfileMetadataFfi? {
+        return runCatching { marmot().userProfile(accountIdHex) }.getOrNull()
+    }
+
+    private fun profilePresentation(accountIdHex: String): ProfilePresentation {
+        profileRevision
+        synchronized(profilePresentationLock) {
+            profilePresentations[accountIdHex]?.let { return it }
+        }
+        val displayName = runCatching { marmot().displayName(accountIdHex) }
+            .getOrNull()
+            ?.let { ProfileSanitizer.displayName(it) }
+        val avatarUrl = ProfileSanitizer.imageUrl(cachedUserProfile(accountIdHex)?.picture)
+        val presentation = ProfilePresentation(displayName = displayName, avatarUrl = avatarUrl)
+        synchronized(profilePresentationLock) {
+            profilePresentations[accountIdHex] = presentation
+        }
+        return presentation
+    }
+
+    private fun notifyProfilesChanged() {
+        synchronized(profilePresentationLock) {
+            profilePresentations.clear()
+        }
+        profileRevision += 1
+    }
+
+    private fun groupMemberSnapshotKey(accountRef: String?, groupIdHex: String): String? {
+        val account = accountRef?.takeIf { it.isNotBlank() } ?: return null
+        return "$account:$groupIdHex"
     }
 
     private fun Throwable.readableMessage(): String {

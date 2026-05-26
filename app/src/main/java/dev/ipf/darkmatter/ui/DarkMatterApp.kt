@@ -8,27 +8,32 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -44,20 +49,21 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -70,6 +76,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -77,30 +84,33 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonMenu
+import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleFloatingActionButton
+import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.material3.DrawerValue
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -110,19 +120,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -133,14 +152,17 @@ import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.ProfileLink
 import dev.ipf.darkmatter.core.ProfileSanitizer
 import dev.ipf.darkmatter.core.QrCodeEncoder
+import dev.ipf.darkmatter.core.RecipientReference
 import dev.ipf.darkmatter.state.AppPhase
 import dev.ipf.darkmatter.state.ChatListItem
 import dev.ipf.darkmatter.state.ChatsController
 import dev.ipf.darkmatter.state.ConversationController
 import dev.ipf.darkmatter.state.DarkMatterAppState
 import dev.ipf.darkmatter.state.MessageStatus
+import dev.ipf.darkmatter.state.OutgoingMessageIndicator
 import dev.ipf.darkmatter.state.RelayListKind
 import dev.ipf.darkmatter.state.TimelineMessage
+import dev.ipf.darkmatter.state.outgoingIndicator
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -160,6 +182,7 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.RelayHealthFfi
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.marmotkit.MarmotKitException
 
 private enum class MainSection {
     Chats,
@@ -169,7 +192,6 @@ private enum class MainSection {
 
 private enum class SettingsDetail {
     Profile,
-    Accounts,
     Identity,
     Relays,
 }
@@ -209,7 +231,7 @@ fun DarkMatterApp(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0.dp),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { DarkMatterSnackbarHost(snackbarHostState) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (val phase = appState.phase) {
@@ -227,11 +249,27 @@ fun DarkMatterApp(
 }
 
 @Composable
-private fun LoadingScreen() {
+fun DarkMatterSnackbarHost(
+    hostState: SnackbarHostState,
+    modifier: Modifier = Modifier,
+    snackbar: @Composable (SnackbarData) -> Unit = { Snackbar(snackbarData = it) },
+) {
+    SnackbarHost(
+        hostState = hostState,
+        modifier = modifier
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 16.dp),
+        snackbar = snackbar,
+    )
+}
+
+@Composable
+fun LoadingScreen() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             CircularProgressIndicator()
-            Text("Starting Marmot", style = MaterialTheme.typography.bodyMedium)
+            Text("Loading Dark Matter", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -265,8 +303,60 @@ private fun FailureScreen(
 @Composable
 private fun OnboardingScreen(appState: DarkMatterAppState) {
     var identity by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
+    var creatingIdentity by remember { mutableStateOf(false) }
+    var signingInBusy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    OnboardingContent(
+        identity = identity,
+        creatingIdentity = creatingIdentity,
+        signingInBusy = signingInBusy,
+        onIdentityChange = { identity = it },
+        onCreateIdentity = {
+            creatingIdentity = true
+            scope.launch {
+                try {
+                    appState.createIdentity()
+                } finally {
+                    creatingIdentity = false
+                }
+            }
+        },
+        onImportIdentity = { value ->
+            signingInBusy = true
+            scope.launch {
+                try {
+                    appState.importIdentity(value)
+                } finally {
+                    signingInBusy = false
+                }
+            }
+        },
+    )
+}
+
+@Composable
+fun OnboardingContent(
+    identity: String,
+    creatingIdentity: Boolean,
+    signingInBusy: Boolean,
+    onIdentityChange: (String) -> Unit,
+    onCreateIdentity: () -> Unit,
+    onImportIdentity: (String) -> Unit,
+) {
+    var signingIn by remember { mutableStateOf(false) }
+    val busy = creatingIdentity || signingInBusy
+
+    if (signingIn) {
+        SignInContent(
+            identity = identity,
+            busy = signingInBusy,
+            onIdentityChange = onIdentityChange,
+            onBack = { signingIn = false },
+            onSignIn = { onImportIdentity(identity.trim()) },
+        )
+        return
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -275,7 +365,12 @@ private fun OnboardingScreen(appState: DarkMatterAppState) {
     ) {
         Spacer(Modifier.height(12.dp))
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Avatar(title = "Dark Matter", seed = "darkmatter", size = 88.dp)
+            Icon(
+                imageVector = Icons.Default.Shield,
+                contentDescription = "Dark Matter shield",
+                modifier = Modifier.size(88.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
             Text("Dark Matter", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
             Text(
                 "End-to-end encrypted group messaging.",
@@ -285,24 +380,71 @@ private fun OnboardingScreen(appState: DarkMatterAppState) {
         }
         Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             Button(
-                onClick = {
-                    busy = true
-                    scope.launch {
-                        appState.createIdentity()
-                        busy = false
-                    }
-                },
+                onClick = onCreateIdentity,
                 enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
             ) {
-                Icon(Icons.Default.Key, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Create New Identity")
+                if (creatingIdentity) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .semantics { contentDescription = "Creating identity" },
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.Default.Key, contentDescription = null)
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    if (creatingIdentity) "Creating Identity" else "Create New Identity",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
+            OutlinedButton(
+                onClick = { signingIn = true },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+            ) {
+                Icon(Icons.Default.Person, contentDescription = null)
+                Spacer(Modifier.width(10.dp))
+                Text("Sign in", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SignInContent(
+    identity: String,
+    busy: Boolean,
+    onIdentityChange: (String) -> Unit,
+    onBack: () -> Unit,
+    onSignIn: () -> Unit,
+) {
+    val canSignIn = identity.isNotBlank() && !busy
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack, enabled = !busy) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Text("Sign in to Dark Matter", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            }
+            Text(
+                "Enter your Nostr secret key to use an existing identity on this device.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             OutlinedTextField(
                 value = identity,
-                onValueChange = { identity = it },
-                label = { Text("nsec or npub") },
+                onValueChange = onIdentityChange,
+                label = { Text("Nostr nsec") },
                 singleLine = true,
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
@@ -313,29 +455,20 @@ private fun OnboardingScreen(appState: DarkMatterAppState) {
                 ),
                 keyboardActions = KeyboardActions(
                     onDone = {
-                        busy = true
-                        scope.launch {
-                            appState.importIdentity(identity)
-                            busy = false
-                        }
+                        if (canSignIn) onSignIn()
                     },
                 ),
             )
-            OutlinedButton(
-                onClick = {
-                    busy = true
-                    scope.launch {
-                        appState.importIdentity(identity)
-                        busy = false
-                    }
-                },
-                enabled = !busy && identity.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Default.Person, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Import Existing Identity")
-            }
+        }
+        Button(
+            onClick = onSignIn,
+            enabled = canSignIn,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
+        ) {
+            Icon(Icons.Default.Person, contentDescription = null)
+            Spacer(Modifier.width(10.dp))
+            Text("Sign in", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -344,9 +477,9 @@ private fun OnboardingScreen(appState: DarkMatterAppState) {
 @Composable
 private fun MainShell(appState: DarkMatterAppState) {
     var section by remember { mutableStateOf(MainSection.Chats) }
-    var selectedGroup by remember { mutableStateOf<AppGroupRecordFfi?>(null) }
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+    var settingsDetail by remember { mutableStateOf<SettingsDetail?>(null) }
+    var selectedChat by remember { mutableStateOf<ChatListItem?>(null) }
+    var profileQrAccountId by remember { mutableStateOf<String?>(null) }
 
     appState.pendingProfileNpub?.let { npub ->
         ProfileSheet(
@@ -355,87 +488,80 @@ private fun MainShell(appState: DarkMatterAppState) {
             onDismiss = { appState.clearPresentedProfile() },
         )
     }
+    profileQrAccountId?.let { accountId ->
+        ProfileQrSheet(
+            appState = appState,
+            accountIdHex = accountId,
+            onDismiss = { profileQrAccountId = null },
+        )
+    }
 
-    if (selectedGroup != null) {
+    if (selectedChat != null) {
         ConversationScreen(
             appState = appState,
-            group = selectedGroup!!,
-            onBack = { selectedGroup = null },
+            chat = selectedChat!!,
+            onBack = { selectedChat = null },
         )
         return
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet {
-                DrawerHeader(appState)
-                NavigationDrawerItem(
-                    label = { Text("Chats") },
-                    selected = section == MainSection.Chats,
-                    icon = { Icon(Icons.Default.Group, contentDescription = null) },
-                    onClick = {
-                        section = MainSection.Chats
-                        scope.launch { drawerState.close() }
-                    },
-                )
-                NavigationDrawerItem(
-                    label = { Text("Settings") },
-                    selected = section == MainSection.Settings,
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                    onClick = {
-                        section = MainSection.Settings
-                        scope.launch { drawerState.close() }
-                    },
-                )
-                if (appState.developerMode) {
-                    NavigationDrawerItem(
-                        label = { Text("Diagnostics") },
-                        selected = section == MainSection.Diagnostics,
-                        icon = { Icon(Icons.Default.BugReport, contentDescription = null) },
-                        onClick = {
-                            section = MainSection.Diagnostics
-                            scope.launch { drawerState.close() }
-                        },
-                    )
-                }
-            }
-        },
-    ) {
-        when (section) {
-            MainSection.Chats -> ChatsScreen(
-                appState = appState,
-                onOpenDrawer = { scope.launch { drawerState.open() } },
-                onOpenGroup = { selectedGroup = it },
-            )
-            MainSection.Settings -> SettingsScreen(appState, onOpenDrawer = { scope.launch { drawerState.open() } })
-            MainSection.Diagnostics -> DiagnosticsScreen(appState, onOpenDrawer = { scope.launch { drawerState.open() } })
-        }
+    when (section) {
+        MainSection.Chats -> ChatsScreen(
+            appState = appState,
+            onOpenSettings = {
+                section = MainSection.Settings
+                settingsDetail = null
+            },
+            onOpenGroup = { selectedChat = it },
+            onOpenProfile = {
+                appState.activeAccount?.accountIdHex?.let { accountId ->
+                    profileQrAccountId = accountId
+                } ?: appState.present("No active account")
+            },
+        )
+        MainSection.Settings -> SettingsScreen(
+            appState = appState,
+            onBackToChats = {
+                section = MainSection.Chats
+                settingsDetail = null
+            },
+            onOpenDiagnostics = {
+                section = MainSection.Diagnostics
+                settingsDetail = null
+            },
+            detail = settingsDetail,
+            onDetailChange = { settingsDetail = it },
+        )
+        MainSection.Diagnostics -> DiagnosticsScreen(
+            appState = appState,
+            onBackToChats = {
+                section = MainSection.Chats
+                settingsDetail = null
+            },
+        )
     }
 }
 
 @Composable
-private fun DrawerHeader(appState: DarkMatterAppState) {
-    val active = appState.activeAccount
-    Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+fun AccountAvatarButton(
+    title: String,
+    seed: String,
+    pictureUrl: String?,
+    size: Dp = 40.dp,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+            .size(56.dp)
+            .semantics { contentDescription = "Open settings" },
+    ) {
         Avatar(
-            title = active?.let { appState.displayName(it.accountIdHex) } ?: "Dark Matter",
-            seed = active?.accountIdHex ?: "darkmatter",
-            size = 56.dp,
-            pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
-        )
-        Text(
-            active?.let { appState.displayName(it.accountIdHex) } ?: "Dark Matter",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            active?.let { appState.shortNpub(it.accountIdHex) } ?: "No active account",
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            title = title,
+            seed = seed,
+            size = size,
+            pictureUrl = pictureUrl,
         )
     }
 }
@@ -444,28 +570,45 @@ private fun DrawerHeader(appState: DarkMatterAppState) {
 @Composable
 private fun ChatsScreen(
     appState: DarkMatterAppState,
-    onOpenDrawer: () -> Unit,
-    onOpenGroup: (AppGroupRecordFfi) -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenGroup: (ChatListItem) -> Unit,
+    onOpenProfile: () -> Unit,
 ) {
     val controller = remember(appState.activeAccountRef) { ChatsController(appState) }
     var showNewChat by remember { mutableStateOf(false) }
+    var newChatTitle by remember { mutableStateOf("New Chat") }
+    var showScanner by remember { mutableStateOf(false) }
     var showArchived by remember { mutableStateOf(false) }
+    var quickActionsExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(controller, appState.activeAccountRef) {
         controller.bind(appState.activeAccountRef)
+    }
+    LaunchedEffect(showArchived) {
+        if (showArchived) quickActionsExpanded = false
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (showArchived) "Archived" else "Chats") },
+                title = {
+                    if (showArchived) Text("Archived")
+                },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        if (showArchived) showArchived = false else onOpenDrawer()
-                    }) {
-                        Icon(
-                            if (showArchived) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.Menu,
-                            contentDescription = if (showArchived) "Back" else "Open navigation",
+                    val active = appState.activeAccount
+                    if (showArchived) {
+                        IconButton(onClick = { showArchived = false }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                            )
+                        }
+                    } else {
+                        AccountAvatarButton(
+                            title = active?.let { appState.displayName(it.accountIdHex) } ?: "Dark Matter",
+                            seed = active?.accountIdHex ?: "darkmatter",
+                            pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
+                            onClick = onOpenSettings,
                         )
                     }
                 },
@@ -473,9 +616,16 @@ private fun ChatsScreen(
         },
         floatingActionButton = {
             if (!showArchived) {
-                FloatingActionButton(onClick = { showNewChat = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "New chat")
-                }
+                QuickActionFabMenu(
+                    expanded = quickActionsExpanded,
+                    onExpandedChange = { quickActionsExpanded = it },
+                    onMyProfile = onOpenProfile,
+                    onScanQr = { showScanner = true },
+                    onCreateGroup = {
+                        newChatTitle = "Create Group"
+                        showNewChat = true
+                    },
+                )
             }
         },
     ) { padding ->
@@ -487,13 +637,16 @@ private fun ChatsScreen(
                 visibleItems.isEmpty() && showArchived -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No archived chats", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                visibleItems.isEmpty() -> EmptyChats(onCreate = { showNewChat = true })
+                visibleItems.isEmpty() -> EmptyChats(onCreate = {
+                    newChatTitle = "New Chat"
+                    showNewChat = true
+                })
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     items(visibleItems, key = { it.id }) { item ->
                         ChatRow(
                             item = item,
                             appState = appState,
-                            onClick = { onOpenGroup(item.group) },
+                            onClick = { onOpenGroup(item) },
                         )
                         HorizontalDivider()
                     }
@@ -513,7 +666,79 @@ private fun ChatsScreen(
     }
 
     if (showNewChat) {
-        NewChatSheet(appState = appState, onDismiss = { showNewChat = false })
+        NewChatSheet(appState = appState, title = newChatTitle, onDismiss = { showNewChat = false })
+    }
+
+    if (showScanner) {
+        QrScannerSheet(
+            onDismiss = { showScanner = false },
+            onScan = { raw ->
+                showScanner = false
+                val scanned = ProfileLink.parse(raw)
+                if (scanned == null) {
+                    appState.present("That QR code is not a Dark Matter profile.")
+                } else {
+                    appState.presentProfile(scanned.npub)
+                }
+            },
+        )
+    }
+}
+
+@Composable
+fun QuickActionFabMenu(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onMyProfile: () -> Unit,
+    onScanQr: () -> Unit,
+    onCreateGroup: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    fun runAction(action: () -> Unit) {
+        onExpandedChange(false)
+        action()
+    }
+
+    BackHandler(enabled = expanded) {
+        onExpandedChange(false)
+    }
+
+    FloatingActionButtonMenu(
+        expanded = expanded,
+        modifier = modifier,
+        button = {
+            ToggleFloatingActionButton(
+                checked = expanded,
+                onCheckedChange = { onExpandedChange(it) },
+            ) {
+                val imageVector by remember {
+                    derivedStateOf {
+                        if (checkedProgress > 0.5f) Icons.Default.Close else Icons.Default.Add
+                    }
+                }
+                Icon(
+                    painter = rememberVectorPainter(imageVector),
+                    contentDescription = if (expanded) "Close quick actions" else "Open quick actions",
+                    modifier = Modifier.animateIcon({ checkedProgress }),
+                )
+            }
+        },
+    ) {
+        FloatingActionButtonMenuItem(
+            onClick = { runAction(onMyProfile) },
+            icon = { Icon(Icons.Default.Person, contentDescription = null) },
+            text = { Text("My Profile") },
+        )
+        FloatingActionButtonMenuItem(
+            onClick = { runAction(onScanQr) },
+            icon = { Icon(Icons.Default.QrCodeScanner, contentDescription = null) },
+            text = { Text("Scan QR Code") },
+        )
+        FloatingActionButtonMenuItem(
+            onClick = { runAction(onCreateGroup) },
+            icon = { Icon(Icons.Default.Group, contentDescription = null) },
+            text = { Text("Create Group") },
+        )
     }
 }
 
@@ -586,7 +811,11 @@ private fun EmptyChats(onCreate: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NewChatSheet(appState: DarkMatterAppState, onDismiss: () -> Unit) {
+private fun NewChatSheet(
+    appState: DarkMatterAppState,
+    title: String = "New Chat",
+    onDismiss: () -> Unit,
+) {
     var members by remember { mutableStateOf<List<String>>(emptyList()) }
     var pending by remember { mutableStateOf("") }
     var groupName by remember { mutableStateOf("") }
@@ -597,20 +826,42 @@ private fun NewChatSheet(appState: DarkMatterAppState, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     fun addRecipient(reference: String) {
-        val trimmed = reference.trim()
-        if (trimmed.isNotEmpty() && !members.contains(trimmed)) {
-            members = members + trimmed
-            pending = ""
+        val normalized = RecipientReference.normalize(reference)
+        if (normalized == null) {
+            error = "Enter a valid npub, profile link, or hex public key."
+            return
         }
+        if (!members.contains(normalized)) {
+            members = members + normalized
+            error = null
+        }
+        pending = ""
     }
 
     fun addPending() {
-        addRecipient(pending)
+        val tokens = RecipientReference.tokenize(pending)
+        if (tokens.isEmpty()) return
+        tokens.forEach { addRecipient(it) }
+    }
+
+    fun createGroupErrorMessage(throwable: Throwable): String {
+        return when (throwable) {
+            is MarmotKitException.MissingKeyPackage ->
+                "That account does not have a published key package yet. Ask them to open Dark Matter, then try again."
+            is MarmotKitException.InvalidIdentity ->
+                "That recipient is not a valid Nostr public key. Use an npub, profile link, or hex public key."
+            is MarmotKitException.Publish ->
+                "The group was created locally, but publishing failed: ${throwable.details}"
+            else -> throwable.message ?: throwable.javaClass.simpleName
+        }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("New Chat", style = MaterialTheme.typography.titleLarge)
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge)
             if (members.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     members.take(3).forEach { member ->
@@ -658,12 +909,23 @@ private fun NewChatSheet(appState: DarkMatterAppState, onDismiss: () -> Unit) {
                 minLines = 2,
             )
             if (error != null) {
-                Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
+                Text(
+                    error.orEmpty(),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
             Button(
                 onClick = {
-                    val recipients = (members + listOfNotNull(pending.trim().takeIf { it.isNotEmpty() }))
-                        .distinct()
+                    val pendingRecipients = RecipientReference.tokenize(pending)
+                    val normalizedPending = pendingRecipients.map { input ->
+                        RecipientReference.normalize(input) ?: run {
+                            error = "Enter a valid npub, profile link, or hex public key."
+                            return@Button
+                        }
+                    }
+                    val recipients = (members + normalizedPending).distinct()
                     members = recipients
                     pending = ""
                     val account = appState.activeAccountRef ?: return@Button
@@ -681,7 +943,7 @@ private fun NewChatSheet(appState: DarkMatterAppState, onDismiss: () -> Unit) {
                             appState.present("Chat created")
                             onDismiss()
                         }.onFailure {
-                            error = it.message ?: it.javaClass.simpleName
+                            error = createGroupErrorMessage(it)
                         }
                         busy = false
                     }
@@ -718,15 +980,26 @@ private fun NewChatSheet(appState: DarkMatterAppState, onDismiss: () -> Unit) {
 @Composable
 private fun ConversationScreen(
     appState: DarkMatterAppState,
-    group: AppGroupRecordFfi,
+    chat: ChatListItem,
     onBack: () -> Unit,
 ) {
-    val controller = remember(group.groupIdHex) { ConversationController(appState, group) }
+    val controller = remember(chat.id) {
+        ConversationController(
+            appState = appState,
+            initialGroup = chat.group,
+            initialMemberSnapshot = chat.memberSnapshot
+                ?: appState.cachedGroupMemberSnapshot(appState.activeAccountRef, chat.group.groupIdHex),
+        )
+    }
     var menuOpen by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val scope = rememberCoroutineScope()
+
+    BackHandler(enabled = !showDetails) {
+        onBack()
+    }
 
     LaunchedEffect(controller) {
         controller.start()
@@ -848,14 +1121,53 @@ private fun GroupDetailsSheet(
 ) {
     var name by remember(controller.group.groupIdHex, controller.group.name) { mutableStateOf(controller.group.name) }
     var description by remember(controller.group.groupIdHex, controller.group.description) { mutableStateOf(controller.group.description) }
-    var pendingMembers by remember { mutableStateOf("") }
+    var pendingMember by remember { mutableStateOf("") }
+    var pendingMemberError by remember { mutableStateOf<String?>(null) }
+    var showMemberScanner by remember { mutableStateOf(false) }
     var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
+    var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    suspend fun refreshMlsDetails() {
+        if (!appState.developerMode) return
+        mlsLoading = true
+        try {
+            mlsState = controller.groupMlsState()
+        } finally {
+            mlsLoading = false
+        }
+    }
+
+    fun runGroupMutation(mutation: suspend () -> Unit) {
+        scope.launch {
+            try {
+                mutation()
+            } finally {
+                refreshMlsDetails()
+            }
+        }
+    }
+
+    LaunchedEffect(
+        appState.developerMode,
+        controller.group.groupIdHex,
+        controller.group.name,
+        controller.group.description,
+        controller.group.admins,
+        controller.members.map { it.memberIdHex },
+    ) {
+        refreshMlsDetails()
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.92f)
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -885,9 +1197,12 @@ private fun GroupDetailsSheet(
                     Button(
                         onClick = {
                             busy = true
-                            scope.launch {
-                                controller.updateGroupProfile(name, description)
-                                busy = false
+                            runGroupMutation {
+                                try {
+                                    controller.updateGroupProfile(name, description)
+                                } finally {
+                                    busy = false
+                                }
                             }
                         },
                         enabled = !busy,
@@ -917,37 +1232,53 @@ private fun GroupDetailsSheet(
                         member = member,
                         controller = controller,
                         onPromote = {
-                            scope.launch { controller.setMemberAdmin(member, admin = true) }
+                            runGroupMutation { controller.setMemberAdmin(member, admin = true) }
                         },
                         onDemote = {
-                            scope.launch { controller.setMemberAdmin(member, admin = false) }
+                            runGroupMutation { controller.setMemberAdmin(member, admin = false) }
                         },
                         onRemove = {
-                            scope.launch { controller.removeMember(member) }
+                            runGroupMutation { controller.removeMember(member) }
                         },
                     )
                 }
                 if (controller.isSelfAdmin) {
                     OutlinedTextField(
-                        value = pendingMembers,
-                        onValueChange = { pendingMembers = it },
-                        label = { Text("npub or hex public keys") },
-                        minLines = 2,
+                        value = pendingMember,
+                        onValueChange = {
+                            pendingMember = it
+                            pendingMemberError = null
+                        },
+                        label = { Text("npub or public key") },
+                        singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
+                        isError = pendingMemberError != null,
+                        supportingText = pendingMemberError?.let { message ->
+                            { Text(message) }
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { showMemberScanner = true }) {
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan member QR code")
+                            }
+                        },
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                     )
                     Button(
                         onClick = {
-                            val refs = pendingMembers.split(Regex("[,\\s]+")).map { it.trim() }.filter { it.isNotEmpty() }
-                            pendingMembers = ""
-                            scope.launch { controller.inviteMembers(refs) }
+                            val ref = RecipientReference.normalize(pendingMember) ?: run {
+                                pendingMemberError = "Enter one valid npub, profile link, or public key."
+                                return@Button
+                            }
+                            pendingMember = ""
+                            pendingMemberError = null
+                            runGroupMutation { controller.inviteMembers(listOf(ref)) }
                         },
-                        enabled = pendingMembers.isNotBlank(),
+                        enabled = pendingMember.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Add Members")
+                        Text("Add Member")
                     }
                 }
             }
@@ -978,33 +1309,41 @@ private fun GroupDetailsSheet(
                     Text("Leave Chat")
                 }
                 if (!controller.canLeaveGroup) {
-                    Text("Make another member an admin before leaving.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Promote another admin before leaving", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
             if (appState.developerMode) {
                 SectionCard(title = "MLS") {
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                mlsState = controller.groupMlsState()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Load MLS State")
-                    }
-                    mlsState?.let { state ->
-                        DiagnosticRow("Group ID", IdentityFormatter.short(state.groupIdHex))
-                        DiagnosticRow("Epoch", state.epoch.toString())
-                        DiagnosticRow("MLS members", state.memberCount.toString())
-                        DiagnosticRow("Required components", state.requiredAppComponents.joinToString(", "))
+                    when {
+                        mlsLoading -> Text("Loading MLS state...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        mlsState == null -> Text("MLS state unavailable.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        else -> {
+                            val state = requireNotNull(mlsState)
+                            DiagnosticRow("Group ID", IdentityFormatter.short(state.groupIdHex))
+                            DiagnosticRow("Epoch", state.epoch.toString())
+                            DiagnosticRow("MLS members", state.memberCount.toString())
+                            DiagnosticRow("Required components", state.requiredAppComponents.joinToString(", "))
+                        }
                     }
                 }
             }
         }
+    }
+    if (showMemberScanner) {
+        QrScannerSheet(
+            onDismiss = { showMemberScanner = false },
+            onScan = { raw ->
+                val ref = RecipientReference.normalize(raw)
+                showMemberScanner = false
+                if (ref == null) {
+                    pendingMemberError = "That QR code is not a valid npub or public key."
+                } else {
+                    pendingMember = ref
+                    pendingMemberError = null
+                }
+            },
+        )
     }
 }
 
@@ -1020,47 +1359,62 @@ private fun GroupMemberRow(
     val isAdmin = controller.isAdmin(member)
     val canManage = controller.isSelfAdmin && !member.local
 
-    ListItem(
-        leadingContent = {
-            Avatar(
-                title = controller.memberDisplayName(member),
-                seed = member.account ?: member.memberIdHex,
-                size = 40.dp,
-                pictureUrl = controller.memberAvatarUrl(member),
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Avatar(
+            title = controller.memberDisplayName(member),
+            seed = member.memberIdHex,
+            size = 40.dp,
+            pictureUrl = controller.memberAvatarUrl(member),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(controller.memberDisplayName(member), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                controller.memberSubtitle(member),
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-        },
-        headlineContent = { Text(controller.memberDisplayName(member)) },
-        supportingContent = { Text(controller.memberSubtitle(member), fontFamily = FontFamily.Monospace) },
-        trailingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isAdmin) {
-                    AssistChip(onClick = {}, label = { Text("Admin") })
+            if (isAdmin) {
+                Text(
+                    "Admin",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (canManage) {
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Member actions")
                 }
-                if (canManage) {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Member actions")
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(if (isAdmin) "Remove admin" else "Make admin") },
-                            onClick = {
-                                menuOpen = false
-                                if (isAdmin) onDemote() else onPromote()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Remove member") },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                            onClick = {
-                                menuOpen = false
-                                onRemove()
-                            },
-                        )
-                    }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(if (isAdmin) "Remove admin" else "Make admin") },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            if (isAdmin) onDemote() else onPromote()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Remove member") },
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            onRemove()
+                        },
+                    )
                 }
             }
-        },
-    )
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -1081,112 +1435,183 @@ private fun MessageBubble(
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
     val quickReactions = listOf("👍", "❤️", "😂", "🎉", "😮")
+    val showSenderAvatar = GroupProjector.shouldShowTranscriptSenderAvatar(
+        memberCount = controller.members.size,
+        mine = mine,
+    )
+    val timestampColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
-    ) {
-        if (!mine) {
-            Avatar(
-                title = appState.displayName(record.sender),
-                seed = record.sender,
-                size = 32.dp,
-                pictureUrl = appState.avatarUrl(record.sender),
-            )
-            Spacer(Modifier.width(8.dp))
-        }
-        Column(horizontalAlignment = if (mine) Alignment.End else Alignment.Start) {
-            Surface(
-                modifier = Modifier.combinedClickable(
-                    onClick = {},
-                    onLongClick = { menuOpen = true },
-                ),
-                color = bubbleColor,
-                shape = RoundedCornerShape(18.dp),
-                tonalElevation = if (mine) 1.dp else 0.dp,
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val messageGroupMaxWidth = maxWidth * 0.95f
+        val senderAvatarWidth = if (showSenderAvatar) 40.dp else 0.dp
+        val bubbleColumnMaxWidth = (messageGroupMaxWidth - senderAvatarWidth).coerceAtLeast(120.dp)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
+        ) {
+            if (showSenderAvatar) {
+                Avatar(
+                    title = appState.displayName(record.sender),
+                    seed = record.sender,
+                    size = 32.dp,
+                    pictureUrl = appState.avatarUrl(record.sender),
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Column(
+                modifier = Modifier.widthIn(max = bubbleColumnMaxWidth),
+                horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
-                Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (!mine) {
-                        Text(
-                            appState.displayName(record.sender),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    controller.replyPreview(record)?.let { (name, body) ->
-                        Surface(
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
-                            shape = RoundedCornerShape(10.dp),
-                        ) {
-                            Column(Modifier.padding(8.dp)) {
-                                Text(name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-                                Text(body, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
-                    }
-                    Text(
-                        if (deleted) "Message deleted" else MessageProjector.displayBody(record),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            IdentityFormatter.relativeTime(record.recordedAt),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (item.status != MessageStatus.Received && item.status != MessageStatus.Sent) {
-                            Spacer(Modifier.width(8.dp))
+                Surface(
+                    modifier = Modifier.combinedClickable(
+                        onClick = {},
+                        onLongClick = { menuOpen = true },
+                    ),
+                    color = bubbleColor,
+                    shape = RoundedCornerShape(18.dp),
+                    tonalElevation = if (mine) 1.dp else 0.dp,
+                ) {
+                    Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (!mine) {
                             Text(
-                                item.status.name.lowercase(),
-                                style = MaterialTheme.typography.labelSmall,
+                                appState.displayName(record.sender),
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Reply") },
-                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null) },
-                                onClick = {
-                                    controller.replyingTo = record
-                                    menuOpen = false
-                                },
-                            )
-                            quickReactions.forEach { emoji ->
-                                DropdownMenuItem(
-                                    text = { Text(emoji) },
-                                    onClick = {
-                                        menuOpen = false
-                                        scope.launch { controller.toggleReaction(emoji, record) }
-                                    },
-                                )
+                        controller.replyPreview(record)?.let { (name, body) ->
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
+                                shape = RoundedCornerShape(10.dp),
+                            ) {
+                                Column(Modifier.padding(8.dp)) {
+                                    Text(name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                                    Text(body, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
                             }
-                            if (mine && record.messageIdHex.isNotBlank()) {
+                        }
+                        Text(
+                            if (deleted) "Message deleted" else MessageProjector.displayBody(record),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Row(
+                            modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                IdentityFormatter.relativeTime(record.recordedAt),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = timestampColor,
+                            )
+                            if (mine) {
+                                OutgoingMessageStatusIcon(item.status, tint = timestampColor)
+                            }
+                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                 DropdownMenuItem(
-                                    text = { Text("Delete") },
-                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                    text = { Text("Reply") },
+                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null) },
                                     onClick = {
+                                        controller.replyingTo = record
                                         menuOpen = false
-                                        scope.launch { controller.deleteMessage(record) }
                                     },
                                 )
+                                quickReactions.forEach { emoji ->
+                                    DropdownMenuItem(
+                                        text = { Text(emoji) },
+                                        onClick = {
+                                            menuOpen = false
+                                            scope.launch { controller.toggleReaction(emoji, record) }
+                                        },
+                                    )
+                                }
+                                if (mine && record.messageIdHex.isNotBlank()) {
+                                    DropdownMenuItem(
+                                        text = { Text("Delete") },
+                                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                        onClick = {
+                                            menuOpen = false
+                                            scope.launch { controller.deleteMessage(record) }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
-            val tallies = controller.reactions[record.messageIdHex].orEmpty()
-            if (tallies.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
-                    tallies.forEach { tally ->
-                        FilterChip(
-                            selected = tally.mine,
-                            onClick = { scope.launch { controller.toggleReaction(tally.emoji, record) } },
-                            label = { Text("${tally.emoji} ${tally.count}") },
-                        )
+                val tallies = controller.reactions[record.messageIdHex].orEmpty()
+                if (tallies.isNotEmpty()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
+                        tallies.forEach { tally ->
+                            FilterChip(
+                                selected = tally.mine,
+                                onClick = { scope.launch { controller.toggleReaction(tally.emoji, record) } },
+                                label = { Text("${tally.emoji} ${tally.count}") },
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OutgoingMessageStatusIcon(status: MessageStatus, tint: Color) {
+    val indicator = status.outgoingIndicator() ?: return
+    when (indicator) {
+        OutgoingMessageIndicator.Sending -> SendingMessageIcon(
+            tint = tint.copy(alpha = 0.76f),
+        )
+        OutgoingMessageIndicator.Sent -> Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = "Sent",
+            modifier = Modifier.size(14.dp),
+            tint = tint,
+        )
+        OutgoingMessageIndicator.Failed -> Icon(
+            imageVector = Icons.Default.ErrorOutline,
+            contentDescription = "Send failed",
+            modifier = Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+@Composable
+private fun SendingMessageIcon(tint: Color) {
+    Canvas(
+        modifier = Modifier
+            .size(14.dp)
+            .semantics { contentDescription = "Sending" },
+    ) {
+        val strokeWidth = 1.35.dp.toPx()
+        val radius = size.minDimension / 2f - strokeWidth / 2f
+        val dash = floatArrayOf(2.4.dp.toPx(), 1.8.dp.toPx())
+        drawCircle(
+            color = tint,
+            radius = radius,
+            style = Stroke(
+                width = strokeWidth,
+                cap = StrokeCap.Round,
+                pathEffect = PathEffect.dashPathEffect(dash),
+            ),
+        )
+        drawLine(
+            color = tint,
+            start = Offset(size.width * 0.29f, size.height * 0.53f),
+            end = Offset(size.width * 0.43f, size.height * 0.67f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = tint,
+            start = Offset(size.width * 0.43f, size.height * 0.67f),
+            end = Offset(size.width * 0.72f, size.height * 0.34f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
     }
 }
 
@@ -1272,68 +1697,74 @@ private fun ComposerBar(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScreen(appState: DarkMatterAppState, onOpenDrawer: () -> Unit) {
-    var detail by remember { mutableStateOf<SettingsDetail?>(null) }
-
+private fun SettingsScreen(
+    appState: DarkMatterAppState,
+    onBackToChats: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
+    detail: SettingsDetail?,
+    onDetailChange: (SettingsDetail?) -> Unit,
+) {
     when (detail) {
-        SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { detail = null })
-        SettingsDetail.Accounts -> AccountsScreen(appState, onBack = { detail = null })
-        SettingsDetail.Identity -> IdentityScreen(appState, onBack = { detail = null })
-        SettingsDetail.Relays -> RelaysScreen(appState, onBack = { detail = null })
+        SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Identity -> IdentityScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
         null -> SettingsHomeScreen(
             appState = appState,
-            onOpenDrawer = onOpenDrawer,
-            onOpenDetail = { detail = it },
+            onBackToChats = onBackToChats,
+            onOpenDiagnostics = onOpenDiagnostics,
+            onOpenDetail = { onDetailChange(it) },
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun SettingsTopBar(onBackToChats: () -> Unit) {
+    CenterAlignedTopAppBar(
+        title = { Text("Settings") },
+        navigationIcon = {
+            IconButton(onClick = onBackToChats) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to chats")
+            }
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun SettingsHomeScreen(
     appState: DarkMatterAppState,
-    onOpenDrawer: () -> Unit,
+    onBackToChats: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
 ) {
     var qrAccountId by remember { mutableStateOf<String?>(null) }
+    var showAccountSelector by remember { mutableStateOf(false) }
+    var showAddIdentity by remember { mutableStateOf(false) }
+
+    LaunchedEffect(appState.accounts.size) {
+        if (showAddIdentity) showAddIdentity = false
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = "Open navigation")
-                    }
-                },
-            )
+            SettingsTopBar(onBackToChats = onBackToChats)
         },
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 SectionCard(title = "Account") {
                     appState.activeAccount?.let { account ->
-                        ListItem(
-                            modifier = Modifier.clickable { onOpenDetail(SettingsDetail.Profile) },
-                            leadingContent = {
-                                Avatar(
-                                    title = appState.displayName(account.accountIdHex),
-                                    seed = account.accountIdHex,
-                                    size = 44.dp,
-                                    pictureUrl = appState.avatarUrl(account.accountIdHex),
-                                )
-                            },
-                            headlineContent = { Text(appState.displayName(account.accountIdHex)) },
-                            supportingContent = { Text(appState.shortNpub(account.accountIdHex), fontFamily = FontFamily.Monospace) },
-                            trailingContent = {
-                                IconButton(onClick = { qrAccountId = account.accountIdHex }) {
-                                    Icon(Icons.Default.QrCode, contentDescription = "My QR code")
-                                }
-                            },
+                        SettingsAccountHeader(
+                            title = appState.displayName(account.accountIdHex),
+                            subtitle = appState.shortNpub(account.accountIdHex),
+                            seed = account.accountIdHex,
+                            pictureUrl = appState.avatarUrl(account.accountIdHex),
+                            onOpenAccountSelector = { showAccountSelector = true },
+                            onOpenQr = { qrAccountId = account.accountIdHex },
                         )
                     }
                     SettingsRow("Profile", "Publish your Nostr kind:0 profile") { onOpenDetail(SettingsDetail.Profile) }
-                    SettingsRow("Accounts", "${appState.accounts.size} identities on this device") { onOpenDetail(SettingsDetail.Accounts) }
                     SettingsRow("Identity & Keys", "Public key, npub, signing status") { onOpenDetail(SettingsDetail.Identity) }
                     SettingsRow("Relays", "Dark Matter-managed relay lists") { onOpenDetail(SettingsDetail.Relays) }
                 }
@@ -1350,6 +1781,9 @@ private fun SettingsHomeScreen(
                             onCheckedChange = { appState.updateDeveloperMode(it) },
                         )
                     }
+                    if (appState.developerMode) {
+                        SettingsRow("Diagnostics", "Relay health and MLS internals") { onOpenDiagnostics() }
+                    }
                 }
             }
         }
@@ -1361,6 +1795,114 @@ private fun SettingsHomeScreen(
             accountIdHex = accountId,
             onDismiss = { qrAccountId = null },
         )
+    }
+    if (showAccountSelector) {
+        AccountSelectorSheet(
+            appState = appState,
+            onDismiss = { showAccountSelector = false },
+            onAddAccount = {
+                showAccountSelector = false
+                showAddIdentity = true
+            },
+        )
+    }
+    if (showAddIdentity) {
+        AddIdentitySheet(appState = appState, onDismiss = { showAddIdentity = false })
+    }
+}
+
+@Composable
+fun SettingsAccountHeader(
+    title: String,
+    subtitle: String,
+    seed: String,
+    pictureUrl: String?,
+    onOpenAccountSelector: () -> Unit,
+    onOpenQr: () -> Unit,
+) {
+    ListItem(
+        modifier = Modifier
+            .clickable(onClick = onOpenAccountSelector)
+            .semantics { contentDescription = "Switch account" },
+        leadingContent = {
+            Avatar(
+                title = title,
+                seed = seed,
+                size = 52.dp,
+                pictureUrl = pictureUrl,
+            )
+        },
+        headlineContent = { Text(title) },
+        supportingContent = { Text(subtitle, fontFamily = FontFamily.Monospace) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ExpandMore, contentDescription = null)
+                IconButton(onClick = onOpenQr) {
+                    Icon(Icons.Default.QrCode, contentDescription = "My QR code")
+                }
+            }
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AccountSelectorSheet(
+    appState: DarkMatterAppState,
+    onDismiss: () -> Unit,
+    onAddAccount: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Switch Account", style = MaterialTheme.typography.titleLarge)
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                items(appState.accounts, key = { it.label }) { account ->
+                    ListItem(
+                        modifier = Modifier.clickable {
+                            appState.setActiveAccount(account.label)
+                            onDismiss()
+                        },
+                        leadingContent = {
+                            Avatar(
+                                title = appState.displayName(account.accountIdHex),
+                                seed = account.accountIdHex,
+                                size = 44.dp,
+                                pictureUrl = appState.avatarUrl(account.accountIdHex),
+                            )
+                        },
+                        headlineContent = { Text(appState.displayName(account.accountIdHex)) },
+                        supportingContent = {
+                            Text(
+                                appState.shortNpub(account.accountIdHex),
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        trailingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (!account.localSigning) {
+                                    Text("Read-only", style = MaterialTheme.typography.labelSmall)
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                if (account.label == appState.activeAccountRef) {
+                                    Icon(Icons.Default.Check, contentDescription = "Active")
+                                }
+                            }
+                        },
+                    )
+                    HorizontalDivider()
+                }
+            }
+            OutlinedButton(
+                onClick = onAddAccount,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Add Account")
+            }
+        }
     }
 }
 
@@ -1848,80 +2390,6 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AccountsScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
-    var showAdd by remember { mutableStateOf(false) }
-    var qrAccountId by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(appState.accounts.size) {
-        if (showAdd) showAdd = false
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Accounts") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showAdd = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Add account")
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding)) {
-            items(appState.accounts, key = { it.label }) { account ->
-                ListItem(
-                    modifier = Modifier.clickable { appState.setActiveAccount(account.label) },
-                    leadingContent = {
-                        Avatar(
-                            title = appState.displayName(account.accountIdHex),
-                            seed = account.accountIdHex,
-                            size = 44.dp,
-                            pictureUrl = appState.avatarUrl(account.accountIdHex),
-                        )
-                    },
-                    headlineContent = { Text(appState.displayName(account.accountIdHex)) },
-                    supportingContent = { Text(appState.shortNpub(account.accountIdHex), fontFamily = FontFamily.Monospace) },
-                    trailingContent = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(horizontalAlignment = Alignment.End) {
-                                if (account.label == appState.activeAccountRef) {
-                                    Icon(Icons.Default.Check, contentDescription = "Active")
-                                }
-                                if (!account.localSigning) {
-                                    Text("Read-only", style = MaterialTheme.typography.labelSmall)
-                                }
-                            }
-                            IconButton(onClick = { qrAccountId = account.accountIdHex }) {
-                                Icon(Icons.Default.QrCode, contentDescription = "Show profile QR code")
-                            }
-                        }
-                    },
-                )
-                HorizontalDivider()
-            }
-        }
-    }
-
-    if (showAdd) {
-        AddIdentitySheet(appState = appState, onDismiss = { showAdd = false })
-    }
-    qrAccountId?.let { accountId ->
-        ProfileQrSheet(
-            appState = appState,
-            accountIdHex = accountId,
-            onDismiss = { qrAccountId = null },
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 private fun AddIdentitySheet(appState: DarkMatterAppState, onDismiss: () -> Unit) {
     var identity by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -1934,16 +2402,28 @@ private fun AddIdentitySheet(appState: DarkMatterAppState, onDismiss: () -> Unit
                 onClick = {
                     busy = true
                     scope.launch {
-                        appState.createIdentity()
-                        busy = false
+                        try {
+                            appState.createIdentity()
+                        } finally {
+                            busy = false
+                        }
                     }
                 },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Default.Key, contentDescription = null)
+                if (busy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .semantics { contentDescription = "Creating identity" },
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.Default.Key, contentDescription = null)
+                }
                 Spacer(Modifier.width(8.dp))
-                Text("Create New Identity")
+                Text(if (busy) "Creating Identity" else "Create New Identity")
             }
             OutlinedTextField(
                 value = identity,
@@ -2247,7 +2727,7 @@ private fun RelayListRow(title: String, list: RelayListFfi) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DiagnosticsScreen(appState: DarkMatterAppState, onOpenDrawer: () -> Unit) {
+private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () -> Unit) {
     var health by remember { mutableStateOf<RelayHealthFfi?>(null) }
     var entries by remember { mutableStateOf<List<DiagnosticLogEntry>>(emptyList()) }
     var streaming by remember { mutableStateOf(false) }
@@ -2278,8 +2758,8 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onOpenDrawer: () -> 
             TopAppBar(
                 title = { Text("Diagnostics") },
                 navigationIcon = {
-                    IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = "Open navigation")
+                    IconButton(onClick = onBackToChats) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to chats")
                     }
                 },
                 actions = {
@@ -2381,9 +2861,22 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onOpenDrawer: () -> 
 
 @Composable
 private fun DiagnosticRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, fontFamily = FontFamily.Monospace)
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            value,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

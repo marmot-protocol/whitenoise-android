@@ -10,8 +10,8 @@ object GroupProjector {
         memberCount: Int,
         memberTitle: (String) -> String,
     ): String {
-        group.name.takeIf { it.isNotBlank() }?.let { return it }
-        if (memberCount > 2) return "$memberCount person group"
+        group.name.trim().takeIf { it.isNotBlank() }?.let { return it }
+        if (memberCount > 2) return "Group of $memberCount people"
         if (memberCount == 2) {
             otherMemberAccount?.takeIf { it.isNotBlank() }?.let { return memberTitle(it) }
         }
@@ -22,13 +22,19 @@ object GroupProjector {
         members: List<AppGroupMemberRecordFfi>,
         activeAccountIdHex: String?,
     ): String? {
-        if (members.any { it.local }) {
-            members.firstOrNull { !it.local && !it.account.isNullOrBlank() }?.account?.let { return it }
+        // memberIdHex is the Nostr pubkey/account id; account is a local label.
+        val active = activeAccountIdHex?.takeIf { it.isNotBlank() }
+        if (active != null) {
+            members.firstOrNull { member ->
+                member.memberIdHex.isNotBlank() && !member.memberIdHex.equals(active, ignoreCase = true)
+            }?.memberIdHex?.let { return it }
         }
-        return members.firstOrNull { member ->
-            val account = member.account
-            account != null && account.isNotBlank() && account != activeAccountIdHex
-        }?.account
+        return members.firstOrNull { !it.local && it.memberIdHex.isNotBlank() }?.memberIdHex
+            ?: members.firstOrNull { it.memberIdHex.isNotBlank() }?.memberIdHex
+    }
+
+    fun shouldShowTranscriptSenderAvatar(memberCount: Int, mine: Boolean): Boolean {
+        return !mine && memberCount > 2
     }
 
     fun memberRef(member: AppGroupMemberRecordFfi): String {
@@ -42,5 +48,9 @@ object GroupProjector {
     fun canLeaveGroup(group: AppGroupRecordFfi, activeAccountIdHex: String?): Boolean {
         if (activeAccountIdHex == null || !group.admins.contains(activeAccountIdHex)) return true
         return group.admins.size > 1
+    }
+
+    fun requiresSelfDemoteBeforeLeave(group: AppGroupRecordFfi, activeAccountIdHex: String?): Boolean {
+        return activeAccountIdHex != null && group.admins.contains(activeAccountIdHex)
     }
 }

@@ -34,6 +34,22 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun adminsRequireSelfDemotionBeforeLeaving() {
+        assertTrue(
+            GroupProjector.requiresSelfDemoteBeforeLeave(
+                group(admins = listOf("alice", "bob")),
+                activeAccountIdHex = "alice",
+            ),
+        )
+        assertFalse(
+            GroupProjector.requiresSelfDemoteBeforeLeave(
+                group(admins = listOf("alice", "bob")),
+                activeAccountIdHex = "carol",
+            ),
+        )
+    }
+
+    @Test
     fun unnamedChatTitleUsesOtherMemberDisplayName() {
         val unnamed = group(name = "")
 
@@ -68,7 +84,7 @@ class GroupProjectorTest {
         val unnamed = group(name = "")
 
         assertEquals(
-            "3 person group",
+            "Group of 3 people",
             GroupProjector.displayTitle(
                 group = unnamed,
                 otherMemberAccount = "alice",
@@ -94,20 +110,37 @@ class GroupProjectorTest {
     }
 
     @Test
-    fun otherMemberExcludesLocalRosterEntryBeforeAccountComparison() {
+    fun transcriptSenderAvatarOnlyShowsForOtherMembersInLargerGroups() {
+        assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(memberCount = 2, mine = false))
+        assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(memberCount = 3, mine = true))
+        assertTrue(GroupProjector.shouldShowTranscriptSenderAvatar(memberCount = 3, mine = false))
+    }
+
+    @Test
+    fun otherMemberUsesMemberIdHexInsteadOfLocalAccountLabel() {
         val members = listOf(
-            member(memberId = "credential-self", account = "alice", local = true),
-            member(memberId = "credential-other", account = "bob", local = false),
+            member(memberId = "alice", account = "Jeff", local = true),
+            member(memberId = "bob", account = null, local = false),
         )
 
-        assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = "unknown-active-id"))
+        assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = "alice"))
+    }
+
+    @Test
+    fun otherMemberFallsBackToNonLocalMemberIdWhenActiveAccountIsMissing() {
+        val members = listOf(
+            member(memberId = "alice", account = "Jeff", local = true),
+            member(memberId = "bob", account = null, local = false),
+        )
+
+        assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = null))
     }
 
     @Test
     fun otherMemberFallsBackToActiveAccountComparisonWhenLocalFlagIsUnavailable() {
         val members = listOf(
-            member(memberId = "credential-self", account = "alice", local = false),
-            member(memberId = "credential-other", account = "bob", local = false),
+            member(memberId = "alice", account = null, local = false),
+            member(memberId = "bob", account = null, local = false),
         )
 
         assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = "alice"))
