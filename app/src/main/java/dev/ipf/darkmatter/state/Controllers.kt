@@ -4,13 +4,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.darkmatter.core.GroupProjector
-import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.ReactionTally
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -25,8 +28,26 @@ data class ChatListItem(
     val latest: AppMessageRecordFfi?,
     val otherMemberAccount: String?,
     val memberCount: Int,
+    val memberSnapshot: GroupMemberSnapshot?,
 ) {
     val id: String = group.groupIdHex
+}
+
+internal fun sortChatListItems(items: List<ChatListItem>): List<ChatListItem> {
+    return items.sortedWith(
+        compareByDescending<ChatListItem> { it.latest?.recordedAt ?: 0uL }
+            .thenBy { it.group.name.ifBlank { it.group.groupIdHex }.lowercase() },
+    )
+}
+
+data class GroupMemberSnapshot(
+    val members: List<AppGroupMemberRecordFfi>,
+) {
+    val memberCount: Int = members.size
+
+    fun otherMemberAccount(activeAccountIdHex: String?): String? {
+        return GroupProjector.otherMemberAccount(members, activeAccountIdHex)
+    }
 }
 
 enum class MessageStatus {
@@ -35,6 +56,22 @@ enum class MessageStatus {
     Sent,
     Failed,
     Streaming,
+}
+
+enum class OutgoingMessageIndicator {
+    Sending,
+    Sent,
+    Failed,
+}
+
+fun MessageStatus.outgoingIndicator(): OutgoingMessageIndicator? {
+    return when (this) {
+        MessageStatus.Pending -> OutgoingMessageIndicator.Sending
+        MessageStatus.Received,
+        MessageStatus.Sent -> OutgoingMessageIndicator.Sent
+        MessageStatus.Failed -> OutgoingMessageIndicator.Failed
+        MessageStatus.Streaming -> null
+    }
 }
 
 data class TimelineMessage(
@@ -56,7 +93,7 @@ class ChatsController(private val appState: DarkMatterAppState) {
     private var accountRef: String? = null
     private var groups = listOf<AppGroupRecordFfi>()
     private var latestByGroup = mapOf<String, AppMessageRecordFfi>()
-    private var memberInfoByGroup = mapOf<String, Pair<Int, String?>>()
+    private var memberInfoByGroup = mapOf<String, GroupMemberSnapshot>()
 
     suspend fun bind(accountRef: String?) {
         this.accountRef = accountRef
@@ -72,16 +109,19 @@ class ChatsController(private val appState: DarkMatterAppState) {
             val marmot = appState.marmot()
             val chatsSubscription = marmot.subscribeChats(accountRef, includeArchived = true)
             groups = chatsSubscription.snapshot()
-            refreshLatest()
-            for (group in groups) refreshMembers(group.groupIdHex)
+            val hasCompleteMemberSnapshots = seedCachedMembers()
+            refreshLatest(recomputeAfter = hasCompleteMemberSnapshots)
+            refreshMembers(groups.map { it.groupIdHex })
             isLoading = false
+            recompute()
 
             coroutineScope {
                 launch {
                     while (isActive) {
                         val update = chatsSubscription.next() ?: break
-                        foldGroup(update)
-                        refreshMembers(update.groupIdHex)
+                        val hasMemberSnapshot = seedCachedMember(update.groupIdHex)
+                        foldGroup(update, recomputeNow = hasMemberSnapshot)
+                        refreshMembers(listOf(update.groupIdHex))
                     }
                 }
                 launch {
@@ -98,7 +138,7 @@ class ChatsController(private val appState: DarkMatterAppState) {
         }
     }
 
-    suspend fun refreshLatest() {
+    suspend fun refreshLatest(recomputeAfter: Boolean = true) {
         val account = accountRef ?: return
         runCatching {
             val recent = appState.marmot().messages(account, groupIdHex = null, limit = 400u)
@@ -106,44 +146,72 @@ class ChatsController(private val appState: DarkMatterAppState) {
             latestByGroup = recent
                 .groupBy { it.groupIdHex }
                 .mapValues { (_, messages) -> messages.maxBy { it.recordedAt } }
-            recompute()
+            if (recomputeAfter) recompute()
         }
     }
 
-    private fun foldGroup(record: AppGroupRecordFfi) {
+    private fun foldGroup(record: AppGroupRecordFfi, recomputeNow: Boolean = true) {
         groups = if (groups.any { it.groupIdHex == record.groupIdHex }) {
             groups.map { if (it.groupIdHex == record.groupIdHex) record else it }
         } else {
             groups + record
         }
-        recompute()
+        if (recomputeNow) recompute()
     }
 
-    private suspend fun refreshMembers(groupIdHex: String) {
+    private fun seedCachedMembers(): Boolean {
+        if (groups.isEmpty()) return true
+        val cachedCount = groups.count { seedCachedMember(it.groupIdHex) }
+        val complete = cachedCount == groups.size
+        if (complete) {
+            recompute()
+        }
+        return complete
+    }
+
+    private fun seedCachedMember(groupIdHex: String): Boolean {
+        val account = accountRef ?: return false
+        val snapshot = appState.cachedGroupMemberSnapshot(account, groupIdHex) ?: return false
+        memberInfoByGroup = memberInfoByGroup + (groupIdHex to snapshot)
+        return true
+    }
+
+    private suspend fun refreshMembers(groupIds: List<String>) {
         val account = accountRef ?: return
-        runCatching {
-            val members = appState.marmot().groupMembers(account, groupIdHex)
-            val me = appState.activeAccount?.accountIdHex
-            val other = GroupProjector.otherMemberAccount(members, me)
-            appState.requestProfiles(members.mapNotNull { it.account })
-            memberInfoByGroup = memberInfoByGroup + (groupIdHex to (members.size to other))
+        val loaded = coroutineScope {
+            groupIds.distinct().map { groupIdHex ->
+                async { loadMembers(account, groupIdHex) }
+            }.awaitAll().filterNotNull()
+        }
+        if (loaded.isNotEmpty()) {
+            memberInfoByGroup = memberInfoByGroup + loaded.toMap()
             recompute()
         }
     }
 
+    private suspend fun loadMembers(account: String, groupIdHex: String): Pair<String, GroupMemberSnapshot>? {
+        return runCatching {
+            val members = withContext(Dispatchers.IO) {
+                appState.marmot().groupMembers(account, groupIdHex)
+            }
+            val snapshot = appState.cacheGroupMemberSnapshot(account, groupIdHex, members)
+            appState.requestProfiles(members.map { it.memberIdHex })
+            groupIdHex to snapshot
+        }.getOrNull()
+    }
+
     private fun recompute() {
+        val active = appState.activeAccount?.accountIdHex
         val all = groups.map { group ->
-            val info = memberInfoByGroup[group.groupIdHex]
+            val snapshot = memberInfoByGroup[group.groupIdHex]
             ChatListItem(
                 group = group,
                 latest = latestByGroup[group.groupIdHex],
-                otherMemberAccount = info?.second,
-                memberCount = info?.first ?: 0,
+                otherMemberAccount = snapshot?.otherMemberAccount(active),
+                memberCount = snapshot?.memberCount ?: 0,
+                memberSnapshot = snapshot,
             )
-        }.sortedWith(
-            compareByDescending<ChatListItem> { it.latest?.recordedAt ?: 0u }
-                .thenBy { it.group.name.ifBlank { it.group.groupIdHex }.lowercase() },
-        )
+        }.let(::sortChatListItems)
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
     }
@@ -152,10 +220,11 @@ class ChatsController(private val appState: DarkMatterAppState) {
 class ConversationController(
     private val appState: DarkMatterAppState,
     initialGroup: AppGroupRecordFfi,
+    initialMemberSnapshot: GroupMemberSnapshot? = null,
 ) {
     var group by mutableStateOf(initialGroup)
         private set
-    var members by mutableStateOf<List<AppGroupMemberRecordFfi>>(emptyList())
+    var members by mutableStateOf<List<AppGroupMemberRecordFfi>>(initialMemberSnapshot?.members.orEmpty())
         private set
     var timeline by mutableStateOf<List<TimelineMessage>>(emptyList())
         private set
@@ -347,6 +416,11 @@ class ConversationController(
             return false
         }
         return runCatching {
+            val activeAccountIdHex = appState.activeAccount?.accountIdHex
+            if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex)) {
+                appState.marmot().selfDemoteAdmin(account, group.groupIdHex)
+                group = group.copy(admins = group.admins.filterNot { it == activeAccountIdHex })
+            }
             appState.marmot().leaveGroup(account, group.groupIdHex)
             appState.present("Left chat")
             true
@@ -433,20 +507,15 @@ class ConversationController(
     fun isAdmin(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.isAdmin(group, member)
 
     fun memberDisplayName(member: AppGroupMemberRecordFfi): String {
-        val account = member.account ?: return IdentityFormatter.short(member.memberIdHex)
-        return appState.displayName(account)
+        return appState.displayName(member.memberIdHex)
     }
 
     fun memberSubtitle(member: AppGroupMemberRecordFfi): String {
-        val account = member.account
-        return when {
-            account != null -> appState.shortNpub(account)
-            else -> IdentityFormatter.short(member.memberIdHex)
-        }
+        return appState.shortNpub(member.memberIdHex)
     }
 
     fun memberAvatarUrl(member: AppGroupMemberRecordFfi): String? {
-        return member.account?.let { appState.avatarUrl(it) }
+        return appState.avatarUrl(member.memberIdHex)
     }
 
     suspend fun groupMlsState(): AppGroupMlsStateFfi? {
@@ -535,8 +604,12 @@ class ConversationController(
     private suspend fun refreshMembers() {
         val account = appState.activeAccountRef ?: return
         runCatching {
-            members = appState.marmot().groupMembers(account, group.groupIdHex)
-            appState.requestProfiles(members.mapNotNull { it.account })
+            val loaded = withContext(Dispatchers.IO) {
+                appState.marmot().groupMembers(account, group.groupIdHex)
+            }
+            members = loaded
+            appState.cacheGroupMemberSnapshot(account, group.groupIdHex, loaded)
+            appState.requestProfiles(members.map { it.memberIdHex })
         }
     }
 

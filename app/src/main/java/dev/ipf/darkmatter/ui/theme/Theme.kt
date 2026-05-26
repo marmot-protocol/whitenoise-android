@@ -1,6 +1,5 @@
 package dev.ipf.darkmatter.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +39,7 @@ fun DarkMatterTheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
+    val baseColorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -49,6 +48,13 @@ fun DarkMatterTheme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
+    val colorScheme = baseColorScheme.copy(
+        primary = Highlight,
+        onPrimary = OnHighlight,
+        primaryContainer = Highlight,
+        onPrimaryContainer = OnHighlight,
+        surfaceTint = Highlight
+    )
 
     MaterialTheme(
         colorScheme = colorScheme,
