@@ -168,5 +168,8 @@ class GroupProjectorTest {
         relays = listOf("wss://relay.example"),
         nostrGroupIdHex = "nostr",
         archived = false,
+        pendingConfirmation = false,
+        welcomerAccountIdHex = null,
+        viaWelcomeMessageIdHex = null,
     )
 }

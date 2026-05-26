@@ -72,6 +72,7 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
@@ -174,6 +175,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.LifecycleOwner
+import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
@@ -183,6 +185,9 @@ import dev.ipf.marmotkit.RelayHealthFfi
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.MarmotKitException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private enum class MainSection {
     Chats,
@@ -194,6 +199,7 @@ private enum class SettingsDetail {
     Profile,
     Identity,
     Relays,
+    KeyPackages,
 }
 
 private data class DiagnosticLogEntry(
@@ -1708,6 +1714,7 @@ private fun SettingsScreen(
         SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Identity -> IdentityScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = { onDetailChange(null) })
         null -> SettingsHomeScreen(
             appState = appState,
             onBackToChats = onBackToChats,
@@ -1767,6 +1774,7 @@ private fun SettingsHomeScreen(
                     SettingsRow("Profile", "Publish your Nostr kind:0 profile") { onOpenDetail(SettingsDetail.Profile) }
                     SettingsRow("Identity & Keys", "Public key, npub, signing status") { onOpenDetail(SettingsDetail.Identity) }
                     SettingsRow("Relays", "Dark Matter-managed relay lists") { onOpenDetail(SettingsDetail.Relays) }
+                    SettingsRow("Key Packages", "Published key packages and rotation") { onOpenDetail(SettingsDetail.KeyPackages) }
                 }
             }
             item {
@@ -2723,6 +2731,223 @@ private fun RelayListRow(title: String, list: RelayListFfi) {
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var packages by remember(appState.activeAccountRef) { mutableStateOf<List<AccountKeyPackageFfi>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
+    var working by remember { mutableStateOf(false) }
+    var loaded by remember(appState.activeAccountRef) { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<AccountKeyPackageFfi?>(null) }
+
+    suspend fun reload() {
+        loading = true
+        packages = appState.fetchKeyPackages()
+        loaded = true
+        loading = false
+    }
+
+    LaunchedEffect(appState.activeAccountRef) {
+        if (appState.activeAccountRef != null) reload()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Key Packages") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { scope.launch { reload() } },
+                        enabled = !loading && !working && appState.activeAccountRef != null,
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                SectionCard(title = "Publishing") {
+                    Text(
+                        "Re-publish the current key package to your configured relays, " +
+                            "or rotate to a fresh one. Old packages stay on relays until deleted.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = {
+                                working = true
+                                scope.launch {
+                                    appState.republishKeyPackage()
+                                    reload()
+                                    working = false
+                                }
+                            },
+                            enabled = !working && !loading && appState.activeAccountRef != null,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Republish")
+                        }
+                        Button(
+                            onClick = {
+                                working = true
+                                scope.launch {
+                                    appState.publishNewKeyPackage()
+                                    reload()
+                                    working = false
+                                }
+                            },
+                            enabled = !working && !loading && appState.activeAccountRef != null,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Publish New")
+                        }
+                    }
+                }
+            }
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Published", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    if (loading) {
+                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+            if (loaded && packages.isEmpty() && !loading) {
+                item {
+                    SectionCard(title = "No key packages found") {
+                        Text(
+                            "Nothing cached locally and no key package events were returned from " +
+                                "the configured relays. Try \"Publish New\".",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            items(packages, key = { it.eventIdHex }) { kp ->
+                KeyPackageCard(
+                    kp = kp,
+                    busy = working,
+                    onDelete = { pendingDelete = kp },
+                )
+            }
+        }
+    }
+
+    pendingDelete?.let { kp ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete key package?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Publishes a NIP-09 deletion for this key package and clears it from the local cache.",
+                    )
+                    Text(
+                        "Event: ${IdentityFormatter.short(kp.eventIdHex)}",
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val target = pendingDelete ?: return@Button
+                    pendingDelete = null
+                    working = true
+                    scope.launch {
+                        appState.deleteKeyPackage(target.eventIdHex, target.sourceRelays)
+                        reload()
+                        working = false
+                    }
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { pendingDelete = null }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun KeyPackageCard(
+    kp: AccountKeyPackageFfi,
+    busy: Boolean,
+    onDelete: () -> Unit,
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        IdentityFormatter.short(kp.keyPackageId),
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        formatPublishedAt(kp.publishedAt),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                IconButton(onClick = onDelete, enabled = !busy) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete key package")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                keyPackageSourceLabels(kp).forEach { label ->
+                    AssistChip(onClick = {}, label = { Text(label, style = MaterialTheme.typography.labelSmall) })
+                }
+            }
+            DiagnosticRow("Event", IdentityFormatter.short(kp.eventIdHex))
+            DiagnosticRow("Ref", IdentityFormatter.short(kp.keyPackageRefHex))
+            DiagnosticRow("Size", "${kp.keyPackageBytes} bytes")
+            if (kp.sourceRelays.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Source relays", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    kp.sourceRelays.forEach { relay ->
+                        Text(relay, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun keyPackageSourceLabels(kp: AccountKeyPackageFfi): List<String> {
+    val out = mutableListOf<String>()
+    if (kp.local) out += "Local"
+    if (kp.relay) out += "Relay"
+    if (out.isEmpty()) out += "Unknown"
+    return out
+}
+
+private val publishedAtFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+
+private fun formatPublishedAt(unixSeconds: ULong): String {
+    if (unixSeconds == 0uL) return "Unknown publish time"
+    val millis = unixSeconds.toLong() * 1000L
+    return "Published ${publishedAtFormatter.format(Date(millis))}"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

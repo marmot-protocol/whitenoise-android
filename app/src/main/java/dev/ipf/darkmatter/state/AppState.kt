@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -189,6 +190,65 @@ class DarkMatterAppState(context: Context) {
     }
 
     fun bootstrapRelayCount(): Int = MarmotClient.bootstrapRelays.size
+
+    suspend fun fetchKeyPackages(): List<AccountKeyPackageFfi> {
+        val account = activeAccountRef ?: return emptyList()
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                marmot().accountKeyPackages(account, MarmotClient.bootstrapRelays)
+            }
+        }.getOrElse {
+            present("Couldn't load key packages", it.readableMessage())
+            emptyList()
+        }
+    }
+
+    suspend fun deleteKeyPackage(eventIdHex: String, sourceRelays: List<String>): Boolean {
+        val account = activeAccountRef ?: return false
+        val relays = normalizeRelayUrls(
+            sourceRelays +
+                runCatching { marmot().accountKeyPackageRelays(account) }.getOrNull().orEmpty() +
+                MarmotClient.bootstrapRelays,
+        )
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                marmot().deleteAccountKeyPackage(account, eventIdHex, relays)
+            }
+            present("Key package deleted")
+            true
+        }.getOrElse {
+            present("Couldn't delete key package", it.readableMessage())
+            false
+        }
+    }
+
+    suspend fun publishNewKeyPackage(): Boolean {
+        val account = activeAccountRef ?: return false
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                marmot().publishNewKeyPackage(account)
+            }
+            present("New key package published")
+            true
+        }.getOrElse {
+            present("Couldn't publish key package", it.readableMessage())
+            false
+        }
+    }
+
+    suspend fun republishKeyPackage(): Boolean {
+        val account = activeAccountRef ?: return false
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                marmot().republishKeyPackage(account)
+            }
+            present("Key package republished")
+            true
+        }.getOrElse {
+            present("Couldn't republish key package", it.readableMessage())
+            false
+        }
+    }
 
     fun updateDeveloperMode(enabled: Boolean) {
         developerMode = enabled

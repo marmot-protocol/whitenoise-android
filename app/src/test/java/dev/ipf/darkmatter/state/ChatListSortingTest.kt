@@ -48,6 +48,9 @@ class ChatListSortingTest {
         relays = emptyList(),
         nostrGroupIdHex = "nostr-$id",
         archived = false,
+        pendingConfirmation = false,
+        welcomerAccountIdHex = null,
+        viaWelcomeMessageIdHex = null,
     )
 
     private fun message(groupId: String, recordedAt: ULong) = AppMessageRecordFfi(
