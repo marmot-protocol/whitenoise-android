@@ -1,21 +1,33 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Keep stack traces readable
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# --- JNA (used by UniFFI) ---
+-dontwarn java.awt.**
+-keep class com.sun.jna.** { *; }
+-keepclassmembers class * extends com.sun.jna.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# --- UniFFI / marmotkit bindings ---
+-keep class dev.ipf.marmotkit.** { *; }
+-keepclassmembers class dev.ipf.marmotkit.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# --- ML Kit barcode scanning ---
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_** { *; }
+-dontwarn com.google.mlkit.**
+
+# --- CameraX ---
+-keep class androidx.camera.** { *; }
+-dontwarn androidx.camera.**
+
+# --- Coroutines ---
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-keepclassmembers class kotlinx.coroutines.** {
+    volatile <fields>;
+}
+
+# --- Compose: usually safe out-of-box, but guard against odd reflection ---
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable <methods>;
+}
