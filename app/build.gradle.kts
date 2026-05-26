@@ -1,7 +1,28 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun signingProperty(key: String): String? =
+    localProperties.getProperty(key) ?: System.getenv(key)
+
+val releaseKeystorePath = signingProperty("DARKMATTER_KEYSTORE_PATH")
+val releaseKeystorePassword = signingProperty("DARKMATTER_KEYSTORE_PASSWORD")
+val releaseKeyAlias = signingProperty("DARKMATTER_KEY_ALIAS")
+val releaseKeyPassword = signingProperty("DARKMATTER_KEY_PASSWORD")
+val hasReleaseSigning =
+    !releaseKeystorePath.isNullOrBlank() &&
+        !releaseKeystorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank() &&
+        file(releaseKeystorePath!!).exists()
 
 android {
     namespace = "dev.ipf.darkmatter"
@@ -19,13 +40,30 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {
@@ -42,6 +80,14 @@ android {
                 "lib/mips/libjnidispatch.so",
                 "lib/mips64/libjnidispatch.so"
             )
+        }
+    }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = true
         }
     }
 }
