@@ -101,6 +101,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.emoji2.emojipicker)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("net.java.dev.jna:jna:5.18.1@aar")
     implementation(libs.zxing.core)

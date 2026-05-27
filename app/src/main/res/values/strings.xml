@@ -83,6 +83,17 @@
     <string name="make_admin">Make admin</string>
     <string name="remove_member">Remove member</string>
     <string name="message_deleted">Message deleted</string>
+    <string name="message_reacted">Reacted %1$s</string>
+    <string name="message_reaction_fallback">to a message</string>
+    <string name="message_deleted_preview">Deleted a message</string>
+    <string name="agent_stream_started">Agent stream started</string>
+    <string name="stream_finished">Stream finished</string>
+    <string name="media_attachment">Media attachment</string>
+    <string name="generic_message">Message</string>
+    <string name="waiting_for_stream">Waiting for stream...</string>
+    <string name="stream_failed_format">Stream failed: %1$s</string>
+    <string name="copy_text">Copy text</string>
+    <string name="open_emoji_picker">Open emoji picker</string>
     <string name="reply">Reply</string>
     <string name="delete">Delete</string>
     <string name="sent">Sent</string>
@@ -184,6 +195,8 @@
     <string name="unknown_publish_time">Unknown publish time</string>
     <string name="published_at">Published %1$s</string>
     <string name="send_to_self">Send to self</string>
+    <string name="diagnostic_sent_ping_to_self">Sent ping to self in %1$s</string>
+    <string name="diagnostic_send_to_self_failed">Send-to-self failed: %1$s</string>
     <string name="clear">Clear</string>
     <string name="live">Live</string>
     <string name="relay_health">Relay Health</string>

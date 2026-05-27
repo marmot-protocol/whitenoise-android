@@ -84,6 +84,26 @@ class MessageProjectorTest {
     }
 
     @Test
+    fun messageFallbackCopyCanBeLocalizedByUi() {
+        val copy = MessageTextCopy(
+            reactedFormat = "R:%1\$s",
+            reactionFallback = "target",
+            deleted = "deleted",
+            agentStreamStarted = "started",
+            streamFinished = "finished",
+            mediaAttachment = "media",
+            message = "message",
+        )
+        val reaction = reaction(id = "r1", sender = "alice", target = "m1", emoji = "", at = 1u)
+        val delete = delete(id = "d1", sender = "alice", target = "m1", at = 2u)
+        val blank = message(id = "blank", plaintext = "")
+
+        assertEquals("R:target", MessageProjector.previewText(reaction, copy))
+        assertEquals("deleted", MessageProjector.previewText(delete, copy))
+        assertEquals("message", MessageProjector.previewText(blank, copy))
+    }
+
+    @Test
     fun outgoingAndDeletedPredicatesAreStable() {
         val sent = message(id = "m1", direction = "sent")
         val received = message(id = "m2", direction = "received")
