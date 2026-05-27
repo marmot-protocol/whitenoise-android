@@ -76,6 +76,11 @@
     <string name="epoch">Époque</string>
     <string name="mls_members">Membres MLS</string>
     <string name="required_components">Composants requis</string>
+    <string name="export_forensics_dump">Exporter le dump forensique</string>
+    <string name="exporting_forensics_dump">Export du dump forensique...</string>
+    <string name="export_public_forensics_dump">Exporter le dump public</string>
+    <string name="export_sensitive_forensics_dump">Exporter le dump sensible</string>
+    <string name="sensitive_forensics_dump_warning">Les dumps sensibles incluent les vrais IDs de compte, IDs de groupe, URL de relais, métadonnées de payload et autres détails locaux de débogage.</string>
     <string name="error_qr_not_valid_npub_or_public_key">Ce code QR n’est pas un npub ou une clé publique valide.</string>
     <string name="admin">Administrateur</string>
     <string name="member_actions">Actions des membres</string>
@@ -281,6 +286,8 @@
     <string name="toast_admin_removed">Administrateur supprimé</string>
     <string name="toast_couldnt_update_admin">Impossible de mettre à jour l’admin</string>
     <string name="toast_couldnt_load_mls_state">Impossible de charger l’état MLS</string>
+    <string name="toast_forensics_dump_exported">Dump forensique exporté</string>
+    <string name="toast_couldnt_export_forensics_dump">Impossible d’exporter le dump forensique</string>
     <string name="toast_chat_created">Chat créé</string>
     <string name="toast_notification_permission_denied">Autorisation de notification refusée</string>
     <string name="toast_copied_npub">npub copié</string>

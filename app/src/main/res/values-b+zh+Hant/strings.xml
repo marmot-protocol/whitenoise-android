@@ -76,6 +76,11 @@
     <string name="epoch">紀元</string>
     <string name="mls_members">MLS 成員</string>
     <string name="required_components">所需組件</string>
+    <string name="export_forensics_dump">匯出鑑識轉儲</string>
+    <string name="exporting_forensics_dump">正在匯出鑑識轉儲...</string>
+    <string name="export_public_forensics_dump">匯出公開轉儲</string>
+    <string name="export_sensitive_forensics_dump">匯出敏感轉儲</string>
+    <string name="sensitive_forensics_dump_warning">敏感轉儲包含實際帳號 ID、群組 ID、中繼 URL、payload 中繼資料以及其他本機除錯詳細資料。</string>
     <string name="error_qr_not_valid_npub_or_public_key">該 QR 程式碼不是有效的 npub 或公鑰。</string>
     <string name="admin">管理員</string>
     <string name="member_actions">會員行動</string>
@@ -281,6 +286,8 @@
     <string name="toast_admin_removed">管理員已刪除</string>
     <string name="toast_couldnt_update_admin">無法更新管理員</string>
     <string name="toast_couldnt_load_mls_state">無法載入 MLS 狀態</string>
+    <string name="toast_forensics_dump_exported">鑑識轉儲已匯出</string>
+    <string name="toast_couldnt_export_forensics_dump">無法匯出鑑識轉儲</string>
     <string name="toast_chat_created">聊天已建立</string>
     <string name="toast_notification_permission_denied">通知權限被拒絕</string>
     <string name="toast_copied_npub">已複製 npub</string>

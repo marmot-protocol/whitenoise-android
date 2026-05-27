@@ -76,6 +76,11 @@
     <string name="epoch">Эпоха</string>
     <string name="mls_members">MLS членов</string>
     <string name="required_components">Необходимые компоненты</string>
+    <string name="export_forensics_dump">Экспортировать криминалистический дамп</string>
+    <string name="exporting_forensics_dump">Экспорт криминалистического дампа...</string>
+    <string name="export_public_forensics_dump">Экспортировать публичный дамп</string>
+    <string name="export_sensitive_forensics_dump">Экспортировать чувствительный дамп</string>
+    <string name="sensitive_forensics_dump_warning">Чувствительные дампы содержат реальные ID аккаунтов, ID групп, URL релеев, метаданные payload и другие локальные отладочные данные.</string>
     <string name="error_qr_not_valid_npub_or_public_key">Этот код QR не является действительным npub или открытым ключом.</string>
     <string name="admin">Админ</string>
     <string name="member_actions">Действия участника</string>
@@ -281,6 +286,8 @@
     <string name="toast_admin_removed">Администратор удален</string>
     <string name="toast_couldnt_update_admin">Не удалось обновить админа</string>
     <string name="toast_couldnt_load_mls_state">Не удалось загрузить состояние MLS</string>
+    <string name="toast_forensics_dump_exported">Криминалистический дамп экспортирован</string>
+    <string name="toast_couldnt_export_forensics_dump">Не удалось экспортировать криминалистический дамп</string>
     <string name="toast_chat_created">Чат создан</string>
     <string name="toast_notification_permission_denied">Разрешение на уведомление отклонено</string>
     <string name="toast_copied_npub">npub скопирован</string>

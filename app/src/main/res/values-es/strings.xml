@@ -76,6 +76,11 @@
     <string name="epoch">Época</string>
     <string name="mls_members">Miembros de MLS</string>
     <string name="required_components">Componentes necesarios</string>
+    <string name="export_forensics_dump">Exportar volcado forense</string>
+    <string name="exporting_forensics_dump">Exportando volcado forense...</string>
+    <string name="export_public_forensics_dump">Exportar volcado público</string>
+    <string name="export_sensitive_forensics_dump">Exportar volcado sensible</string>
+    <string name="sensitive_forensics_dump_warning">Los volcados sensibles incluyen IDs reales de cuenta, IDs de grupo, URL de relés, metadatos de payload y otros detalles locales de depuración.</string>
     <string name="error_qr_not_valid_npub_or_public_key">Ese código QR no es un npub válido o una clave pública.</string>
     <string name="admin">administrador</string>
     <string name="member_actions">Acciones de miembros</string>
@@ -281,6 +286,8 @@
     <string name="toast_admin_removed">Administrador eliminado</string>
     <string name="toast_couldnt_update_admin">No se pudo actualizar el administrador</string>
     <string name="toast_couldnt_load_mls_state">No se pudo cargar el estado MLS</string>
+    <string name="toast_forensics_dump_exported">Volcado forense exportado</string>
+    <string name="toast_couldnt_export_forensics_dump">No se pudo exportar el volcado forense</string>
     <string name="toast_chat_created">Chat creado</string>
     <string name="toast_notification_permission_denied">Permiso de notificación denegado</string>
     <string name="toast_copied_npub">npub copiado</string>

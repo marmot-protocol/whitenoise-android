@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
@@ -161,6 +162,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.DiagnosticFormatter
+import dev.ipf.darkmatter.core.ForensicsExportFileName
 import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
@@ -202,6 +204,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
+import dev.ipf.marmotkit.ForensicsDumpModeFfi
 import dev.ipf.marmotkit.RelayHealthFfi
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -225,6 +228,12 @@ private enum class SettingsDetail {
     KeyPackages,
     Notifications,
 }
+
+private val ForensicsDumpModeFfi.fileNamePart: String
+    get() = when (this) {
+        ForensicsDumpModeFfi.PUBLIC -> "public"
+        ForensicsDumpModeFfi.SENSITIVE -> "sensitive"
+    }
 
 private data class DiagnosticLogEntry(
     val id: String = UUID.randomUUID().toString(),
@@ -1316,12 +1325,38 @@ private fun GroupDetailsSheet(
     var showMemberScanner by remember { mutableStateOf(false) }
     var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
     var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var forensicsExportingMode by remember(controller.group.groupIdHex) { mutableStateOf<ForensicsDumpModeFfi?>(null) }
+    var pendingForensicsJson by remember(controller.group.groupIdHex) { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val groupTitleCopy = rememberGroupTitleCopy()
     val oneValidMemberReferenceError = stringResource(R.string.error_one_valid_member_reference)
     val qrNotValidNpubOrPublicKeyError = stringResource(R.string.error_qr_not_valid_npub_or_public_key)
+    val forensicsExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        val json = pendingForensicsJson
+        pendingForensicsJson = null
+        if (uri != null && json != null) {
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val output = context.contentResolver.openOutputStream(uri)
+                            ?: error("Could not open export destination")
+                        output.bufferedWriter(Charsets.UTF_8).use { writer ->
+                            writer.write(json)
+                        }
+                    }
+                }.onSuccess {
+                    appState.present(R.string.toast_forensics_dump_exported)
+                }.onFailure {
+                    appState.present(R.string.toast_couldnt_export_forensics_dump, AppText.Plain(it.message ?: it.javaClass.simpleName))
+                }
+            }
+        }
+    }
 
     suspend fun refreshMlsDetails() {
         if (!appState.developerMode) return
@@ -1339,6 +1374,25 @@ private fun GroupDetailsSheet(
                 mutation()
             } finally {
                 refreshMlsDetails()
+            }
+        }
+    }
+
+    fun exportForensicsDump(mode: ForensicsDumpModeFfi) {
+        scope.launch {
+            forensicsExportingMode = mode
+            try {
+                val json = controller.groupForensicsJson(mode) ?: return@launch
+                pendingForensicsJson = json
+                forensicsExportLauncher.launch(
+                    ForensicsExportFileName.build(
+                        groupIdHex = controller.group.groupIdHex,
+                        mode = mode.fileNamePart,
+                        nowMillis = System.currentTimeMillis(),
+                    ),
+                )
+            } finally {
+                forensicsExportingMode = null
             }
         }
     }
@@ -1526,6 +1580,30 @@ private fun GroupDetailsSheet(
                             DiagnosticRow(stringResource(R.string.required_components), state.requiredAppComponents.joinToString(", "))
                         }
                     }
+                    val exportBusy = forensicsExportingMode != null
+                    OutlinedButton(
+                        onClick = { exportForensicsDump(ForensicsDumpModeFfi.PUBLIC) },
+                        enabled = !exportBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.export_public_forensics_dump))
+                    }
+                    OutlinedButton(
+                        onClick = { exportForensicsDump(ForensicsDumpModeFfi.SENSITIVE) },
+                        enabled = !exportBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.export_sensitive_forensics_dump))
+                    }
+                    Text(
+                        stringResource(R.string.sensitive_forensics_dump_warning),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
