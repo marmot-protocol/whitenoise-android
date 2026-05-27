@@ -8,12 +8,14 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,6 +33,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,7 +55,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Group
@@ -73,6 +78,7 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
@@ -105,6 +111,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TopAppBar
@@ -119,6 +126,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -131,6 +139,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
@@ -146,6 +155,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -155,15 +165,19 @@ import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MessageProjector
+import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ProfileLink
 import dev.ipf.darkmatter.core.ProfileSanitizer
 import dev.ipf.darkmatter.core.QrCodeEncoder
 import dev.ipf.darkmatter.core.RecipientReference
+import dev.ipf.darkmatter.core.RecentEmojiList
+import dev.ipf.darkmatter.core.ReplySwipe
 import dev.ipf.darkmatter.state.AppPhase
 import dev.ipf.darkmatter.state.AppText
 import dev.ipf.darkmatter.state.AppThemeMode
 import dev.ipf.darkmatter.state.ChatListItem
 import dev.ipf.darkmatter.state.ChatsController
+import dev.ipf.darkmatter.state.ConversationControllerCopy
 import dev.ipf.darkmatter.state.ConversationController
 import dev.ipf.darkmatter.state.DarkMatterAppState
 import dev.ipf.darkmatter.state.MessageStatus
@@ -195,6 +209,7 @@ import dev.ipf.marmotkit.MarmotKitException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private enum class MainSection {
     Chats,
@@ -241,6 +256,27 @@ private fun rememberGroupTitleCopy(): GroupTitleCopy {
     return GroupTitleCopy(
         inviteFromFormat = stringResource(R.string.group_title_invite_from),
         groupOfPeopleFormat = stringResource(R.string.group_title_people_count),
+    )
+}
+
+@Composable
+private fun rememberMessageTextCopy(): MessageTextCopy {
+    return MessageTextCopy(
+        reactedFormat = stringResource(R.string.message_reacted),
+        reactionFallback = stringResource(R.string.message_reaction_fallback),
+        deleted = stringResource(R.string.message_deleted_preview),
+        agentStreamStarted = stringResource(R.string.agent_stream_started),
+        streamFinished = stringResource(R.string.stream_finished),
+        mediaAttachment = stringResource(R.string.media_attachment),
+        message = stringResource(R.string.generic_message),
+    )
+}
+
+@Composable
+private fun rememberConversationControllerCopy(): ConversationControllerCopy {
+    return ConversationControllerCopy(
+        waitingForStream = stringResource(R.string.waiting_for_stream),
+        streamFailedFormat = stringResource(R.string.stream_failed_format),
     )
 }
 
@@ -528,11 +564,13 @@ private fun SignInContent(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainShell(appState: DarkMatterAppState) {
-    var section by remember { mutableStateOf(MainSection.Chats) }
-    var settingsDetail by remember { mutableStateOf<SettingsDetail?>(null) }
+    var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
+    var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedChat by remember { mutableStateOf<ChatListItem?>(null) }
     var profileQrAccountId by remember { mutableStateOf<String?>(null) }
     val chatsController = remember(appState.activeAccountRef) { ChatsController(appState) }
+    val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
+    val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
 
     LaunchedEffect(chatsController, appState.activeAccountRef) {
         chatsController.bind(appState.activeAccountRef)
@@ -574,8 +612,8 @@ private fun MainShell(appState: DarkMatterAppState) {
             appState = appState,
             controller = chatsController,
             onOpenSettings = {
-                section = MainSection.Settings
-                settingsDetail = null
+                sectionName = MainSection.Settings.name
+                settingsDetailName = null
             },
             onOpenGroup = { selectedChat = it },
             onOpenProfile = {
@@ -587,21 +625,21 @@ private fun MainShell(appState: DarkMatterAppState) {
         MainSection.Settings -> SettingsScreen(
             appState = appState,
             onBackToChats = {
-                section = MainSection.Chats
-                settingsDetail = null
+                sectionName = MainSection.Chats.name
+                settingsDetailName = null
             },
             onOpenDiagnostics = {
-                section = MainSection.Diagnostics
-                settingsDetail = null
+                sectionName = MainSection.Diagnostics.name
+                settingsDetailName = null
             },
             detail = settingsDetail,
-            onDetailChange = { settingsDetail = it },
+            onDetailChange = { settingsDetailName = it?.name },
         )
         MainSection.Diagnostics -> DiagnosticsScreen(
             appState = appState,
             onBackToChats = {
-                section = MainSection.Chats
-                settingsDetail = null
+                sectionName = MainSection.Chats.name
+                settingsDetailName = null
             },
         )
     }
@@ -814,6 +852,7 @@ private fun ChatRow(
     onClick: () -> Unit,
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
+    val messageTextCopy = rememberMessageTextCopy()
     val title = GroupProjector.displayTitle(
         group = item.group,
         otherMemberAccount = item.otherMemberAccount,
@@ -839,7 +878,15 @@ private fun ChatRow(
         },
         supportingContent = {
             Text(
-                if (item.group.pendingConfirmation) stringResource(R.string.invitation) else MessageProjector.previewText(item.latest),
+                if (item.group.pendingConfirmation) {
+                    stringResource(R.string.invitation)
+                } else {
+                    MessageProjector.previewText(
+                        message = item.latest,
+                        copy = messageTextCopy,
+                        empty = stringResource(R.string.no_messages_yet),
+                    )
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1061,12 +1108,14 @@ private fun ConversationScreen(
     chat: ChatListItem,
     onBack: () -> Unit,
 ) {
+    val controllerCopy = rememberConversationControllerCopy()
     val controller = remember(chat.id) {
         ConversationController(
             appState = appState,
             initialGroup = chat.group,
             initialMemberSnapshot = chat.memberSnapshot
                 ?: appState.cachedGroupMemberSnapshot(appState.activeAccountRef, chat.group.groupIdHex),
+            copy = controllerCopy,
         )
     }
     var menuOpen by remember { mutableStateOf(false) }
@@ -1074,7 +1123,16 @@ private fun ConversationScreen(
     val listState = rememberLazyListState()
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val groupTitleCopy = rememberGroupTitleCopy()
+    val messageTextCopy = rememberMessageTextCopy()
+    var recentReactionEmojis by remember(context) {
+        mutableStateOf(RecentEmojiPreferences.load(context))
+    }
+
+    fun recordReactionEmoji(emoji: String) {
+        recentReactionEmojis = RecentEmojiPreferences.recordPicked(context, emoji)
+    }
 
     BackHandler(enabled = !showDetails) {
         onBack()
@@ -1151,6 +1209,7 @@ private fun ConversationScreen(
                 ComposerBar(
                     replyingTo = controller.replyingTo,
                     sendInFlight = controller.sendInFlight,
+                    messageTextCopy = messageTextCopy,
                     onCancelReply = { controller.replyingTo = null },
                     onSend = { scope.launch { controller.send(it) } },
                 )
@@ -1189,6 +1248,8 @@ private fun ConversationScreen(
                             item = item,
                             controller = controller,
                             appState = appState,
+                            recentReactionEmojis = recentReactionEmojis,
+                            onReactionEmojiPicked = ::recordReactionEmoji,
                         )
                     }
                     item { Spacer(Modifier.height(8.dp)) }
@@ -1562,6 +1623,8 @@ private fun MessageBubble(
     item: TimelineMessage,
     controller: ConversationController,
     appState: DarkMatterAppState,
+    recentReactionEmojis: List<String>,
+    onReactionEmojiPicked: (String) -> Unit,
 ) {
     val record = item.record
     val mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex)
@@ -1573,12 +1636,40 @@ private fun MessageBubble(
     }
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
-    val quickReactions = listOf("👍", "❤️", "😂", "🎉", "😮")
+    var swipeDrag by remember(record.messageIdHex) { mutableStateOf(0f) }
+    val animatedSwipeOffset by animateFloatAsState(targetValue = swipeDrag, label = "replySwipeOffset")
+    val clipboard = LocalClipboardManager.current
+    val density = LocalDensity.current
+    val replySwipeThresholdPx = with(density) { 64.dp.toPx() }
+    val maxSwipeOffsetPx = with(density) { 72.dp.toPx() }
+    val messageTextCopy = rememberMessageTextCopy()
+    val displayedBody = if (deleted) {
+        stringResource(R.string.message_deleted)
+    } else {
+        MessageProjector.displayBody(record, messageTextCopy)
+    }
     val showSenderAvatar = GroupProjector.shouldShowTranscriptSenderAvatar(
         memberCount = controller.members.size,
         mine = mine,
     )
     val timestampColor = MaterialTheme.colorScheme.onSurfaceVariant
+    var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    val quickReactionEmojis = RecentEmojiList.quickChoices(recentReactionEmojis)
+    fun beginReply() {
+        controller.replyingTo = record
+        menuOpen = false
+    }
+
+    fun reactWithEmoji(emoji: String) {
+        onReactionEmojiPicked(emoji)
+        scope.launch { controller.toggleReaction(emoji, record) }
+    }
+
+    fun copyMessageText() {
+        clipboard.setText(AnnotatedString(displayedBody))
+        appState.present(R.string.copied)
+        menuOpen = false
+    }
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val messageGroupMaxWidth = maxWidth * 0.95f
@@ -1603,10 +1694,28 @@ private fun MessageBubble(
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 Surface(
-                    modifier = Modifier.combinedClickable(
-                        onClick = {},
-                        onLongClick = { menuOpen = true },
-                    ),
+                    modifier = Modifier
+                        .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) }
+                        .pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
+                            detectHorizontalDragGestures(
+                                onHorizontalDrag = { change, dragAmount ->
+                                    val next = ReplySwipe.visualOffset(swipeDrag + dragAmount, maxSwipeOffsetPx)
+                                    if (next != swipeDrag || dragAmount > 0f) change.consume()
+                                    swipeDrag = next
+                                },
+                                onDragEnd = {
+                                    if (ReplySwipe.shouldTriggerReply(swipeDrag, totalY = 0f, threshold = replySwipeThresholdPx)) {
+                                        beginReply()
+                                    }
+                                    swipeDrag = 0f
+                                },
+                                onDragCancel = { swipeDrag = 0f },
+                            )
+                        }
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = { menuOpen = true },
+                        ),
                     color = bubbleColor,
                     shape = RoundedCornerShape(18.dp),
                     tonalElevation = if (mine) 1.dp else 0.dp,
@@ -1619,7 +1728,7 @@ private fun MessageBubble(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        controller.replyPreview(record)?.let { (name, body) ->
+                        controller.replyPreview(record, messageTextCopy)?.let { (name, body) ->
                             Surface(
                                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
                                 shape = RoundedCornerShape(10.dp),
@@ -1631,7 +1740,7 @@ private fun MessageBubble(
                             }
                         }
                         Text(
-                            if (deleted) stringResource(R.string.message_deleted) else MessageProjector.displayBody(record),
+                            displayedBody,
                             style = MaterialTheme.typography.bodyLarge,
                         )
                         Row(
@@ -1647,37 +1756,37 @@ private fun MessageBubble(
                             if (mine) {
                                 OutgoingMessageStatusIcon(item.status, tint = timestampColor)
                             }
-                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.reply)) },
-                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null) },
-                                    onClick = {
-                                        controller.replyingTo = record
-                                        menuOpen = false
-                                    },
-                                )
-                                quickReactions.forEach { emoji ->
-                                    DropdownMenuItem(
-                                        text = { Text(emoji) },
-                                        onClick = {
-                                            menuOpen = false
-                                            scope.launch { controller.toggleReaction(emoji, record) }
-                                        },
-                                    )
-                                }
-                                if (mine && record.messageIdHex.isNotBlank()) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.delete)) },
-                                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                                        onClick = {
-                                            menuOpen = false
-                                            scope.launch { controller.deleteMessage(record) }
-                                        },
-                                    )
-                                }
-                            }
+                            MessageActionMenu(
+                                expanded = menuOpen,
+                                canDelete = mine && record.messageIdHex.isNotBlank(),
+                                quickReactionEmojis = quickReactionEmojis,
+                                onDismissRequest = { menuOpen = false },
+                                onReact = { emoji ->
+                                    menuOpen = false
+                                    reactWithEmoji(emoji)
+                                },
+                                onOpenEmojiPicker = {
+                                    menuOpen = false
+                                    emojiPickerOpen = true
+                                },
+                                onReply = ::beginReply,
+                                onCopyText = ::copyMessageText,
+                                onDelete = {
+                                    menuOpen = false
+                                    scope.launch { controller.deleteMessage(record) }
+                                },
+                            )
                         }
                     }
+                }
+                if (emojiPickerOpen) {
+                    EmojiPickerSheet(
+                        onDismissRequest = { emojiPickerOpen = false },
+                        onEmojiPicked = { emoji ->
+                            emojiPickerOpen = false
+                            reactWithEmoji(emoji)
+                        },
+                    )
                 }
                 val tallies = controller.reactions[record.messageIdHex].orEmpty()
                 if (tallies.isNotEmpty()) {
@@ -1692,6 +1801,141 @@ private fun MessageBubble(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MessageActionMenu(
+    expanded: Boolean,
+    canDelete: Boolean,
+    quickReactionEmojis: List<String>,
+    onDismissRequest: () -> Unit,
+    onReact: (String) -> Unit,
+    onOpenEmojiPicker: () -> Unit,
+    onReply: () -> Unit,
+    onCopyText: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismissRequest) {
+        Column(
+            modifier = Modifier.padding(8.dp).widthIn(min = 292.dp, max = 328.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                quickReactionEmojis.forEach { emoji ->
+                    EmojiActionButton(
+                        emoji = emoji,
+                        onClick = { onReact(emoji) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                IconButton(
+                    onClick = onOpenEmojiPicker,
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(
+                        Icons.Default.EmojiEmotions,
+                        contentDescription = stringResource(R.string.open_emoji_picker),
+                    )
+                }
+            }
+            HorizontalDivider()
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                MessageActionButton(
+                    label = stringResource(R.string.reply),
+                    icon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    onClick = onReply,
+                )
+                MessageActionButton(
+                    label = stringResource(R.string.copy_text),
+                    icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    onClick = onCopyText,
+                )
+                if (canDelete) {
+                    MessageActionButton(
+                        label = stringResource(R.string.delete),
+                        icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        onClick = onDelete,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EmojiPickerSheet(
+    onDismissRequest: () -> Unit,
+    onEmojiPicked: (String) -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        AndroidView(
+            modifier = Modifier.fillMaxWidth().height(384.dp).navigationBarsPadding(),
+            factory = { context ->
+                EmojiPickerView(context).apply {
+                    emojiGridColumns = 8
+                    emojiGridRows = 5.25f
+                    setOnEmojiPickedListener { item -> onEmojiPicked(item.emoji) }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun EmojiActionButton(
+    emoji: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.height(36.dp).clip(CircleShape).clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = CircleShape,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(emoji, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@Composable
+private fun MessageActionButton(
+    label: String,
+    icon: @Composable () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth().heightIn(min = 48.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            icon()
+            Spacer(Modifier.width(8.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -1759,6 +2003,7 @@ private fun SendingMessageIcon(tint: Color) {
 private fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
     sendInFlight: Boolean,
+    messageTextCopy: MessageTextCopy,
     onCancelReply: () -> Unit,
     onSend: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -1780,7 +2025,7 @@ private fun ComposerBar(
                 Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    MessageProjector.displayBody(replyingTo),
+                    MessageProjector.displayBody(replyingTo, messageTextCopy),
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -3254,6 +3499,8 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () ->
     var entries by remember { mutableStateOf<List<DiagnosticLogEntry>>(emptyList()) }
     var streaming by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val sentPingFormat = stringResource(R.string.diagnostic_sent_ping_to_self)
+    val sendToSelfFailedFormat = stringResource(R.string.diagnostic_send_to_self_failed)
 
     fun appendLog(text: String) {
         entries = (entries + DiagnosticLogEntry(text = text)).takeLast(500)
@@ -3315,9 +3562,9 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () ->
                                         )
                                     }
                                     appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }
-                                    appendLog("sent ping to self in ${IdentityFormatter.short(groupId)}")
+                                    appendLog(String.format(sentPingFormat, IdentityFormatter.short(groupId)))
                                 }.onFailure {
-                                    appendLog("send-to-self failed: ${it.message ?: it.javaClass.simpleName}")
+                                    appendLog(String.format(sendToSelfFailedFormat, it.message ?: it.javaClass.simpleName))
                                 }
                             }
                         },

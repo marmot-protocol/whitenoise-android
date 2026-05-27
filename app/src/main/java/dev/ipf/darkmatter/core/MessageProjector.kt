@@ -9,6 +9,30 @@ data class ReactionTally(
     val mine: Boolean,
 )
 
+data class MessageTextCopy(
+    val reactedFormat: String,
+    val reactionFallback: String,
+    val deleted: String,
+    val agentStreamStarted: String,
+    val streamFinished: String,
+    val mediaAttachment: String,
+    val message: String,
+) {
+    fun reacted(value: String): String = String.format(reactedFormat, value)
+
+    companion object {
+        val Default = MessageTextCopy(
+            reactedFormat = "Reacted %1\$s",
+            reactionFallback = "to a message",
+            deleted = "Deleted a message",
+            agentStreamStarted = "Agent stream started",
+            streamFinished = "Stream finished",
+            mediaAttachment = "Media attachment",
+            message = "Message",
+        )
+    }
+}
+
 object MessageProjector {
     private val KindDelete = 5uL
     private val KindReaction = 7uL
@@ -22,29 +46,29 @@ object MessageProjector {
     private const val StreamStartTag = "stream-start"
     private const val StreamHashTag = "stream-hash"
 
-    fun displayBody(message: AppMessageRecordFfi): String {
+    fun displayBody(message: AppMessageRecordFfi, copy: MessageTextCopy = MessageTextCopy.Default): String {
         return when {
-            isReaction(message) -> "Reacted ${message.plaintext.ifBlank { "to a message" }}"
-            isDelete(message) -> "Deleted a message"
-            isStreamStart(message) -> message.plaintext.ifBlank { "Agent stream started" }
+            isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
+            isDelete(message) -> copy.deleted
+            isStreamStart(message) -> message.plaintext.ifBlank { copy.agentStreamStarted }
             isMedia(message) -> message.plaintext.takeIf { it.isNotBlank() }
                 ?: imetaField(message, "filename")
-                ?: "Media attachment"
+                ?: copy.mediaAttachment
             else -> message.plaintext
         }
     }
 
-    fun previewText(message: AppMessageRecordFfi?): String {
-        if (message == null) return "No messages yet"
+    fun previewText(message: AppMessageRecordFfi?, copy: MessageTextCopy = MessageTextCopy.Default, empty: String = "No messages yet"): String {
+        if (message == null) return empty
         return when {
-            isReaction(message) -> "Reacted ${message.plaintext.ifBlank { "to a message" }}"
-            isDelete(message) -> "Deleted a message"
-            isStreamStart(message) -> "Agent stream started"
-            isStreamFinal(message) -> message.plaintext.ifBlank { "Stream finished" }
+            isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
+            isDelete(message) -> copy.deleted
+            isStreamStart(message) -> copy.agentStreamStarted
+            isStreamFinal(message) -> message.plaintext.ifBlank { copy.streamFinished }
             isMedia(message) -> message.plaintext.takeIf { it.isNotBlank() }
                 ?: imetaField(message, "filename")
-                ?: "Media attachment"
-            else -> message.plaintext.ifBlank { "Message" }
+                ?: copy.mediaAttachment
+            else -> message.plaintext.ifBlank { copy.message }
         }
     }
 

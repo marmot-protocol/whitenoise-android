@@ -27,6 +27,7 @@ import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.MessageUpdateFfi
 import dev.ipf.marmotkit.MessagesSubscription
 import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
+import dev.ipf.darkmatter.core.MessageTextCopy
 
 data class ChatListItem(
     val group: AppGroupRecordFfi,
@@ -132,6 +133,13 @@ data class TimelineMessage(
     val record: AppMessageRecordFfi,
     val status: MessageStatus,
 )
+
+data class ConversationControllerCopy(
+    val waitingForStream: String = "Waiting for stream...",
+    val streamFailedFormat: String = "Stream failed: %1\$s",
+) {
+    fun streamFailed(message: String): String = String.format(streamFailedFormat, message)
+}
 
 class ChatsController(private val appState: DarkMatterAppState) {
     var items by mutableStateOf<List<ChatListItem>>(emptyList())
@@ -324,6 +332,7 @@ class ConversationController(
     private val appState: DarkMatterAppState,
     initialGroup: AppGroupRecordFfi,
     initialMemberSnapshot: GroupMemberSnapshot? = null,
+    private val copy: ConversationControllerCopy = ConversationControllerCopy(),
 ) {
     var group by mutableStateOf(initialGroup)
         private set
@@ -687,10 +696,10 @@ class ConversationController(
         }.getOrNull()
     }
 
-    fun replyPreview(record: AppMessageRecordFfi): Pair<String, String>? {
+    fun replyPreview(record: AppMessageRecordFfi, copy: MessageTextCopy = MessageTextCopy.Default): Pair<String, String>? {
         val targetMessageId = MessageProjector.replyTargetMessageId(record) ?: return null
         val target = messageById[targetMessageId] ?: return null
-        return appState.displayName(target.sender) to MessageProjector.displayBody(target)
+        return appState.displayName(target.sender) to MessageProjector.displayBody(target, copy)
     }
 
     private fun fold(update: MessageUpdateFfi, startStreamWatch: (String) -> Unit) {
@@ -735,7 +744,7 @@ class ConversationController(
     private fun ingestStreamStart(record: AppMessageRecordFfi) {
         val streamId = MessageProjector.streamId(record)
         val id = streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}"
-        val preview = record.copy(plaintext = record.plaintext.ifBlank { "Waiting for stream..." })
+        val preview = record.copy(plaintext = record.plaintext.ifBlank { copy.waitingForStream })
         upsert(TimelineMessage(id, preview, MessageStatus.Streaming))
     }
 
@@ -803,14 +812,14 @@ class ConversationController(
                         updateStreamPreview(streamId, text, MessageStatus.Sent)
                     }
                     is AgentStreamUpdateFfi.Failed -> {
-                        updateStreamPreview(streamId, "Stream failed: ${update.message}", MessageStatus.Failed)
+                        updateStreamPreview(streamId, copy.streamFailed(update.message), MessageStatus.Failed)
                     }
                 }
             }
         } catch (throwable: Throwable) {
             updateStreamPreview(
                 streamId,
-                "Stream failed: ${throwable.message ?: throwable.javaClass.simpleName}",
+                copy.streamFailed(throwable.message ?: throwable.javaClass.simpleName),
                 MessageStatus.Failed,
             )
         } finally {
