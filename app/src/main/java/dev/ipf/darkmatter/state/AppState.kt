@@ -1,17 +1,29 @@
 package dev.ipf.darkmatter.state
 
+import android.app.LocaleManager
 import android.content.Context
+import android.os.LocaleList
+import android.util.Log
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MarmotClient
 import dev.ipf.darkmatter.core.ProfileLink
 import dev.ipf.darkmatter.core.ProfileSanitizer
+import dev.ipf.darkmatter.notifications.BackgroundConnectionPreferences
+import dev.ipf.darkmatter.notifications.LocalNotificationPolicy
+import dev.ipf.darkmatter.notifications.LocalNotificationPresenter
+import dev.ipf.darkmatter.notifications.NotificationStreamForegroundService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.ipf.marmotkit.AccountKeyPackageFfi
@@ -19,6 +31,7 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 
 sealed interface AppPhase {
@@ -29,8 +42,8 @@ sealed interface AppPhase {
 }
 
 data class ToastMessage(
-    val title: String,
-    val detail: String? = null,
+    val title: AppText,
+    val detail: AppText? = null,
 )
 
 private data class ProfilePresentation(
@@ -55,6 +68,7 @@ class DarkMatterAppState(context: Context) {
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("darkmatter", Context.MODE_PRIVATE)
     private var client: MarmotClient? = null
+    private val localNotificationPresenter = LocalNotificationPresenter(appContext)
 
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
         private set
@@ -68,10 +82,25 @@ class DarkMatterAppState(context: Context) {
     var developerMode by mutableStateOf(preferences.getBoolean(DEVELOPER_MODE_KEY, false))
         private set
 
+    var themeMode by mutableStateOf(AppThemeMode.fromPreference(preferences.getString(THEME_MODE_KEY, null)))
+        private set
+
+    var languageTag by mutableStateOf(preferences.getString(LANGUAGE_TAG_KEY, null).orEmpty())
+        private set
+
     var toast by mutableStateOf<ToastMessage?>(null)
         private set
 
     var pendingProfileNpub by mutableStateOf<String?>(null)
+        private set
+
+    var localNotificationSettings by mutableStateOf<NotificationSettingsFfi?>(null)
+        private set
+
+    var localNotificationPermissionGranted by mutableStateOf(localNotificationPresenter.canPostNotifications())
+        private set
+
+    var backgroundConnectionEnabled by mutableStateOf(BackgroundConnectionPreferences.isEnabled(appContext))
         private set
 
     private val npubs = mutableStateMapOf<String, String>()
@@ -82,45 +111,90 @@ class DarkMatterAppState(context: Context) {
     private val groupMemberSnapshotLock = Any()
 
     private val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var notificationJob: Job? = null
+    private var appInForeground = false
+    private var activeConversationGroupIdHex: String? = null
     private val requestedProfiles = mutableSetOf<String>()
+
+    init {
+        applyLanguageTag(languageTag)
+    }
 
     val activeAccount: AccountSummaryFfi?
         get() = activeAccountRef?.let { ref -> accounts.firstOrNull { it.label == ref } }
 
     fun marmot(): Marmot = requireNotNull(client) { "Marmot is not initialized" }.marmot
 
+    suspend fun <T> marmotIo(block: suspend Marmot.() -> T): T {
+        return withContext(Dispatchers.IO) {
+            marmot().block()
+        }
+    }
+
     suspend fun bootstrap() {
+        if (client != null && phase != AppPhase.Bootstrapping) {
+            ensureNotificationRuntimeStarted()
+            phase = if (accounts.isEmpty()) AppPhase.Onboarding else AppPhase.Ready
+            return
+        }
         phase = AppPhase.Bootstrapping
         try {
             val opened = withContext(Dispatchers.IO) {
                 client ?: MarmotClient(appContext).also { client = it }
             }
-            opened.marmot.start()
+            appStateDebug { "bootstrap root=${opened.rootPath}" }
+            withContext(Dispatchers.IO) {
+                opened.marmot.start()
+            }
+            appStateDebug { "marmot started" }
+            localNotificationPresenter.ensureChannels()
+            refreshLocalNotificationPermission()
+            startNotificationListener()
             refreshAccounts()
+            appStateDebug {
+                "accounts loaded count=${accounts.size} active=$activeAccountRef labels=${accounts.map { it.label.take(8) to it.running }}"
+            }
             if (accounts.isEmpty()) {
+                localNotificationSettings = null
                 phase = AppPhase.Onboarding
             } else {
                 if (activeAccountRef == null || accounts.none { it.label == activeAccountRef }) {
                     setActiveAccount(accounts.first().label)
                 }
+                refreshLocalNotificationSettings()
                 phase = AppPhase.Ready
                 activeAccount?.accountIdHex?.let { warmProfile(it) }
             }
         } catch (error: Throwable) {
+            appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
             phase = AppPhase.Failed(error.readableMessage())
         }
     }
 
+    suspend fun ensureNotificationRuntimeStarted() {
+        if (client == null) {
+            bootstrap()
+            return
+        }
+        localNotificationPresenter.ensureChannels()
+        refreshLocalNotificationPermission()
+        startNotificationListener()
+        if (accounts.isEmpty()) refreshAccounts()
+        refreshLocalNotificationSettings()
+    }
+
     suspend fun createIdentity() {
         try {
-            val summary = marmot().createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
+            val summary = marmotIo { createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
             refreshAccounts()
             setActiveAccount(summary.label)
+            refreshLocalNotificationSettings()
             phase = AppPhase.Ready
-            present("Identity created")
+            present(R.string.toast_identity_created)
             warmProfile(summary.accountIdHex)
         } catch (error: Throwable) {
-            present("Couldn't create identity", error.readableMessage())
+            present(R.string.toast_couldnt_create_identity, AppText.Plain(error.readableMessage()))
         }
     }
 
@@ -128,27 +202,29 @@ class DarkMatterAppState(context: Context) {
         val trimmed = identity.trim()
         if (trimmed.isEmpty()) return
         try {
-            val summary = marmot().login(trimmed, MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
+            val summary = marmotIo { login(trimmed, MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
             refreshAccounts()
             setActiveAccount(summary.label)
+            refreshLocalNotificationSettings()
             phase = AppPhase.Ready
-            present("Identity imported")
+            present(R.string.toast_identity_imported)
             warmProfile(summary.accountIdHex)
         } catch (error: Throwable) {
-            present("Couldn't import identity", error.readableMessage())
+            present(R.string.toast_couldnt_import_identity, AppText.Plain(error.readableMessage()))
         }
     }
 
     suspend fun refreshAccounts() {
-        accounts = withContext(Dispatchers.IO) {
-            marmot().listAccounts()
-        }
+        accounts = marmotIo { listAccounts() }
     }
 
     fun setActiveAccount(label: String) {
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+        notificationScope.launch {
+            refreshLocalNotificationSettings()
+        }
     }
 
     fun signOutActiveAccount() {
@@ -160,32 +236,35 @@ class DarkMatterAppState(context: Context) {
         next?.let { label ->
             accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
         }
+        notificationScope.launch {
+            refreshLocalNotificationSettings()
+        }
     }
 
-    fun accountRelayLists(): AccountRelayListsFfi? {
+    suspend fun accountRelayLists(): AccountRelayListsFfi? {
         val account = activeAccountRef ?: return null
-        return runCatching { marmot().accountRelayLists(account) }.getOrNull()
+        return runCatching { marmotIo { accountRelayLists(account) } }.getOrNull()
     }
 
     suspend fun setAccountRelays(kind: RelayListKind, relays: List<String>): AccountRelayListsFfi? {
         val account = activeAccountRef ?: return null
         val next = normalizeRelayUrls(relays)
         if (next.isEmpty()) {
-            present("Relay list can't be empty")
+            present(R.string.toast_relay_list_empty)
             return accountRelayLists()
         }
         return runCatching {
-            withContext(Dispatchers.IO) {
+            marmotIo {
                 when (kind) {
-                    RelayListKind.Nip65 -> marmot().setAccountNip65Relays(account, next, MarmotClient.bootstrapRelays)
-                    RelayListKind.Inbox -> marmot().setAccountInboxRelays(account, next, MarmotClient.bootstrapRelays)
-                    RelayListKind.KeyPackage -> marmot().setAccountKeyPackageRelays(account, next, MarmotClient.bootstrapRelays)
+                    RelayListKind.Nip65 -> setAccountNip65Relays(account, next, MarmotClient.bootstrapRelays)
+                    RelayListKind.Inbox -> setAccountInboxRelays(account, next, MarmotClient.bootstrapRelays)
+                    RelayListKind.KeyPackage -> setAccountKeyPackageRelays(account, next, MarmotClient.bootstrapRelays)
                 }
             }
         }.onSuccess {
-            present("Relay list updated")
+            present(R.string.toast_relay_list_updated)
         }.onFailure {
-            present("Relay update failed", it.readableMessage())
+            present(R.string.toast_relay_update_failed, AppText.Plain(it.readableMessage()))
         }.getOrNull()
     }
 
@@ -194,30 +273,29 @@ class DarkMatterAppState(context: Context) {
     suspend fun fetchKeyPackages(): List<AccountKeyPackageFfi> {
         val account = activeAccountRef ?: return emptyList()
         return runCatching {
-            withContext(Dispatchers.IO) {
-                marmot().accountKeyPackages(account, MarmotClient.bootstrapRelays)
-            }
+            marmotIo { accountKeyPackages(account, MarmotClient.bootstrapRelays) }
         }.getOrElse {
-            present("Couldn't load key packages", it.readableMessage())
+            present(R.string.toast_couldnt_load_key_packages, AppText.Plain(it.readableMessage()))
             emptyList()
         }
     }
 
     suspend fun deleteKeyPackage(eventIdHex: String, sourceRelays: List<String>): Boolean {
         val account = activeAccountRef ?: return false
+        val keyPackageRelays = runCatching {
+            marmotIo { accountKeyPackageRelays(account) }
+        }.getOrNull().orEmpty()
         val relays = normalizeRelayUrls(
             sourceRelays +
-                runCatching { marmot().accountKeyPackageRelays(account) }.getOrNull().orEmpty() +
+                keyPackageRelays +
                 MarmotClient.bootstrapRelays,
         )
         return runCatching {
-            withContext(Dispatchers.IO) {
-                marmot().deleteAccountKeyPackage(account, eventIdHex, relays)
-            }
-            present("Key package deleted")
+            marmotIo { deleteAccountKeyPackage(account, eventIdHex, relays) }
+            present(R.string.toast_key_package_deleted)
             true
         }.getOrElse {
-            present("Couldn't delete key package", it.readableMessage())
+            present(R.string.toast_couldnt_delete_key_package, AppText.Plain(it.readableMessage()))
             false
         }
     }
@@ -225,13 +303,11 @@ class DarkMatterAppState(context: Context) {
     suspend fun publishNewKeyPackage(): Boolean {
         val account = activeAccountRef ?: return false
         return runCatching {
-            withContext(Dispatchers.IO) {
-                marmot().publishNewKeyPackage(account)
-            }
-            present("New key package published")
+            marmotIo { publishNewKeyPackage(account) }
+            present(R.string.toast_new_key_package_published)
             true
         }.getOrElse {
-            present("Couldn't publish key package", it.readableMessage())
+            present(R.string.toast_couldnt_publish_key_package, AppText.Plain(it.readableMessage()))
             false
         }
     }
@@ -239,13 +315,11 @@ class DarkMatterAppState(context: Context) {
     suspend fun republishKeyPackage(): Boolean {
         val account = activeAccountRef ?: return false
         return runCatching {
-            withContext(Dispatchers.IO) {
-                marmot().republishKeyPackage(account)
-            }
-            present("Key package republished")
+            marmotIo { republishKeyPackage(account) }
+            present(R.string.toast_key_package_republished)
             true
         }.getOrElse {
-            present("Couldn't republish key package", it.readableMessage())
+            present(R.string.toast_couldnt_republish_key_package, AppText.Plain(it.readableMessage()))
             false
         }
     }
@@ -253,6 +327,104 @@ class DarkMatterAppState(context: Context) {
     fun updateDeveloperMode(enabled: Boolean) {
         developerMode = enabled
         preferences.edit().putBoolean(DEVELOPER_MODE_KEY, enabled).apply()
+    }
+
+    fun updateThemeMode(mode: AppThemeMode) {
+        themeMode = mode
+        preferences.edit().putString(THEME_MODE_KEY, mode.preferenceValue).apply()
+    }
+
+    fun updateLanguageTag(tag: String) {
+        val normalized = tag.trim()
+        languageTag = normalized
+        preferences.edit().putString(LANGUAGE_TAG_KEY, normalized).apply()
+        applyLanguageTag(normalized)
+    }
+
+    fun setAppInForeground(foreground: Boolean) {
+        appInForeground = foreground
+        if (foreground) refreshLocalNotificationPermission()
+        if (foreground && backgroundConnectionEnabled) startBackgroundConnectionService()
+    }
+
+    fun setActiveConversation(groupIdHex: String?) {
+        activeConversationGroupIdHex = groupIdHex
+        appStateDebug { "active conversation=${groupIdHex?.take(8) ?: "<none>"}" }
+    }
+
+    fun refreshLocalNotificationPermission() {
+        localNotificationPermissionGranted = localNotificationPresenter.canPostNotifications()
+    }
+
+    suspend fun refreshLocalNotificationSettings() {
+        val account = activeAccountRef
+        localNotificationSettings = if (account == null) {
+            null
+        } else {
+            runCatching {
+                marmotIo { notificationSettings(account) }
+            }.getOrNull()
+        }
+    }
+
+    suspend fun setLocalNotificationsEnabled(enabled: Boolean): Boolean {
+        val account = activeAccountRef ?: return false
+        refreshLocalNotificationPermission()
+        if (enabled && !localNotificationPermissionGranted) {
+            present(R.string.toast_notification_permission_needed)
+            return false
+        }
+        return runCatching {
+            val settings = marmotIo { setLocalNotificationsEnabled(account, enabled) }
+            localNotificationSettings = settings
+            if (!enabled && backgroundConnectionEnabled) {
+                updateBackgroundConnectionPreference(false)
+                NotificationStreamForegroundService.stop(appContext)
+            }
+            appStateDebug {
+                "local notifications account=${account.take(8)} enabled=${settings.localNotificationsEnabled} permission=$localNotificationPermissionGranted"
+            }
+            present(if (enabled) R.string.toast_local_notifications_enabled else R.string.toast_local_notifications_disabled)
+            true
+        }.getOrElse {
+            present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()))
+            false
+        }
+    }
+
+    suspend fun setBackgroundConnectionEnabled(enabled: Boolean): Boolean {
+        val account = activeAccountRef ?: run {
+            present(R.string.toast_no_active_account)
+            return false
+        }
+        refreshLocalNotificationPermission()
+        if (enabled && !localNotificationPermissionGranted) {
+            present(R.string.toast_notification_permission_needed)
+            return false
+        }
+        if (enabled && localNotificationSettings?.localNotificationsEnabled != true) {
+            val settings = runCatching {
+                marmotIo { setLocalNotificationsEnabled(account, true) }
+            }.getOrElse {
+                present(R.string.toast_couldnt_enable_notifications, AppText.Plain(it.readableMessage()))
+                return false
+            }
+            localNotificationSettings = settings
+        }
+
+        updateBackgroundConnectionPreference(enabled)
+        val serviceUpdated = if (enabled) {
+            startBackgroundConnectionService()
+        } else {
+            NotificationStreamForegroundService.stop(appContext)
+        }
+        if (enabled && !serviceUpdated) {
+            updateBackgroundConnectionPreference(false)
+            present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service)
+            return false
+        }
+        present(if (enabled) R.string.toast_background_connection_enabled else R.string.toast_background_connection_disabled)
+        return true
     }
 
     fun displayName(accountIdHex: String): String {
@@ -285,8 +457,8 @@ class DarkMatterAppState(context: Context) {
         }
     }
 
-    fun accountIdHex(reference: String): String? {
-        return runCatching { marmot().accountIdHex(reference) }.getOrNull()
+    suspend fun accountIdHex(reference: String): String? {
+        return runCatching { marmotIo { accountIdHex(reference) } }.getOrNull()
     }
 
     fun userProfile(accountIdHex: String): UserProfileMetadataFfi? {
@@ -296,6 +468,14 @@ class DarkMatterAppState(context: Context) {
                 null
             }
         }
+    }
+
+    suspend fun loadUserProfile(accountIdHex: String): UserProfileMetadataFfi? {
+        val profile = runCatching {
+            marmotIo { userProfile(accountIdHex) }
+        }.getOrNull()
+        if (profile == null) requestProfile(accountIdHex)
+        return profile
     }
 
     fun avatarUrl(accountIdHex: String): String? {
@@ -342,13 +522,13 @@ class DarkMatterAppState(context: Context) {
 
     suspend fun refreshProfile(accountIdHex: String) {
         val profile = runCatching {
-            withContext(Dispatchers.IO) {
+            marmotIo {
                 val relays = activeAccountRef
-                    ?.let { runCatching { marmot().accountNip65Relays(it) }.getOrNull() }
+                    ?.let { runCatching { accountNip65Relays(it) }.getOrNull() }
                     ?.takeIf { it.isNotEmpty() }
                     ?: MarmotClient.bootstrapRelays
-                marmot().refreshProfile(accountIdHex, relays)
-                marmot().userProfile(accountIdHex)
+                refreshProfile(accountIdHex, relays)
+                userProfile(accountIdHex)
             }
         }.getOrNull()
         if (profile != null) {
@@ -373,11 +553,11 @@ class DarkMatterAppState(context: Context) {
     suspend fun startProfileChat(npub: String): Boolean {
         val account = activeAccountRef ?: return false
         return runCatching {
-            marmot().createGroup(account, "", listOf(npub), null)
-            present("Chat started")
+            marmotIo { createGroup(account, "", listOf(npub), null) }
+            present(R.string.toast_chat_started)
             true
         }.getOrElse {
-            present("Couldn't start chat", it.readableMessage())
+            present(R.string.toast_couldnt_start_chat, AppText.Plain(it.readableMessage()))
             false
         }
     }
@@ -385,20 +565,42 @@ class DarkMatterAppState(context: Context) {
     suspend fun publishProfile(profile: UserProfileMetadataFfi) {
         val account = activeAccountRef ?: return
         runCatching {
-            val relayLists = marmot().accountRelayLists(account)
-            val profileRelays = marmot().accountNip65Relays(account).ifEmpty {
-                relayLists.defaultRelays.ifEmpty { MarmotClient.bootstrapRelays }
+            val profileRelayCount = marmotIo {
+                val relayLists = accountRelayLists(account)
+                val profileRelays = accountNip65Relays(account).ifEmpty {
+                    relayLists.defaultRelays.ifEmpty { MarmotClient.bootstrapRelays }
+                }
+                val bootstrapRelays = relayLists.bootstrapRelays.ifEmpty { MarmotClient.bootstrapRelays }
+                publishUserProfile(account, profile, profileRelays, bootstrapRelays)
+                profileRelays.size
             }
-            val bootstrapRelays = relayLists.bootstrapRelays.ifEmpty { MarmotClient.bootstrapRelays }
-            marmot().publishUserProfile(account, profile, profileRelays, bootstrapRelays)
             notifyProfilesChanged()
-            present("Profile published", "Your kind:0 metadata is live on ${profileRelays.size} relays.")
+            presentText(
+                AppText.Resource(R.string.toast_profile_published),
+                AppText.Resource(R.string.toast_profile_published_detail, listOf(profileRelayCount)),
+            )
         }.onFailure {
-            present("Couldn't publish profile", it.readableMessage())
+            present(R.string.toast_couldnt_publish_profile, AppText.Plain(it.readableMessage()))
         }
     }
 
     fun present(title: String, detail: String? = null) {
+        presentText(AppText.Plain(title), detail?.let { AppText.Plain(it) })
+    }
+
+    fun present(@StringRes titleRes: Int) {
+        presentText(AppText.Resource(titleRes))
+    }
+
+    fun present(@StringRes titleRes: Int, @StringRes detailRes: Int) {
+        presentText(AppText.Resource(titleRes), AppText.Resource(detailRes))
+    }
+
+    fun present(@StringRes titleRes: Int, detail: AppText) {
+        presentText(AppText.Resource(titleRes), detail)
+    }
+
+    fun presentText(title: AppText, detail: AppText? = null) {
         toast = ToastMessage(title, detail)
     }
 
@@ -406,9 +608,67 @@ class DarkMatterAppState(context: Context) {
         toast = null
     }
 
+    fun shutdown() {
+        notificationJob?.cancel()
+        notificationScope.cancel()
+    }
+
     private fun warmProfile(accountIdHex: String) {
         userProfile(accountIdHex)
         requestProfile(accountIdHex)
+    }
+
+    private fun startNotificationListener() {
+        if (notificationJob?.isActive == true) return
+        notificationJob = notificationScope.launch {
+            runCatching {
+                val subscription = marmotIo { subscribeNotifications() }
+                try {
+                    while (isActive) {
+                        val update = marmotIo { subscription.next() } ?: break
+                        val activeConversation = activeConversationGroupIdHex
+                        val shouldPost = LocalNotificationPolicy.shouldPost(
+                            update = update,
+                            appInForeground = appInForeground,
+                            activeConversationGroupIdHex = activeConversation,
+                        )
+                        appStateDebug {
+                            "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
+                                "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} post=$shouldPost"
+                        }
+                        if (shouldPost) {
+                            localNotificationPresenter.show(update)
+                        }
+                    }
+                } finally {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            subscription.close()
+                        }
+                    }
+                }
+            }.onFailure {
+                appStateDebug(it) { "notification listener stopped: ${it.readableMessage()}" }
+            }
+        }
+    }
+
+    private fun updateBackgroundConnectionPreference(enabled: Boolean) {
+        backgroundConnectionEnabled = enabled
+        BackgroundConnectionPreferences.setEnabled(appContext, enabled)
+        appStateDebug { "background connection enabled=$enabled" }
+    }
+
+    private fun startBackgroundConnectionService(): Boolean {
+        val started = NotificationStreamForegroundService.start(appContext)
+        appStateDebug { "background connection service start=$started" }
+        return started
+    }
+
+    private fun applyLanguageTag(tag: String) {
+        appContext
+            .getSystemService(LocaleManager::class.java)
+            .applicationLocales = LocaleList.forLanguageTags(tag)
     }
 
     private fun cachedUserProfile(accountIdHex: String): UserProfileMetadataFfi? {
@@ -450,5 +710,15 @@ class DarkMatterAppState(context: Context) {
     companion object {
         private const val ACTIVE_ACCOUNT_KEY = "active_account"
         private const val DEVELOPER_MODE_KEY = "developer_mode"
+        private const val THEME_MODE_KEY = "theme_mode"
+        private const val LANGUAGE_TAG_KEY = "language_tag"
     }
+}
+
+private inline fun appStateDebug(message: () -> String) {
+    Log.i("DMAppState", message())
+}
+
+private inline fun appStateDebug(error: Throwable, message: () -> String) {
+    Log.e("DMAppState", message(), error)
 }

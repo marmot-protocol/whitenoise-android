@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -110,6 +111,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -132,6 +134,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -146,8 +149,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.DiagnosticFormatter
 import dev.ipf.darkmatter.core.GroupProjector
+import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.ProfileLink
@@ -155,6 +160,8 @@ import dev.ipf.darkmatter.core.ProfileSanitizer
 import dev.ipf.darkmatter.core.QrCodeEncoder
 import dev.ipf.darkmatter.core.RecipientReference
 import dev.ipf.darkmatter.state.AppPhase
+import dev.ipf.darkmatter.state.AppText
+import dev.ipf.darkmatter.state.AppThemeMode
 import dev.ipf.darkmatter.state.ChatListItem
 import dev.ipf.darkmatter.state.ChatsController
 import dev.ipf.darkmatter.state.ConversationController
@@ -196,10 +203,12 @@ private enum class MainSection {
 }
 
 private enum class SettingsDetail {
+    Appearance,
     Profile,
     Identity,
     Relays,
     KeyPackages,
+    Notifications,
 }
 
 private data class DiagnosticLogEntry(
@@ -207,6 +216,41 @@ private data class DiagnosticLogEntry(
     val timestamp: ULong = (System.currentTimeMillis() / 1000L).toULong(),
     val text: String,
 )
+
+private data class LanguageOption(
+    val tag: String,
+    @param:StringRes val labelRes: Int,
+)
+
+private val languageOptions = listOf(
+    LanguageOption("", R.string.language_system),
+    LanguageOption("en", R.string.language_english),
+    LanguageOption("de", R.string.language_german),
+    LanguageOption("es", R.string.language_spanish),
+    LanguageOption("fr", R.string.language_french),
+    LanguageOption("it", R.string.language_italian),
+    LanguageOption("pt", R.string.language_portuguese),
+    LanguageOption("ru", R.string.language_russian),
+    LanguageOption("tr", R.string.language_turkish),
+    LanguageOption("zh", R.string.language_chinese_simplified),
+    LanguageOption("zh-Hant", R.string.language_chinese_traditional),
+)
+
+@Composable
+private fun rememberGroupTitleCopy(): GroupTitleCopy {
+    return GroupTitleCopy(
+        inviteFromFormat = stringResource(R.string.group_title_invite_from),
+        groupOfPeopleFormat = stringResource(R.string.group_title_people_count),
+    )
+}
+
+private val AppThemeMode.labelRes: Int
+    @StringRes
+    get() = when (this) {
+        AppThemeMode.System -> R.string.theme_system
+        AppThemeMode.Light -> R.string.theme_light
+        AppThemeMode.Dark -> R.string.theme_dark
+    }
 
 @Composable
 fun DarkMatterApp(
@@ -216,6 +260,7 @@ fun DarkMatterApp(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val toast = appState.toast
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         appState.bootstrap()
@@ -223,7 +268,7 @@ fun DarkMatterApp(
     LaunchedEffect(toast) {
         if (toast != null) {
             snackbarHostState.showSnackbar(
-                listOfNotNull(toast.title, toast.detail).joinToString("\n"),
+                listOfNotNull(toast.title.resolve(context), toast.detail?.resolve(context)).joinToString("\n"),
             )
             appState.clearToast()
         }
@@ -246,7 +291,7 @@ fun DarkMatterApp(
                 AppPhase.Ready -> MainShell(appState)
                 is AppPhase.Failed -> FailureScreen(
                     message = phase.message,
-                    onRetry = { appState.present("Restarting"); },
+                    onRetry = { appState.present(R.string.toast_restarting) },
                     onRetryAction = { appState.bootstrap() },
                 )
             }
@@ -275,7 +320,7 @@ fun LoadingScreen() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             CircularProgressIndicator()
-            Text("Loading Dark Matter", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.loading_dark_matter), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -290,7 +335,7 @@ private fun FailureScreen(
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(44.dp))
-            Text("Dark Matter couldn't start", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.dark_matter_couldnt_start), style = MaterialTheme.typography.titleLarge)
             Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(
                 onClick = {
@@ -300,7 +345,7 @@ private fun FailureScreen(
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Retry")
+                Text(stringResource(R.string.retry))
             }
         }
     }
@@ -352,6 +397,7 @@ fun OnboardingContent(
 ) {
     var signingIn by remember { mutableStateOf(false) }
     val busy = creatingIdentity || signingInBusy
+    val creatingIdentityDescription = stringResource(R.string.creating_identity)
 
     if (signingIn) {
         SignInContent(
@@ -373,13 +419,13 @@ fun OnboardingContent(
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Icon(
                 imageVector = Icons.Default.Shield,
-                contentDescription = "Dark Matter shield",
+                contentDescription = stringResource(R.string.dark_matter_shield),
                 modifier = Modifier.size(88.dp),
                 tint = MaterialTheme.colorScheme.primary,
             )
-            Text("Dark Matter", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                "End-to-end encrypted group messaging.",
+                stringResource(R.string.onboarding_tagline),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -395,7 +441,7 @@ fun OnboardingContent(
                     CircularProgressIndicator(
                         modifier = Modifier
                             .size(20.dp)
-                            .semantics { contentDescription = "Creating identity" },
+                            .semantics { contentDescription = creatingIdentityDescription },
                         strokeWidth = 2.dp,
                     )
                 } else {
@@ -403,7 +449,7 @@ fun OnboardingContent(
                 }
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    if (creatingIdentity) "Creating Identity" else "Create New Identity",
+                    stringResource(if (creatingIdentity) R.string.creating_identity_title else R.string.create_new_identity),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -416,7 +462,7 @@ fun OnboardingContent(
             ) {
                 Icon(Icons.Default.Person, contentDescription = null)
                 Spacer(Modifier.width(10.dp))
-                Text("Sign in", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -439,18 +485,18 @@ private fun SignInContent(
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack, enabled = !busy) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                 }
-                Text("Sign in to Dark Matter", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.sign_in_to_dark_matter), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             }
             Text(
-                "Enter your Nostr secret key to use an existing identity on this device.",
+                stringResource(R.string.sign_in_secret_key_help),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedTextField(
                 value = identity,
                 onValueChange = onIdentityChange,
-                label = { Text("Nostr nsec") },
+                label = { Text(stringResource(R.string.nostr_nsec)) },
                 singleLine = true,
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
@@ -474,7 +520,7 @@ private fun SignInContent(
         ) {
             Icon(Icons.Default.Person, contentDescription = null)
             Spacer(Modifier.width(10.dp))
-            Text("Sign in", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -486,6 +532,18 @@ private fun MainShell(appState: DarkMatterAppState) {
     var settingsDetail by remember { mutableStateOf<SettingsDetail?>(null) }
     var selectedChat by remember { mutableStateOf<ChatListItem?>(null) }
     var profileQrAccountId by remember { mutableStateOf<String?>(null) }
+    val chatsController = remember(appState.activeAccountRef) { ChatsController(appState) }
+
+    LaunchedEffect(chatsController, appState.activeAccountRef) {
+        chatsController.bind(appState.activeAccountRef)
+    }
+
+    DisposableEffect(selectedChat?.id) {
+        appState.setActiveConversation(selectedChat?.group?.groupIdHex)
+        onDispose {
+            if (selectedChat != null) appState.setActiveConversation(null)
+        }
+    }
 
     appState.pendingProfileNpub?.let { npub ->
         ProfileSheet(
@@ -514,6 +572,7 @@ private fun MainShell(appState: DarkMatterAppState) {
     when (section) {
         MainSection.Chats -> ChatsScreen(
             appState = appState,
+            controller = chatsController,
             onOpenSettings = {
                 section = MainSection.Settings
                 settingsDetail = null
@@ -522,7 +581,7 @@ private fun MainShell(appState: DarkMatterAppState) {
             onOpenProfile = {
                 appState.activeAccount?.accountIdHex?.let { accountId ->
                     profileQrAccountId = accountId
-                } ?: appState.present("No active account")
+                } ?: appState.present(R.string.toast_no_active_account)
             },
         )
         MainSection.Settings -> SettingsScreen(
@@ -557,11 +616,12 @@ fun AccountAvatarButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val openSettingsDescription = stringResource(R.string.open_settings)
     IconButton(
         onClick = onClick,
         modifier = modifier
             .size(56.dp)
-            .semantics { contentDescription = "Open settings" },
+            .semantics { contentDescription = openSettingsDescription },
     ) {
         Avatar(
             title = title,
@@ -576,20 +636,17 @@ fun AccountAvatarButton(
 @Composable
 private fun ChatsScreen(
     appState: DarkMatterAppState,
+    controller: ChatsController,
     onOpenSettings: () -> Unit,
     onOpenGroup: (ChatListItem) -> Unit,
     onOpenProfile: () -> Unit,
 ) {
-    val controller = remember(appState.activeAccountRef) { ChatsController(appState) }
     var showNewChat by remember { mutableStateOf(false) }
-    var newChatTitle by remember { mutableStateOf("New Chat") }
+    var newChatTitle by remember { mutableStateOf(R.string.new_chat) }
     var showScanner by remember { mutableStateOf(false) }
     var showArchived by remember { mutableStateOf(false) }
     var quickActionsExpanded by remember { mutableStateOf(false) }
 
-    LaunchedEffect(controller, appState.activeAccountRef) {
-        controller.bind(appState.activeAccountRef)
-    }
     LaunchedEffect(showArchived) {
         if (showArchived) quickActionsExpanded = false
     }
@@ -598,7 +655,7 @@ private fun ChatsScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    if (showArchived) Text("Archived")
+                    if (showArchived) Text(stringResource(R.string.archived))
                 },
                 navigationIcon = {
                     val active = appState.activeAccount
@@ -606,12 +663,12 @@ private fun ChatsScreen(
                         IconButton(onClick = { showArchived = false }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
                     } else {
                         AccountAvatarButton(
-                            title = active?.let { appState.displayName(it.accountIdHex) } ?: "Dark Matter",
+                            title = active?.let { appState.displayName(it.accountIdHex) } ?: stringResource(R.string.app_name),
                             seed = active?.accountIdHex ?: "darkmatter",
                             pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
                             onClick = onOpenSettings,
@@ -628,7 +685,7 @@ private fun ChatsScreen(
                     onMyProfile = onOpenProfile,
                     onScanQr = { showScanner = true },
                     onCreateGroup = {
-                        newChatTitle = "Create Group"
+                        newChatTitle = R.string.create_group
                         showNewChat = true
                     },
                 )
@@ -639,12 +696,12 @@ private fun ChatsScreen(
             val visibleItems = if (showArchived) controller.archivedItems else controller.items
             when {
                 controller.isLoading && visibleItems.isEmpty() -> LoadingScreen()
-                controller.error != null -> ErrorContent("Couldn't load chats", controller.error.orEmpty())
+                controller.error != null -> ErrorContent(stringResource(R.string.couldnt_load_chats), controller.error.orEmpty())
                 visibleItems.isEmpty() && showArchived -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No archived chats", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.no_archived_chats), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 visibleItems.isEmpty() -> EmptyChats(onCreate = {
-                    newChatTitle = "New Chat"
+                    newChatTitle = R.string.new_chat
                     showNewChat = true
                 })
                 else -> LazyColumn(Modifier.fillMaxSize()) {
@@ -660,8 +717,8 @@ private fun ChatsScreen(
                         item {
                             ListItem(
                                 modifier = Modifier.clickable { showArchived = true },
-                                headlineContent = { Text("Archived") },
-                                supportingContent = { Text("${controller.archivedItems.size} chats") },
+                                headlineContent = { Text(stringResource(R.string.archived)) },
+                                supportingContent = { Text(stringResource(R.string.chats_count, controller.archivedItems.size)) },
                                 leadingContent = { Icon(Icons.Default.Archive, contentDescription = null) },
                             )
                         }
@@ -672,7 +729,7 @@ private fun ChatsScreen(
     }
 
     if (showNewChat) {
-        NewChatSheet(appState = appState, title = newChatTitle, onDismiss = { showNewChat = false })
+        NewChatSheet(appState = appState, titleRes = newChatTitle, onDismiss = { showNewChat = false })
     }
 
     if (showScanner) {
@@ -682,7 +739,7 @@ private fun ChatsScreen(
                 showScanner = false
                 val scanned = ProfileLink.parse(raw)
                 if (scanned == null) {
-                    appState.present("That QR code is not a Dark Matter profile.")
+                    appState.present(R.string.error_not_dark_matter_profile_qr)
                 } else {
                     appState.presentProfile(scanned.npub)
                 }
@@ -724,7 +781,9 @@ fun QuickActionFabMenu(
                 }
                 Icon(
                     painter = rememberVectorPainter(imageVector),
-                    contentDescription = if (expanded) "Close quick actions" else "Open quick actions",
+                    contentDescription = stringResource(
+                        if (expanded) R.string.close_quick_actions else R.string.open_quick_actions,
+                    ),
                     modifier = Modifier.animateIcon({ checkedProgress }),
                 )
             }
@@ -733,17 +792,17 @@ fun QuickActionFabMenu(
         FloatingActionButtonMenuItem(
             onClick = { runAction(onMyProfile) },
             icon = { Icon(Icons.Default.Person, contentDescription = null) },
-            text = { Text("My Profile") },
+            text = { Text(stringResource(R.string.my_profile)) },
         )
         FloatingActionButtonMenuItem(
             onClick = { runAction(onScanQr) },
             icon = { Icon(Icons.Default.QrCodeScanner, contentDescription = null) },
-            text = { Text("Scan QR Code") },
+            text = { Text(stringResource(R.string.scan_qr_code)) },
         )
         FloatingActionButtonMenuItem(
             onClick = { runAction(onCreateGroup) },
             icon = { Icon(Icons.Default.Group, contentDescription = null) },
-            text = { Text("Create Group") },
+            text = { Text(stringResource(R.string.create_group)) },
         )
     }
 }
@@ -754,13 +813,17 @@ private fun ChatRow(
     appState: DarkMatterAppState,
     onClick: () -> Unit,
 ) {
+    val groupTitleCopy = rememberGroupTitleCopy()
     val title = GroupProjector.displayTitle(
         group = item.group,
         otherMemberAccount = item.otherMemberAccount,
         memberCount = item.memberCount,
         memberTitle = { appState.chatMemberTitle(it) },
+        copy = groupTitleCopy,
     )
-    val avatarAccount = item.otherMemberAccount.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
+    val inviteAccount = GroupProjector.inviteAccount(item.group, item.otherMemberAccount)
+    val avatarAccount = inviteAccount
+        ?: item.otherMemberAccount.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
         leadingContent = {
@@ -776,7 +839,7 @@ private fun ChatRow(
         },
         supportingContent = {
             Text(
-                MessageProjector.previewText(item.latest),
+                if (item.group.pendingConfirmation) stringResource(R.string.invitation) else MessageProjector.previewText(item.latest),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -788,7 +851,9 @@ private fun ChatRow(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (item.memberCount > 2) {
+                if (item.group.pendingConfirmation) {
+                    Badge { Text(stringResource(R.string.invite)) }
+                } else if (item.memberCount > 2) {
                     Badge { Text(item.memberCount.toString()) }
                 }
             }
@@ -801,15 +866,15 @@ private fun EmptyChats(onCreate: () -> Unit) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(48.dp))
-            Text("No chats yet", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.no_chats_yet), style = MaterialTheme.typography.titleLarge)
             Text(
-                "Start a conversation by inviting someone with their npub.",
+                stringResource(R.string.empty_chats_invite_npub),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(onClick = onCreate) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("New Chat")
+                Text(stringResource(R.string.new_chat))
             }
         }
     }
@@ -819,7 +884,7 @@ private fun EmptyChats(onCreate: () -> Unit) {
 @Composable
 private fun NewChatSheet(
     appState: DarkMatterAppState,
-    title: String = "New Chat",
+    @StringRes titleRes: Int = R.string.new_chat,
     onDismiss: () -> Unit,
 ) {
     var members by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -830,11 +895,16 @@ private fun NewChatSheet(
     var error by remember { mutableStateOf<String?>(null) }
     var showScanner by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val validRecipientReferenceError = stringResource(R.string.error_valid_recipient_reference)
+    val missingKeyPackageError = stringResource(R.string.error_missing_key_package)
+    val invalidIdentityReferenceError = stringResource(R.string.error_invalid_identity_reference)
+    val groupPublishFailedFormat = stringResource(R.string.error_group_publish_failed)
+    val notDarkMatterProfileQrError = stringResource(R.string.error_not_dark_matter_profile_qr)
 
     fun addRecipient(reference: String) {
         val normalized = RecipientReference.normalize(reference)
         if (normalized == null) {
-            error = "Enter a valid npub, profile link, or hex public key."
+            error = validRecipientReferenceError
             return
         }
         if (!members.contains(normalized)) {
@@ -853,11 +923,11 @@ private fun NewChatSheet(
     fun createGroupErrorMessage(throwable: Throwable): String {
         return when (throwable) {
             is MarmotKitException.MissingKeyPackage ->
-                "That account does not have a published key package yet. Ask them to open Dark Matter, then try again."
+                missingKeyPackageError
             is MarmotKitException.InvalidIdentity ->
-                "That recipient is not a valid Nostr public key. Use an npub, profile link, or hex public key."
+                invalidIdentityReferenceError
             is MarmotKitException.Publish ->
-                "The group was created locally, but publishing failed: ${throwable.details}"
+                String.format(groupPublishFailedFormat, throwable.details)
             else -> throwable.message ?: throwable.javaClass.simpleName
         }
     }
@@ -867,14 +937,14 @@ private fun NewChatSheet(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
             if (members.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     members.take(3).forEach { member ->
                         AssistChip(
                             onClick = { members = members - member },
                             label = { Text(IdentityFormatter.short(member), maxLines = 1) },
-                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Remove") },
+                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove)) },
                         )
                     }
                 }
@@ -883,7 +953,7 @@ private fun NewChatSheet(
                 OutlinedTextField(
                     value = pending,
                     onValueChange = { pending = it },
-                    label = { Text("npub or hex public key") },
+                    label = { Text(stringResource(R.string.npub_or_hex_public_key)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
@@ -894,23 +964,23 @@ private fun NewChatSheet(
                     keyboardActions = KeyboardActions(onDone = { addPending() }),
                 )
                 FloatingActionButton(onClick = { showScanner = true }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan recipient QR code")
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_recipient_qr_code))
                 }
                 FloatingActionButton(onClick = { addPending() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.Add, contentDescription = "Add recipient")
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_recipient))
                 }
             }
             OutlinedTextField(
                 value = groupName,
                 onValueChange = { groupName = it },
-                label = { Text("Group name") },
+                label = { Text(stringResource(R.string.group_name)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Description") },
+                label = { Text(stringResource(R.string.description)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
             )
@@ -927,7 +997,7 @@ private fun NewChatSheet(
                     val pendingRecipients = RecipientReference.tokenize(pending)
                     val normalizedPending = pendingRecipients.map { input ->
                         RecipientReference.normalize(input) ?: run {
-                            error = "Enter a valid npub, profile link, or hex public key."
+                            error = validRecipientReferenceError
                             return@Button
                         }
                     }
@@ -939,14 +1009,16 @@ private fun NewChatSheet(
                     error = null
                     scope.launch {
                         runCatching {
-                            appState.marmot().createGroup(
-                                account,
-                                groupName.trim(),
-                                recipients,
-                                description.trim().ifBlank { null },
-                            )
+                            appState.marmotIo {
+                                createGroup(
+                                    account,
+                                    groupName.trim(),
+                                    recipients,
+                                    description.trim().ifBlank { null },
+                                )
+                            }
                         }.onSuccess {
-                            appState.present("Chat created")
+                            appState.present(R.string.toast_chat_created)
                             onDismiss()
                         }.onFailure {
                             error = createGroupErrorMessage(it)
@@ -960,7 +1032,7 @@ private fun NewChatSheet(
                 if (busy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 else Icon(Icons.Default.Check, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Create")
+                Text(stringResource(R.string.create))
             }
         }
     }
@@ -972,7 +1044,7 @@ private fun NewChatSheet(
                 showScanner = false
                 val scanned = ProfileLink.parse(raw)
                 if (scanned == null) {
-                    error = "That QR code is not a Dark Matter profile."
+                    error = notDarkMatterProfileQrError
                 } else {
                     error = null
                     addRecipient(scanned.npub)
@@ -1002,6 +1074,7 @@ private fun ConversationScreen(
     val listState = rememberLazyListState()
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val scope = rememberCoroutineScope()
+    val groupTitleCopy = rememberGroupTitleCopy()
 
     BackHandler(enabled = !showDetails) {
         onBack()
@@ -1021,9 +1094,13 @@ private fun ConversationScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(controller.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(controller.title(groupTitleCopy), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            controller.subtitle,
+                            controller.subtitle(
+                                justYou = stringResource(R.string.just_you),
+                                oneMember = stringResource(R.string.one_member),
+                                membersFormat = stringResource(R.string.members_count),
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1031,16 +1108,16 @@ private fun ConversationScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Chat actions")
+                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.chat_actions))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text("Details") },
+                            text = { Text(stringResource(R.string.details)) },
                             leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
                             onClick = {
                                 menuOpen = false
@@ -1048,7 +1125,7 @@ private fun ConversationScreen(
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text(if (controller.group.archived) "Unarchive" else "Archive") },
+                            text = { Text(stringResource(if (controller.group.archived) R.string.unarchive else R.string.archive)) },
                             leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
                             onClick = {
                                 menuOpen = false
@@ -1056,7 +1133,7 @@ private fun ConversationScreen(
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Leave") },
+                            text = { Text(stringResource(R.string.leave)) },
                             leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
                             onClick = {
                                 menuOpen = false
@@ -1070,7 +1147,7 @@ private fun ConversationScreen(
             )
         },
         bottomBar = {
-            if (controller.error == null) {
+            if (controller.error == null && !controller.group.pendingConfirmation) {
                 ComposerBar(
                     replyingTo = controller.replyingTo,
                     sendInFlight = controller.sendInFlight,
@@ -1083,9 +1160,22 @@ private fun ConversationScreen(
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
                 controller.isLoading && controller.timeline.isEmpty() -> LoadingScreen()
-                controller.error != null -> ErrorContent("Couldn't load conversation", controller.error.orEmpty())
+                controller.error != null -> ErrorContent(stringResource(R.string.couldnt_load_conversation), controller.error.orEmpty())
+                controller.group.pendingConfirmation -> PendingInviteContent(
+                    title = controller.title(groupTitleCopy),
+                    pictureUrl = controller.inviteAccount?.let { appState.avatarUrl(it) },
+                    avatarSeed = controller.inviteAccount ?: controller.group.groupIdHex,
+                    onAccept = {
+                        scope.launch { controller.acceptInvite() }
+                    },
+                    onDecline = {
+                        scope.launch {
+                            if (controller.declineInvite()) onBack()
+                        }
+                    },
+                )
                 controller.timeline.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No messages yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.no_messages_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 else -> LazyColumn(
                     state = listState,
@@ -1117,6 +1207,39 @@ private fun ConversationScreen(
     }
 }
 
+@Composable
+private fun PendingInviteContent(
+    title: String,
+    pictureUrl: String?,
+    avatarSeed: String,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Avatar(title = title, seed = avatarSeed, size = 64.dp, pictureUrl = pictureUrl)
+            Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+            Text(
+                stringResource(R.string.invited_to_this_chat),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onDecline) {
+                    Icon(Icons.Default.Close, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.decline))
+                }
+                Button(onClick = onAccept) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.accept))
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GroupDetailsSheet(
@@ -1135,6 +1258,9 @@ private fun GroupDetailsSheet(
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val groupTitleCopy = rememberGroupTitleCopy()
+    val oneValidMemberReferenceError = stringResource(R.string.error_one_valid_member_reference)
+    val qrNotValidNpubOrPublicKeyError = stringResource(R.string.error_qr_not_valid_npub_or_public_key)
 
     suspend fun refreshMlsDetails() {
         if (!appState.developerMode) return
@@ -1177,26 +1303,33 @@ private fun GroupDetailsSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Avatar(title = controller.title, seed = controller.group.groupIdHex, size = 56.dp)
+                Avatar(title = controller.title(groupTitleCopy), seed = controller.group.groupIdHex, size = 56.dp)
                 Column(Modifier.weight(1f)) {
-                    Text(controller.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text(controller.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(controller.title(groupTitleCopy), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        controller.subtitle(
+                            justYou = stringResource(R.string.just_you),
+                            oneMember = stringResource(R.string.one_member),
+                            membersFormat = stringResource(R.string.members_count),
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
-            SectionCard(title = "Profile") {
+            SectionCard(title = stringResource(R.string.profile)) {
                 if (controller.isSelfAdmin) {
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("Group name") },
+                        label = { Text(stringResource(R.string.group_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
-                        label = { Text("Description") },
+                        label = { Text(stringResource(R.string.description)) },
                         minLines = 2,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -1216,23 +1349,23 @@ private fun GroupDetailsSheet(
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Save Group")
+                        Text(stringResource(R.string.save_group))
                     }
                 } else {
-                    Text(controller.group.description.ifBlank { "No description" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(controller.group.description.ifBlank { stringResource(R.string.no_description) }, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
-            SectionCard(title = "Info") {
-                DiagnosticRow("Group ID", IdentityFormatter.short(controller.group.groupIdHex))
-                DiagnosticRow("Nostr group", IdentityFormatter.short(controller.group.nostrGroupIdHex))
-                DiagnosticRow("Relays", controller.group.relays.size.toString())
+            SectionCard(title = stringResource(R.string.info)) {
+                DiagnosticRow(stringResource(R.string.group_id), IdentityFormatter.short(controller.group.groupIdHex))
+                DiagnosticRow(stringResource(R.string.nostr_group), IdentityFormatter.short(controller.group.nostrGroupIdHex))
+                DiagnosticRow(stringResource(R.string.relays), controller.group.relays.size.toString())
                 controller.group.relays.forEach { relay ->
                     Text(relay, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
-            SectionCard(title = "Members") {
+            SectionCard(title = stringResource(R.string.members)) {
                 controller.members.forEach { member ->
                     GroupMemberRow(
                         member = member,
@@ -1255,7 +1388,7 @@ private fun GroupDetailsSheet(
                             pendingMember = it
                             pendingMemberError = null
                         },
-                        label = { Text("npub or public key") },
+                        label = { Text(stringResource(R.string.npub_or_public_key)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         isError = pendingMemberError != null,
@@ -1264,7 +1397,7 @@ private fun GroupDetailsSheet(
                         },
                         trailingIcon = {
                             IconButton(onClick = { showMemberScanner = true }) {
-                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan member QR code")
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_member_qr_code))
                             }
                         },
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
@@ -1272,7 +1405,7 @@ private fun GroupDetailsSheet(
                     Button(
                         onClick = {
                             val ref = RecipientReference.normalize(pendingMember) ?: run {
-                                pendingMemberError = "Enter one valid npub, profile link, or public key."
+                                pendingMemberError = oneValidMemberReferenceError
                                 return@Button
                             }
                             pendingMember = ""
@@ -1284,19 +1417,19 @@ private fun GroupDetailsSheet(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Add Member")
+                        Text(stringResource(R.string.add_member))
                     }
                 }
             }
 
-            SectionCard(title = "Actions") {
+            SectionCard(title = stringResource(R.string.actions)) {
                 OutlinedButton(
                     onClick = { scope.launch { controller.setArchived(!controller.group.archived) } },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Default.Archive, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (controller.group.archived) "Unarchive Chat" else "Archive Chat")
+                    Text(stringResource(if (controller.group.archived) R.string.unarchive_chat else R.string.archive_chat))
                 }
                 OutlinedButton(
                     onClick = {
@@ -1312,24 +1445,24 @@ private fun GroupDetailsSheet(
                 ) {
                     Icon(Icons.Default.Close, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Leave Chat")
+                    Text(stringResource(R.string.leave_chat))
                 }
                 if (!controller.canLeaveGroup) {
-                    Text("Promote another admin before leaving", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.promote_admin_before_leaving), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
             if (appState.developerMode) {
-                SectionCard(title = "MLS") {
+                SectionCard(title = stringResource(R.string.mls)) {
                     when {
-                        mlsLoading -> Text("Loading MLS state...", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        mlsState == null -> Text("MLS state unavailable.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        mlsLoading -> Text(stringResource(R.string.loading_mls_state), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        mlsState == null -> Text(stringResource(R.string.mls_state_unavailable), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         else -> {
                             val state = requireNotNull(mlsState)
-                            DiagnosticRow("Group ID", IdentityFormatter.short(state.groupIdHex))
-                            DiagnosticRow("Epoch", state.epoch.toString())
-                            DiagnosticRow("MLS members", state.memberCount.toString())
-                            DiagnosticRow("Required components", state.requiredAppComponents.joinToString(", "))
+                            DiagnosticRow(stringResource(R.string.group_id), IdentityFormatter.short(state.groupIdHex))
+                            DiagnosticRow(stringResource(R.string.epoch), state.epoch.toString())
+                            DiagnosticRow(stringResource(R.string.mls_members), state.memberCount.toString())
+                            DiagnosticRow(stringResource(R.string.required_components), state.requiredAppComponents.joinToString(", "))
                         }
                     }
                 }
@@ -1343,7 +1476,7 @@ private fun GroupDetailsSheet(
                 val ref = RecipientReference.normalize(raw)
                 showMemberScanner = false
                 if (ref == null) {
-                    pendingMemberError = "That QR code is not a valid npub or public key."
+                    pendingMemberError = qrNotValidNpubOrPublicKeyError
                 } else {
                     pendingMember = ref
                     pendingMemberError = null
@@ -1389,7 +1522,7 @@ private fun GroupMemberRow(
             )
             if (isAdmin) {
                 Text(
-                    "Admin",
+                    stringResource(R.string.admin),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1398,11 +1531,11 @@ private fun GroupMemberRow(
         if (canManage) {
             Box {
                 IconButton(onClick = { menuOpen = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Member actions")
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.member_actions))
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
-                        text = { Text(if (isAdmin) "Remove admin" else "Make admin") },
+                        text = { Text(stringResource(if (isAdmin) R.string.remove_admin else R.string.make_admin)) },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         onClick = {
                             menuOpen = false
@@ -1410,7 +1543,7 @@ private fun GroupMemberRow(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Remove member") },
+                        text = { Text(stringResource(R.string.remove_member)) },
                         leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
                         onClick = {
                             menuOpen = false
@@ -1498,7 +1631,7 @@ private fun MessageBubble(
                             }
                         }
                         Text(
-                            if (deleted) "Message deleted" else MessageProjector.displayBody(record),
+                            if (deleted) stringResource(R.string.message_deleted) else MessageProjector.displayBody(record),
                             style = MaterialTheme.typography.bodyLarge,
                         )
                         Row(
@@ -1516,7 +1649,7 @@ private fun MessageBubble(
                             }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                 DropdownMenuItem(
-                                    text = { Text("Reply") },
+                                    text = { Text(stringResource(R.string.reply)) },
                                     leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null) },
                                     onClick = {
                                         controller.replyingTo = record
@@ -1534,7 +1667,7 @@ private fun MessageBubble(
                                 }
                                 if (mine && record.messageIdHex.isNotBlank()) {
                                     DropdownMenuItem(
-                                        text = { Text("Delete") },
+                                        text = { Text(stringResource(R.string.delete)) },
                                         leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
                                         onClick = {
                                             menuOpen = false
@@ -1572,13 +1705,13 @@ private fun OutgoingMessageStatusIcon(status: MessageStatus, tint: Color) {
         )
         OutgoingMessageIndicator.Sent -> Icon(
             imageVector = Icons.Default.Check,
-            contentDescription = "Sent",
+            contentDescription = stringResource(R.string.sent),
             modifier = Modifier.size(14.dp),
             tint = tint,
         )
         OutgoingMessageIndicator.Failed -> Icon(
             imageVector = Icons.Default.ErrorOutline,
-            contentDescription = "Send failed",
+            contentDescription = stringResource(R.string.send_failed),
             modifier = Modifier.size(14.dp),
             tint = MaterialTheme.colorScheme.error,
         )
@@ -1587,10 +1720,11 @@ private fun OutgoingMessageStatusIcon(status: MessageStatus, tint: Color) {
 
 @Composable
 private fun SendingMessageIcon(tint: Color) {
+    val sendingDescription = stringResource(R.string.sending)
     Canvas(
         modifier = Modifier
             .size(14.dp)
-            .semantics { contentDescription = "Sending" },
+            .semantics { contentDescription = sendingDescription },
     ) {
         val strokeWidth = 1.35.dp.toPx()
         val radius = size.minDimension / 2f - strokeWidth / 2f
@@ -1652,7 +1786,7 @@ private fun ComposerBar(
                     overflow = TextOverflow.Ellipsis,
                 )
                 IconButton(onClick = onCancelReply, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Cancel reply", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel_reply), modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -1661,7 +1795,7 @@ private fun ComposerBar(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Message") },
+                placeholder = { Text(stringResource(R.string.message)) },
                 maxLines = 5,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -1695,7 +1829,7 @@ private fun ComposerBar(
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ) {
                 if (sendInFlight) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                else Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                else Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
             }
         }
     }
@@ -1711,10 +1845,12 @@ private fun SettingsScreen(
     onDetailChange: (SettingsDetail?) -> Unit,
 ) {
     when (detail) {
+        SettingsDetail.Appearance -> AppearanceScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Identity -> IdentityScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Notifications -> NotificationsScreen(appState, onBack = { onDetailChange(null) })
         null -> SettingsHomeScreen(
             appState = appState,
             onBackToChats = onBackToChats,
@@ -1728,10 +1864,10 @@ private fun SettingsScreen(
 @Composable
 fun SettingsTopBar(onBackToChats: () -> Unit) {
     CenterAlignedTopAppBar(
-        title = { Text("Settings") },
+        title = { Text(stringResource(R.string.settings)) },
         navigationIcon = {
             IconButton(onClick = onBackToChats) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to chats")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_to_chats))
             }
         },
     )
@@ -1760,7 +1896,7 @@ private fun SettingsHomeScreen(
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                SectionCard(title = "Account") {
+                SectionCard(title = stringResource(R.string.account)) {
                     appState.activeAccount?.let { account ->
                         SettingsAccountHeader(
                             title = appState.displayName(account.accountIdHex),
@@ -1771,18 +1907,24 @@ private fun SettingsHomeScreen(
                             onOpenQr = { qrAccountId = account.accountIdHex },
                         )
                     }
-                    SettingsRow("Profile", "Publish your Nostr kind:0 profile") { onOpenDetail(SettingsDetail.Profile) }
-                    SettingsRow("Identity & Keys", "Public key, npub, signing status") { onOpenDetail(SettingsDetail.Identity) }
-                    SettingsRow("Relays", "Dark Matter-managed relay lists") { onOpenDetail(SettingsDetail.Relays) }
-                    SettingsRow("Key Packages", "Published key packages and rotation") { onOpenDetail(SettingsDetail.KeyPackages) }
+                    SettingsRow(stringResource(R.string.profile), stringResource(R.string.profile_settings_subtitle)) { onOpenDetail(SettingsDetail.Profile) }
+                    SettingsRow(stringResource(R.string.identity_and_keys), stringResource(R.string.identity_settings_subtitle)) { onOpenDetail(SettingsDetail.Identity) }
+                    SettingsRow(stringResource(R.string.relays), stringResource(R.string.relays_settings_subtitle)) { onOpenDetail(SettingsDetail.Relays) }
+                    SettingsRow(stringResource(R.string.key_packages), stringResource(R.string.key_packages_settings_subtitle)) { onOpenDetail(SettingsDetail.KeyPackages) }
                 }
             }
             item {
-                SectionCard(title = "Developer") {
+                SectionCard(title = stringResource(R.string.app_preferences)) {
+                    SettingsRow(stringResource(R.string.appearance), stringResource(R.string.appearance_settings_subtitle)) { onOpenDetail(SettingsDetail.Appearance) }
+                    SettingsRow(stringResource(R.string.notifications), stringResource(R.string.notifications_settings_subtitle)) { onOpenDetail(SettingsDetail.Notifications) }
+                }
+            }
+            item {
+                SectionCard(title = stringResource(R.string.developer)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("Developer mode", style = MaterialTheme.typography.bodyLarge)
-                            Text("Shows diagnostics and MLS internals.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.developer_mode), style = MaterialTheme.typography.bodyLarge)
+                            Text(stringResource(R.string.developer_mode_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(
                             checked = appState.developerMode,
@@ -1790,7 +1932,7 @@ private fun SettingsHomeScreen(
                         )
                     }
                     if (appState.developerMode) {
-                        SettingsRow("Diagnostics", "Relay health and MLS internals") { onOpenDiagnostics() }
+                        SettingsRow(stringResource(R.string.diagnostics), stringResource(R.string.diagnostics_settings_subtitle)) { onOpenDiagnostics() }
                     }
                 }
             }
@@ -1819,6 +1961,148 @@ private fun SettingsHomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppearanceScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.appearance)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            item {
+                SectionCard(title = stringResource(R.string.theme)) {
+                    AppThemeMode.entries.forEach { mode ->
+                        SelectableSettingsRow(
+                            title = stringResource(mode.labelRes),
+                            selected = appState.themeMode == mode,
+                            onClick = { appState.updateThemeMode(mode) },
+                        )
+                    }
+                }
+            }
+            item {
+                SectionCard(title = stringResource(R.string.language)) {
+                    languageOptions.forEach { option ->
+                        SelectableSettingsRow(
+                            title = stringResource(option.labelRes),
+                            selected = appState.languageTag == option.tag,
+                            onClick = { appState.updateLanguageTag(option.tag) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectableSettingsRow(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
+        headlineContent = { Text(title) },
+        trailingContent = {
+            if (selected) {
+                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.selected))
+            }
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NotificationsScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
+    var pendingNotificationEnable by remember { mutableStateOf(false) }
+    var pendingBackgroundConnectionEnable by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        appState.refreshLocalNotificationPermission()
+        if (granted && pendingNotificationEnable) {
+            scope.launch { appState.setLocalNotificationsEnabled(true) }
+        }
+        if (granted && pendingBackgroundConnectionEnable) {
+            scope.launch { appState.setBackgroundConnectionEnabled(true) }
+        } else if (!granted) {
+            appState.present(R.string.toast_notification_permission_denied)
+        }
+        pendingNotificationEnable = false
+        pendingBackgroundConnectionEnable = false
+    }
+
+    LaunchedEffect(appState.activeAccountRef) {
+        appState.refreshLocalNotificationPermission()
+        appState.refreshLocalNotificationSettings()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.notifications)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            item {
+                SectionCard(title = stringResource(R.string.notifications)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.local_notifications), style = MaterialTheme.typography.bodyLarge)
+                            Text(stringResource(R.string.local_notifications_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = appState.localNotificationSettings?.localNotificationsEnabled == true,
+                            enabled = appState.activeAccountRef != null,
+                            onCheckedChange = { enabled ->
+                                if (enabled && !appState.localNotificationPermissionGranted) {
+                                    pendingNotificationEnable = true
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    scope.launch { appState.setLocalNotificationsEnabled(enabled) }
+                                }
+                            },
+                        )
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.keep_connected), style = MaterialTheme.typography.bodyLarge)
+                            Text(stringResource(R.string.keep_connected_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = appState.backgroundConnectionEnabled,
+                            enabled = appState.activeAccountRef != null,
+                            onCheckedChange = { enabled ->
+                                if (enabled && !appState.localNotificationPermissionGranted) {
+                                    pendingBackgroundConnectionEnable = true
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    scope.launch { appState.setBackgroundConnectionEnabled(enabled) }
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun SettingsAccountHeader(
     title: String,
@@ -1828,10 +2112,11 @@ fun SettingsAccountHeader(
     onOpenAccountSelector: () -> Unit,
     onOpenQr: () -> Unit,
 ) {
+    val switchAccountDescription = stringResource(R.string.switch_account)
     ListItem(
         modifier = Modifier
             .clickable(onClick = onOpenAccountSelector)
-            .semantics { contentDescription = "Switch account" },
+            .semantics { contentDescription = switchAccountDescription },
         leadingContent = {
             Avatar(
                 title = title,
@@ -1846,7 +2131,7 @@ fun SettingsAccountHeader(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.ExpandMore, contentDescription = null)
                 IconButton(onClick = onOpenQr) {
-                    Icon(Icons.Default.QrCode, contentDescription = "My QR code")
+                    Icon(Icons.Default.QrCode, contentDescription = stringResource(R.string.my_qr_code))
                 }
             }
         },
@@ -1862,7 +2147,7 @@ private fun AccountSelectorSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Switch Account", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleLarge)
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
                 items(appState.accounts, key = { it.label }) { account ->
                     ListItem(
@@ -1890,11 +2175,11 @@ private fun AccountSelectorSheet(
                         trailingContent = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (!account.localSigning) {
-                                    Text("Read-only", style = MaterialTheme.typography.labelSmall)
+                                    Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)
                                     Spacer(Modifier.width(8.dp))
                                 }
                                 if (account.label == appState.activeAccountRef) {
-                                    Icon(Icons.Default.Check, contentDescription = "Active")
+                                    Icon(Icons.Default.Check, contentDescription = stringResource(R.string.active))
                                 }
                             }
                         },
@@ -1908,7 +2193,7 @@ private fun AccountSelectorSheet(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Add Account")
+                Text(stringResource(R.string.add_account))
             }
         }
     }
@@ -1938,6 +2223,8 @@ private fun ProfileQrSheet(
     var showScanner by remember { mutableStateOf(false) }
     var scanError by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val shareProfileTitle = stringResource(R.string.share_profile)
+    val notDarkMatterProfileQrError = stringResource(R.string.error_not_dark_matter_profile_qr)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -1956,12 +2243,12 @@ private fun ProfileQrSheet(
                 onClick = {
                     clipboard.setText(AnnotatedString(npub))
                     copied = true
-                    appState.present("Copied npub")
+                    appState.present(R.string.toast_copied_npub)
                 },
             ) {
                 Icon(Icons.Default.Check, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(if (copied) "Copied" else IdentityFormatter.short(npub, prefix = 16, suffix = 14))
+                Text(if (copied) stringResource(R.string.copied) else IdentityFormatter.short(npub, prefix = 16, suffix = 14))
             }
             QrCodeImage(content = link.uri)
             scanError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -1971,13 +2258,13 @@ private fun ProfileQrSheet(
                         val sendIntent = Intent(Intent.ACTION_SEND)
                             .setType("text/plain")
                             .putExtra(Intent.EXTRA_TEXT, link.uri)
-                        context.startActivity(Intent.createChooser(sendIntent, "Share profile"))
+                        context.startActivity(Intent.createChooser(sendIntent, shareProfileTitle))
                     },
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(Icons.Default.QrCode, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Share")
+                    Text(stringResource(R.string.share))
                 }
                 Button(
                     onClick = {
@@ -1988,7 +2275,7 @@ private fun ProfileQrSheet(
                 ) {
                     Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Scan")
+                    Text(stringResource(R.string.scan))
                 }
             }
         }
@@ -2001,7 +2288,7 @@ private fun ProfileQrSheet(
                 showScanner = false
                 val scanned = ProfileLink.parse(raw)
                 if (scanned == null) {
-                    scanError = "That QR code is not a Dark Matter profile."
+                    scanError = notDarkMatterProfileQrError
                 } else {
                     onDismiss()
                     appState.presentProfile(scanned.npub)
@@ -2049,7 +2336,7 @@ private fun ProfileSheet(
             Button(
                 onClick = {
                     clipboard.setText(AnnotatedString(npub))
-                    appState.present("Copied npub")
+                    appState.present(R.string.toast_copied_npub)
                 },
             ) {
                 Icon(Icons.Default.Check, contentDescription = null)
@@ -2057,7 +2344,7 @@ private fun ProfileSheet(
                 Text(IdentityFormatter.short(npub, prefix = 16, suffix = 14))
             }
             if (hex == null) {
-                Text("Couldn't read this profile code.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.couldnt_read_profile_code), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Button(
                 onClick = {
@@ -2073,7 +2360,7 @@ private fun ProfileSheet(
                 if (creating) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 else Icon(Icons.Default.Group, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Message")
+                Text(stringResource(R.string.message))
             }
         }
     }
@@ -2093,7 +2380,7 @@ private fun QrCodeImage(content: String) {
         } else {
             Image(
                 bitmap = image!!,
-                contentDescription = "Profile QR code",
+                contentDescription = stringResource(R.string.profile_qr_code),
                 modifier = Modifier.size(257.dp).padding(16.dp),
                 contentScale = ContentScale.Fit,
             )
@@ -2138,9 +2425,9 @@ private fun QrScannerSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Scan", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.scan), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Cancel")
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
                 }
             }
             if (permissionGranted) {
@@ -2150,17 +2437,17 @@ private fun QrScannerSheet(
                 ) {
                     CameraQrScanner(onScan = onScan, onError = { scannerError = it })
                     Text(
-                        scannerError ?: "Point the camera at a Dark Matter profile QR",
+                        scannerError ?: stringResource(R.string.point_camera_at_profile_qr),
                         color = Color.White,
                         modifier = Modifier.padding(16.dp).background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp)).padding(horizontal = 14.dp, vertical = 8.dp),
                     )
                 }
             } else {
-                Text("Camera access is required to scan QR codes.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.camera_access_required), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Allow Camera")
+                    Text(stringResource(R.string.allow_camera))
                 }
             }
         }
@@ -2174,16 +2461,18 @@ private fun CameraQrScanner(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = context.lifecycleOwner()
+    val cameraLifecycleUnavailable = stringResource(R.string.camera_lifecycle_unavailable)
+    val cameraUnavailable = stringResource(R.string.camera_unavailable)
 
     if (lifecycleOwner == null) {
-        onError("Camera lifecycle is unavailable.")
+        onError(cameraLifecycleUnavailable)
         return
     }
 
     AndroidView(
         factory = { viewContext ->
             PreviewView(viewContext).also { previewView ->
-                bindQrScannerCamera(context, lifecycleOwner, previewView, onScan, onError)
+                bindQrScannerCamera(context, lifecycleOwner, previewView, cameraUnavailable, onScan, onError)
             }
         },
         modifier = Modifier.fillMaxSize(),
@@ -2203,6 +2492,7 @@ private fun bindQrScannerCamera(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     previewView: PreviewView,
+    cameraUnavailable: String,
     onScan: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
@@ -2211,7 +2501,7 @@ private fun bindQrScannerCamera(
     cameraProviderFuture.addListener(
         {
             val provider = runCatching { cameraProviderFuture.get() }.getOrElse {
-                onError("Camera is unavailable.")
+                onError(cameraUnavailable)
                 return@addListener
             }
             val preview = Preview.Builder().build().also {
@@ -2278,7 +2568,7 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(active?.accountIdHex) {
-        val profile = active?.accountIdHex?.let { appState.userProfile(it) }
+        val profile = active?.accountIdHex?.let { appState.loadUserProfile(it) }
         if (profile != null) {
             displayName = profile.displayName ?: profile.name ?: ""
             about = profile.about ?: ""
@@ -2291,10 +2581,10 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Profile") },
+                title = { Text(stringResource(R.string.profile)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
             )
@@ -2302,9 +2592,9 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                SectionCard(title = "Preview") {
+                SectionCard(title = stringResource(R.string.preview)) {
                     if (active == null) {
-                        Text("No active account.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         ListItem(
                             leadingContent = {
@@ -2315,32 +2605,32 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                                     pictureUrl = ProfileSanitizer.imageUrl(picture),
                                 )
                             },
-                            headlineContent = { Text(displayName.ifBlank { "Anonymous" }) },
+                            headlineContent = { Text(displayName.ifBlank { stringResource(R.string.anonymous) }) },
                             supportingContent = { Text(appState.shortNpub(active.accountIdHex), fontFamily = FontFamily.Monospace) },
                         )
                     }
                 }
             }
             item {
-                SectionCard(title = "Profile") {
+                SectionCard(title = stringResource(R.string.profile)) {
                     OutlinedTextField(
                         value = displayName,
                         onValueChange = { displayName = it },
-                        label = { Text("Display name") },
+                        label = { Text(stringResource(R.string.display_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = about,
                         onValueChange = { about = it },
-                        label = { Text("About") },
+                        label = { Text(stringResource(R.string.about)) },
                         minLines = 2,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = picture,
                         onValueChange = { picture = it },
-                        label = { Text("Picture URL") },
+                        label = { Text(stringResource(R.string.picture_url)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(
@@ -2352,7 +2642,7 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                     OutlinedTextField(
                         value = nip05,
                         onValueChange = { nip05 = it },
-                        label = { Text("NIP-05") },
+                        label = { Text(stringResource(R.string.nip_05)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
@@ -2360,7 +2650,7 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                     OutlinedTextField(
                         value = lud16,
                         onValueChange = { lud16 = it },
-                        label = { Text("Lightning") },
+                        label = { Text(stringResource(R.string.lightning)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
@@ -2388,7 +2678,7 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                         if (busy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         else Icon(Icons.Default.Check, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Publish to Relays")
+                        Text(stringResource(R.string.publish_to_relays))
                     }
                 }
             }
@@ -2402,10 +2692,11 @@ private fun AddIdentitySheet(appState: DarkMatterAppState, onDismiss: () -> Unit
     var identity by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val creatingIdentityDescription = stringResource(R.string.creating_identity)
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Add Account", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.add_account), style = MaterialTheme.typography.titleLarge)
             Button(
                 onClick = {
                     busy = true
@@ -2424,19 +2715,19 @@ private fun AddIdentitySheet(appState: DarkMatterAppState, onDismiss: () -> Unit
                     CircularProgressIndicator(
                         modifier = Modifier
                             .size(18.dp)
-                            .semantics { contentDescription = "Creating identity" },
+                            .semantics { contentDescription = creatingIdentityDescription },
                         strokeWidth = 2.dp,
                     )
                 } else {
                     Icon(Icons.Default.Key, contentDescription = null)
                 }
                 Spacer(Modifier.width(8.dp))
-                Text(if (busy) "Creating Identity" else "Create New Identity")
+                Text(stringResource(if (busy) R.string.creating_identity_title else R.string.create_new_identity))
             }
             OutlinedTextField(
                 value = identity,
                 onValueChange = { identity = it },
-                label = { Text("nsec or npub") },
+                label = { Text(stringResource(R.string.nsec_or_npub)) },
                 singleLine = true,
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
@@ -2468,7 +2759,7 @@ private fun AddIdentitySheet(appState: DarkMatterAppState, onDismiss: () -> Unit
             ) {
                 Icon(Icons.Default.Person, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Import Existing Identity")
+                Text(stringResource(R.string.import_existing_identity))
             }
         }
     }
@@ -2483,10 +2774,10 @@ private fun IdentityScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Identity") },
+                title = { Text(stringResource(R.string.identity)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
             )
@@ -2494,13 +2785,13 @@ private fun IdentityScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                SectionCard(title = "Identity") {
+                SectionCard(title = stringResource(R.string.identity)) {
                     if (active == null) {
-                        Text("No active account.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
-                        DiagnosticRow("Display name", appState.displayName(active.accountIdHex))
+                        DiagnosticRow(stringResource(R.string.display_name), appState.displayName(active.accountIdHex))
                         CopyableValueRow(
-                            label = "Public key",
+                            label = stringResource(R.string.public_key),
                             display = IdentityFormatter.short(active.accountIdHex),
                             value = active.accountIdHex,
                             clipboard = clipboard,
@@ -2513,28 +2804,28 @@ private fun IdentityScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
                             clipboard = clipboard,
                             appState = appState,
                         )
-                        DiagnosticRow("Local signing", if (active.localSigning) "Yes" else "No")
-                        DiagnosticRow("Status", if (active.running) "Online" else "Idle")
+                        DiagnosticRow(stringResource(R.string.local_signing), stringResource(if (active.localSigning) R.string.yes else R.string.no))
+                        DiagnosticRow(stringResource(R.string.status), stringResource(if (active.running) R.string.online else R.string.idle))
                     }
                 }
             }
             item {
-                SectionCard(title = "Account Session") {
+                SectionCard(title = stringResource(R.string.account_session)) {
                     Text(
-                        "Signing out only forgets which account is active. Identities stay in the device keychain.",
+                        stringResource(R.string.sign_out_session_help),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     OutlinedButton(
                         onClick = {
                             appState.signOutActiveAccount()
-                            appState.present("Signed out")
+                            appState.present(R.string.toast_signed_out)
                         },
                         enabled = active != null,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Default.Close, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Sign out of this account")
+                        Text(stringResource(R.string.sign_out_of_this_account))
                     }
                 }
             }
@@ -2553,7 +2844,7 @@ private fun CopyableValueRow(
     Row(
         Modifier.fillMaxWidth().clickable {
             clipboard.setText(AnnotatedString(value))
-            appState.present("Copied $label")
+            appState.presentText(AppText.Resource(R.string.toast_copied_value, listOf(label)))
         },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -2561,7 +2852,7 @@ private fun CopyableValueRow(
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(display, fontFamily = FontFamily.Monospace)
-            Icon(Icons.Default.Check, contentDescription = "Copy")
+            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.copy))
         }
     }
 }
@@ -2575,7 +2866,7 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
     var saving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    fun reloadLists() {
+    suspend fun reloadLists() {
         lists = appState.accountRelayLists()
     }
 
@@ -2586,15 +2877,15 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Relays") },
+                title = { Text(stringResource(R.string.relays)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
-                    IconButton(onClick = { reloadLists() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    IconButton(onClick = { scope.launch { reloadLists() } }) {
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                     }
                 },
             )
@@ -2602,20 +2893,20 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                SectionCard(title = "Account Relay Lists") {
+                SectionCard(title = stringResource(R.string.account_relay_lists)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         relayListKinds.forEach { option ->
                             FilterChip(
                                 selected = selectedKind == option,
                                 onClick = { selectedKind = option },
-                                label = { Text(option.label) },
+                                label = { Text(stringResource(option.labelRes)) },
                             )
                         }
                     }
 
                     val currentRelays = lists?.relaysFor(selectedKind).orEmpty()
                     if (currentRelays.isEmpty()) {
-                        Text("No relays", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.no_relays), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     currentRelays.forEach { relay ->
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -2630,7 +2921,7 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
                                 },
                                 enabled = !saving && currentRelays.size > 1,
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Remove relay")
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove_relay))
                             }
                         }
                     }
@@ -2665,7 +2956,7 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
                                     !currentRelays.contains(it)
                             },
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add relay")
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_relay))
                         }
                     }
                 }
@@ -2683,11 +2974,11 @@ private val relayListKinds = listOf(
     RelayListKind.KeyPackage,
 )
 
-private val RelayListKind.label: String
+private val RelayListKind.labelRes: Int
     get() = when (this) {
-        RelayListKind.Nip65 -> "NIP-65"
-        RelayListKind.Inbox -> "Inbox"
-        RelayListKind.KeyPackage -> "Key Package"
+        RelayListKind.Nip65 -> R.string.nip_65
+        RelayListKind.Inbox -> R.string.inbox
+        RelayListKind.KeyPackage -> R.string.key_package
     }
 
 private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> {
@@ -2700,18 +2991,18 @@ private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> {
 
 @Composable
 private fun PublishedRelayLists(lists: AccountRelayListsFfi?) {
-    SectionCard(title = "Published Relay Lists") {
+    SectionCard(title = stringResource(R.string.published_relay_lists)) {
         if (lists == null) {
-            Text("No relay-list projection is available yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.no_relay_projection), color = MaterialTheme.colorScheme.onSurfaceVariant)
             return@SectionCard
         }
-        RelayListRow("NIP-65", lists.nip65)
-        RelayListRow("Inbox", lists.inbox)
-        RelayListRow("Key Package", lists.keyPackage)
+        RelayListRow(stringResource(R.string.nip_65), lists.nip65)
+        RelayListRow(stringResource(R.string.inbox), lists.inbox)
+        RelayListRow(stringResource(R.string.key_package), lists.keyPackage)
         if (lists.complete) {
-            Text("All relay lists are published.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.all_relay_lists_published), color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            Text("Missing: ${lists.missing.joinToString(", ")}", color = MaterialTheme.colorScheme.error)
+            Text(stringResource(R.string.missing_relay_lists, lists.missing.joinToString(", ")), color = MaterialTheme.colorScheme.error)
         }
     }
 }
@@ -2724,7 +3015,7 @@ private fun RelayListRow(title: String, list: RelayListFfi) {
             Text("${list.relays.size}", fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (list.relays.isEmpty()) {
-            Text("Not published", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.not_published), color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             list.relays.forEach { relay ->
                 Text(relay, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
@@ -2757,10 +3048,10 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Key Packages") },
+                title = { Text(stringResource(R.string.key_packages)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
@@ -2768,7 +3059,7 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                         onClick = { scope.launch { reload() } },
                         enabled = !loading && !working && appState.activeAccountRef != null,
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                     }
                 },
             )
@@ -2779,10 +3070,9 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-                SectionCard(title = "Publishing") {
+                SectionCard(title = stringResource(R.string.publishing)) {
                     Text(
-                        "Re-publish the current key package to your configured relays, " +
-                            "or rotate to a fresh one. Old packages stay on relays until deleted.",
+                        stringResource(R.string.key_package_publishing_help),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -2801,7 +3091,7 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Republish")
+                            Text(stringResource(R.string.republish))
                         }
                         Button(
                             onClick = {
@@ -2817,14 +3107,14 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Publish New")
+                            Text(stringResource(R.string.publish_new))
                         }
                     }
                 }
             }
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Published", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.published), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     if (loading) {
                         CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                     }
@@ -2832,10 +3122,9 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
             }
             if (loaded && packages.isEmpty() && !loading) {
                 item {
-                    SectionCard(title = "No key packages found") {
+                    SectionCard(title = stringResource(R.string.no_key_packages_found)) {
                         Text(
-                            "Nothing cached locally and no key package events were returned from " +
-                                "the configured relays. Try \"Publish New\".",
+                            stringResource(R.string.no_key_packages_found_help),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -2854,14 +3143,14 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
     pendingDelete?.let { kp ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("Delete key package?") },
+            title = { Text(stringResource(R.string.delete_key_package_question)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "Publishes a NIP-09 deletion for this key package and clears it from the local cache.",
+                        stringResource(R.string.delete_key_package_help),
                     )
                     Text(
-                        "Event: ${IdentityFormatter.short(kp.eventIdHex)}",
+                        stringResource(R.string.event_value, IdentityFormatter.short(kp.eventIdHex)),
                         fontFamily = FontFamily.Monospace,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -2877,10 +3166,10 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                         reload()
                         working = false
                     }
-                }) { Text("Delete") }
+                }) { Text(stringResource(R.string.delete)) }
             },
             dismissButton = {
-                OutlinedButton(onClick = { pendingDelete = null }) { Text("Cancel") }
+                OutlinedButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -2892,6 +3181,9 @@ private fun KeyPackageCard(
     busy: Boolean,
     onDelete: () -> Unit,
 ) {
+    val localLabel = stringResource(R.string.local)
+    val relayLabel = stringResource(R.string.relay)
+    val unknownLabel = stringResource(R.string.unknown)
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -2905,26 +3197,26 @@ private fun KeyPackageCard(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        formatPublishedAt(kp.publishedAt),
+                        formatPublishedAt(kp.publishedAt, stringResource(R.string.unknown_publish_time), stringResource(R.string.published_at)),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
                 IconButton(onClick = onDelete, enabled = !busy) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete key package")
+                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_key_package))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                keyPackageSourceLabels(kp).forEach { label ->
+                keyPackageSourceLabels(kp, localLabel, relayLabel, unknownLabel).forEach { label ->
                     AssistChip(onClick = {}, label = { Text(label, style = MaterialTheme.typography.labelSmall) })
                 }
             }
-            DiagnosticRow("Event", IdentityFormatter.short(kp.eventIdHex))
-            DiagnosticRow("Ref", IdentityFormatter.short(kp.keyPackageRefHex))
-            DiagnosticRow("Size", "${kp.keyPackageBytes} bytes")
+            DiagnosticRow(stringResource(R.string.event), IdentityFormatter.short(kp.eventIdHex))
+            DiagnosticRow(stringResource(R.string.ref), IdentityFormatter.short(kp.keyPackageRefHex))
+            DiagnosticRow(stringResource(R.string.size), stringResource(R.string.bytes_count, kp.keyPackageBytes))
             if (kp.sourceRelays.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Source relays", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.source_relays), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     kp.sourceRelays.forEach { relay ->
                         Text(relay, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
                     }
@@ -2934,20 +3226,25 @@ private fun KeyPackageCard(
     }
 }
 
-private fun keyPackageSourceLabels(kp: AccountKeyPackageFfi): List<String> {
+private fun keyPackageSourceLabels(
+    kp: AccountKeyPackageFfi,
+    localLabel: String,
+    relayLabel: String,
+    unknownLabel: String,
+): List<String> {
     val out = mutableListOf<String>()
-    if (kp.local) out += "Local"
-    if (kp.relay) out += "Relay"
-    if (out.isEmpty()) out += "Unknown"
+    if (kp.local) out += localLabel
+    if (kp.relay) out += relayLabel
+    if (out.isEmpty()) out += unknownLabel
     return out
 }
 
 private val publishedAtFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
 
-private fun formatPublishedAt(unixSeconds: ULong): String {
-    if (unixSeconds == 0uL) return "Unknown publish time"
+private fun formatPublishedAt(unixSeconds: ULong, unknown: String, format: String): String {
+    if (unixSeconds == 0uL) return unknown
     val millis = unixSeconds.toLong() * 1000L
-    return "Published ${publishedAtFormatter.format(Date(millis))}"
+    return String.format(format, publishedAtFormatter.format(Date(millis)))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2964,34 +3261,38 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () ->
 
     LaunchedEffect(Unit) {
         streaming = true
-        val subscription = appState.marmot().subscribeEvents()
+        val subscription = appState.marmotIo { subscribeEvents() }
         try {
             while (true) {
-                val event = subscription.next() ?: break
+                val event = withContext(Dispatchers.IO) {
+                    subscription.next()
+                } ?: break
                 entries = (entries + DiagnosticLogEntry(text = DiagnosticFormatter.describe(event))).takeLast(500)
             }
         } catch (throwable: Throwable) {
             entries = (entries + DiagnosticLogEntry(text = "event stream failed: ${throwable.message ?: throwable.javaClass.simpleName}")).takeLast(500)
         } finally {
             streaming = false
-            subscription.destroy()
+            withContext(Dispatchers.IO) {
+                subscription.destroy()
+            }
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Diagnostics") },
+                title = { Text(stringResource(R.string.diagnostics)) },
                 navigationIcon = {
                     IconButton(onClick = onBackToChats) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to chats")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_to_chats))
                     }
                 },
                 actions = {
                     IconButton(onClick = {
-                        scope.launch { health = appState.marmot().relayHealth() }
+                        scope.launch { health = appState.marmotIo { relayHealth() } }
                     }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                     }
                 },
             )
@@ -3005,13 +3306,15 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () ->
                             scope.launch {
                                 val account = appState.activeAccountRef ?: return@launch
                                 runCatching {
-                                    val groupId = appState.marmot().createGroup(
-                                        account,
-                                        "diagnostic-${System.currentTimeMillis() / 1000L}",
-                                        emptyList(),
-                                        null,
-                                    )
-                                    appState.marmot().sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}")
+                                    val groupId = appState.marmotIo {
+                                        createGroup(
+                                            account,
+                                            "diagnostic-${System.currentTimeMillis() / 1000L}",
+                                            emptyList(),
+                                            null,
+                                        )
+                                    }
+                                    appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }
                                     appendLog("sent ping to self in ${IdentityFormatter.short(groupId)}")
                                 }.onFailure {
                                     appendLog("send-to-self failed: ${it.message ?: it.javaClass.simpleName}")
@@ -3022,49 +3325,49 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () ->
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Send to self")
+                        Text(stringResource(R.string.send_to_self))
                     }
                     OutlinedButton(onClick = { entries = emptyList() }) {
                         Icon(Icons.Default.Delete, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Clear")
+                        Text(stringResource(R.string.clear))
                     }
                     Spacer(Modifier.weight(1f))
-                    Text(if (streaming) "Live" else "Idle", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(if (streaming) R.string.live else R.string.idle), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             item {
-                SectionCard(title = "Relay Health") {
+                SectionCard(title = stringResource(R.string.relay_health)) {
                     if (health == null) {
-                        Text("No relay snapshot yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Button(onClick = { scope.launch { health = appState.marmot().relayHealth() } }) {
+                        Text(stringResource(R.string.no_relay_snapshot_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Button(onClick = { scope.launch { health = appState.marmotIo { relayHealth() } } }) {
                             Icon(Icons.Default.Refresh, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Refresh")
+                            Text(stringResource(R.string.refresh))
                         }
                     } else {
                         health?.let { relay ->
-                            DiagnosticRow("Total", relay.totalRelays.toString())
-                            DiagnosticRow("Connected", relay.connected.toString())
-                            DiagnosticRow("Connecting", relay.connecting.toString())
-                            DiagnosticRow("Disconnected", relay.disconnected.toString())
-                            DiagnosticRow("Attempts", relay.connectionAttempts.toString())
-                            DiagnosticRow("Successes", relay.connectionSuccesses.toString())
+                            DiagnosticRow(stringResource(R.string.total), relay.totalRelays.toString())
+                            DiagnosticRow(stringResource(R.string.connected), relay.connected.toString())
+                            DiagnosticRow(stringResource(R.string.connecting), relay.connecting.toString())
+                            DiagnosticRow(stringResource(R.string.disconnected), relay.disconnected.toString())
+                            DiagnosticRow(stringResource(R.string.attempts), relay.connectionAttempts.toString())
+                            DiagnosticRow(stringResource(R.string.successes), relay.connectionSuccesses.toString())
                         }
                     }
                 }
             }
             item {
-                SectionCard(title = "Runtime") {
-                    DiagnosticRow("Active account", appState.activeAccountRef ?: "none")
-                    DiagnosticRow("Accounts", appState.accounts.size.toString())
-                    DiagnosticRow("Bootstrap relays", appState.bootstrapRelayCount().toString())
+                SectionCard(title = stringResource(R.string.runtime)) {
+                    DiagnosticRow(stringResource(R.string.active_account), appState.activeAccountRef ?: stringResource(R.string.none))
+                    DiagnosticRow(stringResource(R.string.accounts), appState.accounts.size.toString())
+                    DiagnosticRow(stringResource(R.string.bootstrap_relays), appState.bootstrapRelayCount().toString())
                 }
             }
             item {
-                SectionCard(title = "Event Log") {
+                SectionCard(title = stringResource(R.string.event_log)) {
                     if (entries.isEmpty()) {
-                        Text("Waiting for events.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.waiting_for_events), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         entries.forEach { entry ->
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

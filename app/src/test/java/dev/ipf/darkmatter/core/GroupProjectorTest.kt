@@ -110,6 +110,21 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun pendingInviteTitleUsesWelcomerBeforeRosterLoads() {
+        val invite = group(name = "", pending = true, welcomer = "alice")
+
+        assertEquals(
+            "Invite from Alice",
+            GroupProjector.displayTitle(
+                group = invite,
+                otherMemberAccount = null,
+                memberCount = 0,
+                memberTitle = { "Alice" },
+            ),
+        )
+    }
+
+    @Test
     fun transcriptSenderAvatarOnlyShowsForOtherMembersInLargerGroups() {
         assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(memberCount = 2, mine = false))
         assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(memberCount = 3, mine = true))
@@ -159,6 +174,8 @@ class GroupProjectorTest {
     private fun group(
         admins: List<String> = emptyList(),
         name: String = "Test Group",
+        pending: Boolean = false,
+        welcomer: String? = null,
     ) = AppGroupRecordFfi(
         groupIdHex = "group",
         endpoint = "endpoint",
@@ -168,8 +185,8 @@ class GroupProjectorTest {
         relays = listOf("wss://relay.example"),
         nostrGroupIdHex = "nostr",
         archived = false,
-        pendingConfirmation = false,
-        welcomerAccountIdHex = null,
+        pendingConfirmation = pending,
+        welcomerAccountIdHex = welcomer,
         viaWelcomeMessageIdHex = null,
     )
 }

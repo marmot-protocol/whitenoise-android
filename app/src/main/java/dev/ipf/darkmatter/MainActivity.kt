@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,16 +16,19 @@ import dev.ipf.darkmatter.ui.theme.DarkMatterTheme
 
 class MainActivity : ComponentActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
+    private lateinit var appState: DarkMatterAppState
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        appState = (application as DarkMatterApplication).appState
         inboundProfilePayload = intent?.dataString
         enableEdgeToEdge()
         setContent {
-            DarkMatterTheme {
-                val appState = remember { DarkMatterAppState(applicationContext) }
+            val state = remember { appState }
+            val systemDarkTheme = isSystemInDarkTheme()
+            DarkMatterTheme(darkTheme = state.themeMode.resolveDarkTheme(systemDarkTheme)) {
                 DarkMatterApp(
-                    appState = appState,
+                    appState = state,
                     inboundProfilePayload = inboundProfilePayload,
                     onProfilePayloadHandled = { handled ->
                         if (inboundProfilePayload == handled) inboundProfilePayload = null
@@ -32,6 +36,16 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (::appState.isInitialized) appState.setAppInForeground(true)
+    }
+
+    override fun onStop() {
+        if (::appState.isInitialized) appState.setAppInForeground(false)
+        super.onStop()
     }
 
     override fun onNewIntent(intent: Intent) {

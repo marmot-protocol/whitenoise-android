@@ -1,8 +1,10 @@
 package dev.ipf.darkmatter.state
 
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.ReactionTally
@@ -20,7 +22,10 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AgentStreamUpdateFfi
 import dev.ipf.marmotkit.AgentStreamSubscription
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.ChatsSubscription
+import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.MessageUpdateFfi
+import dev.ipf.marmotkit.MessagesSubscription
 import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
 
 data class ChatListItem(
@@ -35,10 +40,58 @@ data class ChatListItem(
 
 internal fun sortChatListItems(items: List<ChatListItem>): List<ChatListItem> {
     return items.sortedWith(
-        compareByDescending<ChatListItem> { it.latest?.recordedAt ?: 0uL }
+        compareByDescending<ChatListItem> { it.group.pendingConfirmation }
+            .thenByDescending { it.latest?.recordedAt ?: 0uL }
             .thenBy { it.group.name.ifBlank { it.group.groupIdHex }.lowercase() },
     )
 }
+
+internal fun latestMessagesAfterStreamUpdate(
+    latestByGroup: Map<String, AppMessageRecordFfi>,
+    update: MessageUpdateFfi,
+    recordedAt: ULong,
+): Map<String, AppMessageRecordFfi> {
+    return latestMessagesAfterRecord(latestByGroup, appMessageRecordFromStreamUpdate(update, recordedAt))
+}
+
+private fun latestMessagesAfterRecord(
+    latestByGroup: Map<String, AppMessageRecordFfi>,
+    record: AppMessageRecordFfi,
+): Map<String, AppMessageRecordFfi> {
+    val current = latestByGroup[record.groupIdHex]
+    if (current != null && current.recordedAt > record.recordedAt) return latestByGroup
+    return latestByGroup + (record.groupIdHex to record)
+}
+
+internal fun appMessageRecordFromStreamUpdate(update: MessageUpdateFfi, recordedAt: ULong): AppMessageRecordFfi {
+    return appMessageRecordFromReceived(streamReceived(update), recordedAt)
+}
+
+private fun streamReceived(update: MessageUpdateFfi): RuntimeMessageReceivedFfi {
+    return when (update) {
+        is MessageUpdateFfi.Message -> update.received
+        is MessageUpdateFfi.AgentStreamStarted -> update.received
+    }
+}
+
+private fun appMessageRecordFromReceived(
+    received: RuntimeMessageReceivedFfi,
+    recordedAt: ULong,
+): AppMessageRecordFfi {
+    return AppMessageRecordFfi(
+        messageIdHex = received.message.messageIdHex,
+        direction = "received",
+        groupIdHex = received.message.groupIdHex,
+        sender = received.message.sender,
+        plaintext = received.message.plaintext,
+        kind = received.message.kind,
+        tags = received.message.tags,
+        recordedAt = recordedAt,
+        receivedAt = recordedAt,
+    )
+}
+
+private fun currentUnixSeconds(): ULong = (System.currentTimeMillis() / 1000L).toULong()
 
 data class GroupMemberSnapshot(
     val members: List<AppGroupMemberRecordFfi>,
@@ -96,6 +149,7 @@ class ChatsController(private val appState: DarkMatterAppState) {
     private var memberInfoByGroup = mapOf<String, GroupMemberSnapshot>()
 
     suspend fun bind(accountRef: String?) {
+        chatsDebug { "bind account=${accountRef?.take(8)}" }
         this.accountRef = accountRef
         groups = emptyList()
         latestByGroup = emptyMap()
@@ -105,43 +159,74 @@ class ChatsController(private val appState: DarkMatterAppState) {
 
         if (accountRef == null) return
         isLoading = true
+        var chatsSubscription: ChatsSubscription? = null
+        var messagesSubscription: MessagesSubscription? = null
         try {
-            val marmot = appState.marmot()
-            val chatsSubscription = marmot.subscribeChats(accountRef, includeArchived = true)
-            groups = chatsSubscription.snapshot()
-            val hasCompleteMemberSnapshots = seedCachedMembers()
-            refreshLatest(recomputeAfter = hasCompleteMemberSnapshots)
-            refreshMembers(groups.map { it.groupIdHex })
+            val chatStream = appState.marmotIo { subscribeChats(accountRef, includeArchived = true) }
+            chatsSubscription = chatStream
+            val messageStream = appState.marmotIo { subscribeMessages(accountRef, groupIdHex = null) }
+            messagesSubscription = messageStream
+            groups = withContext(Dispatchers.IO) {
+                chatStream.snapshot()
+            }
+            groups.forEach(::requestGroupProfiles)
+            chatsDebug {
+                "snapshot account=${accountRef.take(8)} groups=${groups.size} ${groups.map { it.debugSummary() }}"
+            }
+            seedCachedMembers()
+            refreshLatest(recomputeAfter = false)
+            chatsDebug { "latest snapshot account=${accountRef.take(8)} groups=${latestByGroup.size}" }
             isLoading = false
             recompute()
 
             coroutineScope {
                 launch {
+                    refreshMembers(groups.map { it.groupIdHex })
+                }
+                launch {
                     while (isActive) {
-                        val update = chatsSubscription.next() ?: break
+                        val update = withContext(Dispatchers.IO) {
+                            chatStream.next()
+                        } ?: break
+                        requestGroupProfiles(update)
+                        chatsDebug { "chat update account=${accountRef.take(8)} ${update.debugSummary()}" }
                         val hasMemberSnapshot = seedCachedMember(update.groupIdHex)
                         foldGroup(update, recomputeNow = hasMemberSnapshot)
                         refreshMembers(listOf(update.groupIdHex))
                     }
                 }
                 launch {
-                    val messagesSubscription = marmot.subscribeMessages(accountRef, groupIdHex = null)
                     while (isActive) {
-                        messagesSubscription.next() ?: break
-                        refreshLatest()
+                        val update = withContext(Dispatchers.IO) {
+                            messageStream.next()
+                        } ?: break
+                        val record = appMessageRecordFromStreamUpdate(update, currentUnixSeconds())
+                        chatsDebug {
+                            "message update account=${accountRef.take(8)} group=${record.groupIdHex.take(8)} " +
+                                "message=${record.messageIdHex.take(8)} kind=${record.kind} sender=${record.sender.take(8)}"
+                        }
+                        appState.requestProfile(record.sender)
+                        latestByGroup = latestMessagesAfterRecord(latestByGroup, record)
+                        recompute()
                     }
                 }
             }
         } catch (throwable: Throwable) {
+            chatsDebug(throwable) { "bind failed account=${accountRef.take(8)}: ${throwable.message ?: throwable.javaClass.simpleName}" }
             isLoading = false
             error = throwable.message ?: throwable.javaClass.simpleName
+        } finally {
+            withContext(Dispatchers.IO) {
+                runCatching { messagesSubscription?.close() }
+                runCatching { chatsSubscription?.close() }
+            }
         }
     }
 
     suspend fun refreshLatest(recomputeAfter: Boolean = true) {
         val account = accountRef ?: return
         runCatching {
-            val recent = appState.marmot().messages(account, groupIdHex = null, limit = 400u)
+            val recent = appState.marmotIo { messages(account, groupIdHex = null, limit = 400u) }
             appState.requestProfiles(recent.map { it.sender })
             latestByGroup = recent
                 .groupBy { it.groupIdHex }
@@ -157,6 +242,12 @@ class ChatsController(private val appState: DarkMatterAppState) {
             groups + record
         }
         if (recomputeNow) recompute()
+    }
+
+    private fun requestGroupProfiles(group: AppGroupRecordFfi) {
+        appState.requestProfiles(
+            listOfNotNull(group.welcomerAccountIdHex) + group.admins,
+        )
     }
 
     private fun seedCachedMembers(): Boolean {
@@ -191,9 +282,7 @@ class ChatsController(private val appState: DarkMatterAppState) {
 
     private suspend fun loadMembers(account: String, groupIdHex: String): Pair<String, GroupMemberSnapshot>? {
         return runCatching {
-            val members = withContext(Dispatchers.IO) {
-                appState.marmot().groupMembers(account, groupIdHex)
-            }
+            val members = appState.marmotIo { groupMembers(account, groupIdHex) }
             val snapshot = appState.cacheGroupMemberSnapshot(account, groupIdHex, members)
             appState.requestProfiles(members.map { it.memberIdHex })
             groupIdHex to snapshot
@@ -214,7 +303,21 @@ class ChatsController(private val appState: DarkMatterAppState) {
         }.let(::sortChatListItems)
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
+        chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }
     }
+}
+
+private fun AppGroupRecordFfi.debugSummary(): String {
+    return "id=${groupIdHex.take(8)} archived=$archived pending=$pendingConfirmation " +
+        "welcomer=${welcomerAccountIdHex?.take(8)} relays=${relays.size} name=${name.ifBlank { "<blank>" }}"
+}
+
+private inline fun chatsDebug(message: () -> String) {
+    Log.i("DMChats", message())
+}
+
+private inline fun chatsDebug(error: Throwable, message: () -> String) {
+    Log.e("DMChats", message(), error)
 }
 
 class ConversationController(
@@ -245,26 +348,38 @@ class ConversationController(
     private val activeStreamIds = mutableSetOf<String>()
 
     val title: String
+        get() = title()
+
+    fun title(copy: dev.ipf.darkmatter.core.GroupTitleCopy = dev.ipf.darkmatter.core.GroupTitleCopy.Default): String {
+        val me = appState.activeAccount?.accountIdHex
+        val other = GroupProjector.otherMemberAccount(members, me)
+        return GroupProjector.displayTitle(
+            group = group,
+            otherMemberAccount = other,
+            memberCount = members.size,
+            memberTitle = { appState.chatMemberTitle(it) },
+            copy = copy,
+        )
+    }
+
+    val inviteAccount: String?
         get() {
             val me = appState.activeAccount?.accountIdHex
             val other = GroupProjector.otherMemberAccount(members, me)
-            return GroupProjector.displayTitle(
-                group = group,
-                otherMemberAccount = other,
-                memberCount = members.size,
-                memberTitle = { appState.chatMemberTitle(it) },
-            )
+            return GroupProjector.inviteAccount(group, other)
         }
 
     val subtitle: String
-        get() {
-            val count = members.size
-            return when (count) {
-                0 -> "Just you"
-                1 -> "1 member"
-                else -> "$count members"
-            }
+        get() = subtitle(justYou = "Just you", oneMember = "1 member", membersFormat = "%1\$d members")
+
+    fun subtitle(justYou: String, oneMember: String, membersFormat: String): String {
+        val count = members.size
+        return when (count) {
+            0 -> justYou
+            1 -> oneMember
+            else -> String.format(membersFormat, count)
         }
+    }
 
     val isSelfAdmin: Boolean
         get() = appState.activeAccount?.accountIdHex?.let { group.admins.contains(it) } == true
@@ -276,11 +391,16 @@ class ConversationController(
         val account = appState.activeAccountRef ?: return
         isLoading = true
         error = null
+        var messagesSubscription: MessagesSubscription? = null
+        var groupSubscription: GroupStateSubscription? = null
         try {
-            val marmot = appState.marmot()
-            val messagesSubscription = marmot.subscribeMessages(account, group.groupIdHex)
+            val messageStream = appState.marmotIo { subscribeMessages(account, group.groupIdHex) }
+            messagesSubscription = messageStream
             val snapshotStreamIds = linkedSetOf<String>()
-            messagesSubscription.snapshot().forEach { record ->
+            val snapshot = withContext(Dispatchers.IO) {
+                messageStream.snapshot()
+            }
+            snapshot.forEach { record ->
                 ingest(record)
                 when {
                     MessageProjector.isStreamStart(record) -> {
@@ -292,8 +412,12 @@ class ConversationController(
                 }
             }
 
-            val groupSubscription = marmot.subscribeGroupState(account, group.groupIdHex)
-            groupSubscription.snapshot()?.let { group = it }
+            val groupStream = appState.marmotIo { subscribeGroupState(account, group.groupIdHex) }
+            groupSubscription = groupStream
+            val groupSnapshot = withContext(Dispatchers.IO) {
+                groupStream.snapshot()
+            }
+            groupSnapshot?.let { group = it }
             refreshMembers()
             isLoading = false
 
@@ -305,7 +429,9 @@ class ConversationController(
                 }
                 launch {
                     while (isActive) {
-                        val update = messagesSubscription.next() ?: break
+                        val update = withContext(Dispatchers.IO) {
+                            messageStream.next()
+                        } ?: break
                         fold(update) { streamId ->
                             launch { watchAgentTextStream(account, streamId) }
                         }
@@ -313,7 +439,9 @@ class ConversationController(
                 }
                 launch {
                     while (isActive) {
-                        val update = groupSubscription.next() ?: break
+                        val update = withContext(Dispatchers.IO) {
+                            groupStream.next()
+                        } ?: break
                         group = update
                         refreshMembers()
                     }
@@ -322,6 +450,11 @@ class ConversationController(
         } catch (throwable: Throwable) {
             isLoading = false
             error = throwable.message ?: throwable.javaClass.simpleName
+        } finally {
+            withContext(Dispatchers.IO) {
+                runCatching { groupSubscription?.close() }
+                runCatching { messagesSubscription?.close() }
+            }
         }
     }
 
@@ -351,9 +484,9 @@ class ConversationController(
         sendInFlight = true
         try {
             val summary = if (replyTarget != null) {
-                appState.marmot().replyToMessage(account, group.groupIdHex, replyTarget, trimmed)
+                appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, trimmed) }
             } else {
-                appState.marmot().sendText(account, group.groupIdHex, trimmed)
+                appState.marmotIo { sendText(account, group.groupIdHex, trimmed) }
             }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = optimistic.copy(messageIdHex = confirmedId)
@@ -361,7 +494,7 @@ class ConversationController(
             replace("msg:$tempId", TimelineMessage("msg:$confirmedId", confirmed, MessageStatus.Sent))
         } catch (throwable: Throwable) {
             replace("msg:$tempId", TimelineMessage("msg:$tempId", optimistic, MessageStatus.Failed))
-            appState.present("Send failed", throwable.message ?: throwable.javaClass.simpleName)
+            appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         } finally {
             sendInFlight = false
         }
@@ -386,14 +519,14 @@ class ConversationController(
         recomputeReactions()
         try {
             if (alreadyMine) {
-                appState.marmot().unreactFromMessage(account, group.groupIdHex, target)
+                appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
             } else {
-                appState.marmot().reactToMessage(account, group.groupIdHex, target, emoji)
+                appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
             }
         } catch (throwable: Throwable) {
             reactionRecords.remove(synthetic.messageIdHex)
             recomputeReactions()
-            appState.present("Reaction failed", throwable.message ?: throwable.javaClass.simpleName)
+            appState.present(R.string.toast_reaction_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
     }
 
@@ -402,30 +535,55 @@ class ConversationController(
         val target = message.messageIdHex.takeIf { it.isNotBlank() } ?: return
         deletedMessageIds = deletedMessageIds + target
         try {
-            appState.marmot().deleteMessage(account, group.groupIdHex, target)
+            appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
         } catch (throwable: Throwable) {
             deletedMessageIds = deletedMessageIds - target
-            appState.present("Couldn't delete message", throwable.message ?: throwable.javaClass.simpleName)
+            appState.present(R.string.toast_couldnt_delete_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
     }
 
     suspend fun leaveGroup(): Boolean {
         val account = appState.activeAccountRef ?: return false
         if (!canLeaveGroup) {
-            appState.present("Make another admin before leaving", "A group needs at least one admin.")
+            appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
             return false
         }
         return runCatching {
             val activeAccountIdHex = appState.activeAccount?.accountIdHex
             if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex)) {
-                appState.marmot().selfDemoteAdmin(account, group.groupIdHex)
+                appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
                 group = group.copy(admins = group.admins.filterNot { it == activeAccountIdHex })
             }
-            appState.marmot().leaveGroup(account, group.groupIdHex)
-            appState.present("Left chat")
+            appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+            appState.present(R.string.toast_left_chat)
             true
         }.getOrElse {
-            appState.present("Couldn't leave chat", it.message ?: it.javaClass.simpleName)
+            appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
+            false
+        }
+    }
+
+    suspend fun acceptInvite(): Boolean {
+        val account = appState.activeAccountRef ?: return false
+        return runCatching {
+            group = appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) }
+            appState.present(R.string.toast_invite_accepted)
+            true
+        }.getOrElse {
+            appState.present(R.string.toast_couldnt_accept_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
+            false
+        }
+    }
+
+    suspend fun declineInvite(): Boolean {
+        val account = appState.activeAccountRef ?: return false
+        return runCatching {
+            appState.marmotIo { declineGroupInvite(account, group.groupIdHex) }
+            group = group.copy(pendingConfirmation = false, archived = true)
+            appState.present(R.string.toast_invite_declined)
+            true
+        }.getOrElse {
+            appState.present(R.string.toast_couldnt_decline_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
             false
         }
     }
@@ -433,26 +591,28 @@ class ConversationController(
     suspend fun setArchived(archived: Boolean) {
         val account = appState.activeAccountRef ?: return
         runCatching {
-            group = appState.marmot().setGroupArchived(account, group.groupIdHex, archived)
-            appState.present(if (archived) "Chat archived" else "Chat restored")
+            group = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
+            appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
         }.onFailure {
-            appState.present("Couldn't update chat", it.message ?: it.javaClass.simpleName)
+            appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }
     }
 
     suspend fun updateGroupProfile(name: String, description: String) {
         val account = appState.activeAccountRef ?: return
         runCatching {
-            appState.marmot().updateGroupProfile(
-                account,
-                group.groupIdHex,
-                name.trim().takeIf { it.isNotEmpty() },
-                description.trim().takeIf { it.isNotEmpty() },
-            )
+            appState.marmotIo {
+                updateGroupProfile(
+                    account,
+                    group.groupIdHex,
+                    name.trim().takeIf { it.isNotEmpty() },
+                    description.trim().takeIf { it.isNotEmpty() },
+                )
+            }
             group = group.copy(name = name.trim(), description = description.trim())
-            appState.present("Group updated")
+            appState.present(R.string.toast_group_updated)
         }.onFailure {
-            appState.present("Couldn't update group", it.message ?: it.javaClass.simpleName)
+            appState.present(R.string.toast_couldnt_update_group, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }
     }
 
@@ -461,11 +621,11 @@ class ConversationController(
         val refs = memberRefs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         if (refs.isEmpty()) return
         runCatching {
-            appState.marmot().inviteMembers(account, group.groupIdHex, refs)
+            appState.marmotIo { inviteMembers(account, group.groupIdHex, refs) }
             refreshMembers()
-            appState.present("Invite sent")
+            appState.present(R.string.toast_invite_sent)
         }.onFailure {
-            appState.present("Couldn't add members", it.message ?: it.javaClass.simpleName)
+            appState.present(R.string.toast_couldnt_add_members, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }
     }
 
@@ -473,11 +633,11 @@ class ConversationController(
         val account = appState.activeAccountRef ?: return
         val target = GroupProjector.memberRef(member)
         runCatching {
-            appState.marmot().removeMembers(account, group.groupIdHex, listOf(target))
+            appState.marmotIo { removeMembers(account, group.groupIdHex, listOf(target)) }
             refreshMembers()
-            appState.present("Member removed")
+            appState.present(R.string.toast_member_removed)
         }.onFailure {
-            appState.present("Couldn't remove member", it.message ?: it.javaClass.simpleName)
+            appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }
     }
 
@@ -485,22 +645,22 @@ class ConversationController(
         val account = appState.activeAccountRef ?: return
         val target = GroupProjector.memberRef(member)
         if (!admin && isAdmin(member) && group.admins.size <= 1) {
-            appState.present("Keep one admin", "Promote another member before removing this admin.")
+            appState.present(R.string.toast_keep_one_admin, R.string.toast_promote_before_removing_admin)
             return
         }
         runCatching {
             if (admin) {
-                appState.marmot().promoteAdmin(account, group.groupIdHex, target)
+                appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
                 group = group.copy(admins = (group.admins + target).distinct())
-                appState.present("Admin added")
+                appState.present(R.string.toast_admin_added)
             } else {
-                appState.marmot().demoteAdmin(account, group.groupIdHex, target)
+                appState.marmotIo { demoteAdmin(account, group.groupIdHex, target) }
                 group = group.copy(admins = group.admins.filterNot { it == target || it == member.memberIdHex })
-                appState.present("Admin removed")
+                appState.present(R.string.toast_admin_removed)
             }
             refreshMembers()
         }.onFailure {
-            appState.present("Couldn't update admin", it.message ?: it.javaClass.simpleName)
+            appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }
     }
 
@@ -521,9 +681,9 @@ class ConversationController(
     suspend fun groupMlsState(): AppGroupMlsStateFfi? {
         val account = appState.activeAccountRef ?: return null
         return runCatching {
-            appState.marmot().groupMlsState(account, group.groupIdHex)
+            appState.marmotIo { groupMlsState(account, group.groupIdHex) }
         }.onFailure {
-            appState.present("Couldn't load MLS state", it.message ?: it.javaClass.simpleName)
+            appState.present(R.string.toast_couldnt_load_mls_state, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }.getOrNull()
     }
 
@@ -604,9 +764,7 @@ class ConversationController(
     private suspend fun refreshMembers() {
         val account = appState.activeAccountRef ?: return
         runCatching {
-            val loaded = withContext(Dispatchers.IO) {
-                appState.marmot().groupMembers(account, group.groupIdHex)
-            }
+            val loaded = appState.marmotIo { groupMembers(account, group.groupIdHex) }
             members = loaded
             appState.cacheGroupMemberSnapshot(account, group.groupIdHex, loaded)
             appState.requestProfiles(members.map { it.memberIdHex })
@@ -614,33 +772,28 @@ class ConversationController(
     }
 
     private fun receivedToRecord(received: RuntimeMessageReceivedFfi): AppMessageRecordFfi {
-        val now = nowSeconds()
-        return AppMessageRecordFfi(
-            messageIdHex = received.message.messageIdHex,
-            direction = "received",
-            groupIdHex = received.message.groupIdHex,
-            sender = received.message.sender,
-            plaintext = received.message.plaintext,
-            kind = received.message.kind,
-            tags = received.message.tags,
-            recordedAt = now,
-            receivedAt = now,
-        )
+        return appMessageRecordFromReceived(received, nowSeconds())
     }
 
     private suspend fun watchAgentTextStream(account: String, streamId: String) {
         var text = ""
         var subscription: AgentStreamSubscription? = null
         try {
-            subscription = appState.marmot().watchAgentTextStream(
-                accountRef = account,
-                groupIdHex = group.groupIdHex,
-                streamIdHex = streamId,
-                serverCertDer = null,
-                insecureLocal = false,
-            )
+            val streamSubscription = appState.marmotIo {
+                watchAgentTextStream(
+                    accountRef = account,
+                    groupIdHex = group.groupIdHex,
+                    streamIdHex = streamId,
+                    serverCertDer = null,
+                    insecureLocal = false,
+                )
+            }
+            subscription = streamSubscription
             while (true) {
-                when (val update = subscription.next() ?: break) {
+                val update = withContext(Dispatchers.IO) {
+                    streamSubscription.next()
+                } ?: break
+                when (update) {
                     is AgentStreamUpdateFfi.Chunk -> {
                         text += update.text
                         updateStreamPreview(streamId, text, MessageStatus.Streaming)
@@ -661,7 +814,9 @@ class ConversationController(
                 MessageStatus.Failed,
             )
         } finally {
-            subscription?.close()
+            withContext(Dispatchers.IO) {
+                subscription?.close()
+            }
             activeStreamIds.remove(streamId)
         }
     }
