@@ -6,6 +6,14 @@ set shell := ["bash", "-uc"]
 # Use Android Studio's bundled JBR so plain `java` works.
 export JAVA_HOME := env_var_or_default("JAVA_HOME", "/Applications/Android Studio.app/Contents/jbr/Contents/Home")
 
+# Variant packages. The debug variant gets an applicationIdSuffix so dev
+# installs and release installs coexist on a device without a signing-cert
+# collision. Activity stays in the base namespace, so launch commands need
+# the full activity FQN, not the leading-dot shorthand.
+DEBUG_PKG := "dev.ipf.darkmatter.debug"
+RELEASE_PKG := "dev.ipf.darkmatter"
+MAIN_ACTIVITY := "dev.ipf.darkmatter.MainActivity"
+
 _default:
     @just --list
 
@@ -17,6 +25,19 @@ debug:
 # Install the debug APK on the connected device.
 install-debug:
     ./gradlew :app:installDebug
+
+# Launch the installed debug variant. Uses the activity FQN because
+# applicationId (dev.ipf.darkmatter.debug) no longer matches the namespace
+# (dev.ipf.darkmatter), so `pkg/.MainActivity` shorthand doesn't resolve.
+launch-debug:
+    adb shell am start -n {{DEBUG_PKG}}/{{MAIN_ACTIVITY}}
+
+# Build, install, and launch the debug variant. One-shot dev workflow.
+run-debug: install-debug launch-debug
+
+# Uninstall only the debug variant. Release install (Dark Matter) is untouched.
+uninstall-debug:
+    adb uninstall {{DEBUG_PKG}}
 
 # Run unit tests.
 test:
@@ -37,6 +58,17 @@ release-fast:
 install-release:
     ./scripts/release.sh --skip-bindings --abi arm64-v8a
     adb install -r app/build/outputs/apk/release/app-arm64-v8a-release.apk
+
+# Launch the installed release variant.
+launch-release:
+    adb shell am start -n {{RELEASE_PKG}}/{{MAIN_ACTIVITY}}
+
+# Build, install, and launch the release variant. Mirrors run-debug.
+run-release: install-release launch-release
+
+# Uninstall only the release variant. Debug install (Dark Matter (dev)) is untouched.
+uninstall-release:
+    adb uninstall {{RELEASE_PKG}}
 
 # Generate a new release keystore. ONE-TIME: refuses to overwrite an
 # existing keystore. Writes credentials to local.properties.
