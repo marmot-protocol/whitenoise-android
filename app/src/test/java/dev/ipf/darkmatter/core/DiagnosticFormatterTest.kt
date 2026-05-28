@@ -23,6 +23,7 @@ class DiagnosticFormatterTest {
                     plaintext = "hello",
                     kind = 9uL,
                     tags = emptyList(),
+                    recordedAt = 1_779_926_400uL,
                 ),
             ),
         )
