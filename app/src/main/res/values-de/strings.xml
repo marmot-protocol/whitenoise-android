@@ -82,10 +82,15 @@
     <string name="sensitive_forensics_dump_warning">Sensible Dumps enthalten tatsächliche Konto-IDs, Gruppen-IDs, Relay-URLs, Payload-Metadaten und weitere lokale Debugging-Details.</string>
     <string name="error_qr_not_valid_npub_or_public_key">Dieser QR-Code ist kein gültiger npub oder öffentlicher Schlüssel.</string>
     <string name="admin">Admin</string>
+    <string name="you">Du</string>
     <string name="member_actions">Mitgliederaktionen</string>
     <string name="remove_admin">Admin entfernen</string>
     <string name="make_admin">Zum Admin machen</string>
     <string name="remove_member">Aus Gruppe entfernen</string>
+    <string name="confirm_remove_member_title">Mitglied entfernen?</string>
+    <string name="confirm_remove_member_message">%1$s verliert den Zugriff auf diesen Chat. Es erfolgt keine Benachrichtigung.</string>
+    <string name="confirm_leave_title">Chat verlassen?</string>
+    <string name="confirm_leave_message">Du wirst aus dieser Gruppe entfernt. Du benötigst eine neue Einladung, um wieder beizutreten.</string>
     <string name="message_deleted">Diese Nachricht wurde gelöscht.</string>
     <string name="message_reacted">Reagiert mit %1$s</string>
     <string name="message_reaction_fallback">auf eine Nachricht</string>
