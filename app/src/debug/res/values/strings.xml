@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug-variant overlay: AGP merges this on top of src/main/res when the
+    debug buildType is selected. Release builds do not see this file, so the
+    distributed APK keeps the unsuffixed app name.
+-->
+<resources>
+    <string name="app_name">Dark Matter (dev)</string>
+</resources>
