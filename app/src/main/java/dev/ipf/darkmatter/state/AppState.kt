@@ -486,7 +486,8 @@ class DarkMatterAppState(context: Context) {
 
     fun requestProfile(accountIdHex: String) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
-        if (cachedUserProfile(id) != null) return
+        // This is called from render/timeline projection paths, so do not synchronously
+        // probe the Rust profile cache here. The refresh job owns the binding work.
         val shouldFetch = synchronized(requestedProfiles) {
             requestedProfiles.add(id)
         }

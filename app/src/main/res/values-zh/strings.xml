@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Dark Matter</string>
-    <string name="loading_dark_matter">正在加载Dark Matter</string>
     <string name="dark_matter_couldnt_start">Dark Matter 无法启动</string>
     <string name="refresh">刷新转储</string>
     <string name="retry">重试</string>

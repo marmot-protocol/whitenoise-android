@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Dark Matter</string>
-    <string name="loading_dark_matter">Caricamento Dark Matter</string>
     <string name="dark_matter_couldnt_start">Impossibile avviare Dark Matter</string>
     <string name="refresh">Aggiorna dump</string>
     <string name="retry">Riprova</string>

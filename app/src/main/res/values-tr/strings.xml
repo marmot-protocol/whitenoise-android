@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Dark Matter</string>
-    <string name="loading_dark_matter">Dark Matter yükleniyor</string>
     <string name="dark_matter_couldnt_start">Dark Matter başlatılamadı</string>
     <string name="refresh">Dökümü yenile</string>
     <string name="retry">Tekrar dene</string>

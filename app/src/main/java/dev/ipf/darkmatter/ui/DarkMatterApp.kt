@@ -131,6 +131,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -174,6 +175,7 @@ import dev.ipf.darkmatter.core.QrCodeEncoder
 import dev.ipf.darkmatter.core.RecipientReference
 import dev.ipf.darkmatter.core.RecentEmojiList
 import dev.ipf.darkmatter.core.ReplySwipe
+import dev.ipf.darkmatter.core.TimelineProjector
 import dev.ipf.darkmatter.state.AppPhase
 import dev.ipf.darkmatter.state.AppText
 import dev.ipf.darkmatter.state.AppThemeMode
@@ -363,10 +365,7 @@ fun DarkMatterSnackbarHost(
 @Composable
 fun LoadingScreen() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            CircularProgressIndicator()
-            Text(stringResource(R.string.loading_dark_matter), style = MaterialTheme.typography.bodyMedium)
-        }
+        CircularProgressIndicator()
     }
 }
 
@@ -862,7 +861,7 @@ private fun ChatRow(
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     val messageTextCopy = rememberMessageTextCopy()
-    val title = GroupProjector.displayTitle(
+    val title = item.projectedTitle ?: GroupProjector.displayTitle(
         group = item.group,
         otherMemberAccount = item.otherMemberAccount,
         memberCount = item.memberCount,
@@ -890,8 +889,7 @@ private fun ChatRow(
                 if (item.group.pendingConfirmation) {
                     stringResource(R.string.invitation)
                 } else {
-                    MessageProjector.previewText(
-                        message = item.latest,
+                    item.projectedPreviewText(
                         copy = messageTextCopy,
                         empty = stringResource(R.string.no_messages_yet),
                     )
@@ -903,12 +901,16 @@ private fun ChatRow(
         trailingContent = {
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    IdentityFormatter.relativeTime(item.latest?.recordedAt ?: 0uL),
+                    IdentityFormatter.relativeTime(item.latestAt ?: 0uL),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (item.group.pendingConfirmation) {
                     Badge { Text(stringResource(R.string.invite)) }
+                } else if (item.hasUnread) {
+                    Badge {
+                        Text(if (item.unreadCount > 99uL) "99+" else item.unreadCount.toString())
+                    }
                 } else if (item.memberCount > 2) {
                     Badge { Text(item.memberCount.toString()) }
                 }
@@ -1130,6 +1132,8 @@ private fun ConversationScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    var initialTimelineAnchored by remember(chat.id) { mutableStateOf(false) }
+    var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -1148,14 +1152,18 @@ private fun ConversationScreen(
     }
 
     LaunchedEffect(controller) {
+        initialTimelineLoadStarted = true
         controller.start()
     }
-    LaunchedEffect(controller.timeline.lastOrNull()?.id, imeBottom) {
+    val latestTimelineItemId = controller.timeline.lastOrNull()?.id
+    val bottomTimelineIndex = controller.timeline.size + 1 +
+        if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+    LaunchedEffect(latestTimelineItemId, imeBottom) {
         if (controller.timeline.isNotEmpty()) {
-            listState.scrollToItem(controller.timeline.size + 1)
+            listState.scrollToItem(bottomTimelineIndex)
+            initialTimelineAnchored = true
         }
     }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1227,7 +1235,6 @@ private fun ConversationScreen(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
-                controller.isLoading && controller.timeline.isEmpty() -> LoadingScreen()
                 controller.error != null -> ErrorContent(stringResource(R.string.couldnt_load_conversation), controller.error.orEmpty())
                 controller.group.pendingConfirmation -> PendingInviteContent(
                     title = controller.title(groupTitleCopy),
@@ -1242,26 +1249,53 @@ private fun ConversationScreen(
                         }
                     },
                 )
-                controller.timeline.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                controller.timeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Text(stringResource(R.string.no_messages_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                else -> LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(bottom = 8.dp),
-                ) {
-                    item { Spacer(Modifier.height(4.dp)) }
-                    items(controller.timeline, key = { it.id }) { item ->
-                        MessageBubble(
-                            item = item,
-                            controller = controller,
-                            appState = appState,
-                            recentReactionEmojis = recentReactionEmojis,
-                            onReactionEmojiPicked = ::recordReactionEmoji,
-                        )
+                else -> Box(Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp)
+                            .alpha(if (initialTimelineAnchored) 1f else 0f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(bottom = 8.dp),
+                    ) {
+                        item { Spacer(Modifier.height(4.dp)) }
+                        if (controller.hasMoreBefore || controller.isLoadingOlder) {
+                            item(key = "older-messages-loading") {
+                                Box(
+                                    Modifier.fillMaxWidth().height(40.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (controller.isLoadingOlder) {
+                                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
+                                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        items(controller.timeline, key = { it.id }) { item ->
+                            MessageBubble(
+                                item = item,
+                                controller = controller,
+                                appState = appState,
+                                recentReactionEmojis = recentReactionEmojis,
+                                onReactionEmojiPicked = ::recordReactionEmoji,
+                            )
+                        }
+                        item { Spacer(Modifier.height(8.dp)) }
                     }
-                    item { Spacer(Modifier.height(8.dp)) }
+                    if (!initialTimelineAnchored) {
+                        LoadingScreen()
+                    }
                 }
             }
         }
@@ -1706,7 +1740,7 @@ private fun MessageBubble(
 ) {
     val record = item.record
     val mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex)
-    val deleted = MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
+    val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
     val bubbleColor = when {
         deleted -> MaterialTheme.colorScheme.surfaceVariant
         mine -> MaterialTheme.colorScheme.primaryContainer
@@ -1721,7 +1755,12 @@ private fun MessageBubble(
     val replySwipeThresholdPx = with(density) { 64.dp.toPx() }
     val maxSwipeOffsetPx = with(density) { 72.dp.toPx() }
     val messageTextCopy = rememberMessageTextCopy()
-    val displayedBody = if (deleted) {
+    val displayedBody = if (item.projected != null) {
+        TimelineProjector.displayBody(
+            item.projected,
+            messageTextCopy.copy(deleted = stringResource(R.string.message_deleted)),
+        )
+    } else if (deleted) {
         stringResource(R.string.message_deleted)
     } else {
         MessageProjector.displayBody(record, messageTextCopy)
@@ -1806,7 +1845,7 @@ private fun MessageBubble(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        controller.replyPreview(record, messageTextCopy)?.let { (name, body) ->
+                        controller.replyPreview(item, messageTextCopy)?.let { (name, body) ->
                             Surface(
                                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
                                 shape = RoundedCornerShape(10.dp),
