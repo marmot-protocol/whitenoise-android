@@ -580,6 +580,11 @@ private fun MainShell(appState: DarkMatterAppState) {
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
 
+    DisposableEffect(chatsController) {
+        appState.attachChatsController(chatsController)
+        onDispose { appState.attachChatsController(null) }
+    }
+
     LaunchedEffect(chatsController, appState.activeAccountRef) {
         chatsController.bind(appState.activeAccountRef)
     }
