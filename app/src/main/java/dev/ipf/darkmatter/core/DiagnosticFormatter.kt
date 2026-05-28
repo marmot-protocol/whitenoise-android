@@ -11,6 +11,8 @@ object DiagnosticFormatter {
                 "[${event.accountLabel}] group state ${IdentityFormatter.short(event.groupIdHex)}"
             is MarmotEventFfi.MessageReceived ->
                 "[${event.received.accountLabel}] msg from ${IdentityFormatter.short(event.received.message.sender)}: ${event.received.message.plaintext}"
+            is MarmotEventFfi.ProjectionUpdated ->
+                "[${event.update.accountLabel}] projection ${IdentityFormatter.short(event.update.update.groupIdHex)} (${event.update.update.messages.size} messages)"
             is MarmotEventFfi.GroupEvent ->
                 "[${event.accountLabel}] group event"
             is MarmotEventFfi.AccountError ->

@@ -2,11 +2,11 @@ package dev.ipf.darkmatter.state
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.ChatListMessagePreviewFfi
+import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.marmotkit.MessageUpdateFfi
-import dev.ipf.marmotkit.ReceivedMessageFfi
-import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatListSortingTest {
@@ -46,32 +46,22 @@ class ChatListSortingTest {
     }
 
     @Test
-    fun streamedMessageUpdateBecomesLatestWithoutReloadingMessages() {
-        val existing = message(groupId = "group-a", recordedAt = 10uL, plaintext = "old")
-        val update = MessageUpdateFfi.Message(
-            RuntimeMessageReceivedFfi(
-                accountIdHex = "account",
-                accountLabel = "account-label",
-                message = ReceivedMessageFfi(
-                    messageIdHex = "message-new",
-                    groupIdHex = "group-a",
-                    sender = "sender",
-                    senderDisplayName = null,
-                    plaintext = "streamed",
-                    kind = 9uL,
-                    tags = emptyList(),
-                ),
+    fun projectedChatListRowCarriesTitlePreviewTimestampAndUnreadState() {
+        val item = chatListItemFromProjection(
+            row(
+                groupId = "group-a",
+                title = "Marmot Lab",
+                preview = "projected latest",
+                latestAt = 20uL,
+                unreadCount = 3uL,
             ),
         )
 
-        val latest = latestMessagesAfterStreamUpdate(
-            latestByGroup = mapOf("group-a" to existing),
-            update = update,
-            recordedAt = 20uL,
-        )
-
-        assertEquals("streamed", latest["group-a"]?.plaintext)
-        assertEquals(20uL, latest["group-a"]?.recordedAt)
+        assertEquals("Marmot Lab", item.projectedTitle)
+        assertEquals("projected latest", item.projectedPreviewText(empty = "empty"))
+        assertEquals(20uL, item.latestAt)
+        assertEquals(3uL, item.unreadCount)
+        assertTrue(item.hasUnread)
     }
 
     private fun item(id: String, latestAt: ULong?, pending: Boolean = false): ChatListItem {
@@ -83,6 +73,36 @@ class ChatListSortingTest {
             memberSnapshot = null,
         )
     }
+
+    private fun row(
+        groupId: String,
+        title: String,
+        preview: String,
+        latestAt: ULong,
+        unreadCount: ULong,
+    ) = ChatListRowFfi(
+        groupIdHex = groupId,
+        archived = false,
+        pendingConfirmation = false,
+        title = title,
+        groupName = "",
+        avatar = null,
+        lastMessage = ChatListMessagePreviewFfi(
+            messageIdHex = "message-$groupId",
+            sender = "sender",
+            senderDisplayName = "Sender",
+            plaintext = preview,
+            kind = 9uL,
+            timelineAt = latestAt,
+            deleted = false,
+        ),
+        unreadCount = unreadCount,
+        hasUnread = unreadCount > 0uL,
+        firstUnreadMessageIdHex = "message-$groupId",
+        lastReadMessageIdHex = null,
+        lastReadTimelineAt = null,
+        updatedAt = latestAt,
+    )
 
     private fun group(id: String, pending: Boolean = false) = AppGroupRecordFfi(
         groupIdHex = id,
