@@ -866,13 +866,20 @@ private fun ChatRow(
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     val messageTextCopy = rememberMessageTextCopy()
-    val title = item.projectedTitle ?: GroupProjector.displayTitle(
-        group = item.group,
-        otherMemberAccount = item.otherMemberAccount,
-        memberCount = item.memberCount,
-        memberTitle = { appState.chatMemberTitle(it) },
-        copy = groupTitleCopy,
-    )
+    // derivedStateOf so the title is only recomputed when its snapshot reads
+    // (item, the profile-presentation revision read inside chatMemberTitle)
+    // actually change, instead of every chat-list recomposition pass.
+    val title by remember(item) {
+        derivedStateOf {
+            item.projectedTitle ?: GroupProjector.displayTitle(
+                group = item.group,
+                otherMemberAccount = item.otherMemberAccount,
+                memberCount = item.memberCount,
+                memberTitle = { appState.chatMemberTitle(it) },
+                copy = groupTitleCopy,
+            )
+        }
+    }
     val inviteAccount = GroupProjector.inviteAccount(item.group, item.otherMemberAccount)
     val avatarAccount = inviteAccount
         ?: item.otherMemberAccount.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
@@ -1070,7 +1077,9 @@ private fun NewChatSheet(
                     val account = appState.activeAccountRef ?: return@Button
                     busy = true
                     error = null
-                    scope.launch {
+                    // Process-lifetime scope so MLS commit + Nostr publish complete
+                    // even if the sheet dismisses mid-flight.
+                    appState.launchMutation {
                         runCatching {
                             appState.marmotIo {
                                 createGroup(
@@ -1255,10 +1264,10 @@ private fun ConversationScreen(
                     pictureUrl = controller.inviteAccount?.let { appState.avatarUrl(it) },
                     avatarSeed = controller.inviteAccount ?: controller.group.groupIdHex,
                     onAccept = {
-                        scope.launch { controller.acceptInvite() }
+                        appState.launchMutation { controller.acceptInvite() }
                     },
                     onDecline = {
-                        scope.launch {
+                        appState.launchMutation {
                             if (controller.declineInvite()) onBack()
                         }
                     },
