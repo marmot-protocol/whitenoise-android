@@ -82,10 +82,15 @@
     <string name="sensitive_forensics_dump_warning">Hassas dökümler gerçek hesap ID’lerini, grup ID’lerini, relay URL’lerini, payload meta verilerini ve diğer yerel hata ayıklama ayrıntılarını içerir.</string>
     <string name="error_qr_not_valid_npub_or_public_key">Bu QR kodu geçerli bir npub veya genel anahtar değil.</string>
     <string name="admin">Yönetici</string>
+    <string name="you">Sen</string>
     <string name="member_actions">Üye eylemleri</string>
     <string name="remove_admin">Yöneticilikten çıkar</string>
     <string name="make_admin">Yönetici yap</string>
     <string name="remove_member">Gruptan çıkar</string>
+    <string name="confirm_remove_member_title">Üye çıkarılsın mı?</string>
+    <string name="confirm_remove_member_message">%1$s bu sohbete erişimini kaybedecek. Bildirim gönderilmez.</string>
+    <string name="confirm_leave_title">Sohbetten ayrılınsın mı?</string>
+    <string name="confirm_leave_message">Bu gruptan çıkarılacaksın. Tekrar katılmak için yeni bir davetiye gerekir.</string>
     <string name="message_deleted">Bu mesaj silindi.</string>
     <string name="message_reacted">%1$s ile tepki verildi</string>
     <string name="message_reaction_fallback">bir mesaja</string>

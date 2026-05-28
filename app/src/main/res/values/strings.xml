@@ -82,10 +82,15 @@
     <string name="sensitive_forensics_dump_warning">Sensitive dumps include actual account IDs, group IDs, relay URLs, payload metadata, and other local debugging details.</string>
     <string name="error_qr_not_valid_npub_or_public_key">That QR code is not a valid npub or public key.</string>
     <string name="admin">Admin</string>
+    <string name="you">You</string>
     <string name="member_actions">Member actions</string>
     <string name="remove_admin">Remove admin</string>
     <string name="make_admin">Make admin</string>
     <string name="remove_member">Remove member</string>
+    <string name="confirm_remove_member_title">Remove member?</string>
+    <string name="confirm_remove_member_message">%1$s will lose access to this chat. They will not be notified.</string>
+    <string name="confirm_leave_title">Leave chat?</string>
+    <string name="confirm_leave_message">You will be removed from this group. You will need a new invite to rejoin.</string>
     <string name="message_deleted">Message deleted</string>
     <string name="message_reacted">Reacted %1$s</string>
     <string name="message_reaction_fallback">to a message</string>
