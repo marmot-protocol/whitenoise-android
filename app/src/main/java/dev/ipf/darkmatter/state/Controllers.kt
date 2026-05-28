@@ -284,6 +284,17 @@ class ChatsController(private val appState: DarkMatterAppState) {
         recompute()
     }
 
+    fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
+        if (accountRef == null) return
+        if (groupRecordsById[record.groupIdHex] == null) return
+        // chatListItemFromProjection reads row.archived (not group.archived), so
+        // patch both the chat row and the group record to keep them consistent.
+        chatRows = chatRows.map { row ->
+            if (row.groupIdHex == record.groupIdHex) row.copy(archived = record.archived) else row
+        }
+        foldGroup(record)
+    }
+
     private fun foldChatRow(row: ChatListRowFfi) {
         chatRows = if (chatRows.any { it.groupIdHex == row.groupIdHex }) {
             chatRows.map { if (it.groupIdHex == row.groupIdHex) row else it }
@@ -649,7 +660,9 @@ class ConversationController(
     suspend fun setArchived(archived: Boolean) {
         val account = appState.activeAccountRef ?: return
         runCatching {
-            group = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
+            val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
+            group = updated
+            appState.applyLocalGroupUpdate(updated)
             appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
         }.onFailure {
             appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
