@@ -52,6 +52,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Side-by-side install with the release-signed APK Jeff distributes.
+            // Different applicationId -> separate sandbox (data dir, keystore
+            // entries, SharedPreferences) so the two installs never collide.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
