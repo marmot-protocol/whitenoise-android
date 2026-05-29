@@ -6,6 +6,19 @@ data class ProfileLink(val npub: String) {
     val uri: String = "darkmatter://profile/$npub"
 
     companion object {
+        // A Nostr npub is bech32-encoded: prefix `npub1`, body in the bech32
+        // alphabet (lowercase a-z 0-9 minus 'b' 'i' 'o' '1'), total length 63.
+        // We don't bech32-decode here (that's the FFI's job) — we just reject
+        // clearly-invalid inputs so ProfileSheet doesn't open against garbage.
+        private const val NPUB_LENGTH = 63
+        private val NPUB_BODY_CHARSET = Regex("^[ac-hj-np-z02-9]+$")
+
+        private fun isLikelyNpub(value: String): Boolean {
+            if (value.length != NPUB_LENGTH) return false
+            if (!value.startsWith("npub1")) return false
+            return NPUB_BODY_CHARSET.matches(value.substring(5))
+        }
+
         fun parse(raw: String): ProfileLink? {
             val trimmed = raw.trim()
             if (trimmed.isEmpty()) return null
@@ -14,9 +27,9 @@ data class ProfileLink(val npub: String) {
 
             if (trimmed.lowercase().startsWith("nostr:")) {
                 val rest = trimmed.drop("nostr:".length)
-                if (rest.startsWith("npub")) return ProfileLink(rest)
+                if (isLikelyNpub(rest)) return ProfileLink(rest)
             }
-            if (trimmed.startsWith("npub")) return ProfileLink(trimmed)
+            if (isLikelyNpub(trimmed)) return ProfileLink(trimmed)
             return null
         }
 
@@ -27,8 +40,8 @@ data class ProfileLink(val npub: String) {
             val host = uri.host.orEmpty()
             val path = uri.path.orEmpty().trim('/')
             return when {
-                host.equals("profile", ignoreCase = true) && path.startsWith("npub") -> ProfileLink(path)
-                host.startsWith("npub") -> ProfileLink(host)
+                host.equals("profile", ignoreCase = true) && isLikelyNpub(path) -> ProfileLink(path)
+                isLikelyNpub(host) -> ProfileLink(host)
                 else -> null
             }
         }

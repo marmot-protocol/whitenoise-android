@@ -154,6 +154,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -544,9 +546,14 @@ private fun SignInContent(
                 singleLine = true,
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
+                // Treat the nsec entry as a password: hides the value on
+                // screen, and tells the IME not to retain it for suggestions,
+                // autofill, or third-party clipboard inspection.
+                visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.None,
                     autoCorrectEnabled = false,
+                    keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done,
                 ),
                 keyboardActions = KeyboardActions(
@@ -3086,6 +3093,12 @@ private fun AddIdentitySheet(appState: DarkMatterAppState, onDismiss: () -> Unit
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(if (busy) R.string.creating_identity_title else R.string.create_new_identity))
             }
+            // Mask unless the value is unambiguously a public npub.
+            // Treats partial / empty / unprefixed input as potentially secret,
+            // so a pasted nsec is never rendered while the field is non-empty.
+            // Keep `KeyboardType.Password` even when revealing the npub so the
+            // IME stays opted out of suggestions / autofill / history.
+            val maskSecret = !identity.trim().startsWith("npub1")
             OutlinedTextField(
                 value = identity,
                 onValueChange = { identity = it },
@@ -3093,9 +3106,11 @@ private fun AddIdentitySheet(appState: DarkMatterAppState, onDismiss: () -> Unit
                 singleLine = true,
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
+                visualTransformation = if (maskSecret) PasswordVisualTransformation() else VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.None,
                     autoCorrectEnabled = false,
+                    keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done,
                 ),
                 keyboardActions = KeyboardActions(

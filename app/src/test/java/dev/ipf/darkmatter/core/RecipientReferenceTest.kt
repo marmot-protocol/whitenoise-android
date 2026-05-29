@@ -5,22 +5,27 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class RecipientReferenceTest {
+    // bech32 npubs are `npub1` + 58 chars from the bech32 alphabet.
+    private val sampleNpub = "npub1" + "a".repeat(58)
+
     @Test
     fun normalizesProfileLinksNpubsAndHexKeysForGroupRecipients() {
         val hex = "AB".repeat(32)
 
-        assertEquals("npub1abc", RecipientReference.normalize("darkmatter://profile/npub1abc"))
-        assertEquals("npub1abc", RecipientReference.normalize("nostr:npub1abc"))
-        assertEquals("npub1abc", RecipientReference.normalize(" npub1abc "))
+        assertEquals(sampleNpub, RecipientReference.normalize("darkmatter://profile/$sampleNpub"))
+        assertEquals(sampleNpub, RecipientReference.normalize("nostr:$sampleNpub"))
+        assertEquals(sampleNpub, RecipientReference.normalize(" $sampleNpub "))
         assertEquals(hex.lowercase(), RecipientReference.normalize(hex))
     }
 
     @Test
     fun rejectsMalformedRecipientReferencesBeforeGroupCreation() {
         assertNull(RecipientReference.normalize(""))
-        assertNull(RecipientReference.normalize("https://example.com/npub1abc"))
+        assertNull(RecipientReference.normalize("https://example.com/$sampleNpub"))
         assertNull(RecipientReference.normalize("not-a-public-key"))
         assertNull(RecipientReference.normalize("aa"))
+        // Short npub-prefixed strings used to slip through; they should not now.
+        assertNull(RecipientReference.normalize("npub1abc"))
     }
 
     @Test
