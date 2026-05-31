@@ -117,7 +117,7 @@ class DarkMatterAppState(context: Context) {
     private var notificationJob: Job? = null
     private var appInForeground = false
     private var activeConversationGroupIdHex: String? = null
-    private val requestedProfiles = mutableSetOf<String>()
+    private val profileRefreshGate = ProfileRefreshGate(PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS)
     private var chatsController: ChatsController? = null
 
     init {
@@ -514,10 +514,7 @@ class DarkMatterAppState(context: Context) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
         // This is called from render/timeline projection paths, so do not synchronously
         // probe the Rust profile cache here. The refresh job owns the binding work.
-        val shouldFetch = synchronized(requestedProfiles) {
-            requestedProfiles.add(id)
-        }
-        if (!shouldFetch) return
+        if (!profileRefreshGate.tryStart(id, System.currentTimeMillis())) return
         profileScope.launch {
             refreshProfile(id)
         }
@@ -558,15 +555,9 @@ class DarkMatterAppState(context: Context) {
                 userProfile(accountIdHex)
             }
         }.getOrNull()
-        // Always release the in-flight marker, even on fetch failure, so a
-        // later requestProfile() for the same id can try again. Without this
-        // (issue #9), a profile that fails to resolve once stays stuck on the
-        // hex fallback forever — most visible on the pending-invite screen.
-        synchronized(requestedProfiles) {
-            requestedProfiles.remove(accountIdHex)
-        }
+        profileRefreshGate.finish(accountIdHex, System.currentTimeMillis())
         if (profile != null) {
-            notifyProfilesChanged()
+            notifyProfileChanged(accountIdHex)
         }
     }
 
@@ -716,15 +707,29 @@ class DarkMatterAppState(context: Context) {
         synchronized(profilePresentationLock) {
             profilePresentations[accountIdHex]?.let { return it }
         }
-        val displayName = runCatching { marmot().displayName(accountIdHex) }
-            .getOrNull()
-            ?.let { ProfileSanitizer.displayName(it) }
-        val avatarUrl = ProfileSanitizer.imageUrl(cachedUserProfile(accountIdHex)?.picture)
-        val presentation = ProfilePresentation(displayName = displayName, avatarUrl = avatarUrl)
+        val presentation = readProfilePresentation(accountIdHex)
         synchronized(profilePresentationLock) {
             profilePresentations[accountIdHex] = presentation
         }
         return presentation
+    }
+
+    private fun readProfilePresentation(accountIdHex: String): ProfilePresentation {
+        val displayName = runCatching { marmot().displayName(accountIdHex) }
+            .getOrNull()
+            ?.let { ProfileSanitizer.displayName(it) }
+        val avatarUrl = ProfileSanitizer.imageUrl(cachedUserProfile(accountIdHex)?.picture)
+        return ProfilePresentation(displayName = displayName, avatarUrl = avatarUrl)
+    }
+
+    private fun notifyProfileChanged(accountIdHex: String) {
+        val presentation = readProfilePresentation(accountIdHex)
+        val changed = synchronized(profilePresentationLock) {
+            profilePresentations.put(accountIdHex, presentation) != presentation
+        }
+        if (changed) {
+            profileRevision += 1
+        }
     }
 
     private fun notifyProfilesChanged() {
@@ -748,6 +753,7 @@ class DarkMatterAppState(context: Context) {
         private const val DEVELOPER_MODE_KEY = "developer_mode"
         private const val THEME_MODE_KEY = "theme_mode"
         private const val LANGUAGE_TAG_KEY = "language_tag"
+        private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
     }
 }
 
