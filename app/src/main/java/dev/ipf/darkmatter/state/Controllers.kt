@@ -807,6 +807,7 @@ class ConversationController(
         return runCatching {
             appState.marmotIo { groupMlsState(account, group.groupIdHex) }
         }.onFailure {
+            if (it is CancellationException) throw it
             appState.present(R.string.toast_couldnt_load_mls_state, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }.getOrNull()
     }

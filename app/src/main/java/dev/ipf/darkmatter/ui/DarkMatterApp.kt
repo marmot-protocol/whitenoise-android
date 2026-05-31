@@ -1472,26 +1472,11 @@ private fun GroupDetailsSheet(
     fun runGroupMutation(mutation: suspend () -> Unit) {
         // Launched on a process-lifetime scope so the MLS commit + Nostr
         // publish complete even if the user dismisses this sheet mid-flight.
-        // The post-mutation refreshMembers() + appState.present(toast) inside
-        // each ConversationController.* method then always run, regardless of
+        // The refreshMembers() + appState.present(toast) inside each
+        // ConversationController.* method then always run, regardless of
         // whether this composable is still on screen.
         appState.launchMutation {
-            try {
-                mutation()
-            } finally {
-                // refreshMlsDetails reads composable-local state. The sheet
-                // may have been disposed; only swallow the specific lifecycle
-                // exceptions so real refresh bugs still surface as logs.
-                try {
-                    refreshMlsDetails()
-                } catch (cancel: kotlinx.coroutines.CancellationException) {
-                    throw cancel
-                } catch (_: IllegalStateException) {
-                    // Composable disposed mid-flight — expected; skip.
-                } catch (throwable: Throwable) {
-                    android.util.Log.w("DMGroupDetails", "refreshMlsDetails after mutation failed", throwable)
-                }
-            }
+            mutation()
         }
     }
 
@@ -1517,8 +1502,6 @@ private fun GroupDetailsSheet(
     LaunchedEffect(
         appState.developerMode,
         controller.group.groupIdHex,
-        controller.group.name,
-        controller.group.description,
         controller.group.admins,
         controller.members.map { it.memberIdHex },
     ) {
