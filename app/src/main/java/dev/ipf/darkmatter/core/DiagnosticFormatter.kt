@@ -9,8 +9,16 @@ object DiagnosticFormatter {
                 "[${event.accountLabel}] joined group ${IdentityFormatter.short(event.groupIdHex)}"
             is MarmotEventFfi.GroupStateUpdated ->
                 "[${event.accountLabel}] group state ${IdentityFormatter.short(event.groupIdHex)}"
-            is MarmotEventFfi.MessageReceived ->
-                "[${event.received.accountLabel}] msg from ${IdentityFormatter.short(event.received.message.sender)}: ${event.received.message.plaintext}"
+            is MarmotEventFfi.MessageReceived -> {
+                // Diagnostic entries render live on the Diagnostics screen and
+                // are captured by screen recorders, screenshots, and logcat.
+                // Never embed decrypted message text here — the kind + length
+                // is enough to debug delivery without breaking the e2e
+                // confidentiality contract.
+                val msg = event.received.message
+                "[${event.received.accountLabel}] msg from ${IdentityFormatter.short(msg.sender)} " +
+                    "kind=${msg.kind} len=${msg.plaintext.length}"
+            }
             is MarmotEventFfi.ProjectionUpdated ->
                 "[${event.update.accountLabel}] projection ${IdentityFormatter.short(event.update.update.groupIdHex)} (${event.update.update.messages.size} messages)"
             is MarmotEventFfi.GroupEvent ->

@@ -44,7 +44,10 @@ class DiagnosticFormatterTest {
             ),
         )
 
-        assertEquals("[alice] msg from 01234567...cdef: hello", DiagnosticFormatter.describe(message))
+        assertEquals(
+            "[alice] msg from 01234567...cdef kind=9 len=5",
+            DiagnosticFormatter.describe(message),
+        )
         assertEquals("[alice] group state fedcba98...3210", DiagnosticFormatter.describe(group))
         assertEquals("[alice] projection aaaabbbb...dddd (0 messages)", DiagnosticFormatter.describe(projection))
     }
