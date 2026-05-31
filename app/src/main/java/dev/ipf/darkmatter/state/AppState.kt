@@ -29,6 +29,7 @@ import kotlinx.coroutines.withContext
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.NotificationSettingsFfi
@@ -111,11 +112,13 @@ class DarkMatterAppState(context: Context) {
     private val groupMemberSnapshotLock = Any()
 
     private val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val mutationsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var notificationJob: Job? = null
     private var appInForeground = false
     private var activeConversationGroupIdHex: String? = null
     private val requestedProfiles = mutableSetOf<String>()
+    private var chatsController: ChatsController? = null
 
     init {
         applyLanguageTag(languageTag)
@@ -125,6 +128,29 @@ class DarkMatterAppState(context: Context) {
         get() = activeAccountRef?.let { ref -> accounts.firstOrNull { it.label == ref } }
 
     fun marmot(): Marmot = requireNotNull(client) { "Marmot is not initialized" }.marmot
+
+    /**
+     * Launches a group/account mutation on a process-lifetime scope so it
+     * survives if the host composable (bottom sheet, dialog) dismisses
+     * mid-flight. Without this, MLS commits + Nostr publishes can be cancelled
+     * by `rememberCoroutineScope()` going away — the FFI work may still
+     * succeed, but the post-await refreshMembers + present(toast) never run.
+     */
+    fun launchMutation(block: suspend () -> Unit) {
+        mutationsScope.launch { block() }
+    }
+
+    fun attachChatsController(controller: ChatsController?) {
+        chatsController = controller
+    }
+
+    // TODO(marmot): remove this UI-controller backchannel once Marmot emits a
+    // ProjectionUpdated (or equivalent chat-list/group projection update) after
+    // set_group_archived. Until then, the ChatsController stream never sees the
+    // archived-flag change and we forward it locally.
+    fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
+        chatsController?.applyLocalGroupUpdate(record)
+    }
 
     suspend fun <T> marmotIo(block: suspend Marmot.() -> T): T {
         return withContext(Dispatchers.IO) {
@@ -532,6 +558,13 @@ class DarkMatterAppState(context: Context) {
                 userProfile(accountIdHex)
             }
         }.getOrNull()
+        // Always release the in-flight marker, even on fetch failure, so a
+        // later requestProfile() for the same id can try again. Without this
+        // (issue #9), a profile that fails to resolve once stays stuck on the
+        // hex fallback forever — most visible on the pending-invite screen.
+        synchronized(requestedProfiles) {
+            requestedProfiles.remove(accountIdHex)
+        }
         if (profile != null) {
             notifyProfilesChanged()
         }
@@ -611,6 +644,8 @@ class DarkMatterAppState(context: Context) {
 
     fun shutdown() {
         notificationJob?.cancel()
+        profileScope.cancel()
+        mutationsScope.cancel()
         notificationScope.cancel()
     }
 

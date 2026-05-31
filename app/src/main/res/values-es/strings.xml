@@ -82,10 +82,15 @@
     <string name="sensitive_forensics_dump_warning">Los volcados sensibles incluyen IDs reales de cuenta, IDs de grupo, URL de relés, metadatos de payload y otros detalles locales de depuración.</string>
     <string name="error_qr_not_valid_npub_or_public_key">Ese código QR no es un npub válido o una clave pública.</string>
     <string name="admin">administrador</string>
+    <string name="you">Tú</string>
     <string name="member_actions">Acciones de miembros</string>
     <string name="remove_admin">Quitar admin</string>
     <string name="make_admin">Hacer admin</string>
     <string name="remove_member">Eliminar del grupo</string>
+    <string name="confirm_remove_member_title">¿Eliminar miembro?</string>
+    <string name="confirm_remove_member_message">%1$s perderá el acceso a este chat. No se le notificará.</string>
+    <string name="confirm_leave_title">¿Salir del chat?</string>
+    <string name="confirm_leave_message">Serás eliminado de este grupo. Necesitarás una nueva invitación para volver a unirte.</string>
     <string name="message_deleted">Este mensaje fue eliminado.</string>
     <string name="message_reacted">Reaccionó con %1$s</string>
     <string name="message_reaction_fallback">a un mensaje</string>

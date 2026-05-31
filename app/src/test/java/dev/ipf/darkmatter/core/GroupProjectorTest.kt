@@ -29,6 +29,7 @@ class GroupProjectorTest {
     @Test
     fun lastAdminCannotLeaveGroup() {
         assertFalse(GroupProjector.canLeaveGroup(group(admins = listOf("alice")), activeAccountIdHex = "alice"))
+        assertFalse(GroupProjector.canLeaveGroup(group(admins = listOf("ALICE")), activeAccountIdHex = "alice"))
         assertTrue(GroupProjector.canLeaveGroup(group(admins = listOf("alice", "bob")), activeAccountIdHex = "alice"))
         assertTrue(GroupProjector.canLeaveGroup(group(admins = listOf("alice")), activeAccountIdHex = "carol"))
     }
@@ -38,6 +39,12 @@ class GroupProjectorTest {
         assertTrue(
             GroupProjector.requiresSelfDemoteBeforeLeave(
                 group(admins = listOf("alice", "bob")),
+                activeAccountIdHex = "alice",
+            ),
+        )
+        assertTrue(
+            GroupProjector.requiresSelfDemoteBeforeLeave(
+                group(admins = listOf("ALICE", "bob")),
                 activeAccountIdHex = "alice",
             ),
         )
@@ -159,6 +166,45 @@ class GroupProjectorTest {
         )
 
         assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = "alice"))
+    }
+
+    @Test
+    fun activeAccountMemberMatchesByMemberIdHex() {
+        val self = member(memberId = "alice", account = "alice", local = true)
+
+        assertTrue(GroupProjector.isActiveAccountMember(self, activeAccountIdHex = "alice"))
+    }
+
+    @Test
+    fun activeAccountMemberIgnoresHexCase() {
+        val self = member(memberId = "ALICE", account = null, local = true)
+
+        assertTrue(GroupProjector.isActiveAccountMember(self, activeAccountIdHex = "alice"))
+    }
+
+    @Test
+    fun activeAccountMemberRejectsOtherLocalAccountOnSameDevice() {
+        // Multi-account install: "bob" is another local account on this device
+        // (local=true), but the active account is "alice". The row is NOT self
+        // for menu-gating purposes.
+        val otherLocal = member(memberId = "bob", account = "bob", local = true)
+
+        assertFalse(GroupProjector.isActiveAccountMember(otherLocal, activeAccountIdHex = "alice"))
+    }
+
+    @Test
+    fun activeAccountMemberRejectsRemoteMember() {
+        val remote = member(memberId = "carol", account = null, local = false)
+
+        assertFalse(GroupProjector.isActiveAccountMember(remote, activeAccountIdHex = "alice"))
+    }
+
+    @Test
+    fun activeAccountMemberReturnsFalseWhenNoActiveAccount() {
+        val self = member(memberId = "alice", account = null, local = true)
+
+        assertFalse(GroupProjector.isActiveAccountMember(self, activeAccountIdHex = null))
+        assertFalse(GroupProjector.isActiveAccountMember(self, activeAccountIdHex = ""))
     }
 
     private fun member(

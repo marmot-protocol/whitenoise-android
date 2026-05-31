@@ -82,10 +82,15 @@
     <string name="sensitive_forensics_dump_warning">敏感转储包含实际账号 ID、群组 ID、中继 URL、payload 元数据以及其他本地调试详情。</string>
     <string name="error_qr_not_valid_npub_or_public_key">该 QR 代码不是有效的 npub 或公钥。</string>
     <string name="admin">管理员</string>
+    <string name="you">你</string>
     <string name="member_actions">会员行动</string>
     <string name="remove_admin">取消管理员</string>
     <string name="make_admin">设为管理员</string>
     <string name="remove_member">移出群组</string>
+    <string name="confirm_remove_member_title">移除成员？</string>
+    <string name="confirm_remove_member_message">%1$s 将失去对此聊天的访问权限，不会收到通知。</string>
+    <string name="confirm_leave_title">离开聊天？</string>
+    <string name="confirm_leave_message">你将被移出此群组。重新加入需要新的邀请。</string>
     <string name="message_deleted">此消息已被删除。</string>
     <string name="message_reacted">已回应 %1$s</string>
     <string name="message_reaction_fallback">一条消息</string>
