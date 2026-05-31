@@ -172,6 +172,26 @@ data class TimelineMessage(
     val projected: TimelineMessageRecordFfi? = null,
 )
 
+internal fun pendingOptimisticMessageIdForProjection(
+    optimisticMessages: Collection<TimelineMessage>,
+    projected: AppMessageRecordFfi,
+): String? {
+    return optimisticMessages.firstOrNull { optimistic ->
+        optimistic.status == MessageStatus.Pending &&
+            optimistic.record.direction == projected.direction &&
+            optimistic.record.groupIdHex == projected.groupIdHex &&
+            optimistic.record.sender == projected.sender &&
+            optimistic.record.plaintext == projected.plaintext &&
+            optimistic.record.kind == projected.kind &&
+            optimistic.record.tags == projected.tags &&
+            timestampsAreNear(optimistic.record.recordedAt, projected.recordedAt)
+    }?.record?.messageIdHex
+}
+
+private fun timestampsAreNear(left: ULong, right: ULong): Boolean {
+    return if (left >= right) left - right <= 1uL else right - left <= 1uL
+}
+
 data class ConversationControllerCopy(
     val waitingForStream: String = "Waiting for stream...",
     val streamFailedFormat: String = "Stream failed: %1\$s",
@@ -609,6 +629,7 @@ class ConversationController(
             val confirmed = optimistic.copy(messageIdHex = confirmedId)
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
             optimisticMessages.remove("msg:$tempId")
+            messageById.remove(tempId)
             optimisticMessages["msg:$confirmedId"] = TimelineMessage("msg:$confirmedId", confirmed, MessageStatus.Sent)
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
@@ -1074,6 +1095,10 @@ class ConversationController(
         }
         timelineRecords[record.messageIdHex] = record
         val actionRecord = TimelineProjector.toAppMessageRecord(record)
+        pendingOptimisticMessageIdForProjection(optimisticMessages.values, actionRecord)?.let { optimisticId ->
+            optimisticMessages.remove("msg:$optimisticId")
+            messageById.remove(optimisticId)
+        }
         messageById[record.messageIdHex] = actionRecord
         val item = timelineMessageFromProjection(record, actionRecord)
         timelineItemsById[item.id] = item
