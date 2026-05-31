@@ -11,6 +11,7 @@ import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ReactionTally
 import dev.ipf.darkmatter.core.TimelineProjector
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
@@ -267,6 +268,11 @@ class ChatsController(private val appState: DarkMatterAppState) {
                     }
                 }
             }
+        } catch (cancel: CancellationException) {
+            // Expected when LaunchedEffect re-keys (account switch, navigate
+            // away). Re-throw so structured concurrency unwinds cleanly and we
+            // don't log normal lifecycle events as bind failures.
+            throw cancel
         } catch (throwable: Throwable) {
             chatsDebug(throwable) { "bind failed account=${accountRef.take(8)}: ${throwable.message ?: throwable.javaClass.simpleName}" }
             isLoading = false
@@ -282,6 +288,22 @@ class ChatsController(private val appState: DarkMatterAppState) {
     private fun foldGroup(record: AppGroupRecordFfi) {
         groupRecordsById = groupRecordsById + (record.groupIdHex to record)
         recompute()
+    }
+
+    // Marmot's `set_group_archived` writes local state + saves but emits no
+    // ProjectionUpdated event, so the chat-list snapshot stays stale until the
+    // next account switch (issue: unarchive doesn't move chat out of archived
+    // section). Callers in ConversationController forward the updated record
+    // here via AppState so the chat list reflects the new archived flag.
+    fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
+        if (accountRef == null) return
+        if (groupRecordsById[record.groupIdHex] == null) return
+        // chatListItemFromProjection reads row.archived (not group.archived), so
+        // patch both the chat row and the group record to keep them consistent.
+        chatRows = chatRows.map { row ->
+            if (row.groupIdHex == record.groupIdHex) row.copy(archived = record.archived) else row
+        }
+        foldGroup(record)
     }
 
     private fun foldChatRow(row: ChatListRowFfi) {
@@ -358,8 +380,27 @@ class ConversationController(
         private set
     var sendInFlight by mutableStateOf(false)
         private set
+    // Single guard for archive/leave/member-management mutations so the UI can
+    // disable buttons while one is in flight and prevent double-submits.
+    var mutationInFlight by mutableStateOf(false)
+        private set
     var error by mutableStateOf<String?>(null)
         private set
+
+    // Drops re-entrant calls so a rapid double-tap can't enqueue duplicate
+    // FFI work even before Compose re-evaluates `enabled = !mutationInFlight`.
+    // mutationsScope runs on Main.immediate, so the check + set is sequential
+    // within a single coroutine and atomic across coroutines on the same
+    // dispatcher.
+    private suspend inline fun withMutationLock(block: () -> Unit) {
+        if (mutationInFlight) return
+        mutationInFlight = true
+        try {
+            block()
+        } finally {
+            mutationInFlight = false
+        }
+    }
 
     private val messageById = linkedMapOf<String, AppMessageRecordFfi>()
     private val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
@@ -403,7 +444,7 @@ class ConversationController(
     }
 
     val isSelfAdmin: Boolean
-        get() = appState.activeAccount?.accountIdHex?.let { group.admins.contains(it) } == true
+        get() = GroupProjector.isAdminRef(group, appState.activeAccount?.accountIdHex)
 
     val canLeaveGroup: Boolean
         get() = GroupProjector.canLeaveGroup(group, appState.activeAccount?.accountIdHex)
@@ -505,6 +546,11 @@ class ConversationController(
                     }
                 }
             }
+        } catch (cancel: CancellationException) {
+            // Expected when the conversation screen leaves the composition.
+            // Re-throw so cancellation propagates and we don't log it as an
+            // error.
+            throw cancel
         } catch (throwable: Throwable) {
             isLoading = false
             error = throwable.message ?: throwable.javaClass.simpleName
@@ -601,23 +647,34 @@ class ConversationController(
     }
 
     suspend fun leaveGroup(): Boolean {
+        if (mutationInFlight) return false
         val account = appState.activeAccountRef ?: return false
         if (!canLeaveGroup) {
             appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
             return false
         }
-        return runCatching {
-            val activeAccountIdHex = appState.activeAccount?.accountIdHex
-            if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex)) {
-                appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
-                group = group.copy(admins = group.admins.filterNot { it == activeAccountIdHex })
+        mutationInFlight = true
+        return try {
+            runCatching {
+                val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex)) {
+                    appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
+                    // Case-insensitive so hex-casing drift between the admin
+                    // list and the active account id doesn't leave the UI
+                    // showing you as admin after a successful self-demote.
+                    group = group.copy(
+                        admins = group.admins.filterNot { it.equals(activeAccountIdHex, ignoreCase = true) },
+                    )
+                }
+                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+                appState.present(R.string.toast_left_chat)
+                true
+            }.getOrElse {
+                appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
+                false
             }
-            appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-            appState.present(R.string.toast_left_chat)
-            true
-        }.getOrElse {
-            appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
-            false
+        } finally {
+            mutationInFlight = false
         }
     }
 
@@ -646,18 +703,20 @@ class ConversationController(
         }
     }
 
-    suspend fun setArchived(archived: Boolean) {
-        val account = appState.activeAccountRef ?: return
+    suspend fun setArchived(archived: Boolean) = withMutationLock {
+        val account = appState.activeAccountRef ?: return@withMutationLock
         runCatching {
-            group = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
+            val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
+            group = updated
+            appState.applyLocalGroupUpdate(updated)
             appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
         }.onFailure {
             appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }
     }
 
-    suspend fun updateGroupProfile(name: String, description: String) {
-        val account = appState.activeAccountRef ?: return
+    suspend fun updateGroupProfile(name: String, description: String) = withMutationLock {
+        val account = appState.activeAccountRef ?: return@withMutationLock
         runCatching {
             appState.marmotIo {
                 updateGroupProfile(
@@ -674,10 +733,10 @@ class ConversationController(
         }
     }
 
-    suspend fun inviteMembers(memberRefs: List<String>) {
-        val account = appState.activeAccountRef ?: return
+    suspend fun inviteMembers(memberRefs: List<String>) = withMutationLock {
+        val account = appState.activeAccountRef ?: return@withMutationLock
         val refs = memberRefs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-        if (refs.isEmpty()) return
+        if (refs.isEmpty()) return@withMutationLock
         runCatching {
             appState.marmotIo { inviteMembers(account, group.groupIdHex, refs) }
             refreshMembers()
@@ -687,8 +746,8 @@ class ConversationController(
         }
     }
 
-    suspend fun removeMember(member: AppGroupMemberRecordFfi) {
-        val account = appState.activeAccountRef ?: return
+    suspend fun removeMember(member: AppGroupMemberRecordFfi) = withMutationLock {
+        val account = appState.activeAccountRef ?: return@withMutationLock
         val target = GroupProjector.memberRef(member)
         runCatching {
             appState.marmotIo { removeMembers(account, group.groupIdHex, listOf(target)) }
@@ -699,12 +758,15 @@ class ConversationController(
         }
     }
 
-    suspend fun setMemberAdmin(member: AppGroupMemberRecordFfi, admin: Boolean) {
-        val account = appState.activeAccountRef ?: return
-        val target = GroupProjector.memberRef(member)
+    suspend fun setMemberAdmin(member: AppGroupMemberRecordFfi, admin: Boolean) = withMutationLock {
+        val account = appState.activeAccountRef ?: return@withMutationLock
+        // promote_admin / demote_admin sign the new admin list onto the MLS
+        // group, so they require a Nostr pubkey hex — not a local-account
+        // label. memberRef can return either; memberIdHex is always the hex.
+        val target = member.memberIdHex
         if (!admin && isAdmin(member) && group.admins.size <= 1) {
             appState.present(R.string.toast_keep_one_admin, R.string.toast_promote_before_removing_admin)
-            return
+            return@withMutationLock
         }
         runCatching {
             if (admin) {
@@ -713,7 +775,11 @@ class ConversationController(
                 appState.present(R.string.toast_admin_added)
             } else {
                 appState.marmotIo { demoteAdmin(account, group.groupIdHex, target) }
-                group = group.copy(admins = group.admins.filterNot { it == target || it == member.memberIdHex })
+                // Case-insensitive so admin hex casing variations don't keep
+                // the local UI showing the member as admin until next refresh.
+                group = group.copy(
+                    admins = group.admins.filterNot { it.equals(target, ignoreCase = true) },
+                )
                 appState.present(R.string.toast_admin_removed)
             }
             refreshMembers()

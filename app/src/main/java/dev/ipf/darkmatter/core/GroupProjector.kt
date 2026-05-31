@@ -67,15 +67,39 @@ object GroupProjector {
     }
 
     fun isAdmin(group: AppGroupRecordFfi, member: AppGroupMemberRecordFfi): Boolean {
-        return group.admins.contains(memberRef(member)) || group.admins.contains(member.memberIdHex)
+        val ref = memberRef(member)
+        // Case-insensitive: hex casing can drift between admins and member ids.
+        return isAdminRef(group, ref) || isAdminRef(group, member.memberIdHex)
+    }
+
+    fun isAdminRef(group: AppGroupRecordFfi, accountIdHex: String?): Boolean {
+        val id = accountIdHex?.takeIf { it.isNotBlank() } ?: return false
+        return group.admins.any { it.equals(id, ignoreCase = true) }
+    }
+
+    /**
+     * True iff [member] is the currently active account on this device.
+     *
+     * Distinct from [AppGroupMemberRecordFfi.local], which Marmot sets to true
+     * when ANY account on this device matches the member identity. With
+     * multi-account installs that broader flag mis-identifies other local
+     * accounts as "self" and hides admin actions on rows that should be
+     * manageable.
+     */
+    fun isActiveAccountMember(
+        member: AppGroupMemberRecordFfi,
+        activeAccountIdHex: String?,
+    ): Boolean {
+        val active = activeAccountIdHex?.takeIf { it.isNotBlank() } ?: return false
+        return member.memberIdHex.equals(active, ignoreCase = true)
     }
 
     fun canLeaveGroup(group: AppGroupRecordFfi, activeAccountIdHex: String?): Boolean {
-        if (activeAccountIdHex == null || !group.admins.contains(activeAccountIdHex)) return true
+        if (!isAdminRef(group, activeAccountIdHex)) return true
         return group.admins.size > 1
     }
 
     fun requiresSelfDemoteBeforeLeave(group: AppGroupRecordFfi, activeAccountIdHex: String?): Boolean {
-        return activeAccountIdHex != null && group.admins.contains(activeAccountIdHex)
+        return isAdminRef(group, activeAccountIdHex)
     }
 }

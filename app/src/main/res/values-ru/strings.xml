@@ -82,10 +82,15 @@
     <string name="sensitive_forensics_dump_warning">Чувствительные дампы содержат реальные ID аккаунтов, ID групп, URL релеев, метаданные payload и другие локальные отладочные данные.</string>
     <string name="error_qr_not_valid_npub_or_public_key">Этот код QR не является действительным npub или открытым ключом.</string>
     <string name="admin">Админ</string>
+    <string name="you">Вы</string>
     <string name="member_actions">Действия участника</string>
     <string name="remove_admin">Снять админа</string>
     <string name="make_admin">Сделать админом</string>
     <string name="remove_member">Удалить из группы</string>
+    <string name="confirm_remove_member_title">Удалить участника?</string>
+    <string name="confirm_remove_member_message">%1$s потеряет доступ к этому чату. Уведомление не будет отправлено.</string>
+    <string name="confirm_leave_title">Покинуть чат?</string>
+    <string name="confirm_leave_message">Вы будете удалены из этой группы. Чтобы вернуться, потребуется новое приглашение.</string>
     <string name="message_deleted">Это сообщение было удалено.</string>
     <string name="message_reacted">Реакция: %1$s</string>
     <string name="message_reaction_fallback">на сообщение</string>

@@ -587,6 +587,11 @@ private fun MainShell(appState: DarkMatterAppState) {
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
 
+    DisposableEffect(chatsController) {
+        appState.attachChatsController(chatsController)
+        onDispose { appState.attachChatsController(null) }
+    }
+
     LaunchedEffect(chatsController, appState.activeAccountRef) {
         chatsController.bind(appState.activeAccountRef)
     }
@@ -868,13 +873,20 @@ private fun ChatRow(
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     val messageTextCopy = rememberMessageTextCopy()
-    val title = item.projectedTitle ?: GroupProjector.displayTitle(
-        group = item.group,
-        otherMemberAccount = item.otherMemberAccount,
-        memberCount = item.memberCount,
-        memberTitle = { appState.chatMemberTitle(it) },
-        copy = groupTitleCopy,
-    )
+    // derivedStateOf so the title is only recomputed when its snapshot reads
+    // (item, the profile-presentation revision read inside chatMemberTitle)
+    // actually change, instead of every chat-list recomposition pass.
+    val title by remember(item) {
+        derivedStateOf {
+            item.projectedTitle ?: GroupProjector.displayTitle(
+                group = item.group,
+                otherMemberAccount = item.otherMemberAccount,
+                memberCount = item.memberCount,
+                memberTitle = { appState.chatMemberTitle(it) },
+                copy = groupTitleCopy,
+            )
+        }
+    }
     val inviteAccount = GroupProjector.inviteAccount(item.group, item.otherMemberAccount)
     val avatarAccount = inviteAccount
         ?: item.otherMemberAccount.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
@@ -1072,7 +1084,9 @@ private fun NewChatSheet(
                     val account = appState.activeAccountRef ?: return@Button
                     busy = true
                     error = null
-                    scope.launch {
+                    // Process-lifetime scope so MLS commit + Nostr publish complete
+                    // even if the sheet dismisses mid-flight.
+                    appState.launchMutation {
                         runCatching {
                             appState.marmotIo {
                                 createGroup(
@@ -1091,7 +1105,8 @@ private fun NewChatSheet(
                         busy = false
                     }
                 },
-                enabled = !busy && (members.isNotEmpty() || pending.isNotBlank()),
+                enabled = !busy && groupName.trim().isNotBlank() &&
+                    (members.isNotEmpty() || pending.isNotBlank()),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (busy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -1138,6 +1153,7 @@ private fun ConversationScreen(
     }
     var menuOpen by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
+    var confirmLeaveFromTopBar by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var initialTimelineAnchored by remember(chat.id) { mutableStateOf(false) }
     var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
@@ -1171,21 +1187,36 @@ private fun ConversationScreen(
             initialTimelineAnchored = true
         }
     }
+    val openDetailsDescription = stringResource(R.string.details)
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(controller.title(groupTitleCopy), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            controller.subtitle(
-                                justYou = stringResource(R.string.just_you),
-                                oneMember = stringResource(R.string.one_member),
-                                membersFormat = stringResource(R.string.members_count),
-                            ),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showDetails = true }
+                            .semantics { contentDescription = openDetailsDescription },
+                    ) {
+                        Avatar(
+                            title = controller.title(groupTitleCopy),
+                            seed = controller.group.groupIdHex,
+                            size = 36.dp,
                         )
+                        Column {
+                            Text(controller.title(groupTitleCopy), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                controller.subtitle(
+                                    justYou = stringResource(R.string.just_you),
+                                    oneMember = stringResource(R.string.one_member),
+                                    membersFormat = stringResource(R.string.members_count),
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
@@ -1199,29 +1230,21 @@ private fun ConversationScreen(
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.details)) },
-                            leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
-                            onClick = {
-                                menuOpen = false
-                                showDetails = true
-                            },
-                        )
-                        DropdownMenuItem(
                             text = { Text(stringResource(if (controller.group.archived) R.string.unarchive else R.string.archive)) },
                             leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                            enabled = !controller.mutationInFlight,
                             onClick = {
                                 menuOpen = false
-                                scope.launch { controller.setArchived(!controller.group.archived) }
+                                appState.launchMutation { controller.setArchived(!controller.group.archived) }
                             },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.leave)) },
                             leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
+                            enabled = !controller.mutationInFlight,
                             onClick = {
                                 menuOpen = false
-                                scope.launch {
-                                    if (controller.leaveGroup()) onBack()
-                                }
+                                confirmLeaveFromTopBar = true
                             },
                         )
                     }
@@ -1235,7 +1258,7 @@ private fun ConversationScreen(
                     sendInFlight = controller.sendInFlight,
                     messageTextCopy = messageTextCopy,
                     onCancelReply = { controller.replyingTo = null },
-                    onSend = { scope.launch { controller.send(it) } },
+                    onSend = { appState.launchMutation { controller.send(it) } },
                 )
             }
         },
@@ -1248,10 +1271,10 @@ private fun ConversationScreen(
                     pictureUrl = controller.inviteAccount?.let { appState.avatarUrl(it) },
                     avatarSeed = controller.inviteAccount ?: controller.group.groupIdHex,
                     onAccept = {
-                        scope.launch { controller.acceptInvite() }
+                        appState.launchMutation { controller.acceptInvite() }
                     },
                     onDecline = {
-                        scope.launch {
+                        appState.launchMutation {
                             if (controller.declineInvite()) onBack()
                         }
                     },
@@ -1316,6 +1339,42 @@ private fun ConversationScreen(
             onLeft = onBack,
         )
     }
+
+    if (confirmLeaveFromTopBar) {
+        ConfirmDialog(
+            title = stringResource(R.string.confirm_leave_title),
+            message = stringResource(R.string.confirm_leave_message),
+            confirmLabel = stringResource(R.string.leave),
+            onConfirm = {
+                confirmLeaveFromTopBar = false
+                appState.launchMutation {
+                    if (controller.leaveGroup()) onBack()
+                }
+            },
+            onDismiss = { confirmLeaveFromTopBar = false },
+        )
+    }
+}
+
+@Composable
+private fun ConfirmDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(confirmLabel) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
 }
 
 @Composable
@@ -1369,6 +1428,7 @@ private fun GroupDetailsSheet(
     var forensicsExportingMode by remember(controller.group.groupIdHex) { mutableStateOf<ForensicsDumpModeFfi?>(null) }
     var pendingForensicsJson by remember(controller.group.groupIdHex) { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1410,11 +1470,27 @@ private fun GroupDetailsSheet(
     }
 
     fun runGroupMutation(mutation: suspend () -> Unit) {
-        scope.launch {
+        // Launched on a process-lifetime scope so the MLS commit + Nostr
+        // publish complete even if the user dismisses this sheet mid-flight.
+        // The post-mutation refreshMembers() + appState.present(toast) inside
+        // each ConversationController.* method then always run, regardless of
+        // whether this composable is still on screen.
+        appState.launchMutation {
             try {
                 mutation()
             } finally {
-                refreshMlsDetails()
+                // refreshMlsDetails reads composable-local state. The sheet
+                // may have been disposed; only swallow the specific lifecycle
+                // exceptions so real refresh bugs still surface as logs.
+                try {
+                    refreshMlsDetails()
+                } catch (cancel: kotlinx.coroutines.CancellationException) {
+                    throw cancel
+                } catch (_: IllegalStateException) {
+                    // Composable disposed mid-flight — expected; skip.
+                } catch (throwable: Throwable) {
+                    android.util.Log.w("DMGroupDetails", "refreshMlsDetails after mutation failed", throwable)
+                }
             }
         }
     }
@@ -1500,7 +1576,7 @@ private fun GroupDetailsSheet(
                                 }
                             }
                         },
-                        enabled = !busy,
+                        enabled = !busy && !controller.mutationInFlight,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null)
@@ -1526,6 +1602,7 @@ private fun GroupDetailsSheet(
                     GroupMemberRow(
                         member = member,
                         controller = controller,
+                        appState = appState,
                         onPromote = {
                             runGroupMutation { controller.setMemberAdmin(member, admin = true) }
                         },
@@ -1533,7 +1610,7 @@ private fun GroupDetailsSheet(
                             runGroupMutation { controller.setMemberAdmin(member, admin = false) }
                         },
                         onRemove = {
-                            runGroupMutation { controller.removeMember(member) }
+                            pendingConfirm = DetailsConfirm.RemoveMember(member)
                         },
                     )
                 }
@@ -1568,7 +1645,7 @@ private fun GroupDetailsSheet(
                             pendingMemberError = null
                             runGroupMutation { controller.inviteMembers(listOf(ref)) }
                         },
-                        enabled = pendingMember.isNotBlank(),
+                        enabled = pendingMember.isNotBlank() && !controller.mutationInFlight,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
@@ -1580,7 +1657,10 @@ private fun GroupDetailsSheet(
 
             SectionCard(title = stringResource(R.string.actions)) {
                 OutlinedButton(
-                    onClick = { scope.launch { controller.setArchived(!controller.group.archived) } },
+                    // Route through runGroupMutation so the MLS commit + toast
+                    // survive sheet dismissal — same fix as inviteMembers etc.
+                    onClick = { runGroupMutation { controller.setArchived(!controller.group.archived) } },
+                    enabled = !controller.mutationInFlight,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Default.Archive, contentDescription = null)
@@ -1588,15 +1668,8 @@ private fun GroupDetailsSheet(
                     Text(stringResource(if (controller.group.archived) R.string.unarchive_chat else R.string.archive_chat))
                 }
                 OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            if (controller.leaveGroup()) {
-                                onDismiss()
-                                onLeft()
-                            }
-                        }
-                    },
-                    enabled = controller.canLeaveGroup,
+                    onClick = { pendingConfirm = DetailsConfirm.Leave },
+                    enabled = controller.canLeaveGroup && !controller.mutationInFlight,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Default.Close, contentDescription = null)
@@ -1664,19 +1737,65 @@ private fun GroupDetailsSheet(
             },
         )
     }
+
+    pendingConfirm?.let { confirm ->
+        when (confirm) {
+            is DetailsConfirm.RemoveMember -> ConfirmDialog(
+                title = stringResource(R.string.confirm_remove_member_title),
+                message = stringResource(
+                    R.string.confirm_remove_member_message,
+                    controller.memberDisplayName(confirm.member),
+                ),
+                confirmLabel = stringResource(R.string.remove_member),
+                onConfirm = {
+                    pendingConfirm = null
+                    runGroupMutation { controller.removeMember(confirm.member) }
+                },
+                onDismiss = { pendingConfirm = null },
+            )
+            DetailsConfirm.Leave -> ConfirmDialog(
+                title = stringResource(R.string.confirm_leave_title),
+                message = stringResource(R.string.confirm_leave_message),
+                confirmLabel = stringResource(R.string.leave),
+                onConfirm = {
+                    pendingConfirm = null
+                    // Process-lifetime scope so a swipe-dismiss mid-leave doesn't
+                    // kill the toast/refresh; onDismiss + onLeft are safe Compose
+                    // state writes from Main.immediate.
+                    appState.launchMutation {
+                        if (controller.leaveGroup()) {
+                            onDismiss()
+                            onLeft()
+                        }
+                    }
+                },
+                onDismiss = { pendingConfirm = null },
+            )
+        }
+    }
+}
+
+private sealed class DetailsConfirm {
+    data class RemoveMember(val member: AppGroupMemberRecordFfi) : DetailsConfirm()
+    data object Leave : DetailsConfirm()
 }
 
 @Composable
 private fun GroupMemberRow(
     member: AppGroupMemberRecordFfi,
     controller: ConversationController,
+    appState: DarkMatterAppState,
     onPromote: () -> Unit,
     onDemote: () -> Unit,
     onRemove: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val isAdmin = controller.isAdmin(member)
-    val canManage = controller.isSelfAdmin && !member.local
+    val isSelfRow = GroupProjector.isActiveAccountMember(
+        member,
+        appState.activeAccount?.accountIdHex,
+    )
+    val canManage = controller.isSelfAdmin && !isSelfRow
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -1700,12 +1819,21 @@ private fun GroupMemberRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (isAdmin) {
-                Text(
-                    stringResource(R.string.admin),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (isSelfRow) {
+                    Text(
+                        stringResource(R.string.you),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (isAdmin) {
+                    Text(
+                        stringResource(R.string.admin),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         if (canManage) {
@@ -1717,6 +1845,7 @@ private fun GroupMemberRow(
                     DropdownMenuItem(
                         text = { Text(stringResource(if (isAdmin) R.string.remove_admin else R.string.make_admin)) },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        enabled = !controller.mutationInFlight,
                         onClick = {
                             menuOpen = false
                             if (isAdmin) onDemote() else onPromote()
@@ -1725,6 +1854,7 @@ private fun GroupMemberRow(
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.remove_member)) },
                         leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                        enabled = !controller.mutationInFlight,
                         onClick = {
                             menuOpen = false
                             onRemove()
@@ -1762,13 +1892,18 @@ private fun MessageBubble(
     val replySwipeThresholdPx = with(density) { 64.dp.toPx() }
     val maxSwipeOffsetPx = with(density) { 72.dp.toPx() }
     val messageTextCopy = rememberMessageTextCopy()
-    val displayedBody = if (item.projected != null) {
+    val displayedBody = if (deleted) {
+        // Check `deleted` first so the optimistic tombstone (from
+        // controller.deletedMessageIds) renders immediately on tap. Otherwise
+        // the projected branch runs against the stale Rust-side `deleted`
+        // flag and the bubble keeps showing the original body until the
+        // delete echo arrives.
+        stringResource(R.string.message_deleted)
+    } else if (item.projected != null) {
         TimelineProjector.displayBody(
             item.projected,
             messageTextCopy.copy(deleted = stringResource(R.string.message_deleted)),
         )
-    } else if (deleted) {
-        stringResource(R.string.message_deleted)
     } else {
         MessageProjector.displayBody(record, messageTextCopy)
     }
@@ -1776,7 +1911,14 @@ private fun MessageBubble(
         memberCount = controller.members.size,
         mine = mine,
     )
-    val timestampColor = MaterialTheme.colorScheme.onSurfaceVariant
+    // Match the timestamp to the bubble's on-color family. The mine bubble
+    // fills with primaryContainer, so the M3 paired token is onPrimaryContainer;
+    // using onSurfaceVariant there blends into the tint and reads as invisible.
+    val timestampColor = if (mine && !deleted) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
     var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     val quickReactionEmojis = RecentEmojiList.quickChoices(recentReactionEmojis)
     fun beginReply() {
@@ -1786,7 +1928,8 @@ private fun MessageBubble(
 
     fun reactWithEmoji(emoji: String) {
         onReactionEmojiPicked(emoji)
-        scope.launch { controller.toggleReaction(emoji, record) }
+        // Route via launchMutation: same survives-navigation rationale as delete/send.
+        appState.launchMutation { controller.toggleReaction(emoji, record) }
     }
 
     fun copyMessageText() {
@@ -1805,12 +1948,18 @@ private fun MessageBubble(
             horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
         ) {
             if (showSenderAvatar) {
-                Avatar(
-                    title = appState.displayName(record.sender),
-                    seed = record.sender,
-                    size = 32.dp,
-                    pictureUrl = appState.avatarUrl(record.sender),
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable { appState.presentProfile(appState.npub(record.sender)) },
+                ) {
+                    Avatar(
+                        title = appState.displayName(record.sender),
+                        seed = record.sender,
+                        size = 32.dp,
+                        pictureUrl = appState.avatarUrl(record.sender),
+                    )
+                }
                 Spacer(Modifier.width(8.dp))
             }
             Column(
@@ -1850,6 +1999,10 @@ private fun MessageBubble(
                                 appState.displayName(record.sender),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.combinedClickable(
+                                    onClick = { appState.presentProfile(appState.npub(record.sender)) },
+                                    onLongClick = { menuOpen = true },
+                                ),
                             )
                         }
                         controller.replyPreview(item, messageTextCopy)?.let { (name, body) ->
@@ -1897,7 +2050,13 @@ private fun MessageBubble(
                                 onCopyText = ::copyMessageText,
                                 onDelete = {
                                     menuOpen = false
-                                    scope.launch { controller.deleteMessage(record) }
+                                    // launchMutation so the MLS commit + Nostr publish
+                                    // survive navigating away from the conversation —
+                                    // the optimistic tombstone is already set in the
+                                    // controller's state and the FFI write needs to
+                                    // complete regardless of whether this bubble is
+                                    // still in composition.
+                                    appState.launchMutation { controller.deleteMessage(record) }
                                 },
                             )
                         }
@@ -1918,7 +2077,7 @@ private fun MessageBubble(
                         tallies.forEach { tally ->
                             FilterChip(
                                 selected = tally.mine,
-                                onClick = { scope.launch { controller.toggleReaction(tally.emoji, record) } },
+                                onClick = { appState.launchMutation { controller.toggleReaction(tally.emoji, record) } },
                                 label = { Text("${tally.emoji} ${tally.count}") },
                             )
                         }
@@ -2676,8 +2835,6 @@ private fun ProfileSheet(
 ) {
     val clipboard = LocalClipboardManager.current
     var hex by remember(npub) { mutableStateOf<String?>(null) }
-    var creating by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(npub) {
@@ -2687,7 +2844,6 @@ private fun ProfileSheet(
     }
 
     val title = hex?.let { appState.displayName(it) } ?: IdentityFormatter.short(npub)
-    val isSelf = hex?.let { resolved -> appState.accounts.any { it.accountIdHex == resolved } } == true
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -2716,18 +2872,14 @@ private fun ProfileSheet(
                 Text(stringResource(R.string.couldnt_read_profile_code), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Button(
-                onClick = {
-                    creating = true
-                    scope.launch {
-                        if (appState.startProfileChat(npub)) onDismiss()
-                        creating = false
-                    }
-                },
-                enabled = !creating && hex != null && appState.activeAccountRef != null && !isSelf,
+                onClick = {},
+                // 1:1 DMs aren't a product feature yet; button is intentionally
+                // disabled until they are.
+                enabled = false,
+
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (creating) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Default.Group, contentDescription = null)
+                Icon(Icons.Default.Group, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.message))
             }
