@@ -1394,7 +1394,7 @@ class ConversationController(
     private fun updateStreamPreview(streamId: String, plaintext: String, status: MessageStatus) {
         if (streamId in removedStreamIds) return
         val id = "stream:$streamId"
-        val existingItem = optimisticMessages[id] ?: timeline.firstOrNull { it.id == id }
+        val existingItem = optimisticMessages[id] ?: timelineItemsById[id]
         val existing = existingItem?.record
         val record = (existing ?: AppMessageRecordFfi(
             messageIdHex = "stream-$streamId",

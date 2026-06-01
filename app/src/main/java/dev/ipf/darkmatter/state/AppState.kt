@@ -111,10 +111,12 @@ class DarkMatterAppState(context: Context) {
     private val profilePresentationLock = Any()
     private val groupMemberSnapshots = mutableMapOf<String, GroupMemberSnapshot>()
     private val groupMemberSnapshotLock = Any()
+    private val conversationStateLock = Any()
     private val optimisticMessagesByConversation = mutableMapOf<String, SnapshotStateMap<String, TimelineMessage>>()
     private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
     private val timelineOrderOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
     private val timelineTimestampOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
+    private val recentConversationStateKeys = LinkedHashMap<String, Unit>(16, 0.75f, true)
 
     private val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mutationsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -146,27 +148,45 @@ class DarkMatterAppState(context: Context) {
     }
 
     internal fun optimisticMessages(accountRef: String?, groupIdHex: String): SnapshotStateMap<String, TimelineMessage> {
-        return optimisticMessagesByConversation.getOrPut(conversationKey(accountRef, groupIdHex)) {
-            mutableStateMapOf()
+        return synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            optimisticMessagesByConversation.getOrPut(key) { mutableStateMapOf() }
         }
     }
 
     internal fun projectedMessageIds(accountRef: String?, groupIdHex: String): MutableSet<String> {
-        return projectedMessageIdsByConversation.getOrPut(conversationKey(accountRef, groupIdHex)) {
-            mutableSetOf()
+        return synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            projectedMessageIdsByConversation.getOrPut(key) { mutableSetOf() }
         }
     }
 
     internal fun timelineOrderOverrides(accountRef: String?, groupIdHex: String): MutableMap<String, ULong> {
-        return timelineOrderOverridesByConversation.getOrPut(conversationKey(accountRef, groupIdHex)) {
-            mutableMapOf()
+        return synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            timelineOrderOverridesByConversation.getOrPut(key) { mutableMapOf() }
         }
     }
 
     internal fun timelineTimestampOverrides(accountRef: String?, groupIdHex: String): MutableMap<String, ULong> {
-        return timelineTimestampOverridesByConversation.getOrPut(conversationKey(accountRef, groupIdHex)) {
-            mutableMapOf()
+        return synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            timelineTimestampOverridesByConversation.getOrPut(key) { mutableMapOf() }
         }
+    }
+
+    private fun retainConversationState(accountRef: String?, groupIdHex: String): String {
+        val key = conversationKey(accountRef, groupIdHex)
+        recentConversationStateKeys[key] = Unit
+        while (recentConversationStateKeys.size > MAX_RETAINED_CONVERSATION_STATES) {
+            val staleKey = recentConversationStateKeys.entries.first().key
+            recentConversationStateKeys.remove(staleKey)
+            optimisticMessagesByConversation.remove(staleKey)
+            projectedMessageIdsByConversation.remove(staleKey)
+            timelineOrderOverridesByConversation.remove(staleKey)
+            timelineTimestampOverridesByConversation.remove(staleKey)
+        }
+        return key
     }
 
     private fun conversationKey(accountRef: String?, groupIdHex: String): String {
@@ -787,6 +807,7 @@ class DarkMatterAppState(context: Context) {
         private const val THEME_MODE_KEY = "theme_mode"
         private const val LANGUAGE_TAG_KEY = "language_tag"
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
+        private const val MAX_RETAINED_CONVERSATION_STATES = 32
     }
 }
 
