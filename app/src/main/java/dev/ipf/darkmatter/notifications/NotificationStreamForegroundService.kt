@@ -26,12 +26,6 @@ class NotificationStreamForegroundService : Service() {
     private var bootstrapJob: Job? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf(startId)
-            return START_NOT_STICKY
-        }
-
         startForeground(
             NOTIFICATION_ID,
             BackgroundConnectionNotification.build(this),
@@ -60,7 +54,6 @@ class NotificationStreamForegroundService : Service() {
 
     companion object {
         private const val ACTION_START = "dev.ipf.darkmatter.notifications.START_STREAM_FOREGROUND_SERVICE"
-        private const val ACTION_STOP = "dev.ipf.darkmatter.notifications.STOP_STREAM_FOREGROUND_SERVICE"
         private const val NOTIFICATION_ID = 1001
 
         fun start(context: Context): Boolean {
@@ -81,7 +74,7 @@ class NotificationStreamForegroundService : Service() {
             return runCatching {
                 val appContext = context.applicationContext
                 appContext.stopService(
-                    Intent(appContext, NotificationStreamForegroundService::class.java).setAction(ACTION_STOP),
+                    Intent(appContext, NotificationStreamForegroundService::class.java),
                 )
             }.getOrElse {
                 foregroundServiceDebug(it) { "stop rejected" }
