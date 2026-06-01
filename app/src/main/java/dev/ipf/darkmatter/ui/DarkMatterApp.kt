@@ -10,6 +10,7 @@ import android.graphics.BitmapFactory
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -199,6 +200,7 @@ import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.LifecycleOwner
@@ -1157,6 +1159,7 @@ private fun ConversationScreen(
     val listState = rememberLazyListState()
     var initialTimelineAnchored by remember(chat.id) { mutableStateOf(false) }
     var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
+    var highlightedMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -1168,6 +1171,28 @@ private fun ConversationScreen(
 
     fun recordReactionEmoji(emoji: String) {
         recentReactionEmojis = RecentEmojiPreferences.recordPicked(context, emoji)
+    }
+
+    fun navigateToReplyTarget(item: TimelineMessage) {
+        scope.launch {
+            val targetMessageId = controller.replyTargetMessageId(item)
+            if (targetMessageId == null || !controller.loadUntilMessageAvailable(targetMessageId)) {
+                appState.present(R.string.toast_original_message_unavailable)
+                return@launch
+            }
+            val timelineIndex = controller.timelineIndexOf(targetMessageId)
+            if (timelineIndex < 0) {
+                appState.present(R.string.toast_original_message_unavailable)
+                return@launch
+            }
+            val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+            listState.animateScrollToItem(1 + olderMessagesHeaderCount + timelineIndex)
+            highlightedMessageId = targetMessageId
+            delay(1_500L)
+            if (highlightedMessageId == targetMessageId) {
+                highlightedMessageId = null
+            }
+        }
     }
 
     BackHandler(enabled = !showDetails) {
@@ -1317,8 +1342,10 @@ private fun ConversationScreen(
                                 item = item,
                                 controller = controller,
                                 appState = appState,
+                                highlighted = item.record.messageIdHex == highlightedMessageId,
                                 recentReactionEmojis = recentReactionEmojis,
                                 onReactionEmojiPicked = ::recordReactionEmoji,
+                                onReplyPreviewClick = ::navigateToReplyTarget,
                             )
                         }
                         item { Spacer(Modifier.height(8.dp)) }
@@ -1855,8 +1882,10 @@ private fun MessageBubble(
     item: TimelineMessage,
     controller: ConversationController,
     appState: DarkMatterAppState,
+    highlighted: Boolean,
     recentReactionEmojis: List<String>,
     onReactionEmojiPicked: (String) -> Unit,
+    onReplyPreviewClick: (TimelineMessage) -> Unit,
 ) {
     val record = item.record
     val mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex)
@@ -1974,6 +2003,7 @@ private fun MessageBubble(
                         ),
                     color = bubbleColor,
                     shape = RoundedCornerShape(18.dp),
+                    border = if (highlighted) BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary) else null,
                     tonalElevation = if (mine) 1.dp else 0.dp,
                 ) {
                     Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1990,6 +2020,7 @@ private fun MessageBubble(
                         }
                         controller.replyPreview(item, messageTextCopy)?.let { (name, body) ->
                             Surface(
+                                modifier = Modifier.clickable { onReplyPreviewClick(item) },
                                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
                                 shape = RoundedCornerShape(10.dp),
                             ) {
@@ -2317,15 +2348,7 @@ private fun ComposerBar(
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences,
                     keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Send,
-                ),
-                keyboardActions = KeyboardActions(
-                    onSend = {
-                        if (text.isNotBlank()) {
-                            onSend(text)
-                            text = ""
-                        }
-                    },
+                    imeAction = ImeAction.Default,
                 ),
             )
             FloatingActionButton(
@@ -3364,7 +3387,7 @@ private fun CopyableValueRow(
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(display, fontFamily = FontFamily.Monospace)
-            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.copy))
+            Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy))
         }
     }
 }
@@ -3960,7 +3983,7 @@ private fun Avatar(
         Color(0xFF006D3B),
         Color(0xFF9A4055),
     )
-    val color = palette[kotlin.math.abs(seed.hashCode()) % palette.size]
+    val color = palette[avatarPaletteIndex(seed.hashCode(), palette.size)]
     val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, pictureUrl) {
         value = null
         val url = pictureUrl ?: return@produceState
@@ -3992,4 +4015,8 @@ private fun Avatar(
             )
         }
     }
+}
+
+internal fun avatarPaletteIndex(seedHash: Int, paletteSize: Int): Int {
+    return Math.floorMod(seedHash, paletteSize)
 }

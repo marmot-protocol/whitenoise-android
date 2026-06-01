@@ -92,6 +92,7 @@
     <string name="confirm_leave_title">Покинуть чат?</string>
     <string name="confirm_leave_message">Вы будете удалены из этой группы. Чтобы вернуться, потребуется новое приглашение.</string>
     <string name="message_deleted">Это сообщение было удалено.</string>
+    <string name="toast_original_message_unavailable">Исходное сообщение недоступно.</string>
     <string name="message_reacted">Реакция: %1$s</string>
     <string name="message_reaction_fallback">на сообщение</string>
     <string name="message_deleted_preview">Сообщение удалено</string>

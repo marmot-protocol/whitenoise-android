@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.state
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -28,5 +29,16 @@ class ProfileRefreshGateTest {
         gate.finish("alice", nowMillis = 200L)
 
         assertTrue(gate.tryStart("bob", nowMillis = 201L))
+    }
+
+    @Test
+    fun expiredCooldownEntriesAreEvictedLazily() {
+        assertTrue(gate.tryStart("alice", nowMillis = 100L))
+        gate.finish("alice", nowMillis = 200L)
+        assertEquals(1, gate.retainedCooldownCount())
+
+        assertTrue(gate.tryStart("bob", nowMillis = 1_200L))
+
+        assertEquals(0, gate.retainedCooldownCount())
     }
 }

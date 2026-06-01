@@ -2,6 +2,7 @@ package dev.ipf.darkmatter.notifications
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -27,6 +28,7 @@ class LocalNotificationPresenter(private val context: Context) {
         ).apply {
             description = context.getString(R.string.notification_channel_messages_description)
             enableVibration(true)
+            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
         }
         manager.createNotificationChannel(channel)
     }
@@ -74,6 +76,7 @@ class LocalNotificationPresenter(private val context: Context) {
             .setAutoCancel(true)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setSilent(false)
             .apply {
                 content.groupKey?.let { group ->

@@ -8,6 +8,7 @@ internal class ProfileRefreshGate(
 
     @Synchronized
     fun tryStart(accountIdHex: String, nowMillis: Long): Boolean {
+        retryAfterMillis.entries.removeAll { (_, retryAfter) -> retryAfter <= nowMillis }
         if (accountIdHex in inFlight) return false
         if (nowMillis < retryAfterMillis.getOrDefault(accountIdHex, 0L)) return false
         inFlight.add(accountIdHex)
@@ -19,4 +20,7 @@ internal class ProfileRefreshGate(
         inFlight.remove(accountIdHex)
         retryAfterMillis[accountIdHex] = nowMillis + retryCooldownMillis
     }
+
+    @Synchronized
+    internal fun retainedCooldownCount(): Int = retryAfterMillis.size
 }

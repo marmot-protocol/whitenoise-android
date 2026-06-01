@@ -92,6 +92,7 @@
     <string name="confirm_leave_title">Sohbetten ayrılınsın mı?</string>
     <string name="confirm_leave_message">Bu gruptan çıkarılacaksın. Tekrar katılmak için yeni bir davetiye gerekir.</string>
     <string name="message_deleted">Bu mesaj silindi.</string>
+    <string name="toast_original_message_unavailable">Orijinal mesaj kullanılamıyor.</string>
     <string name="message_reacted">%1$s ile tepki verildi</string>
     <string name="message_reaction_fallback">bir mesaja</string>
     <string name="message_deleted_preview">Mesaj silindi</string>

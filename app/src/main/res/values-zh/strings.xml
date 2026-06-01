@@ -92,6 +92,7 @@
     <string name="confirm_leave_title">离开聊天？</string>
     <string name="confirm_leave_message">你将被移出此群组。重新加入需要新的邀请。</string>
     <string name="message_deleted">此消息已被删除。</string>
+    <string name="toast_original_message_unavailable">原始消息不可用。</string>
     <string name="message_reacted">已回应 %1$s</string>
     <string name="message_reaction_fallback">一条消息</string>
     <string name="message_deleted_preview">消息已删除</string>
