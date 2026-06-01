@@ -6,6 +6,7 @@ import android.os.LocaleList
 import android.util.Log
 import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -110,6 +111,10 @@ class DarkMatterAppState(context: Context) {
     private val profilePresentationLock = Any()
     private val groupMemberSnapshots = mutableMapOf<String, GroupMemberSnapshot>()
     private val groupMemberSnapshotLock = Any()
+    private val optimisticMessagesByConversation = mutableMapOf<String, SnapshotStateMap<String, TimelineMessage>>()
+    private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
+    private val timelineOrderOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
+    private val timelineTimestampOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
 
     private val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mutationsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -138,6 +143,34 @@ class DarkMatterAppState(context: Context) {
      */
     fun launchMutation(block: suspend () -> Unit) {
         mutationsScope.launch { block() }
+    }
+
+    internal fun optimisticMessages(accountRef: String?, groupIdHex: String): SnapshotStateMap<String, TimelineMessage> {
+        return optimisticMessagesByConversation.getOrPut(conversationKey(accountRef, groupIdHex)) {
+            mutableStateMapOf()
+        }
+    }
+
+    internal fun projectedMessageIds(accountRef: String?, groupIdHex: String): MutableSet<String> {
+        return projectedMessageIdsByConversation.getOrPut(conversationKey(accountRef, groupIdHex)) {
+            mutableSetOf()
+        }
+    }
+
+    internal fun timelineOrderOverrides(accountRef: String?, groupIdHex: String): MutableMap<String, ULong> {
+        return timelineOrderOverridesByConversation.getOrPut(conversationKey(accountRef, groupIdHex)) {
+            mutableMapOf()
+        }
+    }
+
+    internal fun timelineTimestampOverrides(accountRef: String?, groupIdHex: String): MutableMap<String, ULong> {
+        return timelineTimestampOverridesByConversation.getOrPut(conversationKey(accountRef, groupIdHex)) {
+            mutableMapOf()
+        }
+    }
+
+    private fun conversationKey(accountRef: String?, groupIdHex: String): String {
+        return "${accountRef.orEmpty()}\u0000$groupIdHex"
     }
 
     fun attachChatsController(controller: ChatsController?) {

@@ -170,26 +170,46 @@ data class TimelineMessage(
     val record: AppMessageRecordFfi,
     val status: MessageStatus,
     val projected: TimelineMessageRecordFfi? = null,
+    val timelineOrder: ULong = 0uL,
 )
 
-internal fun pendingOptimisticMessageIdForProjection(
+internal fun optimisticMessageIdForProjection(
     optimisticMessages: Collection<TimelineMessage>,
     projected: AppMessageRecordFfi,
+    allowDelayedProjection: Boolean = false,
 ): String? {
     return optimisticMessages.firstOrNull { optimistic ->
-        optimistic.status == MessageStatus.Pending &&
+        (optimistic.status == MessageStatus.Pending || optimistic.status == MessageStatus.Sent) &&
             optimistic.record.direction == projected.direction &&
             optimistic.record.groupIdHex == projected.groupIdHex &&
             optimistic.record.sender == projected.sender &&
             optimistic.record.plaintext == projected.plaintext &&
             optimistic.record.kind == projected.kind &&
             optimistic.record.tags == projected.tags &&
-            timestampsAreNear(optimistic.record.recordedAt, projected.recordedAt)
+            (
+                timestampsAreNear(optimistic.record.recordedAt, projected.recordedAt) ||
+                    allowDelayedProjection && projected.recordedAt >= optimistic.record.recordedAt
+            )
     }?.record?.messageIdHex
 }
 
 private fun timestampsAreNear(left: ULong, right: ULong): Boolean {
     return if (left >= right) left - right <= 1uL else right - left <= 1uL
+}
+
+internal fun shouldInsertSentOptimisticMessage(
+    confirmedId: String,
+    projectedMessageIds: Set<String>,
+): Boolean {
+    return confirmedId !in projectedMessageIds
+}
+
+internal fun compareTimelineMessages(left: TimelineMessage, right: TimelineMessage): Int {
+    return compareValuesBy(left, right, { it.record.recordedAt }, { it.timelineOrder }, { it.id })
+}
+
+internal fun AppMessageRecordFfi.withRecordedAtOverride(recordedAt: ULong?): AppMessageRecordFfi {
+    return recordedAt?.let { copy(recordedAt = it) } ?: this
 }
 
 data class ConversationControllerCopy(
@@ -417,8 +437,6 @@ class ConversationController(
         private set
     var hasMoreBefore by mutableStateOf(false)
         private set
-    var sendInFlight by mutableStateOf(false)
-        private set
     // Single guard for archive/leave/member-management mutations so the UI can
     // disable buttons while one is in flight and prevent double-submits.
     var mutationInFlight by mutableStateOf(false)
@@ -451,11 +469,16 @@ class ConversationController(
         }
     }
 
+    private val conversationAccountRef = appState.activeAccountRef
     private val messageById = linkedMapOf<String, AppMessageRecordFfi>()
     private val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
     private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
-    private val optimisticMessages = linkedMapOf<String, TimelineMessage>()
+    private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
+    private val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
+    private val localTimelineOrderOverrides = appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
+    private val localTimelineTimestampOverrides =
+        appState.timelineTimestampOverrides(conversationAccountRef, initialGroup.groupIdHex)
     private val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
     private val activeStreamIds = mutableSetOf<String>()
     private val removedStreamIds = mutableSetOf<String>()
@@ -502,7 +525,7 @@ class ConversationController(
         get() = GroupProjector.canLeaveGroup(group, appState.activeAccount?.accountIdHex)
 
     suspend fun start() {
-        val account = appState.activeAccountRef ?: return
+        val account = conversationAccountRef ?: return
         isLoading = true
         error = null
         var timelineSubscription: TimelineMessagesSubscription? = null
@@ -595,7 +618,7 @@ class ConversationController(
 
     suspend fun send(text: String) {
         val trimmed = text.trim()
-        val account = appState.activeAccountRef ?: return
+        val account = conversationAccountRef ?: return
         if (trimmed.isEmpty()) return
 
         val replyTarget = replyingTo?.messageIdHex?.takeIf { it.isNotBlank() }
@@ -614,11 +637,16 @@ class ConversationController(
             recordedAt = now,
             receivedAt = now,
         )
-        optimisticMessages["msg:$tempId"] = TimelineMessage("msg:$tempId", optimistic, MessageStatus.Pending)
+        val optimisticOrder = nextOptimisticTimelineOrder()
+        optimisticMessages["msg:$tempId"] = TimelineMessage(
+            "msg:$tempId",
+            optimistic,
+            MessageStatus.Pending,
+            timelineOrder = optimisticOrder,
+        )
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
         replyingTo = null
-        sendInFlight = true
         try {
             val summary = if (replyTarget != null) {
                 appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, trimmed) }
@@ -630,14 +658,24 @@ class ConversationController(
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
             optimisticMessages.remove("msg:$tempId")
             messageById.remove(tempId)
-            optimisticMessages["msg:$confirmedId"] = TimelineMessage("msg:$confirmedId", confirmed, MessageStatus.Sent)
+            if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
+                optimisticMessages["msg:$confirmedId"] = TimelineMessage(
+                    "msg:$confirmedId",
+                    confirmed,
+                    MessageStatus.Sent,
+                    timelineOrder = optimisticOrder,
+                )
+            }
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
-            optimisticMessages["msg:$tempId"] = TimelineMessage("msg:$tempId", optimistic, MessageStatus.Failed)
+            optimisticMessages["msg:$tempId"] = TimelineMessage(
+                "msg:$tempId",
+                optimistic,
+                MessageStatus.Failed,
+                timelineOrder = optimisticOrder,
+            )
             publishTimelineFromIndexes()
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
-        } finally {
-            sendInFlight = false
         }
     }
 
@@ -935,9 +973,14 @@ class ConversationController(
             timelineRecords.clear()
             timelineItemsById.clear()
             timelineOrder.clear()
+            projectedMessageIds.clear()
         }
         page.messages.forEach { record ->
-            val actionRecord = upsertProjectedRecord(record)
+            val actionRecord = upsertProjectedRecord(
+                record,
+                reconcileOptimistic = replaceWindow,
+                allowDelayedProjection = replaceWindow,
+            )
             appState.requestProfile(record.sender)
             record.replyPreview?.let { appState.requestProfile(it.sender) }
             if (record.deleted) {
@@ -970,7 +1013,11 @@ class ConversationController(
             when (change) {
                 is TimelineMessageChangeFfi.Upsert -> {
                     val record = change.message
-                    val actionRecord = upsertProjectedRecord(record)
+                    val actionRecord = upsertProjectedRecord(
+                        record,
+                        reconcileOptimistic = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                        allowDelayedProjection = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                    )
                     if (change.trigger.recomputesReactions()) {
                         reactionTargets.add(record.messageIdHex)
                     }
@@ -1087,15 +1134,28 @@ class ConversationController(
         publishTimelineFromIndexes()
     }
 
-    private fun upsertProjectedRecord(record: TimelineMessageRecordFfi): AppMessageRecordFfi {
+    private fun upsertProjectedRecord(
+        record: TimelineMessageRecordFfi,
+        reconcileOptimistic: Boolean = false,
+        allowDelayedProjection: Boolean = false,
+    ): AppMessageRecordFfi {
         val previousItemId = timelineRecords[record.messageIdHex]?.let(::projectedItemId)
         if (previousItemId != null) {
             timelineItemsById.remove(previousItemId)
             timelineOrder.remove(previousItemId)
         }
         timelineRecords[record.messageIdHex] = record
+        projectedMessageIds.add(record.messageIdHex)
         val actionRecord = TimelineProjector.toAppMessageRecord(record)
-        pendingOptimisticMessageIdForProjection(optimisticMessages.values, actionRecord)?.let { optimisticId ->
+        preserveOptimisticDisplayPosition(record.messageIdHex, record.messageIdHex)
+        optimisticMessageIdForProjection(
+            optimisticMessages.values,
+            actionRecord,
+            allowDelayedProjection = allowDelayedProjection,
+        )
+            ?.takeIf { reconcileOptimistic }
+            ?.let { optimisticId ->
+            preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
             optimisticMessages.remove("msg:$optimisticId")
             messageById.remove(optimisticId)
         }
@@ -1106,9 +1166,18 @@ class ConversationController(
         return actionRecord
     }
 
+    private fun preserveOptimisticDisplayPosition(projectedId: String, optimisticId: String) {
+        val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
+        localTimelineOrderOverrides[projectedId] = optimistic.timelineOrder
+        localTimelineTimestampOverrides[projectedId] = optimistic.record.recordedAt
+    }
+
     private fun removeProjectedRecord(messageIdHex: String) {
         val itemId = timelineRecords[messageIdHex]?.let(::projectedItemId) ?: "msg:$messageIdHex"
         timelineRecords.remove(messageIdHex)
+        projectedMessageIds.remove(messageIdHex)
+        localTimelineOrderOverrides.remove(messageIdHex)
+        localTimelineTimestampOverrides.remove(messageIdHex)
         timelineItemsById.remove(itemId)
         timelineOrder.remove(itemId)
     }
@@ -1122,7 +1191,7 @@ class ConversationController(
             actionRecord.copy(plaintext = actionRecord.plaintext.ifBlank { copy.waitingForStream })
         } else {
             actionRecord
-        }
+        }.withRecordedAtOverride(localTimelineTimestampOverrides[record.messageIdHex])
         return TimelineMessage(
             id = streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}",
             record = displayRecord,
@@ -1132,6 +1201,7 @@ class ConversationController(
                 else -> MessageStatus.Received
             },
             projected = record,
+            timelineOrder = localTimelineOrderOverrides[record.messageIdHex] ?: 0uL,
         )
     }
 
@@ -1144,7 +1214,7 @@ class ConversationController(
     private fun insertTimelineItemId(itemId: String, item: TimelineMessage) {
         val insertAt = timelineOrder.indexOfFirst { existingId ->
             val existing = timelineItemsById[existingId] ?: return@indexOfFirst false
-            compareTimelineItems(item, existing) < 0
+            compareTimelineMessages(item, existing) < 0
         }
         if (insertAt == -1) {
             timelineOrder.add(itemId)
@@ -1157,11 +1227,15 @@ class ConversationController(
         val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
         timeline = (optimisticMessages.values + projected)
             .distinctBy { it.id }
-            .sortedWith(::compareTimelineItems)
+            .sortedWith(::compareTimelineMessages)
     }
 
-    private fun compareTimelineItems(left: TimelineMessage, right: TimelineMessage): Int {
-        return compareValuesBy(left, right, { it.record.recordedAt }, { it.id })
+    private fun nextOptimisticTimelineOrder(): ULong {
+        return timeline.asSequence()
+            .map { it.timelineOrder }
+            .maxOrNull()
+            ?.plus(1uL)
+            ?: 1uL
     }
 
     private fun recomputeReactions() {
@@ -1320,7 +1394,8 @@ class ConversationController(
     private fun updateStreamPreview(streamId: String, plaintext: String, status: MessageStatus) {
         if (streamId in removedStreamIds) return
         val id = "stream:$streamId"
-        val existing = optimisticMessages[id]?.record ?: timeline.firstOrNull { it.id == id }?.record
+        val existingItem = optimisticMessages[id] ?: timeline.firstOrNull { it.id == id }
+        val existing = existingItem?.record
         val record = (existing ?: AppMessageRecordFfi(
             messageIdHex = "stream-$streamId",
             direction = "received",
@@ -1332,7 +1407,12 @@ class ConversationController(
             recordedAt = nowSeconds(),
             receivedAt = nowSeconds(),
         )).copy(plaintext = plaintext)
-        optimisticMessages[id] = TimelineMessage(id, record, status)
+        optimisticMessages[id] = TimelineMessage(
+            id,
+            record,
+            status,
+            timelineOrder = existingItem?.timelineOrder ?: nextOptimisticTimelineOrder(),
+        )
         publishTimelineFromIndexes()
     }
 
