@@ -678,6 +678,7 @@ class ConversationController(
             appState.present(R.string.toast_left_chat)
             true
         }.getOrElse {
+            if (it is CancellationException) throw it
             appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
             false
         }
@@ -841,7 +842,7 @@ class ConversationController(
         var loadedPageCount = 0
         while (
             ReplyNavigation.shouldLoadOlder(
-                targetLoaded = messageById.containsKey(messageIdHex),
+                targetLoaded = timelineRecords.containsKey(messageIdHex),
                 hasMoreBefore = hasMoreBefore,
                 loadedPageCount = loadedPageCount,
             )
@@ -849,7 +850,7 @@ class ConversationController(
             if (!loadOlderPage()) break
             loadedPageCount += 1
         }
-        return messageById.containsKey(messageIdHex)
+        return timelineRecords.containsKey(messageIdHex)
     }
 
     fun replyTargetMessageId(item: TimelineMessage): String? {
