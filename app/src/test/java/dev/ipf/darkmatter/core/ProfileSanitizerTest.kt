@@ -13,9 +13,9 @@ class ProfileSanitizerTest {
     }
 
     @Test
-    fun imageUrlsOnlyAllowHttpUrlsWithHosts() {
+    fun imageUrlsOnlyAllowHttpsUrlsWithHosts() {
         assertEquals("https://example.com/avatar.png", ProfileSanitizer.imageUrl(" https://example.com/avatar.png "))
-        assertEquals("http://example.com/avatar.png", ProfileSanitizer.imageUrl("http://example.com/avatar.png"))
+        assertNull(ProfileSanitizer.imageUrl("http://example.com/avatar.png"))
         assertNull(ProfileSanitizer.imageUrl("data:image/png;base64,abc"))
         assertNull(ProfileSanitizer.imageUrl("file:///tmp/avatar.png"))
         assertNull(ProfileSanitizer.imageUrl("https:///missing-host.png"))

@@ -92,6 +92,7 @@
     <string name="confirm_leave_title">¿Salir del chat?</string>
     <string name="confirm_leave_message">Serás eliminado de este grupo. Necesitarás una nueva invitación para volver a unirte.</string>
     <string name="message_deleted">Este mensaje fue eliminado.</string>
+    <string name="toast_original_message_unavailable">El mensaje original no está disponible.</string>
     <string name="message_reacted">Reaccionó con %1$s</string>
     <string name="message_reaction_fallback">a un mensaje</string>
     <string name="message_deleted_preview">Mensaje eliminado</string>

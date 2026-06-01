@@ -20,8 +20,7 @@ object ProfileSanitizer {
         val trimmed = raw?.trim().orEmpty()
         if (trimmed.isEmpty()) return null
         val uri = runCatching { URI(trimmed) }.getOrNull() ?: return null
-        val scheme = uri.scheme?.lowercase()
-        if (scheme != "https" && scheme != "http") return null
+        if (uri.scheme?.lowercase() != "https") return null
         if (uri.host.isNullOrBlank()) return null
         return uri.toString()
     }
