@@ -92,6 +92,7 @@
     <string name="confirm_leave_title">Sair do bate-papo?</string>
     <string name="confirm_leave_message">Você será removido deste grupo. Será necessário um novo convite para entrar novamente.</string>
     <string name="message_deleted">Esta mensagem foi excluída.</string>
+    <string name="toast_original_message_unavailable">A mensagem original não está disponível.</string>
     <string name="message_reacted">Reagiu com %1$s</string>
     <string name="message_reaction_fallback">a uma mensagem</string>
     <string name="message_deleted_preview">Mensagem apagada</string>

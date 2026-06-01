@@ -92,6 +92,7 @@
     <string name="confirm_leave_title">Quitter la discussion ?</string>
     <string name="confirm_leave_message">Vous serez retiré de ce groupe. Une nouvelle invitation sera nécessaire pour le rejoindre.</string>
     <string name="message_deleted">Ce message a été supprimé.</string>
+    <string name="toast_original_message_unavailable">Le message d’origine est indisponible.</string>
     <string name="message_reacted">A réagi avec %1$s</string>
     <string name="message_reaction_fallback">à un message</string>
     <string name="message_deleted_preview">Message supprimé</string>

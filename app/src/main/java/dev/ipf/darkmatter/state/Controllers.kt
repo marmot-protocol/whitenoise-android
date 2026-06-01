@@ -9,6 +9,7 @@ import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ReactionTally
+import dev.ipf.darkmatter.core.ReplyNavigation
 import dev.ipf.darkmatter.core.TimelineProjector
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -402,6 +403,16 @@ class ConversationController(
         }
     }
 
+    private suspend inline fun <T> withMutationLockResult(defaultValue: T, block: () -> T): T {
+        if (mutationInFlight) return defaultValue
+        mutationInFlight = true
+        return try {
+            block()
+        } finally {
+            mutationInFlight = false
+        }
+    }
+
     private val messageById = linkedMapOf<String, AppMessageRecordFfi>()
     private val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
     private val optimisticMessages = linkedMapOf<String, TimelineMessage>()
@@ -646,35 +657,29 @@ class ConversationController(
         }
     }
 
-    suspend fun leaveGroup(): Boolean {
-        if (mutationInFlight) return false
+    suspend fun leaveGroup(): Boolean = withMutationLockResult(false) {
         val account = appState.activeAccountRef ?: return false
         if (!canLeaveGroup) {
             appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
             return false
         }
-        mutationInFlight = true
-        return try {
-            runCatching {
-                val activeAccountIdHex = appState.activeAccount?.accountIdHex
-                if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex)) {
-                    appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
-                    // Case-insensitive so hex-casing drift between the admin
-                    // list and the active account id doesn't leave the UI
-                    // showing you as admin after a successful self-demote.
-                    group = group.copy(
-                        admins = group.admins.filterNot { it.equals(activeAccountIdHex, ignoreCase = true) },
-                    )
-                }
-                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-                appState.present(R.string.toast_left_chat)
-                true
-            }.getOrElse {
-                appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
-                false
+        runCatching {
+            val activeAccountIdHex = appState.activeAccount?.accountIdHex
+            if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex)) {
+                appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
+                // Case-insensitive so hex-casing drift between the admin
+                // list and the active account id doesn't leave the UI
+                // showing you as admin after a successful self-demote.
+                group = group.copy(
+                    admins = group.admins.filterNot { it.equals(activeAccountIdHex, ignoreCase = true) },
+                )
             }
-        } finally {
-            mutationInFlight = false
+            appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+            appState.present(R.string.toast_left_chat)
+            true
+        }.getOrElse {
+            appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
+            false
         }
     }
 
@@ -829,13 +834,40 @@ class ConversationController(
     }
 
     suspend fun loadOlder() {
-        val account = appState.activeAccountRef ?: return
-        if (!hasMoreBefore || isLoadingOlder) return
+        loadOlderPage()
+    }
+
+    suspend fun loadUntilMessageAvailable(messageIdHex: String): Boolean {
+        var loadedPageCount = 0
+        while (
+            ReplyNavigation.shouldLoadOlder(
+                targetLoaded = messageById.containsKey(messageIdHex),
+                hasMoreBefore = hasMoreBefore,
+                loadedPageCount = loadedPageCount,
+            )
+        ) {
+            if (!loadOlderPage()) break
+            loadedPageCount += 1
+        }
+        return messageById.containsKey(messageIdHex)
+    }
+
+    fun replyTargetMessageId(item: TimelineMessage): String? {
+        return ReplyNavigation.targetMessageId(item.record, item.projected)
+    }
+
+    fun timelineIndexOf(messageIdHex: String): Int {
+        return timeline.indexOfFirst { it.record.messageIdHex == messageIdHex }
+    }
+
+    private suspend fun loadOlderPage(): Boolean {
+        val account = appState.activeAccountRef ?: return false
+        if (!hasMoreBefore || isLoadingOlder) return false
         val oldest = timelineRecords.values.minWithOrNull(
             compareBy<TimelineMessageRecordFfi> { it.timelineAt }.thenBy { it.messageIdHex },
-        ) ?: return
+        ) ?: return false
         isLoadingOlder = true
-        try {
+        return try {
             val page = appState.marmotIo {
                 timelineMessages(
                     account,
@@ -852,8 +884,10 @@ class ConversationController(
             }
             hasLoadedOlderPages = true
             applyTimelinePage(page, replaceWindow = false, updatePagination = true)
+            page.messages.isNotEmpty()
         } catch (throwable: Throwable) {
             error = throwable.message ?: throwable.javaClass.simpleName
+            false
         } finally {
             isLoadingOlder = false
         }
