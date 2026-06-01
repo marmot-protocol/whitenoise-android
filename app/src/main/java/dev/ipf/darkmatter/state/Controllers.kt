@@ -885,6 +885,8 @@ class ConversationController(
             hasLoadedOlderPages = true
             applyTimelinePage(page, replaceWindow = false, updatePagination = true)
             page.messages.isNotEmpty()
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (throwable: Throwable) {
             error = throwable.message ?: throwable.javaClass.simpleName
             false

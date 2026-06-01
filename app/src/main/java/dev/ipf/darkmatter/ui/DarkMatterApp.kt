@@ -200,6 +200,7 @@ import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -1160,6 +1161,7 @@ private fun ConversationScreen(
     var initialTimelineAnchored by remember(chat.id) { mutableStateOf(false) }
     var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
     var highlightedMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
+    var navigateReplyJob by remember(chat.id) { mutableStateOf<Job?>(null) }
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -1174,7 +1176,8 @@ private fun ConversationScreen(
     }
 
     fun navigateToReplyTarget(item: TimelineMessage) {
-        scope.launch {
+        navigateReplyJob?.cancel()
+        navigateReplyJob = scope.launch {
             val targetMessageId = controller.replyTargetMessageId(item)
             if (targetMessageId == null || !controller.loadUntilMessageAvailable(targetMessageId)) {
                 appState.present(R.string.toast_original_message_unavailable)
