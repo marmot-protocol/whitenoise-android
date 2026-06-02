@@ -10,6 +10,6 @@ class BackgroundConnectionBootReceiver : BroadcastReceiver() {
         val enabled = BackgroundConnectionPreferences.isEnabled(context)
         if (!BackgroundConnectionPolicy.shouldStartFromSystemWake(intent.action, enabled)) return
         val started = NotificationStreamForegroundService.start(context)
-        Log.i("DMForegroundSvc", "boot wake action=${intent.action} started=$started")
+        Log.i("DMForegroundSvc", "system wake action=${intent.action} started=$started")
     }
 }

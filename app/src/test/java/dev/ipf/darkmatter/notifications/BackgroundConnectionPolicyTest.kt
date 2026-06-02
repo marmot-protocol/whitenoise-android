@@ -16,6 +16,16 @@ class BackgroundConnectionPolicyTest {
     }
 
     @Test
+    fun startsAfterAppUpdateWhenBackgroundConnectionIsEnabled() {
+        assertTrue(
+            BackgroundConnectionPolicy.shouldStartFromSystemWake(
+                action = BackgroundConnectionPolicy.ACTION_MY_PACKAGE_REPLACED,
+                backgroundConnectionEnabled = true,
+            ),
+        )
+    }
+
+    @Test
     fun doesNotStartOnBootWhenBackgroundConnectionIsDisabled() {
         assertFalse(
             BackgroundConnectionPolicy.shouldStartFromSystemWake(

@@ -6,9 +6,9 @@ import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
-import kotlin.math.absoluteValue
 
 data class LocalNotificationContent(
+    val notificationTag: String,
     val notificationId: Int,
     val groupKey: String?,
     val title: String,
@@ -27,7 +27,8 @@ object LocalNotificationFormatter {
             NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context)
         }
         return LocalNotificationContent(
-            notificationId = stableId(update.notificationKey),
+            notificationTag = update.notificationKey,
+            notificationId = 0,
             groupKey = null,
             title = title,
             body = body,
@@ -62,11 +63,6 @@ object LocalNotificationFormatter {
             ?.replace(Regex("\\s+"), " ")
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
-    }
-
-    private fun stableId(key: String): Int {
-        val hash = key.hashCode()
-        return if (hash == Int.MIN_VALUE) 0 else hash.absoluteValue
     }
 
     private fun text(context: Context?, resId: Int, fallback: String, vararg args: Any): String {

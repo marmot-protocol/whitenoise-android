@@ -86,7 +86,7 @@ class LocalNotificationPresenter(private val context: Context) {
             }
             .build()
 
-        NotificationManagerCompat.from(context).notify(content.notificationId, notification)
+        NotificationManagerCompat.from(context).notify(content.notificationTag, content.notificationId, notification)
         notificationDebug {
             "posted id=${content.notificationId} trigger=${update.trigger} group=${update.groupIdHex.take(8)} title=${content.title}"
         }
