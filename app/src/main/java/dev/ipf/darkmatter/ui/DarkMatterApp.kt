@@ -71,6 +71,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Shield
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -134,12 +135,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
@@ -1283,7 +1280,6 @@ private fun ConversationScreen(
             if (controller.error == null && !controller.group.pendingConfirmation) {
                 ComposerBar(
                     replyingTo = controller.replyingTo,
-                    sendInFlight = controller.sendInFlight,
                     messageTextCopy = messageTextCopy,
                     onCancelReply = { controller.replyingTo = null },
                     onSend = { appState.launchMutation { controller.send(it) } },
@@ -2244,7 +2240,10 @@ private fun MessageActionButton(
 private fun OutgoingMessageStatusIcon(status: MessageStatus, tint: Color) {
     val indicator = status.outgoingIndicator() ?: return
     when (indicator) {
-        OutgoingMessageIndicator.Sending -> SendingMessageIcon(
+        OutgoingMessageIndicator.Sending -> Icon(
+            imageVector = Icons.Default.Schedule,
+            contentDescription = stringResource(R.string.sending),
+            modifier = Modifier.size(14.dp),
             tint = tint.copy(alpha = 0.76f),
         )
         OutgoingMessageIndicator.Sent -> Icon(
@@ -2263,46 +2262,8 @@ private fun OutgoingMessageStatusIcon(status: MessageStatus, tint: Color) {
 }
 
 @Composable
-private fun SendingMessageIcon(tint: Color) {
-    val sendingDescription = stringResource(R.string.sending)
-    Canvas(
-        modifier = Modifier
-            .size(14.dp)
-            .semantics { contentDescription = sendingDescription },
-    ) {
-        val strokeWidth = 1.35.dp.toPx()
-        val radius = size.minDimension / 2f - strokeWidth / 2f
-        val dash = floatArrayOf(2.4.dp.toPx(), 1.8.dp.toPx())
-        drawCircle(
-            color = tint,
-            radius = radius,
-            style = Stroke(
-                width = strokeWidth,
-                cap = StrokeCap.Round,
-                pathEffect = PathEffect.dashPathEffect(dash),
-            ),
-        )
-        drawLine(
-            color = tint,
-            start = Offset(size.width * 0.29f, size.height * 0.53f),
-            end = Offset(size.width * 0.43f, size.height * 0.67f),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round,
-        )
-        drawLine(
-            color = tint,
-            start = Offset(size.width * 0.43f, size.height * 0.67f),
-            end = Offset(size.width * 0.72f, size.height * 0.34f),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round,
-        )
-    }
-}
-
-@Composable
 private fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
-    sendInFlight: Boolean,
     messageTextCopy: MessageTextCopy,
     onCancelReply: () -> Unit,
     onSend: (String) -> Unit,
@@ -2365,8 +2326,7 @@ private fun ComposerBar(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ) {
-                if (sendInFlight) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                else Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
             }
         }
     }

@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.ReceivedMessageFfi
 import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
 import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 
 class DiagnosticFormatterTest {
@@ -39,7 +40,9 @@ class DiagnosticFormatterTest {
                 update = TimelineProjectionUpdateFfi(
                     groupIdHex = "aaaabbbbccccdddd",
                     messages = emptyList(),
+                    changes = emptyList(),
                     chatListRow = null,
+                    chatListTrigger = ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH,
                 ),
             ),
         )
