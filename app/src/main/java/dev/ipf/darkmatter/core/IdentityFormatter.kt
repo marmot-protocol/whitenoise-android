@@ -29,6 +29,8 @@ object IdentityFormatter {
         val now = Instant.now()
         val delta = now.epochSecond - instant.epochSecond
         return when {
+            // Sender clock skew or a relay-provided future timestamp.
+            delta < 0 -> "future"
             delta < 60 -> "now"
             delta < 3_600 -> "${delta / 60}m"
             delta < 86_400 -> "${delta / 3_600}h"
