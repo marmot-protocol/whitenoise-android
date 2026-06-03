@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -2341,6 +2342,10 @@ private fun SettingsScreen(
     detail: SettingsDetail?,
     onDetailChange: (SettingsDetail?) -> Unit,
 ) {
+    BackHandler(enabled = detail != null) {
+        onDetailChange(null)
+    }
+
     when (detail) {
         SettingsDetail.Appearance -> AppearanceScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
@@ -2879,13 +2884,14 @@ private fun QrCodeImage(content: String) {
 }
 
 private fun qrBitmap(content: String, size: Int): Bitmap {
-    val matrix = QrCodeEncoder.matrix(content, size)
+    val pixels = QrCodeEncoder.pixels(
+        content = content,
+        size = size,
+        onColor = android.graphics.Color.BLACK,
+        offColor = android.graphics.Color.WHITE,
+    )
     return Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bitmap ->
-        for (x in 0 until size) {
-            for (y in 0 until size) {
-                bitmap.setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
-            }
-        }
+        bitmap.setPixels(pixels, 0, size, 0, 0, size, size)
     }
 }
 
@@ -3532,11 +3538,14 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
     var loaded by remember(appState.activeAccountRef) { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<AccountKeyPackageFfi?>(null) }
 
-    suspend fun reload() {
+    suspend fun reload(refreshFromNetwork: Boolean = false) {
         loading = true
-        packages = appState.fetchKeyPackages()
-        loaded = true
-        loading = false
+        try {
+            packages = appState.fetchKeyPackages(refreshFromNetwork = refreshFromNetwork)
+            loaded = true
+        } finally {
+            loading = false
+        }
     }
 
     LaunchedEffect(appState.activeAccountRef) {
@@ -3554,7 +3563,7 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                 },
                 actions = {
                     IconButton(
-                        onClick = { scope.launch { reload() } },
+                        onClick = { scope.launch { reload(refreshFromNetwork = true) } },
                         enabled = !loading && !working && appState.activeAccountRef != null,
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
@@ -3579,9 +3588,12 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                             onClick = {
                                 working = true
                                 scope.launch {
-                                    appState.republishKeyPackage()
-                                    reload()
-                                    working = false
+                                    try {
+                                        appState.republishKeyPackage()
+                                        reload(refreshFromNetwork = true)
+                                    } finally {
+                                        working = false
+                                    }
                                 }
                             },
                             enabled = !working && !loading && appState.activeAccountRef != null,
@@ -3595,9 +3607,12 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                             onClick = {
                                 working = true
                                 scope.launch {
-                                    appState.publishNewKeyPackage()
-                                    reload()
-                                    working = false
+                                    try {
+                                        appState.publishNewKeyPackage()
+                                        reload(refreshFromNetwork = true)
+                                    } finally {
+                                        working = false
+                                    }
                                 }
                             },
                             enabled = !working && !loading && appState.activeAccountRef != null,
@@ -3628,7 +3643,7 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                     }
                 }
             }
-            items(packages, key = { it.eventIdHex }) { kp ->
+            itemsIndexed(packages, key = { index, kp -> "${kp.eventIdHex}:$index" }) { _, kp ->
                 KeyPackageCard(
                     kp = kp,
                     busy = working,
@@ -3660,9 +3675,12 @@ private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                     pendingDelete = null
                     working = true
                     scope.launch {
-                        appState.deleteKeyPackage(target.eventIdHex, target.sourceRelays)
-                        reload()
-                        working = false
+                        try {
+                            appState.deleteKeyPackage(target.eventIdHex, target.sourceRelays)
+                            reload(refreshFromNetwork = true)
+                        } finally {
+                            working = false
+                        }
                     }
                 }) { Text(stringResource(R.string.delete)) }
             },
@@ -3711,7 +3729,7 @@ private fun KeyPackageCard(
             }
             DiagnosticRow(stringResource(R.string.event), IdentityFormatter.short(kp.eventIdHex))
             DiagnosticRow(stringResource(R.string.ref), IdentityFormatter.short(kp.keyPackageRefHex))
-            DiagnosticRow(stringResource(R.string.size), stringResource(R.string.bytes_count, kp.keyPackageBytes))
+            DiagnosticRow(stringResource(R.string.size), stringResource(R.string.bytes_count, kp.keyPackageBytes.toLong()))
             if (kp.sourceRelays.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(stringResource(R.string.source_relays), color = MaterialTheme.colorScheme.onSurfaceVariant)

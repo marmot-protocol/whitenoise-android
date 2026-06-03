@@ -13,7 +13,10 @@ import dev.ipf.darkmatter.core.ReplyNavigation
 import dev.ipf.darkmatter.core.TimelineProjector
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -480,6 +483,7 @@ class ConversationController(
     private val localTimelineTimestampOverrides =
         appState.timelineTimestampOverrides(conversationAccountRef, initialGroup.groupIdHex)
     private val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
+    private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val activeStreamIds = mutableSetOf<String>()
     private val removedStreamIds = mutableSetOf<String>()
     private var hasLoadedOlderPages = false
@@ -609,6 +613,7 @@ class ConversationController(
             isLoading = false
             error = throwable.message ?: throwable.javaClass.simpleName
         } finally {
+            inviteStreamScope.cancel()
             withContext(Dispatchers.IO) {
                 runCatching { groupSubscription?.close() }
                 runCatching { timelineSubscription?.close() }
@@ -746,6 +751,13 @@ class ConversationController(
         val account = appState.activeAccountRef ?: return false
         return runCatching {
             group = appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) }
+            refreshMembers()
+            refreshCurrentTimeline(account).forEach { streamId ->
+                if (activeStreamIds.add(streamId)) {
+                    inviteStreamScope.launch { watchAgentTextStream(account, streamId) }
+                }
+            }
+            initializeReadState(account)
             appState.present(R.string.toast_invite_accepted)
             true
         }.getOrElse {
@@ -951,6 +963,25 @@ class ConversationController(
         } finally {
             isLoadingOlder = false
         }
+    }
+
+    private suspend fun refreshCurrentTimeline(account: String): List<String> {
+        val page = appState.marmotIo {
+            timelineMessages(
+                account,
+                TimelineMessageQueryFfi(
+                    groupIdHex = group.groupIdHex,
+                    search = null,
+                    before = null,
+                    beforeMessageId = null,
+                    after = null,
+                    afterMessageId = null,
+                    limit = ConversationTimelinePageLimit,
+                ),
+            )
+        }
+        hasLoadedOlderPages = false
+        return applyTimelinePage(page, replaceWindow = true, updatePagination = true)
     }
 
     fun replyPreview(item: TimelineMessage, copy: MessageTextCopy = MessageTextCopy.Default): Pair<String, String>? {
