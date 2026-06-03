@@ -36,6 +36,9 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import java.net.IDN
+import java.net.URI
+import java.util.Locale
 
 sealed interface AppPhase {
     data object Bootstrapping : AppPhase
@@ -62,9 +65,42 @@ enum class RelayListKind {
 
 internal fun normalizeRelayUrls(relays: Iterable<String>): List<String> {
     return relays
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
+        .mapNotNull(::canonicalRelayUrl)
         .distinct()
+}
+
+internal fun isAcceptableRelayUrl(url: String): Boolean {
+    return canonicalRelayUrl(url) != null
+}
+
+private fun canonicalRelayUrl(url: String): String? {
+    return runCatching {
+        val uri = URI(url.trim())
+        if (uri.scheme?.equals("wss", ignoreCase = true) != true || uri.userInfo != null) {
+            return@runCatching null
+        }
+        val host = uri.host ?: uri.rawAuthority?.relayHostCandidate() ?: return@runCatching null
+        val hostWithoutBrackets = host.removeSurrounding("[", "]")
+        if (hostWithoutBrackets.any { it.isWhitespace() }) return@runCatching null
+        val asciiHost = if (hostWithoutBrackets.contains(":")) {
+            hostWithoutBrackets
+        } else {
+            IDN.toASCII(hostWithoutBrackets)
+        }
+        val canonicalHost = asciiHost.lowercase(Locale.ROOT).takeIf { it.isNotBlank() }
+            ?: return@runCatching null
+        val authorityHost = if (canonicalHost.contains(":")) "[$canonicalHost]" else canonicalHost
+        val port = uri.port.takeIf { it >= 0 }?.let { ":$it" }.orEmpty()
+        val path = uri.rawPath.orEmpty()
+        val query = uri.rawQuery?.let { "?$it" }.orEmpty()
+        "wss://$authorityHost$port$path$query"
+    }.getOrNull()
+}
+
+private fun String.relayHostCandidate(): String? {
+    if (isBlank() || contains("@")) return null
+    if (startsWith("[")) return substringAfter("[", "").substringBefore("]", "").takeIf { it.isNotBlank() }
+    return if (count { it == ':' } == 1) substringBefore(":") else this
 }
 
 class DarkMatterAppState(context: Context) {
@@ -328,7 +364,12 @@ class DarkMatterAppState(context: Context) {
 
     suspend fun setAccountRelays(kind: RelayListKind, relays: List<String>): AccountRelayListsFfi? {
         val account = activeAccountRef ?: return null
-        val next = normalizeRelayUrls(relays)
+        val candidates = relays.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (candidates.any { !isAcceptableRelayUrl(it) }) {
+            present(R.string.toast_relay_update_failed, R.string.error_remove_invalid_relay_urls_first)
+            return accountRelayLists()
+        }
+        val next = normalizeRelayUrls(candidates)
         if (next.isEmpty()) {
             present(R.string.toast_relay_list_empty)
             return accountRelayLists()
@@ -547,11 +588,11 @@ class DarkMatterAppState(context: Context) {
     }
 
     fun userProfile(accountIdHex: String): UserProfileMetadataFfi? {
-        return profileRevision.let {
-            cachedUserProfile(accountIdHex) ?: run {
-                requestProfile(accountIdHex)
-                null
-            }
+        // Observe profile cache invalidations for Compose callers.
+        profileRevision
+        return cachedUserProfile(accountIdHex) ?: run {
+            requestProfile(accountIdHex)
+            null
         }
     }
 

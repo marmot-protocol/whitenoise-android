@@ -243,6 +243,7 @@
     <string name="toast_relay_list_empty">中繼站清單不能為空</string>
     <string name="toast_relay_list_updated">中繼清單已更新</string>
     <string name="toast_relay_update_failed">中繼更新失敗</string>
+    <string name="error_remove_invalid_relay_urls_first">請先移除無效的中繼 URL。</string>
     <string name="toast_couldnt_load_key_packages">無法載入金鑰套件</string>
     <string name="toast_key_package_deleted">金鑰套件已刪除</string>
     <string name="toast_couldnt_delete_key_package">刪除金鑰套件失敗。請再試一次。</string>
