@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -189,6 +190,7 @@ import dev.ipf.darkmatter.state.MessageStatus
 import dev.ipf.darkmatter.state.OutgoingMessageIndicator
 import dev.ipf.darkmatter.state.RelayListKind
 import dev.ipf.darkmatter.state.TimelineMessage
+import dev.ipf.darkmatter.state.isAcceptableRelayUrl
 import dev.ipf.darkmatter.state.outgoingIndicator
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -1017,8 +1019,12 @@ private fun NewChatSheet(
         ) {
             Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
             if (members.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    members.take(3).forEach { member ->
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    members.forEach { member ->
                         AssistChip(
                             onClick = { members = members - member },
                             label = { Text(IdentityFormatter.short(member), maxLines = 1) },
@@ -3456,7 +3462,7 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
                             modifier = Modifier.size(48.dp),
                             enabled = pendingUrl.trim().let {
                                 !saving && appState.activeAccountRef != null &&
-                                    (it.startsWith("wss://") || it.startsWith("ws://")) &&
+                                    isAcceptableRelayUrl(it) &&
                                     !currentRelays.contains(it)
                             },
                         ) {

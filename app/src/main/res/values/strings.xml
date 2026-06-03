@@ -243,6 +243,7 @@
     <string name="toast_relay_list_empty">Relay list can\'t be empty</string>
     <string name="toast_relay_list_updated">Relay list updated</string>
     <string name="toast_relay_update_failed">Relay update failed</string>
+    <string name="error_remove_invalid_relay_urls_first">Remove invalid relay URLs first.</string>
     <string name="toast_couldnt_load_key_packages">Couldn\'t load key packages</string>
     <string name="toast_key_package_deleted">Key package deleted</string>
     <string name="toast_couldnt_delete_key_package">Couldn\'t delete key package</string>

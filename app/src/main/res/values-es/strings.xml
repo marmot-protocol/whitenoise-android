@@ -243,6 +243,7 @@
     <string name="toast_relay_list_empty">La lista de relés no puede estar vacía</string>
     <string name="toast_relay_list_updated">Lista de retransmisiones actualizada</string>
     <string name="toast_relay_update_failed">Error en la actualización del relé</string>
+    <string name="error_remove_invalid_relay_urls_first">Elimina primero las URL de relés no válidas.</string>
     <string name="toast_couldnt_load_key_packages">No se pudieron cargar los paquetes de llaves</string>
     <string name="toast_key_package_deleted">Paquete de llaves eliminado</string>
     <string name="toast_couldnt_delete_key_package">Error al eliminar el paquete de llaves. Inténtalo de nuevo.</string>

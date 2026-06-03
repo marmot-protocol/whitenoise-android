@@ -243,6 +243,7 @@
     <string name="toast_relay_list_empty">A lista de relays não pode ficar vazia</string>
     <string name="toast_relay_list_updated">Lista de retransmissão atualizada</string>
     <string name="toast_relay_update_failed">Falha na atualização do relé</string>
+    <string name="error_remove_invalid_relay_urls_first">Remova primeiro os URLs de relay inválidos.</string>
     <string name="toast_couldnt_load_key_packages">Não foi possível carregar os pacotes de chaves</string>
     <string name="toast_key_package_deleted">Pacote de chaves excluído</string>
     <string name="toast_couldnt_delete_key_package">Falha ao excluir o pacote de chaves. Tente novamente.</string>
