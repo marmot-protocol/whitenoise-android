@@ -16,4 +16,13 @@ object QrCodeEncoder {
         )
         return QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, hints)
     }
+
+    fun pixels(content: String, size: Int, onColor: Int, offColor: Int): IntArray {
+        val matrix = matrix(content, size)
+        return IntArray(size * size) { index ->
+            val x = index % size
+            val y = index / size
+            if (matrix[x, y]) onColor else offColor
+        }
+    }
 }
