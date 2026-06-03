@@ -20,6 +20,7 @@ import dev.ipf.darkmatter.notifications.LocalNotificationPolicy
 import dev.ipf.darkmatter.notifications.LocalNotificationPresenter
 import dev.ipf.darkmatter.notifications.NotificationStreamForegroundService
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -349,11 +350,13 @@ class DarkMatterAppState(context: Context) {
 
     fun bootstrapRelayCount(): Int = MarmotClient.bootstrapRelays.size
 
-    suspend fun fetchKeyPackages(): List<AccountKeyPackageFfi> {
+    suspend fun fetchKeyPackages(refreshFromNetwork: Boolean = false): List<AccountKeyPackageFfi> {
         val account = activeAccountRef ?: return emptyList()
         return runCatching {
-            marmotIo { accountKeyPackages(account, MarmotClient.bootstrapRelays) }
+            val bootstrapRelays = if (refreshFromNetwork) MarmotClient.bootstrapRelays else emptyList()
+            marmotIo { accountKeyPackages(account, bootstrapRelays) }
         }.getOrElse {
+            if (it is CancellationException) throw it
             present(R.string.toast_couldnt_load_key_packages, AppText.Plain(it.readableMessage()))
             emptyList()
         }
@@ -374,6 +377,7 @@ class DarkMatterAppState(context: Context) {
             present(R.string.toast_key_package_deleted)
             true
         }.getOrElse {
+            if (it is CancellationException) throw it
             present(R.string.toast_couldnt_delete_key_package, AppText.Plain(it.readableMessage()))
             false
         }
@@ -386,6 +390,7 @@ class DarkMatterAppState(context: Context) {
             present(R.string.toast_new_key_package_published)
             true
         }.getOrElse {
+            if (it is CancellationException) throw it
             present(R.string.toast_couldnt_publish_key_package, AppText.Plain(it.readableMessage()))
             false
         }
@@ -398,6 +403,7 @@ class DarkMatterAppState(context: Context) {
             present(R.string.toast_key_package_republished)
             true
         }.getOrElse {
+            if (it is CancellationException) throw it
             present(R.string.toast_couldnt_republish_key_package, AppText.Plain(it.readableMessage()))
             false
         }
