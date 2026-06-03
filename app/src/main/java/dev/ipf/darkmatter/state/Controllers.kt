@@ -980,6 +980,7 @@ class ConversationController(
                 ),
             )
         }
+        hasLoadedOlderPages = false
         return applyTimelinePage(page, replaceWindow = true, updatePagination = true)
     }
 
