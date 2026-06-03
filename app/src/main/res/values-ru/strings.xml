@@ -243,6 +243,7 @@
     <string name="toast_relay_list_empty">Список реле не может быть пустым</string>
     <string name="toast_relay_list_updated">Список реле обновлен</string>
     <string name="toast_relay_update_failed">Обновление реле не удалось</string>
+    <string name="error_remove_invalid_relay_urls_first">Сначала удалите недействительные URL реле.</string>
     <string name="toast_couldnt_load_key_packages">Не удалось загрузить пакеты ключей</string>
     <string name="toast_key_package_deleted">Пакет ключей удалён</string>
     <string name="toast_couldnt_delete_key_package">Не удалось удалить пакет ключей. Попробуйте снова.</string>
