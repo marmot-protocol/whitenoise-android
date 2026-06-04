@@ -876,8 +876,16 @@ class ConversationController(
      */
     fun discardFailedSend(item: TimelineMessage) {
         val key = item.id
-        val tempId = item.record.messageIdHex
-        when (item.status) {
+        // Re-read live state. If the user taps Retry then Discard before the
+        // bubble recomposes, the captured item.status is still Failed while
+        // the live state has moved to Pending — the Failed branch would
+        // no-op past discardedDuringRetry.add, and the in-flight retry would
+        // re-insert the confirmed message on completion. tempId likewise
+        // comes from the live record because retry refreshes messageIdHex.
+        val current = optimisticMessages[key]
+        val status = current?.status ?: item.status
+        val tempId = current?.record?.messageIdHex ?: item.record.messageIdHex
+        when (status) {
             MessageStatus.Failed -> Unit
             MessageStatus.Pending -> discardedDuringRetry.add(key)
             else -> return
