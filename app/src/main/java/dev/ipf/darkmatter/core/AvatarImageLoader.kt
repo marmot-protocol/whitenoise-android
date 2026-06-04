@@ -32,6 +32,10 @@ object AvatarImageLoader {
     }
     private val inFlight = mutableMapOf<String, CompletableDeferred<ImageBitmap?>>()
     private val failureExpiresAt = mutableMapOf<String, Long>()
+    // Bumped by clear(); fetches launched under an older generation discard
+    // their results so a logout/account-switch can't be re-polluted by an
+    // in-flight request that was already on the network.
+    private var generation = 0L
 
     suspend fun load(url: String): ImageBitmap? {
         cached(url)?.let { return it }
@@ -43,9 +47,16 @@ object AvatarImageLoader {
             inFlight[url]?.let { return@synchronized PendingAvatarRequest(it) }
             val deferred = CompletableDeferred<ImageBitmap?>()
             inFlight[url] = deferred
+            val launchedGeneration = generation
             scope.launch {
                 val image = runCatching { fetch(url) }.getOrNull()
                 synchronized(lock) {
+                    if (launchedGeneration != generation) {
+                        // clear() ran while we were in flight; drop the result.
+                        inFlight.remove(url, deferred)
+                        deferred.complete(null)
+                        return@launch
+                    }
                     if (image != null) {
                         cache.put(url, image)
                         failureExpiresAt.remove(url)
@@ -63,8 +74,11 @@ object AvatarImageLoader {
 
     fun clear() {
         synchronized(lock) {
+            generation++
             cache.evictAll()
             failureExpiresAt.clear()
+            inFlight.values.forEach { it.complete(null) }
+            inFlight.clear()
         }
     }
 
@@ -122,7 +136,7 @@ internal fun isAvatarFailureFresh(expiresAt: Long?, nowMillis: Long): Boolean =
 internal fun avatarDecodeSampleSize(width: Int, height: Int, maxDimension: Int): Int {
     if (width <= maxDimension && height <= maxDimension) return 1
     var sampleSize = 1
-    while ((width / (sampleSize * 2)) >= maxDimension || (height / (sampleSize * 2)) >= maxDimension) {
+    while ((width / sampleSize) > maxDimension || (height / sampleSize) > maxDimension) {
         sampleSize *= 2
     }
     return sampleSize

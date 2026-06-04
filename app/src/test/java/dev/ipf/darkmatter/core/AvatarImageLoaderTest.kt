@@ -16,6 +16,13 @@ class AvatarImageLoaderTest {
     }
 
     @Test
+    fun avatarDecodeSampleSizeDownsamplesImagesJustOverTheCap() {
+        // 513 / 1 = 513 still > 512, so sampleSize must advance to 2.
+        assertEquals(2, avatarDecodeSampleSize(width = 513, height = 513, maxDimension = 512))
+        assertEquals(2, avatarDecodeSampleSize(width = 513, height = 100, maxDimension = 512))
+    }
+
+    @Test
     fun avatarFailureFreshIsFalseWhenNoExpiry() {
         assertEquals(false, isAvatarFailureFresh(expiresAt = null, nowMillis = 1_000L))
     }
