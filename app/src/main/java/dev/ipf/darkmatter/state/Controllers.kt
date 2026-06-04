@@ -720,6 +720,12 @@ class ConversationController(
         }
     }
 
+    // Tracks optimistic ids the user discarded while a retry was in flight.
+    // The retry coroutine consults this set before re-inserting a failed
+    // record, so a discard during retry doesn't get clobbered by the catch
+    // path putting the message back as Failed.
+    private val discardedDuringRetry = mutableSetOf<String>()
+
     /**
      * Re-issues a previously-failed outgoing send for [item]. The optimistic
      * record is updated in-place (preserving its [TimelineMessage.timelineOrder]
@@ -736,6 +742,7 @@ class ConversationController(
         val replyTarget = MessageProjector.replyTargetMessageId(item.record)
         val refreshedRecord = item.record.copy()
         val order = item.timelineOrder ?: nextOptimisticTimelineOrder()
+        discardedDuringRetry.remove(key)
         optimisticMessages[key] = TimelineMessage(
             key,
             refreshedRecord,
@@ -752,9 +759,14 @@ class ConversationController(
             }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = refreshedRecord.copy(messageIdHex = confirmedId)
-            if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
             optimisticMessages.remove(key)
             messageById.remove(tempId)
+            if (discardedDuringRetry.remove(key)) {
+                // User discarded mid-flight; drop the result entirely.
+                publishTimelineFromIndexes()
+                return
+            }
+            if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
             if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
                 optimisticMessages["msg:$confirmedId"] = TimelineMessage(
                     "msg:$confirmedId",
@@ -765,6 +777,13 @@ class ConversationController(
             }
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
+            if (discardedDuringRetry.remove(key)) {
+                // User discarded mid-flight; don't restore the Failed bubble.
+                optimisticMessages.remove(key)
+                messageById.remove(tempId)
+                publishTimelineFromIndexes()
+                return
+            }
             optimisticMessages[key] = TimelineMessage(
                 key,
                 refreshedRecord,
@@ -779,12 +798,16 @@ class ConversationController(
     /**
      * Drops a failed outgoing send from the local timeline. Purely client-side
      * cleanup; the message was never accepted by the relay so there's nothing
-     * to retract.
+     * to retract. Tracks the id in [discardedDuringRetry] so an in-flight
+     * retry's terminal write doesn't resurrect the bubble.
      */
     fun discardFailedSend(item: TimelineMessage) {
-        if (item.status != MessageStatus.Failed) return
         val key = item.id
         val tempId = item.record.messageIdHex
+        // Accept either Failed (no retry in flight) or Pending (retry in
+        // flight); other statuses (Sent/Streaming) aren't user-discardable.
+        if (item.status != MessageStatus.Failed && item.status != MessageStatus.Pending) return
+        discardedDuringRetry.add(key)
         optimisticMessages.remove(key)
         messageById.remove(tempId)
         publishTimelineFromIndexes()

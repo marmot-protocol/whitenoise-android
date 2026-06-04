@@ -1170,15 +1170,20 @@ private fun ConversationScreen(
     var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
     var highlightedMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     var navigateReplyJob by remember(chat.id) { mutableStateOf<Job?>(null) }
-    // Jump-to-newest plumbing: track the timeline size when the user was last
-    // pinned to the newest message so we can show the count of messages that
-    // arrived while they were scrolled away.
+    // Jump-to-newest plumbing: track the count of INCOMING messages received
+    // while the user was scrolled away. Own outgoing sends are excluded so
+    // tapping send while scrolled up doesn't bump the badge.
     val atBottom by remember { derivedStateOf { !listState.canScrollForward } }
-    var lastSeenTimelineSize by remember(chat.id) { mutableStateOf(controller.timeline.size) }
-    LaunchedEffect(atBottom, controller.timeline.size) {
-        if (atBottom) lastSeenTimelineSize = controller.timeline.size
+    val incomingTimelineCount by remember {
+        derivedStateOf {
+            controller.timeline.count { it.record.direction == "received" }
+        }
     }
-    val unreadIncomingCount = (controller.timeline.size - lastSeenTimelineSize).coerceAtLeast(0)
+    var lastSeenIncomingCount by remember(chat.id) { mutableStateOf(incomingTimelineCount) }
+    LaunchedEffect(atBottom, incomingTimelineCount) {
+        if (atBottom) lastSeenIncomingCount = incomingTimelineCount
+    }
+    val unreadIncomingCount = (incomingTimelineCount - lastSeenIncomingCount).coerceAtLeast(0)
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -1228,8 +1233,17 @@ private fun ConversationScreen(
         if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
     LaunchedEffect(latestTimelineItemId, imeBottom) {
         if (controller.timeline.isNotEmpty()) {
-            listState.scrollToItem(bottomTimelineIndex)
-            initialTimelineAnchored = true
+            // Only force-snap to the newest message on (a) the very first
+            // anchor for this conversation OR (b) when the user is still
+            // pinned to the newest message. Otherwise leave their scroll
+            // position alone so reading older history isn't interrupted by
+            // every incoming message (see issue #59).
+            val nearBottom = !listState.canScrollForward ||
+                listState.firstVisibleItemIndex >= bottomTimelineIndex - 3
+            if (!initialTimelineAnchored || nearBottom) {
+                listState.scrollToItem(bottomTimelineIndex)
+                initialTimelineAnchored = true
+            }
         }
     }
     val openDetailsDescription = stringResource(R.string.details)
