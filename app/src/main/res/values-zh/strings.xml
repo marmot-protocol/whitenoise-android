@@ -50,6 +50,7 @@
     <string name="couldnt_load_conversation">无法加载对话</string>
     <string name="no_messages_yet">暂无消息</string>
     <string name="chat_row_draft_prefix">草稿：</string>
+    <string name="jump_to_newest">跳到最新</string>
     <string name="invited_to_this_chat">您被邀请参加此聊天。</string>
     <string name="decline">拒绝</string>
     <string name="accept">接受</string>

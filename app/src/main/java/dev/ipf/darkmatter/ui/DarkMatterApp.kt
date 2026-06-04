@@ -55,6 +55,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -1169,6 +1170,15 @@ private fun ConversationScreen(
     var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
     var highlightedMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     var navigateReplyJob by remember(chat.id) { mutableStateOf<Job?>(null) }
+    // Jump-to-newest plumbing: track the timeline size when the user was last
+    // pinned to the newest message so we can show the count of messages that
+    // arrived while they were scrolled away.
+    val atBottom by remember { derivedStateOf { !listState.canScrollForward } }
+    var lastSeenTimelineSize by remember(chat.id) { mutableStateOf(controller.timeline.size) }
+    LaunchedEffect(atBottom, controller.timeline.size) {
+        if (atBottom) lastSeenTimelineSize = controller.timeline.size
+    }
+    val unreadIncomingCount = (controller.timeline.size - lastSeenTimelineSize).coerceAtLeast(0)
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -1365,6 +1375,39 @@ private fun ConversationScreen(
                     }
                     if (!initialTimelineAnchored) {
                         LoadingScreen()
+                    }
+                    if (initialTimelineAnchored && !atBottom) {
+                        FloatingActionButton(
+                            onClick = {
+                                scope.launch {
+                                    val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                                    listState.animateScrollToItem(lastIndex)
+                                }
+                            },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(16.dp),
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.ArrowDownward,
+                                    contentDescription = stringResource(R.string.jump_to_newest),
+                                )
+                                if (unreadIncomingCount > 0) {
+                                    Badge(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .offset(x = 12.dp, y = (-12).dp),
+                                    ) {
+                                        Text(
+                                            if (unreadIncomingCount > 99) "99+" else unreadIncomingCount.toString(),
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

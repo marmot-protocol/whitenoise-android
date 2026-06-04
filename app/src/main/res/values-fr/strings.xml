@@ -50,6 +50,7 @@
     <string name="couldnt_load_conversation">Impossible de charger la conversation</string>
     <string name="no_messages_yet">Pas encore de messages</string>
     <string name="chat_row_draft_prefix">Brouillon : </string>
+    <string name="jump_to_newest">Aller au plus récent</string>
     <string name="invited_to_this_chat">Vous avez été invité à ce chat.</string>
     <string name="decline">Refuser</string>
     <string name="accept">Accepter</string>

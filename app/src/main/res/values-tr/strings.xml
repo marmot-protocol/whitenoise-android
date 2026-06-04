@@ -50,6 +50,7 @@
     <string name="couldnt_load_conversation">Konuşma yüklenemedi</string>
     <string name="no_messages_yet">Henüz mesaj yok</string>
     <string name="chat_row_draft_prefix">Taslak: </string>
+    <string name="jump_to_newest">En yeniye atla</string>
     <string name="invited_to_this_chat">Bu sohbete davet edildiniz.</string>
     <string name="decline">Reddet</string>
     <string name="accept">Kabul et</string>
