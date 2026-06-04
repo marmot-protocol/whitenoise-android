@@ -6,7 +6,6 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
@@ -164,6 +163,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import dev.ipf.darkmatter.R
+import dev.ipf.darkmatter.core.AvatarImageLoader
 import dev.ipf.darkmatter.core.DiagnosticFormatter
 import dev.ipf.darkmatter.core.ForensicsExportFileName
 import dev.ipf.darkmatter.core.GroupProjector
@@ -196,7 +196,6 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -3974,13 +3973,7 @@ private fun Avatar(
     val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, pictureUrl) {
         value = null
         val url = pictureUrl ?: return@produceState
-        value = runCatching {
-            withContext(Dispatchers.IO) {
-                URL(url).openStream().use { stream ->
-                    BitmapFactory.decodeStream(stream)?.asImageBitmap()
-                }
-            }
-        }.getOrNull()
+        value = AvatarImageLoader.load(url)
     }
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(color),
