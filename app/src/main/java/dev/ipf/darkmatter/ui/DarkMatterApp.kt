@@ -55,6 +55,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -98,6 +99,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -132,6 +134,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -144,11 +147,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -190,7 +195,9 @@ import dev.ipf.darkmatter.state.MessageStatus
 import dev.ipf.darkmatter.state.OutgoingMessageIndicator
 import dev.ipf.darkmatter.state.RelayListKind
 import dev.ipf.darkmatter.state.TimelineMessage
+import dev.ipf.darkmatter.state.countUnreadIncoming
 import dev.ipf.darkmatter.state.isAcceptableRelayUrl
+import dev.ipf.darkmatter.state.nextReadAnchor
 import dev.ipf.darkmatter.state.outgoingIndicator
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -201,6 +208,8 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.LifecycleOwner
@@ -906,17 +915,20 @@ private fun ChatRow(
             Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         supportingContent = {
+            val draft = appState.draftFor(item.group.groupIdHex)?.takeIf { it.isNotBlank() }
+            val preview = when {
+                item.group.pendingConfirmation -> stringResource(R.string.invitation)
+                draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
+                else -> item.projectedPreviewText(
+                    copy = messageTextCopy,
+                    empty = stringResource(R.string.no_messages_yet),
+                )
+            }
             Text(
-                if (item.group.pendingConfirmation) {
-                    stringResource(R.string.invitation)
-                } else {
-                    item.projectedPreviewText(
-                        copy = messageTextCopy,
-                        empty = stringResource(R.string.no_messages_yet),
-                    )
-                },
+                text = preview,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
             )
         },
         trailingContent = {
@@ -1140,6 +1152,57 @@ private fun NewChatSheet(
     }
 }
 
+/** Within this many items of the trailing edge counts as "at bottom". */
+private const val ConversationNearBottomItemSlack = 3
+
+@Composable
+private fun UnreadMessagesDivider(count: Int) {
+    val text = pluralStringResource(R.plurals.unread_messages_count, count, count)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(12.dp),
+                )
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+    }
+}
+
+/**
+ * Shared definition of "user is at (or near) the newest message". Used both
+ * by the auto-scroll LaunchedEffect (issue #59) and the jump-to-newest FAB
+ * so they can't disagree on the threshold.
+ */
+private fun isNearBottom(
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    timelineSize: Int,
+    hasOlderHeader: Boolean,
+): Boolean {
+    if (!listState.canScrollForward) return true
+    val olderHeaderCount = if (hasOlderHeader) 1 else 0
+    val bottomTimelineIndex = timelineSize + 1 + olderHeaderCount
+    return listState.firstVisibleItemIndex >= bottomTimelineIndex - ConversationNearBottomItemSlack
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ConversationScreen(
@@ -1165,6 +1228,57 @@ private fun ConversationScreen(
     var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
     var highlightedMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     var navigateReplyJob by remember(chat.id) { mutableStateOf<Job?>(null) }
+    // Jump-to-newest plumbing.
+    //
+    // Badge = incoming messages newer than the highest-index timeline row the
+    // user has ever had on screen during this composition. The high-water
+    // mark only INCREASES, so scrolling back up past read messages doesn't
+    // resurrect the badge.
+    //
+    //   HWM advances when the viewport reaches a new highest-visible row.
+    //   New incoming arrivals (which extend the timeline beyond HWM) bump
+    //   the badge. On chat re-entry, the auto-scroll's snap to the bottom
+    //   immediately advances HWM to the last timeline index, so the badge
+    //   shows 0 — matching WhatsApp/Signal semantics.
+    val nearBottom by remember {
+        derivedStateOf {
+            isNearBottom(listState, controller.timeline.size, controller.hasMoreBefore || controller.isLoadingOlder)
+        }
+    }
+    // Read anchor stored as the message id of the deepest row the user has
+    // settled on. Looked up live each time so load-older prepends shift both
+    // the candidate and the anchor by the same offset — position comparisons
+    // stay valid. Anchored on id (not recordedAt) to survive same-second
+    // collisions: send() stamps with nowSeconds(), so multiple messages can
+    // share a recordedAt and a strict-`>` filter would under-count.
+    var readAnchorMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
+    val currentHighestVisibleTimelineIndex by remember {
+        derivedStateOf {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            if (visible.isEmpty()) return@derivedStateOf -1
+            val olderHeader = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+            // LazyColumn layout: [Spacer][maybe older-loading][timeline items][Spacer]
+            val firstTimelineListIndex = 1 + olderHeader
+            (visible.last().index - firstTimelineListIndex)
+                .coerceAtMost(controller.timeline.lastIndex)
+        }
+    }
+    LaunchedEffect(currentHighestVisibleTimelineIndex) {
+        val idx = currentHighestVisibleTimelineIndex
+        if (idx < 0) return@LaunchedEffect
+        // Monotonic advance only — scroll-up keeps the existing anchor so the
+        // read pointer never moves backwards. See [nextReadAnchor].
+        readAnchorMessageId = nextReadAnchor(controller.timeline, readAnchorMessageId, idx)
+    }
+    val unreadIncomingCount by remember {
+        derivedStateOf {
+            if (!initialTimelineAnchored) {
+                0
+            } else {
+                countUnreadIncoming(controller.timeline, readAnchorMessageId)
+            }
+        }
+    }
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -1210,13 +1324,65 @@ private fun ConversationScreen(
         controller.start()
     }
     val latestTimelineItemId = controller.timeline.lastOrNull()?.id
-    val bottomTimelineIndex = controller.timeline.size + 1 +
-        if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+    val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+    val bottomTimelineIndex = controller.timeline.size + 1 + olderHeaderCount
+    // Capture the unread boundary at chat open. Stays fixed for the lifetime
+    // of this composable (per chat.id) so the "N unread messages" divider
+    // doesn't keep moving as the user scrolls and marks messages as read.
+    val entryUnreadCount = remember(chat.id) { chat.unreadCount.toInt().coerceAtLeast(0) }
+    var entryFirstUnreadMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(chat.id, controller.timeline.size) {
+        if (entryFirstUnreadMessageId == null && entryUnreadCount > 0) {
+            val firstUnreadIndex = controller.firstUnreadTimelineIndex(entryUnreadCount)
+            if (firstUnreadIndex >= 0) {
+                entryFirstUnreadMessageId = controller.timeline[firstUnreadIndex].record.messageIdHex
+                    .takeIf { it.isNotBlank() }
+            }
+        }
+    }
     LaunchedEffect(latestTimelineItemId, imeBottom) {
         if (controller.timeline.isNotEmpty()) {
-            listState.scrollToItem(bottomTimelineIndex)
-            initialTimelineAnchored = true
+            if (!initialTimelineAnchored) {
+                // First-time anchor on chat open. If there are unread
+                // messages, land at the first unread one so the user can
+                // read forward from there; otherwise drop them at the
+                // newest message.
+                val firstUnreadTimelineIndex = controller.firstUnreadTimelineIndex(chat.unreadCount.toInt())
+                val targetIndex = if (firstUnreadTimelineIndex >= 0) {
+                    1 + olderHeaderCount + firstUnreadTimelineIndex
+                } else {
+                    bottomTimelineIndex
+                }
+                listState.scrollToItem(targetIndex)
+                initialTimelineAnchored = true
+            } else if (nearBottom) {
+                // User is still pinned to the newest message; follow new
+                // incoming messages down. Reading older history isn't
+                // interrupted by this branch (see issue #59).
+                listState.scrollToItem(bottomTimelineIndex)
+            }
         }
+    }
+
+    // Scroll-driven read pointer advance. Watches the shared read anchor
+    // (`readAnchorMessageId`) so the FFI only sees IDs that strictly advance
+    // the pointer — scroll-up cannot regress the count. Settle-gated
+    // (`!isScrollInProgress`) avoids per-frame FFI hops while scrolling.
+    LaunchedEffect(listState, chat.id) {
+        snapshotFlow {
+            if (!initialTimelineAnchored || listState.isScrollInProgress) {
+                null
+            } else {
+                readAnchorMessageId
+            }
+        }
+            .filterNotNull()
+            .distinctUntilChanged()
+            .collect { messageId ->
+                if (messageId.isNotBlank()) {
+                    controller.markReadUpTo(messageId)
+                }
+            }
     }
     val openDetailsDescription = stringResource(R.string.details)
     Scaffold(
@@ -1284,11 +1450,24 @@ private fun ConversationScreen(
         },
         bottomBar = {
             if (controller.error == null && !controller.group.pendingConfirmation) {
+                val groupIdHex = controller.group.groupIdHex
                 ComposerBar(
                     replyingTo = controller.replyingTo,
                     messageTextCopy = messageTextCopy,
                     onCancelReply = { controller.replyingTo = null },
                     onSend = { appState.launchMutation { controller.send(it) } },
+                    initialDraft = appState.draftFor(groupIdHex).orEmpty(),
+                    onDraftChange = { appState.setDraft(groupIdHex, it) },
+                    draftKey = groupIdHex,
+                    onAfterSend = {
+                        // Always pull the user down to see their just-sent
+                        // bubble, even if they were reading older history.
+                        // Matches standard chat-app behavior.
+                        scope.launch {
+                            val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                            listState.animateScrollToItem(lastIndex)
+                        }
+                    },
                 )
             }
         },
@@ -1343,6 +1522,9 @@ private fun ConversationScreen(
                             }
                         }
                         items(controller.timeline, key = { it.id }) { item ->
+                            if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
+                                UnreadMessagesDivider(count = entryUnreadCount)
+                            }
                             MessageBubble(
                                 item = item,
                                 controller = controller,
@@ -1357,6 +1539,40 @@ private fun ConversationScreen(
                     }
                     if (!initialTimelineAnchored) {
                         LoadingScreen()
+                    }
+                    if (initialTimelineAnchored && !nearBottom) {
+                        SmallFloatingActionButton(
+                            onClick = {
+                                scope.launch {
+                                    val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                                    listState.animateScrollToItem(lastIndex)
+                                }
+                            },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(12.dp),
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.ArrowDownward,
+                                    contentDescription = stringResource(R.string.jump_to_newest),
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                if (unreadIncomingCount > 0) {
+                                    Badge(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .offset(x = 10.dp, y = (-10).dp),
+                                    ) {
+                                        Text(
+                                            if (unreadIncomingCount > 99) "99+" else unreadIncomingCount.toString(),
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2052,6 +2268,30 @@ private fun MessageBubble(
                             if (mine) {
                                 OutgoingMessageStatusIcon(item.status, tint = timestampColor)
                             }
+                            if (mine && item.status == MessageStatus.Failed) {
+                                IconButton(
+                                    onClick = { appState.launchMutation { controller.retryFailedSend(item) } },
+                                    modifier = Modifier.size(24.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = stringResource(R.string.retry),
+                                        tint = timestampColor,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { controller.discardFailedSend(item) },
+                                    modifier = Modifier.size(24.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.discard_failed_message),
+                                        tint = timestampColor,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            }
                             MessageActionMenu(
                                 expanded = menuOpen,
                                 canDelete = mine && record.messageIdHex.isNotBlank(),
@@ -2274,8 +2514,14 @@ private fun ComposerBar(
     onCancelReply: () -> Unit,
     onSend: (String) -> Unit,
     modifier: Modifier = Modifier,
+    initialDraft: String = "",
+    onDraftChange: (String) -> Unit = {},
+    draftKey: Any? = null,
+    onAfterSend: () -> Unit = {},
 ) {
-    var text by remember { mutableStateOf("") }
+    // Keyed on draftKey so switching to a different chat re-hydrates the text
+    // field from that chat's saved draft rather than carrying state across.
+    var text by remember(draftKey) { mutableStateOf(initialDraft) }
     Column(
         modifier
             .fillMaxWidth()
@@ -2305,7 +2551,10 @@ private fun ComposerBar(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = text,
-                onValueChange = { text = it },
+                onValueChange = {
+                    text = it
+                    onDraftChange(it)
+                },
                 modifier = Modifier.weight(1f),
                 placeholder = { Text(stringResource(R.string.message)) },
                 maxLines = 5,
@@ -2326,6 +2575,8 @@ private fun ComposerBar(
                     if (text.isNotBlank()) {
                         onSend(text)
                         text = ""
+                        onDraftChange("")
+                        onAfterSend()
                     }
                 },
                 modifier = Modifier.size(52.dp),

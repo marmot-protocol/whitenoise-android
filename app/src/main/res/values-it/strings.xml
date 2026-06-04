@@ -49,6 +49,9 @@
     <string name="leave">Lascia</string>
     <string name="couldnt_load_conversation">Impossibile caricare la conversazione</string>
     <string name="no_messages_yet">Ancora nessun messaggio</string>
+    <string name="chat_row_draft_prefix">Bozza: </string>
+    <string name="jump_to_newest">Vai al più recente</string>
+    <string name="discard_failed_message">Elimina messaggio non riuscito</string>
     <string name="invited_to_this_chat">Sei stato invitato a questa chat.</string>
     <string name="decline">Rifiuta</string>
     <string name="accept">Accetta</string>
@@ -324,4 +327,8 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Selezionato</string>
+    <plurals name="unread_messages_count">
+        <item quantity="one">%1$d messaggio non letto</item>
+        <item quantity="other">%1$d messaggi non letti</item>
+    </plurals>
 </resources>

@@ -49,6 +49,9 @@
     <string name="leave">Покинуть</string>
     <string name="couldnt_load_conversation">Не удалось загрузить беседу</string>
     <string name="no_messages_yet">Пока нет сообщений</string>
+    <string name="chat_row_draft_prefix">Черновик: </string>
+    <string name="jump_to_newest">К новым</string>
+    <string name="discard_failed_message">Удалить неотправленное сообщение</string>
     <string name="invited_to_this_chat">Вас пригласили в этот чат.</string>
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>
@@ -324,4 +327,10 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Выбрано</string>
+    <plurals name="unread_messages_count">
+        <item quantity="one">%1$d непрочитанное сообщение</item>
+        <item quantity="few">%1$d непрочитанных сообщения</item>
+        <item quantity="many">%1$d непрочитанных сообщений</item>
+        <item quantity="other">%1$d непрочитанных сообщений</item>
+    </plurals>
 </resources>
