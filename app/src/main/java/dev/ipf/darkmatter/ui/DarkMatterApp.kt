@@ -1243,7 +1243,10 @@ private fun ConversationScreen(
             isNearBottom(listState, controller.timeline.size, controller.hasMoreBefore || controller.isLoadingOlder)
         }
     }
-    var highestSeenTimelineIndex by remember(chat.id) { mutableStateOf(-1) }
+    // Read high-water mark anchored on `recordedAt` (stable per message)
+    // rather than timeline index — load-older prepends and other inserts
+    // shift indices but never change a record's recordedAt.
+    var highestSeenRecordedAt by remember(chat.id) { mutableStateOf(0uL) }
     val currentHighestVisibleTimelineIndex by remember {
         derivedStateOf {
             val visible = listState.layoutInfo.visibleItemsInfo
@@ -1256,18 +1259,19 @@ private fun ConversationScreen(
         }
     }
     LaunchedEffect(currentHighestVisibleTimelineIndex) {
-        if (currentHighestVisibleTimelineIndex > highestSeenTimelineIndex) {
-            highestSeenTimelineIndex = currentHighestVisibleTimelineIndex
+        val idx = currentHighestVisibleTimelineIndex
+        if (idx < 0) return@LaunchedEffect
+        val seenAt = controller.timeline.getOrNull(idx)?.record?.recordedAt ?: return@LaunchedEffect
+        if (seenAt > highestSeenRecordedAt) {
+            highestSeenRecordedAt = seenAt
         }
     }
     val unreadIncomingCount by remember {
         derivedStateOf {
             if (!initialTimelineAnchored || controller.timeline.isEmpty()) return@derivedStateOf 0
-            val after = highestSeenTimelineIndex + 1
-            if (after >= controller.timeline.size) return@derivedStateOf 0
-            controller.timeline
-                .subList(after.coerceAtLeast(0), controller.timeline.size)
-                .count { it.record.direction == "received" }
+            controller.timeline.count {
+                it.record.direction == "received" && it.record.recordedAt > highestSeenRecordedAt
+            }
         }
     }
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
