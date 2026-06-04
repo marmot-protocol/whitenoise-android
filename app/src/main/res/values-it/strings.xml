@@ -49,6 +49,7 @@
     <string name="leave">Lascia</string>
     <string name="couldnt_load_conversation">Impossibile caricare la conversazione</string>
     <string name="no_messages_yet">Ancora nessun messaggio</string>
+    <string name="chat_row_draft_prefix">Bozza: </string>
     <string name="invited_to_this_chat">Sei stato invitato a questa chat.</string>
     <string name="decline">Rifiuta</string>
     <string name="accept">Accetta</string>

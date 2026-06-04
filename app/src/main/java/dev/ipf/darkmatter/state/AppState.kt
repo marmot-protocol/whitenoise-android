@@ -155,6 +155,8 @@ class DarkMatterAppState(context: Context) {
     private val timelineTimestampOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
     private val recentConversationStateKeys = LinkedHashMap<String, Unit>(16, 0.75f, true)
 
+    val draftStore: DraftStore = DraftStore.forContext(appContext)
+
     private val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mutationsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -170,6 +172,18 @@ class DarkMatterAppState(context: Context) {
 
     val activeAccount: AccountSummaryFfi?
         get() = activeAccountRef?.let { ref -> accounts.firstOrNull { it.label == ref } }
+
+    /** Convenience: return the active account's draft for [groupIdHex], or null. */
+    fun draftFor(groupIdHex: String): String? {
+        val account = activeAccount?.accountIdHex ?: return null
+        return draftStore.get(account, groupIdHex)
+    }
+
+    /** Convenience: write the active account's draft for [groupIdHex]. Empty/blank clears. */
+    fun setDraft(groupIdHex: String, text: String) {
+        val account = activeAccount?.accountIdHex ?: return
+        draftStore.set(account, groupIdHex, text)
+    }
 
     fun marmot(): Marmot = requireNotNull(client) { "Marmot is not initialized" }.marmot
 

@@ -49,6 +49,7 @@
     <string name="leave">離開</string>
     <string name="couldnt_load_conversation">無法載入對話</string>
     <string name="no_messages_yet">尚無訊息</string>
+    <string name="chat_row_draft_prefix">草稿：</string>
     <string name="invited_to_this_chat">您被邀請參加此聊天。</string>
     <string name="decline">拒絕</string>
     <string name="accept">接受</string>

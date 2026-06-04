@@ -49,6 +49,7 @@
     <string name="leave">Leave</string>
     <string name="couldnt_load_conversation">Couldn\'t load conversation</string>
     <string name="no_messages_yet">No messages yet</string>
+    <string name="chat_row_draft_prefix">Draft: </string>
     <string name="invited_to_this_chat">You were invited to this chat.</string>
     <string name="decline">Decline</string>
     <string name="accept">Accept</string>

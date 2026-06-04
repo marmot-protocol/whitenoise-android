@@ -49,6 +49,7 @@
     <string name="leave">Verlassen</string>
     <string name="couldnt_load_conversation">Unterhaltung konnte nicht geladen werden</string>
     <string name="no_messages_yet">Noch keine Nachrichten</string>
+    <string name="chat_row_draft_prefix">Entwurf: </string>
     <string name="invited_to_this_chat">Sie wurden zu diesem Chat eingeladen.</string>
     <string name="decline">Ablehnen</string>
     <string name="accept">Annehmen</string>

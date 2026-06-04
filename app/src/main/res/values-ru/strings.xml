@@ -49,6 +49,7 @@
     <string name="leave">Покинуть</string>
     <string name="couldnt_load_conversation">Не удалось загрузить беседу</string>
     <string name="no_messages_yet">Пока нет сообщений</string>
+    <string name="chat_row_draft_prefix">Черновик: </string>
     <string name="invited_to_this_chat">Вас пригласили в этот чат.</string>
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>

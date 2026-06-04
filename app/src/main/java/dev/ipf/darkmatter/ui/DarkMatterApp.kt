@@ -149,6 +149,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -906,17 +907,20 @@ private fun ChatRow(
             Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         supportingContent = {
+            val draft = appState.draftFor(item.group.groupIdHex)?.takeIf { it.isNotBlank() }
+            val preview = when {
+                item.group.pendingConfirmation -> stringResource(R.string.invitation)
+                draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
+                else -> item.projectedPreviewText(
+                    copy = messageTextCopy,
+                    empty = stringResource(R.string.no_messages_yet),
+                )
+            }
             Text(
-                if (item.group.pendingConfirmation) {
-                    stringResource(R.string.invitation)
-                } else {
-                    item.projectedPreviewText(
-                        copy = messageTextCopy,
-                        empty = stringResource(R.string.no_messages_yet),
-                    )
-                },
+                text = preview,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
             )
         },
         trailingContent = {
@@ -1284,11 +1288,15 @@ private fun ConversationScreen(
         },
         bottomBar = {
             if (controller.error == null && !controller.group.pendingConfirmation) {
+                val groupIdHex = controller.group.groupIdHex
                 ComposerBar(
                     replyingTo = controller.replyingTo,
                     messageTextCopy = messageTextCopy,
                     onCancelReply = { controller.replyingTo = null },
                     onSend = { appState.launchMutation { controller.send(it) } },
+                    initialDraft = appState.draftFor(groupIdHex).orEmpty(),
+                    onDraftChange = { appState.setDraft(groupIdHex, it) },
+                    draftKey = groupIdHex,
                 )
             }
         },
@@ -2274,8 +2282,13 @@ private fun ComposerBar(
     onCancelReply: () -> Unit,
     onSend: (String) -> Unit,
     modifier: Modifier = Modifier,
+    initialDraft: String = "",
+    onDraftChange: (String) -> Unit = {},
+    draftKey: Any? = null,
 ) {
-    var text by remember { mutableStateOf("") }
+    // Keyed on draftKey so switching to a different chat re-hydrates the text
+    // field from that chat's saved draft rather than carrying state across.
+    var text by remember(draftKey) { mutableStateOf(initialDraft) }
     Column(
         modifier
             .fillMaxWidth()
@@ -2305,7 +2318,10 @@ private fun ComposerBar(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = text,
-                onValueChange = { text = it },
+                onValueChange = {
+                    text = it
+                    onDraftChange(it)
+                },
                 modifier = Modifier.weight(1f),
                 placeholder = { Text(stringResource(R.string.message)) },
                 maxLines = 5,
@@ -2326,6 +2342,7 @@ private fun ComposerBar(
                     if (text.isNotBlank()) {
                         onSend(text)
                         text = ""
+                        onDraftChange("")
                     }
                 },
                 modifier = Modifier.size(52.dp),
