@@ -51,6 +51,7 @@
     <string name="no_messages_yet">Ainda não há mensagens</string>
     <string name="chat_row_draft_prefix">Rascunho: </string>
     <string name="jump_to_newest">Ir para a mais recente</string>
+    <string name="discard_failed_message">Descartar mensagem com falha</string>
     <string name="invited_to_this_chat">Você foi convidado para este bate-papo.</string>
     <string name="decline">Recusar</string>
     <string name="accept">Aceitar</string>

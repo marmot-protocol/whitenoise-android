@@ -2103,6 +2103,30 @@ private fun MessageBubble(
                             if (mine) {
                                 OutgoingMessageStatusIcon(item.status, tint = timestampColor)
                             }
+                            if (mine && item.status == MessageStatus.Failed) {
+                                IconButton(
+                                    onClick = { appState.launchMutation { controller.retryFailedSend(item) } },
+                                    modifier = Modifier.size(24.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = stringResource(R.string.retry),
+                                        tint = timestampColor,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { controller.discardFailedSend(item) },
+                                    modifier = Modifier.size(24.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.discard_failed_message),
+                                        tint = timestampColor,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            }
                             MessageActionMenu(
                                 expanded = menuOpen,
                                 canDelete = mine && record.messageIdHex.isNotBlank(),

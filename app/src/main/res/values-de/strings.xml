@@ -51,6 +51,7 @@
     <string name="no_messages_yet">Noch keine Nachrichten</string>
     <string name="chat_row_draft_prefix">Entwurf: </string>
     <string name="jump_to_newest">Zum Neuesten springen</string>
+    <string name="discard_failed_message">Fehlgeschlagene Nachricht verwerfen</string>
     <string name="invited_to_this_chat">Sie wurden zu diesem Chat eingeladen.</string>
     <string name="decline">Ablehnen</string>
     <string name="accept">Annehmen</string>

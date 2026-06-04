@@ -720,6 +720,76 @@ class ConversationController(
         }
     }
 
+    /**
+     * Re-issues a previously-failed outgoing send for [item]. The optimistic
+     * record is updated in-place (preserving its [TimelineMessage.timelineOrder]
+     * so the bubble doesn't visually jump) and transitions Failed -> Pending
+     * while the FFI call is in flight. On success it follows the same
+     * confirmed-id swap path as [send]; on failure it returns to Failed.
+     */
+    suspend fun retryFailedSend(item: TimelineMessage) {
+        if (item.status != MessageStatus.Failed) return
+        val account = conversationAccountRef ?: return
+        val key = item.id
+        val tempId = item.record.messageIdHex
+        val text = item.record.plaintext.takeIf { it.isNotBlank() } ?: return
+        val replyTarget = MessageProjector.replyTargetMessageId(item.record)
+        val refreshedRecord = item.record.copy()
+        val order = item.timelineOrder ?: nextOptimisticTimelineOrder()
+        optimisticMessages[key] = TimelineMessage(
+            key,
+            refreshedRecord,
+            MessageStatus.Pending,
+            timelineOrder = order,
+        )
+        messageById[tempId] = refreshedRecord
+        publishTimelineFromIndexes()
+        try {
+            val summary = if (replyTarget != null) {
+                appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, text) }
+            } else {
+                appState.marmotIo { sendText(account, group.groupIdHex, text) }
+            }
+            val confirmedId = summary.messageIds.firstOrNull() ?: tempId
+            val confirmed = refreshedRecord.copy(messageIdHex = confirmedId)
+            if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
+            optimisticMessages.remove(key)
+            messageById.remove(tempId)
+            if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
+                optimisticMessages["msg:$confirmedId"] = TimelineMessage(
+                    "msg:$confirmedId",
+                    confirmed,
+                    MessageStatus.Sent,
+                    timelineOrder = order,
+                )
+            }
+            publishTimelineFromIndexes()
+        } catch (throwable: Throwable) {
+            optimisticMessages[key] = TimelineMessage(
+                key,
+                refreshedRecord,
+                MessageStatus.Failed,
+                timelineOrder = order,
+            )
+            publishTimelineFromIndexes()
+            appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
+        }
+    }
+
+    /**
+     * Drops a failed outgoing send from the local timeline. Purely client-side
+     * cleanup; the message was never accepted by the relay so there's nothing
+     * to retract.
+     */
+    fun discardFailedSend(item: TimelineMessage) {
+        if (item.status != MessageStatus.Failed) return
+        val key = item.id
+        val tempId = item.record.messageIdHex
+        optimisticMessages.remove(key)
+        messageById.remove(tempId)
+        publishTimelineFromIndexes()
+    }
+
     suspend fun leaveGroup(): Boolean = withMutationLockResult(false) {
         val account = appState.activeAccountRef ?: return false
         if (!canLeaveGroup) {
