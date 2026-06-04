@@ -195,7 +195,9 @@ import dev.ipf.darkmatter.state.MessageStatus
 import dev.ipf.darkmatter.state.OutgoingMessageIndicator
 import dev.ipf.darkmatter.state.RelayListKind
 import dev.ipf.darkmatter.state.TimelineMessage
+import dev.ipf.darkmatter.state.countUnreadIncoming
 import dev.ipf.darkmatter.state.isAcceptableRelayUrl
+import dev.ipf.darkmatter.state.nextReadAnchor
 import dev.ipf.darkmatter.state.outgoingIndicator
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -1264,33 +1266,17 @@ private fun ConversationScreen(
     LaunchedEffect(currentHighestVisibleTimelineIndex) {
         val idx = currentHighestVisibleTimelineIndex
         if (idx < 0) return@LaunchedEffect
-        val candidateId = controller.timeline.getOrNull(idx)?.record?.messageIdHex
-        if (candidateId.isNullOrBlank()) return@LaunchedEffect
-        val current = readAnchorMessageId
-        val advance = if (current == null) {
-            true
-        } else {
-            val anchorIdx = controller.timeline.indexOfFirst { it.record.messageIdHex == current }
-            // Strict positional advance only. Anchor falling out of the
-            // window (e.g. timeline trim) counts as a reset to the new row.
-            anchorIdx < 0 || idx > anchorIdx
-        }
-        if (advance) {
-            readAnchorMessageId = candidateId
-        }
+        // Monotonic advance only — scroll-up keeps the existing anchor so the
+        // read pointer never moves backwards. See [nextReadAnchor].
+        readAnchorMessageId = nextReadAnchor(controller.timeline, readAnchorMessageId, idx)
     }
     val unreadIncomingCount by remember {
         derivedStateOf {
-            if (!initialTimelineAnchored || controller.timeline.isEmpty()) return@derivedStateOf 0
-            val anchorId = readAnchorMessageId
-            val anchorIdx = if (anchorId == null) {
-                -1
+            if (!initialTimelineAnchored) {
+                0
             } else {
-                controller.timeline.indexOfFirst { it.record.messageIdHex == anchorId }
+                countUnreadIncoming(controller.timeline, readAnchorMessageId)
             }
-            controller.timeline
-                .drop(anchorIdx + 1)
-                .count { it.record.direction == "received" }
         }
     }
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)

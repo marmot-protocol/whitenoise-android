@@ -215,6 +215,61 @@ internal fun AppMessageRecordFfi.withRecordedAtOverride(recordedAt: ULong?): App
     return recordedAt?.let { copy(recordedAt = it) } ?: this
 }
 
+/**
+ * Index of the first (oldest) still-unread received message in [timeline]
+ * given the chat-list projection's [unreadCount]. Returns -1 when nothing is
+ * unread, the timeline is empty, or the loaded window holds fewer than
+ * [unreadCount] received messages (caller falls back to the bottom).
+ */
+internal fun firstUnreadReceivedIndex(timeline: List<TimelineMessage>, unreadCount: Int): Int {
+    if (unreadCount <= 0 || timeline.isEmpty()) return -1
+    var seen = 0
+    for (index in timeline.indices.reversed()) {
+        if (timeline[index].record.direction == "received") {
+            seen += 1
+            if (seen == unreadCount) return index
+        }
+    }
+    // The loaded window doesn't contain enough received messages to satisfy
+    // the unread count; signal "use the bottom" rather than the top, since
+    // the read state still advances as the user scrolls.
+    return -1
+}
+
+/**
+ * Count of received messages positioned after the read anchor in [timeline].
+ * A null anchor — or one that has fallen out of the loaded window — is
+ * treated as "nothing read yet", so the count starts from the first row.
+ * Anchoring on a message id (not an index) keeps the count stable when
+ * load-older prepends shift every index by the same offset.
+ */
+internal fun countUnreadIncoming(timeline: List<TimelineMessage>, readAnchorMessageId: String?): Int {
+    if (timeline.isEmpty()) return 0
+    val anchorIdx = readAnchorMessageId?.let { id ->
+        timeline.indexOfFirst { it.record.messageIdHex == id }
+    } ?: -1
+    return timeline.drop(anchorIdx + 1).count { it.record.direction == "received" }
+}
+
+/**
+ * Monotonic read-anchor advance. Returns the candidate row's id (the row at
+ * [candidateIndex]) only when it is strictly deeper than the current anchor's
+ * live position — or when there is no current anchor, or the current anchor
+ * has fallen out of the loaded window. Otherwise returns [currentAnchorId]
+ * unchanged, so scrolling up can never move the read pointer backwards.
+ */
+internal fun nextReadAnchor(
+    timeline: List<TimelineMessage>,
+    currentAnchorId: String?,
+    candidateIndex: Int,
+): String? {
+    val candidateId = timeline.getOrNull(candidateIndex)?.record?.messageIdHex
+    if (candidateId.isNullOrBlank()) return currentAnchorId
+    if (currentAnchorId == null) return candidateId
+    val anchorIdx = timeline.indexOfFirst { it.record.messageIdHex == currentAnchorId }
+    return if (anchorIdx < 0 || candidateIndex > anchorIdx) candidateId else currentAnchorId
+}
+
 data class ConversationControllerCopy(
     val waitingForStream: String = "Waiting for stream...",
     val streamFailedFormat: String = "Stream failed: %1\$s",
@@ -1282,20 +1337,8 @@ class ConversationController(
      * the unread count exceeds the loaded window (caller falls back to the
      * bottom in that case).
      */
-    fun firstUnreadTimelineIndex(unreadCount: Int): Int {
-        if (unreadCount <= 0 || timeline.isEmpty()) return -1
-        var seen = 0
-        for (index in timeline.indices.reversed()) {
-            if (timeline[index].record.direction == "received") {
-                seen += 1
-                if (seen == unreadCount) return index
-            }
-        }
-        // The loaded window doesn't contain enough received messages to
-        // satisfy the unread count; signal "use the bottom" rather than the
-        // top, since the read state will still advance as the user scrolls.
-        return -1
-    }
+    fun firstUnreadTimelineIndex(unreadCount: Int): Int =
+        firstUnreadReceivedIndex(timeline, unreadCount)
 
     private fun pruneConfirmedOptimisticMessages() {
         val projectedIds = timelineRecords.keys.mapTo(mutableSetOf()) { "msg:$it" }
