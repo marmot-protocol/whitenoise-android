@@ -49,6 +49,9 @@
     <string name="leave">退出</string>
     <string name="couldnt_load_conversation">无法加载对话</string>
     <string name="no_messages_yet">暂无消息</string>
+    <string name="chat_row_draft_prefix">草稿：</string>
+    <string name="jump_to_newest">跳到最新</string>
+    <string name="discard_failed_message">丢弃发送失败的消息</string>
     <string name="invited_to_this_chat">您被邀请参加此聊天。</string>
     <string name="decline">拒绝</string>
     <string name="accept">接受</string>
@@ -324,4 +327,7 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">已选择</string>
+    <plurals name="unread_messages_count">
+        <item quantity="other">%1$d 条未读消息</item>
+    </plurals>
 </resources>

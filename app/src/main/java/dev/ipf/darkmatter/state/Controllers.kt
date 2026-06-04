@@ -215,6 +215,61 @@ internal fun AppMessageRecordFfi.withRecordedAtOverride(recordedAt: ULong?): App
     return recordedAt?.let { copy(recordedAt = it) } ?: this
 }
 
+/**
+ * Index of the first (oldest) still-unread received message in [timeline]
+ * given the chat-list projection's [unreadCount]. Returns -1 when nothing is
+ * unread, the timeline is empty, or the loaded window holds fewer than
+ * [unreadCount] received messages (caller falls back to the bottom).
+ */
+internal fun firstUnreadReceivedIndex(timeline: List<TimelineMessage>, unreadCount: Int): Int {
+    if (unreadCount <= 0 || timeline.isEmpty()) return -1
+    var seen = 0
+    for (index in timeline.indices.reversed()) {
+        if (timeline[index].record.direction == "received") {
+            seen += 1
+            if (seen == unreadCount) return index
+        }
+    }
+    // The loaded window doesn't contain enough received messages to satisfy
+    // the unread count; signal "use the bottom" rather than the top, since
+    // the read state still advances as the user scrolls.
+    return -1
+}
+
+/**
+ * Count of received messages positioned after the read anchor in [timeline].
+ * A null anchor — or one that has fallen out of the loaded window — is
+ * treated as "nothing read yet", so the count starts from the first row.
+ * Anchoring on a message id (not an index) keeps the count stable when
+ * load-older prepends shift every index by the same offset.
+ */
+internal fun countUnreadIncoming(timeline: List<TimelineMessage>, readAnchorMessageId: String?): Int {
+    if (timeline.isEmpty()) return 0
+    val anchorIdx = readAnchorMessageId?.let { id ->
+        timeline.indexOfFirst { it.record.messageIdHex == id }
+    } ?: -1
+    return timeline.drop(anchorIdx + 1).count { it.record.direction == "received" }
+}
+
+/**
+ * Monotonic read-anchor advance. Returns the candidate row's id (the row at
+ * [candidateIndex]) only when it is strictly deeper than the current anchor's
+ * live position — or when there is no current anchor, or the current anchor
+ * has fallen out of the loaded window. Otherwise returns [currentAnchorId]
+ * unchanged, so scrolling up can never move the read pointer backwards.
+ */
+internal fun nextReadAnchor(
+    timeline: List<TimelineMessage>,
+    currentAnchorId: String?,
+    candidateIndex: Int,
+): String? {
+    val candidateId = timeline.getOrNull(candidateIndex)?.record?.messageIdHex
+    if (candidateId.isNullOrBlank()) return currentAnchorId
+    if (currentAnchorId == null) return candidateId
+    val anchorIdx = timeline.indexOfFirst { it.record.messageIdHex == currentAnchorId }
+    return if (anchorIdx < 0 || candidateIndex > anchorIdx) candidateId else currentAnchorId
+}
+
 data class ConversationControllerCopy(
     val waitingForStream: String = "Waiting for stream...",
     val streamFailedFormat: String = "Stream failed: %1\$s",
@@ -487,6 +542,10 @@ class ConversationController(
     private val activeStreamIds = mutableSetOf<String>()
     private val removedStreamIds = mutableSetOf<String>()
     private var hasLoadedOlderPages = false
+    // Last message id we successfully marked as read on the Rust side.
+    // Dedupes scroll-driven [markReadUpTo] calls so settling on the same row
+    // doesn't issue redundant FFI hops.
+    private var lastReadMessageId: String? = null
 
     val title: String
         get() = title()
@@ -542,7 +601,9 @@ class ConversationController(
             val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
             val snapshotStreamIds = snapshot?.let { applyTimelinePage(it, replaceWindow = true, updatePagination = true) }.orEmpty()
             initializeReadState(account)
-            markLatestVisibleRead(account)
+            // Don't blanket-mark the absolute newest as read here — the UI
+            // layer now drives mark-read as the user scrolls so partial-read
+            // sessions retain accurate unread counts on the chat list.
 
             val groupStream = appState.marmotIo { subscribeGroupState(account, group.groupIdHex) }
             groupSubscription = groupStream
@@ -586,7 +647,12 @@ class ConversationController(
                                 }
                             }
                         }
-                        markLatestVisibleRead(account)
+                        // Scroll-driven mark-read in the UI layer handles the
+                        // user-visible read pointer. The projection-update
+                        // path no longer force-marks the absolute newest as
+                        // read; if the user is scrolled up reading older
+                        // history, an incoming message must remain unread
+                        // until they actually scroll to it.
                         streamIds.forEach { streamId ->
                             if (activeStreamIds.add(streamId)) {
                                 launch { watchAgentTextStream(account, streamId) }
@@ -718,6 +784,115 @@ class ConversationController(
             deletedMessageIds = deletedMessageIds - target
             appState.present(R.string.toast_couldnt_delete_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
+    }
+
+    // Tracks optimistic ids the user discarded while a retry was in flight.
+    // The retry coroutine consults this set before re-inserting a failed
+    // record, so a discard during retry doesn't get clobbered by the catch
+    // path putting the message back as Failed.
+    private val discardedDuringRetry = mutableSetOf<String>()
+
+    /**
+     * Re-issues a previously-failed outgoing send for [item]. The optimistic
+     * record is updated in-place (preserving its [TimelineMessage.timelineOrder]
+     * so the bubble doesn't visually jump) and transitions Failed -> Pending
+     * while the FFI call is in flight. On success it follows the same
+     * confirmed-id swap path as [send]; on failure it returns to Failed.
+     */
+    suspend fun retryFailedSend(item: TimelineMessage) {
+        val key = item.id
+        // Re-check live state. The captured item.status may be stale if the
+        // user double-taps before recomposition: both taps would see Failed
+        // on the captured argument and both would queue FFI sends. By reading
+        // from optimisticMessages and bailing unless still Failed, the second
+        // tap finds Pending (set by the first tap below) and exits.
+        val current = optimisticMessages[key] ?: return
+        if (current.status != MessageStatus.Failed) return
+        val account = conversationAccountRef ?: return
+        val tempId = current.record.messageIdHex
+        val text = current.record.plaintext.takeIf { it.isNotBlank() } ?: return
+        val replyTarget = MessageProjector.replyTargetMessageId(current.record)
+        val refreshedRecord = current.record.copy()
+        val order = current.timelineOrder ?: nextOptimisticTimelineOrder()
+        discardedDuringRetry.remove(key)
+        optimisticMessages[key] = TimelineMessage(
+            key,
+            refreshedRecord,
+            MessageStatus.Pending,
+            timelineOrder = order,
+        )
+        messageById[tempId] = refreshedRecord
+        publishTimelineFromIndexes()
+        try {
+            val summary = if (replyTarget != null) {
+                appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, text) }
+            } else {
+                appState.marmotIo { sendText(account, group.groupIdHex, text) }
+            }
+            val confirmedId = summary.messageIds.firstOrNull() ?: tempId
+            val confirmed = refreshedRecord.copy(messageIdHex = confirmedId)
+            optimisticMessages.remove(key)
+            messageById.remove(tempId)
+            if (discardedDuringRetry.remove(key)) {
+                // User discarded mid-flight; drop the result entirely.
+                publishTimelineFromIndexes()
+                return
+            }
+            if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
+            if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
+                optimisticMessages["msg:$confirmedId"] = TimelineMessage(
+                    "msg:$confirmedId",
+                    confirmed,
+                    MessageStatus.Sent,
+                    timelineOrder = order,
+                )
+            }
+            publishTimelineFromIndexes()
+        } catch (throwable: Throwable) {
+            if (discardedDuringRetry.remove(key)) {
+                // User discarded mid-flight; don't restore the Failed bubble.
+                optimisticMessages.remove(key)
+                messageById.remove(tempId)
+                publishTimelineFromIndexes()
+                return
+            }
+            optimisticMessages[key] = TimelineMessage(
+                key,
+                refreshedRecord,
+                MessageStatus.Failed,
+                timelineOrder = order,
+            )
+            publishTimelineFromIndexes()
+            appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
+        }
+    }
+
+    /**
+     * Drops a failed outgoing send from the local timeline. Purely client-side
+     * cleanup; the message was never accepted by the relay so there's nothing
+     * to retract. Only tracks the id in [discardedDuringRetry] when status is
+     * Pending (retry in flight); otherwise the set would grow unbounded with
+     * keys no retry coroutine ever consults.
+     */
+    fun discardFailedSend(item: TimelineMessage) {
+        val key = item.id
+        // Re-read live state. If the user taps Retry then Discard before the
+        // bubble recomposes, the captured item.status is still Failed while
+        // the live state has moved to Pending — the Failed branch would
+        // no-op past discardedDuringRetry.add, and the in-flight retry would
+        // re-insert the confirmed message on completion. tempId likewise
+        // comes from the live record because retry refreshes messageIdHex.
+        val current = optimisticMessages[key]
+        val status = current?.status ?: item.status
+        val tempId = current?.record?.messageIdHex ?: item.record.messageIdHex
+        when (status) {
+            MessageStatus.Failed -> Unit
+            MessageStatus.Pending -> discardedDuringRetry.add(key)
+            else -> return
+        }
+        optimisticMessages.remove(key)
+        messageById.remove(tempId)
+        publishTimelineFromIndexes()
     }
 
     suspend fun leaveGroup(): Boolean = withMutationLockResult(false) {
@@ -1140,6 +1315,38 @@ class ConversationController(
             Log.w("DMConversation", "mark read failed for ${group.groupIdHex.take(8)} message=${messageId.take(8)}", it)
         }
     }
+
+    /**
+     * Advance the per-chat read pointer to [messageId]. Called from the UI
+     * layer when the user has actually scrolled past a message; lets the
+     * chat-list unread count decrement incrementally during the session
+     * instead of being zeroed out on chat open.
+     *
+     * Reuses the controller's [lastReadMessageId] dedupe so a quiet scroll
+     * (settled on the same row) doesn't issue redundant FFI hops.
+     */
+    suspend fun markReadUpTo(messageId: String) {
+        val trimmed = messageId.takeIf { it.isNotBlank() } ?: return
+        if (trimmed == lastReadMessageId) return
+        val account = conversationAccountRef ?: return
+        lastReadMessageId = trimmed
+        runCatching {
+            appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, trimmed) }
+        }.onFailure {
+            lastReadMessageId = null
+            Log.w("DMConversation", "mark read failed for ${group.groupIdHex.take(8)} message=${trimmed.take(8)}", it)
+        }
+    }
+
+    /**
+     * Returns the timeline index of the FIRST received message that hasn't
+     * been read yet, given the chat-list-projection's [unreadCount].
+     * Returns -1 when there's nothing unread, the timeline is empty, or
+     * the unread count exceeds the loaded window (caller falls back to the
+     * bottom in that case).
+     */
+    fun firstUnreadTimelineIndex(unreadCount: Int): Int =
+        firstUnreadReceivedIndex(timeline, unreadCount)
 
     private fun pruneConfirmedOptimisticMessages() {
         val projectedIds = timelineRecords.keys.mapTo(mutableSetOf()) { "msg:$it" }
