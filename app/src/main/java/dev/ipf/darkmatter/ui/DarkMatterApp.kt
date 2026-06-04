@@ -207,7 +207,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.LifecycleOwner
@@ -1243,10 +1243,13 @@ private fun ConversationScreen(
             isNearBottom(listState, controller.timeline.size, controller.hasMoreBefore || controller.isLoadingOlder)
         }
     }
-    // Read high-water mark anchored on `recordedAt` (stable per message)
-    // rather than timeline index — load-older prepends and other inserts
-    // shift indices but never change a record's recordedAt.
-    var highestSeenRecordedAt by remember(chat.id) { mutableStateOf(0uL) }
+    // Read anchor stored as the message id of the deepest row the user has
+    // settled on. Looked up live each time so load-older prepends shift both
+    // the candidate and the anchor by the same offset — position comparisons
+    // stay valid. Anchored on id (not recordedAt) to survive same-second
+    // collisions: send() stamps with nowSeconds(), so multiple messages can
+    // share a recordedAt and a strict-`>` filter would under-count.
+    var readAnchorMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     val currentHighestVisibleTimelineIndex by remember {
         derivedStateOf {
             val visible = listState.layoutInfo.visibleItemsInfo
@@ -1261,17 +1264,33 @@ private fun ConversationScreen(
     LaunchedEffect(currentHighestVisibleTimelineIndex) {
         val idx = currentHighestVisibleTimelineIndex
         if (idx < 0) return@LaunchedEffect
-        val seenAt = controller.timeline.getOrNull(idx)?.record?.recordedAt ?: return@LaunchedEffect
-        if (seenAt > highestSeenRecordedAt) {
-            highestSeenRecordedAt = seenAt
+        val candidateId = controller.timeline.getOrNull(idx)?.record?.messageIdHex
+        if (candidateId.isNullOrBlank()) return@LaunchedEffect
+        val current = readAnchorMessageId
+        val advance = if (current == null) {
+            true
+        } else {
+            val anchorIdx = controller.timeline.indexOfFirst { it.record.messageIdHex == current }
+            // Strict positional advance only. Anchor falling out of the
+            // window (e.g. timeline trim) counts as a reset to the new row.
+            anchorIdx < 0 || idx > anchorIdx
+        }
+        if (advance) {
+            readAnchorMessageId = candidateId
         }
     }
     val unreadIncomingCount by remember {
         derivedStateOf {
             if (!initialTimelineAnchored || controller.timeline.isEmpty()) return@derivedStateOf 0
-            controller.timeline.count {
-                it.record.direction == "received" && it.record.recordedAt > highestSeenRecordedAt
+            val anchorId = readAnchorMessageId
+            val anchorIdx = if (anchorId == null) {
+                -1
+            } else {
+                controller.timeline.indexOfFirst { it.record.messageIdHex == anchorId }
             }
+            controller.timeline
+                .drop(anchorIdx + 1)
+                .count { it.record.direction == "received" }
         }
     }
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
@@ -1359,23 +1378,22 @@ private fun ConversationScreen(
         }
     }
 
-    // Scroll-driven read pointer advance. Whenever the user settles on a new
-    // higher-index timeline row, mark that row as read on the Rust side so
-    // the chat-list unread count decrements incrementally. Settle-only
-    // (`!isScrollInProgress`) keeps us from hammering the FFI during scroll.
+    // Scroll-driven read pointer advance. Watches the shared read anchor
+    // (`readAnchorMessageId`) so the FFI only sees IDs that strictly advance
+    // the pointer — scroll-up cannot regress the count. Settle-gated
+    // (`!isScrollInProgress`) avoids per-frame FFI hops while scrolling.
     LaunchedEffect(listState, chat.id) {
         snapshotFlow {
             if (!initialTimelineAnchored || listState.isScrollInProgress) {
-                -1
+                null
             } else {
-                currentHighestVisibleTimelineIndex
+                readAnchorMessageId
             }
         }
-            .filter { it >= 0 }
+            .filterNotNull()
             .distinctUntilChanged()
-            .collect { index ->
-                val messageId = controller.timeline.getOrNull(index)?.record?.messageIdHex
-                if (messageId?.isNotBlank() == true) {
+            .collect { messageId ->
+                if (messageId.isNotBlank()) {
                     controller.markReadUpTo(messageId)
                 }
             }
