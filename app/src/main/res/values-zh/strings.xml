@@ -344,4 +344,25 @@
     <string name="message_status_streaming">流式传输中</string>
     <string name="toast_notification_account_unavailable">该账户已不可用</string>
     <string name="toast_notification_conversation_unavailable">该对话已不可用</string>
+    <string name="attach_image">附加图片</string>
+    <string name="toast_couldnt_decode_image">无法解码该图片</string>
+    <string name="toast_reattach_to_retry_media">重新附加图片以重试</string>
+    <string name="media_uploading">上传中…</string>
+    <string name="media_upload_failed">上传失败</string>
+    <string name="media_tap_to_retry">点按重试</string>
+    <string name="media_tap_to_download">点按下载</string>
+    <string name="media_save">保存</string>
+    <string name="media_saved">已保存到相册</string>
+    <string name="media_save_failed">无法保存图片</string>
+    <string name="close">关闭</string>
+    <string name="add_caption">添加说明…</string>
+    <string name="attach_take_photo">拍照</string>
+    <string name="attach_photo_library">图库</string>
+    <string name="media_auto_download_title">自动下载媒体</string>
+    <string name="media_auto_download_always">始终</string>
+    <string name="media_auto_download_wifi">仅 Wi-Fi</string>
+    <string name="media_auto_download_never">从不</string>
+    <plurals name="media_selected_count">
+        <item quantity="other">已选择 %1$d 张图片</item>
+    </plurals>
 </resources>

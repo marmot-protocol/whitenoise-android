@@ -34,12 +34,23 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -55,12 +66,17 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
@@ -76,6 +92,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Shield
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
@@ -140,6 +157,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
@@ -175,6 +193,9 @@ import dev.ipf.darkmatter.core.AvatarImageLoader
 import dev.ipf.darkmatter.core.DiagnosticFormatter
 import dev.ipf.darkmatter.core.ForensicsExportFileName
 import dev.ipf.darkmatter.core.GroupProjector
+import dev.ipf.darkmatter.media.MediaPipeline
+import dev.ipf.darkmatter.media.MediaReferenceParser
+import dev.ipf.marmotkit.MediaReferenceFfi
 import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MessageProjector
@@ -197,6 +218,7 @@ import dev.ipf.darkmatter.state.ChatsController
 import dev.ipf.darkmatter.state.ConversationControllerCopy
 import dev.ipf.darkmatter.state.ConversationController
 import dev.ipf.darkmatter.state.DarkMatterAppState
+import dev.ipf.darkmatter.state.MediaAutoDownloadPolicy
 import dev.ipf.darkmatter.state.MessageStatus
 import dev.ipf.darkmatter.state.OutgoingMessageIndicator
 import dev.ipf.darkmatter.state.RelayListKind
@@ -322,6 +344,14 @@ private val AppThemeMode.labelRes: Int
         AppThemeMode.System -> R.string.theme_system
         AppThemeMode.Light -> R.string.theme_light
         AppThemeMode.Dark -> R.string.theme_dark
+    }
+
+private val MediaAutoDownloadPolicy.labelRes: Int
+    @StringRes
+    get() = when (this) {
+        MediaAutoDownloadPolicy.Always -> R.string.media_auto_download_always
+        MediaAutoDownloadPolicy.WifiOnly -> R.string.media_auto_download_wifi
+        MediaAutoDownloadPolicy.Never -> R.string.media_auto_download_never
     }
 
 @Composable
@@ -1235,6 +1265,527 @@ private fun NewChatSheet(
 /** Within this many items of the trailing edge counts as "at bottom". */
 private const val ConversationNearBottomItemSlack = 3
 
+/** Fixed height of an in-timeline image bubble — constant across load states
+ *  so async decode never reflows the list (would break the open-time anchor). */
+private val MediaBubbleHeight = 240.dp
+
+/** Saves a nullable Uri across process death (camera capture round-trip). */
+private val NullableUriSaver: Saver<android.net.Uri?, String> = Saver(
+    save = { it?.toString() ?: "" },
+    restore = { s -> s.takeIf { it.isNotEmpty() }?.let(android.net.Uri::parse) },
+)
+
+@Composable
+private fun MediaImageBubble(
+    item: TimelineMessage,
+    reference: MediaReferenceFfi,
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    mine: Boolean,
+) {
+    val record = item.record
+    val key = record.messageIdHex
+    // Seed from the decoded-thumbnail cache so an already-fetched or just-sent
+    // image paints on the first frame — no decode spinner, no visible "reload".
+    var bitmap by remember(key) { mutableStateOf(controller.thumbnailFor(key)?.asImageBitmap()) }
+    var failed by remember(key) { mutableStateOf(false) }
+    var viewerOpen by remember(key) { mutableStateOf(false) }
+    var reloadToken by remember(key) { mutableStateOf(0) }
+    // Auto-download gating (#10): own messages always render (bytes are cached
+    // from the send), incoming honor the policy. Keyed on the policy so
+    // flipping the setting re-gates undownloaded bubbles.
+    var startDownload by remember(key, appState.mediaAutoDownloadPolicy) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia())
+    }
+
+    LaunchedEffect(key, startDownload, reloadToken) {
+        if (bitmap != null) return@LaunchedEffect // already have a decoded thumbnail
+        if (!startDownload) return@LaunchedEffect
+        failed = false
+        try {
+            val data = controller.downloadAttachment(key, reference)
+            // Decode a sampled bitmap sized to the bubble — a full 1920px
+            // image would be a ~14 MB ARGB_8888 bitmap per visible row.
+            val decoded = withContext(Dispatchers.Default) {
+                MediaPipeline.decodeSampledBitmap(data, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+            }
+            if (decoded != null) {
+                controller.cacheThumbnail(key, decoded)
+                bitmap = decoded.asImageBitmap()
+            } else {
+                failed = true
+            }
+        } catch (_: Throwable) {
+            failed = true
+        }
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+        // FIXED height across every state (loading / image / failed / gated) so
+        // the bubble never changes size when the image finishes decoding. A
+        // variable height would reflow the timeline after the open-time
+        // scroll-to-bottom and strand the user mid-list (and cause visible
+        // flips). Full aspect-ratio sizing needs `dim` in the imeta tag (Rust).
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(MediaBubbleHeight),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            val current = bitmap
+            when {
+                current != null -> Image(
+                    bitmap = current,
+                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable { viewerOpen = true },
+                )
+                failed -> MediaBubbleAction(
+                    icon = Icons.Default.BrokenImage,
+                    label = stringResource(R.string.media_tap_to_retry),
+                    onClick = { failed = false; reloadToken++ },
+                )
+                !startDownload -> MediaBubbleAction(
+                    icon = Icons.Default.Download,
+                    label = stringResource(R.string.media_tap_to_download),
+                    onClick = { startDownload = true },
+                )
+                else -> CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+
+    if (viewerOpen) {
+        FullScreenImageViewer(
+            controller = controller,
+            appState = appState,
+            messageIdHex = key,
+            reference = reference,
+            onDismiss = { viewerOpen = false },
+        )
+    }
+}
+
+/** Centered icon+label tap target used for the retry/download bubble states. */
+@Composable
+private fun MediaBubbleAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(onClick = onClick)
+            .wrapContentSize(Alignment.Center)
+            .padding(16.dp),
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(28.dp),
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun MediaPendingPlaceholder(previewBytes: ByteArray?, failed: Boolean) {
+    // The sender holds the local bytes, so preview the actual image while it
+    // uploads, with a centered status overlay (spinner / error) on top.
+    val preview = rememberSampledBitmap(previewBytes)
+    val statusLabel = stringResource(if (failed) R.string.media_upload_failed else R.string.media_uploading)
+    val statusColor = if (failed) MaterialTheme.colorScheme.error else Color.White
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(MediaBubbleHeight),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            preview?.let {
+                Image(
+                    bitmap = it,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                // Scrim so the overlay stays legible over any image.
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)))
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (failed) {
+                    Icon(
+                        Icons.Default.BrokenImage,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(28.dp),
+                    )
+                } else {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 2.dp,
+                        color = if (preview != null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    statusLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (preview != null) statusColor else {
+                        if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** Decode [bytes] to a sampled [ImageBitmap] off the main thread; null while
+ *  decoding or when [bytes] is null/undecodable. */
+@Composable
+private fun rememberSampledBitmap(bytes: ByteArray?): ImageBitmap? {
+    var bitmap by remember(bytes) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(bytes) {
+        bitmap = if (bytes == null) {
+            null
+        } else {
+            withContext(Dispatchers.Default) {
+                MediaPipeline.decodeSampledBitmap(bytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)?.asImageBitmap()
+            }
+        }
+    }
+    return bitmap
+}
+
+@Composable
+private fun FullScreenImageViewer(
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    messageIdHex: String,
+    reference: MediaReferenceFfi,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val savedMessage = stringResource(R.string.media_saved)
+    val saveFailedMessage = stringResource(R.string.media_save_failed)
+    // Decode the full-resolution bitmap for display only. We deliberately don't
+    // keep the raw bytes in Compose state — save/share re-read them from
+    // [ConversationController.downloadAttachment], which is an instant hit on
+    // the app-level cache that already holds this image.
+    var androidBitmap by remember(messageIdHex) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val bitmap = remember(androidBitmap) { androidBitmap?.asImageBitmap() }
+    LaunchedEffect(messageIdHex) {
+        runCatching {
+            val data = controller.downloadAttachment(messageIdHex, reference)
+            androidBitmap = withContext(Dispatchers.Default) {
+                android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size)
+            }
+        }
+    }
+    // Free the multi-MB native buffer when the viewer closes instead of waiting
+    // for GC.
+    DisposableEffect(messageIdHex) {
+        onDispose { androidBitmap?.recycle() }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+        ) {
+            val current = bitmap
+            if (current != null) {
+                var scale by remember { mutableStateOf(1f) }
+                var offset by remember { mutableStateOf(Offset.Zero) }
+                Image(
+                    bitmap = current,
+                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTapGestures(onDoubleTap = { scale = 1f; offset = Offset.Zero })
+                        }
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 5f)
+                                offset = if (scale > 1f) {
+                                    // Clamp pan so the image can't fly off-screen.
+                                    val maxX = (size.width * (scale - 1f)) / 2f
+                                    val maxY = (size.height * (scale - 1f)) / 2f
+                                    Offset(
+                                        (offset.x + pan.x).coerceIn(-maxX, maxX),
+                                        (offset.y + pan.y).coerceIn(-maxY, maxY),
+                                    )
+                                } else {
+                                    Offset.Zero
+                                }
+                            }
+                        }
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offset.x,
+                            translationY = offset.y,
+                        ),
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color.White,
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
+                }
+                Row {
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                // Re-read from the app cache (instant hit) rather
+                                // than holding the bytes in Compose state.
+                                val data = runCatching {
+                                    controller.downloadAttachment(messageIdHex, reference)
+                                }.getOrNull()
+                                val ok = data != null && withContext(Dispatchers.IO) {
+                                    saveImageToGallery(context, data, reference.fileName)
+                                }
+                                // Snackbar lives inside the Dialog so the result
+                                // is visible without dismissing the viewer.
+                                snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
+                            }
+                        },
+                        enabled = bitmap != null,
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = stringResource(R.string.media_save), tint = Color.White)
+                    }
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                runCatching {
+                                    controller.downloadAttachment(messageIdHex, reference)
+                                }.getOrNull()?.let { shareImage(context, it, reference.fileName) }
+                            }
+                        },
+                        enabled = bitmap != null,
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
+                    }
+                }
+            }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding(),
+            )
+        }
+    }
+}
+
+/**
+ * Persist [bytes] to the device gallery (Pictures/DarkMatter). Returns success.
+ * Uses the IS_PENDING dance so other apps never see a half-written entry, and
+ * sanitizes the remote-supplied [fileName] to a basename.
+ */
+private fun saveImageToGallery(
+    context: android.content.Context,
+    bytes: ByteArray,
+    fileName: String,
+): Boolean {
+    val resolver = context.contentResolver
+    val values = android.content.ContentValues().apply {
+        put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, MediaPipeline.safeDisplayName(fileName))
+        put(android.provider.MediaStore.Images.Media.MIME_TYPE, MediaPipeline.RECOMPRESSED_MIME)
+        put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/DarkMatter")
+        put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
+    }
+    val uri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+        ?: return false
+    return try {
+        resolver.openOutputStream(uri).use { out ->
+            if (out == null) throw java.io.IOException("null output stream")
+            out.write(bytes)
+        }
+        values.clear()
+        values.put(android.provider.MediaStore.Images.Media.IS_PENDING, 0)
+        resolver.update(uri, values, null, null)
+        true
+    } catch (_: Throwable) {
+        resolver.delete(uri, null, null) // don't leave a pending orphan
+        false
+    }
+}
+
+/** Share [bytes] via a FileProvider Uri using the system share sheet. */
+private fun shareImage(
+    context: android.content.Context,
+    bytes: ByteArray,
+    fileName: String,
+) {
+    try {
+        val dir = java.io.File(context.cacheDir, "shared_media").apply { mkdirs() }
+        // Unique temp keyed off a sanitized basename — avoids collisions and
+        // path traversal from a remote-supplied filename.
+        val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
+        file.outputStream().use { it.write(bytes) }
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file,
+        )
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = MediaPipeline.RECOMPRESSED_MIME
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(
+            android.content.Intent.createChooser(intent, null).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+    } catch (_: Throwable) {
+        // Best-effort; failure to share is non-fatal.
+    }
+}
+
+/** Create a cache file for a camera capture. Returns null if it can't be made. */
+private fun createImageCaptureFile(context: android.content.Context): java.io.File? {
+    return try {
+        val dir = java.io.File(context.cacheDir, "camera").apply { mkdirs() }
+        java.io.File.createTempFile("capture_", ".jpg", dir)
+    } catch (_: Throwable) {
+        null
+    }
+}
+
+private fun fileProviderUri(context: android.content.Context, file: java.io.File): android.net.Uri =
+    androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+
+/** Best-effort wipe of decrypted media temp files (share + camera) from cache. */
+private fun clearMediaTempFiles(context: android.content.Context) {
+    runCatching { java.io.File(context.cacheDir, "shared_media").deleteRecursively() }
+    runCatching { java.io.File(context.cacheDir, "camera").deleteRecursively() }
+}
+
+/** Decode a downscaled preview bitmap for a local content Uri, off-thread. */
+@Composable
+private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
+    val context = LocalContext.current
+    var bitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(uri) {
+        bitmap = withContext(Dispatchers.Default) {
+            runCatching {
+                val bytes = MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
+                bytes?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
+            }.getOrNull()
+        }
+    }
+    return bitmap
+}
+
+@Composable
+private fun LocalImagePreview(uri: android.net.Uri, modifier: Modifier = Modifier) {
+    val bitmap = rememberLocalPreviewBitmap(uri)
+    Box(modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+        val current = bitmap
+        if (current != null) {
+            Image(
+                bitmap = current,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MediaPreviewSheet(
+    uri: android.net.Uri,
+    onDismiss: () -> Unit,
+    onSend: (caption: String) -> Unit,
+) {
+    var caption by remember { mutableStateOf("") }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            LocalImagePreview(
+                uri = uri,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 320.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = caption,
+                    onValueChange = { caption = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(stringResource(R.string.add_caption)) },
+                    maxLines = 4,
+                )
+                FilledIconButton(onClick = { onSend(caption) }) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        contentDescription = stringResource(R.string.send),
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+    }
+}
+
 @Composable
 private fun UnreadMessagesDivider(count: Int) {
     val text = pluralStringResource(R.plurals.unread_messages_count, count, count)
@@ -1281,6 +1832,22 @@ private fun isNearBottom(
     val olderHeaderCount = if (hasOlderHeader) 1 else 0
     val bottomTimelineIndex = timelineSize + 1 + olderHeaderCount
     return listState.firstVisibleItemIndex >= bottomTimelineIndex - ConversationNearBottomItemSlack
+}
+
+/** Read the user-visible filename a content Uri exposes via OpenableColumns,
+ *  falling back to the Uri's path segment. Null when neither is available. */
+private fun queryDisplayName(
+    contentResolver: android.content.ContentResolver,
+    uri: android.net.Uri,
+): String? {
+    contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val name = cursor.getString(0)
+                if (!name.isNullOrBlank()) return name
+            }
+        }
+    return uri.lastPathSegment
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1366,6 +1933,86 @@ private fun ConversationScreen(
     val messageTextCopy = rememberMessageTextCopy()
     var recentReactionEmojis by remember(context) {
         mutableStateOf(RecentEmojiPreferences.load(context))
+    }
+    // Selected-but-not-yet-sent attachment: when non-null the preview/caption
+    // sheet is shown. Single image per send — the FFI publishes one imeta
+    // reference per kind-9, so album-as-one-message needs Rust support first.
+    var pendingMediaUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    // Survives process death while the camera app is foreground (the result
+    // callback fires into a recreated activity, otherwise the capture is lost).
+    var cameraOutputUri by rememberSaveable(stateSaver = NullableUriSaver) {
+        mutableStateOf<android.net.Uri?>(null)
+    }
+    var cameraOutputFile by remember { mutableStateOf<java.io.File?>(null) }
+
+    // PickVisualMedia uses the system Photo Picker — no READ_MEDIA_IMAGES
+    // permission needed (Android 13+ scopes the picker's own grant); on older
+    // devices it falls back to GET_CONTENT with the same UX.
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) pendingMediaUri = uri
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { success ->
+        val captured = cameraOutputUri
+        if (success && captured != null) {
+            pendingMediaUri = captured
+        } else {
+            cameraOutputFile?.delete() // cancelled — don't leak the empty temp
+        }
+        cameraOutputUri = null
+        cameraOutputFile = null
+    }
+
+    fun launchCameraCapture() {
+        val file = createImageCaptureFile(context)
+        if (file == null) {
+            appState.present(R.string.toast_couldnt_decode_image)
+            return
+        }
+        cameraOutputFile = file
+        val uri = fileProviderUri(context, file)
+        cameraOutputUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    // TakePicture needs no permission of its own, but because CAMERA is declared
+    // in the manifest (for the QR scanner) some OEMs require the runtime grant
+    // before launching the capture intent — request it first if missing.
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) launchCameraCapture() }
+
+    // Decode/compress off the main thread, then hand the image to the controller.
+    fun sendPickedMedia(uri: android.net.Uri, caption: String) {
+        appState.launchMutation {
+            val jpeg = withContext(Dispatchers.Default) {
+                MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
+            }
+            if (jpeg == null) {
+                appState.present(R.string.toast_couldnt_decode_image)
+                return@launchMutation
+            }
+            val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
+            val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
+            controller.sendImageAttachment(
+                jpeg,
+                MediaPipeline.RECOMPRESSED_MIME,
+                fileName,
+                caption.trim().takeIf { it.isNotBlank() },
+            )
+        }
+    }
+
+    // Wipe decrypted share/camera temp files and retained outgoing JPEG bytes
+    // when leaving the conversation so plaintext media doesn't linger.
+    DisposableEffect(Unit) {
+        onDispose {
+            clearMediaTempFiles(context)
+            controller.clearRetainedUploads()
+        }
     }
 
     fun recordReactionEmoji(emoji: String) {
@@ -1548,6 +2195,22 @@ private fun ConversationScreen(
                             listState.animateScrollToItem(lastIndex)
                         }
                     },
+                    onPickFromGallery = {
+                        imagePickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    onCaptureFromCamera = {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.CAMERA,
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (granted) {
+                            launchCameraCapture()
+                        } else {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    },
                 )
             }
         },
@@ -1680,6 +2343,17 @@ private fun ConversationScreen(
                 }
             },
             onDismiss = { confirmLeaveFromTopBar = false },
+        )
+    }
+
+    pendingMediaUri?.let { uri ->
+        MediaPreviewSheet(
+            uri = uri,
+            onDismiss = { pendingMediaUri = null },
+            onSend = { caption ->
+                pendingMediaUri = null
+                sendPickedMedia(uri, caption)
+            },
         )
     }
 }
@@ -2337,10 +3011,45 @@ private fun MessageBubble(
                                 }
                             }
                         }
-                        Text(
-                            displayedBody,
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
+                        val mediaReference = remember(record.tags) {
+                            MediaReferenceParser.parseImetaTag(record.tags)
+                        }
+                        val mediaPendingName = remember(record.tags) {
+                            record.tags
+                                .firstOrNull { it.values.firstOrNull() == "_media_pending" }
+                                ?.values?.getOrNull(1)
+                        }
+                        if (!deleted && mediaReference != null && MediaReferenceParser.isImageMedia(mediaReference)) {
+                            MediaImageBubble(
+                                item = item,
+                                reference = mediaReference,
+                                controller = controller,
+                                appState = appState,
+                                mine = mine,
+                            )
+                        } else if (!deleted && mediaPendingName != null) {
+                            MediaPendingPlaceholder(
+                                previewBytes = controller.pendingMediaBytes(record.messageIdHex),
+                                failed = item.status == MessageStatus.Failed,
+                            )
+                        }
+                        // Suppress the body text when the message is purely an
+                        // attachment with no caption (the placeholder string we
+                        // stuff into the optimistic record is just for fallback
+                        // rendering) or when the media-pending placeholder is
+                        // already showing.
+                        val showBodyText = when {
+                            deleted -> true
+                            mediaPendingName != null -> false
+                            mediaReference != null && displayedBody.isBlank() -> false
+                            else -> true
+                        }
+                        if (showBodyText) {
+                            Text(
+                                displayedBody,
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
                         Row(
                             modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start),
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -2772,7 +3481,10 @@ private fun ComposerBar(
     onDraftChange: (String) -> Unit = {},
     draftKey: Any? = null,
     onAfterSend: () -> Unit = {},
+    onPickFromGallery: (() -> Unit)? = null,
+    onCaptureFromCamera: (() -> Unit)? = null,
 ) {
+    var attachMenuOpen by remember { mutableStateOf(false) }
     // Keyed on draftKey so switching to a different chat re-hydrates the text
     // field from that chat's saved draft rather than carrying state across.
     var text by remember(draftKey) { mutableStateOf(initialDraft) }
@@ -2803,6 +3515,45 @@ private fun ComposerBar(
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (onPickFromGallery != null || onCaptureFromCamera != null) {
+                Box {
+                    IconButton(
+                        onClick = { attachMenuOpen = true },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.AttachFile,
+                            contentDescription = stringResource(R.string.attach_image),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = attachMenuOpen,
+                        onDismissRequest = { attachMenuOpen = false },
+                    ) {
+                        if (onCaptureFromCamera != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.attach_take_photo)) },
+                                leadingIcon = { Icon(Icons.Default.PhotoCamera, contentDescription = null) },
+                                onClick = {
+                                    attachMenuOpen = false
+                                    onCaptureFromCamera()
+                                },
+                            )
+                        }
+                        if (onPickFromGallery != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.attach_photo_library)) },
+                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                onClick = {
+                                    attachMenuOpen = false
+                                    onPickFromGallery()
+                                },
+                            )
+                        }
+                    }
+                }
+            }
             OutlinedTextField(
                 value = text,
                 onValueChange = {
@@ -3007,6 +3758,17 @@ private fun AppearanceScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
                             title = stringResource(option.labelRes),
                             selected = appState.languageTag == option.tag,
                             onClick = { appState.updateLanguageTag(option.tag) },
+                        )
+                    }
+                }
+            }
+            item {
+                SectionCard(title = stringResource(R.string.media_auto_download_title)) {
+                    MediaAutoDownloadPolicy.entries.forEach { policy ->
+                        SelectableSettingsRow(
+                            title = stringResource(policy.labelRes),
+                            selected = appState.mediaAutoDownloadPolicy == policy,
+                            onClick = { appState.updateMediaAutoDownloadPolicy(policy) },
                         )
                     }
                 }

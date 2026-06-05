@@ -345,4 +345,26 @@
     <string name="message_status_streaming">Transmitindo</string>
     <string name="toast_notification_account_unavailable">Essa conta não está mais disponível</string>
     <string name="toast_notification_conversation_unavailable">Essa conversa não está mais disponível</string>
+    <string name="attach_image">Anexar imagem</string>
+    <string name="toast_couldnt_decode_image">Não foi possível decodificar a imagem</string>
+    <string name="toast_reattach_to_retry_media">Anexe a imagem novamente para tentar de novo</string>
+    <string name="media_uploading">Enviando…</string>
+    <string name="media_upload_failed">Falha no envio</string>
+    <string name="media_tap_to_retry">Toque para tentar novamente</string>
+    <string name="media_tap_to_download">Toque para baixar</string>
+    <string name="media_save">Salvar</string>
+    <string name="media_saved">Salvo na galeria</string>
+    <string name="media_save_failed">Não foi possível salvar a imagem</string>
+    <string name="close">Fechar</string>
+    <string name="add_caption">Adicionar uma legenda…</string>
+    <string name="attach_take_photo">Tirar foto</string>
+    <string name="attach_photo_library">Galeria de fotos</string>
+    <string name="media_auto_download_title">Baixar mídia automaticamente</string>
+    <string name="media_auto_download_always">Sempre</string>
+    <string name="media_auto_download_wifi">Somente no Wi-Fi</string>
+    <string name="media_auto_download_never">Nunca</string>
+    <plurals name="media_selected_count">
+        <item quantity="one">%1$d imagem selecionada</item>
+        <item quantity="other">%1$d imagens selecionadas</item>
+    </plurals>
 </resources>

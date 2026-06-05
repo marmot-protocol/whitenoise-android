@@ -344,4 +344,25 @@
     <string name="message_status_streaming">串流中</string>
     <string name="toast_notification_account_unavailable">該帳戶已無法使用</string>
     <string name="toast_notification_conversation_unavailable">該對話已無法使用</string>
+    <string name="attach_image">附加圖片</string>
+    <string name="toast_couldnt_decode_image">無法解碼該圖片</string>
+    <string name="toast_reattach_to_retry_media">重新附加圖片以重試</string>
+    <string name="media_uploading">上傳中…</string>
+    <string name="media_upload_failed">上傳失敗</string>
+    <string name="media_tap_to_retry">輕觸以重試</string>
+    <string name="media_tap_to_download">輕觸以下載</string>
+    <string name="media_save">儲存</string>
+    <string name="media_saved">已儲存至相簿</string>
+    <string name="media_save_failed">無法儲存圖片</string>
+    <string name="close">關閉</string>
+    <string name="add_caption">新增說明…</string>
+    <string name="attach_take_photo">拍照</string>
+    <string name="attach_photo_library">圖庫</string>
+    <string name="media_auto_download_title">自動下載媒體</string>
+    <string name="media_auto_download_always">一律</string>
+    <string name="media_auto_download_wifi">僅限 Wi-Fi</string>
+    <string name="media_auto_download_never">永不</string>
+    <plurals name="media_selected_count">
+        <item quantity="other">已選擇 %1$d 張圖片</item>
+    </plurals>
 </resources>

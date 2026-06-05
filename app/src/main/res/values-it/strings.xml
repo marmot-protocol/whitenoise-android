@@ -345,4 +345,26 @@
     <string name="message_status_streaming">In streaming</string>
     <string name="toast_notification_account_unavailable">Quell\'account non è più disponibile</string>
     <string name="toast_notification_conversation_unavailable">Quella conversazione non è più disponibile</string>
+    <string name="attach_image">Allega immagine</string>
+    <string name="toast_couldnt_decode_image">Impossibile decodificare l\'immagine</string>
+    <string name="toast_reattach_to_retry_media">Allega di nuovo l\'immagine per riprovare</string>
+    <string name="media_uploading">Caricamento…</string>
+    <string name="media_upload_failed">Caricamento non riuscito</string>
+    <string name="media_tap_to_retry">Tocca per riprovare</string>
+    <string name="media_tap_to_download">Tocca per scaricare</string>
+    <string name="media_save">Salva</string>
+    <string name="media_saved">Salvato nella galleria</string>
+    <string name="media_save_failed">Impossibile salvare l\'immagine</string>
+    <string name="close">Chiudi</string>
+    <string name="add_caption">Aggiungi una didascalia…</string>
+    <string name="attach_take_photo">Scatta foto</string>
+    <string name="attach_photo_library">Galleria foto</string>
+    <string name="media_auto_download_title">Download automatico dei media</string>
+    <string name="media_auto_download_always">Sempre</string>
+    <string name="media_auto_download_wifi">Solo Wi-Fi</string>
+    <string name="media_auto_download_never">Mai</string>
+    <plurals name="media_selected_count">
+        <item quantity="one">%1$d immagine selezionata</item>
+        <item quantity="other">%1$d immagini selezionate</item>
+    </plurals>
 </resources>

@@ -347,4 +347,28 @@
     <string name="message_status_streaming">Потоковая передача</string>
     <string name="toast_notification_account_unavailable">Этот аккаунт больше недоступен</string>
     <string name="toast_notification_conversation_unavailable">Этот разговор больше недоступен</string>
+    <string name="attach_image">Прикрепить изображение</string>
+    <string name="toast_couldnt_decode_image">Не удалось декодировать изображение</string>
+    <string name="toast_reattach_to_retry_media">Прикрепите изображение ещё раз, чтобы повторить</string>
+    <string name="media_uploading">Отправка…</string>
+    <string name="media_upload_failed">Не удалось загрузить</string>
+    <string name="media_tap_to_retry">Нажмите, чтобы повторить</string>
+    <string name="media_tap_to_download">Нажмите, чтобы скачать</string>
+    <string name="media_save">Сохранить</string>
+    <string name="media_saved">Сохранено в галерею</string>
+    <string name="media_save_failed">Не удалось сохранить изображение</string>
+    <string name="close">Закрыть</string>
+    <string name="add_caption">Добавить подпись…</string>
+    <string name="attach_take_photo">Сделать фото</string>
+    <string name="attach_photo_library">Фотогалерея</string>
+    <string name="media_auto_download_title">Автозагрузка медиа</string>
+    <string name="media_auto_download_always">Всегда</string>
+    <string name="media_auto_download_wifi">Только по Wi-Fi</string>
+    <string name="media_auto_download_never">Никогда</string>
+    <plurals name="media_selected_count">
+        <item quantity="one">%1$d изображение выбрано</item>
+        <item quantity="few">%1$d изображения выбрано</item>
+        <item quantity="many">%1$d изображений выбрано</item>
+        <item quantity="other">%1$d изображений выбрано</item>
+    </plurals>
 </resources>
