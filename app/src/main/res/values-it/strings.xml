@@ -338,7 +338,6 @@
     <string name="message_info_message_id">ID messaggio</string>
     <string name="message_info_status">Stato</string>
     <string name="message_info_created_at">Creato</string>
-    <string name="message_info_original_timestamp">Timestamp originale</string>
     <string name="message_status_pending">Invio…</string>
     <string name="message_status_sent">Inviato</string>
     <string name="message_status_received">Ricevuto</string>

@@ -338,7 +338,6 @@
     <string name="message_info_message_id">Mesaj kimliği</string>
     <string name="message_info_status">Durum</string>
     <string name="message_info_created_at">Oluşturuldu</string>
-    <string name="message_info_original_timestamp">Orijinal zaman damgası</string>
     <string name="message_status_pending">Gönderiliyor…</string>
     <string name="message_status_sent">Gönderildi</string>
     <string name="message_status_received">Alındı</string>

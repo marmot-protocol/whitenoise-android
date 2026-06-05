@@ -337,7 +337,6 @@
     <string name="message_info_message_id">訊息 ID</string>
     <string name="message_info_status">狀態</string>
     <string name="message_info_created_at">已建立</string>
-    <string name="message_info_original_timestamp">原始時間戳記</string>
     <string name="message_status_pending">傳送中…</string>
     <string name="message_status_sent">已傳送</string>
     <string name="message_status_received">已接收</string>

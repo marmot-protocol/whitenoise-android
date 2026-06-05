@@ -2516,8 +2516,12 @@ private fun MessageInfoSheet(
                 )
             }
             if (formattedOriginalTimestamp.isNotBlank()) {
+                // Sender's claimed send time. Suppressed when it matches the
+                // local Received time within the skew tolerance — see
+                // shouldShowOriginalTimestamp — so the row only appears when
+                // it adds information.
                 MessageInfoRow(
-                    label = stringResource(R.string.message_info_original_timestamp),
+                    label = stringResource(R.string.message_info_sent_at),
                     value = formattedOriginalTimestamp,
                 )
             }
