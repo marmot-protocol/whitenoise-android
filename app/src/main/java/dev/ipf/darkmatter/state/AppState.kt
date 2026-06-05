@@ -129,6 +129,24 @@ class DarkMatterAppState(context: Context) {
         sizeOf = { it.allocationByteCount },
     )
 
+    /**
+     * Persistent (L2) cache of decrypted attachment bytes. Survives process
+     * restart so re-opening a chat after a kill doesn't re-download every
+     * visible image. Sits behind [mediaPlaintextCache] (L1):
+     *
+     *   L1 hit → return
+     *   L2 hit → hydrate L1, return
+     *   miss   → FFI download, store in both
+     *
+     * Lives in `cacheDir/decrypted-media/` — Android's not-backed-up cache
+     * surface. Sign-out wipes it alongside L1 so account A's plaintext
+     * doesn't linger on disk after switching to account B.
+     */
+    internal val diskMediaCache = dev.ipf.darkmatter.media.DiskByteCache(
+        cacheDir = java.io.File(appContext.cacheDir, "decrypted-media"),
+        maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
+    )
+
     private var client: MarmotClient? = null
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
 
@@ -399,6 +417,11 @@ class DarkMatterAppState(context: Context) {
         // simply re-downloads — no durable state is lost.
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
+        // Disk wipe is potentially many file deletes — push to IO so we
+        // don't stall the sign-out tap on slow storage. Account A's
+        // plaintext is unreachable the instant L1 clears; the on-disk
+        // bytes are scheduled for removal moments later.
+        notificationScope.launch(Dispatchers.IO) { diskMediaCache.clear() }
         val next = accounts.firstOrNull { it.label != activeAccountRef }?.label
         activeAccountRef = next
         preferences.edit().apply {
@@ -937,6 +960,10 @@ class DarkMatterAppState(context: Context) {
         // ~48 MiB of decoded thumbnails (sampled to <=1280px). Enough to keep
         // visible bubbles spinner-free; bounded so it can't grow unbounded.
         private const val MEDIA_THUMBNAIL_CACHE_MAX_BYTES: Long = 48L * 1024L * 1024L
+        // ~256 MiB of persistent decrypted media on disk. Big enough to keep
+        // typical chat history through OS cache reaps; OS may still trim
+        // earlier if device-wide cache pressure hits.
+        private const val DISK_MEDIA_CACHE_MAX_BYTES: Long = 256L * 1024L * 1024L
         private const val LANGUAGE_TAG_KEY = "language_tag"
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
         private const val MAX_RETAINED_CONVERSATION_STATES = 32

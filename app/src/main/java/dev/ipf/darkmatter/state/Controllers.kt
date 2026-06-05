@@ -187,18 +187,31 @@ internal fun optimisticMessageIdForProjection(
     projected: AppMessageRecordFfi,
     allowDelayedProjection: Boolean = false,
 ): String? {
+    val projectedIsMedia = projected.tags.any { it.values.firstOrNull() == "imeta" }
     return optimisticMessages.firstOrNull { optimistic ->
-        (optimistic.status == MessageStatus.Pending || optimistic.status == MessageStatus.Sent) &&
-            optimistic.record.direction == projected.direction &&
-            optimistic.record.groupIdHex == projected.groupIdHex &&
-            optimistic.record.sender == projected.sender &&
-            optimistic.record.plaintext == projected.plaintext &&
-            optimistic.record.kind == projected.kind &&
-            optimistic.record.tags == projected.tags &&
-            (
-                timestampsAreNear(optimistic.record.recordedAt, projected.recordedAt) ||
-                    allowDelayedProjection && projected.recordedAt >= optimistic.record.recordedAt
-            )
+        val sendable = optimistic.status == MessageStatus.Pending || optimistic.status == MessageStatus.Sent
+        if (!sendable) return@firstOrNull false
+        if (optimistic.record.direction != projected.direction) return@firstOrNull false
+        if (optimistic.record.groupIdHex != projected.groupIdHex) return@firstOrNull false
+        if (optimistic.record.sender != projected.sender) return@firstOrNull false
+        if (optimistic.record.kind != projected.kind) return@firstOrNull false
+        val timestampsOk = timestampsAreNear(optimistic.record.recordedAt, projected.recordedAt) ||
+            (allowDelayedProjection && projected.recordedAt >= optimistic.record.recordedAt)
+        if (!timestampsOk) return@firstOrNull false
+
+        // Media-pending optimistic ↔ media projection: the pending bubble
+        // carries plaintext = "📎 filename" + the "_media_pending" sentinel
+        // tag, while the projection carries plaintext = caption (often
+        // empty) + the real imeta tag. Plain field-by-field equality won't
+        // match. The sentinel tag on the optimistic side plus an imeta tag
+        // on the projection side, combined with the identity fields above,
+        // uniquely identifies the pending → confirmed pair.
+        val optimisticIsMediaPending = optimistic.record.tags.any { it.values.firstOrNull() == "_media_pending" }
+        if (optimisticIsMediaPending && projectedIsMedia) return@firstOrNull true
+
+        // Standard match for text sends: plaintext + tags equal.
+        optimistic.record.plaintext == projected.plaintext &&
+            optimistic.record.tags == projected.tags
     }?.record?.messageIdHex
 }
 
@@ -903,9 +916,16 @@ class ConversationController(
             // confirmed id so the sender's own bubble renders instantly — no
             // Blossom round-trip and no decode spinner.
             if (confirmedId.isNotEmpty()) {
-                appState.mediaPlaintextCache.put(mediaCacheKey(account, confirmedId), retained.jpegBytes)
+                val confirmedKey = mediaCacheKey(account, confirmedId)
+                appState.mediaPlaintextCache.put(confirmedKey, retained.jpegBytes)
                 MediaPipeline.decodeSampledBitmap(retained.jpegBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)?.let {
-                    appState.mediaThumbnailCache.put(mediaCacheKey(account, confirmedId), it)
+                    appState.mediaThumbnailCache.put(confirmedKey, it)
+                }
+                // Also persist to L2 so own-sent images survive process
+                // restart, matching the receive-path's L2 behaviour.
+                val bytesToPersist = retained.jpegBytes
+                appState.launchMutation {
+                    withContext(Dispatchers.IO) { appState.diskMediaCache.put(confirmedKey, bytesToPersist) }
                 }
             }
             retainedMediaUploads.remove(key)
@@ -1031,12 +1051,27 @@ class ConversationController(
         // ("|group|msg"), which a later sign-in could collide with.
         val account = conversationAccountRef ?: error("no active account")
         val cacheKey = mediaCacheKey(account, messageIdHex)
+        // L1: in-memory LRU (hottest cache, instant return).
         appState.mediaPlaintextCache.get(cacheKey)?.let { return it }
+        // L2: disk LRU (survives process restart). Read off the main thread
+        // since file I/O on big JPEGs can take 5-30ms.
+        val onDisk = withContext(Dispatchers.IO) { appState.diskMediaCache.get(cacheKey) }
+        if (onDisk != null) {
+            appState.mediaPlaintextCache.put(cacheKey, onDisk)
+            return onDisk
+        }
         val result = appState.marmotIo { downloadMedia(account, group.groupIdHex, reference) }
         // Never cache empty plaintext — a zero-byte result would render as a
         // permanent broken image and short-circuit tap-to-retry.
         if (result.plaintext.isNotEmpty()) {
             appState.mediaPlaintextCache.put(cacheKey, result.plaintext)
+            // Persist to L2 in the background. The L1 write above means the
+            // bubble already renders; the disk write only needs to finish
+            // before the user kills the app, which is many seconds away.
+            val plaintext = result.plaintext
+            appState.launchMutation {
+                withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, plaintext) }
+            }
         }
         return result.plaintext
     }
@@ -1052,6 +1087,33 @@ class ConversationController(
     fun cacheThumbnail(messageIdHex: String, bitmap: android.graphics.Bitmap) {
         val account = conversationAccountRef ?: return
         appState.mediaThumbnailCache.put(mediaCacheKey(account, messageIdHex), bitmap)
+    }
+
+    /**
+     * Race-fix for own-sent media bubbles: when an outgoing media projection
+     * arrives and we reconcile it against the pending `_media_pending`
+     * optimistic, we already hold the JPEG bytes in [retainedMediaUploads].
+     * Seed L1 plaintext + decoded thumbnail under the projection's cache
+     * key so the bubble's `LaunchedEffect` finds bytes immediately —
+     * otherwise it would call `downloadAttachment` → empty L1 → empty L2
+     * (background disk write hasn't flushed yet) → re-download from
+     * Blossom, even though we just uploaded the same bytes.
+     *
+     * L2 (disk) write is scheduled in the background, same pattern as
+     * `downloadAttachment`'s post-fetch path.
+     */
+    private fun handoffOwnMediaCacheOnReconcile(optimisticKey: String, projectedMessageIdHex: String) {
+        val retained = retainedMediaUploads.get(optimisticKey) ?: return
+        val account = conversationAccountRef ?: return
+        val cacheKey = mediaCacheKey(account, projectedMessageIdHex)
+        appState.mediaPlaintextCache.put(cacheKey, retained.jpegBytes)
+        MediaPipeline.decodeSampledBitmap(retained.jpegBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)?.let {
+            appState.mediaThumbnailCache.put(cacheKey, it)
+        }
+        val bytesToPersist = retained.jpegBytes
+        appState.launchMutation {
+            withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, bytesToPersist) }
+        }
     }
 
     /**
@@ -1674,7 +1736,33 @@ class ConversationController(
         reconcileOptimistic: Boolean = false,
         allowDelayedProjection: Boolean = false,
     ): AppMessageRecordFfi {
-        val previousItemId = timelineRecords[record.messageIdHex]?.let(::projectedItemId)
+        // Defensive guard against the Rust core re-emitting an identical
+        // record (own-publish + own-relay-echo both fire
+        // `timeline_changes_for_event` for the same kind-9). Without this,
+        // the remove-then-reinsert pair below briefly empties the bubble
+        // from the timeline and Compose renders the "vanished + reappeared"
+        // frame as a visible duplicate flash on large media bubbles.
+        // Upstream fix tracked separately. See docs/design/darkmatter-double-upsert.md.
+        //
+        // Compare on RENDER-RELEVANT fields only. `receivedAt` and other
+        // ephemeral fields differ between the two emits (the Rust core
+        // records them with distinct local timestamps), so full equality
+        // would never fire — but the bubble's content is identical.
+        //
+        // Also require the by-id index to already hold the item, otherwise
+        // renderTimeline (clears timelineItemsById + timelineOrder but not
+        // timelineRecords, then re-calls this fn for each record) would
+        // short-circuit on every record and leave the timeline empty.
+        val existing = timelineRecords[record.messageIdHex]
+        val previousItemId = existing?.let(::projectedItemId)
+        if (
+            existing != null &&
+            recordsRenderEqual(existing, record) &&
+            previousItemId != null &&
+            timelineItemsById.containsKey(previousItemId)
+        ) {
+            return TimelineProjector.toAppMessageRecord(record)
+        }
         if (previousItemId != null) {
             timelineItemsById.remove(previousItemId)
             timelineOrder.remove(previousItemId)
@@ -1691,7 +1779,16 @@ class ConversationController(
             ?.takeIf { reconcileOptimistic }
             ?.let { optimisticId ->
             preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
-            optimisticMessages.remove("msg:$optimisticId")
+            val optimisticKey = "msg:$optimisticId"
+            // Hand off own-sent media bytes from the pending optimistic to
+            // the projection's cache key BEFORE the bubble's LaunchedEffect
+            // can fire and ask Blossom for them. Without this, the projected
+            // bubble starts rendering, finds the thumbnail/plaintext caches
+            // empty for the confirmed messageIdHex, and triggers an FFI
+            // downloadMedia round-trip — re-downloading bytes we literally
+            // just uploaded.
+            handoffOwnMediaCacheOnReconcile(optimisticKey, record.messageIdHex)
+            optimisticMessages.remove(optimisticKey)
             messageById.remove(optimisticId)
         }
         messageById[record.messageIdHex] = actionRecord
@@ -1952,6 +2049,34 @@ class ConversationController(
     }
 
     private fun nowSeconds(): ULong = (System.currentTimeMillis() / 1000L).toULong()
+
+    /**
+     * Whether two timeline records would render the same bubble. Compares
+     * the user-visible fields — id, body, tags (incl. imeta), reply preview,
+     * media descriptor, reactions, direction, sender — and ignores the
+     * ephemeral fields (`receivedAt`, `timelineAt`) that vary between the
+     * Rust core's duplicate emits of the same logical event. Used by the
+     * `upsertProjectedRecord` short-circuit to avoid the remove-then-
+     * reinsert flash on no-op upserts.
+     */
+    private fun recordsRenderEqual(
+        a: TimelineMessageRecordFfi,
+        b: TimelineMessageRecordFfi,
+    ): Boolean {
+        return a.messageIdHex == b.messageIdHex &&
+            a.sourceMessageIdHex == b.sourceMessageIdHex &&
+            a.direction == b.direction &&
+            a.groupIdHex == b.groupIdHex &&
+            a.sender == b.sender &&
+            a.plaintext == b.plaintext &&
+            a.kind == b.kind &&
+            a.tags == b.tags &&
+            a.replyToMessageIdHex == b.replyToMessageIdHex &&
+            a.replyPreview == b.replyPreview &&
+            a.mediaJson == b.mediaJson &&
+            a.agentTextStreamJson == b.agentTextStreamJson &&
+            a.reactions == b.reactions
+    }
 
     private companion object {
         // 32 MiB cap on retained compressed bytes for in-flight/failed
