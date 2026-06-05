@@ -117,7 +117,10 @@ object MediaPipeline {
     ): ByteArray? {
         // Two-pass decode: first read just the bounds so we can decide an
         // inSampleSize, then decode at that sampled size. Avoids a 50MB
-        // bitmap in heap for a 12MP source.
+        // bitmap in heap for a 12MP source. Any I/O or decode failure below
+        // surfaces as null (see the catch) so callers never crash or ship
+        // partial bytes.
+        return try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         contentResolver.openInputStream(uri).use { stream ->
             stream ?: return null
@@ -142,10 +145,22 @@ object MediaPipeline {
             }
         } else decoded
 
-        return ByteArrayOutputStream().use { out ->
-            scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)
+        try {
+            ByteArrayOutputStream().use { out ->
+                // compress() returns false on failure — don't ship partial bytes.
+                if (scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)) {
+                    out.toByteArray()
+                } else {
+                    null
+                }
+            }
+        } finally {
             scaled.recycle()
-            out.toByteArray()
+        }
+        } catch (_: java.io.IOException) {
+            null
+        } catch (_: SecurityException) {
+            null
         }
     }
 

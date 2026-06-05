@@ -43,7 +43,10 @@ object MediaReferenceParser {
             "filename ${reference.fileName}",
             "x ${reference.fileHashHex}",
             "n ${reference.nonceHex}",
-            "v ${reference.version}",
+            // Always emit the canonical version this parser accepts — never
+            // forward an unexpected reference.version that our own validator
+            // (and the Rust receiver) would then reject.
+            "v $VERSION_VALUE",
         ),
     )
 

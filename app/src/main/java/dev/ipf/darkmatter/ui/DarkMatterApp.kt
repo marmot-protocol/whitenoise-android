@@ -1579,7 +1579,7 @@ private fun FullScreenImageViewer(
                                     controller.downloadAttachment(messageIdHex, reference)
                                 }.getOrNull()
                                 val ok = data != null && withContext(Dispatchers.IO) {
-                                    saveImageToGallery(context, data, reference.fileName)
+                                    saveImageToGallery(context, data, reference.fileName, reference.mediaType)
                                 }
                                 // Snackbar lives inside the Dialog so the result
                                 // is visible without dismissing the viewer.
@@ -1595,7 +1595,7 @@ private fun FullScreenImageViewer(
                             scope.launch {
                                 runCatching {
                                     controller.downloadAttachment(messageIdHex, reference)
-                                }.getOrNull()?.let { shareImage(context, it, reference.fileName) }
+                                }.getOrNull()?.let { shareImage(context, it, reference.fileName, reference.mediaType) }
                             }
                         },
                         enabled = bitmap != null,
@@ -1623,11 +1623,14 @@ private fun saveImageToGallery(
     context: android.content.Context,
     bytes: ByteArray,
     fileName: String,
+    mediaType: String,
 ): Boolean {
     val resolver = context.contentResolver
     val values = android.content.ContentValues().apply {
         put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, MediaPipeline.safeDisplayName(fileName))
-        put(android.provider.MediaStore.Images.Media.MIME_TYPE, MediaPipeline.RECOMPRESSED_MIME)
+        // Preserve the attachment's real MIME (a peer may send PNG/WebP/HEIC),
+        // so gallery indexing matches the actual bytes.
+        put(android.provider.MediaStore.Images.Media.MIME_TYPE, mediaType.ifBlank { MediaPipeline.RECOMPRESSED_MIME })
         put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/DarkMatter")
         put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
     }
@@ -1653,6 +1656,7 @@ private fun shareImage(
     context: android.content.Context,
     bytes: ByteArray,
     fileName: String,
+    mediaType: String,
 ) {
     try {
         val dir = java.io.File(context.cacheDir, "shared_media").apply { mkdirs() }
@@ -1666,7 +1670,7 @@ private fun shareImage(
             file,
         )
         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-            type = MediaPipeline.RECOMPRESSED_MIME
+            type = mediaType.ifBlank { MediaPipeline.RECOMPRESSED_MIME }
             putExtra(android.content.Intent.EXTRA_STREAM, uri)
             addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }

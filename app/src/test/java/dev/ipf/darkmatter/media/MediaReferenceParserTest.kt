@@ -205,6 +205,36 @@ class MediaReferenceParserTest {
         listOf(imetaWithOverride("m" to mime)),
     )!!
 
+    @Test
+    fun toImetaTag_roundTripsThroughParser() {
+        val ref = MediaReferenceFfi(
+            url = URL,
+            fileHashHex = SHA256_HEX,
+            nonceHex = NONCE_HEX,
+            fileName = "photo.jpg",
+            mediaType = MIME_JPEG,
+            version = "mip04-v2",
+        )
+        val parsed = MediaReferenceParser.parseImetaTag(listOf(MediaReferenceParser.toImetaTag(ref)))
+        assertEquals(ref, parsed)
+    }
+
+    @Test
+    fun toImetaTag_pinsVersionEvenWhenReferenceVersionIsWrong() {
+        // A stale/foreign version must not produce a tag our own parser rejects.
+        val ref = MediaReferenceFfi(
+            url = URL,
+            fileHashHex = SHA256_HEX,
+            nonceHex = NONCE_HEX,
+            fileName = "photo.jpg",
+            mediaType = MIME_JPEG,
+            version = "mip04-v1",
+        )
+        val tag = MediaReferenceParser.toImetaTag(ref)
+        assertTrue(tag.values.contains("v mip04-v2"))
+        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
+    }
+
     private companion object {
         const val URL = "https://blossom.primal.net/abcdef.bin"
         const val MIME_JPEG = "image/jpeg"

@@ -927,6 +927,9 @@ class ConversationController(
             }
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
+            // Coroutine cancellation (e.g. leaving the screen) is not a send
+            // failure — rethrow so it isn't surfaced as a Failed bubble/toast.
+            if (throwable is CancellationException) throw throwable
             if (discardedDuringRetry.remove(key)) {
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
