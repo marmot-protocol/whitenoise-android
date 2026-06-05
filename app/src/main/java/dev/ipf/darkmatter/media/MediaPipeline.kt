@@ -140,8 +140,13 @@ object MediaPipeline {
             BitmapFactory.decodeStream(stream, null, opts) ?: return null
         }
         val scaled = if (decoded.width != targetW || decoded.height != targetH) {
-            Bitmap.createScaledBitmap(decoded, targetW, targetH, true).also {
-                if (it !== decoded) decoded.recycle()
+            try {
+                Bitmap.createScaledBitmap(decoded, targetW, targetH, true).also {
+                    if (it !== decoded) decoded.recycle()
+                }
+            } catch (t: Throwable) {
+                decoded.recycle() // don't leak the source bitmap on scale failure
+                throw t
             }
         } else decoded
 

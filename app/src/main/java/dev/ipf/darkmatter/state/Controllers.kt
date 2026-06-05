@@ -295,6 +295,10 @@ private class RetainedMediaUpload(
     val mediaType: String,
     val fileName: String,
     val caption: String?,
+    // Set once the Blossom upload succeeds. On a publish-only failure, retry
+    // reuses this reference instead of re-uploading the blob (which would
+    // orphan a duplicate on the Blossom server).
+    var uploadedReference: MediaReferenceFfi? = null,
 )
 
 class ChatsController(private val appState: DarkMatterAppState) {
@@ -851,7 +855,10 @@ class ConversationController(
         }
         discardedDuringRetry.remove(key)
         try {
-            val uploadResult = appState.marmotIo {
+            // Reuse the reference if a prior attempt already uploaded the blob
+            // (publish-only failure) — re-uploading would orphan a duplicate
+            // on the Blossom server.
+            val reference = retained.uploadedReference ?: appState.marmotIo {
                 uploadMedia(
                     account,
                     group.groupIdHex,
@@ -863,8 +870,8 @@ class ConversationController(
                         send = false,
                         blossomServer = null,
                     ),
-                )
-            }
+                ).reference
+            }.also { retained.uploadedReference = it }
             // Discard window #1: blob is uploaded but not yet published. If the
             // user discarded here, bail BEFORE sendMediaReference so we don't
             // publish a kind-9 they cancelled (unlike a published event, an
@@ -877,7 +884,7 @@ class ConversationController(
                 return
             }
             val summary = appState.marmotIo {
-                sendMediaReference(account, group.groupIdHex, uploadResult.reference, retained.caption)
+                sendMediaReference(account, group.groupIdHex, reference, retained.caption)
             }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             optimisticMessages.remove(key)
@@ -915,7 +922,7 @@ class ConversationController(
                     // sent), not the "📎 filename" optimistic placeholder, so
                     // the bridge bubble is identical to the projected one.
                     plaintext = retained.caption.orEmpty(),
-                    tags = listOf(MediaReferenceParser.toImetaTag(uploadResult.reference)),
+                    tags = listOf(MediaReferenceParser.toImetaTag(reference)),
                 )
                 messageById[confirmedId] = confirmedRecord
                 optimisticMessages["msg:$confirmedId"] = TimelineMessage(

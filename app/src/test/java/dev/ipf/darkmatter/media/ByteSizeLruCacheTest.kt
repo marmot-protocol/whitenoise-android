@@ -108,4 +108,14 @@ class ByteSizeLruCacheTest {
         assertEquals(0, cache.size())
         assertEquals(0L, cache.residentBytes())
     }
+
+    @Test
+    fun nonPositiveSizeOf_isClampedSoCapStillBounds() {
+        // A sizeOf returning 0/negative would otherwise never count toward the
+        // cap; each entry is charged >= 1 byte so eviction still bounds size.
+        val cache = ByteSizeLruCache<String, String>(maxBytes = 3, sizeOf = { 0 })
+        repeat(10) { cache.put("k$it", "v$it") }
+        assertTrue("resident should be bounded by cap", cache.residentBytes() <= 3L)
+        assertTrue("size should be bounded by cap", cache.size() <= 3)
+    }
 }

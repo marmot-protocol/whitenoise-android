@@ -1532,9 +1532,24 @@ private fun FullScreenImageViewer(
                             detectTransformGestures { _, pan, zoom, _ ->
                                 scale = (scale * zoom).coerceIn(1f, 5f)
                                 offset = if (scale > 1f) {
-                                    // Clamp pan so the image can't fly off-screen.
-                                    val maxX = (size.width * (scale - 1f)) / 2f
-                                    val maxY = (size.height * (scale - 1f)) / 2f
+                                    // Clamp against the ContentScale.Fit image
+                                    // bounds (letterboxed), not the viewport, so
+                                    // pan can't drift into the empty margins.
+                                    val viewportW = size.width.toFloat()
+                                    val viewportH = size.height.toFloat()
+                                    val imageAspect = current.width.toFloat() / current.height.toFloat()
+                                    val viewportAspect = viewportW / viewportH
+                                    val baseWidth: Float
+                                    val baseHeight: Float
+                                    if (imageAspect > viewportAspect) {
+                                        baseWidth = viewportW
+                                        baseHeight = viewportW / imageAspect
+                                    } else {
+                                        baseHeight = viewportH
+                                        baseWidth = viewportH * imageAspect
+                                    }
+                                    val maxX = ((baseWidth * scale) - viewportW).coerceAtLeast(0f) / 2f
+                                    val maxY = ((baseHeight * scale) - viewportH).coerceAtLeast(0f) / 2f
                                     Offset(
                                         (offset.x + pan.x).coerceIn(-maxX, maxX),
                                         (offset.y + pan.y).coerceIn(-maxY, maxY),
@@ -1941,7 +1956,9 @@ private fun ConversationScreen(
     // Selected-but-not-yet-sent attachment: when non-null the preview/caption
     // sheet is shown. Single image per send — the FFI publishes one imeta
     // reference per kind-9, so album-as-one-message needs Rust support first.
-    var pendingMediaUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var pendingMediaUri by rememberSaveable(stateSaver = NullableUriSaver) {
+        mutableStateOf<android.net.Uri?>(null)
+    }
     // Survives process death while the camera app is foreground (the result
     // callback fires into a recreated activity, otherwise the capture is lost).
     var cameraOutputUri by rememberSaveable(stateSaver = NullableUriSaver) {
@@ -3037,20 +3054,27 @@ private fun MessageBubble(
                                 failed = item.status == MessageStatus.Failed,
                             )
                         }
-                        // Suppress the body text when the message is purely an
-                        // attachment with no caption (the placeholder string we
-                        // stuff into the optimistic record is just for fallback
-                        // rendering) or when the media-pending placeholder is
-                        // already showing.
-                        val showBodyText = when {
-                            deleted -> true
-                            mediaPendingName != null -> false
-                            mediaReference != null && displayedBody.isBlank() -> false
-                            else -> true
+                        // Body text policy:
+                        // - Pending optimistic with an attachment: placeholder
+                        //   composable already renders, suppress text.
+                        // - Confirmed media (imeta tag present): render ONLY
+                        //   the user-typed caption (record.plaintext). Never
+                        //   use displayedBody here — MessageProjector falls
+                        //   back to the imeta filename when the caption is
+                        //   blank, which is the right answer for chat-list
+                        //   previews but wrong for a bubble that's already
+                        //   showing the image inline.
+                        // - Non-media: render displayedBody (covers reactions,
+                        //   deletions, agent streams, plain text).
+                        val bodyTextToRender: String? = when {
+                            deleted -> displayedBody
+                            mediaPendingName != null -> null
+                            mediaReference != null -> record.plaintext.takeIf { it.isNotBlank() }
+                            else -> displayedBody
                         }
-                        if (showBodyText) {
+                        if (bodyTextToRender != null) {
                             Text(
-                                displayedBody,
+                                bodyTextToRender,
                                 style = MaterialTheme.typography.bodyLarge,
                             )
                         }

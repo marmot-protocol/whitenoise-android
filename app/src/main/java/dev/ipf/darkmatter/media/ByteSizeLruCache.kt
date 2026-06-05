@@ -30,10 +30,15 @@ class ByteSizeLruCache<K : Any, V : Any>(
      * promotes the entry to MRU, and evicts LRU entries until total
      * resident bytes are within the cap.
      */
+    // Every entry is charged at least 1 byte: a 0 or negative sizeOf would
+    // break the cap invariant (entries that never count toward eviction), so
+    // the cache could grow without bound. Clamp here, in one place.
+    private fun chargeOf(value: V): Long = sizeOf(value).coerceAtLeast(1).toLong()
+
     fun put(key: K, value: V): V? {
         val previous = entries.put(key, value)
-        if (previous != null) residentBytes -= sizeOf(previous)
-        residentBytes += sizeOf(value)
+        if (previous != null) residentBytes -= chargeOf(previous)
+        residentBytes += chargeOf(value)
         evictUntilUnderCap()
         return previous
     }
@@ -41,7 +46,7 @@ class ByteSizeLruCache<K : Any, V : Any>(
     /** Removes [key] if present, updating byte accounting. Returns the value. */
     fun remove(key: K): V? {
         val removed = entries.remove(key)
-        if (removed != null) residentBytes -= sizeOf(removed)
+        if (removed != null) residentBytes -= chargeOf(removed)
         return removed
     }
 
@@ -62,7 +67,7 @@ class ByteSizeLruCache<K : Any, V : Any>(
         val it = entries.entries.iterator()
         while (it.hasNext() && residentBytes > maxBytes) {
             val eldest = it.next()
-            residentBytes -= sizeOf(eldest.value)
+            residentBytes -= chargeOf(eldest.value)
             it.remove()
         }
     }
