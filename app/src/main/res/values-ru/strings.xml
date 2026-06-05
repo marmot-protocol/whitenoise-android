@@ -333,4 +333,16 @@
         <item quantity="many">%1$d непрочитанных сообщений</item>
         <item quantity="other">%1$d непрочитанных сообщений</item>
     </plurals>
+    <string name="message_info">Сведения о сообщении</string>
+    <string name="message_info_sent_at">Отправлено</string>
+    <string name="message_info_received_at">Получено</string>
+    <string name="message_info_sender">От</string>
+    <string name="message_info_message_id">ID сообщения</string>
+    <string name="message_info_status">Статус</string>
+    <string name="message_info_created_at">Создано</string>
+    <string name="message_status_pending">Отправка…</string>
+    <string name="message_status_sent">Отправлено</string>
+    <string name="message_status_received">Получено</string>
+    <string name="message_status_failed">Ошибка</string>
+    <string name="message_status_streaming">Потоковая передача</string>
 </resources>

@@ -331,4 +331,16 @@
         <item quantity="one">%1$d ungelesene Nachricht</item>
         <item quantity="other">%1$d ungelesene Nachrichten</item>
     </plurals>
+    <string name="message_info">Nachrichteninfo</string>
+    <string name="message_info_sent_at">Gesendet</string>
+    <string name="message_info_received_at">Empfangen</string>
+    <string name="message_info_sender">Von</string>
+    <string name="message_info_message_id">Nachrichten-ID</string>
+    <string name="message_info_status">Status</string>
+    <string name="message_info_created_at">Erstellt</string>
+    <string name="message_status_pending">Wird gesendet …</string>
+    <string name="message_status_sent">Gesendet</string>
+    <string name="message_status_received">Empfangen</string>
+    <string name="message_status_failed">Fehlgeschlagen</string>
+    <string name="message_status_streaming">Wird gestreamt</string>
 </resources>

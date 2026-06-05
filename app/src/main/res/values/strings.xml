@@ -331,4 +331,16 @@
         <item quantity="one">%1$d unread message</item>
         <item quantity="other">%1$d unread messages</item>
     </plurals>
+    <string name="message_info">Message info</string>
+    <string name="message_info_sent_at">Sent</string>
+    <string name="message_info_received_at">Received</string>
+    <string name="message_info_sender">From</string>
+    <string name="message_info_message_id">Message ID</string>
+    <string name="message_info_status">Status</string>
+    <string name="message_info_created_at">Created</string>
+    <string name="message_status_pending">Sending…</string>
+    <string name="message_status_sent">Sent</string>
+    <string name="message_status_received">Received</string>
+    <string name="message_status_failed">Failed</string>
+    <string name="message_status_streaming">Streaming</string>
 </resources>

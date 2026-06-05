@@ -331,4 +331,16 @@
         <item quantity="one">%1$d mensagem não lida</item>
         <item quantity="other">%1$d mensagens não lidas</item>
     </plurals>
+    <string name="message_info">Informações da mensagem</string>
+    <string name="message_info_sent_at">Enviada</string>
+    <string name="message_info_received_at">Recebida</string>
+    <string name="message_info_sender">De</string>
+    <string name="message_info_message_id">ID da mensagem</string>
+    <string name="message_info_status">Status</string>
+    <string name="message_info_created_at">Criada</string>
+    <string name="message_status_pending">Enviando…</string>
+    <string name="message_status_sent">Enviada</string>
+    <string name="message_status_received">Recebida</string>
+    <string name="message_status_failed">Falhou</string>
+    <string name="message_status_streaming">Transmitindo</string>
 </resources>

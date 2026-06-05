@@ -86,6 +86,7 @@ class LocalizationResourceTest {
             "language_turkish",
             "live",
             "message",
+            "message_info_status",
             "mls",
             "nip_05",
             "nip_65",

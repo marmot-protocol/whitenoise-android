@@ -330,4 +330,16 @@
     <plurals name="unread_messages_count">
         <item quantity="other">%1$d 則未讀訊息</item>
     </plurals>
+    <string name="message_info">訊息資訊</string>
+    <string name="message_info_sent_at">傳送時間</string>
+    <string name="message_info_received_at">接收時間</string>
+    <string name="message_info_sender">傳送者</string>
+    <string name="message_info_message_id">訊息 ID</string>
+    <string name="message_info_status">狀態</string>
+    <string name="message_info_created_at">已建立</string>
+    <string name="message_status_pending">傳送中…</string>
+    <string name="message_status_sent">已傳送</string>
+    <string name="message_status_received">已接收</string>
+    <string name="message_status_failed">失敗</string>
+    <string name="message_status_streaming">串流中</string>
 </resources>
