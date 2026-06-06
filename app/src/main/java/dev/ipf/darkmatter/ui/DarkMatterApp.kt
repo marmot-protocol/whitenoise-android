@@ -647,26 +647,40 @@ private fun MainShell(
         if (appState.accounts.isEmpty()) return@LaunchedEffect // accounts not loaded yet
         val chatListReady = chatsController.boundAccountRef == target.accountRef &&
             !chatsController.isLoading
+        // Archived conversations still exist — include them so an archived
+        // group isn't treated as a missing conversation.
+        val allChats = chatsController.items + chatsController.archivedItems
         val step = resolveNotificationNav(
             target = target,
             knownAccountRefs = appState.accounts.mapTo(mutableSetOf()) { it.label },
             activeAccountRef = appState.activeAccountRef,
             chatListReady = chatListReady,
-            availableGroupIds = chatsController.items.mapTo(mutableSetOf()) { it.group.groupIdHex },
+            availableGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex },
         )
+        fun fallBackToChatList() {
+            sectionName = MainSection.Chats.name
+            settingsDetailName = null
+            selectedChat = null
+        }
         when (step) {
             is NotificationNavStep.SwitchAccount -> appState.setActiveAccount(step.accountRef)
             NotificationNavStep.AwaitChatList -> Unit // re-fires when list state settles
             is NotificationNavStep.OpenConversation -> {
-                chatsController.items.firstOrNull { it.group.groupIdHex == step.groupIdHex }
+                // Ensure we're on the Chats section so back-from-conversation
+                // lands on the chat list, not whatever section was open.
+                sectionName = MainSection.Chats.name
+                settingsDetailName = null
+                allChats.firstOrNull { it.group.groupIdHex == step.groupIdHex }
                     ?.let { selectedChat = it }
                 onNotificationTargetHandled(target)
             }
             NotificationNavStep.MissingAccount -> {
+                fallBackToChatList()
                 appState.present(R.string.toast_notification_account_unavailable)
                 onNotificationTargetHandled(target)
             }
             NotificationNavStep.MissingConversation -> {
+                fallBackToChatList()
                 appState.present(R.string.toast_notification_conversation_unavailable)
                 onNotificationTargetHandled(target)
             }

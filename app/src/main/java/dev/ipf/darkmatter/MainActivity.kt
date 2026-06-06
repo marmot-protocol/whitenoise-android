@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
             inboundNotificationTarget = target
             inboundProfilePayload = null
         } else {
+            inboundNotificationTarget = null
             inboundProfilePayload = intent?.dataString
         }
     }
