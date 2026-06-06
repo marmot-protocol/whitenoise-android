@@ -24,6 +24,8 @@ class MarmotClient(
             "wss://relay.damus.io",
             "wss://nos.lol",
             "wss://relay.primal.net",
+            "wss://relay.eu.whitenoise.chat",
+            "wss://relay.us.whitenoise.chat",
         )
     }
 }

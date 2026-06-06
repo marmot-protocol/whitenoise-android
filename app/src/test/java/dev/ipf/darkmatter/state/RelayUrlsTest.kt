@@ -48,4 +48,14 @@ class RelayUrlsTest {
     fun bootstrapRelaysSatisfyRelayUrlValidation() {
         assertEquals(emptyList<String>(), MarmotClient.bootstrapRelays.filterNot(::isAcceptableRelayUrl))
     }
+
+    @Test
+    fun bootstrapRelaysIncludeWhiteNoiseRegionalRelays() {
+        val expected = listOf(
+            "wss://relay.eu.whitenoise.chat",
+            "wss://relay.us.whitenoise.chat",
+        )
+
+        assertEquals(emptyList<String>(), expected.filterNot(MarmotClient.bootstrapRelays::contains))
+    }
 }
