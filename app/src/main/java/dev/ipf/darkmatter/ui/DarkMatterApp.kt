@@ -257,9 +257,9 @@ import dev.ipf.marmotkit.RelayHealthFfi
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.MarmotKitException
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -5107,12 +5107,13 @@ private fun keyPackageSourceLabels(
     return out
 }
 
-private val publishedAtFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+private val publishedAtFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.getDefault()).withZone(ZoneId.systemDefault())
 
 private fun formatPublishedAt(unixSeconds: ULong, unknown: String, format: String): String {
     if (unixSeconds == 0uL) return unknown
-    val millis = unixSeconds.toLong() * 1000L
-    return String.format(format, publishedAtFormatter.format(Date(millis)))
+    val instant = Instant.ofEpochSecond(unixSeconds.toLong())
+    return String.format(format, publishedAtFormatter.format(instant))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
