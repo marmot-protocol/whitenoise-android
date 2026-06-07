@@ -13,7 +13,7 @@ object ProfileSanitizer {
 
     fun messageBody(raw: String): String {
         val clamped = stripUnsafe(raw).replace(Regex("\n{3,}"), "\n\n").trim()
-        return clamped.take(MAX_MESSAGE_LENGTH)
+        return safeTake(clamped, MAX_MESSAGE_LENGTH)
     }
 
     fun imageUrl(raw: String?): String? {
@@ -30,15 +30,25 @@ object ProfileSanitizer {
             .split(Regex("\\s+"))
             .filter { it.isNotBlank() }
             .joinToString(" ")
-        return collapsed.takeIf { it.isNotEmpty() }?.take(maxLength)
+        return collapsed.takeIf { it.isNotEmpty() }?.let { safeTake(it, maxLength) }
     }
 
     private fun multiline(raw: String?, maxLength: Int): String? {
         val cleaned = stripUnsafe(raw ?: "").trim()
-        return cleaned.takeIf { it.isNotEmpty() }?.take(maxLength)
+        return cleaned.takeIf { it.isNotEmpty() }?.let { safeTake(it, maxLength) }
     }
 
-    private fun stripUnsafe(value: String): String {
+    // `String.take(n)` counts UTF-16 code units, so a cap of 80 silently
+    // becomes 40 for an emoji-heavy name and can also split a surrogate pair
+    // at the boundary. Truncate by code points instead so MAX_NAME_LENGTH and
+    // friends mean the same number of grapheme bases regardless of plane.
+    private fun safeTake(value: String, maxLength: Int): String {
+        if (value.codePointCount(0, value.length) <= maxLength) return value
+        val end = value.offsetByCodePoints(0, maxLength)
+        return value.substring(0, end)
+    }
+
+    fun stripUnsafe(value: String): String {
         return buildString(value.length) {
             value.forEach { char ->
                 when {
