@@ -38,13 +38,14 @@ object ProfileSanitizer {
         return cleaned.takeIf { it.isNotEmpty() }?.let { safeTake(it, maxLength) }
     }
 
-    // `String.take(n)` counts UTF-16 code units, so a cut at an odd boundary
-    // inside a surrogate pair leaves a dangling high surrogate (invalid UTF-16).
-    // Drop the trailing high surrogate when the cap would split a pair.
+    // `String.take(n)` counts UTF-16 code units, so a cap of 80 silently
+    // becomes 40 for an emoji-heavy name and can also split a surrogate pair
+    // at the boundary. Truncate by code points instead so MAX_NAME_LENGTH and
+    // friends mean the same number of grapheme bases regardless of plane.
     private fun safeTake(value: String, maxLength: Int): String {
-        if (value.length <= maxLength) return value
-        val taken = value.take(maxLength)
-        return if (taken.lastOrNull()?.isHighSurrogate() == true) taken.dropLast(1) else taken
+        if (value.codePointCount(0, value.length) <= maxLength) return value
+        val end = value.offsetByCodePoints(0, maxLength)
+        return value.substring(0, end)
     }
 
     fun stripUnsafe(value: String): String {
