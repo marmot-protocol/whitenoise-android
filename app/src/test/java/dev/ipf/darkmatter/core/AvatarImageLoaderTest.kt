@@ -37,4 +37,21 @@ class AvatarImageLoaderTest {
         assertEquals(false, isAvatarFailureFresh(expiresAt = 1_000L, nowMillis = 1_000L))
         assertEquals(false, isAvatarFailureFresh(expiresAt = 1_000L, nowMillis = 5_000L))
     }
+
+    @Test
+    fun avatarDecodeSampleSizeAcceptsExactBoundary() {
+        // Source equal to the cap on the long edge — no downscale needed.
+        assertEquals(1, avatarDecodeSampleSize(width = 512, height = 256, maxDimension = 512))
+        assertEquals(1, avatarDecodeSampleSize(width = 512, height = 512, maxDimension = 512))
+    }
+
+    @Test
+    fun avatarDecodeSampleSizeHandlesNonPowerOfTwoRatios() {
+        // 1000 > 512 but 1000/2 = 500 ≤ 512, so sampleSize = 2 satisfies the
+        // cap on the long edge even though the input isn't a clean power-of-
+        // two scale of the maxDimension.
+        assertEquals(2, avatarDecodeSampleSize(width = 1000, height = 1000, maxDimension = 512))
+        // 1500/2 = 750 still > 512; need 1500/4 = 375.
+        assertEquals(4, avatarDecodeSampleSize(width = 1500, height = 1500, maxDimension = 512))
+    }
 }

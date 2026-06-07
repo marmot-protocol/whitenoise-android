@@ -19,6 +19,9 @@ object AvatarImageLoader {
     private const val READ_TIMEOUT_MS = 10_000
     private const val MAX_AVATAR_BYTES = 2 * 1024 * 1024
     private const val MAX_AVATAR_DIMENSION = 512
+    // Bounded redirect chain so a malicious peer can't redirect-loop us.
+    // Real avatar CDNs rarely exceed 1-2 hops; 5 is generous.
+    private const val MAX_REDIRECT_HOPS = 5
     // Byte-budgeted cache. With ~1MB worst-case decoded avatar and typical
     // <400KB, this holds dozens of avatars without unbounded memory growth.
     private const val CACHE_SIZE_BYTES = 16 * 1024 * 1024
@@ -64,8 +67,14 @@ object AvatarImageLoader {
                         failureExpiresAt[url] = System.currentTimeMillis() + FAILURE_TTL_MS
                     }
                     inFlight.remove(url)
+                    // Complete INSIDE the lock so any concurrent `load(url)`
+                    // that enters the synchronized block sees a consistent
+                    // (cache hit OR fresh failure-fresh state OR pending
+                    // entry) — never the gap of "removed from inFlight + not
+                    // yet completed" that would let a second fetch slip in
+                    // for the same URL.
+                    deferred.complete(image)
                 }
-                deferred.complete(image)
             }
             PendingAvatarRequest(deferred)
         }
@@ -91,31 +100,55 @@ object AvatarImageLoader {
     }
 
     private fun fetch(url: String): ImageBitmap? {
-        val connection = URL(url).openConnection() as? HttpURLConnection ?: return null
-        return try {
-            connection.instanceFollowRedirects = true
-            connection.connectTimeout = CONNECT_TIMEOUT_MS
-            connection.readTimeout = READ_TIMEOUT_MS
-            connection.connect()
-            if (connection.url.protocol != "https") return null
-            val contentLength = connection.contentLengthLong
-            if (contentLength > MAX_AVATAR_BYTES) return null
-            val bytes = connection.inputStream.use { input ->
-                val output = ByteArrayOutputStream()
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                var total = 0
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read == -1) break
-                    total += read
-                    if (total > MAX_AVATAR_BYTES) return null
-                    output.write(buffer, 0, read)
+        // Manual redirect handling so we can validate the HTTPS scheme on
+        // EVERY hop. `HttpURLConnection.url` returns the original constructor
+        // URL — not the post-redirect URL — so `instanceFollowRedirects=true`
+        // silently follows an https→http downgrade and the protocol check
+        // afterward is a no-op. Avatar URLs come from remote profile records;
+        // a malicious peer can publish an https URL that 301s to http.
+        var current = url
+        var hops = 0
+        while (true) {
+            val parsed = runCatching { URL(current) }.getOrNull() ?: return null
+            if (parsed.protocol != "https") return null
+            val connection = parsed.openConnection() as? HttpURLConnection ?: return null
+            try {
+                connection.instanceFollowRedirects = false
+                connection.connectTimeout = CONNECT_TIMEOUT_MS
+                connection.readTimeout = READ_TIMEOUT_MS
+                connection.connect()
+                val code = connection.responseCode
+                when {
+                    code in 300..399 -> {
+                        if (hops >= MAX_REDIRECT_HOPS) return null
+                        val location = connection.getHeaderField("Location") ?: return null
+                        current = runCatching { URL(parsed, location).toString() }.getOrNull() ?: return null
+                        hops += 1
+                        // fall through to disconnect + loop continuation
+                    }
+                    code !in 200..299 -> return null
+                    else -> {
+                        val contentLength = connection.contentLengthLong
+                        if (contentLength > MAX_AVATAR_BYTES) return null
+                        val bytes = connection.inputStream.use { input ->
+                            val output = ByteArrayOutputStream()
+                            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                            var total = 0
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read == -1) break
+                                total += read
+                                if (total > MAX_AVATAR_BYTES) return null
+                                output.write(buffer, 0, read)
+                            }
+                            output.toByteArray()
+                        }
+                        return decode(bytes)?.asImageBitmap()
+                    }
                 }
-                output.toByteArray()
+            } finally {
+                connection.disconnect()
             }
-            decode(bytes)?.asImageBitmap()
-        } finally {
-            connection.disconnect()
         }
     }
 
