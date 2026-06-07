@@ -180,6 +180,9 @@ import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ProfileLink
+import dev.ipf.darkmatter.notifications.NotificationNavStep
+import dev.ipf.darkmatter.notifications.NotificationTarget
+import dev.ipf.darkmatter.notifications.resolveNotificationNav
 import dev.ipf.darkmatter.core.ProfileSanitizer
 import dev.ipf.darkmatter.core.QrCodeEncoder
 import dev.ipf.darkmatter.core.RecipientReference
@@ -326,6 +329,8 @@ fun DarkMatterApp(
     appState: DarkMatterAppState,
     inboundProfilePayload: String? = null,
     onProfilePayloadHandled: (String) -> Unit = {},
+    inboundNotificationTarget: NotificationTarget? = null,
+    onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val toast = appState.toast
@@ -357,7 +362,11 @@ fun DarkMatterApp(
             when (val phase = appState.phase) {
                 AppPhase.Bootstrapping -> LoadingScreen()
                 AppPhase.Onboarding -> OnboardingScreen(appState)
-                AppPhase.Ready -> MainShell(appState)
+                AppPhase.Ready -> MainShell(
+                    appState = appState,
+                    inboundNotificationTarget = inboundNotificationTarget,
+                    onNotificationTargetHandled = onNotificationTargetHandled,
+                )
                 is AppPhase.Failed -> FailureScreen(
                     message = phase.message,
                     onRetry = { appState.present(R.string.toast_restarting) },
@@ -598,7 +607,11 @@ private fun SignInContent(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainShell(appState: DarkMatterAppState) {
+private fun MainShell(
+    appState: DarkMatterAppState,
+    inboundNotificationTarget: NotificationTarget? = null,
+    onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
+) {
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedChat by remember { mutableStateOf<ChatListItem?>(null) }
@@ -614,6 +627,64 @@ private fun MainShell(appState: DarkMatterAppState) {
 
     LaunchedEffect(chatsController, appState.activeAccountRef) {
         chatsController.bind(appState.activeAccountRef)
+    }
+
+    // Notification tap routing: switch to the target account if needed, wait
+    // for its chat list, then open the conversation — or fall back to the chat
+    // list with a toast for a stale/removed target. Pure logic in
+    // [resolveNotificationNav]; this effect just acts on each step and re-fires
+    // as account/chat-list state changes.
+    LaunchedEffect(
+        inboundNotificationTarget,
+        appState.activeAccountRef,
+        appState.accounts,
+        chatsController,
+        chatsController.boundAccountRef,
+        chatsController.isLoading,
+        chatsController.items,
+    ) {
+        val target = inboundNotificationTarget ?: return@LaunchedEffect
+        if (appState.accounts.isEmpty()) return@LaunchedEffect // accounts not loaded yet
+        val chatListReady = chatsController.boundAccountRef == target.accountRef &&
+            !chatsController.isLoading
+        // Archived conversations still exist — include them so an archived
+        // group isn't treated as a missing conversation.
+        val allChats = chatsController.items + chatsController.archivedItems
+        val step = resolveNotificationNav(
+            target = target,
+            knownAccountRefs = appState.accounts.mapTo(mutableSetOf()) { it.label },
+            activeAccountRef = appState.activeAccountRef,
+            chatListReady = chatListReady,
+            availableGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex },
+        )
+        fun fallBackToChatList() {
+            sectionName = MainSection.Chats.name
+            settingsDetailName = null
+            selectedChat = null
+        }
+        when (step) {
+            is NotificationNavStep.SwitchAccount -> appState.setActiveAccount(step.accountRef)
+            NotificationNavStep.AwaitChatList -> Unit // re-fires when list state settles
+            is NotificationNavStep.OpenConversation -> {
+                // Ensure we're on the Chats section so back-from-conversation
+                // lands on the chat list, not whatever section was open.
+                sectionName = MainSection.Chats.name
+                settingsDetailName = null
+                allChats.firstOrNull { it.group.groupIdHex == step.groupIdHex }
+                    ?.let { selectedChat = it }
+                onNotificationTargetHandled(target)
+            }
+            NotificationNavStep.MissingAccount -> {
+                fallBackToChatList()
+                appState.present(R.string.toast_notification_account_unavailable)
+                onNotificationTargetHandled(target)
+            }
+            NotificationNavStep.MissingConversation -> {
+                fallBackToChatList()
+                appState.present(R.string.toast_notification_conversation_unavailable)
+                onNotificationTargetHandled(target)
+            }
+        }
     }
 
     DisposableEffect(selectedChat?.id) {

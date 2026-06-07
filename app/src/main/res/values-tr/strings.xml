@@ -343,4 +343,6 @@
     <string name="message_status_received">Alındı</string>
     <string name="message_status_failed">Başarısız</string>
     <string name="message_status_streaming">Aktarılıyor</string>
+    <string name="toast_notification_account_unavailable">Bu hesap artık kullanılamıyor</string>
+    <string name="toast_notification_conversation_unavailable">Bu sohbet artık kullanılamıyor</string>
 </resources>

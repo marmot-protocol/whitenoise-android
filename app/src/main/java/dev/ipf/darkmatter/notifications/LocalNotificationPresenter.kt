@@ -52,12 +52,21 @@ class LocalNotificationPresenter(private val context: Context) {
         }
         ensureChannels()
 
+        val tapIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            // Stamp the navigation target. The unique data URI (from the
+            // notification key) gives each notification a distinct PendingIntent
+            // identity — Android ignores extras when comparing PendingIntents,
+            // so without it a later notification would overwrite an earlier
+            // one's click target.
+            NotificationNavigation.fromUpdate(update)?.let { target ->
+                NotificationNavigation.applyToIntent(this, target, update.notificationKey)
+            }
+        }
         val pendingIntent = PendingIntent.getActivity(
             context,
-            content.notificationId,
-            Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
+            NotificationNavigation.requestCode(update.notificationKey),
+            tapIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val category = when (update.trigger) {

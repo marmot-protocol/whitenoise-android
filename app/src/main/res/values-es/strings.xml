@@ -343,4 +343,6 @@
     <string name="message_status_received">Recibido</string>
     <string name="message_status_failed">Falló</string>
     <string name="message_status_streaming">Transmitiendo</string>
+    <string name="toast_notification_account_unavailable">Esa cuenta ya no está disponible</string>
+    <string name="toast_notification_conversation_unavailable">Esa conversación ya no está disponible</string>
 </resources>

@@ -345,4 +345,6 @@
     <string name="message_status_received">Получено</string>
     <string name="message_status_failed">Ошибка</string>
     <string name="message_status_streaming">Потоковая передача</string>
+    <string name="toast_notification_account_unavailable">Этот аккаунт больше недоступен</string>
+    <string name="toast_notification_conversation_unavailable">Этот разговор больше недоступен</string>
 </resources>

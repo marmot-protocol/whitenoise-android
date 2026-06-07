@@ -292,6 +292,10 @@ class ChatsController(private val appState: DarkMatterAppState) {
         private set
     var error by mutableStateOf<String?>(null)
         private set
+    /** The account this controller is currently bound to (observable so
+     *  notification routing can tell when the right account's list is ready). */
+    var boundAccountRef by mutableStateOf<String?>(null)
+        private set
 
     private var accountRef: String? = null
     private var chatRows = listOf<ChatListRowFfi>()
@@ -300,6 +304,7 @@ class ChatsController(private val appState: DarkMatterAppState) {
     suspend fun bind(accountRef: String?) {
         chatsDebug { "bind account=${accountRef?.take(8)}" }
         this.accountRef = accountRef
+        this.boundAccountRef = accountRef
         chatRows = emptyList()
         groupRecordsById = emptyMap()
         recompute()

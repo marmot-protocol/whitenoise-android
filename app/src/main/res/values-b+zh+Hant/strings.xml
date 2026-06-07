@@ -342,4 +342,6 @@
     <string name="message_status_received">已接收</string>
     <string name="message_status_failed">失敗</string>
     <string name="message_status_streaming">串流中</string>
+    <string name="toast_notification_account_unavailable">該帳戶已無法使用</string>
+    <string name="toast_notification_conversation_unavailable">該對話已無法使用</string>
 </resources>
