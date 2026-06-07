@@ -1315,6 +1315,10 @@ private fun MediaImageBubble(
             } else {
                 failed = true
             }
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            // Composable left composition or key changed — propagate. A
+            // cancelled effect isn't a download failure; the bubble is gone.
+            throw cancel
         } catch (_: Throwable) {
             failed = true
         }
@@ -1491,13 +1495,30 @@ private fun FullScreenImageViewer(
     // [ConversationController.downloadAttachment], which is an instant hit on
     // the app-level cache that already holds this image.
     var androidBitmap by remember(messageIdHex) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var viewerFailed by remember(messageIdHex) { mutableStateOf(false) }
+    var viewerReloadToken by remember(messageIdHex) { mutableStateOf(0) }
     val bitmap = remember(androidBitmap) { androidBitmap?.asImageBitmap() }
-    LaunchedEffect(messageIdHex) {
-        runCatching {
+    LaunchedEffect(messageIdHex, viewerReloadToken) {
+        viewerFailed = false
+        try {
             val data = controller.downloadAttachment(messageIdHex, reference)
-            androidBitmap = withContext(Dispatchers.Default) {
-                android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size)
+            // Bounded sampled decode. A 5000px remote image decoded full-size
+            // is ~100 MB ARGB_8888 and OOMs mid-class devices; the viewer
+            // ceiling caps that while keeping quality high enough on phones.
+            val decoded = withContext(Dispatchers.Default) {
+                MediaPipeline.decodeSampledBitmap(data, MediaPipeline.VIEWER_MAX_EDGE_PX)
             }
+            if (decoded != null) {
+                androidBitmap = decoded
+            } else {
+                viewerFailed = true
+            }
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            // Composable left composition or key changed — propagate. Don't
+            // mark a failure state for a viewer that's no longer on-screen.
+            throw cancel
+        } catch (_: Throwable) {
+            viewerFailed = true
         }
     }
     // Free the multi-MB native buffer when the viewer closes instead of waiting
@@ -1566,6 +1587,26 @@ private fun FullScreenImageViewer(
                             translationY = offset.y,
                         ),
                 )
+            } else if (viewerFailed) {
+                Column(
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(
+                        Icons.Default.BrokenImage,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(48.dp),
+                    )
+                    Text(
+                        stringResource(R.string.media_save_failed),
+                        color = Color.White,
+                    )
+                    TextButton(onClick = { viewerReloadToken += 1 }) {
+                        Text(stringResource(R.string.media_tap_to_retry), color = Color.White)
+                    }
+                }
             } else {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
@@ -1764,6 +1805,9 @@ private fun MediaPreviewSheet(
     onSend: (caption: String) -> Unit,
 ) {
     var caption by remember { mutableStateOf("") }
+    // Local guard against a rapid double-tap firing onSend twice before the
+    // parent clears pendingMediaUri and the sheet leaves composition.
+    var sending by remember { mutableStateOf(false) }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -1792,8 +1836,16 @@ private fun MediaPreviewSheet(
                     modifier = Modifier.weight(1f),
                     placeholder = { Text(stringResource(R.string.add_caption)) },
                     maxLines = 4,
+                    enabled = !sending,
                 )
-                FilledIconButton(onClick = { onSend(caption) }) {
+                FilledIconButton(
+                    onClick = {
+                        if (sending) return@FilledIconButton
+                        sending = true
+                        onSend(caption)
+                    },
+                    enabled = !sending,
+                ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Send,
                         contentDescription = stringResource(R.string.send),

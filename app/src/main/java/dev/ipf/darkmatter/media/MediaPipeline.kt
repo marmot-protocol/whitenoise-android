@@ -37,6 +37,14 @@ object MediaPipeline {
     const val THUMBNAIL_MAX_EDGE_PX: Int = 1280
 
     /**
+     * Full-screen viewer decode ceiling. Bounded so a malicious or oversize
+     * remote attachment can't allocate a runaway ARGB_8888 bitmap (a 5000px
+     * image decodes to ~100 MB). 2560px keeps quality high on phone screens
+     * while keeping peak heap use bounded (~25 MB).
+     */
+    const val VIEWER_MAX_EDGE_PX: Int = 2560
+
+    /**
      * Replace whatever extension the source carried with `.jpg`, since the
      * payload is always recompressed to JPEG. Without this swap, the imeta
      * tag would advertise `m=image/png` while the bytes are actually JPEG —
