@@ -695,8 +695,8 @@ class DarkMatterAppState(context: Context) {
     }
 
     fun npub(accountIdHex: String): String {
-        return npubs.getOrPut(accountIdHex) {
-            runCatching { marmot().npub(accountIdHex) }.getOrNull() ?: accountIdHex
+        return npubs.computeIfAbsent(accountIdHex) { key ->
+            runCatching { marmot().npub(key) }.getOrNull() ?: key
         }
     }
 
