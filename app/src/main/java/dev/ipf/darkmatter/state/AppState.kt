@@ -39,6 +39,7 @@ import dev.ipf.marmotkit.UserProfileMetadataFfi
 import java.net.IDN
 import java.net.URI
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 sealed interface AppPhase {
     data object Bootstrapping : AppPhase
@@ -188,7 +189,7 @@ class DarkMatterAppState(context: Context) {
     var backgroundConnectionEnabled by mutableStateOf(BackgroundConnectionPreferences.isEnabled(appContext))
         private set
 
-    private val npubs = mutableStateMapOf<String, String>()
+    private val npubs = ConcurrentHashMap<String, String>()
     private var profileRevision by mutableStateOf(0)
     private val profilePresentations = mutableMapOf<String, ProfilePresentation>()
     private val profilePresentationLock = Any()
@@ -694,8 +695,8 @@ class DarkMatterAppState(context: Context) {
     }
 
     fun npub(accountIdHex: String): String {
-        return npubs.getOrPut(accountIdHex) {
-            runCatching { marmot().npub(accountIdHex) }.getOrNull() ?: accountIdHex
+        return npubs.computeIfAbsent(accountIdHex) { key ->
+            runCatching { marmot().npub(key) }.getOrNull() ?: key
         }
     }
 

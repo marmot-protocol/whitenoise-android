@@ -3,6 +3,7 @@ package dev.ipf.darkmatter.notifications
 import android.content.Context
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.IdentityFormatter
+import dev.ipf.darkmatter.core.ProfileSanitizer
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
@@ -59,10 +60,11 @@ object LocalNotificationFormatter {
     }
 
     private fun clean(value: String?): String? {
-        return value
-            ?.replace(Regex("\\s+"), " ")
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
+        if (value == null) return null
+        return ProfileSanitizer.stripUnsafe(value)
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .takeIf { it.isNotEmpty() }
     }
 
     private fun text(context: Context?, resId: Int, fallback: String, vararg args: Any): String {
