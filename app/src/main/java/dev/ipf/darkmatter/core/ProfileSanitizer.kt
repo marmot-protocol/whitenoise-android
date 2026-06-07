@@ -13,7 +13,7 @@ object ProfileSanitizer {
 
     fun messageBody(raw: String): String {
         val clamped = stripUnsafe(raw).replace(Regex("\n{3,}"), "\n\n").trim()
-        return clamped.take(MAX_MESSAGE_LENGTH)
+        return safeTake(clamped, MAX_MESSAGE_LENGTH)
     }
 
     fun imageUrl(raw: String?): String? {
@@ -30,15 +30,24 @@ object ProfileSanitizer {
             .split(Regex("\\s+"))
             .filter { it.isNotBlank() }
             .joinToString(" ")
-        return collapsed.takeIf { it.isNotEmpty() }?.take(maxLength)
+        return collapsed.takeIf { it.isNotEmpty() }?.let { safeTake(it, maxLength) }
     }
 
     private fun multiline(raw: String?, maxLength: Int): String? {
         val cleaned = stripUnsafe(raw ?: "").trim()
-        return cleaned.takeIf { it.isNotEmpty() }?.take(maxLength)
+        return cleaned.takeIf { it.isNotEmpty() }?.let { safeTake(it, maxLength) }
     }
 
-    private fun stripUnsafe(value: String): String {
+    // `String.take(n)` counts UTF-16 code units, so a cut at an odd boundary
+    // inside a surrogate pair leaves a dangling high surrogate (invalid UTF-16).
+    // Drop the trailing high surrogate when the cap would split a pair.
+    private fun safeTake(value: String, maxLength: Int): String {
+        if (value.length <= maxLength) return value
+        val taken = value.take(maxLength)
+        return if (taken.lastOrNull()?.isHighSurrogate() == true) taken.dropLast(1) else taken
+    }
+
+    fun stripUnsafe(value: String): String {
         return buildString(value.length) {
             value.forEach { char ->
                 when {
