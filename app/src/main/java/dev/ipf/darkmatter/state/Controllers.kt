@@ -1976,6 +1976,7 @@ class ConversationController(
             appState.cacheGroupMemberSnapshot(account, group.groupIdHex, loaded)
             appState.requestProfiles(members.map { it.memberIdHex })
         }.onFailure {
+            if (it is CancellationException) throw it
             Log.w("DMConversation", "refresh members failed for ${group.groupIdHex.take(8)}", it)
         }
     }
