@@ -1470,6 +1470,11 @@ class ConversationController(
         val oldest = timelineRecords.values.minWithOrNull(
             compareBy<TimelineMessageRecordFfi> { it.timelineAt }.thenBy { it.messageIdHex },
         ) ?: return false
+        // A previous loadOlderPage failure leaves `error` set; clear it now
+        // that we're actually retrying, otherwise the stale banner sits over
+        // a successful retry and a developer can't distinguish "still broken"
+        // from "we forgot to clear it".
+        error = null
         isLoadingOlder = true
         return try {
             val page = appState.marmotIo {
@@ -1970,6 +1975,8 @@ class ConversationController(
             members = loaded
             appState.cacheGroupMemberSnapshot(account, group.groupIdHex, loaded)
             appState.requestProfiles(members.map { it.memberIdHex })
+        }.onFailure {
+            Log.w("DMConversation", "refresh members failed for ${group.groupIdHex.take(8)}", it)
         }
     }
 
@@ -2032,7 +2039,7 @@ class ConversationController(
             messageIdHex = "stream-$streamId",
             direction = "received",
             groupIdHex = group.groupIdHex,
-            sender = "",
+            sender = inferStreamSender(streamId),
             plaintext = "",
             kind = 1200uL,
             tags = listOf(MessageProjector.streamTag(streamId)),
@@ -2046,6 +2053,21 @@ class ConversationController(
             timelineOrder = existingItem?.timelineOrder ?: nextOptimisticTimelineOrder(),
         )
         publishTimelineFromIndexes()
+    }
+
+    // The authoritative sender for a stream comes from the projected timeline
+    // record (the kind:1200 event that introduced the streamId). If we're
+    // synthesizing a preview record because no projection has landed yet,
+    // walk timelineRecords for a record carrying the same stream tag — that
+    // covers the common case where the kind:1200 event arrived before the
+    // first chunk. Falls back to empty for the genuine cold-start window,
+    // which the projection will overwrite as soon as it lands.
+    private fun inferStreamSender(streamId: String): String {
+        val tagValues = MessageProjector.streamTag(streamId).values
+        return timelineRecords.values
+            .firstOrNull { record -> record.tags.any { it.values == tagValues } }
+            ?.sender
+            .orEmpty()
     }
 
     private fun nowSeconds(): ULong = (System.currentTimeMillis() / 1000L).toULong()
