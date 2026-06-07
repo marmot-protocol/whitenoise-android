@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Temp files we create for camera capture and outgoing share intents. -->
+    <cache-path name="camera" path="camera/" />
+    <cache-path name="shared_media" path="shared_media/" />
+</paths>

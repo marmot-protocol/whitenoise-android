@@ -106,6 +106,47 @@ private fun String.relayHostCandidate(): String? {
 class DarkMatterAppState(context: Context) {
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("darkmatter", Context.MODE_PRIVATE)
+
+    /**
+     * App-lifetime cache of decrypted attachment bytes, keyed by the globally
+     * unique `messageIdHex`. Lives here (not on the per-conversation
+     * controller) so re-opening a chat doesn't re-download media already
+     * fetched this session. Bounded in bytes; see [dev.ipf.darkmatter.media.ByteSizeLruCache].
+     */
+    internal val mediaPlaintextCache = dev.ipf.darkmatter.media.ByteSizeLruCache<String, ByteArray>(
+        maxBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
+        sizeOf = { it.size },
+    )
+
+    /**
+     * App-lifetime cache of *decoded* attachment thumbnails (sampled bitmaps),
+     * keyed identically to [mediaPlaintextCache]. Lets a bubble render its
+     * image on the first frame — no decode spinner — for anything already
+     * fetched/sent this session. Bounded by approximate pixel bytes.
+     */
+    internal val mediaThumbnailCache = dev.ipf.darkmatter.media.ByteSizeLruCache<String, android.graphics.Bitmap>(
+        maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
+        sizeOf = { it.allocationByteCount },
+    )
+
+    /**
+     * Persistent (L2) cache of decrypted attachment bytes. Survives process
+     * restart so re-opening a chat after a kill doesn't re-download every
+     * visible image. Sits behind [mediaPlaintextCache] (L1):
+     *
+     *   L1 hit → return
+     *   L2 hit → hydrate L1, return
+     *   miss   → FFI download, store in both
+     *
+     * Lives in `cacheDir/decrypted-media/` — Android's not-backed-up cache
+     * surface. Sign-out wipes it alongside L1 so account A's plaintext
+     * doesn't linger on disk after switching to account B.
+     */
+    internal val diskMediaCache = dev.ipf.darkmatter.media.DiskByteCache(
+        cacheDir = java.io.File(appContext.cacheDir, "decrypted-media"),
+        maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
+    )
+
     private var client: MarmotClient? = null
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
 
@@ -122,6 +163,11 @@ class DarkMatterAppState(context: Context) {
         private set
 
     var themeMode by mutableStateOf(AppThemeMode.fromPreference(preferences.getString(THEME_MODE_KEY, null)))
+        private set
+
+    var mediaAutoDownloadPolicy by mutableStateOf(
+        MediaAutoDownloadPolicy.fromPreference(preferences.getString(MEDIA_AUTO_DOWNLOAD_KEY, null)),
+    )
         private set
 
     var languageTag by mutableStateOf(preferences.getString(LANGUAGE_TAG_KEY, null).orEmpty())
@@ -349,12 +395,31 @@ class DarkMatterAppState(context: Context) {
     }
 
     fun setActiveAccount(label: String) {
+        // Switching accounts (from the account picker) is a session boundary
+        // identical to sign-out for media-cache purposes: account A's
+        // decrypted bytes must not linger in process memory or on disk after
+        // account B is active. Re-opening a chat under B simply re-downloads.
+        // Skip the wipe when the label is unchanged (no-op tap on the
+        // already-active account) so caches survive a redundant tap.
+        if (label != activeAccountRef) clearMediaCaches()
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
         notificationScope.launch {
             refreshLocalNotificationSettings()
         }
+    }
+
+    /**
+     * Wipe the decrypted-media caches at a session boundary (sign-out or
+     * account switch). L1 (in-memory) clears synchronously so account A's
+     * plaintext is unreachable immediately; L2 (disk) is scheduled to IO
+     * since many file deletes shouldn't stall the UI thread.
+     */
+    private fun clearMediaCaches() {
+        mediaPlaintextCache.clear()
+        mediaThumbnailCache.clear()
+        notificationScope.launch(Dispatchers.IO) { diskMediaCache.clear() }
     }
 
     fun signOutActiveAccount() {
@@ -364,6 +429,14 @@ class DarkMatterAppState(context: Context) {
         // emoji, etc.) MUST persist across this transition. The only correct
         // place to call DraftStore.clearAllForAccount is a real
         // identity-delete flow, which doesn't exist yet.
+        //
+        // Decrypted media is the exception: it's a process-wide in-memory cache
+        // (not per-account persistence), so account A's plaintext images must
+        // not linger in memory after switching to account B. Re-opening a chat
+        // simply re-downloads — no durable state is lost.
+        // Both sign-out and account-switch wipe decrypted-media caches; the
+        // helper centralises the L1-sync + L2-on-IO pattern.
+        clearMediaCaches()
         val next = accounts.firstOrNull { it.label != activeAccountRef }?.label
         activeAccountRef = next
         preferences.edit().apply {
@@ -478,6 +551,29 @@ class DarkMatterAppState(context: Context) {
     fun updateThemeMode(mode: AppThemeMode) {
         themeMode = mode
         preferences.edit().putString(THEME_MODE_KEY, mode.preferenceValue).apply()
+    }
+
+    fun updateMediaAutoDownloadPolicy(policy: MediaAutoDownloadPolicy) {
+        mediaAutoDownloadPolicy = policy
+        preferences.edit().putString(MEDIA_AUTO_DOWNLOAD_KEY, policy.preferenceValue).apply()
+    }
+
+    /**
+     * Whether an incoming attachment should be fetched/decrypted automatically
+     * given the current [mediaAutoDownloadPolicy] and network metering.
+     */
+    fun shouldAutoDownloadMedia(): Boolean {
+        return when (mediaAutoDownloadPolicy) {
+            MediaAutoDownloadPolicy.Always -> true
+            MediaAutoDownloadPolicy.Never -> false
+            MediaAutoDownloadPolicy.WifiOnly -> !isActiveNetworkMetered()
+        }
+    }
+
+    private fun isActiveNetworkMetered(): Boolean {
+        val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            ?: return true // Unknown → treat as metered (conservative).
+        return cm.isActiveNetworkMetered
     }
 
     fun updateLanguageTag(tag: String) {
@@ -872,6 +968,17 @@ class DarkMatterAppState(context: Context) {
         private const val ACTIVE_ACCOUNT_KEY = "active_account"
         private const val DEVELOPER_MODE_KEY = "developer_mode"
         private const val THEME_MODE_KEY = "theme_mode"
+        private const val MEDIA_AUTO_DOWNLOAD_KEY = "media_auto_download"
+        // 24 MiB cap on decrypted attachment bytes resident in memory —
+        // roughly ten 1920px JPEGs. Persists across conversation re-entry.
+        private const val MEDIA_PLAINTEXT_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L
+        // ~48 MiB of decoded thumbnails (sampled to <=1280px). Enough to keep
+        // visible bubbles spinner-free; bounded so it can't grow unbounded.
+        private const val MEDIA_THUMBNAIL_CACHE_MAX_BYTES: Long = 48L * 1024L * 1024L
+        // ~256 MiB of persistent decrypted media on disk. Big enough to keep
+        // typical chat history through OS cache reaps; OS may still trim
+        // earlier if device-wide cache pressure hits.
+        private const val DISK_MEDIA_CACHE_MAX_BYTES: Long = 256L * 1024L * 1024L
         private const val LANGUAGE_TAG_KEY = "language_tag"
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
         private const val MAX_RETAINED_CONVERSATION_STATES = 32

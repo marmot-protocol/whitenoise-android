@@ -345,4 +345,26 @@
     <string name="message_status_streaming">Diffusion</string>
     <string name="toast_notification_account_unavailable">Ce compte n\'est plus disponible</string>
     <string name="toast_notification_conversation_unavailable">Cette conversation n\'est plus disponible</string>
+    <string name="attach_image">Joindre une image</string>
+    <string name="toast_couldnt_decode_image">Impossible de décoder l\'image</string>
+    <string name="toast_reattach_to_retry_media">Joignez à nouveau l\'image pour réessayer</string>
+    <string name="media_uploading">Envoi…</string>
+    <string name="media_upload_failed">Échec de l\'envoi</string>
+    <string name="media_tap_to_retry">Appuyez pour réessayer</string>
+    <string name="media_tap_to_download">Appuyez pour télécharger</string>
+    <string name="media_save">Enregistrer</string>
+    <string name="media_saved">Enregistré dans la galerie</string>
+    <string name="media_save_failed">Impossible d\'enregistrer l\'image</string>
+    <string name="close">Fermer</string>
+    <string name="add_caption">Ajouter une légende…</string>
+    <string name="attach_take_photo">Prendre une photo</string>
+    <string name="attach_photo_library">Photothèque</string>
+    <string name="media_auto_download_title">Téléchargement auto des médias</string>
+    <string name="media_auto_download_always">Toujours</string>
+    <string name="media_auto_download_wifi">Wi-Fi uniquement</string>
+    <string name="media_auto_download_never">Jamais</string>
+    <plurals name="media_selected_count">
+        <item quantity="one">%1$d image sélectionnée</item>
+        <item quantity="other">%1$d images sélectionnées</item>
+    </plurals>
 </resources>

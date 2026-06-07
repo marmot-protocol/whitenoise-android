@@ -345,4 +345,26 @@
     <string name="message_status_streaming">Aktarılıyor</string>
     <string name="toast_notification_account_unavailable">Bu hesap artık kullanılamıyor</string>
     <string name="toast_notification_conversation_unavailable">Bu sohbet artık kullanılamıyor</string>
+    <string name="attach_image">Resim ekle</string>
+    <string name="toast_couldnt_decode_image">Resim çözülemedi</string>
+    <string name="toast_reattach_to_retry_media">Yeniden denemek için resmi tekrar ekle</string>
+    <string name="media_uploading">Yükleniyor…</string>
+    <string name="media_upload_failed">Yükleme başarısız</string>
+    <string name="media_tap_to_retry">Yeniden denemek için dokunun</string>
+    <string name="media_tap_to_download">İndirmek için dokunun</string>
+    <string name="media_save">Kaydet</string>
+    <string name="media_saved">Galeriye kaydedildi</string>
+    <string name="media_save_failed">Görüntü kaydedilemedi</string>
+    <string name="close">Kapat</string>
+    <string name="add_caption">Başlık ekle…</string>
+    <string name="attach_take_photo">Fotoğraf çek</string>
+    <string name="attach_photo_library">Fotoğraf galerisi</string>
+    <string name="media_auto_download_title">Medyayı otomatik indir</string>
+    <string name="media_auto_download_always">Her zaman</string>
+    <string name="media_auto_download_wifi">Yalnızca Wi-Fi\'de</string>
+    <string name="media_auto_download_never">Asla</string>
+    <plurals name="media_selected_count">
+        <item quantity="one">%1$d görüntü seçildi</item>
+        <item quantity="other">%1$d görüntü seçildi</item>
+    </plurals>
 </resources>
