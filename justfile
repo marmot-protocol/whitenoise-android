@@ -48,6 +48,13 @@ test:
 release:
     ./scripts/release.sh
 
+# Build the production/release arm64-v8a APK immediately using the current
+# checked-in Marmot bindings + native libs.
+apk:
+    ./scripts/release.sh --skip-bindings --abi arm64-v8a
+
+alias APK := apk
+
 # Same as `release` but skip the (slow) Rust rebuild — use whatever .so's
 # are already checked in.
 release-fast:
@@ -57,7 +64,7 @@ release-fast:
 # sanity-checking a release build on your own phone.
 install-release:
     ./scripts/release.sh --skip-bindings --abi arm64-v8a
-    adb install -r app/build/outputs/apk/release/app-arm64-v8a-release.apk
+    adb install -r app/build/outputs/apk/release/darkmatter-v8a-release-$(date +%F).apk
 
 # Launch the installed release variant.
 launch-release:

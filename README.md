@@ -14,6 +14,7 @@ The Android app should not become a second database for Dark Matter data. If a s
 just test
 just debug
 just install-debug
+just apk
 just release-fast
 ```
 
@@ -33,6 +34,16 @@ Release builds use signing values from `local.properties` or the matching enviro
 - `DARKMATTER_KEYSTORE_PASSWORD`
 - `DARKMATTER_KEY_ALIAS`
 - `DARKMATTER_KEY_PASSWORD`
+
+Use:
+
+```bash
+just apk
+```
+
+This builds the signed `arm64-v8a` release APK only, using the checked-in Marmot
+bindings and native libraries. The output filename is
+`darkmatter-v8a-release-YYYY-MM-DD.apk`.
 
 Use:
 
