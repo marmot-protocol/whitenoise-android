@@ -1,7 +1,9 @@
 package dev.ipf.darkmatter.media
 
+import dev.ipf.darkmatter.core.HostSafety
 import dev.ipf.marmotkit.MediaReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import java.net.URI
 
 /**
  * Pure parser for the MIP-04-v2 `imeta` tag carried on kind-9 messages that
@@ -81,7 +83,7 @@ object MediaReferenceParser {
             // First occurrence wins — matches Rust's HashMap-based parse.
             fields.putIfAbsent(key, value)
         }
-        val url = fields["url"]?.takeIf { it.isNotBlank() } ?: return null
+        val url = fields["url"]?.takeIf { isDownloadableUrl(it) } ?: return null
         val mediaType = fields["m"]?.takeIf { it.isNotBlank() } ?: return null
         val fileName = fields["filename"]?.takeIf { it.isNotBlank() } ?: return null
         val fileHash = fields["x"]?.takeIf { isHex(it, SHA256_HEX_LEN) } ?: return null
@@ -95,6 +97,23 @@ object MediaReferenceParser {
             mediaType = mediaType,
             version = version,
         )
+    }
+
+    /**
+     * Whether [raw] is a media URL we're willing to download: a non-blank
+     * http(s) URL whose host is not loopback / the local network. Defense in
+     * depth against SSRF via a malicious imeta tag — a hostile group member
+     * could otherwise point auto-download at `http://127.0.0.1:8080/...` or an
+     * RFC-1918 service. See issue #98.
+     */
+    private fun isDownloadableUrl(raw: String): Boolean {
+        if (raw.isBlank()) return false
+        val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return false
+        val scheme = uri.scheme?.lowercase()
+        if (scheme != "http" && scheme != "https") return false
+        val host = uri.host ?: return false
+        if (host.isBlank()) return false
+        return !HostSafety.isPrivateOrLoopbackHost(host)
     }
 
     /** True iff [s] has [requiredLength] characters, all hex. */

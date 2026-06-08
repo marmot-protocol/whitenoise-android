@@ -22,6 +22,9 @@ object ProfileSanitizer {
         val uri = runCatching { URI(trimmed) }.getOrNull() ?: return null
         if (uri.scheme?.lowercase() != "https") return null
         if (uri.host.isNullOrBlank()) return null
+        // SSRF guard: never let an avatar URL point the app at loopback or the
+        // local network. See issue #89.
+        if (HostSafety.isPrivateOrLoopbackHost(uri.host)) return null
         return uri.toString()
     }
 

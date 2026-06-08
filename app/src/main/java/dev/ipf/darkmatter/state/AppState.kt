@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
+import dev.ipf.darkmatter.core.HostSafety
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MarmotClient
 import dev.ipf.darkmatter.core.ProfileLink
@@ -114,6 +115,10 @@ private fun canonicalRelayUrl(url: String): String? {
         }
         val canonicalHost = asciiHost.lowercase(Locale.ROOT).takeIf { it.isNotBlank() }
             ?: return@runCatching null
+        // SSRF guard: relay URLs can arrive from untrusted protocol messages, so
+        // never accept one that points the client at loopback or the local
+        // network. See issue #82.
+        if (HostSafety.isPrivateOrLoopbackHost(canonicalHost)) return@runCatching null
         val authorityHost = if (canonicalHost.contains(":")) "[$canonicalHost]" else canonicalHost
         val port = uri.port.takeIf { it >= 0 }?.let { ":$it" }.orEmpty()
         val path = uri.rawPath.orEmpty()

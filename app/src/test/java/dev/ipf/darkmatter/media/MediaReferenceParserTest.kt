@@ -117,6 +117,31 @@ class MediaReferenceParserTest {
         assertEquals(URL, ref!!.url)
     }
 
+    @Test
+    fun returnsNull_whenUrlSchemeIsNotHttp() {
+        // SSRF / local-file guard: only http(s) media URLs are downloadable.
+        // See issue #98.
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "file:///etc/passwd"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "gopher://example.com/x"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "ftp://example.com/x.bin"))))
+    }
+
+    @Test
+    fun returnsNull_whenUrlHostIsPrivateOrLoopback() {
+        // A malicious group member must not be able to point auto-download at
+        // the device's loopback or the local network. See issue #98.
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://127.0.0.1:8080/admin"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "https://192.168.1.1/x.bin"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "https://[::1]/x.bin"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://localhost/x.bin"))))
+    }
+
+    @Test
+    fun acceptsPublicHttpAndHttpsMediaUrls() {
+        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://blossom.example/x.bin"))))
+        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "https://blossom.example/x.bin"))))
+    }
+
     // ---- toImetaTag (round-trip) -------------------------------------------
 
     @Test
