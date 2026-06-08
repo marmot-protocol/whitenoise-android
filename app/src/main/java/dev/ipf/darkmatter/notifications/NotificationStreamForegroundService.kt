@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.util.Log
+import dev.ipf.darkmatter.BuildConfig
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import dev.ipf.darkmatter.DarkMatterApplication
@@ -124,7 +125,8 @@ private object BackgroundConnectionNotification {
 }
 
 private inline fun foregroundServiceDebug(message: () -> String) {
-    Log.i("DMForegroundSvc", message())
+    // Debug-only so operational INFO logs don't ship in release logcat. See #39.
+    if (BuildConfig.DEBUG) Log.i("DMForegroundSvc", message())
 }
 
 private inline fun foregroundServiceDebug(error: Throwable, message: () -> String) {

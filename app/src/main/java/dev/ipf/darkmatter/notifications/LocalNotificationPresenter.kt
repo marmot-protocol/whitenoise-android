@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
+import dev.ipf.darkmatter.BuildConfig
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -101,7 +102,8 @@ class LocalNotificationPresenter(private val context: Context) {
 
         NotificationManagerCompat.from(context).notify(content.notificationTag, content.notificationId, notification)
         notificationDebug {
-            "posted id=${content.notificationId} trigger=${update.trigger} group=${update.groupIdHex.take(8)} title=${content.title}"
+            // Never log the title — it carries sender / group names (PII).
+            "posted id=${content.notificationId} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
         }
         return true
     }
@@ -112,5 +114,5 @@ class LocalNotificationPresenter(private val context: Context) {
 }
 
 private inline fun notificationDebug(message: () -> String) {
-    Log.i("DMLocalNotify", message())
+    if (BuildConfig.DEBUG) Log.i("DMLocalNotify", message())
 }

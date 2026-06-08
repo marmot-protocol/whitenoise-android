@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.state
 
 import android.util.Log
+import dev.ipf.darkmatter.BuildConfig
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -513,7 +514,8 @@ private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean {
 }
 
 private inline fun chatsDebug(message: () -> String) {
-    Log.i("DMChats", message())
+    // Debug-only so operational INFO logs don't ship in release logcat. See #39.
+    if (BuildConfig.DEBUG) Log.i("DMChats", message())
 }
 
 private inline fun chatsDebug(error: Throwable, message: () -> String) {

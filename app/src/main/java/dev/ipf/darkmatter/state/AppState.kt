@@ -1254,7 +1254,9 @@ class DarkMatterAppState(context: Context) {
 }
 
 private inline fun appStateDebug(message: () -> String) {
-    Log.i("DMAppState", message())
+    // Debug-only: these INFO lines are operational/diagnostic and some carry
+    // sender/group context, so they must not ship in release logcat. See #39.
+    if (BuildConfig.DEBUG) Log.i("DMAppState", message())
 }
 
 private inline fun appStateDebug(error: Throwable, message: () -> String) {
