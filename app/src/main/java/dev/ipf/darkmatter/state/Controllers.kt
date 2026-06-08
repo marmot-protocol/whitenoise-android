@@ -1808,7 +1808,7 @@ class ConversationController(
         messageById[record.messageIdHex] = actionRecord
         val item = timelineMessageFromProjection(record, actionRecord)
         timelineItemsById[item.id] = item
-        insertTimelineItemId(item.id, item)
+        insertTimelineItemId(item.id)
         return actionRecord
     }
 
@@ -1857,16 +1857,12 @@ class ConversationController(
         return streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}"
     }
 
-    private fun insertTimelineItemId(itemId: String, item: TimelineMessage) {
-        val insertAt = timelineOrder.indexOfFirst { existingId ->
-            val existing = timelineItemsById[existingId] ?: return@indexOfFirst false
-            compareTimelineMessages(item, existing) < 0
-        }
-        if (insertAt == -1) {
-            timelineOrder.add(itemId)
-        } else {
-            timelineOrder.add(insertAt, itemId)
-        }
+    private fun insertTimelineItemId(itemId: String) {
+        // Append in O(1). Position is irrelevant here: publishTimelineFromIndexes
+        // re-sorts the whole list with compareTimelineMessages (a total order),
+        // so timelineOrder is only a membership set. The previous sorted insert
+        // did an O(n) scan per item, making each page load O(n²). See #74.
+        timelineOrder.add(itemId)
     }
 
     private fun publishTimelineFromIndexes() {
