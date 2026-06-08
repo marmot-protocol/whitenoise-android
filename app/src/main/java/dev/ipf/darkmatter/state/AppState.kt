@@ -432,6 +432,7 @@ class DarkMatterAppState(context: Context) {
             present(R.string.toast_identity_created)
             warmProfile(summary.accountIdHex)
         } catch (error: Throwable) {
+            rethrowIfCancellation(error)
             present(R.string.toast_couldnt_create_identity, AppText.Plain(error.readableMessage()))
         }
     }
@@ -448,6 +449,7 @@ class DarkMatterAppState(context: Context) {
             present(R.string.toast_identity_imported)
             warmProfile(summary.accountIdHex)
         } catch (error: Throwable) {
+            rethrowIfCancellation(error)
             present(R.string.toast_couldnt_import_identity, AppText.Plain(error.readableMessage()))
         }
     }
@@ -544,6 +546,7 @@ class DarkMatterAppState(context: Context) {
         }.onSuccess {
             present(R.string.toast_relay_list_updated)
         }.onFailure {
+            rethrowIfCancellation(it)
             present(R.string.toast_relay_update_failed, AppText.Plain(it.readableMessage()))
         }.getOrNull()
     }
@@ -728,6 +731,7 @@ class DarkMatterAppState(context: Context) {
             present(if (enabled) R.string.toast_local_notifications_enabled else R.string.toast_local_notifications_disabled)
             true
         }.getOrElse {
+            rethrowIfCancellation(it)
             present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()))
             false
         }
@@ -747,6 +751,7 @@ class DarkMatterAppState(context: Context) {
             val settings = runCatching {
                 marmotIo { setLocalNotificationsEnabled(account, true) }
             }.getOrElse {
+                rethrowIfCancellation(it)
                 present(R.string.toast_couldnt_enable_notifications, AppText.Plain(it.readableMessage()))
                 return false
             }
@@ -895,17 +900,25 @@ class DarkMatterAppState(context: Context) {
     }
 
     suspend fun refreshProfile(accountIdHex: String) {
-        val profile = runCatching {
-            marmotIo {
-                val relays = activeAccountRef
-                    ?.let { runCatching { accountNip65Relays(it) }.getOrNull() }
-                    ?.takeIf { it.isNotEmpty() }
-                    ?: MarmotClient.bootstrapRelays
-                refreshProfile(accountIdHex, relays)
-                userProfile(accountIdHex)
+        val profile = try {
+            val result = runCatching {
+                marmotIo {
+                    val relays = activeAccountRef
+                        ?.let { runCatching { accountNip65Relays(it) }.getOrNull() }
+                        ?.takeIf { it.isNotEmpty() }
+                        ?: MarmotClient.bootstrapRelays
+                    refreshProfile(accountIdHex, relays)
+                    userProfile(accountIdHex)
+                }
             }
-        }.getOrNull()
-        profileRefreshGate.finish(accountIdHex, System.currentTimeMillis())
+            // Don't let runCatching swallow cancellation: rethrow so the
+            // profileScope job actually stops. finish() still runs in finally,
+            // so the refresh gate is released either way (no stuck in-flight).
+            result.exceptionOrNull()?.let(::rethrowIfCancellation)
+            result.getOrNull()
+        } finally {
+            profileRefreshGate.finish(accountIdHex, System.currentTimeMillis())
+        }
         if (profile != null) {
             notifyProfileChanged(accountIdHex)
         }
@@ -932,6 +945,7 @@ class DarkMatterAppState(context: Context) {
             present(R.string.toast_chat_started)
             true
         }.getOrElse {
+            rethrowIfCancellation(it)
             present(R.string.toast_couldnt_start_chat, AppText.Plain(it.readableMessage()))
             false
         }
@@ -955,6 +969,7 @@ class DarkMatterAppState(context: Context) {
                 AppText.Resource(R.string.toast_profile_published_detail, listOf(profileRelayCount)),
             )
         }.onFailure {
+            rethrowIfCancellation(it)
             present(R.string.toast_couldnt_publish_profile, AppText.Plain(it.readableMessage()))
         }
     }

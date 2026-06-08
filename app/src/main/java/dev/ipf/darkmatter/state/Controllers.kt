@@ -789,6 +789,7 @@ class ConversationController(
             }
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
+            rethrowIfCancellation(throwable)
             optimisticMessages["msg:$tempId"] = TimelineMessage(
                 "msg:$tempId",
                 optimistic,
@@ -1007,6 +1008,7 @@ class ConversationController(
                 appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
             }
         } catch (throwable: Throwable) {
+            rethrowIfCancellation(throwable)
             optimisticReactionChanges.remove(optimisticId)
             recomputeReactions()
             appState.present(R.string.toast_reaction_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
@@ -1020,6 +1022,7 @@ class ConversationController(
         try {
             appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
         } catch (throwable: Throwable) {
+            rethrowIfCancellation(throwable)
             deletedMessageIds = deletedMessageIds - target
             appState.present(R.string.toast_couldnt_delete_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
@@ -1220,6 +1223,7 @@ class ConversationController(
             }
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
+            rethrowIfCancellation(throwable)
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; don't restore the Failed bubble.
                 optimisticMessages.remove(key)
@@ -1309,6 +1313,7 @@ class ConversationController(
             appState.present(R.string.toast_invite_accepted)
             true
         }.getOrElse {
+            rethrowIfCancellation(it)
             appState.present(R.string.toast_couldnt_accept_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
             false
         }
@@ -1322,6 +1327,7 @@ class ConversationController(
             appState.present(R.string.toast_invite_declined)
             true
         }.getOrElse {
+            rethrowIfCancellation(it)
             appState.present(R.string.toast_couldnt_decline_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
             false
         }
@@ -1335,6 +1341,7 @@ class ConversationController(
             appState.applyLocalGroupUpdate(updated)
             appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
         }.onFailure {
+            rethrowIfCancellation(it)
             appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }
     }
@@ -1352,6 +1359,7 @@ class ConversationController(
             }
             appState.present(R.string.toast_group_updated)
         }.onFailure {
+            rethrowIfCancellation(it)
             appState.present(R.string.toast_couldnt_update_group, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }
     }
@@ -1365,6 +1373,7 @@ class ConversationController(
             refreshMembers()
             appState.present(R.string.toast_invite_sent)
         }.onFailure {
+            rethrowIfCancellation(it)
             appState.present(R.string.toast_couldnt_add_members, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }
     }
@@ -1377,6 +1386,7 @@ class ConversationController(
             refreshMembers()
             appState.present(R.string.toast_member_removed)
         }.onFailure {
+            rethrowIfCancellation(it)
             appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }
     }
@@ -1407,6 +1417,7 @@ class ConversationController(
             }
             refreshMembers()
         }.onFailure {
+            rethrowIfCancellation(it)
             appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }
     }
