@@ -55,7 +55,8 @@ android {
         buildConfigField("String", "DARKMATTER_OTLP_AUTH_TOKEN", runtimeConfigProperty(listOf("DARKMATTER_OTLP_AUTH_TOKEN", "OTLP_TOKEN_DARKMATTER_ANDROID")).asBuildConfigString())
         buildConfigField("String", "DARKMATTER_AUDIT_LOG_ENDPOINT", runtimeConfigProperty("DARKMATTER_AUDIT_LOG_ENDPOINT").asBuildConfigString())
         buildConfigField("String", "DARKMATTER_AUDIT_LOG_AUTH_TOKEN", runtimeConfigProperty(listOf("DARKMATTER_AUDIT_LOG_AUTH_TOKEN", "OTLP_TOKEN_DARKMATTER_ANDROID")).asBuildConfigString())
-        buildConfigField("String", "DARKMATTER_DEPLOYMENT_ENVIRONMENT", runtimeConfigProperty("DARKMATTER_DEPLOYMENT_ENVIRONMENT", "android-release").asBuildConfigString())
+        buildConfigField("String", "DARKMATTER_DEPLOYMENT_ENVIRONMENT", runtimeConfigProperty("DARKMATTER_DEPLOYMENT_ENVIRONMENT", "production").asBuildConfigString())
+        buildConfigField("String", "DARKMATTER_TELEMETRY_TENANT", runtimeConfigProperty("DARKMATTER_TELEMETRY_TENANT", "darkmatter-android").asBuildConfigString())
     }
 
     signingConfigs {

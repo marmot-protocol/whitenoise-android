@@ -78,6 +78,22 @@ internal fun normalizeRelayUrls(relays: Iterable<String>): List<String> {
         .distinct()
 }
 
+internal fun telemetryServiceVersion(versionName: String, versionCode: Int): String {
+    return "${versionName.trim()}+$versionCode"
+}
+
+internal fun telemetryDeploymentEnvironment(value: String): String {
+    return when (val normalized = value.trim().lowercase(Locale.ROOT)) {
+        "production", "staging", "development", "test" -> normalized
+        "android-release" -> "production"
+        else -> "production"
+    }
+}
+
+internal fun telemetryDeviceModelIdentifier(model: String): String? {
+    return model.trim().takeIf { it.isNotEmpty() }
+}
+
 internal fun isAcceptableRelayUrl(url: String): Boolean {
     return canonicalRelayUrl(url) != null
 }
@@ -205,6 +221,11 @@ class DarkMatterAppState(context: Context) {
 
     var backgroundConnectionEnabled by mutableStateOf(BackgroundConnectionPreferences.isEnabled(appContext))
         private set
+
+    private var defaultNotificationsEnableAttempted by mutableStateOf(
+        preferences.getBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, false),
+    )
+    private var defaultNotificationPermissionPromptInFlight by mutableStateOf(false)
 
     private val npubs = ConcurrentHashMap<String, String>()
     private var profileRevision by mutableStateOf(0)
@@ -724,6 +745,41 @@ class DarkMatterAppState(context: Context) {
         return true
     }
 
+    fun shouldRequestDefaultNotificationPermission(): Boolean {
+        return activeAccountRef != null &&
+            !defaultNotificationsEnableAttempted &&
+            !defaultNotificationPermissionPromptInFlight &&
+            !localNotificationPermissionGranted &&
+            backgroundConnectionEnabled
+    }
+
+    fun markDefaultNotificationPermissionPromptLaunched() {
+        defaultNotificationPermissionPromptInFlight = true
+        appStateDebug { "default notification permission prompt launched" }
+    }
+
+    fun markDefaultNotificationsEnableAttempted() {
+        defaultNotificationPermissionPromptInFlight = false
+        if (defaultNotificationsEnableAttempted) return
+        defaultNotificationsEnableAttempted = true
+        preferences.edit().putBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, true).apply()
+        appStateDebug { "default notifications enable attempted" }
+    }
+
+    suspend fun enableDefaultNotificationsIfReady(): Boolean {
+        if (defaultNotificationsEnableAttempted) return false
+        val account = activeAccountRef ?: return false
+        refreshLocalNotificationPermission()
+        if (!localNotificationPermissionGranted) return false
+        markDefaultNotificationsEnableAttempted()
+        if (backgroundConnectionEnabled) {
+            return setBackgroundConnectionEnabled(true)
+        }
+        val settings = marmotIo { setLocalNotificationsEnabled(account, true) }
+        localNotificationSettings = settings
+        return settings.localNotificationsEnabled
+    }
+
     fun displayName(accountIdHex: String): String {
         profileDisplayName(accountIdHex)?.let { return it }
         requestProfile(accountIdHex)
@@ -970,22 +1026,20 @@ class DarkMatterAppState(context: Context) {
         }
     }
 
-    private fun Marmot.configurePrivacyRuntime(accountLabel: String?) {
+    private suspend fun Marmot.configurePrivacyRuntime(accountLabel: String?) {
         val installId = runCatching { telemetryInstallId() }.getOrNull().orEmpty()
         setRelayTelemetryRuntimeConfig(
             RelayTelemetryRuntimeConfigFfi(
                 otlpEndpoint = BuildConfig.DARKMATTER_OTLP_ENDPOINT.nonBlankOrNull(),
                 authorizationBearerToken = BuildConfig.DARKMATTER_OTLP_AUTH_TOKEN.nonBlankOrNull(),
                 resource = RelayTelemetryResourceFfi(
-                    serviceVersion = BuildConfig.VERSION_NAME,
-                    serviceInstanceId = installId.ifBlank { appContext.packageName },
-                    deploymentEnvironment = BuildConfig.DARKMATTER_DEPLOYMENT_ENVIRONMENT.ifBlank { "android-release" },
-                    osType = "android",
+                    serviceVersion = telemetryServiceVersion(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                    serviceInstanceId = installId,
+                    deploymentEnvironment = telemetryDeploymentEnvironment(BuildConfig.DARKMATTER_DEPLOYMENT_ENVIRONMENT),
+                    tenant = BuildConfig.DARKMATTER_TELEMETRY_TENANT.ifBlank { "darkmatter-android" },
+                    osType = "linux",
                     osVersion = Build.VERSION.RELEASE.ifBlank { Build.VERSION.SDK_INT.toString() },
-                    deviceModelIdentifier = listOf(Build.MANUFACTURER, Build.MODEL)
-                        .filter { it.isNotBlank() }
-                        .joinToString(" ")
-                        .nonBlankOrNull(),
+                    deviceModelIdentifier = telemetryDeviceModelIdentifier(Build.MODEL),
                 ),
             ),
         )
@@ -1117,6 +1171,7 @@ class DarkMatterAppState(context: Context) {
         private const val DEVELOPER_MODE_KEY = "developer_mode"
         private const val THEME_MODE_KEY = "theme_mode"
         private const val MEDIA_AUTO_DOWNLOAD_KEY = "media_auto_download"
+        private const val DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY = "default_notifications_enable_attempted"
         // 24 MiB cap on decrypted attachment bytes resident in memory —
         // roughly ten 1920px JPEGs. Persists across conversation re-entry.
         private const val MEDIA_PLAINTEXT_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L

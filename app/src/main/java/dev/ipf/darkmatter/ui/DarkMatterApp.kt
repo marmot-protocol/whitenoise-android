@@ -358,9 +358,35 @@ fun DarkMatterApp(
     val snackbarHostState = remember { SnackbarHostState() }
     val toast = appState.toast
     val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        appState.refreshLocalNotificationPermission()
+        if (granted) {
+            appState.launchMutation { appState.enableDefaultNotificationsIfReady() }
+        } else {
+            appState.markDefaultNotificationsEnableAttempted()
+        }
+    }
 
     LaunchedEffect(Unit) {
         appState.bootstrap()
+    }
+    LaunchedEffect(
+        appState.phase,
+        appState.activeAccountRef,
+        appState.localNotificationPermissionGranted,
+        appState.backgroundConnectionEnabled,
+        appState.localNotificationSettings?.localNotificationsEnabled,
+        appState.runtimeGeneration,
+    ) {
+        if (appState.phase != AppPhase.Ready) return@LaunchedEffect
+        appState.refreshLocalNotificationPermission()
+        appState.refreshLocalNotificationSettings()
+        if (appState.shouldRequestDefaultNotificationPermission()) {
+            appState.markDefaultNotificationPermissionPromptLaunched()
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            appState.enableDefaultNotificationsIfReady()
+        }
     }
     LaunchedEffect(toast) {
         if (toast != null) {
