@@ -199,6 +199,7 @@ import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageTextCopy
+import dev.ipf.darkmatter.core.ProfileFieldValidation
 import dev.ipf.darkmatter.core.ProfileLink
 import dev.ipf.darkmatter.notifications.NotificationNavStep
 import dev.ipf.darkmatter.notifications.NotificationTarget
@@ -4532,11 +4533,17 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                         minLines = 2,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    // Client-side validation: flag a malformed picture URL or
+                    // nip-05 (red field) and block publish so we don't push junk
+                    // — or an SSRF-prone avatar URL — to relays. See #69.
+                    val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
+                    val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
                     OutlinedTextField(
                         value = picture,
                         onValueChange = { picture = it },
                         label = { Text(stringResource(R.string.picture_url)) },
                         singleLine = true,
+                        isError = !pictureValid,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(
                             capitalization = KeyboardCapitalization.None,
@@ -4549,6 +4556,7 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                         onValueChange = { nip05 = it },
                         label = { Text(stringResource(R.string.nip_05)) },
                         singleLine = true,
+                        isError = !nip05Valid,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                     )
@@ -4577,7 +4585,7 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                                 busy = false
                             }
                         },
-                        enabled = !busy && active != null,
+                        enabled = !busy && active != null && pictureValid && nip05Valid,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         if (busy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
