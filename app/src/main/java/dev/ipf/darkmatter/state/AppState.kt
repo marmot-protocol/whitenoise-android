@@ -58,6 +58,20 @@ sealed interface AppPhase {
     data class Failed(val message: String) : AppPhase
 }
 
+internal data class SignOutOutcome(val nextActiveRef: String?, val phase: AppPhase)
+
+/**
+ * The active-account ref and app phase after signing [activeRef] out. Sign-out
+ * is a non-destructive session switch, so if another account remains we switch
+ * to it and stay [AppPhase.Ready]; if the signed-out account was the last
+ * active one, drop to [AppPhase.Onboarding] rather than leaving a MainShell
+ * rendered with no active account.
+ */
+internal fun signOutOutcome(accountLabels: List<String>, activeRef: String?): SignOutOutcome {
+    val next = accountLabels.firstOrNull { it != activeRef }
+    return SignOutOutcome(next, if (next == null) AppPhase.Onboarding else AppPhase.Ready)
+}
+
 data class ToastMessage(
     val title: AppText,
     val detail: AppText? = null,
@@ -486,11 +500,15 @@ class DarkMatterAppState(context: Context) {
         // Both sign-out and account-switch wipe decrypted-media caches; the
         // helper centralises the L1-sync + L2-on-IO pattern.
         clearMediaCaches()
-        val next = accounts.firstOrNull { it.label != activeAccountRef }?.label
+        val outcome = signOutOutcome(accounts.map { it.label }, activeAccountRef)
+        val next = outcome.nextActiveRef
         activeAccountRef = next
         preferences.edit().apply {
             if (next == null) remove(ACTIVE_ACCOUNT_KEY) else putString(ACTIVE_ACCOUNT_KEY, next)
         }.apply()
+        // Signing out the last active account must leave a usable state, not a
+        // MainShell with no active account. See issue #11.
+        phase = outcome.phase
         next?.let { label ->
             accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
         }
