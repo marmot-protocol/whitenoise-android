@@ -38,7 +38,6 @@ import dev.ipf.marmotkit.ChatListSubscription
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatsSubscription
-import dev.ipf.marmotkit.ForensicsDumpModeFfi
 import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
@@ -1418,22 +1417,6 @@ class ConversationController(
         }.onFailure {
             if (it is CancellationException) throw it
             appState.present(R.string.toast_couldnt_load_mls_state, AppText.Plain(it.message ?: it.javaClass.simpleName))
-        }.getOrNull()
-    }
-
-    suspend fun groupForensicsJson(mode: ForensicsDumpModeFfi): String? {
-        val account = appState.activeAccountRef ?: return null
-        return runCatching {
-            appState.marmotIo {
-                groupForensicsJson(
-                    account,
-                    group.groupIdHex,
-                    mode,
-                    null,
-                )
-            }
-        }.onFailure {
-            appState.present(R.string.toast_couldnt_export_forensics_dump, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }.getOrNull()
     }
 

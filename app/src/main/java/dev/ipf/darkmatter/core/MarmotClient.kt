@@ -21,11 +21,8 @@ class MarmotClient(
 
     companion object {
         val bootstrapRelays = listOf(
-            "wss://relay.damus.io",
-            "wss://nos.lol",
-            "wss://relay.primal.net",
-            "wss://relay.eu.whitenoise.chat",
             "wss://relay.us.whitenoise.chat",
+            "wss://relay.eu.whitenoise.chat",
         )
     }
 }

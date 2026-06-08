@@ -13,6 +13,18 @@ val localProperties = Properties().apply {
 fun signingProperty(key: String): String? =
     localProperties.getProperty(key) ?: System.getenv(key)
 
+fun runtimeConfigProperty(keys: List<String>, defaultValue: String = ""): String =
+    keys.asSequence()
+        .mapNotNull { key -> localProperties.getProperty(key) ?: System.getenv(key) }
+        .firstOrNull()
+        ?: defaultValue
+
+fun runtimeConfigProperty(key: String, defaultValue: String = ""): String =
+    runtimeConfigProperty(listOf(key), defaultValue)
+
+fun String.asBuildConfigString(): String =
+    "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
 val releaseKeystorePath = signingProperty("DARKMATTER_KEYSTORE_PATH")
 val releaseKeystorePassword = signingProperty("DARKMATTER_KEYSTORE_PASSWORD")
 val releaseKeyAlias = signingProperty("DARKMATTER_KEY_ALIAS")
@@ -34,10 +46,16 @@ android {
         applicationId = "dev.ipf.darkmatter"
         minSdk = 34
         targetSdk = 36
-        versionCode = 3
-        versionName = "2026.5.28"
+        versionCode = 4
+        versionName = "2026.6.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "DARKMATTER_OTLP_ENDPOINT", runtimeConfigProperty("DARKMATTER_OTLP_ENDPOINT").asBuildConfigString())
+        buildConfigField("String", "DARKMATTER_OTLP_AUTH_TOKEN", runtimeConfigProperty(listOf("DARKMATTER_OTLP_AUTH_TOKEN", "OTLP_TOKEN_DARKMATTER_ANDROID")).asBuildConfigString())
+        buildConfigField("String", "DARKMATTER_AUDIT_LOG_ENDPOINT", runtimeConfigProperty("DARKMATTER_AUDIT_LOG_ENDPOINT").asBuildConfigString())
+        buildConfigField("String", "DARKMATTER_AUDIT_LOG_AUTH_TOKEN", runtimeConfigProperty(listOf("DARKMATTER_AUDIT_LOG_AUTH_TOKEN", "OTLP_TOKEN_DARKMATTER_ANDROID")).asBuildConfigString())
+        buildConfigField("String", "DARKMATTER_DEPLOYMENT_ENVIRONMENT", runtimeConfigProperty("DARKMATTER_DEPLOYMENT_ENVIRONMENT", "android-release").asBuildConfigString())
     }
 
     signingConfigs {
@@ -79,6 +97,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         jniLibs {
