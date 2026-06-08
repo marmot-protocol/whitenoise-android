@@ -235,6 +235,15 @@ internal fun AppMessageRecordFfi.withRecordedAtOverride(recordedAt: ULong?): App
 }
 
 /**
+ * The timeline position to reuse when retrying a failed optimistic send.
+ * [stored] is non-nullable (`TimelineMessage.timelineOrder` defaults to `0uL`),
+ * so an elvis against it is dead code; `0uL` is the "unset" sentinel and is the
+ * only case that should mint a fresh order via [freshOrder].
+ */
+internal fun retriedTimelineOrder(stored: ULong, freshOrder: () -> ULong): ULong =
+    stored.takeIf { it != 0uL } ?: freshOrder()
+
+/**
  * Index of the first (oldest) still-unread received message in [timeline]
  * given the chat-list projection's [unreadCount]. Returns -1 when nothing is
  * unread, the timeline is empty, or the loaded window holds fewer than
@@ -1159,7 +1168,7 @@ class ConversationController(
         // the shared path. If the bytes were evicted/lost, performMediaUpload
         // flips back to Failed and prompts a re-attach.
         if (current.record.tags.any { it.values.firstOrNull() == "_media_pending" }) {
-            val mediaOrder = current.timelineOrder ?: nextOptimisticTimelineOrder()
+            val mediaOrder = retriedTimelineOrder(current.timelineOrder) { nextOptimisticTimelineOrder() }
             val mediaTempId = current.record.messageIdHex
             optimisticMessages[key] = TimelineMessage(
                 key,
@@ -1175,7 +1184,7 @@ class ConversationController(
         val text = current.record.plaintext.takeIf { it.isNotBlank() } ?: return
         val replyTarget = MessageProjector.replyTargetMessageId(current.record)
         val refreshedRecord = current.record.copy()
-        val order = current.timelineOrder ?: nextOptimisticTimelineOrder()
+        val order = retriedTimelineOrder(current.timelineOrder) { nextOptimisticTimelineOrder() }
         discardedDuringRetry.remove(key)
         optimisticMessages[key] = TimelineMessage(
             key,
