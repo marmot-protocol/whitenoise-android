@@ -4365,7 +4365,12 @@ private fun CameraQrScanner(
     val cameraUnavailable = stringResource(R.string.camera_unavailable)
 
     if (lifecycleOwner == null) {
-        onError(cameraLifecycleUnavailable)
+        // Emit the error as a post-composition effect, not a side effect during
+        // composition (which violates Compose's rules and can fire on every
+        // recomposition). See #23.
+        LaunchedEffect(cameraLifecycleUnavailable) {
+            onError(cameraLifecycleUnavailable)
+        }
         return
     }
 
