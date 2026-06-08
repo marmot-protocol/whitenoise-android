@@ -5395,10 +5395,12 @@ private fun Avatar(
         Color(0xFF9A4055),
     )
     val color = palette[avatarPaletteIndex(seed.hashCode(), palette.size)]
-    val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, pictureUrl) {
-        value = null
-        val url = pictureUrl ?: return@produceState
-        value = AvatarImageLoader.load(url)
+    // Seed from the in-memory cache so re-entering a screen shows a
+    // already-loaded avatar immediately, with no placeholder flash and no
+    // re-fetch. See #31.
+    val image by produceState(AvatarImageLoader.peek(pictureUrl), pictureUrl) {
+        val url = pictureUrl ?: run { value = null; return@produceState }
+        if (value == null) value = AvatarImageLoader.load(url)
     }
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(color),
