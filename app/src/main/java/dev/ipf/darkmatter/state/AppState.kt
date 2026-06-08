@@ -30,6 +30,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,6 +73,10 @@ internal fun signOutOutcome(accountLabels: List<String>, activeRef: String?): Si
     val next = accountLabels.firstOrNull { it != activeRef }
     return SignOutOutcome(next, if (next == null) AppPhase.Onboarding else AppPhase.Ready)
 }
+
+/** Next exponential-backoff delay: double [current], clamped to [maxMillis]. */
+internal fun nextRetryBackoffMillis(current: Long, maxMillis: Long): Long =
+    (current * 2).coerceAtMost(maxMillis)
 
 data class ToastMessage(
     val title: AppText,
@@ -1108,35 +1113,50 @@ class DarkMatterAppState(context: Context) {
     private fun startNotificationListener() {
         if (notificationJob?.isActive == true) return
         notificationJob = notificationScope.launch {
-            runCatching {
-                val subscription = marmotIo { subscribeNotifications() }
+            // Restart the subscription on any failure (or clean end-of-stream)
+            // with exponential backoff, so a transient relay/binding error
+            // doesn't permanently silence notifications. Backoff resets after
+            // each received update; cancellation propagates and stops the loop.
+            // See #56.
+            var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+            while (isActive) {
                 try {
-                    while (isActive) {
-                        val update = marmotIo { subscription.next() } ?: break
-                        val activeConversation = activeConversationGroupIdHex
-                        val shouldPost = LocalNotificationPolicy.shouldPost(
-                            update = update,
-                            appInForeground = appInForeground,
-                            activeConversationGroupIdHex = activeConversation,
-                        )
-                        appStateDebug {
-                            "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
-                                "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} post=$shouldPost"
+                    val subscription = marmotIo { subscribeNotifications() }
+                    try {
+                        while (isActive) {
+                            val update = marmotIo { subscription.next() } ?: break
+                            backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                            val activeConversation = activeConversationGroupIdHex
+                            val shouldPost = LocalNotificationPolicy.shouldPost(
+                                update = update,
+                                appInForeground = appInForeground,
+                                activeConversationGroupIdHex = activeConversation,
+                            )
+                            appStateDebug {
+                                "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
+                                    "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} post=$shouldPost"
+                            }
+                            if (shouldPost) {
+                                localNotificationPresenter.show(update)
+                            }
                         }
-                        if (shouldPost) {
-                            localNotificationPresenter.show(update)
+                    } finally {
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                subscription.close()
+                            }
                         }
                     }
-                } finally {
-                    runCatching {
-                        withContext(Dispatchers.IO) {
-                            subscription.close()
-                        }
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (throwable: Throwable) {
+                    appStateDebug(throwable) {
+                        "notification listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"
                     }
                 }
-            }.onFailure {
-                if (it is CancellationException) return@onFailure
-                appStateDebug(it) { "notification listener stopped: ${it.readableMessage()}" }
+                if (!isActive) break
+                delay(backoffMillis)
+                backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
             }
         }
     }
@@ -1227,6 +1247,8 @@ class DarkMatterAppState(context: Context) {
         private const val DISK_MEDIA_CACHE_MAX_BYTES: Long = 256L * 1024L * 1024L
         private const val LANGUAGE_TAG_KEY = "language_tag"
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
+        private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
+        private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
         private const val MAX_RETAINED_CONVERSATION_STATES = 32
     }
 }
