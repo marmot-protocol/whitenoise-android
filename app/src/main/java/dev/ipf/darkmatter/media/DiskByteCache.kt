@@ -33,14 +33,22 @@ class DiskByteCache(
 ) {
     private val index = LinkedHashMap<String, Entry>(8, 0.75f, /* accessOrder = */ true)
     private var residentBytes: Long = 0L
+    private var hydrated = false
 
-    init {
+    // No directory I/O in the constructor: the scan + per-file stat are
+    // deferred to the first cache operation so they don't run on the main
+    // thread at app launch (the cache is constructed eagerly as an AppState
+    // field). First access happens on Dispatchers.IO. See #100.
+    private fun ensureHydrated() {
+        if (hydrated) return
         cacheDir.mkdirs()
         rehydrateIndex()
+        hydrated = true
     }
 
     @Synchronized
     fun get(key: String): ByteArray? {
+        ensureHydrated()
         val hashed = fileNameFor(key)
         val entry = index[hashed] ?: return null
         return try {
@@ -57,6 +65,7 @@ class DiskByteCache(
     @Synchronized
     fun put(key: String, bytes: ByteArray) {
         if (bytes.isEmpty()) return
+        ensureHydrated()
         val hashed = fileNameFor(key)
         val existing = index.remove(hashed)
         if (existing != null) {
@@ -90,6 +99,7 @@ class DiskByteCache(
 
     @Synchronized
     fun clear() {
+        ensureHydrated()
         index.values.forEach { runCatching { it.file.delete() } }
         index.clear()
         residentBytes = 0L
@@ -103,8 +113,8 @@ class DiskByteCache(
             ?.forEach { runCatching { it.delete() } }
     }
 
-    fun size(): Int = synchronized(this) { index.size }
-    fun residentBytes(): Long = synchronized(this) { residentBytes }
+    fun size(): Int = synchronized(this) { ensureHydrated(); index.size }
+    fun residentBytes(): Long = synchronized(this) { ensureHydrated(); residentBytes }
 
     private fun evictUntilUnderCap() {
         if (residentBytes <= maxBytes) return
