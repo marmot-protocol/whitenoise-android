@@ -626,7 +626,7 @@ class ConversationController(
         get() = GroupProjector.isAdminRef(group, appState.activeAccount?.accountIdHex)
 
     val canLeaveGroup: Boolean
-        get() = GroupProjector.canLeaveGroup(group, appState.activeAccount?.accountIdHex)
+        get() = GroupProjector.canLeaveGroup(group, appState.activeAccount?.accountIdHex, members.size)
 
     suspend fun start() {
         val account = conversationAccountRef ?: return
@@ -1267,7 +1267,7 @@ class ConversationController(
         }
         runCatching {
             val activeAccountIdHex = appState.activeAccount?.accountIdHex
-            if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex)) {
+            if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, members.size)) {
                 appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
                 // Case-insensitive so hex-casing drift between the admin
                 // list and the active account id doesn't leave the UI

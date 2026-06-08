@@ -94,12 +94,21 @@ object GroupProjector {
         return member.memberIdHex.equals(active, ignoreCase = true)
     }
 
-    fun canLeaveGroup(group: AppGroupRecordFfi, activeAccountIdHex: String?): Boolean {
+    fun canLeaveGroup(group: AppGroupRecordFfi, activeAccountIdHex: String?, memberCount: Int): Boolean {
         if (!isAdminRef(group, activeAccountIdHex)) return true
+        // A sole admin who is also the only remaining member can always leave:
+        // dissolving the group orphans no one. Without this they'd be stuck.
+        if (memberCount == 1) return true
         return group.admins.size > 1
     }
 
-    fun requiresSelfDemoteBeforeLeave(group: AppGroupRecordFfi, activeAccountIdHex: String?): Boolean {
+    fun requiresSelfDemoteBeforeLeave(
+        group: AppGroupRecordFfi,
+        activeAccountIdHex: String?,
+        memberCount: Int,
+    ): Boolean {
+        // No one to hand admin to when you're the only member — just leave.
+        if (memberCount == 1) return false
         return isAdminRef(group, activeAccountIdHex)
     }
 }
