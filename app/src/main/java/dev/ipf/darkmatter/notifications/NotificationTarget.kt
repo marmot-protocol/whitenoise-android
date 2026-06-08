@@ -63,6 +63,33 @@ fun resolveNotificationNav(
     return NotificationNavStep.MissingConversation
 }
 
+/** The activity's pending inbound-intent routing: a tapped-notification target
+ *  and/or a `darkmatter://` profile deep link awaiting consumption by the UI. */
+data class InboundIntentRouting(
+    val notificationTarget: NotificationTarget?,
+    val profilePayload: String?,
+)
+
+/**
+ * Resolve a newly-arrived intent against the [current] pending routing:
+ * - a notification tap ([parsedTarget] non-null) wins and clears any pending
+ *   profile link (the two are mutually exclusive);
+ * - otherwise a `darkmatter://` data URI ([dataString]) becomes the profile
+ *   payload;
+ * - otherwise — a dataless, non-notification intent such as a bare launcher
+ *   relaunch — the [current] target/link is left intact rather than being
+ *   silently discarded. See issue #67.
+ */
+fun routeInboundIntent(
+    parsedTarget: NotificationTarget?,
+    dataString: String?,
+    current: InboundIntentRouting,
+): InboundIntentRouting = when {
+    parsedTarget != null -> InboundIntentRouting(parsedTarget, null)
+    dataString != null -> InboundIntentRouting(null, dataString)
+    else -> current
+}
+
 object NotificationNavigation {
     /** Constant action marking a content intent as a notification tap. */
     const val ACTION_OPEN = "dev.ipf.darkmatter.action.OPEN_NOTIFICATION"
