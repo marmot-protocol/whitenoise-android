@@ -33,6 +33,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
@@ -198,6 +200,9 @@ class DarkMatterAppState(context: Context) {
     )
 
     private var client: MarmotClient? = null
+    // Serializes bootstrap so two concurrent callers can't both pass the
+    // null-client check and each construct a MarmotClient (TOCTOU). See #33.
+    private val bootstrapMutex = Mutex()
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
 
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
@@ -372,7 +377,9 @@ class DarkMatterAppState(context: Context) {
         }
     }
 
-    suspend fun bootstrap() {
+    suspend fun bootstrap() = bootstrapMutex.withLock { bootstrapLocked() }
+
+    private suspend fun bootstrapLocked() {
         if (client != null && phase != AppPhase.Bootstrapping) {
             ensureNotificationRuntimeStarted()
             phase = if (accounts.isEmpty()) AppPhase.Onboarding else AppPhase.Ready
