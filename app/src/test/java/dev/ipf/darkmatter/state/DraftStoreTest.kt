@@ -1,5 +1,6 @@
 package dev.ipf.darkmatter.state
 
+import androidx.compose.runtime.snapshots.Snapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -7,6 +8,40 @@ import org.junit.Test
 
 class DraftStoreTest {
     private fun store() = DraftStore(InMemoryDraftPersistence())
+
+    @Test
+    fun editingOneDraftDoesNotInvalidateReadersOfAnotherDraft() {
+        // Regression for #76: a single shared revision counter made every
+        // chat-list row (each reads its own draft) recompose on every keystroke
+        // in any conversation. Drafts must be observed per (account, group) key
+        // so only the affected row's read-set is invalidated.
+        val s = store()
+        s.set("a", "g1", "one")
+        s.set("a", "g2", "two")
+
+        // Capture the Compose state objects read when fetching g1's draft.
+        val g1Reads = HashSet<Any>()
+        val snapshot = Snapshot.takeSnapshot { g1Reads.add(it) }
+        try {
+            snapshot.enter { s.get("a", "g1") }
+        } finally {
+            snapshot.dispose()
+        }
+
+        // Capture the state objects changed when editing g2's draft.
+        val g2Changed = HashSet<Any>()
+        val handle = Snapshot.registerApplyObserver { changed, _ -> g2Changed.addAll(changed) }
+        try {
+            Snapshot.withMutableSnapshot { s.set("a", "g2", "two-edited") }
+        } finally {
+            handle.dispose()
+        }
+
+        assertTrue(
+            "editing g2 must not touch the state g1's reader depends on",
+            g1Reads.intersect(g2Changed).isEmpty(),
+        )
+    }
 
     @Test
     fun getReturnsNullWhenNoDraft() {
