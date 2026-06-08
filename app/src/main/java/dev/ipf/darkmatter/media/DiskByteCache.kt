@@ -46,18 +46,28 @@ class DiskByteCache(
         hydrated = true
     }
 
-    @Synchronized
     fun get(key: String): ByteArray? {
-        ensureHydrated()
         val hashed = fileNameFor(key)
-        val entry = index[hashed] ?: return null
+        // Look up (and LRU-promote) the entry under the lock, then read the
+        // file OUTSIDE it. Holding the monitor across readBytes() serialized
+        // every concurrent media load and blocked clear() for the duration of
+        // disk I/O. See #99.
+        val entry = synchronized(this) {
+            ensureHydrated()
+            index[hashed]
+        } ?: return null
         return try {
             entry.file.readBytes()
         } catch (_: IOException) {
             // File vanished (manual delete, OS cache reap, FS corruption).
             // Drop the index entry and report miss; the caller will re-fetch.
-            index.remove(hashed)
-            residentBytes -= entry.size
+            synchronized(this) {
+                // Only evict if a concurrent put() hasn't already replaced it.
+                if (index[hashed] === entry) {
+                    index.remove(hashed)
+                    residentBytes -= entry.size
+                }
+            }
             null
         }
     }
@@ -97,16 +107,23 @@ class DiskByteCache(
         evictUntilUnderCap()
     }
 
-    @Synchronized
     fun clear() {
-        ensureHydrated()
-        index.values.forEach { runCatching { it.file.delete() } }
-        index.clear()
-        residentBytes = 0L
+        // Drop the index and reset accounting under the lock, then delete files
+        // OUTSIDE it so a sign-out doesn't block concurrent get()s for the
+        // duration of (potentially many) file deletions. See #99.
+        val toDelete = synchronized(this) {
+            ensureHydrated()
+            val files = index.values.map { it.file }
+            index.clear()
+            residentBytes = 0L
+            files
+        }
+        toDelete.forEach { runCatching { it.delete() } }
         // Catch any orphans that aren't in the index — e.g. a prior crash
         // mid-put left a `.tmp`, or an entry whose index row was lost.
         // Scoped to OUR file-naming convention (`.bin` + `.tmp`) so a
-        // future co-tenant in the same dir survives sign-out.
+        // future co-tenant in the same dir survives sign-out. Touches no
+        // shared state, so it is safe outside the lock.
         cacheDir.listFiles()
             ?.asSequence()
             ?.filter { it.isFile && (it.name.endsWith(SUFFIX) || it.name.endsWith(TMP_SUFFIX)) }
