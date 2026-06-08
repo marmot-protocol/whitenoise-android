@@ -2014,7 +2014,7 @@ class ConversationController(
             )
         } finally {
             withContext(NonCancellable + Dispatchers.IO) {
-                subscription?.close()
+                runCatching { subscription?.close() }
             }
             activeStreamIds.remove(streamId)
         }
