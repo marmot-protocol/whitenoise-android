@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
+import dev.ipf.darkmatter.core.AvatarImageLoader
 import dev.ipf.darkmatter.core.HostSafety
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MarmotClient
@@ -484,6 +485,10 @@ class DarkMatterAppState(context: Context) {
     private fun clearMediaCaches() {
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
+        // Avatars are keyed by URL and shared across accounts, so wipe them on
+        // sign-out / account switch too — otherwise the LRU grows unbounded
+        // across switches and account A's avatars linger for account B. See #77.
+        AvatarImageLoader.clear()
         notificationScope.launch(Dispatchers.IO) { diskMediaCache.clear() }
     }
 
