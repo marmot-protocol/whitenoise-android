@@ -5238,6 +5238,9 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () ->
                                         )
                                     }
                                     appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }
+                                    // Archive the throwaway diagnostic group so it doesn't
+                                    // accumulate as an orphan in the chat list on every click. See #70.
+                                    appState.marmotIo { setGroupArchived(account, groupId, true) }
                                     appendLog(String.format(sentPingFormat, IdentityFormatter.short(groupId)))
                                 }.onFailure {
                                     appendLog(String.format(sendToSelfFailedFormat, it.message ?: it.javaClass.simpleName))
@@ -5287,22 +5290,31 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () ->
                     DiagnosticRow(stringResource(R.string.bootstrap_relays), appState.bootstrapRelayCount().toString())
                 }
             }
+            // Event log: emitted as top-level lazy items (keyed by the entry's
+            // id) rather than a forEach inside a single item, so the up-to-500
+            // rows are actually virtualized instead of all composing at once.
+            // See #35.
             item {
-                SectionCard(title = stringResource(R.string.event_log)) {
-                    if (entries.isEmpty()) {
-                        Text(stringResource(R.string.waiting_for_events), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else {
-                        entries.forEach { entry ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text(
-                                    IdentityFormatter.relativeTime(entry.timestamp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Text(entry.text, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
-                            }
-                        }
+                Text(
+                    stringResource(R.string.event_log),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            if (entries.isEmpty()) {
+                item {
+                    Text(stringResource(R.string.waiting_for_events), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                items(entries, key = { it.id }) { entry ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            IdentityFormatter.relativeTime(entry.timestamp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(entry.text, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
                     }
                 }
             }
