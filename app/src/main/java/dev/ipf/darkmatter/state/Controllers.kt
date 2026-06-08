@@ -15,6 +15,7 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
@@ -293,6 +294,11 @@ data class ConversationControllerCopy(
     val streamFailedFormat: String = "Stream failed: %1\$s",
 ) {
     fun streamFailed(message: String): String = String.format(streamFailedFormat, message)
+}
+
+internal fun agentStreamFailureText(throwable: Throwable, copy: ConversationControllerCopy): String {
+    if (throwable is CancellationException) throw throwable
+    return copy.streamFailed(throwable.message ?: throwable.javaClass.simpleName)
 }
 
 private data class OptimisticReactionChange(
@@ -2003,11 +2009,11 @@ class ConversationController(
         } catch (throwable: Throwable) {
             updateStreamPreview(
                 streamId,
-                copy.streamFailed(throwable.message ?: throwable.javaClass.simpleName),
+                agentStreamFailureText(throwable, copy),
                 MessageStatus.Failed,
             )
         } finally {
-            withContext(Dispatchers.IO) {
+            withContext(NonCancellable + Dispatchers.IO) {
                 subscription?.close()
             }
             activeStreamIds.remove(streamId)
