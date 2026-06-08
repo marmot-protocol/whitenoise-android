@@ -124,10 +124,10 @@
     <string name="notifications_settings_subtitle">Local alerts and background connection</string>
     <string name="security_and_privacy">Security &amp; Privacy</string>
     <string name="security_privacy_settings_subtitle">Telemetry, audit logs, diagnostics</string>
-    <string name="telemetry">Telemetry</string>
+    <string name="telemetry">Share anonymous app telemetry</string>
     <string name="telemetry_settings_subtitle">Share relay connection telemetry.</string>
     <string name="audit_logs">Audit logs</string>
-    <string name="audit_logs_settings_subtitle">Create and send security audit log files.</string>
+    <string name="audit_logs_settings_subtitle">Create and Send Group Audit Log Files</string>
     <string name="developer">Developer</string>
     <string name="developer_mode">Developer mode</string>
     <string name="developer_mode_subtitle">Shows diagnostics and MLS internals.</string>

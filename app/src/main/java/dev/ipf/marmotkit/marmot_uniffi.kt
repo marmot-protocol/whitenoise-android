@@ -1146,10 +1146,10 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_set_native_push_enabled(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`enabled`: Byte,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_runtime_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_runtime_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_shutdown(`ptr`: Pointer,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_start(`ptr`: Pointer,
@@ -1778,10 +1778,10 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_native_push_enabled() != 28116.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_runtime_config() != 203.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_runtime_config() != 6820.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_settings() != 54491.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_settings() != 50897.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_shutdown() != 57342.toShort()) {
@@ -3944,13 +3944,13 @@ public interface MarmotInterface {
      * override, bearer token from the host app's build-time secret, and
      * resource attributes from the platform shell.
      */
-    fun `setRelayTelemetryRuntimeConfig`(`config`: RelayTelemetryRuntimeConfigFfi)
+    suspend fun `setRelayTelemetryRuntimeConfig`(`config`: RelayTelemetryRuntimeConfigFfi)
     
     /**
      * Persist device-wide relay telemetry export settings and return the
      * normalized settings that were stored.
      */
-    fun `setRelayTelemetrySettings`(`settings`: RelayTelemetrySettingsFfi): RelayTelemetrySettingsFfi
+    suspend fun `setRelayTelemetrySettings`(`settings`: RelayTelemetrySettingsFfi): RelayTelemetrySettingsFfi
     
     /**
      * Tear the runtime down. Drops all subscriptions; long-lived
@@ -5587,33 +5587,51 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * override, bearer token from the host app's build-time secret, and
      * resource attributes from the platform shell.
      */
-    @Throws(MarmotKitException::class)override fun `setRelayTelemetryRuntimeConfig`(`config`: RelayTelemetryRuntimeConfigFfi)
-        = 
-    callWithPointer {
-    uniffiRustCallWithError(MarmotKitException) { _status ->
-    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_runtime_config(
-        it, FfiConverterTypeRelayTelemetryRuntimeConfigFfi.lower(`config`),_status)
-}
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `setRelayTelemetryRuntimeConfig`(`config`: RelayTelemetryRuntimeConfigFfi) {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_runtime_config(
+                thisPtr,
+                FfiConverterTypeRelayTelemetryRuntimeConfigFfi.lower(`config`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
+        // lift function
+        { Unit },
+        
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
     }
-    
-    
 
     
     /**
      * Persist device-wide relay telemetry export settings and return the
      * normalized settings that were stored.
      */
-    @Throws(MarmotKitException::class)override fun `setRelayTelemetrySettings`(`settings`: RelayTelemetrySettingsFfi): RelayTelemetrySettingsFfi {
-            return FfiConverterTypeRelayTelemetrySettingsFfi.lift(
-    callWithPointer {
-    uniffiRustCallWithError(MarmotKitException) { _status ->
-    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_settings(
-        it, FfiConverterTypeRelayTelemetrySettingsFfi.lower(`settings`),_status)
-}
-    }
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `setRelayTelemetrySettings`(`settings`: RelayTelemetrySettingsFfi) : RelayTelemetrySettingsFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_settings(
+                thisPtr,
+                FfiConverterTypeRelayTelemetrySettingsFfi.lower(`settings`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeRelayTelemetrySettingsFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
     )
     }
-    
 
     
     /**
@@ -8807,6 +8825,7 @@ data class RelayTelemetryResourceFfi (
     var `serviceVersion`: kotlin.String, 
     var `serviceInstanceId`: kotlin.String, 
     var `deploymentEnvironment`: kotlin.String, 
+    var `tenant`: kotlin.String, 
     var `osType`: kotlin.String, 
     var `osVersion`: kotlin.String, 
     var `deviceModelIdentifier`: kotlin.String?
@@ -8826,6 +8845,7 @@ public object FfiConverterTypeRelayTelemetryResourceFfi: FfiConverterRustBuffer<
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
             FfiConverterOptionalString.read(buf),
         )
     }
@@ -8834,6 +8854,7 @@ public object FfiConverterTypeRelayTelemetryResourceFfi: FfiConverterRustBuffer<
             FfiConverterString.allocationSize(value.`serviceVersion`) +
             FfiConverterString.allocationSize(value.`serviceInstanceId`) +
             FfiConverterString.allocationSize(value.`deploymentEnvironment`) +
+            FfiConverterString.allocationSize(value.`tenant`) +
             FfiConverterString.allocationSize(value.`osType`) +
             FfiConverterString.allocationSize(value.`osVersion`) +
             FfiConverterOptionalString.allocationSize(value.`deviceModelIdentifier`)
@@ -8843,6 +8864,7 @@ public object FfiConverterTypeRelayTelemetryResourceFfi: FfiConverterRustBuffer<
             FfiConverterString.write(value.`serviceVersion`, buf)
             FfiConverterString.write(value.`serviceInstanceId`, buf)
             FfiConverterString.write(value.`deploymentEnvironment`, buf)
+            FfiConverterString.write(value.`tenant`, buf)
             FfiConverterString.write(value.`osType`, buf)
             FfiConverterString.write(value.`osVersion`, buf)
             FfiConverterOptionalString.write(value.`deviceModelIdentifier`, buf)

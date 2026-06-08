@@ -7,7 +7,7 @@ object BackgroundConnectionPreferences {
     private const val KEY_ENABLED = "background_connection_enabled"
 
     fun isEnabled(context: Context): Boolean {
-        return preferences(context).getBoolean(KEY_ENABLED, false)
+        return preferences(context).getBoolean(KEY_ENABLED, true)
     }
 
     fun setEnabled(context: Context, enabled: Boolean) {
