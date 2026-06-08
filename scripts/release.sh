@@ -54,6 +54,34 @@ done
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MARMOT_DIR="${DARKMATTER_MARMOT_DIR:-$(cd "$REPO_DIR/../darkmatter" 2>/dev/null && pwd || true)}"
 
+android_build_tool() {
+  local tool="$1"
+  if command -v "$tool" >/dev/null 2>&1; then
+    command -v "$tool"
+    return 0
+  fi
+
+  local sdk_dir="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
+  if [[ -d "$sdk_dir/build-tools" ]]; then
+    find "$sdk_dir/build-tools" -mindepth 2 -maxdepth 2 -type f -name "$tool" | sort | tail -1
+  fi
+}
+
+assert_not_test_only() {
+  local apk="$1"
+  local aapt_path
+  aapt_path="$(android_build_tool aapt)"
+  if [[ -z "$aapt_path" || ! -x "$aapt_path" ]]; then
+    echo "error: aapt not found; cannot verify release APK manifest" >&2
+    exit 1
+  fi
+
+  if "$aapt_path" dump xmltree "$apk" AndroidManifest.xml | grep -q "android:testOnly.*0xffffffff"; then
+    echo "error: release APK is marked android:testOnly=true: $apk" >&2
+    exit 1
+  fi
+}
+
 if [[ -n "$TARGET_ABI" ]]; then
   case "$TARGET_ABI" in
     arm64-v8a|armeabi-v7a|x86|x86_64|universal) ;;
@@ -108,9 +136,10 @@ if [[ "$SKIP_BINDINGS" == "false" ]]; then
     echo "error: marmot workspace not found. Set DARKMATTER_MARMOT_DIR." >&2
     exit 1
   fi
-  echo "==> Rebuilding marmot bindings with RUSTFLAGS=-C strip=symbols"
+  # Android release binaries include the OTLP exporter; tokens remain runtime config.
+  echo "==> Rebuilding marmot bindings with RUSTFLAGS=-C strip=symbols OTLP_EXPORT=1"
   pushd "$MARMOT_DIR" >/dev/null
-  RUSTFLAGS="-C strip=symbols" bash crates/marmot-uniffi/kotlin-bindings.sh
+  OTLP_EXPORT=1 RUSTFLAGS="-C strip=symbols" bash crates/marmot-uniffi/kotlin-bindings.sh
   popd >/dev/null
 
   echo "==> Copying generated bindings + native libs into Android repo"
@@ -132,7 +161,9 @@ mkdir -p "$APK_DIR"
 if [[ -n "$TARGET_ABI" && "$TARGET_ABI" != "universal" ]]; then
   echo "==> Assembling release APK for $TARGET_ABI"
   rm -f "$APK_DIR"/*.apk
-  ./gradlew :app:assembleRelease -Pandroid.injected.build.abi="$TARGET_ABI"
+  ./gradlew :app:assembleRelease \
+    -Pandroid.injected.build.abi="$TARGET_ABI" \
+    -Pandroid.injected.testOnly=false
 
   gradle_apk_name="app-${TARGET_ABI}-release.apk"
   selected_apk="$APK_DIR/$gradle_apk_name"
@@ -149,6 +180,8 @@ if [[ -n "$TARGET_ABI" && "$TARGET_ABI" != "universal" ]]; then
     selected_apk="$APK_DIR/darkmatter-v8a-release-$(date +%F).apk"
     mv "$APK_DIR/$gradle_apk_name" "$selected_apk"
   fi
+
+  assert_not_test_only "$selected_apk"
 else
   echo "==> Assembling release APKs"
   ./gradlew :app:assembleRelease

@@ -13,6 +13,7 @@ export JAVA_HOME := env_var_or_default("JAVA_HOME", "/Applications/Android Studi
 DEBUG_PKG := "dev.ipf.darkmatter.debug"
 RELEASE_PKG := "dev.ipf.darkmatter"
 MAIN_ACTIVITY := "dev.ipf.darkmatter.MainActivity"
+RELEASE_APK_DIR := "app/build/outputs/apk/release"
 
 _default:
     @just --list
@@ -49,11 +50,11 @@ release:
     ./scripts/release.sh
 
 # Build the production/release arm64-v8a APK immediately using the current
-# checked-in Marmot bindings + native libs.
+# checked-in Marmot bindings + native libs, then print the release folder as
+# the final line so it is easy to open in Finder.
 apk:
     ./scripts/release.sh --skip-bindings --abi arm64-v8a
-
-alias APK := apk
+    @printf '%s\n' "$PWD/{{RELEASE_APK_DIR}}"
 
 # Same as `release` but skip the (slow) Rust rebuild — use whatever .so's
 # are already checked in.
@@ -64,7 +65,7 @@ release-fast:
 # sanity-checking a release build on your own phone.
 install-release:
     ./scripts/release.sh --skip-bindings --abi arm64-v8a
-    adb install -r app/build/outputs/apk/release/darkmatter-v8a-release-$(date +%F).apk
+    adb install -r {{RELEASE_APK_DIR}}/darkmatter-v8a-release-$(date +%F).apk
 
 # Launch the installed release variant.
 launch-release:

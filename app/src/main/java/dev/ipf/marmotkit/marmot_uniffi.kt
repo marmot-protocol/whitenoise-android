@@ -931,6 +931,22 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1002,13 +1018,15 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_account_inbox_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_key_package_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_account_key_packages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_account_nip65_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_account_relay_lists(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_files(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_settings(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_catch_up_accounts(`ptr`: Pointer,
     ): Long
@@ -1037,8 +1055,6 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_download_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_group_details(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_group_forensics_json(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`mode`: RustBuffer.ByValue,`publicRedactionSaltHex`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_group_management_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
@@ -1074,6 +1090,10 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_npub(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_file(`ptr`: Pointer,`path`: RustBuffer.ByValue,`endpoint`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_tracker_update(`ptr`: Pointer,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_promote_admin(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_promote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
@@ -1091,6 +1111,10 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_refresh_profile(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_relay_health(`ptr`: Pointer,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_relay_telemetry_settings(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_remove_account(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_remove_members(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
     ): Long
@@ -1110,16 +1134,22 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_set_account_inbox_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_account_key_package_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
-    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_set_account_nip65_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_tracker_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_set_group_archived(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`archived`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_set_local_notifications_enabled(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`enabled`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_set_native_push_enabled(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`enabled`: Byte,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_runtime_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_shutdown(`ptr`: Pointer,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_start(`ptr`: Pointer,
@@ -1140,6 +1170,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_telemetry_install_id(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`query`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_unreact_from_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,
@@ -1316,13 +1348,15 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_account_inbox_relays(
     ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_account_key_package_relays(
-    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_account_key_packages(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_account_nip65_relays(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_account_relay_lists(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_audit_log_files(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_audit_log_settings(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_catch_up_accounts(
     ): Short
@@ -1351,8 +1385,6 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_download_media(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_group_details(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_group_forensics_json(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_group_management_state(
     ): Short
@@ -1388,6 +1420,10 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_npub(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_post_audit_log_file(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_post_audit_log_tracker_update(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_promote_admin(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_promote_admin_detailed(
@@ -1405,6 +1441,10 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_refresh_profile(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_relay_health(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_relay_telemetry_settings(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_remove_account(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_remove_members(
     ): Short
@@ -1424,15 +1464,21 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_account_inbox_relays(
     ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_set_account_key_package_relays(
-    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_account_nip65_relays(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_settings(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_tracker_config(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_group_archived(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_local_notifications_enabled(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_set_native_push_enabled(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_runtime_config(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_settings(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_shutdown(
     ): Short
@@ -1453,6 +1499,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_notifications(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_subscribe_timeline_messages(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_telemetry_install_id(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_timeline_messages(
     ): Short
@@ -1538,16 +1586,19 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_inbox_relays() != 4611.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_key_package_relays() != 12467.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_key_packages() != 23031.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_nip65_relays() != 27766.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_relay_lists() != 20645.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_relay_lists() != 47794.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_audit_log_files() != 25846.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_audit_log_settings() != 34729.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_catch_up_accounts() != 28824.toShort()) {
@@ -1590,9 +1641,6 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_details() != 55062.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_forensics_json() != 53970.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_management_state() != 47526.toShort()) {
@@ -1646,6 +1694,12 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_npub() != 20744.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_post_audit_log_file() != 63080.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_post_audit_log_tracker_update() != 48289.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_promote_admin() != 43119.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1655,7 +1709,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_publish_new_key_package() != 11266.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_publish_relay_lists() != 678.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_publish_relay_lists() != 14063.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_publish_user_profile() != 48272.toShort()) {
@@ -1671,6 +1725,12 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_relay_health() != 9336.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_relay_telemetry_settings() != 36605.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_remove_account() != 37396.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_remove_members() != 32012.toShort()) {
@@ -1700,10 +1760,13 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_account_inbox_relays() != 12290.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_account_key_package_relays() != 35542.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_account_nip65_relays() != 61454.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_account_nip65_relays() != 61454.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_settings() != 56917.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_tracker_config() != 30506.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_group_archived() != 3813.toShort()) {
@@ -1713,6 +1776,12 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_native_push_enabled() != 28116.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_runtime_config() != 203.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_relay_telemetry_settings() != 54491.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_shutdown() != 57342.toShort()) {
@@ -1743,6 +1812,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_subscribe_timeline_messages() != 20678.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_telemetry_install_id() != 40706.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_timeline_messages() != 13755.toShort()) {
@@ -3561,8 +3633,6 @@ public interface MarmotInterface {
     
     fun `accountInboxRelays`(`accountRef`: kotlin.String): List<kotlin.String>
     
-    fun `accountKeyPackageRelays`(`accountRef`: kotlin.String): List<kotlin.String>
-    
     /**
      * List the local and relay-discovered Marmot KeyPackage publications for
      * `account_ref`.
@@ -3572,10 +3642,21 @@ public interface MarmotInterface {
     fun `accountNip65Relays`(`accountRef`: kotlin.String): List<kotlin.String>
     
     /**
-     * Per-account relay lists: the NIP-65, inbox, and key-package lists the
-     * account has published, plus the configured default/bootstrap sets.
+     * Per-account relay lists: the NIP-65 and inbox lists the account has
+     * published, plus the configured default/bootstrap sets.
      */
     fun `accountRelayLists`(`accountRef`: kotlin.String): AccountRelayListsFfi
+    
+    /**
+     * Local JSONL audit logs available for explicit forensic upload.
+     */
+    fun `auditLogFiles`(): List<AuditLogFileFfi>
+    
+    /**
+     * Local forensic audit-log recording settings. Recording is opt-in and only
+     * applies to account sessions opened after the setting is enabled.
+     */
+    fun `auditLogSettings`(): AuditLogSettingsFfi
     
     suspend fun `catchUpAccounts`()
     
@@ -3640,14 +3721,6 @@ public interface MarmotInterface {
      * Group plus enriched member rows for detail screens.
      */
     suspend fun `groupDetails`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupDetailsFfi
-    
-    /**
-     * Export a forensic JSON bundle for this account/device's local view of a
-     * group. Public mode redacts operational identifiers, payload bytes, and
-     * stable payload digests. Pass the same public salt across devices when
-     * comparing public dumps from one incident.
-     */
-    suspend fun `groupForensicsJson`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `mode`: ForensicsDumpModeFfi, `publicRedactionSaltHex`: kotlin.String?): kotlin.String
     
     /**
      * Current caller permissions plus per-member action availability.
@@ -3735,6 +3808,18 @@ public interface MarmotInterface {
     fun `npub`(`accountIdHex`: kotlin.String): kotlin.String?
     
     /**
+     * POST one selected JSONL audit log to a forensic analyzer endpoint.
+     */
+    suspend fun `postAuditLogFile`(`path`: kotlin.String, `endpoint`: kotlin.String): AuditLogUploadResultFfi
+    
+    /**
+     * POST all local audit logs to the configured tracker when audit logging is
+     * enabled. This is safe for host apps to call unconditionally; disabled or
+     * unconfigured states return a structured skip result.
+     */
+    suspend fun `postAuditLogTrackerUpdate`(): AuditLogTrackerUpdateResultFfi
+    
+    /**
      * Grant admin rights to `member_ref` (npub or hex). Requires the caller
      * to be an admin; publishes a group state update.
      */
@@ -3748,7 +3833,7 @@ public interface MarmotInterface {
     suspend fun `publishNewKeyPackage`(`accountRef`: kotlin.String): kotlin.ULong
     
     /**
-     * Publish (or re-publish) NIP-65, inbox, and key-package relay lists for
+     * Publish (or re-publish) the NIP-65 and inbox relay lists for
      * `account_ref`. Idempotent — safe to call on every launch.
      */
     suspend fun `publishRelayLists`(`accountRef`: kotlin.String, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>)
@@ -3779,6 +3864,18 @@ public interface MarmotInterface {
      * disconnected counts, etc.) for the relay diagnostics view.
      */
     suspend fun `relayHealth`(): RelayHealthFfi
+    
+    /**
+     * Device-wide relay telemetry export settings. Export is opt-in and stays
+     * inert until `export_enabled` is true and runtime/default config supplies
+     * a valid OTLP endpoint, bearer token, and resource attributes.
+     */
+    fun `relayTelemetrySettings`(): RelayTelemetrySettingsFfi
+    
+    /**
+     * Remove a local-signing account from this device.
+     */
+    suspend fun `removeAccount`(`accountRef`: kotlin.String)
     
     suspend fun `removeMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): SendSummaryFfi
     
@@ -3816,9 +3913,20 @@ public interface MarmotInterface {
     
     suspend fun `setAccountInboxRelays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountRelayListsFfi
     
-    suspend fun `setAccountKeyPackageRelays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountRelayListsFfi
-    
     suspend fun `setAccountNip65Relays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountRelayListsFfi
+    
+    /**
+     * Persist local forensic audit-log recording settings and return the stored
+     * value.
+     */
+    fun `setAuditLogSettings`(`settings`: AuditLogSettingsFfi): AuditLogSettingsFfi
+    
+    /**
+     * Supply non-persisted audit tracker upload metadata: optional Goggles
+     * upload URL override, bearer token from the host app, and optional human
+     * source labels.
+     */
+    fun `setAuditLogTrackerConfig`(`config`: AuditLogTrackerConfigFfi): AuditLogTrackerConfigFfi
     
     /**
      * Flag a group archived (or restore it). Local-only projection state —
@@ -3830,6 +3938,19 @@ public interface MarmotInterface {
     fun `setLocalNotificationsEnabled`(`accountRef`: kotlin.String, `enabled`: kotlin.Boolean): NotificationSettingsFfi
     
     suspend fun `setNativePushEnabled`(`accountRef`: kotlin.String, `enabled`: kotlin.Boolean): NotificationSettingsFfi
+    
+    /**
+     * Supply non-persisted OTLP runtime metadata: optional metrics URL
+     * override, bearer token from the host app's build-time secret, and
+     * resource attributes from the platform shell.
+     */
+    fun `setRelayTelemetryRuntimeConfig`(`config`: RelayTelemetryRuntimeConfigFfi)
+    
+    /**
+     * Persist device-wide relay telemetry export settings and return the
+     * normalized settings that were stored.
+     */
+    fun `setRelayTelemetrySettings`(`settings`: RelayTelemetrySettingsFfi): RelayTelemetrySettingsFfi
     
     /**
      * Tear the runtime down. Drops all subscriptions; long-lived
@@ -3896,6 +4017,13 @@ public interface MarmotInterface {
      * The snapshot and each update are full pages for the supplied query.
      */
     suspend fun `subscribeTimelineMessages`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String?, `limit`: kotlin.UInt?): TimelineMessagesSubscription
+    
+    /**
+     * Stable random identifier for this app install, suitable for the OTLP
+     * `service.instance.id` resource attribute. Separate from audit-log device
+     * identity.
+     */
+    fun `telemetryInstallId`(): kotlin.String
     
     /**
      * Materialized conversation timeline for a group or account-wide tail.
@@ -4099,19 +4227,6 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
 
     
-    @Throws(MarmotKitException::class)override fun `accountKeyPackageRelays`(`accountRef`: kotlin.String): List<kotlin.String> {
-            return FfiConverterSequenceString.lift(
-    callWithPointer {
-    uniffiRustCallWithError(MarmotKitException) { _status ->
-    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_account_key_package_relays(
-        it, FfiConverterString.lower(`accountRef`),_status)
-}
-    }
-    )
-    }
-    
-
-    
     /**
      * List the local and relay-discovered Marmot KeyPackage publications for
      * `account_ref`.
@@ -4151,8 +4266,8 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
-     * Per-account relay lists: the NIP-65, inbox, and key-package lists the
-     * account has published, plus the configured default/bootstrap sets.
+     * Per-account relay lists: the NIP-65 and inbox lists the account has
+     * published, plus the configured default/bootstrap sets.
      */
     @Throws(MarmotKitException::class)override fun `accountRelayLists`(`accountRef`: kotlin.String): AccountRelayListsFfi {
             return FfiConverterTypeAccountRelayListsFfi.lift(
@@ -4160,6 +4275,39 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     uniffiRustCallWithError(MarmotKitException) { _status ->
     UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_account_relay_lists(
         it, FfiConverterString.lower(`accountRef`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Local JSONL audit logs available for explicit forensic upload.
+     */
+    @Throws(MarmotKitException::class)override fun `auditLogFiles`(): List<AuditLogFileFfi> {
+            return FfiConverterSequenceTypeAuditLogFileFfi.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_audit_log_files(
+        it, _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Local forensic audit-log recording settings. Recording is opt-in and only
+     * applies to account sessions opened after the setting is enabled.
+     */
+    @Throws(MarmotKitException::class)override fun `auditLogSettings`(): AuditLogSettingsFfi {
+            return FfiConverterTypeAuditLogSettingsFfi.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_audit_log_settings(
+        it, _status)
 }
     }
     )
@@ -4476,33 +4624,6 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeGroupDetailsFfi.lift(it) },
-        // Error FFI converter
-        MarmotKitException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Export a forensic JSON bundle for this account/device's local view of a
-     * group. Public mode redacts operational identifiers, payload bytes, and
-     * stable payload digests. Pass the same public salt across devices when
-     * comparing public dumps from one incident.
-     */
-    @Throws(MarmotKitException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `groupForensicsJson`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `mode`: ForensicsDumpModeFfi, `publicRedactionSaltHex`: kotlin.String?) : kotlin.String {
-        return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_group_forensics_json(
-                thisPtr,
-                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterTypeForensicsDumpModeFfi.lower(`mode`),FfiConverterOptionalString.lower(`publicRedactionSaltHex`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterString.lift(it) },
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
@@ -4844,6 +4965,56 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * POST one selected JSONL audit log to a forensic analyzer endpoint.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `postAuditLogFile`(`path`: kotlin.String, `endpoint`: kotlin.String) : AuditLogUploadResultFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_file(
+                thisPtr,
+                FfiConverterString.lower(`path`),FfiConverterString.lower(`endpoint`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeAuditLogUploadResultFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * POST all local audit logs to the configured tracker when audit logging is
+     * enabled. This is safe for host apps to call unconditionally; disabled or
+     * unconfigured states return a structured skip result.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `postAuditLogTrackerUpdate`() : AuditLogTrackerUpdateResultFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_tracker_update(
+                thisPtr,
+                
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeAuditLogTrackerUpdateResultFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Grant admin rights to `member_ref` (npub or hex). Requires the caller
      * to be an admin; publishes a group state update.
      */
@@ -4914,7 +5085,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
-     * Publish (or re-publish) NIP-65, inbox, and key-package relay lists for
+     * Publish (or re-publish) the NIP-65 and inbox relay lists for
      * `account_ref`. Idempotent — safe to call on every launch.
      */
     @Throws(MarmotKitException::class)
@@ -5049,6 +5220,49 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { FfiConverterTypeRelayHealthFfi.lift(it) },
         // Error FFI converter
         UniffiNullRustCallStatusErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Device-wide relay telemetry export settings. Export is opt-in and stays
+     * inert until `export_enabled` is true and runtime/default config supplies
+     * a valid OTLP endpoint, bearer token, and resource attributes.
+     */
+    @Throws(MarmotKitException::class)override fun `relayTelemetrySettings`(): RelayTelemetrySettingsFfi {
+            return FfiConverterTypeRelayTelemetrySettingsFfi.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_relay_telemetry_settings(
+        it, _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Remove a local-signing account from this device.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `removeAccount`(`accountRef`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_remove_account(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
+        // lift function
+        { Unit },
+        
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
     )
     }
 
@@ -5262,27 +5476,6 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `setAccountKeyPackageRelays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>) : AccountRelayListsFfi {
-        return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_account_key_package_relays(
-                thisPtr,
-                FfiConverterString.lower(`accountRef`),FfiConverterSequenceString.lower(`relays`),FfiConverterSequenceString.lower(`bootstrapRelays`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeAccountRelayListsFfi.lift(it) },
-        // Error FFI converter
-        MarmotKitException.ErrorHandler,
-    )
-    }
-
-    
-    @Throws(MarmotKitException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `setAccountNip65Relays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>) : AccountRelayListsFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
@@ -5300,6 +5493,41 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         MarmotKitException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * Persist local forensic audit-log recording settings and return the stored
+     * value.
+     */
+    @Throws(MarmotKitException::class)override fun `setAuditLogSettings`(`settings`: AuditLogSettingsFfi): AuditLogSettingsFfi {
+            return FfiConverterTypeAuditLogSettingsFfi.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_settings(
+        it, FfiConverterTypeAuditLogSettingsFfi.lower(`settings`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Supply non-persisted audit tracker upload metadata: optional Goggles
+     * upload URL override, bearer token from the host app, and optional human
+     * source labels.
+     */
+    @Throws(MarmotKitException::class)override fun `setAuditLogTrackerConfig`(`config`: AuditLogTrackerConfigFfi): AuditLogTrackerConfigFfi {
+            return FfiConverterTypeAuditLogTrackerConfigFfi.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_tracker_config(
+        it, FfiConverterTypeAuditLogTrackerConfigFfi.lower(`config`),_status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -5352,6 +5580,40 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         MarmotKitException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * Supply non-persisted OTLP runtime metadata: optional metrics URL
+     * override, bearer token from the host app's build-time secret, and
+     * resource attributes from the platform shell.
+     */
+    @Throws(MarmotKitException::class)override fun `setRelayTelemetryRuntimeConfig`(`config`: RelayTelemetryRuntimeConfigFfi)
+        = 
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_runtime_config(
+        it, FfiConverterTypeRelayTelemetryRuntimeConfigFfi.lower(`config`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Persist device-wide relay telemetry export settings and return the
+     * normalized settings that were stored.
+     */
+    @Throws(MarmotKitException::class)override fun `setRelayTelemetrySettings`(`settings`: RelayTelemetrySettingsFfi): RelayTelemetrySettingsFfi {
+            return FfiConverterTypeRelayTelemetrySettingsFfi.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_relay_telemetry_settings(
+        it, FfiConverterTypeRelayTelemetrySettingsFfi.lower(`settings`),_status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -5600,6 +5862,24 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         MarmotKitException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * Stable random identifier for this app install, suitable for the OTLP
+     * `service.instance.id` resource attribute. Separate from audit-log device
+     * identity.
+     */
+    @Throws(MarmotKitException::class)override fun `telemetryInstallId`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_telemetry_install_id(
+        it, _status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -6655,8 +6935,7 @@ data class AccountRelayListsFfi (
     var `defaultRelays`: List<kotlin.String>, 
     var `bootstrapRelays`: List<kotlin.String>, 
     var `nip65`: RelayListFfi, 
-    var `inbox`: RelayListFfi, 
-    var `keyPackage`: RelayListFfi
+    var `inbox`: RelayListFfi
 ) {
     
     companion object
@@ -6674,7 +6953,6 @@ public object FfiConverterTypeAccountRelayListsFfi: FfiConverterRustBuffer<Accou
             FfiConverterSequenceString.read(buf),
             FfiConverterTypeRelayListFfi.read(buf),
             FfiConverterTypeRelayListFfi.read(buf),
-            FfiConverterTypeRelayListFfi.read(buf),
         )
     }
 
@@ -6684,8 +6962,7 @@ public object FfiConverterTypeAccountRelayListsFfi: FfiConverterRustBuffer<Accou
             FfiConverterSequenceString.allocationSize(value.`defaultRelays`) +
             FfiConverterSequenceString.allocationSize(value.`bootstrapRelays`) +
             FfiConverterTypeRelayListFfi.allocationSize(value.`nip65`) +
-            FfiConverterTypeRelayListFfi.allocationSize(value.`inbox`) +
-            FfiConverterTypeRelayListFfi.allocationSize(value.`keyPackage`)
+            FfiConverterTypeRelayListFfi.allocationSize(value.`inbox`)
     )
 
     override fun write(value: AccountRelayListsFfi, buf: ByteBuffer) {
@@ -6695,7 +6972,6 @@ public object FfiConverterTypeAccountRelayListsFfi: FfiConverterRustBuffer<Accou
             FfiConverterSequenceString.write(value.`bootstrapRelays`, buf)
             FfiConverterTypeRelayListFfi.write(value.`nip65`, buf)
             FfiConverterTypeRelayListFfi.write(value.`inbox`, buf)
-            FfiConverterTypeRelayListFfi.write(value.`keyPackage`, buf)
     }
 }
 
@@ -6986,6 +7262,226 @@ public object FfiConverterTypeAppMessageRecordFfi: FfiConverterRustBuffer<AppMes
             FfiConverterSequenceTypeMessageTagFfi.write(value.`tags`, buf)
             FfiConverterULong.write(value.`recordedAt`, buf)
             FfiConverterULong.write(value.`receivedAt`, buf)
+    }
+}
+
+
+
+data class AuditLogFileFfi (
+    var `accountRef`: kotlin.String, 
+    var `path`: kotlin.String, 
+    var `fileName`: kotlin.String, 
+    var `sizeBytes`: kotlin.ULong, 
+    var `modifiedAtMs`: kotlin.ULong?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAuditLogFileFfi: FfiConverterRustBuffer<AuditLogFileFfi> {
+    override fun read(buf: ByteBuffer): AuditLogFileFfi {
+        return AuditLogFileFfi(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AuditLogFileFfi) = (
+            FfiConverterString.allocationSize(value.`accountRef`) +
+            FfiConverterString.allocationSize(value.`path`) +
+            FfiConverterString.allocationSize(value.`fileName`) +
+            FfiConverterULong.allocationSize(value.`sizeBytes`) +
+            FfiConverterOptionalULong.allocationSize(value.`modifiedAtMs`)
+    )
+
+    override fun write(value: AuditLogFileFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`accountRef`, buf)
+            FfiConverterString.write(value.`path`, buf)
+            FfiConverterString.write(value.`fileName`, buf)
+            FfiConverterULong.write(value.`sizeBytes`, buf)
+            FfiConverterOptionalULong.write(value.`modifiedAtMs`, buf)
+    }
+}
+
+
+
+data class AuditLogSettingsFfi (
+    var `enabled`: kotlin.Boolean
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAuditLogSettingsFfi: FfiConverterRustBuffer<AuditLogSettingsFfi> {
+    override fun read(buf: ByteBuffer): AuditLogSettingsFfi {
+        return AuditLogSettingsFfi(
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AuditLogSettingsFfi) = (
+            FfiConverterBoolean.allocationSize(value.`enabled`)
+    )
+
+    override fun write(value: AuditLogSettingsFfi, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`enabled`, buf)
+    }
+}
+
+
+
+data class AuditLogTrackerConfigFfi (
+    var `endpoint`: kotlin.String?, 
+    var `authorizationBearerToken`: kotlin.String?, 
+    var `source`: AuditLogUploadSourceFfi
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAuditLogTrackerConfigFfi: FfiConverterRustBuffer<AuditLogTrackerConfigFfi> {
+    override fun read(buf: ByteBuffer): AuditLogTrackerConfigFfi {
+        return AuditLogTrackerConfigFfi(
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterTypeAuditLogUploadSourceFfi.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AuditLogTrackerConfigFfi) = (
+            FfiConverterOptionalString.allocationSize(value.`endpoint`) +
+            FfiConverterOptionalString.allocationSize(value.`authorizationBearerToken`) +
+            FfiConverterTypeAuditLogUploadSourceFfi.allocationSize(value.`source`)
+    )
+
+    override fun write(value: AuditLogTrackerConfigFfi, buf: ByteBuffer) {
+            FfiConverterOptionalString.write(value.`endpoint`, buf)
+            FfiConverterOptionalString.write(value.`authorizationBearerToken`, buf)
+            FfiConverterTypeAuditLogUploadSourceFfi.write(value.`source`, buf)
+    }
+}
+
+
+
+data class AuditLogTrackerUpdateResultFfi (
+    var `enabled`: kotlin.Boolean, 
+    var `uploaded`: List<AuditLogUploadResultFfi>, 
+    var `skippedReason`: kotlin.String?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAuditLogTrackerUpdateResultFfi: FfiConverterRustBuffer<AuditLogTrackerUpdateResultFfi> {
+    override fun read(buf: ByteBuffer): AuditLogTrackerUpdateResultFfi {
+        return AuditLogTrackerUpdateResultFfi(
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceTypeAuditLogUploadResultFfi.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AuditLogTrackerUpdateResultFfi) = (
+            FfiConverterBoolean.allocationSize(value.`enabled`) +
+            FfiConverterSequenceTypeAuditLogUploadResultFfi.allocationSize(value.`uploaded`) +
+            FfiConverterOptionalString.allocationSize(value.`skippedReason`)
+    )
+
+    override fun write(value: AuditLogTrackerUpdateResultFfi, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`enabled`, buf)
+            FfiConverterSequenceTypeAuditLogUploadResultFfi.write(value.`uploaded`, buf)
+            FfiConverterOptionalString.write(value.`skippedReason`, buf)
+    }
+}
+
+
+
+data class AuditLogUploadResultFfi (
+    var `path`: kotlin.String, 
+    var `status`: kotlin.UShort, 
+    var `bytesSent`: kotlin.ULong
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAuditLogUploadResultFfi: FfiConverterRustBuffer<AuditLogUploadResultFfi> {
+    override fun read(buf: ByteBuffer): AuditLogUploadResultFfi {
+        return AuditLogUploadResultFfi(
+            FfiConverterString.read(buf),
+            FfiConverterUShort.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AuditLogUploadResultFfi) = (
+            FfiConverterString.allocationSize(value.`path`) +
+            FfiConverterUShort.allocationSize(value.`status`) +
+            FfiConverterULong.allocationSize(value.`bytesSent`)
+    )
+
+    override fun write(value: AuditLogUploadResultFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`path`, buf)
+            FfiConverterUShort.write(value.`status`, buf)
+            FfiConverterULong.write(value.`bytesSent`, buf)
+    }
+}
+
+
+
+data class AuditLogUploadSourceFfi (
+    var `accountLabel`: kotlin.String?, 
+    var `deviceLabel`: kotlin.String?, 
+    var `platform`: kotlin.String?, 
+    var `appVersion`: kotlin.String?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAuditLogUploadSourceFfi: FfiConverterRustBuffer<AuditLogUploadSourceFfi> {
+    override fun read(buf: ByteBuffer): AuditLogUploadSourceFfi {
+        return AuditLogUploadSourceFfi(
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AuditLogUploadSourceFfi) = (
+            FfiConverterOptionalString.allocationSize(value.`accountLabel`) +
+            FfiConverterOptionalString.allocationSize(value.`deviceLabel`) +
+            FfiConverterOptionalString.allocationSize(value.`platform`) +
+            FfiConverterOptionalString.allocationSize(value.`appVersion`)
+    )
+
+    override fun write(value: AuditLogUploadSourceFfi, buf: ByteBuffer) {
+            FfiConverterOptionalString.write(value.`accountLabel`, buf)
+            FfiConverterOptionalString.write(value.`deviceLabel`, buf)
+            FfiConverterOptionalString.write(value.`platform`, buf)
+            FfiConverterOptionalString.write(value.`appVersion`, buf)
     }
 }
 
@@ -8307,6 +8803,122 @@ public object FfiConverterTypeRelayListFfi: FfiConverterRustBuffer<RelayListFfi>
 
 
 
+data class RelayTelemetryResourceFfi (
+    var `serviceVersion`: kotlin.String, 
+    var `serviceInstanceId`: kotlin.String, 
+    var `deploymentEnvironment`: kotlin.String, 
+    var `osType`: kotlin.String, 
+    var `osVersion`: kotlin.String, 
+    var `deviceModelIdentifier`: kotlin.String?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRelayTelemetryResourceFfi: FfiConverterRustBuffer<RelayTelemetryResourceFfi> {
+    override fun read(buf: ByteBuffer): RelayTelemetryResourceFfi {
+        return RelayTelemetryResourceFfi(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: RelayTelemetryResourceFfi) = (
+            FfiConverterString.allocationSize(value.`serviceVersion`) +
+            FfiConverterString.allocationSize(value.`serviceInstanceId`) +
+            FfiConverterString.allocationSize(value.`deploymentEnvironment`) +
+            FfiConverterString.allocationSize(value.`osType`) +
+            FfiConverterString.allocationSize(value.`osVersion`) +
+            FfiConverterOptionalString.allocationSize(value.`deviceModelIdentifier`)
+    )
+
+    override fun write(value: RelayTelemetryResourceFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`serviceVersion`, buf)
+            FfiConverterString.write(value.`serviceInstanceId`, buf)
+            FfiConverterString.write(value.`deploymentEnvironment`, buf)
+            FfiConverterString.write(value.`osType`, buf)
+            FfiConverterString.write(value.`osVersion`, buf)
+            FfiConverterOptionalString.write(value.`deviceModelIdentifier`, buf)
+    }
+}
+
+
+
+data class RelayTelemetryRuntimeConfigFfi (
+    var `otlpEndpoint`: kotlin.String?, 
+    var `authorizationBearerToken`: kotlin.String?, 
+    var `resource`: RelayTelemetryResourceFfi?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRelayTelemetryRuntimeConfigFfi: FfiConverterRustBuffer<RelayTelemetryRuntimeConfigFfi> {
+    override fun read(buf: ByteBuffer): RelayTelemetryRuntimeConfigFfi {
+        return RelayTelemetryRuntimeConfigFfi(
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalTypeRelayTelemetryResourceFfi.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: RelayTelemetryRuntimeConfigFfi) = (
+            FfiConverterOptionalString.allocationSize(value.`otlpEndpoint`) +
+            FfiConverterOptionalString.allocationSize(value.`authorizationBearerToken`) +
+            FfiConverterOptionalTypeRelayTelemetryResourceFfi.allocationSize(value.`resource`)
+    )
+
+    override fun write(value: RelayTelemetryRuntimeConfigFfi, buf: ByteBuffer) {
+            FfiConverterOptionalString.write(value.`otlpEndpoint`, buf)
+            FfiConverterOptionalString.write(value.`authorizationBearerToken`, buf)
+            FfiConverterOptionalTypeRelayTelemetryResourceFfi.write(value.`resource`, buf)
+    }
+}
+
+
+
+data class RelayTelemetrySettingsFfi (
+    var `exportEnabled`: kotlin.Boolean, 
+    var `exportIntervalSeconds`: kotlin.ULong
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRelayTelemetrySettingsFfi: FfiConverterRustBuffer<RelayTelemetrySettingsFfi> {
+    override fun read(buf: ByteBuffer): RelayTelemetrySettingsFfi {
+        return RelayTelemetrySettingsFfi(
+            FfiConverterBoolean.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: RelayTelemetrySettingsFfi) = (
+            FfiConverterBoolean.allocationSize(value.`exportEnabled`) +
+            FfiConverterULong.allocationSize(value.`exportIntervalSeconds`)
+    )
+
+    override fun write(value: RelayTelemetrySettingsFfi, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`exportEnabled`, buf)
+            FfiConverterULong.write(value.`exportIntervalSeconds`, buf)
+    }
+}
+
+
+
 data class RuntimeMessageReceivedFfi (
     var `accountIdHex`: kotlin.String, 
     var `accountLabel`: kotlin.String, 
@@ -9058,38 +9670,6 @@ public object FfiConverterTypeChatListUpdateTriggerFfi: FfiConverterRustBuffer<C
     override fun allocationSize(value: ChatListUpdateTriggerFfi) = 4UL
 
     override fun write(value: ChatListUpdateTriggerFfi, buf: ByteBuffer) {
-        buf.putInt(value.ordinal + 1)
-    }
-}
-
-
-
-
-
-
-enum class ForensicsDumpModeFfi {
-    
-    PUBLIC,
-    SENSITIVE;
-    companion object
-}
-
-
-/**
- * @suppress
- */
-public object FfiConverterTypeForensicsDumpModeFfi: FfiConverterRustBuffer<ForensicsDumpModeFfi> {
-    override fun read(buf: ByteBuffer) = try {
-        
-        ForensicsDumpModeFfi.entries[buf.getInt() - 1]
-        
-    } catch (e: IndexOutOfBoundsException) {
-        throw RuntimeException("invalid enum value, something is very wrong!!", e)
-    }
-
-    override fun allocationSize(value: ForensicsDumpModeFfi) = 4UL
-
-    override fun write(value: ForensicsDumpModeFfi, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }
@@ -10477,6 +11057,38 @@ public object FfiConverterOptionalTypePushRegistrationFfi: FfiConverterRustBuffe
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeRelayTelemetryResourceFfi: FfiConverterRustBuffer<RelayTelemetryResourceFfi?> {
+    override fun read(buf: ByteBuffer): RelayTelemetryResourceFfi? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeRelayTelemetryResourceFfi.read(buf)
+    }
+
+    override fun allocationSize(value: RelayTelemetryResourceFfi?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeRelayTelemetryResourceFfi.allocationSize(value)
+        }
+    }
+
+    override fun write(value: RelayTelemetryResourceFfi?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeRelayTelemetryResourceFfi.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeSendSummaryFfi: FfiConverterRustBuffer<SendSummaryFfi?> {
     override fun read(buf: ByteBuffer): SendSummaryFfi? {
         if (buf.get().toInt() == 0) {
@@ -10951,6 +11563,62 @@ public object FfiConverterSequenceTypeAppMessageRecordFfi: FfiConverterRustBuffe
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeAppMessageRecordFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeAuditLogFileFfi: FfiConverterRustBuffer<List<AuditLogFileFfi>> {
+    override fun read(buf: ByteBuffer): List<AuditLogFileFfi> {
+        val len = buf.getInt()
+        return List<AuditLogFileFfi>(len) {
+            FfiConverterTypeAuditLogFileFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<AuditLogFileFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeAuditLogFileFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<AuditLogFileFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeAuditLogFileFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeAuditLogUploadResultFfi: FfiConverterRustBuffer<List<AuditLogUploadResultFfi>> {
+    override fun read(buf: ByteBuffer): List<AuditLogUploadResultFfi> {
+        val len = buf.getInt()
+        return List<AuditLogUploadResultFfi>(len) {
+            FfiConverterTypeAuditLogUploadResultFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<AuditLogUploadResultFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeAuditLogUploadResultFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<AuditLogUploadResultFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeAuditLogUploadResultFfi.write(it, buf)
         }
     }
 }

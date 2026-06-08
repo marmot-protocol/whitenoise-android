@@ -191,7 +191,6 @@ import androidx.core.content.ContextCompat
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.AvatarImageLoader
 import dev.ipf.darkmatter.core.DiagnosticFormatter
-import dev.ipf.darkmatter.core.ForensicsExportFileName
 import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.media.MediaPipeline
 import dev.ipf.darkmatter.media.MediaReferenceParser
@@ -252,7 +251,6 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
-import dev.ipf.marmotkit.ForensicsDumpModeFfi
 import dev.ipf.marmotkit.RelayHealthFfi
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -276,13 +274,8 @@ private enum class SettingsDetail {
     Relays,
     KeyPackages,
     Notifications,
+    SecurityPrivacy,
 }
-
-private val ForensicsDumpModeFfi.fileNamePart: String
-    get() = when (this) {
-        ForensicsDumpModeFfi.PUBLIC -> "public"
-        ForensicsDumpModeFfi.SENSITIVE -> "sensitive"
-    }
 
 private data class DiagnosticLogEntry(
     val id: String = UUID.randomUUID().toString(),
@@ -646,7 +639,7 @@ private fun MainShell(
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedChat by remember { mutableStateOf<ChatListItem?>(null) }
     var profileQrAccountId by remember { mutableStateOf<String?>(null) }
-    val chatsController = remember(appState.activeAccountRef) { ChatsController(appState) }
+    val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
 
@@ -655,7 +648,7 @@ private fun MainShell(
         onDispose { appState.attachChatsController(null) }
     }
 
-    LaunchedEffect(chatsController, appState.activeAccountRef) {
+    LaunchedEffect(chatsController, appState.activeAccountRef, appState.runtimeGeneration) {
         chatsController.bind(appState.activeAccountRef)
     }
 
@@ -667,6 +660,7 @@ private fun MainShell(
     LaunchedEffect(
         inboundNotificationTarget,
         appState.activeAccountRef,
+        appState.runtimeGeneration,
         appState.accounts,
         chatsController,
         chatsController.boundAccountRef,
@@ -1929,7 +1923,7 @@ private fun ConversationScreen(
     onBack: () -> Unit,
 ) {
     val controllerCopy = rememberConversationControllerCopy()
-    val controller = remember(chat.id) {
+    val controller = remember(chat.id, appState.runtimeGeneration) {
         ConversationController(
             appState = appState,
             initialGroup = chat.group,
@@ -2500,39 +2494,13 @@ private fun GroupDetailsSheet(
     var showMemberScanner by remember { mutableStateOf(false) }
     var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
     var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var forensicsExportingMode by remember(controller.group.groupIdHex) { mutableStateOf<ForensicsDumpModeFfi?>(null) }
-    var pendingForensicsJson by remember(controller.group.groupIdHex) { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val groupTitleCopy = rememberGroupTitleCopy()
     val oneValidMemberReferenceError = stringResource(R.string.error_one_valid_member_reference)
     val qrNotValidNpubOrPublicKeyError = stringResource(R.string.error_qr_not_valid_npub_or_public_key)
-    val forensicsExportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json"),
-    ) { uri ->
-        val json = pendingForensicsJson
-        pendingForensicsJson = null
-        if (uri != null && json != null) {
-            scope.launch {
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        val output = context.contentResolver.openOutputStream(uri)
-                            ?: error("Could not open export destination")
-                        output.bufferedWriter(Charsets.UTF_8).use { writer ->
-                            writer.write(json)
-                        }
-                    }
-                }.onSuccess {
-                    appState.present(R.string.toast_forensics_dump_exported)
-                }.onFailure {
-                    appState.present(R.string.toast_couldnt_export_forensics_dump, AppText.Plain(it.message ?: it.javaClass.simpleName))
-                }
-            }
-        }
-    }
 
     suspend fun refreshMlsDetails() {
         if (!appState.developerMode) return
@@ -2552,25 +2520,6 @@ private fun GroupDetailsSheet(
         // whether this composable is still on screen.
         appState.launchMutation {
             mutation()
-        }
-    }
-
-    fun exportForensicsDump(mode: ForensicsDumpModeFfi) {
-        scope.launch {
-            forensicsExportingMode = mode
-            try {
-                val json = controller.groupForensicsJson(mode) ?: return@launch
-                pendingForensicsJson = json
-                forensicsExportLauncher.launch(
-                    ForensicsExportFileName.build(
-                        groupIdHex = controller.group.groupIdHex,
-                        mode = mode.fileNamePart,
-                        nowMillis = System.currentTimeMillis(),
-                    ),
-                )
-            } finally {
-                forensicsExportingMode = null
-            }
         }
     }
 
@@ -2752,30 +2701,6 @@ private fun GroupDetailsSheet(
                             DiagnosticRow(stringResource(R.string.required_components), state.requiredAppComponents.joinToString(", "))
                         }
                     }
-                    val exportBusy = forensicsExportingMode != null
-                    OutlinedButton(
-                        onClick = { exportForensicsDump(ForensicsDumpModeFfi.PUBLIC) },
-                        enabled = !exportBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.export_public_forensics_dump))
-                    }
-                    OutlinedButton(
-                        onClick = { exportForensicsDump(ForensicsDumpModeFfi.SENSITIVE) },
-                        enabled = !exportBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.export_sensitive_forensics_dump))
-                    }
-                    Text(
-                        stringResource(R.string.sensitive_forensics_dump_warning),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }
@@ -3694,10 +3619,14 @@ private fun SettingsScreen(
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Notifications -> NotificationsScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.SecurityPrivacy -> SecurityPrivacyScreen(
+            appState = appState,
+            onBack = { onDetailChange(null) },
+            onOpenDiagnostics = onOpenDiagnostics,
+        )
         null -> SettingsHomeScreen(
             appState = appState,
             onBackToChats = onBackToChats,
-            onOpenDiagnostics = onOpenDiagnostics,
             onOpenDetail = { onDetailChange(it) },
         )
     }
@@ -3721,7 +3650,6 @@ fun SettingsTopBar(onBackToChats: () -> Unit) {
 private fun SettingsHomeScreen(
     appState: DarkMatterAppState,
     onBackToChats: () -> Unit,
-    onOpenDiagnostics: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
 ) {
     var qrAccountId by remember { mutableStateOf<String?>(null) }
@@ -3760,23 +3688,7 @@ private fun SettingsHomeScreen(
                 SectionCard(title = stringResource(R.string.app_preferences)) {
                     SettingsRow(stringResource(R.string.appearance), stringResource(R.string.appearance_settings_subtitle)) { onOpenDetail(SettingsDetail.Appearance) }
                     SettingsRow(stringResource(R.string.notifications), stringResource(R.string.notifications_settings_subtitle)) { onOpenDetail(SettingsDetail.Notifications) }
-                }
-            }
-            item {
-                SectionCard(title = stringResource(R.string.developer)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.developer_mode), style = MaterialTheme.typography.bodyLarge)
-                            Text(stringResource(R.string.developer_mode_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(
-                            checked = appState.developerMode,
-                            onCheckedChange = { appState.updateDeveloperMode(it) },
-                        )
-                    }
-                    if (appState.developerMode) {
-                        SettingsRow(stringResource(R.string.diagnostics), stringResource(R.string.diagnostics_settings_subtitle)) { onOpenDiagnostics() }
-                    }
+                    SettingsRow(stringResource(R.string.security_and_privacy), stringResource(R.string.security_privacy_settings_subtitle)) { onOpenDetail(SettingsDetail.SecurityPrivacy) }
                 }
             }
         }
@@ -3953,6 +3865,120 @@ private fun NotificationsScreen(appState: DarkMatterAppState, onBack: () -> Unit
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SecurityPrivacyScreen(
+    appState: DarkMatterAppState,
+    onBack: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var telemetryBusy by remember { mutableStateOf(false) }
+    var auditLogsBusy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(appState.runtimeGeneration) {
+        appState.refreshSecurityPrivacySettings()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.security_and_privacy)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            item {
+                SectionCard(title = stringResource(R.string.security_and_privacy)) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.telemetry),
+                        subtitle = stringResource(R.string.telemetry_settings_subtitle),
+                        checked = appState.relayTelemetrySettings?.exportEnabled == true,
+                        enabled = !telemetryBusy,
+                        busy = telemetryBusy,
+                        onCheckedChange = { enabled ->
+                            telemetryBusy = true
+                            scope.launch {
+                                try {
+                                    appState.setTelemetryEnabled(enabled)
+                                } finally {
+                                    telemetryBusy = false
+                                }
+                            }
+                        },
+                    )
+                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.audit_logs),
+                        subtitle = stringResource(R.string.audit_logs_settings_subtitle),
+                        checked = appState.auditLogSettings?.enabled == true,
+                        enabled = !auditLogsBusy,
+                        busy = auditLogsBusy,
+                        onCheckedChange = { enabled ->
+                            auditLogsBusy = true
+                            appState.launchMutation {
+                                try {
+                                    appState.setAuditLogsEnabled(enabled)
+                                } finally {
+                                    auditLogsBusy = false
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+            item {
+                SectionCard(title = stringResource(R.string.developer)) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.developer_mode),
+                        subtitle = stringResource(R.string.developer_mode_subtitle),
+                        checked = appState.developerMode,
+                        onCheckedChange = { appState.updateDeveloperMode(it) },
+                    )
+                    if (appState.developerMode) {
+                        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                        SettingsRow(stringResource(R.string.diagnostics), stringResource(R.string.diagnostics_settings_subtitle)) { onOpenDiagnostics() }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsSwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    busy: Boolean = false,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (busy) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Switch(
+                checked = checked,
+                enabled = enabled,
+                onCheckedChange = onCheckedChange,
+            )
         }
     }
 }
@@ -4827,21 +4853,18 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
 private val relayListKinds = listOf(
     RelayListKind.Nip65,
     RelayListKind.Inbox,
-    RelayListKind.KeyPackage,
 )
 
 private val RelayListKind.labelRes: Int
     get() = when (this) {
         RelayListKind.Nip65 -> R.string.nip_65
         RelayListKind.Inbox -> R.string.inbox
-        RelayListKind.KeyPackage -> R.string.key_package
     }
 
 private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> {
     return when (kind) {
         RelayListKind.Nip65 -> nip65.relays
         RelayListKind.Inbox -> inbox.relays
-        RelayListKind.KeyPackage -> keyPackage.relays
     }
 }
 
@@ -4854,7 +4877,6 @@ private fun PublishedRelayLists(lists: AccountRelayListsFfi?) {
         }
         RelayListRow(stringResource(R.string.nip_65), lists.nip65)
         RelayListRow(stringResource(R.string.inbox), lists.inbox)
-        RelayListRow(stringResource(R.string.key_package), lists.keyPackage)
         if (lists.complete) {
             Text(stringResource(R.string.all_relay_lists_published), color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {

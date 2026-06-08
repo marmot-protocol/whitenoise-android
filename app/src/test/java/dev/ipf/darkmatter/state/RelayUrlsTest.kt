@@ -50,12 +50,21 @@ class RelayUrlsTest {
     }
 
     @Test
-    fun bootstrapRelaysIncludeWhiteNoiseRegionalRelays() {
-        val expected = listOf(
-            "wss://relay.eu.whitenoise.chat",
-            "wss://relay.us.whitenoise.chat",
+    fun bootstrapRelaysUseOnlyWhiteNoiseRegionalRelays() {
+        assertEquals(
+            listOf(
+                "wss://relay.us.whitenoise.chat",
+                "wss://relay.eu.whitenoise.chat",
+            ),
+            MarmotClient.bootstrapRelays,
         )
+    }
 
-        assertEquals(emptyList<String>(), expected.filterNot(MarmotClient.bootstrapRelays::contains))
+    @Test
+    fun accountRelayListsExposeOnlyNip65AndInboxKinds() {
+        assertEquals(
+            listOf(RelayListKind.Nip65, RelayListKind.Inbox),
+            RelayListKind.entries.toList(),
+        )
     }
 }

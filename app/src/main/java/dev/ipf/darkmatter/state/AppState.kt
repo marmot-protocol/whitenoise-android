@@ -2,6 +2,7 @@ package dev.ipf.darkmatter.state
 
 import android.app.LocaleManager
 import android.content.Context
+import android.os.Build
 import android.os.LocaleList
 import android.util.Log
 import androidx.annotation.StringRes
@@ -10,6 +11,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MarmotClient
@@ -25,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,8 +36,14 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AuditLogSettingsFfi
+import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
+import dev.ipf.marmotkit.AuditLogUploadSourceFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.NotificationSettingsFfi
+import dev.ipf.marmotkit.RelayTelemetryResourceFfi
+import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
+import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import java.net.IDN
 import java.net.URI
@@ -61,7 +70,6 @@ private data class ProfilePresentation(
 enum class RelayListKind {
     Nip65,
     Inbox,
-    KeyPackage,
 }
 
 internal fun normalizeRelayUrls(relays: Iterable<String>): List<String> {
@@ -181,6 +189,15 @@ class DarkMatterAppState(context: Context) {
         private set
 
     var localNotificationSettings by mutableStateOf<NotificationSettingsFfi?>(null)
+        private set
+
+    var relayTelemetrySettings by mutableStateOf<RelayTelemetrySettingsFfi?>(null)
+        private set
+
+    var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
+        private set
+
+    var runtimeGeneration by mutableStateOf(0)
         private set
 
     var localNotificationPermissionGranted by mutableStateOf(localNotificationPresenter.canPostNotifications())
@@ -321,13 +338,16 @@ class DarkMatterAppState(context: Context) {
                 client ?: MarmotClient(appContext).also { client = it }
             }
             appStateDebug { "bootstrap root=${opened.rootPath}" }
+            val accountLabelForRuntime = activeAccountRef
             withContext(Dispatchers.IO) {
+                opened.marmot.configurePrivacyRuntime(accountLabelForRuntime)
                 opened.marmot.start()
             }
             appStateDebug { "marmot started" }
             localNotificationPresenter.ensureChannels()
             refreshLocalNotificationPermission()
             startNotificationListener()
+            refreshSecurityPrivacySettings()
             refreshAccounts()
             appStateDebug {
                 "accounts loaded count=${accounts.size} active=$activeAccountRef labels=${accounts.map { it.label.take(8) to it.running }}"
@@ -344,6 +364,7 @@ class DarkMatterAppState(context: Context) {
                 activeAccount?.accountIdHex?.let { warmProfile(it) }
             }
         } catch (error: Throwable) {
+            if (error is CancellationException) throw error
             appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
             phase = AppPhase.Failed(error.readableMessage())
         }
@@ -407,6 +428,7 @@ class DarkMatterAppState(context: Context) {
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
         notificationScope.launch {
+            configurePrivacyRuntime()
             refreshLocalNotificationSettings()
         }
     }
@@ -473,7 +495,6 @@ class DarkMatterAppState(context: Context) {
                 when (kind) {
                     RelayListKind.Nip65 -> setAccountNip65Relays(account, next, MarmotClient.bootstrapRelays)
                     RelayListKind.Inbox -> setAccountInboxRelays(account, next, MarmotClient.bootstrapRelays)
-                    RelayListKind.KeyPackage -> setAccountKeyPackageRelays(account, next, MarmotClient.bootstrapRelays)
                 }
             }
         }.onSuccess {
@@ -499,14 +520,7 @@ class DarkMatterAppState(context: Context) {
 
     suspend fun deleteKeyPackage(eventIdHex: String, sourceRelays: List<String>): Boolean {
         val account = activeAccountRef ?: return false
-        val keyPackageRelays = runCatching {
-            marmotIo { accountKeyPackageRelays(account) }
-        }.getOrNull().orEmpty()
-        val relays = normalizeRelayUrls(
-            sourceRelays +
-                keyPackageRelays +
-                MarmotClient.bootstrapRelays,
-        )
+        val relays = normalizeRelayUrls(sourceRelays)
         return runCatching {
             marmotIo { deleteAccountKeyPackage(account, eventIdHex, relays) }
             present(R.string.toast_key_package_deleted)
@@ -547,6 +561,46 @@ class DarkMatterAppState(context: Context) {
     fun updateDeveloperMode(enabled: Boolean) {
         developerMode = enabled
         preferences.edit().putBoolean(DEVELOPER_MODE_KEY, enabled).apply()
+    }
+
+    suspend fun refreshSecurityPrivacySettings() {
+        relayTelemetrySettings = runCatching { marmotIo { relayTelemetrySettings() } }.getOrNull()
+        auditLogSettings = runCatching { marmotIo { auditLogSettings() } }.getOrNull()
+    }
+
+    suspend fun setTelemetryEnabled(enabled: Boolean): Boolean {
+        return runCatching {
+            val current = relayTelemetrySettings ?: marmotIo { relayTelemetrySettings() }
+            val updated = marmotIo {
+                setRelayTelemetrySettings(
+                    RelayTelemetrySettingsFfi(
+                        exportEnabled = enabled,
+                        exportIntervalSeconds = current.exportIntervalSeconds,
+                    ),
+                )
+            }
+            relayTelemetrySettings = updated
+            present(R.string.toast_security_privacy_updated)
+            true
+        }.getOrElse {
+            if (it is CancellationException) throw it
+            present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()))
+            false
+        }
+    }
+
+    suspend fun setAuditLogsEnabled(enabled: Boolean): Boolean {
+        return runCatching {
+            val updated = marmotIo { setAuditLogSettings(AuditLogSettingsFfi(enabled = enabled)) }
+            auditLogSettings = updated
+            restartMarmotRuntime()
+            present(R.string.toast_security_privacy_updated)
+            true
+        }.getOrElse {
+            if (it is CancellationException) throw it
+            present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()))
+            false
+        }
     }
 
     fun updateThemeMode(mode: AppThemeMode) {
@@ -852,9 +906,101 @@ class DarkMatterAppState(context: Context) {
 
     fun shutdown() {
         notificationJob?.cancel()
+        runCatching { client?.marmot?.close() }
         profileScope.cancel()
         mutationsScope.cancel()
         notificationScope.cancel()
+    }
+
+    private suspend fun restartMarmotRuntime() {
+        val previousNotificationJob = notificationJob
+        notificationJob = null
+        val previousClient = client
+        val accountLabelForRuntime = activeAccountRef
+
+        appStateDebug { "marmot runtime reopening" }
+        previousNotificationJob?.cancelAndJoin()
+        val opened = try {
+            withContext(Dispatchers.IO) {
+                previousClient?.marmot?.close()
+                MarmotClient(appContext).also { nextClient ->
+                    nextClient.marmot.configurePrivacyRuntime(accountLabelForRuntime)
+                    nextClient.marmot.start()
+                }
+            }
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            client = null
+            phase = AppPhase.Failed(error.readableMessage())
+            throw error
+        }
+
+        client = opened
+        runtimeGeneration += 1
+        localNotificationPresenter.ensureChannels()
+        refreshLocalNotificationPermission()
+        startNotificationListener()
+        refreshSecurityPrivacySettings()
+        refreshAccounts()
+        if (accounts.isEmpty()) {
+            localNotificationSettings = null
+            phase = AppPhase.Onboarding
+        } else {
+            if (activeAccountRef == null || accounts.none { it.label == activeAccountRef }) {
+                setActiveAccount(accounts.first().label)
+            }
+            refreshLocalNotificationSettings()
+            phase = AppPhase.Ready
+            activeAccount?.accountIdHex?.let { warmProfile(it) }
+        }
+        appStateDebug {
+            "marmot runtime reopened accounts=${accounts.size} active=${activeAccountRef?.take(8) ?: "<none>"}"
+        }
+    }
+
+    private suspend fun configurePrivacyRuntime() {
+        val accountLabelForRuntime = activeAccountRef
+        runCatching {
+            withContext(Dispatchers.IO) {
+                marmot().configurePrivacyRuntime(accountLabelForRuntime)
+            }
+        }.onFailure {
+            if (it is CancellationException) throw it
+            appStateDebug(it) { "privacy runtime config failed: ${it.readableMessage()}" }
+        }
+    }
+
+    private fun Marmot.configurePrivacyRuntime(accountLabel: String?) {
+        val installId = runCatching { telemetryInstallId() }.getOrNull().orEmpty()
+        setRelayTelemetryRuntimeConfig(
+            RelayTelemetryRuntimeConfigFfi(
+                otlpEndpoint = BuildConfig.DARKMATTER_OTLP_ENDPOINT.nonBlankOrNull(),
+                authorizationBearerToken = BuildConfig.DARKMATTER_OTLP_AUTH_TOKEN.nonBlankOrNull(),
+                resource = RelayTelemetryResourceFfi(
+                    serviceVersion = BuildConfig.VERSION_NAME,
+                    serviceInstanceId = installId.ifBlank { appContext.packageName },
+                    deploymentEnvironment = BuildConfig.DARKMATTER_DEPLOYMENT_ENVIRONMENT.ifBlank { "android-release" },
+                    osType = "android",
+                    osVersion = Build.VERSION.RELEASE.ifBlank { Build.VERSION.SDK_INT.toString() },
+                    deviceModelIdentifier = listOf(Build.MANUFACTURER, Build.MODEL)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" ")
+                        .nonBlankOrNull(),
+                ),
+            ),
+        )
+        setAuditLogTrackerConfig(
+            AuditLogTrackerConfigFfi(
+                endpoint = BuildConfig.DARKMATTER_AUDIT_LOG_ENDPOINT.nonBlankOrNull(),
+                authorizationBearerToken = BuildConfig.DARKMATTER_AUDIT_LOG_AUTH_TOKEN.nonBlankOrNull(),
+                source = AuditLogUploadSourceFfi(
+                    accountLabel = accountLabel.nonBlankOrNull(),
+                    deviceLabel = Build.MODEL.nonBlankOrNull(),
+                    platform = "android",
+                    appVersion = BuildConfig.VERSION_NAME,
+                ),
+            ),
+        )
     }
 
     private fun warmProfile(accountIdHex: String) {
@@ -892,6 +1038,7 @@ class DarkMatterAppState(context: Context) {
                     }
                 }
             }.onFailure {
+                if (it is CancellationException) return@onFailure
                 appStateDebug(it) { "notification listener stopped: ${it.readableMessage()}" }
             }
         }
@@ -993,3 +1140,5 @@ private inline fun appStateDebug(message: () -> String) {
 private inline fun appStateDebug(error: Throwable, message: () -> String) {
     Log.e("DMAppState", message(), error)
 }
+
+private fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }

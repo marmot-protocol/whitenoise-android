@@ -35,6 +35,17 @@ Release builds use signing values from `local.properties` or the matching enviro
 - `DARKMATTER_KEY_ALIAS`
 - `DARKMATTER_KEY_PASSWORD`
 
+Telemetry and audit-log upload runtime configuration is also read from
+`local.properties` or environment variables so endpoints and tokens stay out of
+Git:
+
+- `DARKMATTER_OTLP_ENDPOINT`
+- `DARKMATTER_OTLP_AUTH_TOKEN`
+- `DARKMATTER_AUDIT_LOG_ENDPOINT`
+- `DARKMATTER_AUDIT_LOG_AUTH_TOKEN`
+- `OTLP_TOKEN_DARKMATTER_ANDROID` (fallback auth token for both telemetry and audit logs)
+- `DARKMATTER_DEPLOYMENT_ENVIRONMENT` (defaults to `android-release`)
+
 Use:
 
 ```bash
@@ -43,7 +54,8 @@ just apk
 
 This builds the signed `arm64-v8a` release APK only, using the checked-in Marmot
 bindings and native libraries. The output filename is
-`darkmatter-v8a-release-YYYY-MM-DD.apk`.
+`darkmatter-v8a-release-YYYY-MM-DD.apk`. The release folder is printed as the
+final line for Finder.
 
 Use:
 
