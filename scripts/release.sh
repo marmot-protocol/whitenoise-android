@@ -16,7 +16,7 @@ usage() {
 Usage: scripts/release.sh [--skip-bindings] [--abi <ABI>] [--help]
 
   --skip-bindings   Don't rebuild the Rust .so libs (use whatever's checked in)
-  --abi <ABI>       After building, print the path to a specific ABI APK
+  --abi <ABI>       Build only a specific ABI APK, then print its path
                     (arm64-v8a | armeabi-v7a | x86 | x86_64 | universal)
   --help            Show this help
 
@@ -37,7 +37,15 @@ TARGET_ABI=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-bindings) SKIP_BINDINGS=true; shift ;;
-    --abi) TARGET_ABI="$2"; shift 2 ;;
+    --abi)
+      if [[ $# -lt 2 || "$2" == --* ]]; then
+        echo "error: --abi requires a value" >&2
+        usage
+        exit 1
+      fi
+      TARGET_ABI="$2"
+      shift 2
+      ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown arg: $1" >&2; usage; exit 1 ;;
   esac
@@ -45,6 +53,17 @@ done
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MARMOT_DIR="${DARKMATTER_MARMOT_DIR:-$(cd "$REPO_DIR/../darkmatter" 2>/dev/null && pwd || true)}"
+
+if [[ -n "$TARGET_ABI" ]]; then
+  case "$TARGET_ABI" in
+    arm64-v8a|armeabi-v7a|x86|x86_64|universal) ;;
+    *)
+      echo "error: unsupported ABI: $TARGET_ABI" >&2
+      usage
+      exit 1
+      ;;
+  esac
+fi
 
 # --- Java sanity ---
 if ! command -v java >/dev/null 2>&1; then
@@ -104,21 +123,42 @@ if [[ "$SKIP_BINDINGS" == "false" ]]; then
 fi
 
 # --- Gradle release build ---
-echo "==> Assembling release APKs"
 cd "$REPO_DIR"
-./gradlew :app:assembleRelease
 
 APK_DIR="$REPO_DIR/app/build/outputs/apk/release"
+INTERMEDIATE_APK_DIR="$REPO_DIR/app/build/intermediates/apk/release"
+mkdir -p "$APK_DIR"
+
+if [[ -n "$TARGET_ABI" && "$TARGET_ABI" != "universal" ]]; then
+  echo "==> Assembling release APK for $TARGET_ABI"
+  rm -f "$APK_DIR"/*.apk
+  ./gradlew :app:assembleRelease -Pandroid.injected.build.abi="$TARGET_ABI"
+
+  gradle_apk_name="app-${TARGET_ABI}-release.apk"
+  selected_apk="$APK_DIR/$gradle_apk_name"
+  intermediate_apk="$INTERMEDIATE_APK_DIR/$gradle_apk_name"
+  if [[ ! -f "$selected_apk" && -f "$intermediate_apk" ]]; then
+    cp "$intermediate_apk" "$selected_apk"
+  fi
+  if [[ ! -f "$selected_apk" ]]; then
+    echo "error: no APK found for ABI: $TARGET_ABI" >&2
+    exit 1
+  fi
+
+  if [[ "$TARGET_ABI" == "arm64-v8a" ]]; then
+    selected_apk="$APK_DIR/darkmatter-v8a-release-$(date +%F).apk"
+    mv "$APK_DIR/$gradle_apk_name" "$selected_apk"
+  fi
+else
+  echo "==> Assembling release APKs"
+  ./gradlew :app:assembleRelease
+fi
+
 echo ""
 echo "==> Release APKs:"
 ls -lh "$APK_DIR"/*.apk
 
 if [[ -n "$TARGET_ABI" ]]; then
-  match=$(ls "$APK_DIR" | grep -E "app-${TARGET_ABI}-release.apk$" || true)
-  if [[ -z "$match" ]]; then
-    echo "error: no APK found for ABI: $TARGET_ABI" >&2
-    exit 1
-  fi
   echo ""
-  echo "==> Selected: $APK_DIR/$match"
+  echo "==> Selected: $selected_apk"
 fi
