@@ -81,6 +81,18 @@ object AvatarImageLoader {
         return request.await()
     }
 
+    /**
+     * Synchronously returns an already-cached avatar for [url], or null when
+     * absent. Lets a composable seed its initial state from the in-memory
+     * cache so re-entering a screen shows the cached image immediately instead
+     * of flashing the placeholder while [load] re-resolves it. In-memory read
+     * only — safe to call from composition. See issue #31.
+     */
+    fun peek(url: String?): ImageBitmap? {
+        val key = url ?: return null
+        return synchronized(lock) { cache.get(key) }
+    }
+
     fun clear() {
         synchronized(lock) {
             generation++
