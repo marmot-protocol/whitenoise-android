@@ -1553,6 +1553,11 @@ class ConversationController(
             timelineItemsById.clear()
             timelineOrder.clear()
             projectedMessageIds.clear()
+            // Drop stale projected records so messageById doesn't grow unbounded
+            // as older pages are loaded; keep in-flight optimistic records so a
+            // pending send still reconciles across a window replacement. See #68.
+            val optimisticIds = optimisticMessages.values.mapTo(mutableSetOf()) { it.record.messageIdHex }
+            messageById.keys.retainAll(optimisticIds)
         }
         page.messages.forEach { record ->
             val actionRecord = upsertProjectedRecord(
