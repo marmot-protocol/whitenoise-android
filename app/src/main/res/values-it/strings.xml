@@ -56,7 +56,9 @@
     <string name="decline">Rifiuta</string>
     <string name="accept">Accetta</string>
     <string name="profile">Profilo</string>
+    <string name="dismiss">Chiudi</string>
     <string name="save_group">Salva gruppo</string>
+    <string name="saving_group">Salvataggio gruppo...</string>
     <string name="no_description">Nessuna descrizione</string>
     <string name="info">Informazioni</string>
     <string name="group_id">ID del Gruppo</string>
@@ -67,10 +69,16 @@
     <string name="scan_member_qr_code">Scansiona il codice QR del membro</string>
     <string name="error_one_valid_member_reference">Inserisci un npub, un collegamento al profilo o una chiave pubblica valido.</string>
     <string name="add_member">Aggiungi membri</string>
+    <string name="adding_member">Aggiunta membro...</string>
+    <string name="invite_pending">Invito in sospeso: %1$s</string>
+    <string name="latest_group_error">Ultimo errore gruppo: %1$s</string>
     <string name="actions">Azioni</string>
     <string name="archive_chat">Archivia</string>
     <string name="unarchive_chat">Rimuovi dall’archivio</string>
+    <string name="archiving_chat">Archiviazione chat...</string>
+    <string name="restoring_chat">Ripristino chat...</string>
     <string name="leave_chat">Lascia il gruppo</string>
+    <string name="leaving_chat">Uscita dalla chat...</string>
     <string name="promote_admin_before_leaving">Promuovi un altro amministratore prima di lasciare</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">Caricamento dello stato MLS...</string>
@@ -83,6 +91,9 @@
     <string name="you">Tu</string>
     <string name="member_actions">Azioni dei membri</string>
     <string name="remove_admin">Rimuovi admin</string>
+    <string name="adding_admin">Aggiunta admin...</string>
+    <string name="removing_admin">Rimozione admin...</string>
+    <string name="removing_member">Rimozione membro...</string>
     <string name="make_admin">Rendi admin</string>
     <string name="remove_member">Rimuovi dal gruppo</string>
     <string name="confirm_remove_member_title">Rimuovere il membro?</string>

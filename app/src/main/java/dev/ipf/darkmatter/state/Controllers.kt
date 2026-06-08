@@ -540,6 +540,8 @@ class ConversationController(
     // disable buttons while one is in flight and prevent double-submits.
     var mutationInFlight by mutableStateOf(false)
         private set
+    var lastMutationError by mutableStateOf<String?>(null)
+        private set
     var error by mutableStateOf<String?>(null)
         private set
 
@@ -556,6 +558,14 @@ class ConversationController(
         } finally {
             mutationInFlight = false
         }
+    }
+
+    fun clearLastMutationError() {
+        lastMutationError = null
+    }
+
+    private fun mutationError(throwable: Throwable): String {
+        return throwable.message ?: throwable.javaClass.simpleName
     }
 
     private suspend inline fun <T> withMutationLockResult(defaultValue: T, block: () -> T): T {
@@ -1261,6 +1271,7 @@ class ConversationController(
 
     suspend fun leaveGroup(): Boolean = withMutationLockResult(false) {
         val account = appState.activeAccountRef ?: return false
+        lastMutationError = null
         if (!canLeaveGroup) {
             appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
             return false
@@ -1281,7 +1292,9 @@ class ConversationController(
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
+            val message = mutationError(it)
+            lastMutationError = message
+            appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(message))
             false
         }
     }
@@ -1318,20 +1331,25 @@ class ConversationController(
         }
     }
 
-    suspend fun setArchived(archived: Boolean) = withMutationLock {
-        val account = appState.activeAccountRef ?: return@withMutationLock
+    suspend fun setArchived(archived: Boolean): Boolean = withMutationLockResult(false) {
+        val account = appState.activeAccountRef ?: return@withMutationLockResult false
+        lastMutationError = null
         runCatching {
             val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
             group = updated
             appState.applyLocalGroupUpdate(updated)
             appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
+            true
         }.onFailure {
-            appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
-        }
+            val message = mutationError(it)
+            lastMutationError = message
+            appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(message))
+        }.getOrDefault(false)
     }
 
-    suspend fun updateGroupProfile(name: String, description: String) = withMutationLock {
-        val account = appState.activeAccountRef ?: return@withMutationLock
+    suspend fun updateGroupProfile(name: String, description: String): Boolean = withMutationLockResult(false) {
+        val account = appState.activeAccountRef ?: return@withMutationLockResult false
+        lastMutationError = null
         runCatching {
             appState.marmotIo {
                 updateGroupProfile(
@@ -1342,46 +1360,58 @@ class ConversationController(
                 )
             }
             appState.present(R.string.toast_group_updated)
+            true
         }.onFailure {
-            appState.present(R.string.toast_couldnt_update_group, AppText.Plain(it.message ?: it.javaClass.simpleName))
-        }
+            val message = mutationError(it)
+            lastMutationError = message
+            appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message))
+        }.getOrDefault(false)
     }
 
-    suspend fun inviteMembers(memberRefs: List<String>) = withMutationLock {
-        val account = appState.activeAccountRef ?: return@withMutationLock
+    suspend fun inviteMembers(memberRefs: List<String>): Boolean = withMutationLockResult(false) {
+        val account = appState.activeAccountRef ?: return@withMutationLockResult false
         val refs = memberRefs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-        if (refs.isEmpty()) return@withMutationLock
+        if (refs.isEmpty()) return@withMutationLockResult false
+        lastMutationError = null
         runCatching {
             appState.marmotIo { inviteMembers(account, group.groupIdHex, refs) }
             refreshMembers()
             appState.present(R.string.toast_invite_sent)
+            true
         }.onFailure {
-            appState.present(R.string.toast_couldnt_add_members, AppText.Plain(it.message ?: it.javaClass.simpleName))
-        }
+            val message = mutationError(it)
+            lastMutationError = message
+            appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message))
+        }.getOrDefault(false)
     }
 
-    suspend fun removeMember(member: AppGroupMemberRecordFfi) = withMutationLock {
-        val account = appState.activeAccountRef ?: return@withMutationLock
+    suspend fun removeMember(member: AppGroupMemberRecordFfi): Boolean = withMutationLockResult(false) {
+        val account = appState.activeAccountRef ?: return@withMutationLockResult false
         val target = GroupProjector.memberRef(member)
+        lastMutationError = null
         runCatching {
             appState.marmotIo { removeMembers(account, group.groupIdHex, listOf(target)) }
             refreshMembers()
             appState.present(R.string.toast_member_removed)
+            true
         }.onFailure {
-            appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(it.message ?: it.javaClass.simpleName))
-        }
+            val message = mutationError(it)
+            lastMutationError = message
+            appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(message))
+        }.getOrDefault(false)
     }
 
-    suspend fun setMemberAdmin(member: AppGroupMemberRecordFfi, admin: Boolean) = withMutationLock {
-        val account = appState.activeAccountRef ?: return@withMutationLock
+    suspend fun setMemberAdmin(member: AppGroupMemberRecordFfi, admin: Boolean): Boolean = withMutationLockResult(false) {
+        val account = appState.activeAccountRef ?: return@withMutationLockResult false
         // promote_admin / demote_admin sign the new admin list onto the MLS
         // group, so they require a Nostr pubkey hex — not a local-account
         // label. memberRef can return either; memberIdHex is always the hex.
         val target = member.memberIdHex
         if (!admin && isAdmin(member) && group.admins.size <= 1) {
             appState.present(R.string.toast_keep_one_admin, R.string.toast_promote_before_removing_admin)
-            return@withMutationLock
+            return@withMutationLockResult false
         }
+        lastMutationError = null
         runCatching {
             if (admin) {
                 appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
@@ -1397,9 +1427,12 @@ class ConversationController(
                 appState.present(R.string.toast_admin_removed)
             }
             refreshMembers()
+            true
         }.onFailure {
-            appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(it.message ?: it.javaClass.simpleName))
-        }
+            val message = mutationError(it)
+            lastMutationError = message
+            appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message))
+        }.getOrDefault(false)
     }
 
     fun isAdmin(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.isAdmin(group, member)

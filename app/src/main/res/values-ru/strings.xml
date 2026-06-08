@@ -56,7 +56,9 @@
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>
     <string name="profile">Профиль</string>
+    <string name="dismiss">Закрыть</string>
     <string name="save_group">Сохранить группу</string>
+    <string name="saving_group">Сохранение группы...</string>
     <string name="no_description">Нет описания</string>
     <string name="info">Информация</string>
     <string name="group_id">ID группы</string>
@@ -67,10 +69,16 @@
     <string name="scan_member_qr_code">Сканировать QR-код участника</string>
     <string name="error_one_valid_member_reference">Введите один действительный npub, ссылку на профиль или открытый ключ.</string>
     <string name="add_member">Добавить участников</string>
+    <string name="adding_member">Добавление участника...</string>
+    <string name="invite_pending">Приглашение ожидает: %1$s</string>
+    <string name="latest_group_error">Последняя ошибка группы: %1$s</string>
     <string name="actions">Действия</string>
     <string name="archive_chat">Архивировать</string>
     <string name="unarchive_chat">Разархивировать</string>
+    <string name="archiving_chat">Архивирование чата...</string>
+    <string name="restoring_chat">Восстановление чата...</string>
     <string name="leave_chat">Покинуть группу</string>
+    <string name="leaving_chat">Выход из чата...</string>
     <string name="promote_admin_before_leaving">Повысьте другого администратора перед уходом</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">Загрузка состояния MLS...</string>
@@ -83,6 +91,9 @@
     <string name="you">Вы</string>
     <string name="member_actions">Действия участника</string>
     <string name="remove_admin">Снять админа</string>
+    <string name="adding_admin">Добавление админа...</string>
+    <string name="removing_admin">Удаление админа...</string>
+    <string name="removing_member">Удаление участника...</string>
     <string name="make_admin">Сделать админом</string>
     <string name="remove_member">Удалить из группы</string>
     <string name="confirm_remove_member_title">Удалить участника?</string>

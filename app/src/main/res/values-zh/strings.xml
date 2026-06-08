@@ -56,7 +56,9 @@
     <string name="decline">拒绝</string>
     <string name="accept">接受</string>
     <string name="profile">个人资料</string>
+    <string name="dismiss">关闭</string>
     <string name="save_group">保存组</string>
+    <string name="saving_group">正在保存群组...</string>
     <string name="no_description">无描述</string>
     <string name="info">信息</string>
     <string name="group_id">群组 ID</string>
@@ -67,10 +69,16 @@
     <string name="scan_member_qr_code">扫描会员QR码</string>
     <string name="error_one_valid_member_reference">输入一个有效的 npub、个人资料链接或公钥。</string>
     <string name="add_member">添加成员</string>
+    <string name="adding_member">正在添加成员...</string>
+    <string name="invite_pending">邀请待处理：%1$s</string>
+    <string name="latest_group_error">最新群组错误：%1$s</string>
     <string name="actions">行动</string>
     <string name="archive_chat">归档</string>
     <string name="unarchive_chat">取消归档</string>
+    <string name="archiving_chat">正在归档聊天...</string>
+    <string name="restoring_chat">正在恢复聊天...</string>
     <string name="leave_chat">退出群组</string>
+    <string name="leaving_chat">正在离开聊天...</string>
     <string name="promote_admin_before_leaving">离开前晋升另一位管理员</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">正在加载 MLS 状态...</string>
@@ -83,6 +91,9 @@
     <string name="you">你</string>
     <string name="member_actions">会员行动</string>
     <string name="remove_admin">取消管理员</string>
+    <string name="adding_admin">正在添加管理员...</string>
+    <string name="removing_admin">正在移除管理员...</string>
+    <string name="removing_member">正在移除成员...</string>
     <string name="make_admin">设为管理员</string>
     <string name="remove_member">移出群组</string>
     <string name="confirm_remove_member_title">移除成员？</string>

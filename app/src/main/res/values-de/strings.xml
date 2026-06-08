@@ -56,7 +56,9 @@
     <string name="decline">Ablehnen</string>
     <string name="accept">Annehmen</string>
     <string name="profile">Profil</string>
+    <string name="dismiss">Schließen</string>
     <string name="save_group">Gruppe speichern</string>
+    <string name="saving_group">Gruppe wird gespeichert...</string>
     <string name="no_description">Keine Beschreibung</string>
     <string name="info">Infos</string>
     <string name="group_id">Gruppen-ID</string>
@@ -67,10 +69,16 @@
     <string name="scan_member_qr_code">Scannen Sie den QR-Code des Mitglieds</string>
     <string name="error_one_valid_member_reference">Geben Sie einen gültigen npub, Profillink oder öffentlichen Schlüssel ein.</string>
     <string name="add_member">Mitglieder hinzufügen</string>
+    <string name="adding_member">Mitglied wird hinzugefügt...</string>
+    <string name="invite_pending">Einladung ausstehend: %1$s</string>
+    <string name="latest_group_error">Letzter Gruppenfehler: %1$s</string>
     <string name="actions">Aktionen</string>
     <string name="archive_chat">Archivieren</string>
     <string name="unarchive_chat">Dearchivieren</string>
+    <string name="archiving_chat">Chat wird archiviert...</string>
+    <string name="restoring_chat">Chat wird wiederhergestellt...</string>
     <string name="leave_chat">Gruppe verlassen</string>
+    <string name="leaving_chat">Chat wird verlassen...</string>
     <string name="promote_admin_before_leaving">Befördern Sie einen anderen Administrator, bevor Sie gehen</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">MLS-Status wird geladen...</string>
@@ -83,6 +91,9 @@
     <string name="you">Du</string>
     <string name="member_actions">Mitgliederaktionen</string>
     <string name="remove_admin">Admin entfernen</string>
+    <string name="adding_admin">Admin wird hinzugefügt...</string>
+    <string name="removing_admin">Admin wird entfernt...</string>
+    <string name="removing_member">Mitglied wird entfernt...</string>
     <string name="make_admin">Zum Admin machen</string>
     <string name="remove_member">Aus Gruppe entfernen</string>
     <string name="confirm_remove_member_title">Mitglied entfernen?</string>

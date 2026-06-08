@@ -2520,7 +2520,10 @@ private fun GroupDetailsSheet(
     var showMemberScanner by remember { mutableStateOf(false) }
     var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
     var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
+    // Scoped to the visible group; the controller mutation continues on appState
+    // if the user switches conversations, but this sheet stops tracking it.
+    var activeMutation by remember(controller.group.groupIdHex) { mutableStateOf<ActiveGroupMutation?>(null) }
+    var pendingInvites by remember(controller.group.groupIdHex) { mutableStateOf<List<String>>(emptyList()) }
     var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -2538,14 +2541,27 @@ private fun GroupDetailsSheet(
         }
     }
 
-    fun runGroupMutation(mutation: suspend () -> Unit) {
+    fun runGroupMutation(
+        action: GroupMutationAction,
+        mutation: suspend () -> Boolean,
+        target: String? = null,
+        onSuccess: () -> Unit = {},
+    ) {
         // Launched on a process-lifetime scope so the MLS commit + Nostr
         // publish complete even if the user dismisses this sheet mid-flight.
         // The refreshMembers() + appState.present(toast) inside each
         // ConversationController.* method then always run, regardless of
         // whether this composable is still on screen.
+        activeMutation = ActiveGroupMutation(action, target)
+        controller.clearLastMutationError()
         appState.launchMutation {
-            mutation()
+            try {
+                if (mutation()) onSuccess()
+            } finally {
+                // onSuccess() may have already dismissed this sheet; clearing
+                // detached Compose state is harmless in that case.
+                activeMutation = null
+            }
         }
     }
 
@@ -2556,6 +2572,11 @@ private fun GroupDetailsSheet(
         controller.members.map { it.memberIdHex },
     ) {
         refreshMlsDetails()
+    }
+
+    LaunchedEffect(controller.members.map { it.memberIdHex }) {
+        val memberIds = controller.members.map { it.memberIdHex.lowercase() }.toSet()
+        pendingInvites = pendingInvites.filterNot { it.lowercase() in memberIds }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -2600,24 +2621,48 @@ private fun GroupDetailsSheet(
                     )
                     Button(
                         onClick = {
-                            busy = true
-                            runGroupMutation {
-                                try {
-                                    controller.updateGroupProfile(name, description)
-                                } finally {
-                                    busy = false
-                                }
-                            }
+                            runGroupMutation(
+                                action = GroupMutationAction.SaveProfile,
+                                mutation = { controller.updateGroupProfile(name, description) },
+                            )
                         },
-                        enabled = !busy && !controller.mutationInFlight,
+                        enabled = activeMutation == null && !controller.mutationInFlight,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null)
+                        if (activeMutation?.action == GroupMutationAction.SaveProfile) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                        }
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.save_group))
+                        Text(stringResource(if (activeMutation?.action == GroupMutationAction.SaveProfile) R.string.saving_group else R.string.save_group))
                     }
                 } else {
                     Text(controller.group.description.ifBlank { stringResource(R.string.no_description) }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            controller.lastMutationError?.let { message ->
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Default.ErrorOutline, contentDescription = null)
+                        Text(
+                            stringResource(R.string.latest_group_error, message),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        IconButton(onClick = { controller.clearLastMutationError() }) {
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+                        }
+                    }
                 }
             }
 
@@ -2636,11 +2681,20 @@ private fun GroupDetailsSheet(
                         member = member,
                         controller = controller,
                         appState = appState,
+                        activeMutation = activeMutation,
                         onPromote = {
-                            runGroupMutation { controller.setMemberAdmin(member, admin = true) }
+                            runGroupMutation(
+                                action = GroupMutationAction.PromoteAdmin,
+                                mutation = { controller.setMemberAdmin(member, admin = true) },
+                                target = member.memberIdHex,
+                            )
                         },
                         onDemote = {
-                            runGroupMutation { controller.setMemberAdmin(member, admin = false) }
+                            runGroupMutation(
+                                action = GroupMutationAction.DemoteAdmin,
+                                mutation = { controller.setMemberAdmin(member, admin = false) },
+                                target = member.memberIdHex,
+                            )
                         },
                         onRemove = {
                             pendingConfirm = DetailsConfirm.RemoveMember(member)
@@ -2676,14 +2730,30 @@ private fun GroupDetailsSheet(
                             }
                             pendingMember = ""
                             pendingMemberError = null
-                            runGroupMutation { controller.inviteMembers(listOf(ref)) }
+                            runGroupMutation(
+                                action = GroupMutationAction.InviteMember,
+                                mutation = { controller.inviteMembers(listOf(ref)) },
+                                target = ref,
+                                onSuccess = { pendingInvites = (pendingInvites + ref).distinct() },
+                            )
                         },
-                        enabled = pendingMember.isNotBlank() && !controller.mutationInFlight,
+                        enabled = pendingMember.isNotBlank() && activeMutation == null && !controller.mutationInFlight,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null)
+                        if (activeMutation?.action == GroupMutationAction.InviteMember) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                        }
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.add_member))
+                        Text(stringResource(if (activeMutation?.action == GroupMutationAction.InviteMember) R.string.adding_member else R.string.add_member))
+                    }
+                    pendingInvites.forEach { invite ->
+                        AssistChip(
+                            onClick = {},
+                            label = { Text(stringResource(R.string.invite_pending, IdentityFormatter.short(invite))) },
+                            leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+                        )
                     }
                 }
             }
@@ -2692,22 +2762,44 @@ private fun GroupDetailsSheet(
                 OutlinedButton(
                     // Route through runGroupMutation so the MLS commit + toast
                     // survive sheet dismissal — same fix as inviteMembers etc.
-                    onClick = { runGroupMutation { controller.setArchived(!controller.group.archived) } },
-                    enabled = !controller.mutationInFlight,
+                    onClick = {
+                        runGroupMutation(
+                            action = GroupMutationAction.Archive,
+                            mutation = { controller.setArchived(!controller.group.archived) },
+                        )
+                    },
+                    enabled = activeMutation == null && !controller.mutationInFlight,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.Default.Archive, contentDescription = null)
+                    if (activeMutation?.action == GroupMutationAction.Archive) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Archive, contentDescription = null)
+                    }
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(if (controller.group.archived) R.string.unarchive_chat else R.string.archive_chat))
+                    Text(
+                        stringResource(
+                            when {
+                                activeMutation?.action == GroupMutationAction.Archive && controller.group.archived -> R.string.restoring_chat
+                                activeMutation?.action == GroupMutationAction.Archive -> R.string.archiving_chat
+                                controller.group.archived -> R.string.unarchive_chat
+                                else -> R.string.archive_chat
+                            },
+                        ),
+                    )
                 }
                 OutlinedButton(
                     onClick = { pendingConfirm = DetailsConfirm.Leave },
-                    enabled = controller.canLeaveGroup && !controller.mutationInFlight,
+                    enabled = controller.canLeaveGroup && activeMutation == null && !controller.mutationInFlight,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = null)
+                    if (activeMutation?.action == GroupMutationAction.Leave) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Close, contentDescription = null)
+                    }
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.leave_chat))
+                    Text(stringResource(if (activeMutation?.action == GroupMutationAction.Leave) R.string.leaving_chat else R.string.leave_chat))
                 }
                 if (!controller.canLeaveGroup) {
                     Text(stringResource(R.string.promote_admin_before_leaving), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2758,7 +2850,11 @@ private fun GroupDetailsSheet(
                 confirmLabel = stringResource(R.string.remove_member),
                 onConfirm = {
                     pendingConfirm = null
-                    runGroupMutation { controller.removeMember(confirm.member) }
+                    runGroupMutation(
+                        action = GroupMutationAction.RemoveMember,
+                        mutation = { controller.removeMember(confirm.member) },
+                        target = confirm.member.memberIdHex,
+                    )
                 },
                 onDismiss = { pendingConfirm = null },
             )
@@ -2771,12 +2867,14 @@ private fun GroupDetailsSheet(
                     // Process-lifetime scope so a swipe-dismiss mid-leave doesn't
                     // kill the toast/refresh; onDismiss + onLeft are safe Compose
                     // state writes from Main.immediate.
-                    appState.launchMutation {
-                        if (controller.leaveGroup()) {
+                    runGroupMutation(
+                        action = GroupMutationAction.Leave,
+                        mutation = { controller.leaveGroup() },
+                        onSuccess = {
                             onDismiss()
                             onLeft()
-                        }
-                    }
+                        },
+                    )
                 },
                 onDismiss = { pendingConfirm = null },
             )
@@ -2789,11 +2887,27 @@ private sealed class DetailsConfirm {
     data object Leave : DetailsConfirm()
 }
 
+private enum class GroupMutationAction {
+    SaveProfile,
+    InviteMember,
+    RemoveMember,
+    PromoteAdmin,
+    DemoteAdmin,
+    Archive,
+    Leave,
+}
+
+private data class ActiveGroupMutation(
+    val action: GroupMutationAction,
+    val target: String? = null,
+)
+
 @Composable
 private fun GroupMemberRow(
     member: AppGroupMemberRecordFfi,
     controller: ConversationController,
     appState: DarkMatterAppState,
+    activeMutation: ActiveGroupMutation?,
     onPromote: () -> Unit,
     onDemote: () -> Unit,
     onRemove: () -> Unit,
@@ -2805,6 +2919,7 @@ private fun GroupMemberRow(
         appState.activeAccount?.accountIdHex,
     )
     val canManage = controller.isSelfAdmin && !isSelfRow
+    val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -2845,7 +2960,19 @@ private fun GroupMemberRow(
                 }
             }
         }
-        if (canManage) {
+        if (rowMutation != null) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                Text(
+                    stringResource(rowMutation.action.memberStatusLabelRes),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else if (canManage) {
             Box {
                 IconButton(onClick = { menuOpen = true }) {
                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.member_actions))
@@ -2874,6 +3001,15 @@ private fun GroupMemberRow(
         }
     }
 }
+
+private val GroupMutationAction.memberStatusLabelRes: Int
+    @StringRes
+    get() = when (this) {
+        GroupMutationAction.PromoteAdmin -> R.string.adding_admin
+        GroupMutationAction.DemoteAdmin -> R.string.removing_admin
+        GroupMutationAction.RemoveMember -> R.string.removing_member
+        else -> R.string.member_actions
+    }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
