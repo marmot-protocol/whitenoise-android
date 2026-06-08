@@ -1571,10 +1571,7 @@ class ConversationController(
                 deletedMessageIds = deletedMessageIds - record.messageIdHex
             }
             if (MessageProjector.isStreamFinal(actionRecord)) {
-                MessageProjector.streamId(actionRecord)?.let { streamId ->
-                    activeStreamIds.remove(streamId)
-                    optimisticMessages.remove("stream:$streamId")
-                }
+                MessageProjector.streamId(actionRecord)?.let(::finalizeStream)
             }
         }
         if (updatePagination) {
@@ -1617,10 +1614,7 @@ class ConversationController(
                         }
                     }
                     if (MessageProjector.isStreamFinal(actionRecord)) {
-                        MessageProjector.streamId(actionRecord)?.let { streamId ->
-                            activeStreamIds.remove(streamId)
-                            optimisticMessages.remove("stream:$streamId")
-                        }
+                        MessageProjector.streamId(actionRecord)?.let(::finalizeStream)
                     }
                 }
                 is TimelineMessageChangeFfi.Remove -> {
@@ -2039,6 +2033,17 @@ class ConversationController(
             }
             activeStreamIds.remove(streamId)
         }
+    }
+
+    // The projected stream-final (kind:1200) record is now authoritative, so
+    // drop the optimistic preview and mark the stream removed. Without the
+    // removedStreamIds mark, a late AgentStreamUpdateFfi.Finished event would
+    // recreate "stream:$streamId" via updateStreamPreview and the timeline
+    // would show a duplicate entry alongside the projected record. See #25.
+    private fun finalizeStream(streamId: String) {
+        activeStreamIds.remove(streamId)
+        removedStreamIds.add(streamId)
+        optimisticMessages.remove("stream:$streamId")
     }
 
     private fun updateStreamPreview(streamId: String, plaintext: String, status: MessageStatus) {
