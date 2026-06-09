@@ -1474,6 +1474,171 @@ private fun MediaImageBubble(
     }
 }
 
+/**
+ * Multi-image album bubble: a 2-column grid of square thumbnails. Used for
+ * any message carrying ≥2 image attachments. Each tile maintains its own
+ * download/cache state (keyed by `(messageId, attachmentIndex)`); tap any
+ * tile to open the full-screen viewer at that attachment. When the album
+ * holds more than four images, the fourth tile gets a "+N" overlay and the
+ * remaining images are reachable from the viewer (next-tile navigation
+ * lands with the pager-viewer follow-up).
+ */
+@Composable
+private fun MediaImageGridBubble(
+    item: TimelineMessage,
+    references: List<MediaAttachmentReferenceFfi>,
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+) {
+    val record = item.record
+    val visible = references.take(4)
+    val overflow = (references.size - visible.size).coerceAtLeast(0)
+    var viewerOpenAt by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.padding(2.dp),
+        ) {
+            visible.chunked(2).forEachIndexed { rowIndex, row ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    row.forEachIndexed { colIndex, reference ->
+                        val tileIndex = rowIndex * 2 + colIndex
+                        val showOverflow = tileIndex == visible.lastIndex && overflow > 0
+                        MediaImageGridTile(
+                            messageIdHex = record.messageIdHex,
+                            attachmentIndex = tileIndex,
+                            reference = reference,
+                            controller = controller,
+                            onTap = { viewerOpenAt = tileIndex },
+                            overflowCount = if (showOverflow) overflow else 0,
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f),
+                        )
+                    }
+                    // Pad odd-count rows so a single-tile last row stays
+                    // half-width instead of stretching across the bubble.
+                    if (row.size == 1) {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+
+    viewerOpenAt?.let { index ->
+        FullScreenImageViewer(
+            controller = controller,
+            appState = appState,
+            messageIdHex = record.messageIdHex,
+            reference = references[index],
+            onDismiss = { viewerOpenAt = null },
+        )
+    }
+}
+
+/**
+ * One tile of the album grid: square thumbnail + per-tile download state.
+ * The thumbnail-cache lookup is keyed on `(messageId, attachmentIndex)` so
+ * tiles never clobber each other. Tap fires [onTap] (the parent opens the
+ * full-screen viewer at this attachment's index).
+ */
+@Composable
+private fun MediaImageGridTile(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    controller: ConversationController,
+    onTap: () -> Unit,
+    overflowCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    val tileKey = "$messageIdHex#$attachmentIndex"
+    var bitmap by remember(tileKey) {
+        mutableStateOf(controller.thumbnailFor(messageIdHex, attachmentIndex)?.asImageBitmap())
+    }
+    var failed by remember(tileKey) { mutableStateOf(false) }
+    var reloadToken by remember(tileKey) { mutableStateOf(0) }
+
+    LaunchedEffect(tileKey, reloadToken) {
+        if (bitmap != null) return@LaunchedEffect
+        failed = false
+        try {
+            val data = controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+            val decoded =
+                withContext(Dispatchers.Default) {
+                    MediaPipeline.decodeSampledBitmap(data, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+                }
+            if (decoded != null) {
+                controller.cacheThumbnail(messageIdHex, attachmentIndex, decoded)
+                bitmap = decoded.asImageBitmap()
+            } else {
+                failed = true
+            }
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
+        } catch (_: Throwable) {
+            failed = true
+        }
+    }
+
+    Box(
+        modifier = modifier.clickable(onClick = onTap),
+        contentAlignment = Alignment.Center,
+    ) {
+        val current = bitmap
+        when {
+            current != null ->
+                Image(
+                    bitmap = current,
+                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            failed ->
+                IconButton(onClick = {
+                    failed = false
+                    reloadToken++
+                }) {
+                    Icon(
+                        Icons.Default.BrokenImage,
+                        contentDescription = stringResource(R.string.media_tap_to_retry),
+                    )
+                }
+            else ->
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp,
+                )
+        }
+        if (overflowCount > 0 && current != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "+$overflowCount",
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
 /** Centered icon+label tap target used for the retry/download bubble states. */
 @Composable
 private fun MediaBubbleAction(
@@ -3599,10 +3764,10 @@ private fun MessageBubble(
                                 controller.mediaReferences[record.messageIdHex]
                                     ?: MediaReferenceParser.parseAllImetaTags(record.tags)
                             }
-                        // First reference still used by the (current) single-image
-                        // bubble; the grid bubble that consumes the full list
-                        // ships with the next commit.
-                        val mediaReference = mediaReferences.firstOrNull()
+                        val imageReferences =
+                            remember(mediaReferences) {
+                                mediaReferences.filter { MediaReferenceParser.isImageMedia(it) }
+                            }
                         val mediaPendingName =
                             remember(record.tags) {
                                 record.tags
@@ -3610,14 +3775,23 @@ private fun MessageBubble(
                                     ?.values
                                     ?.getOrNull(1)
                             }
-                        if (!deleted && !invalidated && mediaReference != null && MediaReferenceParser.isImageMedia(mediaReference)) {
-                            MediaImageBubble(
-                                item = item,
-                                reference = mediaReference,
-                                controller = controller,
-                                appState = appState,
-                                mine = mine,
-                            )
+                        if (!deleted && !invalidated && imageReferences.isNotEmpty()) {
+                            if (imageReferences.size == 1) {
+                                MediaImageBubble(
+                                    item = item,
+                                    reference = imageReferences.first(),
+                                    controller = controller,
+                                    appState = appState,
+                                    mine = mine,
+                                )
+                            } else {
+                                MediaImageGridBubble(
+                                    item = item,
+                                    references = imageReferences,
+                                    controller = controller,
+                                    appState = appState,
+                                )
+                            }
                         } else if (!deleted && !invalidated && mediaPendingName != null) {
                             MediaPendingPlaceholder(
                                 previewBytes = controller.pendingMediaBytes(record.messageIdHex),
@@ -3642,7 +3816,7 @@ private fun MessageBubble(
                                 // tombstone copy, never an inline image/caption.
                                 deleted || invalidated -> displayedBody
                                 mediaPendingName != null -> null
-                                mediaReference != null -> record.plaintext.takeIf { it.isNotBlank() }
+                                imageReferences.isNotEmpty() -> record.plaintext.takeIf { it.isNotBlank() }
                                 else -> displayedBody
                             }
                         if (bodyTextToRender != null) {
