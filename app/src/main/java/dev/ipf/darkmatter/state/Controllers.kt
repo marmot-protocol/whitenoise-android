@@ -596,6 +596,15 @@ class ConversationController(
     // first refresh verifies the roster.
     var membersLoaded by mutableStateOf(initialMemberSnapshot?.members?.isNotEmpty() == true)
         private set
+
+    // Typed media references keyed by `messageIdHex`. Populated from Rust's
+    // `listMedia` FFI — the only place the receive-side `source_epoch` is
+    // surfaced (TimelineMessageRecordFfi / AppMessageRecordFfi don't expose
+    // it). Without this, `downloadMedia` would be called with the imeta-tag
+    // parser's `sourceEpoch = 0` fallback and the Rust core would error
+    // with `missing encrypted media secret for epoch 0`.
+    var mediaReferences: Map<String, MediaAttachmentReferenceFfi> by mutableStateOf(emptyMap())
+        private set
     private var membersVerified by mutableStateOf(false)
     var timeline by mutableStateOf<List<TimelineMessage>>(emptyList())
         private set
@@ -743,6 +752,7 @@ class ConversationController(
             timelineSubscription = timelineStream
             val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
             val snapshotStreamIds = snapshot?.let { applyTimelinePage(it, replaceWindow = true, updatePagination = true) }.orEmpty()
+            refreshMediaReferences()
             initializeReadState(account)
             // Don't blanket-mark the absolute newest as read here — the UI
             // layer now drives mark-read as the user scrolls so partial-read
@@ -793,6 +803,10 @@ class ConversationController(
                                     }
                                 }
                             }
+                        // New messages may include media; refresh the cached
+                        // references so the bubble's download path finds the
+                        // correct `sourceEpoch`. Cheap local SQLite query.
+                        refreshMediaReferences()
                         // Scroll-driven mark-read in the UI layer handles the
                         // user-visible read pointer. The projection-update
                         // path no longer force-marks the absolute newest as
@@ -1217,7 +1231,17 @@ class ConversationController(
             appState.mediaPlaintextCache.put(cacheKey, onDisk)
             return onDisk
         }
-        val result = appState.marmotIo { downloadMedia(account, group.groupIdHex, reference) }
+        val result =
+            runCatching {
+                appState.marmotIo { downloadMedia(account, group.groupIdHex, reference) }
+            }.onFailure {
+                if (it is CancellationException) throw it
+                Log.w(
+                    "DMConversation",
+                    "downloadAttachment failed for ${group.groupIdHex.take(8)} message=${messageIdHex.take(8)}",
+                    it,
+                )
+            }.getOrThrow()
         // Never cache empty plaintext — a zero-byte result would render as a
         // permanent broken image and short-circuit tap-to-retry.
         if (result.plaintext.isNotEmpty()) {
@@ -1373,6 +1397,11 @@ class ConversationController(
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
+            Log.w(
+                "DMConversation",
+                "retryFailedSend failed for ${group.groupIdHex.take(8)} key=${key.take(8)}",
+                throwable,
+            )
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; don't restore the Failed bubble.
                 optimisticMessages.remove(key)
@@ -1942,6 +1971,11 @@ class ConversationController(
      */
     suspend fun markReadUpTo(messageId: String) {
         val trimmed = messageId.takeIf { it.isNotBlank() } ?: return
+        // Optimistic messages carry a Kotlin UUID as their messageIdHex
+        // ("xxxxxxxx-xxxx-..."). The FFI rejects anything that isn't a 64-char
+        // hex blob (InvalidHex at the first '-'). Skip — the projection will
+        // call markReadUpTo again with the confirmed hex id once it echoes.
+        if (!HEX_MESSAGE_ID.matches(trimmed)) return
         if (trimmed == lastReadMessageId) return
         val account = conversationAccountRef ?: return
         lastReadMessageId = trimmed
@@ -2281,6 +2315,25 @@ class ConversationController(
         }
     }
 
+    /**
+     * Pull typed media references from Rust and cache them by `messageIdHex`.
+     * Required so `downloadMedia` is called with the real `sourceEpoch`; the
+     * imeta-tag parser fallback hard-codes `sourceEpoch = 0` (no field in the
+     * wire format) and would otherwise fail every receive-side decryption
+     * with `missing encrypted media secret for epoch 0`.
+     */
+    private suspend fun refreshMediaReferences() {
+        val account = appState.activeAccountRef ?: return
+        runCatching {
+            appState.marmotIo { listMedia(account, group.groupIdHex, null) }
+        }.onSuccess { records ->
+            mediaReferences = records.associate { it.messageIdHex to it.reference }
+        }.onFailure {
+            if (it is CancellationException) throw it
+            Log.w("DMConversation", "listMedia failed for ${group.groupIdHex.take(8)}", it)
+        }
+    }
+
     private fun markActiveAccountRemovedFromMembers(account: String) {
         val activeAccountIdHex = appState.activeAccount?.accountIdHex ?: return
         val updatedMembers =
@@ -2480,5 +2533,10 @@ class ConversationController(
         // uploads. A few failed images stay retryable without letting an
         // undiscarded backlog accrete unbounded heap.
         const val MEDIA_RETAINED_MAX_BYTES: Long = 32L * 1024L * 1024L
+
+        // 32-byte (64 hex char) message id as Rust expects on the FFI
+        // boundary. Used to filter optimistic UUID-format ids out of FFI
+        // calls that would otherwise throw InvalidHex.
+        val HEX_MESSAGE_ID: Regex = Regex("^[0-9a-fA-F]{64}$")
     }
 }

@@ -3520,9 +3520,15 @@ private fun MessageBubble(
                                 }
                             }
                         }
+                        // Prefer the controller's listMedia cache — it carries
+                        // the receive-side `sourceEpoch`, which the imeta-tag
+                        // parser can't recover (no epoch field in the wire
+                        // format). Fall back to the imeta parser for optimistic
+                        // bridge records that haven't been projected yet.
                         val mediaReference =
-                            remember(record.tags) {
-                                MediaReferenceParser.parseImetaTag(record.tags)
+                            remember(record.tags, record.messageIdHex, controller.mediaReferences) {
+                                controller.mediaReferences[record.messageIdHex]
+                                    ?: MediaReferenceParser.parseImetaTag(record.tags)
                             }
                         val mediaPendingName =
                             remember(record.tags) {
