@@ -7,7 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ByteSizeLruCacheTest {
-
     @Test
     fun emptyCache_getReturnsNull() {
         val cache = ByteSizeLruCache<String, ByteArray>(maxBytes = 100, sizeOf = { it.size })

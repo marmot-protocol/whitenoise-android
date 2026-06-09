@@ -4,7 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class RetriedTimelineOrderTest {
-
     @Test
     fun reusesStoredOrderWhenSet() {
         assertEquals(42uL, retriedTimelineOrder(42uL) { error("should not be called") })

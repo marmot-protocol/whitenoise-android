@@ -118,14 +118,18 @@ class DraftStoreTest {
 
     @Test
     fun hydratesFromPersistenceOnInit() {
-        val backing = InMemoryDraftPersistence().apply {
-            write(draftKey("a", "g"), "preloaded")
-        }
+        val backing =
+            InMemoryDraftPersistence().apply {
+                write(draftKey("a", "g"), "preloaded")
+            }
         val s = DraftStore(backing)
         assertEquals("preloaded", s.get("a", "g"))
     }
 
-    private fun draftKey(account: String, group: String): String = "$account $group"
+    private fun draftKey(
+        account: String,
+        group: String,
+    ): String = "$account $group"
 }
 
 private class InMemoryDraftPersistence : DraftPersistence {
@@ -133,7 +137,10 @@ private class InMemoryDraftPersistence : DraftPersistence {
 
     override fun read(): Map<String, String> = map.toMap()
 
-    override fun write(key: String, value: String?) {
+    override fun write(
+        key: String,
+        value: String?,
+    ) {
         if (value == null) map.remove(key) else map[key] = value
     }
 

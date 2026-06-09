@@ -5,7 +5,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SignOutOutcomeTest {
-
     @Test
     fun switchesToARemainingAccountAndStaysReady() {
         val outcome = signOutOutcome(accountLabels = listOf("alice", "bob"), activeRef = "alice")

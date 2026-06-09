@@ -7,10 +7,10 @@ import android.os.LocaleList
 import android.util.Log
 import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.AvatarImageLoader
@@ -23,8 +23,22 @@ import dev.ipf.darkmatter.notifications.BackgroundConnectionPreferences
 import dev.ipf.darkmatter.notifications.LocalNotificationPolicy
 import dev.ipf.darkmatter.notifications.LocalNotificationPresenter
 import dev.ipf.darkmatter.notifications.NotificationStreamForegroundService
-import kotlinx.coroutines.CoroutineScope
+import dev.ipf.marmotkit.AccountKeyPackageFfi
+import dev.ipf.marmotkit.AccountRelayListsFfi
+import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AuditLogSettingsFfi
+import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
+import dev.ipf.marmotkit.AuditLogUploadSourceFfi
+import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.NotificationSettingsFfi
+import dev.ipf.marmotkit.RelayTelemetryResourceFfi
+import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
+import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -36,20 +50,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import dev.ipf.marmotkit.AccountKeyPackageFfi
-import dev.ipf.marmotkit.AccountRelayListsFfi
-import dev.ipf.marmotkit.AppGroupMemberRecordFfi
-import dev.ipf.marmotkit.AppGroupRecordFfi
-import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.AuditLogSettingsFfi
-import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
-import dev.ipf.marmotkit.AuditLogUploadSourceFfi
-import dev.ipf.marmotkit.Marmot
-import dev.ipf.marmotkit.NotificationSettingsFfi
-import dev.ipf.marmotkit.RelayTelemetryResourceFfi
-import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
-import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
-import dev.ipf.marmotkit.UserProfileMetadataFfi
 import java.net.IDN
 import java.net.URI
 import java.util.Locale
@@ -57,12 +57,20 @@ import java.util.concurrent.ConcurrentHashMap
 
 sealed interface AppPhase {
     data object Bootstrapping : AppPhase
+
     data object Onboarding : AppPhase
+
     data object Ready : AppPhase
-    data class Failed(val message: String) : AppPhase
+
+    data class Failed(
+        val message: String,
+    ) : AppPhase
 }
 
-internal data class SignOutOutcome(val nextActiveRef: String?, val phase: AppPhase)
+internal data class SignOutOutcome(
+    val nextActiveRef: String?,
+    val phase: AppPhase,
+)
 
 /**
  * The active-account ref and app phase after signing [activeRef] out. Sign-out
@@ -71,14 +79,19 @@ internal data class SignOutOutcome(val nextActiveRef: String?, val phase: AppPha
  * active one, drop to [AppPhase.Onboarding] rather than leaving a MainShell
  * rendered with no active account.
  */
-internal fun signOutOutcome(accountLabels: List<String>, activeRef: String?): SignOutOutcome {
+internal fun signOutOutcome(
+    accountLabels: List<String>,
+    activeRef: String?,
+): SignOutOutcome {
     val next = accountLabels.firstOrNull { it != activeRef }
     return SignOutOutcome(next, if (next == null) AppPhase.Onboarding else AppPhase.Ready)
 }
 
 /** Next exponential-backoff delay: double [current], clamped to [maxMillis]. */
-internal fun nextRetryBackoffMillis(current: Long, maxMillis: Long): Long =
-    (current * 2).coerceAtMost(maxMillis)
+internal fun nextRetryBackoffMillis(
+    current: Long,
+    maxMillis: Long,
+): Long = (current * 2).coerceAtMost(maxMillis)
 
 data class ToastMessage(
     val title: AppText,
@@ -95,31 +108,26 @@ enum class RelayListKind {
     Inbox,
 }
 
-internal fun normalizeRelayUrls(relays: Iterable<String>): List<String> {
-    return relays
+internal fun normalizeRelayUrls(relays: Iterable<String>): List<String> =
+    relays
         .mapNotNull(::canonicalRelayUrl)
         .distinct()
-}
 
-internal fun telemetryServiceVersion(versionName: String, versionCode: Int): String {
-    return "${versionName.trim()}+$versionCode"
-}
+internal fun telemetryServiceVersion(
+    versionName: String,
+    versionCode: Int,
+): String = "${versionName.trim()}+$versionCode"
 
-internal fun telemetryDeploymentEnvironment(value: String): String {
-    return when (val normalized = value.trim().lowercase(Locale.ROOT)) {
+internal fun telemetryDeploymentEnvironment(value: String): String =
+    when (val normalized = value.trim().lowercase(Locale.ROOT)) {
         "production", "staging", "development", "test" -> normalized
         "android-release" -> "production"
         else -> "production"
     }
-}
 
-internal fun telemetryDeviceModelIdentifier(model: String): String? {
-    return model.trim().takeIf { it.isNotEmpty() }
-}
+internal fun telemetryDeviceModelIdentifier(model: String): String? = model.trim().takeIf { it.isNotEmpty() }
 
-internal fun isAcceptableRelayUrl(url: String): Boolean {
-    return canonicalRelayUrl(url) != null
-}
+internal fun isAcceptableRelayUrl(url: String): Boolean = canonicalRelayUrl(url) != null
 
 private fun canonicalRelayUrl(url: String): String? {
     return runCatching {
@@ -130,19 +138,25 @@ private fun canonicalRelayUrl(url: String): String? {
         val host = uri.host ?: uri.rawAuthority?.relayHostCandidate() ?: return@runCatching null
         val hostWithoutBrackets = host.removeSurrounding("[", "]")
         if (hostWithoutBrackets.any { it.isWhitespace() }) return@runCatching null
-        val asciiHost = if (hostWithoutBrackets.contains(":")) {
-            hostWithoutBrackets
-        } else {
-            IDN.toASCII(hostWithoutBrackets)
-        }
-        val canonicalHost = asciiHost.lowercase(Locale.ROOT).takeIf { it.isNotBlank() }
-            ?: return@runCatching null
+        val asciiHost =
+            if (hostWithoutBrackets.contains(":")) {
+                hostWithoutBrackets
+            } else {
+                IDN.toASCII(hostWithoutBrackets)
+            }
+        val canonicalHost =
+            asciiHost.lowercase(Locale.ROOT).takeIf { it.isNotBlank() }
+                ?: return@runCatching null
         // SSRF guard: relay URLs can arrive from untrusted protocol messages, so
         // never accept one that points the client at loopback or the local
         // network. See issue #82.
         if (HostSafety.isPrivateOrLoopbackHost(canonicalHost)) return@runCatching null
         val authorityHost = if (canonicalHost.contains(":")) "[$canonicalHost]" else canonicalHost
-        val port = uri.port.takeIf { it >= 0 }?.let { ":$it" }.orEmpty()
+        val port =
+            uri.port
+                .takeIf { it >= 0 }
+                ?.let { ":$it" }
+                .orEmpty()
         val path = uri.rawPath.orEmpty()
         val query = uri.rawQuery?.let { "?$it" }.orEmpty()
         "wss://$authorityHost$port$path$query"
@@ -155,7 +169,9 @@ private fun String.relayHostCandidate(): String? {
     return if (count { it == ':' } == 1) substringBefore(":") else this
 }
 
-class DarkMatterAppState(context: Context) {
+class DarkMatterAppState(
+    context: Context,
+) {
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("darkmatter", Context.MODE_PRIVATE)
 
@@ -165,10 +181,11 @@ class DarkMatterAppState(context: Context) {
      * controller) so re-opening a chat doesn't re-download media already
      * fetched this session. Bounded in bytes; see [dev.ipf.darkmatter.media.ByteSizeLruCache].
      */
-    internal val mediaPlaintextCache = dev.ipf.darkmatter.media.ByteSizeLruCache<String, ByteArray>(
-        maxBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
-        sizeOf = { it.size },
-    )
+    internal val mediaPlaintextCache =
+        dev.ipf.darkmatter.media.ByteSizeLruCache<String, ByteArray>(
+            maxBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
+            sizeOf = { it.size },
+        )
 
     /**
      * App-lifetime cache of *decoded* attachment thumbnails (sampled bitmaps),
@@ -176,10 +193,11 @@ class DarkMatterAppState(context: Context) {
      * image on the first frame — no decode spinner — for anything already
      * fetched/sent this session. Bounded by approximate pixel bytes.
      */
-    internal val mediaThumbnailCache = dev.ipf.darkmatter.media.ByteSizeLruCache<String, android.graphics.Bitmap>(
-        maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
-        sizeOf = { it.allocationByteCount },
-    )
+    internal val mediaThumbnailCache =
+        dev.ipf.darkmatter.media.ByteSizeLruCache<String, android.graphics.Bitmap>(
+            maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
+            sizeOf = { it.allocationByteCount },
+        )
 
     /**
      * Persistent (L2) cache of decrypted attachment bytes. Survives process
@@ -194,12 +212,14 @@ class DarkMatterAppState(context: Context) {
      * surface. Sign-out wipes it alongside L1 so account A's plaintext
      * doesn't linger on disk after switching to account B.
      */
-    internal val diskMediaCache = dev.ipf.darkmatter.media.DiskByteCache(
-        cacheDir = java.io.File(appContext.cacheDir, "decrypted-media"),
-        maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
-    )
+    internal val diskMediaCache =
+        dev.ipf.darkmatter.media.DiskByteCache(
+            cacheDir = java.io.File(appContext.cacheDir, "decrypted-media"),
+            maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
+        )
 
     private var client: MarmotClient? = null
+
     // Serializes bootstrap so two concurrent callers can't both pass the
     // null-client check and each construct a MarmotClient (TOCTOU). See #33.
     private val bootstrapMutex = Mutex()
@@ -295,7 +315,10 @@ class DarkMatterAppState(context: Context) {
     }
 
     /** Convenience: write the active account's draft for [groupIdHex]. Empty/blank clears. */
-    fun setDraft(groupIdHex: String, text: String) {
+    fun setDraft(
+        groupIdHex: String,
+        text: String,
+    ) {
         val account = activeAccount?.accountIdHex ?: return
         draftStore.set(account, groupIdHex, text)
     }
@@ -313,35 +336,46 @@ class DarkMatterAppState(context: Context) {
         mutationsScope.launch { block() }
     }
 
-    internal fun optimisticMessages(accountRef: String?, groupIdHex: String): SnapshotStateMap<String, TimelineMessage> {
-        return synchronized(conversationStateLock) {
+    internal fun optimisticMessages(
+        accountRef: String?,
+        groupIdHex: String,
+    ): SnapshotStateMap<String, TimelineMessage> =
+        synchronized(conversationStateLock) {
             val key = retainConversationState(accountRef, groupIdHex)
             optimisticMessagesByConversation.getOrPut(key) { mutableStateMapOf() }
         }
-    }
 
-    internal fun projectedMessageIds(accountRef: String?, groupIdHex: String): MutableSet<String> {
-        return synchronized(conversationStateLock) {
+    internal fun projectedMessageIds(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableSet<String> =
+        synchronized(conversationStateLock) {
             val key = retainConversationState(accountRef, groupIdHex)
             projectedMessageIdsByConversation.getOrPut(key) { mutableSetOf() }
         }
-    }
 
-    internal fun timelineOrderOverrides(accountRef: String?, groupIdHex: String): MutableMap<String, ULong> {
-        return synchronized(conversationStateLock) {
+    internal fun timelineOrderOverrides(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableMap<String, ULong> =
+        synchronized(conversationStateLock) {
             val key = retainConversationState(accountRef, groupIdHex)
             timelineOrderOverridesByConversation.getOrPut(key) { mutableMapOf() }
         }
-    }
 
-    internal fun timelineTimestampOverrides(accountRef: String?, groupIdHex: String): MutableMap<String, ULong> {
-        return synchronized(conversationStateLock) {
+    internal fun timelineTimestampOverrides(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableMap<String, ULong> =
+        synchronized(conversationStateLock) {
             val key = retainConversationState(accountRef, groupIdHex)
             timelineTimestampOverridesByConversation.getOrPut(key) { mutableMapOf() }
         }
-    }
 
-    private fun retainConversationState(accountRef: String?, groupIdHex: String): String {
+    private fun retainConversationState(
+        accountRef: String?,
+        groupIdHex: String,
+    ): String {
         val key = conversationKey(accountRef, groupIdHex)
         recentConversationStateKeys[key] = Unit
         while (recentConversationStateKeys.size > MAX_RETAINED_CONVERSATION_STATES) {
@@ -355,9 +389,10 @@ class DarkMatterAppState(context: Context) {
         return key
     }
 
-    private fun conversationKey(accountRef: String?, groupIdHex: String): String {
-        return "${accountRef.orEmpty()}\u0000$groupIdHex"
-    }
+    private fun conversationKey(
+        accountRef: String?,
+        groupIdHex: String,
+    ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
 
     fun attachChatsController(controller: ChatsController?) {
         chatsController = controller
@@ -371,11 +406,10 @@ class DarkMatterAppState(context: Context) {
         chatsController?.applyLocalGroupUpdate(record)
     }
 
-    suspend fun <T> marmotIo(block: suspend Marmot.() -> T): T {
-        return withContext(Dispatchers.IO) {
+    suspend fun <T> marmotIo(block: suspend Marmot.() -> T): T =
+        withContext(Dispatchers.IO) {
             marmot().block()
         }
-    }
 
     suspend fun bootstrap() = bootstrapMutex.withLock { bootstrapLocked() }
 
@@ -387,9 +421,10 @@ class DarkMatterAppState(context: Context) {
         }
         phase = AppPhase.Bootstrapping
         try {
-            val opened = withContext(Dispatchers.IO) {
-                client ?: MarmotClient(appContext).also { client = it }
-            }
+            val opened =
+                withContext(Dispatchers.IO) {
+                    client ?: MarmotClient(appContext).also { client = it }
+                }
             appStateDebug { "bootstrap root=${opened.rootPath}" }
             val accountLabelForRuntime = activeAccountRef
             withContext(Dispatchers.IO) {
@@ -522,9 +557,11 @@ class DarkMatterAppState(context: Context) {
         val outcome = signOutOutcome(accounts.map { it.label }, activeAccountRef)
         val next = outcome.nextActiveRef
         activeAccountRef = next
-        preferences.edit().apply {
-            if (next == null) remove(ACTIVE_ACCOUNT_KEY) else putString(ACTIVE_ACCOUNT_KEY, next)
-        }.apply()
+        preferences
+            .edit()
+            .apply {
+                if (next == null) remove(ACTIVE_ACCOUNT_KEY) else putString(ACTIVE_ACCOUNT_KEY, next)
+            }.apply()
         // Signing out the last active account must leave a usable state, not a
         // MainShell with no active account. See issue #11.
         phase = outcome.phase
@@ -541,7 +578,10 @@ class DarkMatterAppState(context: Context) {
         return runCatching { marmotIo { accountRelayLists(account) } }.getOrNull()
     }
 
-    suspend fun setAccountRelays(kind: RelayListKind, relays: List<String>): AccountRelayListsFfi? {
+    suspend fun setAccountRelays(
+        kind: RelayListKind,
+        relays: List<String>,
+    ): AccountRelayListsFfi? {
         val account = activeAccountRef ?: return null
         val candidates = relays.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         if (candidates.any { !isAcceptableRelayUrl(it) }) {
@@ -582,7 +622,10 @@ class DarkMatterAppState(context: Context) {
         }
     }
 
-    suspend fun deleteKeyPackage(eventIdHex: String, sourceRelays: List<String>): Boolean {
+    suspend fun deleteKeyPackage(
+        eventIdHex: String,
+        sourceRelays: List<String>,
+    ): Boolean {
         val account = activeAccountRef ?: return false
         val relays = normalizeRelayUrls(sourceRelays)
         return runCatching {
@@ -632,17 +675,18 @@ class DarkMatterAppState(context: Context) {
         auditLogSettings = runCatching { marmotIo { auditLogSettings() } }.getOrNull()
     }
 
-    suspend fun setTelemetryEnabled(enabled: Boolean): Boolean {
-        return runCatching {
+    suspend fun setTelemetryEnabled(enabled: Boolean): Boolean =
+        runCatching {
             val current = relayTelemetrySettings ?: marmotIo { relayTelemetrySettings() }
-            val updated = marmotIo {
-                setRelayTelemetrySettings(
-                    RelayTelemetrySettingsFfi(
-                        exportEnabled = enabled,
-                        exportIntervalSeconds = current.exportIntervalSeconds,
-                    ),
-                )
-            }
+            val updated =
+                marmotIo {
+                    setRelayTelemetrySettings(
+                        RelayTelemetrySettingsFfi(
+                            exportEnabled = enabled,
+                            exportIntervalSeconds = current.exportIntervalSeconds,
+                        ),
+                    )
+                }
             relayTelemetrySettings = updated
             present(R.string.toast_security_privacy_updated)
             true
@@ -651,10 +695,9 @@ class DarkMatterAppState(context: Context) {
             present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()))
             false
         }
-    }
 
-    suspend fun setAuditLogsEnabled(enabled: Boolean): Boolean {
-        return runCatching {
+    suspend fun setAuditLogsEnabled(enabled: Boolean): Boolean =
+        runCatching {
             val updated = marmotIo { setAuditLogSettings(AuditLogSettingsFfi(enabled = enabled)) }
             auditLogSettings = updated
             restartMarmotRuntime()
@@ -665,7 +708,6 @@ class DarkMatterAppState(context: Context) {
             present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()))
             false
         }
-    }
 
     fun updateThemeMode(mode: AppThemeMode) {
         themeMode = mode
@@ -681,17 +723,17 @@ class DarkMatterAppState(context: Context) {
      * Whether an incoming attachment should be fetched/decrypted automatically
      * given the current [mediaAutoDownloadPolicy] and network metering.
      */
-    fun shouldAutoDownloadMedia(): Boolean {
-        return when (mediaAutoDownloadPolicy) {
+    fun shouldAutoDownloadMedia(): Boolean =
+        when (mediaAutoDownloadPolicy) {
             MediaAutoDownloadPolicy.Always -> true
             MediaAutoDownloadPolicy.Never -> false
             MediaAutoDownloadPolicy.WifiOnly -> !isActiveNetworkMetered()
         }
-    }
 
     private fun isActiveNetworkMetered(): Boolean {
-        val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
-            ?: return true // Unknown → treat as metered (conservative).
+        val cm =
+            appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+                ?: return true // Unknown → treat as metered (conservative).
         return cm.isActiveNetworkMetered
     }
 
@@ -719,13 +761,14 @@ class DarkMatterAppState(context: Context) {
 
     suspend fun refreshLocalNotificationSettings() {
         val account = activeAccountRef
-        localNotificationSettings = if (account == null) {
-            null
-        } else {
-            runCatching {
-                marmotIo { notificationSettings(account) }
-            }.getOrNull()
-        }
+        localNotificationSettings =
+            if (account == null) {
+                null
+            } else {
+                runCatching {
+                    marmotIo { notificationSettings(account) }
+                }.getOrNull()
+            }
     }
 
     suspend fun setLocalNotificationsEnabled(enabled: Boolean): Boolean {
@@ -755,32 +798,35 @@ class DarkMatterAppState(context: Context) {
     }
 
     suspend fun setBackgroundConnectionEnabled(enabled: Boolean): Boolean {
-        val account = activeAccountRef ?: run {
-            present(R.string.toast_no_active_account)
-            return false
-        }
+        val account =
+            activeAccountRef ?: run {
+                present(R.string.toast_no_active_account)
+                return false
+            }
         refreshLocalNotificationPermission()
         if (enabled && !localNotificationPermissionGranted) {
             present(R.string.toast_notification_permission_needed)
             return false
         }
         if (enabled && localNotificationSettings?.localNotificationsEnabled != true) {
-            val settings = runCatching {
-                marmotIo { setLocalNotificationsEnabled(account, true) }
-            }.getOrElse {
-                rethrowIfCancellation(it)
-                present(R.string.toast_couldnt_enable_notifications, AppText.Plain(it.readableMessage()))
-                return false
-            }
+            val settings =
+                runCatching {
+                    marmotIo { setLocalNotificationsEnabled(account, true) }
+                }.getOrElse {
+                    rethrowIfCancellation(it)
+                    present(R.string.toast_couldnt_enable_notifications, AppText.Plain(it.readableMessage()))
+                    return false
+                }
             localNotificationSettings = settings
         }
 
         updateBackgroundConnectionPreference(enabled)
-        val serviceUpdated = if (enabled) {
-            startBackgroundConnectionService()
-        } else {
-            NotificationStreamForegroundService.stop(appContext)
-        }
+        val serviceUpdated =
+            if (enabled) {
+                startBackgroundConnectionService()
+            } else {
+                NotificationStreamForegroundService.stop(appContext)
+            }
         if (enabled && !serviceUpdated) {
             updateBackgroundConnectionPreference(false)
             present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service)
@@ -790,13 +836,12 @@ class DarkMatterAppState(context: Context) {
         return true
     }
 
-    fun shouldRequestDefaultNotificationPermission(): Boolean {
-        return activeAccountRef != null &&
+    fun shouldRequestDefaultNotificationPermission(): Boolean =
+        activeAccountRef != null &&
             !defaultNotificationsEnableAttempted &&
             !defaultNotificationPermissionPromptInFlight &&
             !localNotificationPermissionGranted &&
             backgroundConnectionEnabled
-    }
 
     fun markDefaultNotificationPermissionPromptLaunched() {
         defaultNotificationPermissionPromptInFlight = true
@@ -840,24 +885,19 @@ class DarkMatterAppState(context: Context) {
         return shortNpub(accountIdHex)
     }
 
-    private fun profileDisplayName(accountIdHex: String): String? {
-        return profilePresentation(accountIdHex).displayName
-    }
+    private fun profileDisplayName(accountIdHex: String): String? = profilePresentation(accountIdHex).displayName
 
     fun shortNpub(accountIdHex: String): String {
         val npub = npub(accountIdHex)
         return IdentityFormatter.short(npub, prefix = 10, suffix = 8)
     }
 
-    fun npub(accountIdHex: String): String {
-        return npubs.computeIfAbsent(accountIdHex) { key ->
+    fun npub(accountIdHex: String): String =
+        npubs.computeIfAbsent(accountIdHex) { key ->
             runCatching { marmot().npub(key) }.getOrNull() ?: key
         }
-    }
 
-    suspend fun accountIdHex(reference: String): String? {
-        return runCatching { marmotIo { accountIdHex(reference) } }.getOrNull()
-    }
+    suspend fun accountIdHex(reference: String): String? = runCatching { marmotIo { accountIdHex(reference) } }.getOrNull()
 
     fun userProfile(accountIdHex: String): UserProfileMetadataFfi? {
         // Observe profile cache invalidations for Compose callers.
@@ -869,9 +909,10 @@ class DarkMatterAppState(context: Context) {
     }
 
     suspend fun loadUserProfile(accountIdHex: String): UserProfileMetadataFfi? {
-        val profile = runCatching {
-            marmotIo { userProfile(accountIdHex) }
-        }.getOrNull()
+        val profile =
+            runCatching {
+                marmotIo { userProfile(accountIdHex) }
+            }.getOrNull()
         if (profile == null) requestProfile(accountIdHex)
         return profile
     }
@@ -896,7 +937,10 @@ class DarkMatterAppState(context: Context) {
         accountIdHexes.forEach { requestProfile(it) }
     }
 
-    fun cachedGroupMemberSnapshot(accountRef: String?, groupIdHex: String): GroupMemberSnapshot? {
+    fun cachedGroupMemberSnapshot(
+        accountRef: String?,
+        groupIdHex: String,
+    ): GroupMemberSnapshot? {
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return null
         return synchronized(groupMemberSnapshotLock) {
             groupMemberSnapshots[key]
@@ -917,25 +961,28 @@ class DarkMatterAppState(context: Context) {
     }
 
     suspend fun refreshProfile(accountIdHex: String) {
-        val profile = try {
-            val result = runCatching {
-                marmotIo {
-                    val relays = activeAccountRef
-                        ?.let { runCatching { accountNip65Relays(it) }.getOrNull() }
-                        ?.takeIf { it.isNotEmpty() }
-                        ?: MarmotClient.bootstrapRelays
-                    refreshProfile(accountIdHex, relays)
-                    userProfile(accountIdHex)
-                }
+        val profile =
+            try {
+                val result =
+                    runCatching {
+                        marmotIo {
+                            val relays =
+                                activeAccountRef
+                                    ?.let { runCatching { accountNip65Relays(it) }.getOrNull() }
+                                    ?.takeIf { it.isNotEmpty() }
+                                    ?: MarmotClient.bootstrapRelays
+                            refreshProfile(accountIdHex, relays)
+                            userProfile(accountIdHex)
+                        }
+                    }
+                // Don't let runCatching swallow cancellation: rethrow so the
+                // profileScope job actually stops. finish() still runs in finally,
+                // so the refresh gate is released either way (no stuck in-flight).
+                result.exceptionOrNull()?.let(::rethrowIfCancellation)
+                result.getOrNull()
+            } finally {
+                profileRefreshGate.finish(accountIdHex, System.currentTimeMillis())
             }
-            // Don't let runCatching swallow cancellation: rethrow so the
-            // profileScope job actually stops. finish() still runs in finally,
-            // so the refresh gate is released either way (no stuck in-flight).
-            result.exceptionOrNull()?.let(::rethrowIfCancellation)
-            result.getOrNull()
-        } finally {
-            profileRefreshGate.finish(accountIdHex, System.currentTimeMillis())
-        }
         if (profile != null) {
             notifyProfileChanged(accountIdHex)
         }
@@ -971,15 +1018,17 @@ class DarkMatterAppState(context: Context) {
     suspend fun publishProfile(profile: UserProfileMetadataFfi) {
         val account = activeAccountRef ?: return
         runCatching {
-            val profileRelayCount = marmotIo {
-                val relayLists = accountRelayLists(account)
-                val profileRelays = accountNip65Relays(account).ifEmpty {
-                    relayLists.defaultRelays.ifEmpty { MarmotClient.bootstrapRelays }
+            val profileRelayCount =
+                marmotIo {
+                    val relayLists = accountRelayLists(account)
+                    val profileRelays =
+                        accountNip65Relays(account).ifEmpty {
+                            relayLists.defaultRelays.ifEmpty { MarmotClient.bootstrapRelays }
+                        }
+                    val bootstrapRelays = relayLists.bootstrapRelays.ifEmpty { MarmotClient.bootstrapRelays }
+                    publishUserProfile(account, profile, profileRelays, bootstrapRelays)
+                    profileRelays.size
                 }
-                val bootstrapRelays = relayLists.bootstrapRelays.ifEmpty { MarmotClient.bootstrapRelays }
-                publishUserProfile(account, profile, profileRelays, bootstrapRelays)
-                profileRelays.size
-            }
             notifyProfilesChanged()
             presentText(
                 AppText.Resource(R.string.toast_profile_published),
@@ -991,23 +1040,37 @@ class DarkMatterAppState(context: Context) {
         }
     }
 
-    fun present(title: String, detail: String? = null) {
+    fun present(
+        title: String,
+        detail: String? = null,
+    ) {
         presentText(AppText.Plain(title), detail?.let { AppText.Plain(it) })
     }
 
-    fun present(@StringRes titleRes: Int) {
+    fun present(
+        @StringRes titleRes: Int,
+    ) {
         presentText(AppText.Resource(titleRes))
     }
 
-    fun present(@StringRes titleRes: Int, @StringRes detailRes: Int) {
+    fun present(
+        @StringRes titleRes: Int,
+        @StringRes detailRes: Int,
+    ) {
         presentText(AppText.Resource(titleRes), AppText.Resource(detailRes))
     }
 
-    fun present(@StringRes titleRes: Int, detail: AppText) {
+    fun present(
+        @StringRes titleRes: Int,
+        detail: AppText,
+    ) {
         presentText(AppText.Resource(titleRes), detail)
     }
 
-    fun presentText(title: AppText, detail: AppText? = null) {
+    fun presentText(
+        title: AppText,
+        detail: AppText? = null,
+    ) {
         toast = ToastMessage(title, detail)
     }
 
@@ -1031,20 +1094,21 @@ class DarkMatterAppState(context: Context) {
 
         appStateDebug { "marmot runtime reopening" }
         previousNotificationJob?.cancelAndJoin()
-        val opened = try {
-            withContext(Dispatchers.IO) {
-                previousClient?.marmot?.close()
-                MarmotClient(appContext).also { nextClient ->
-                    nextClient.marmot.configurePrivacyRuntime(accountLabelForRuntime)
-                    nextClient.marmot.start()
+        val opened =
+            try {
+                withContext(Dispatchers.IO) {
+                    previousClient?.marmot?.close()
+                    MarmotClient(appContext).also { nextClient ->
+                        nextClient.marmot.configurePrivacyRuntime(accountLabelForRuntime)
+                        nextClient.marmot.start()
+                    }
                 }
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                client = null
+                phase = AppPhase.Failed(error.readableMessage())
+                throw error
             }
-        } catch (error: Throwable) {
-            if (error is CancellationException) throw error
-            client = null
-            phase = AppPhase.Failed(error.readableMessage())
-            throw error
-        }
 
         client = opened
         runtimeGeneration += 1
@@ -1087,27 +1151,29 @@ class DarkMatterAppState(context: Context) {
             RelayTelemetryRuntimeConfigFfi(
                 otlpEndpoint = BuildConfig.DARKMATTER_OTLP_ENDPOINT.nonBlankOrNull(),
                 authorizationBearerToken = BuildConfig.DARKMATTER_OTLP_AUTH_TOKEN.nonBlankOrNull(),
-                resource = RelayTelemetryResourceFfi(
-                    serviceVersion = telemetryServiceVersion(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-                    serviceInstanceId = installId,
-                    deploymentEnvironment = telemetryDeploymentEnvironment(BuildConfig.DARKMATTER_DEPLOYMENT_ENVIRONMENT),
-                    tenant = BuildConfig.DARKMATTER_TELEMETRY_TENANT.ifBlank { "darkmatter-android" },
-                    osType = "linux",
-                    osVersion = Build.VERSION.RELEASE.ifBlank { Build.VERSION.SDK_INT.toString() },
-                    deviceModelIdentifier = telemetryDeviceModelIdentifier(Build.MODEL),
-                ),
+                resource =
+                    RelayTelemetryResourceFfi(
+                        serviceVersion = telemetryServiceVersion(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                        serviceInstanceId = installId,
+                        deploymentEnvironment = telemetryDeploymentEnvironment(BuildConfig.DARKMATTER_DEPLOYMENT_ENVIRONMENT),
+                        tenant = BuildConfig.DARKMATTER_TELEMETRY_TENANT.ifBlank { "darkmatter-android" },
+                        osType = "linux",
+                        osVersion = Build.VERSION.RELEASE.ifBlank { Build.VERSION.SDK_INT.toString() },
+                        deviceModelIdentifier = telemetryDeviceModelIdentifier(Build.MODEL),
+                    ),
             ),
         )
         setAuditLogTrackerConfig(
             AuditLogTrackerConfigFfi(
                 endpoint = BuildConfig.DARKMATTER_AUDIT_LOG_ENDPOINT.nonBlankOrNull(),
                 authorizationBearerToken = BuildConfig.DARKMATTER_AUDIT_LOG_AUTH_TOKEN.nonBlankOrNull(),
-                source = AuditLogUploadSourceFfi(
-                    accountLabel = accountLabel.nonBlankOrNull(),
-                    deviceLabel = Build.MODEL.nonBlankOrNull(),
-                    platform = "android",
-                    appVersion = BuildConfig.VERSION_NAME,
-                ),
+                source =
+                    AuditLogUploadSourceFfi(
+                        accountLabel = accountLabel.nonBlankOrNull(),
+                        deviceLabel = Build.MODEL.nonBlankOrNull(),
+                        platform = "android",
+                        appVersion = BuildConfig.VERSION_NAME,
+                    ),
             ),
         )
     }
@@ -1119,53 +1185,55 @@ class DarkMatterAppState(context: Context) {
 
     private fun startNotificationListener() {
         if (notificationJob?.isActive == true) return
-        notificationJob = notificationScope.launch {
-            // Restart the subscription on any failure (or clean end-of-stream)
-            // with exponential backoff, so a transient relay/binding error
-            // doesn't permanently silence notifications. Backoff resets after
-            // each received update; cancellation propagates and stops the loop.
-            // See #56.
-            var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-            while (isActive) {
-                try {
-                    val subscription = marmotIo { subscribeNotifications() }
+        notificationJob =
+            notificationScope.launch {
+                // Restart the subscription on any failure (or clean end-of-stream)
+                // with exponential backoff, so a transient relay/binding error
+                // doesn't permanently silence notifications. Backoff resets after
+                // each received update; cancellation propagates and stops the loop.
+                // See #56.
+                var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                while (isActive) {
                     try {
-                        while (isActive) {
-                            val update = marmotIo { subscription.next() } ?: break
-                            backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-                            val activeConversation = activeConversationGroupIdHex
-                            val shouldPost = LocalNotificationPolicy.shouldPost(
-                                update = update,
-                                appInForeground = appInForeground,
-                                activeConversationGroupIdHex = activeConversation,
-                            )
-                            appStateDebug {
-                                "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
-                                    "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} post=$shouldPost"
+                        val subscription = marmotIo { subscribeNotifications() }
+                        try {
+                            while (isActive) {
+                                val update = marmotIo { subscription.next() } ?: break
+                                backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                                val activeConversation = activeConversationGroupIdHex
+                                val shouldPost =
+                                    LocalNotificationPolicy.shouldPost(
+                                        update = update,
+                                        appInForeground = appInForeground,
+                                        activeConversationGroupIdHex = activeConversation,
+                                    )
+                                appStateDebug {
+                                    "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
+                                        "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} post=$shouldPost"
+                                }
+                                if (shouldPost) {
+                                    localNotificationPresenter.show(update)
+                                }
                             }
-                            if (shouldPost) {
-                                localNotificationPresenter.show(update)
+                        } finally {
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    subscription.close()
+                                }
                             }
                         }
-                    } finally {
-                        runCatching {
-                            withContext(Dispatchers.IO) {
-                                subscription.close()
-                            }
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (throwable: Throwable) {
+                        appStateDebug(throwable) {
+                            "notification listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"
                         }
                     }
-                } catch (cancel: CancellationException) {
-                    throw cancel
-                } catch (throwable: Throwable) {
-                    appStateDebug(throwable) {
-                        "notification listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"
-                    }
+                    if (!isActive) break
+                    delay(backoffMillis)
+                    backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
                 }
-                if (!isActive) break
-                delay(backoffMillis)
-                backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
             }
-        }
     }
 
     private fun updateBackgroundConnectionPreference(enabled: Boolean) {
@@ -1186,9 +1254,7 @@ class DarkMatterAppState(context: Context) {
             .applicationLocales = LocaleList.forLanguageTags(tag)
     }
 
-    private fun cachedUserProfile(accountIdHex: String): UserProfileMetadataFfi? {
-        return runCatching { marmot().userProfile(accountIdHex) }.getOrNull()
-    }
+    private fun cachedUserProfile(accountIdHex: String): UserProfileMetadataFfi? = runCatching { marmot().userProfile(accountIdHex) }.getOrNull()
 
     private fun profilePresentation(accountIdHex: String): ProfilePresentation {
         profileRevision
@@ -1203,18 +1269,20 @@ class DarkMatterAppState(context: Context) {
     }
 
     private fun readProfilePresentation(accountIdHex: String): ProfilePresentation {
-        val displayName = runCatching { marmot().displayName(accountIdHex) }
-            .getOrNull()
-            ?.let { ProfileSanitizer.displayName(it) }
+        val displayName =
+            runCatching { marmot().displayName(accountIdHex) }
+                .getOrNull()
+                ?.let { ProfileSanitizer.displayName(it) }
         val avatarUrl = ProfileSanitizer.imageUrl(cachedUserProfile(accountIdHex)?.picture)
         return ProfilePresentation(displayName = displayName, avatarUrl = avatarUrl)
     }
 
     private fun notifyProfileChanged(accountIdHex: String) {
         val presentation = readProfilePresentation(accountIdHex)
-        val changed = synchronized(profilePresentationLock) {
-            profilePresentations.put(accountIdHex, presentation) != presentation
-        }
+        val changed =
+            synchronized(profilePresentationLock) {
+                profilePresentations.put(accountIdHex, presentation) != presentation
+            }
         if (changed) {
             profileRevision += 1
         }
@@ -1227,14 +1295,15 @@ class DarkMatterAppState(context: Context) {
         profileRevision += 1
     }
 
-    private fun groupMemberSnapshotKey(accountRef: String?, groupIdHex: String): String? {
+    private fun groupMemberSnapshotKey(
+        accountRef: String?,
+        groupIdHex: String,
+    ): String? {
         val account = accountRef?.takeIf { it.isNotBlank() } ?: return null
         return "$account:$groupIdHex"
     }
 
-    private fun Throwable.readableMessage(): String {
-        return message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
-    }
+    private fun Throwable.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
     companion object {
         private const val ACTIVE_ACCOUNT_KEY = "active_account"
@@ -1242,12 +1311,15 @@ class DarkMatterAppState(context: Context) {
         private const val THEME_MODE_KEY = "theme_mode"
         private const val MEDIA_AUTO_DOWNLOAD_KEY = "media_auto_download"
         private const val DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY = "default_notifications_enable_attempted"
+
         // 24 MiB cap on decrypted attachment bytes resident in memory —
         // roughly ten 1920px JPEGs. Persists across conversation re-entry.
         private const val MEDIA_PLAINTEXT_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L
+
         // ~48 MiB of decoded thumbnails (sampled to <=1280px). Enough to keep
         // visible bubbles spinner-free; bounded so it can't grow unbounded.
         private const val MEDIA_THUMBNAIL_CACHE_MAX_BYTES: Long = 48L * 1024L * 1024L
+
         // ~256 MiB of persistent decrypted media on disk. Big enough to keep
         // typical chat history through OS cache reaps; OS may still trim
         // earlier if device-wide cache pressure hits.
@@ -1266,7 +1338,10 @@ private inline fun appStateDebug(message: () -> String) {
     if (BuildConfig.DEBUG) Log.i("DMAppState", message())
 }
 
-private inline fun appStateDebug(error: Throwable, message: () -> String) {
+private inline fun appStateDebug(
+    error: Throwable,
+    message: () -> String,
+) {
     Log.e("DMAppState", message(), error)
 }
 

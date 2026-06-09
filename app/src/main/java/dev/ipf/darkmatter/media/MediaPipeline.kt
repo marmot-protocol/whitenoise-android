@@ -24,11 +24,12 @@ import java.io.ByteArrayOutputStream
  * OOM on a 12MP source.
  */
 object MediaPipeline {
-
     /** 1920px max edge mirrors `ImagePicker(maxWidth: 1920, maxHeight: 1920)`. */
     const val DEFAULT_MAX_EDGE_PX: Int = 1920
+
     /** Quality 85 mirrors `ImagePicker(imageQuality: 85)`. */
     const val DEFAULT_JPEG_QUALITY: Int = 85
+
     /** MIME on the wire always matches the recompressed payload, not the source. */
     const val RECOMPRESSED_MIME: String = "image/jpeg"
 
@@ -79,15 +80,19 @@ object MediaPipeline {
      * 1920px image isn't held as a ~14 MB ARGB_8888 bitmap per visible row.
      * Returns null when the bytes can't be decoded.
      */
-    fun decodeSampledBitmap(bytes: ByteArray, maxEdgePx: Int): Bitmap? {
+    fun decodeSampledBitmap(
+        bytes: ByteArray,
+        maxEdgePx: Int,
+    ): Bitmap? {
         if (bytes.isEmpty()) return null
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         val (targetW, targetH) = targetDimensions(bounds.outWidth, bounds.outHeight, maxEdgePx)
         if (targetW == 0 || targetH == 0) return null
-        val opts = BitmapFactory.Options().apply {
-            inSampleSize = computeInSampleSize(bounds.outWidth, bounds.outHeight, targetW, targetH)
-        }
+        val opts =
+            BitmapFactory.Options().apply {
+                inSampleSize = computeInSampleSize(bounds.outWidth, bounds.outHeight, targetW, targetH)
+            }
         return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
     }
 
@@ -101,7 +106,11 @@ object MediaPipeline {
      * as "give up, don't try to upload" rather than failing later in
      * Bitmap.createScaledBitmap with an opaque exception.
      */
-    fun targetDimensions(srcWidth: Int, srcHeight: Int, maxEdgePx: Int): Pair<Int, Int> {
+    fun targetDimensions(
+        srcWidth: Int,
+        srcHeight: Int,
+        maxEdgePx: Int,
+    ): Pair<Int, Int> {
         if (srcWidth <= 0 || srcHeight <= 0 || maxEdgePx <= 0) return 0 to 0
         val longerEdge = maxOf(srcWidth, srcHeight)
         if (longerEdge <= maxEdgePx) return srcWidth to srcHeight
@@ -129,47 +138,51 @@ object MediaPipeline {
         // surfaces as null (see the catch) so callers never crash or ship
         // partial bytes.
         return try {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        contentResolver.openInputStream(uri).use { stream ->
-            stream ?: return null
-            BitmapFactory.decodeStream(stream, null, bounds)
-        }
-        val srcW = bounds.outWidth
-        val srcH = bounds.outHeight
-        if (srcW <= 0 || srcH <= 0) return null
-
-        val (targetW, targetH) = targetDimensions(srcW, srcH, maxEdgePx)
-        if (targetW == 0 || targetH == 0) return null
-        val sampleSize = computeInSampleSize(srcW, srcH, targetW, targetH)
-
-        val decoded: Bitmap = contentResolver.openInputStream(uri).use { stream ->
-            stream ?: return null
-            val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-            BitmapFactory.decodeStream(stream, null, opts) ?: return null
-        }
-        val scaled = if (decoded.width != targetW || decoded.height != targetH) {
-            try {
-                Bitmap.createScaledBitmap(decoded, targetW, targetH, true).also {
-                    if (it !== decoded) decoded.recycle()
-                }
-            } catch (t: Throwable) {
-                decoded.recycle() // don't leak the source bitmap on scale failure
-                throw t
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            contentResolver.openInputStream(uri).use { stream ->
+                stream ?: return null
+                BitmapFactory.decodeStream(stream, null, bounds)
             }
-        } else decoded
+            val srcW = bounds.outWidth
+            val srcH = bounds.outHeight
+            if (srcW <= 0 || srcH <= 0) return null
 
-        try {
-            ByteArrayOutputStream().use { out ->
-                // compress() returns false on failure — don't ship partial bytes.
-                if (scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)) {
-                    out.toByteArray()
+            val (targetW, targetH) = targetDimensions(srcW, srcH, maxEdgePx)
+            if (targetW == 0 || targetH == 0) return null
+            val sampleSize = computeInSampleSize(srcW, srcH, targetW, targetH)
+
+            val decoded: Bitmap =
+                contentResolver.openInputStream(uri).use { stream ->
+                    stream ?: return null
+                    val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                    BitmapFactory.decodeStream(stream, null, opts) ?: return null
+                }
+            val scaled =
+                if (decoded.width != targetW || decoded.height != targetH) {
+                    try {
+                        Bitmap.createScaledBitmap(decoded, targetW, targetH, true).also {
+                            if (it !== decoded) decoded.recycle()
+                        }
+                    } catch (t: Throwable) {
+                        decoded.recycle() // don't leak the source bitmap on scale failure
+                        throw t
+                    }
                 } else {
-                    null
+                    decoded
                 }
+
+            try {
+                ByteArrayOutputStream().use { out ->
+                    // compress() returns false on failure — don't ship partial bytes.
+                    if (scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)) {
+                        out.toByteArray()
+                    } else {
+                        null
+                    }
+                }
+            } finally {
+                scaled.recycle()
             }
-        } finally {
-            scaled.recycle()
-        }
         } catch (_: java.io.IOException) {
             null
         } catch (_: SecurityException) {
@@ -183,7 +196,12 @@ object MediaPipeline {
      * `createScaledBitmap` walks the rest of the way. Matches the pattern
      * Android documents in `BitmapFactory.Options#inSampleSize`.
      */
-    internal fun computeInSampleSize(srcW: Int, srcH: Int, reqW: Int, reqH: Int): Int {
+    internal fun computeInSampleSize(
+        srcW: Int,
+        srcH: Int,
+        reqW: Int,
+        reqH: Int,
+    ): Int {
         if (reqW <= 0 || reqH <= 0) return 1
         var sample = 1
         while (srcW / (sample * 2) >= reqW && srcH / (sample * 2) >= reqH) {

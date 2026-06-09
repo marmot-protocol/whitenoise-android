@@ -5,7 +5,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HostSafetyTest {
-
     @Test
     fun loopbackAndUnspecifiedIpv4AreFlagged() {
         assertTrue(HostSafety.isPrivateOrLoopbackHost("127.0.0.1"))

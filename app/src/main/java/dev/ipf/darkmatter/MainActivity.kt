@@ -54,11 +54,12 @@ class MainActivity : ComponentActivity() {
      * already-queued target/link intact (see [routeInboundIntent]).
      */
     private fun consumeIntent(intent: Intent?) {
-        val routing = routeInboundIntent(
-            parsedTarget = NotificationNavigation.parse(intent),
-            dataString = intent?.dataString,
-            current = InboundIntentRouting(inboundNotificationTarget, inboundProfilePayload),
-        )
+        val routing =
+            routeInboundIntent(
+                parsedTarget = NotificationNavigation.parse(intent),
+                dataString = intent?.dataString,
+                current = InboundIntentRouting(inboundNotificationTarget, inboundProfilePayload),
+            )
         inboundNotificationTarget = routing.notificationTarget
         inboundProfilePayload = routing.profilePayload
     }

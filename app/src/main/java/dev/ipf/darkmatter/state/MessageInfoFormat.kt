@@ -6,12 +6,12 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
-/**
+/*
  * Pure formatters for the message-info sheet. Extracted from the Compose
  * surface so the boundary behavior (epoch overflow, hex bounds, status
  * mapping) can be unit-tested directly without an Android runtime.
  *
- * @see firstUnreadReceivedIndex for the testability pattern used here.
+ * See firstUnreadReceivedIndex for the testability pattern used here.
  */
 
 /**
@@ -40,10 +40,11 @@ fun formatExactTimestamp(
     if (recordedAtSeconds == 0uL) return ""
     if (recordedAtSeconds > Instant.MAX.epochSecond.toULong()) return ""
     val instant = Instant.ofEpochSecond(recordedAtSeconds.toLong())
-    val formatter = DateTimeFormatter
-        .ofLocalizedDateTime(FormatStyle.LONG, FormatStyle.LONG)
-        .withLocale(locale)
-        .withZone(zone)
+    val formatter =
+        DateTimeFormatter
+            .ofLocalizedDateTime(FormatStyle.LONG, FormatStyle.LONG)
+            .withLocale(locale)
+            .withZone(zone)
     return formatter.format(instant)
 }
 
@@ -52,7 +53,10 @@ fun formatExactTimestamp(
  * (never goes negative). Used to compare a record's claimed `recordedAt`
  * against the locally observed `receivedAt`.
  */
-fun absDelta(a: ULong, b: ULong): ULong = if (a > b) a - b else b - a
+fun absDelta(
+    a: ULong,
+    b: ULong,
+): ULong = if (a > b) a - b else b - a
 
 /** Seconds of clock skew below which sender's claimed and locally observed
  *  timestamps are considered "the same". 5s absorbs typical NTP drift and
@@ -84,7 +88,11 @@ fun shouldShowOriginalTimestamp(
  * Returns the input unchanged when it's already short enough (≤ `head+tail`).
  * Defensive: blank input yields blank output rather than throwing.
  */
-fun shortHex(hex: String, head: Int = 8, tail: Int = 4): String {
+fun shortHex(
+    hex: String,
+    head: Int = 8,
+    tail: Int = 4,
+): String {
     if (hex.isBlank()) return ""
     if (hex.length <= head + tail) return hex
     return "${hex.take(head)}…${hex.takeLast(tail)}"
@@ -103,10 +111,14 @@ data class MessageStatusLabels(
     val streaming: String,
 )
 
-fun labelFor(status: MessageStatus, labels: MessageStatusLabels): String = when (status) {
-    MessageStatus.Pending -> labels.pending
-    MessageStatus.Sent -> labels.sent
-    MessageStatus.Received -> labels.received
-    MessageStatus.Failed -> labels.failed
-    MessageStatus.Streaming -> labels.streaming
-}
+fun labelFor(
+    status: MessageStatus,
+    labels: MessageStatusLabels,
+): String =
+    when (status) {
+        MessageStatus.Pending -> labels.pending
+        MessageStatus.Sent -> labels.sent
+        MessageStatus.Received -> labels.received
+        MessageStatus.Failed -> labels.failed
+        MessageStatus.Streaming -> labels.streaming
+    }

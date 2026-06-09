@@ -1,7 +1,5 @@
 package dev.ipf.darkmatter.media
 
-import java.io.File
-import java.nio.file.Files
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -9,9 +7,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
+import java.nio.file.Files
 
 class DiskByteCacheTest {
-
     private lateinit var dir: File
 
     @Before

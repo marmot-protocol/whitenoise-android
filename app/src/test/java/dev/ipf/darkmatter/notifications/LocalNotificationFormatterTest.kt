@@ -11,14 +11,15 @@ import org.junit.Test
 class LocalNotificationFormatterTest {
     @Test
     fun messageNotificationUsesSenderGroupAndPreviewText() {
-        val content = LocalNotificationFormatter.content(
-            update(
-                trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                groupName = "Launch",
-                previewText = "We are go",
-                sender = user(displayName = "Alice"),
-            ),
-        )
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    groupName = "Launch",
+                    previewText = "We are go",
+                    sender = user(displayName = "Alice"),
+                ),
+            )
 
         assertEquals("Alice in Launch", content?.title)
         assertEquals("We are go", content?.body)
@@ -27,14 +28,15 @@ class LocalNotificationFormatterTest {
 
     @Test
     fun inviteNotificationUsesInviteCopy() {
-        val content = LocalNotificationFormatter.content(
-            update(
-                trigger = NotificationTriggerFfi.GROUP_INVITE,
-                groupName = null,
-                previewText = null,
-                sender = user(displayName = "Bob"),
-            ),
-        )
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.GROUP_INVITE,
+                    groupName = null,
+                    previewText = null,
+                    sender = user(displayName = "Bob"),
+                ),
+            )
 
         assertEquals("Group invite", content?.title)
         assertEquals("Invite from Bob", content?.body)

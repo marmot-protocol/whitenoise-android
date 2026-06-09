@@ -5,20 +5,24 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class CompareTimelineMessagesTest {
-
-    private fun msg(id: String, recordedAt: ULong, order: ULong) = TimelineMessage(
+    private fun msg(
+        id: String,
+        recordedAt: ULong,
+        order: ULong,
+    ) = TimelineMessage(
         id = id,
-        record = AppMessageRecordFfi(
-            messageIdHex = id,
-            direction = "received",
-            groupIdHex = "g",
-            sender = "s",
-            plaintext = "",
-            kind = 9uL,
-            tags = emptyList(),
-            recordedAt = recordedAt,
-            receivedAt = recordedAt,
-        ),
+        record =
+            AppMessageRecordFfi(
+                messageIdHex = id,
+                direction = "received",
+                groupIdHex = "g",
+                sender = "s",
+                plaintext = "",
+                kind = 9uL,
+                tags = emptyList(),
+                recordedAt = recordedAt,
+                receivedAt = recordedAt,
+            ),
         status = MessageStatus.Received,
         timelineOrder = order,
     )

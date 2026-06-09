@@ -5,7 +5,6 @@ import org.junit.Test
 import kotlin.coroutines.cancellation.CancellationException
 
 class CancellationHandlingTest {
-
     @Test
     fun rethrowsCancellationException() {
         assertThrows(CancellationException::class.java) {

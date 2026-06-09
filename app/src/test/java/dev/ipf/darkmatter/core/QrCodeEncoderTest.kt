@@ -16,12 +16,13 @@ class QrCodeEncoderTest {
 
     @Test
     fun createsPackedQrPixelsForBitmapRendering() {
-        val pixels = QrCodeEncoder.pixels(
-            content = ProfileLink("npub1abc").uri,
-            size = 128,
-            onColor = 1,
-            offColor = 0,
-        )
+        val pixels =
+            QrCodeEncoder.pixels(
+                content = ProfileLink("npub1abc").uri,
+                size = 128,
+                onColor = 1,
+                offColor = 0,
+            )
 
         assertEquals(128 * 128, pixels.size)
         assertTrue(pixels.any { it == 1 })

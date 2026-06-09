@@ -21,15 +21,16 @@ data class MessageTextCopy(
     fun reacted(value: String): String = String.format(reactedFormat, value)
 
     companion object {
-        val Default = MessageTextCopy(
-            reactedFormat = "Reacted %1\$s",
-            reactionFallback = "to a message",
-            deleted = "Deleted a message",
-            agentStreamStarted = "Agent stream started",
-            streamFinished = "Stream finished",
-            mediaAttachment = "Media attachment",
-            message = "Message",
-        )
+        val Default =
+            MessageTextCopy(
+                reactedFormat = "Reacted %1\$s",
+                reactionFallback = "to a message",
+                deleted = "Deleted a message",
+                agentStreamStarted = "Agent stream started",
+                streamFinished = "Stream finished",
+                mediaAttachment = "Media attachment",
+                message = "Message",
+            )
     }
 }
 
@@ -46,28 +47,36 @@ object MessageProjector {
     private const val StreamStartTag = "stream-start"
     private const val StreamHashTag = "stream-hash"
 
-    fun displayBody(message: AppMessageRecordFfi, copy: MessageTextCopy = MessageTextCopy.Default): String {
-        return when {
+    fun displayBody(
+        message: AppMessageRecordFfi,
+        copy: MessageTextCopy = MessageTextCopy.Default,
+    ): String =
+        when {
             isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
             isDelete(message) -> copy.deleted
             isStreamStart(message) -> message.plaintext.ifBlank { copy.agentStreamStarted }
-            isMedia(message) -> message.plaintext.takeIf { it.isNotBlank() }
-                ?: imetaField(message, "filename")
-                ?: copy.mediaAttachment
+            isMedia(message) ->
+                message.plaintext.takeIf { it.isNotBlank() }
+                    ?: imetaField(message, "filename")
+                    ?: copy.mediaAttachment
             else -> message.plaintext
         }
-    }
 
-    fun previewText(message: AppMessageRecordFfi?, copy: MessageTextCopy = MessageTextCopy.Default, empty: String = "No messages yet"): String {
+    fun previewText(
+        message: AppMessageRecordFfi?,
+        copy: MessageTextCopy = MessageTextCopy.Default,
+        empty: String = "No messages yet",
+    ): String {
         if (message == null) return empty
         return when {
             isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
             isDelete(message) -> copy.deleted
             isStreamStart(message) -> copy.agentStreamStarted
             isStreamFinal(message) -> message.plaintext.ifBlank { copy.streamFinished }
-            isMedia(message) -> message.plaintext.takeIf { it.isNotBlank() }
-                ?: imetaField(message, "filename")
-                ?: copy.mediaAttachment
+            isMedia(message) ->
+                message.plaintext.takeIf { it.isNotBlank() }
+                    ?: imetaField(message, "filename")
+                    ?: copy.mediaAttachment
             else -> message.plaintext.ifBlank { copy.message }
         }
     }
@@ -108,27 +117,31 @@ object MessageProjector {
 
         return sendersByEmoji
             .mapNotNull { (emoji, senders) ->
-                if (senders.isEmpty()) null
-                else ReactionTally(
-                    emoji = emoji,
-                    count = senders.size,
-                    mine = myAccountId != null && senders.contains(myAccountId),
-                )
-            }
-            .sortedWith(
+                if (senders.isEmpty()) {
+                    null
+                } else {
+                    ReactionTally(
+                        emoji = emoji,
+                        count = senders.size,
+                        mine = myAccountId != null && senders.contains(myAccountId),
+                    )
+                }
+            }.sortedWith(
                 compareByDescending<ReactionTally> { it.count }
                     .thenByDescending { it.mine }
                     .thenBy { it.emoji },
             )
     }
 
-    fun isMine(message: AppMessageRecordFfi, myAccountId: String?): Boolean {
-        return message.direction == "sent" || (myAccountId != null && message.sender == myAccountId)
-    }
+    fun isMine(
+        message: AppMessageRecordFfi,
+        myAccountId: String?,
+    ): Boolean = message.direction == "sent" || (myAccountId != null && message.sender == myAccountId)
 
-    fun isDeleted(messageIdHex: String, deletedMessageIds: Set<String>): Boolean {
-        return messageIdHex.isNotEmpty() && deletedMessageIds.contains(messageIdHex)
-    }
+    fun isDeleted(
+        messageIdHex: String,
+        deletedMessageIds: Set<String>,
+    ): Boolean = messageIdHex.isNotEmpty() && deletedMessageIds.contains(messageIdHex)
 
     fun isReaction(message: AppMessageRecordFfi): Boolean = message.kind == KindReaction
 
@@ -136,11 +149,10 @@ object MessageProjector {
 
     fun isStreamStart(message: AppMessageRecordFfi): Boolean = message.kind == KindAgentStreamStart
 
-    fun isStreamFinal(message: AppMessageRecordFfi): Boolean {
-        return message.kind == KindChat &&
+    fun isStreamFinal(message: AppMessageRecordFfi): Boolean =
+        message.kind == KindChat &&
             tagValue(message, StreamTag) != null &&
             (tagValue(message, StreamStartTag) != null || tagValue(message, StreamHashTag) != null)
-    }
 
     fun streamId(message: AppMessageRecordFfi): String? = tagValue(message, StreamTag)
 
@@ -157,34 +169,40 @@ object MessageProjector {
 
     fun streamTag(streamId: String): MessageTagFfi = MessageTagFfi(listOf(StreamTag, streamId))
 
-    private fun isMedia(message: AppMessageRecordFfi): Boolean {
-        return message.kind == KindChat && message.tags.any { it.values.firstOrNull() == ImetaTag }
-    }
+    private fun isMedia(message: AppMessageRecordFfi): Boolean = message.kind == KindChat && message.tags.any { it.values.firstOrNull() == ImetaTag }
 
     private fun firstEventRef(message: AppMessageRecordFfi): String? = tagValue(message, EventRefTag)
 
-    private fun tagValue(message: AppMessageRecordFfi, name: String): String? {
-        return message.tags
+    private fun tagValue(
+        message: AppMessageRecordFfi,
+        name: String,
+    ): String? =
+        message.tags
             .firstOrNull { it.values.firstOrNull() == name }
             ?.values
             ?.getOrNull(1)
             ?.takeIf { it.isNotBlank() }
-    }
 
-    private fun tagValues(message: AppMessageRecordFfi, name: String): List<String> {
-        return message.tags
+    private fun tagValues(
+        message: AppMessageRecordFfi,
+        name: String,
+    ): List<String> =
+        message.tags
             .filter { it.values.firstOrNull() == name }
             .mapNotNull { it.values.getOrNull(1)?.takeIf { value -> value.isNotBlank() } }
-    }
 
-    private fun imetaField(message: AppMessageRecordFfi, fieldName: String): String? {
+    private fun imetaField(
+        message: AppMessageRecordFfi,
+        fieldName: String,
+    ): String? {
         val prefix = "$fieldName "
         return message.tags
             .asSequence()
             .filter { it.values.firstOrNull() == ImetaTag }
             .flatMap { it.values.drop(1).asSequence() }
             .firstNotNullOfOrNull { value ->
-                value.removePrefix(prefix)
+                value
+                    .removePrefix(prefix)
                     .takeIf { value.startsWith(prefix) && it.isNotBlank() }
             }
     }

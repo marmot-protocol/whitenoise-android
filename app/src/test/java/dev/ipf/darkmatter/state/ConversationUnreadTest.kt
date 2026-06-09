@@ -2,7 +2,6 @@ package dev.ipf.darkmatter.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -19,7 +18,6 @@ import org.junit.Test
  * prepends must not over-count (id-anchored, not index-anchored).
  */
 class ConversationUnreadTest {
-
     // ---- firstUnreadReceivedIndex -------------------------------------------
 
     @Test
@@ -238,30 +236,36 @@ class ConversationUnreadTest {
 
     // ---- helpers ------------------------------------------------------------
 
-    private fun received(id: String, recordedAt: ULong = 1uL): TimelineMessage =
-        message(id, direction = "received", recordedAt = recordedAt)
+    private fun received(
+        id: String,
+        recordedAt: ULong = 1uL,
+    ): TimelineMessage = message(id, direction = "received", recordedAt = recordedAt)
 
-    private fun sent(id: String, recordedAt: ULong = 1uL): TimelineMessage =
-        message(id, direction = "sent", recordedAt = recordedAt)
+    private fun sent(
+        id: String,
+        recordedAt: ULong = 1uL,
+    ): TimelineMessage = message(id, direction = "sent", recordedAt = recordedAt)
 
     private fun message(
         id: String,
         direction: String,
         recordedAt: ULong = 1uL,
         status: MessageStatus = if (direction == "received") MessageStatus.Received else MessageStatus.Sent,
-    ): TimelineMessage = TimelineMessage(
-        id = "msg:$id",
-        record = AppMessageRecordFfi(
-            messageIdHex = id,
-            direction = direction,
-            groupIdHex = "group",
-            sender = if (direction == "received") "bob" else "alice",
-            plaintext = "text-$id",
-            kind = 9uL,
-            tags = emptyList(),
-            recordedAt = recordedAt,
-            receivedAt = recordedAt,
-        ),
-        status = status,
-    )
+    ): TimelineMessage =
+        TimelineMessage(
+            id = "msg:$id",
+            record =
+                AppMessageRecordFfi(
+                    messageIdHex = id,
+                    direction = direction,
+                    groupIdHex = "group",
+                    sender = if (direction == "received") "bob" else "alice",
+                    plaintext = "text-$id",
+                    kind = 9uL,
+                    tags = emptyList(),
+                    recordedAt = recordedAt,
+                    receivedAt = recordedAt,
+                ),
+            status = status,
+        )
 }

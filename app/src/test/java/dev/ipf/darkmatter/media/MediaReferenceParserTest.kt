@@ -10,7 +10,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MediaReferenceParserTest {
-
     @Test
     fun returnsNull_whenNoImetaTagPresent() {
         val tags = listOf(MessageTagFfi(listOf("e", "abc")), MessageTagFfi(listOf("p", "def")))
@@ -37,15 +36,18 @@ class MediaReferenceParserTest {
     @Test
     fun isLenientAboutFieldOrder() {
         // Reverse order — still parses.
-        val reversed = MessageTagFfi(listOf(
-            "imeta",
-            "v mip04-v2",
-            "n $NONCE_HEX",
-            "x $SHA256_HEX",
-            "filename photo.jpg",
-            "m $MIME_JPEG",
-            "url $URL",
-        ))
+        val reversed =
+            MessageTagFfi(
+                listOf(
+                    "imeta",
+                    "v mip04-v2",
+                    "n $NONCE_HEX",
+                    "x $SHA256_HEX",
+                    "filename photo.jpg",
+                    "m $MIME_JPEG",
+                    "url $URL",
+                ),
+            )
         assertNotNull(MediaReferenceParser.parseImetaTag(listOf(reversed)))
     }
 
@@ -88,15 +90,18 @@ class MediaReferenceParserTest {
     @Test
     fun ignoresMalformedEntriesWithoutAValue() {
         // "filename" with no space-value. Should NOT crash, just treat as missing.
-        val tag = MessageTagFfi(listOf(
-            "imeta",
-            "url $URL",
-            "m $MIME_JPEG",
-            "filename",
-            "x $SHA256_HEX",
-            "n $NONCE_HEX",
-            "v mip04-v2",
-        ))
+        val tag =
+            MessageTagFfi(
+                listOf(
+                    "imeta",
+                    "url $URL",
+                    "m $MIME_JPEG",
+                    "filename",
+                    "x $SHA256_HEX",
+                    "n $NONCE_HEX",
+                    "v mip04-v2",
+                ),
+            )
         assertNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
     }
 
@@ -148,14 +153,15 @@ class MediaReferenceParserTest {
     fun toImetaTag_roundTripsThroughParse() {
         // The whole point of the builder is symmetry with the parser, so a
         // ref written and re-parsed must equal the original.
-        val original = MediaReferenceFfi(
-            url = URL,
-            fileHashHex = SHA256_HEX,
-            nonceHex = NONCE_HEX,
-            fileName = "photo.jpg",
-            mediaType = MIME_JPEG,
-            version = "mip04-v2",
-        )
+        val original =
+            MediaReferenceFfi(
+                url = URL,
+                fileHashHex = SHA256_HEX,
+                nonceHex = NONCE_HEX,
+                fileName = "photo.jpg",
+                mediaType = MIME_JPEG,
+                version = "mip04-v2",
+            )
         val tag = MediaReferenceParser.toImetaTag(original)
         val parsed = MediaReferenceParser.parseImetaTag(listOf(tag))
         assertEquals(original, parsed)
@@ -167,14 +173,15 @@ class MediaReferenceParserTest {
         // The parser splits "key value" on the FIRST space, so the value
         // (everything after) survives — but only if the writer doesn't add
         // any escaping that the parser doesn't unescape.
-        val original = MediaReferenceFfi(
-            url = URL,
-            fileHashHex = SHA256_HEX,
-            nonceHex = NONCE_HEX,
-            fileName = "Screenshot 2026-06-05 at 12.34.56.jpg",
-            mediaType = MIME_JPEG,
-            version = "mip04-v2",
-        )
+        val original =
+            MediaReferenceFfi(
+                url = URL,
+                fileHashHex = SHA256_HEX,
+                nonceHex = NONCE_HEX,
+                fileName = "Screenshot 2026-06-05 at 12.34.56.jpg",
+                mediaType = MIME_JPEG,
+                version = "mip04-v2",
+            )
         val parsed = MediaReferenceParser.parseImetaTag(listOf(MediaReferenceParser.toImetaTag(original)))
         assertEquals("Screenshot 2026-06-05 at 12.34.56.jpg", parsed?.fileName)
     }
@@ -184,10 +191,17 @@ class MediaReferenceParserTest {
         // Defensive: if the Rust receive-side validator ever became
         // order-sensitive, our optimistic-injected tag must match what Rust
         // emits. Document the canonical order via assertion.
-        val tag = MediaReferenceParser.toImetaTag(MediaReferenceFfi(
-            url = URL, fileHashHex = SHA256_HEX, nonceHex = NONCE_HEX,
-            fileName = "f.jpg", mediaType = MIME_JPEG, version = "mip04-v2",
-        ))
+        val tag =
+            MediaReferenceParser.toImetaTag(
+                MediaReferenceFfi(
+                    url = URL,
+                    fileHashHex = SHA256_HEX,
+                    nonceHex = NONCE_HEX,
+                    fileName = "f.jpg",
+                    mediaType = MIME_JPEG,
+                    version = "mip04-v2",
+                ),
+            )
         // The tag values include the "imeta" name plus the six fields in order.
         val keys = tag.values.drop(1).map { it.substringBefore(' ') }
         assertEquals(listOf("url", "m", "filename", "x", "n", "v"), keys)
@@ -211,14 +225,15 @@ class MediaReferenceParserTest {
 
     private fun canonicalImetaTag() = MessageTagFfi(listOf("imeta") + canonicalEntries())
 
-    private fun canonicalEntries() = listOf(
-        "url $URL",
-        "m $MIME_JPEG",
-        "filename photo.jpg",
-        "x $SHA256_HEX",
-        "n $NONCE_HEX",
-        "v mip04-v2",
-    )
+    private fun canonicalEntries() =
+        listOf(
+            "url $URL",
+            "m $MIME_JPEG",
+            "filename photo.jpg",
+            "x $SHA256_HEX",
+            "n $NONCE_HEX",
+            "v mip04-v2",
+        )
 
     private fun imetaWithOverride(vararg overrides: Pair<String, String>): MessageTagFfi {
         val byKey = canonicalEntries().associateBy { it.substringBefore(' ') }.toMutableMap()
@@ -226,20 +241,22 @@ class MediaReferenceParserTest {
         return MessageTagFfi(listOf("imeta") + byKey.values.toList())
     }
 
-    private fun parsedFixture(mime: String) = MediaReferenceParser.parseImetaTag(
-        listOf(imetaWithOverride("m" to mime)),
-    )!!
+    private fun parsedFixture(mime: String) =
+        MediaReferenceParser.parseImetaTag(
+            listOf(imetaWithOverride("m" to mime)),
+        )!!
 
     @Test
     fun toImetaTag_roundTripsThroughParser() {
-        val ref = MediaReferenceFfi(
-            url = URL,
-            fileHashHex = SHA256_HEX,
-            nonceHex = NONCE_HEX,
-            fileName = "photo.jpg",
-            mediaType = MIME_JPEG,
-            version = "mip04-v2",
-        )
+        val ref =
+            MediaReferenceFfi(
+                url = URL,
+                fileHashHex = SHA256_HEX,
+                nonceHex = NONCE_HEX,
+                fileName = "photo.jpg",
+                mediaType = MIME_JPEG,
+                version = "mip04-v2",
+            )
         val parsed = MediaReferenceParser.parseImetaTag(listOf(MediaReferenceParser.toImetaTag(ref)))
         assertEquals(ref, parsed)
     }
@@ -247,14 +264,15 @@ class MediaReferenceParserTest {
     @Test
     fun toImetaTag_pinsVersionEvenWhenReferenceVersionIsWrong() {
         // A stale/foreign version must not produce a tag our own parser rejects.
-        val ref = MediaReferenceFfi(
-            url = URL,
-            fileHashHex = SHA256_HEX,
-            nonceHex = NONCE_HEX,
-            fileName = "photo.jpg",
-            mediaType = MIME_JPEG,
-            version = "mip04-v1",
-        )
+        val ref =
+            MediaReferenceFfi(
+                url = URL,
+                fileHashHex = SHA256_HEX,
+                nonceHex = NONCE_HEX,
+                fileName = "photo.jpg",
+                mediaType = MIME_JPEG,
+                version = "mip04-v1",
+            )
         val tag = MediaReferenceParser.toImetaTag(ref)
         assertTrue(tag.values.contains("v mip04-v2"))
         assertNotNull(MediaReferenceParser.parseImetaTag(listOf(tag)))

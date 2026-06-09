@@ -7,7 +7,10 @@ import android.util.Log
 import dev.ipf.darkmatter.BuildConfig
 
 class BackgroundConnectionBootReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         val enabled = BackgroundConnectionPreferences.isEnabled(context)
         if (!BackgroundConnectionPolicy.shouldStartFromSystemWake(intent.action, enabled)) return
         val started = NotificationStreamForegroundService.start(context)

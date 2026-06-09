@@ -31,7 +31,8 @@ class DiskByteCache(
     private val cacheDir: File,
     private val maxBytes: Long,
 ) {
-    private val index = LinkedHashMap<String, Entry>(8, 0.75f, /* accessOrder = */ true)
+    // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
+    private val index = LinkedHashMap<String, Entry>(8, 0.75f, true)
     private var residentBytes: Long = 0L
     private var hydrated = false
 
@@ -52,10 +53,11 @@ class DiskByteCache(
         // file OUTSIDE it. Holding the monitor across readBytes() serialized
         // every concurrent media load and blocked clear() for the duration of
         // disk I/O. See #99.
-        val entry = synchronized(this) {
-            ensureHydrated()
-            index[hashed]
-        } ?: return null
+        val entry =
+            synchronized(this) {
+                ensureHydrated()
+                index[hashed]
+            } ?: return null
         return try {
             entry.file.readBytes()
         } catch (_: IOException) {
@@ -73,7 +75,10 @@ class DiskByteCache(
     }
 
     @Synchronized
-    fun put(key: String, bytes: ByteArray) {
+    fun put(
+        key: String,
+        bytes: ByteArray,
+    ) {
         if (bytes.isEmpty()) return
         ensureHydrated()
         val hashed = fileNameFor(key)
@@ -111,27 +116,38 @@ class DiskByteCache(
         // Drop the index and reset accounting under the lock, then delete files
         // OUTSIDE it so a sign-out doesn't block concurrent get()s for the
         // duration of (potentially many) file deletions. See #99.
-        val toDelete = synchronized(this) {
-            ensureHydrated()
-            val files = index.values.map { it.file }
-            index.clear()
-            residentBytes = 0L
-            files
-        }
+        val toDelete =
+            synchronized(this) {
+                ensureHydrated()
+                val files = index.values.map { it.file }
+                index.clear()
+                residentBytes = 0L
+                files
+            }
         toDelete.forEach { runCatching { it.delete() } }
         // Catch any orphans that aren't in the index — e.g. a prior crash
         // mid-put left a `.tmp`, or an entry whose index row was lost.
         // Scoped to OUR file-naming convention (`.bin` + `.tmp`) so a
         // future co-tenant in the same dir survives sign-out. Touches no
         // shared state, so it is safe outside the lock.
-        cacheDir.listFiles()
+        cacheDir
+            .listFiles()
             ?.asSequence()
             ?.filter { it.isFile && (it.name.endsWith(SUFFIX) || it.name.endsWith(TMP_SUFFIX)) }
             ?.forEach { runCatching { it.delete() } }
     }
 
-    fun size(): Int = synchronized(this) { ensureHydrated(); index.size }
-    fun residentBytes(): Long = synchronized(this) { ensureHydrated(); residentBytes }
+    fun size(): Int =
+        synchronized(this) {
+            ensureHydrated()
+            index.size
+        }
+
+    fun residentBytes(): Long =
+        synchronized(this) {
+            ensureHydrated()
+            residentBytes
+        }
 
     private fun evictUntilUnderCap() {
         if (residentBytes <= maxBytes) return
@@ -145,10 +161,12 @@ class DiskByteCache(
     }
 
     private fun rehydrateIndex() {
-        val files = cacheDir.listFiles()
-            ?.filter { it.isFile && it.name.endsWith(SUFFIX) }
-            ?.sortedBy { it.lastModified() }
-            ?: return
+        val files =
+            cacheDir
+                .listFiles()
+                ?.filter { it.isFile && it.name.endsWith(SUFFIX) }
+                ?.sortedBy { it.lastModified() }
+                ?: return
         for (file in files) {
             val size = file.length()
             if (size <= 0 || size > Int.MAX_VALUE) {
@@ -175,14 +193,32 @@ class DiskByteCache(
         return sb.toString()
     }
 
-    private data class Entry(val file: File, val size: Int)
+    private data class Entry(
+        val file: File,
+        val size: Int,
+    )
 
     private companion object {
         const val SUFFIX = ".bin"
         const val TMP_SUFFIX = ".tmp"
-        val HEX = charArrayOf(
-            '0', '1', '2', '3', '4', '5', '6', '7',
-            '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
-        )
+        val HEX =
+            charArrayOf(
+                '0',
+                '1',
+                '2',
+                '3',
+                '4',
+                '5',
+                '6',
+                '7',
+                '8',
+                '9',
+                'a',
+                'b',
+                'c',
+                'd',
+                'e',
+                'f',
+            )
     }
 }

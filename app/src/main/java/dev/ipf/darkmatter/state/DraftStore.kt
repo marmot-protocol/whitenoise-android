@@ -14,7 +14,11 @@ import androidx.compose.runtime.mutableStateOf
  */
 internal interface DraftPersistence {
     fun read(): Map<String, String>
-    fun write(key: String, value: String?)
+
+    fun write(
+        key: String,
+        value: String?,
+    )
 }
 
 /**
@@ -41,14 +45,20 @@ class DraftStore internal constructor(
     // draft recompose once it is set.
     private fun stateFor(k: String): MutableState<String?> = drafts.getOrPut(k) { mutableStateOf(null) }
 
-    fun get(accountIdHex: String, groupIdHex: String): String? =
-        stateFor(key(accountIdHex, groupIdHex)).value
+    fun get(
+        accountIdHex: String,
+        groupIdHex: String,
+    ): String? = stateFor(key(accountIdHex, groupIdHex)).value
 
     /**
      * Sets the draft. Empty or whitespace-only text clears the draft so we
      * don't store noise.
      */
-    fun set(accountIdHex: String, groupIdHex: String, text: String) {
+    fun set(
+        accountIdHex: String,
+        groupIdHex: String,
+        text: String,
+    ) {
         val k = key(accountIdHex, groupIdHex)
         val state = stateFor(k)
         if (text.isBlank()) {
@@ -72,16 +82,19 @@ class DraftStore internal constructor(
         }
     }
 
-    private fun key(accountIdHex: String, groupIdHex: String): String = "$accountIdHex $groupIdHex"
+    private fun key(
+        accountIdHex: String,
+        groupIdHex: String,
+    ): String = "$accountIdHex $groupIdHex"
 
     companion object {
-        fun forContext(context: Context): DraftStore {
-            return DraftStore(SharedPreferencesDraftPersistence(context.applicationContext))
-        }
+        fun forContext(context: Context): DraftStore = DraftStore(SharedPreferencesDraftPersistence(context.applicationContext))
     }
 }
 
-internal class SharedPreferencesDraftPersistence(context: Context) : DraftPersistence {
+internal class SharedPreferencesDraftPersistence(
+    context: Context,
+) : DraftPersistence {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("darkmatter.drafts", Context.MODE_PRIVATE)
 
@@ -90,9 +103,14 @@ internal class SharedPreferencesDraftPersistence(context: Context) : DraftPersis
         return prefs.all.filterValues { it is String } as Map<String, String>
     }
 
-    override fun write(key: String, value: String?) {
-        prefs.edit().apply {
-            if (value == null) remove(key) else putString(key, value)
-        }.apply()
+    override fun write(
+        key: String,
+        value: String?,
+    ) {
+        prefs
+            .edit()
+            .apply {
+                if (value == null) remove(key) else putString(key, value)
+            }.apply()
     }
 }

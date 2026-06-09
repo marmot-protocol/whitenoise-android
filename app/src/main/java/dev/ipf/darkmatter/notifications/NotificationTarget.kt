@@ -23,13 +23,21 @@ data class NotificationTarget(
 /** One step of the tap-to-navigate state machine (see [resolveNotificationNav]). */
 sealed interface NotificationNavStep {
     /** Active account differs from the target's — switch first, then re-evaluate. */
-    data class SwitchAccount(val accountRef: String) : NotificationNavStep
+    data class SwitchAccount(
+        val accountRef: String,
+    ) : NotificationNavStep
+
     /** Right account is active but its chat list hasn't loaded yet — wait. */
     data object AwaitChatList : NotificationNavStep
+
     /** Ready: open this conversation. */
-    data class OpenConversation(val groupIdHex: String) : NotificationNavStep
+    data class OpenConversation(
+        val groupIdHex: String,
+    ) : NotificationNavStep
+
     /** Target account no longer exists locally — fall back to the chat list. */
     data object MissingAccount : NotificationNavStep
+
     /** Account is loaded but the conversation is gone — fall back to the chat list. */
     data object MissingConversation : NotificationNavStep
 }
@@ -84,11 +92,12 @@ fun routeInboundIntent(
     parsedTarget: NotificationTarget?,
     dataString: String?,
     current: InboundIntentRouting,
-): InboundIntentRouting = when {
-    parsedTarget != null -> InboundIntentRouting(parsedTarget, null)
-    dataString != null -> InboundIntentRouting(null, dataString)
-    else -> current
-}
+): InboundIntentRouting =
+    when {
+        parsedTarget != null -> InboundIntentRouting(parsedTarget, null)
+        dataString != null -> InboundIntentRouting(null, dataString)
+        else -> current
+    }
 
 object NotificationNavigation {
     /** Constant action marking a content intent as a notification tap. */
@@ -106,8 +115,7 @@ object NotificationNavigation {
      * keeps each notification's click target distinct — otherwise a later
      * notification would overwrite an earlier one's target.
      */
-    fun targetUriString(notificationKey: String): String =
-        "$URI_SCHEME://open/" + notificationKey.ifBlank { "unknown" }
+    fun targetUriString(notificationKey: String): String = "$URI_SCHEME://open/" + notificationKey.ifBlank { "unknown" }
 
     /** Stable request code per notification (belt-and-suspenders with the URI). */
     fun requestCode(notificationKey: String): Int = notificationKey.hashCode()
@@ -116,13 +124,15 @@ object NotificationNavigation {
     fun fromUpdate(update: NotificationUpdateFfi): NotificationTarget? {
         val accountRef = update.accountRef.takeIf { it.isNotBlank() } ?: return null
         val groupIdHex = update.groupIdHex.takeIf { it.isNotBlank() } ?: return null
-        val kind = when (update.trigger) {
-            NotificationTriggerFfi.NEW_MESSAGE -> NotificationTargetKind.MESSAGE
-            NotificationTriggerFfi.GROUP_INVITE -> NotificationTargetKind.INVITE
-        }
+        val kind =
+            when (update.trigger) {
+                NotificationTriggerFfi.NEW_MESSAGE -> NotificationTargetKind.MESSAGE
+                NotificationTriggerFfi.GROUP_INVITE -> NotificationTargetKind.INVITE
+            }
         // messageId is only meaningful for message notifications.
-        val messageIdHex = update.messageIdHex
-            ?.takeIf { it.isNotBlank() && kind == NotificationTargetKind.MESSAGE }
+        val messageIdHex =
+            update.messageIdHex
+                ?.takeIf { it.isNotBlank() && kind == NotificationTargetKind.MESSAGE }
         return NotificationTarget(accountRef, groupIdHex, messageIdHex, kind)
     }
 
@@ -147,7 +157,11 @@ object NotificationNavigation {
     }
 
     /** Stamp [target] onto a content [intent] (action + unique data + extras). */
-    fun applyToIntent(intent: Intent, target: NotificationTarget, notificationKey: String) {
+    fun applyToIntent(
+        intent: Intent,
+        target: NotificationTarget,
+        notificationKey: String,
+    ) {
         intent.action = ACTION_OPEN
         intent.data = Uri.parse(targetUriString(notificationKey))
         intent.putExtra(EXTRA_ACCOUNT_REF, target.accountRef)

@@ -1,8 +1,8 @@
 package dev.ipf.darkmatter.state
 
+import dev.ipf.darkmatter.core.MarmotClient
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import dev.ipf.darkmatter.core.MarmotClient
 
 class RelayUrlsTest {
     @Test

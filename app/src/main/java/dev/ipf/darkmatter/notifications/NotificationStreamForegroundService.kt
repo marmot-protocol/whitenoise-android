@@ -9,9 +9,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.util.Log
-import dev.ipf.darkmatter.BuildConfig
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.DarkMatterApplication
 import dev.ipf.darkmatter.MainActivity
 import dev.ipf.darkmatter.R
@@ -26,20 +26,25 @@ class NotificationStreamForegroundService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var bootstrapJob: Job? = null
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         startForeground(
             NOTIFICATION_ID,
             BackgroundConnectionNotification.build(this),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
         )
         if (bootstrapJob?.isActive != true) {
-            bootstrapJob = serviceScope.launch {
-                runCatching {
-                    (application as DarkMatterApplication).appState.ensureNotificationRuntimeStarted()
-                }.onFailure {
-                    foregroundServiceDebug(it) { "notification runtime failed" }
+            bootstrapJob =
+                serviceScope.launch {
+                    runCatching {
+                        (application as DarkMatterApplication).appState.ensureNotificationRuntimeStarted()
+                    }.onFailure {
+                        foregroundServiceDebug(it) { "notification runtime failed" }
+                    }
                 }
-            }
         }
         foregroundServiceDebug { "started" }
         return START_STICKY
@@ -57,8 +62,8 @@ class NotificationStreamForegroundService : Service() {
         private const val ACTION_START = "dev.ipf.darkmatter.notifications.START_STREAM_FOREGROUND_SERVICE"
         private const val NOTIFICATION_ID = 1001
 
-        fun start(context: Context): Boolean {
-            return runCatching {
+        fun start(context: Context): Boolean =
+            runCatching {
                 val appContext = context.applicationContext
                 ContextCompat.startForegroundService(
                     appContext,
@@ -69,10 +74,9 @@ class NotificationStreamForegroundService : Service() {
                 foregroundServiceDebug(it) { "start rejected" }
                 false
             }
-        }
 
-        fun stop(context: Context): Boolean {
-            return runCatching {
+        fun stop(context: Context): Boolean =
+            runCatching {
                 val appContext = context.applicationContext
                 appContext.stopService(
                     Intent(appContext, NotificationStreamForegroundService::class.java),
@@ -81,7 +85,6 @@ class NotificationStreamForegroundService : Service() {
                 foregroundServiceDebug(it) { "stop rejected" }
                 false
             }
-        }
     }
 }
 
@@ -90,15 +93,17 @@ private object BackgroundConnectionNotification {
 
     fun build(context: Context): Notification {
         ensureChannel(context)
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        return NotificationCompat.Builder(context, CHANNEL_ID)
+        val pendingIntent =
+            PendingIntent.getActivity(
+                context,
+                0,
+                Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        return NotificationCompat
+            .Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_darkmatter)
             .setContentTitle(context.getString(R.string.background_connection_notification_title))
             .setContentText(context.getString(R.string.background_connection_notification_text))
@@ -112,14 +117,15 @@ private object BackgroundConnectionNotification {
 
     private fun ensureChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            context.getString(R.string.notification_channel_background_connection),
-            NotificationManager.IMPORTANCE_LOW,
-        ).apply {
-            description = context.getString(R.string.notification_channel_background_connection_description)
-            setShowBadge(false)
-        }
+        val channel =
+            NotificationChannel(
+                CHANNEL_ID,
+                context.getString(R.string.notification_channel_background_connection),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = context.getString(R.string.notification_channel_background_connection_description)
+                setShowBadge(false)
+            }
         manager.createNotificationChannel(channel)
     }
 }
@@ -129,6 +135,9 @@ private inline fun foregroundServiceDebug(message: () -> String) {
     if (BuildConfig.DEBUG) Log.i("DMForegroundSvc", message())
 }
 
-private inline fun foregroundServiceDebug(error: Throwable, message: () -> String) {
+private inline fun foregroundServiceDebug(
+    error: Throwable,
+    message: () -> String,
+) {
     Log.e("DMForegroundSvc", message(), error)
 }

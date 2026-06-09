@@ -10,8 +10,8 @@ data class TimelineReplyDisplay(
 )
 
 object TimelineProjector {
-    fun toAppMessageRecord(record: TimelineMessageRecordFfi): AppMessageRecordFfi {
-        return AppMessageRecordFfi(
+    fun toAppMessageRecord(record: TimelineMessageRecordFfi): AppMessageRecordFfi =
+        AppMessageRecordFfi(
             messageIdHex = record.messageIdHex,
             direction = record.direction,
             groupIdHex = record.groupIdHex,
@@ -22,9 +22,11 @@ object TimelineProjector {
             recordedAt = record.timelineAt,
             receivedAt = record.receivedAt,
         )
-    }
 
-    fun displayBody(record: TimelineMessageRecordFfi, copy: MessageTextCopy = MessageTextCopy.Default): String {
+    fun displayBody(
+        record: TimelineMessageRecordFfi,
+        copy: MessageTextCopy = MessageTextCopy.Default,
+    ): String {
         if (record.deleted) return copy.deleted
         return projectedBody(
             plaintext = record.plaintext,
@@ -36,7 +38,10 @@ object TimelineProjector {
         )
     }
 
-    fun replyPreview(record: TimelineMessageRecordFfi, copy: MessageTextCopy = MessageTextCopy.Default): TimelineReplyDisplay? {
+    fun replyPreview(
+        record: TimelineMessageRecordFfi,
+        copy: MessageTextCopy = MessageTextCopy.Default,
+    ): TimelineReplyDisplay? {
         val preview = record.replyPreview ?: return null
         return TimelineReplyDisplay(
             sender = preview.sender,
@@ -44,8 +49,11 @@ object TimelineProjector {
         )
     }
 
-    fun reactionTallies(record: TimelineMessageRecordFfi, myAccountId: String?): List<ReactionTally> {
-        return record.reactions.byEmoji
+    fun reactionTallies(
+        record: TimelineMessageRecordFfi,
+        myAccountId: String?,
+    ): List<ReactionTally> =
+        record.reactions.byEmoji
             .mapNotNull { summary ->
                 if (summary.senders.isEmpty()) {
                     null
@@ -56,13 +64,11 @@ object TimelineProjector {
                         mine = myAccountId != null && summary.senders.contains(myAccountId),
                     )
                 }
-            }
-            .sortedWith(
+            }.sortedWith(
                 compareByDescending<ReactionTally> { it.count }
                     .thenByDescending { it.mine }
                     .thenBy { it.emoji },
             )
-    }
 
     private fun TimelineReplyPreviewFfi.displayBody(copy: MessageTextCopy): String {
         if (deleted) return copy.deleted

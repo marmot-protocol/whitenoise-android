@@ -4,7 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class NotificationRetryBackoffTest {
-
     @Test
     fun doublesEachStep() {
         assertEquals(2_000L, nextRetryBackoffMillis(1_000L, maxMillis = 60_000L))

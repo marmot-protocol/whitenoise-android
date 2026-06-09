@@ -1,11 +1,11 @@
 package dev.ipf.darkmatter.core
 
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import dev.ipf.marmotkit.AppGroupMemberRecordFfi
-import dev.ipf.marmotkit.AppGroupRecordFfi
 
 class GroupProjectorTest {
     @Test
@@ -153,30 +153,33 @@ class GroupProjectorTest {
 
     @Test
     fun otherMemberUsesMemberIdHexInsteadOfLocalAccountLabel() {
-        val members = listOf(
-            member(memberId = "alice", account = "Jeff", local = true),
-            member(memberId = "bob", account = null, local = false),
-        )
+        val members =
+            listOf(
+                member(memberId = "alice", account = "Jeff", local = true),
+                member(memberId = "bob", account = null, local = false),
+            )
 
         assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = "alice"))
     }
 
     @Test
     fun otherMemberFallsBackToNonLocalMemberIdWhenActiveAccountIsMissing() {
-        val members = listOf(
-            member(memberId = "alice", account = "Jeff", local = true),
-            member(memberId = "bob", account = null, local = false),
-        )
+        val members =
+            listOf(
+                member(memberId = "alice", account = "Jeff", local = true),
+                member(memberId = "bob", account = null, local = false),
+            )
 
         assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = null))
     }
 
     @Test
     fun otherMemberFallsBackToActiveAccountComparisonWhenLocalFlagIsUnavailable() {
-        val members = listOf(
-            member(memberId = "alice", account = null, local = false),
-            member(memberId = "bob", account = null, local = false),
-        )
+        val members =
+            listOf(
+                member(memberId = "alice", account = null, local = false),
+                member(memberId = "bob", account = null, local = false),
+            )
 
         assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = "alice"))
     }

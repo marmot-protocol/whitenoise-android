@@ -13,14 +13,18 @@ package dev.ipf.darkmatter.core
  * contract.
  */
 object HostSafety {
-
     /**
      * True when [host] is an IP literal in a private/loopback/link-local range,
      * a loopback hostname (`localhost` / `*.localhost`), or unparseable/blank.
      * Ordinary public hostnames and public IP literals return false.
      */
     fun isPrivateOrLoopbackHost(host: String?): Boolean {
-        val normalized = host?.trim()?.removeSurrounding("[", "]")?.lowercase().orEmpty()
+        val normalized =
+            host
+                ?.trim()
+                ?.removeSurrounding("[", "]")
+                ?.lowercase()
+                .orEmpty()
         if (normalized.isEmpty()) return true
         if (normalized == "localhost" || normalized.endsWith(".localhost")) return true
         if (normalized.contains(':')) return isPrivateIpv6(normalized)
@@ -71,8 +75,10 @@ object HostSafety {
             // fc00::/7 unique-local.
             address.startsWith("fc") || address.startsWith("fd") -> true
             // fe80::/10 link-local.
-            address.startsWith("fe8") || address.startsWith("fe9") ||
-                address.startsWith("fea") || address.startsWith("feb") -> true
+            address.startsWith("fe8") ||
+                address.startsWith("fe9") ||
+                address.startsWith("fea") ||
+                address.startsWith("feb") -> true
             else -> false
         }
     }

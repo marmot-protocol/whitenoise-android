@@ -24,11 +24,10 @@ import java.net.URI
  * if the validator ever loosens, we still won't render junk.
  */
 object MediaReferenceParser {
-
     private const val TAG_NAME = "imeta"
     private const val VERSION_VALUE = "mip04-v2"
     private const val SHA256_HEX_LEN = 64 // 32 bytes
-    private const val NONCE_HEX_LEN = 24  // 12 bytes
+    private const val NONCE_HEX_LEN = 24 // 12 bytes
     private const val HEX_CHARS = "0123456789abcdefABCDEF"
 
     /**
@@ -37,20 +36,21 @@ object MediaReferenceParser {
      * optimistically (bridging the gap until the published event echoes back)
      * without waiting for the projection round-trip.
      */
-    fun toImetaTag(reference: MediaReferenceFfi): MessageTagFfi = MessageTagFfi(
-        listOf(
-            TAG_NAME,
-            "url ${reference.url}",
-            "m ${reference.mediaType}",
-            "filename ${reference.fileName}",
-            "x ${reference.fileHashHex}",
-            "n ${reference.nonceHex}",
-            // Always emit the canonical version this parser accepts — never
-            // forward an unexpected reference.version that our own validator
-            // (and the Rust receiver) would then reject.
-            "v $VERSION_VALUE",
-        ),
-    )
+    fun toImetaTag(reference: MediaReferenceFfi): MessageTagFfi =
+        MessageTagFfi(
+            listOf(
+                TAG_NAME,
+                "url ${reference.url}",
+                "m ${reference.mediaType}",
+                "filename ${reference.fileName}",
+                "x ${reference.fileHashHex}",
+                "n ${reference.nonceHex}",
+                // Always emit the canonical version this parser accepts — never
+                // forward an unexpected reference.version that our own validator
+                // (and the Rust receiver) would then reject.
+                "v $VERSION_VALUE",
+            ),
+        )
 
     /**
      * Returns the first valid imeta-tag attachment reference in [tags], or
@@ -117,7 +117,10 @@ object MediaReferenceParser {
     }
 
     /** True iff [s] has [requiredLength] characters, all hex. */
-    private fun isHex(s: String, requiredLength: Int): Boolean {
+    private fun isHex(
+        s: String,
+        requiredLength: Int,
+    ): Boolean {
         if (s.length != requiredLength) return false
         for (c in s) if (c !in HEX_CHARS) return false
         return true
@@ -128,6 +131,5 @@ object MediaReferenceParser {
      * image bubble. Tied to mime prefix so non-image attachments (Phase 3)
      * route through a different surface.
      */
-    fun isImageMedia(reference: MediaReferenceFfi): Boolean =
-        reference.mediaType.startsWith("image/", ignoreCase = true)
+    fun isImageMedia(reference: MediaReferenceFfi): Boolean = reference.mediaType.startsWith("image/", ignoreCase = true)
 }

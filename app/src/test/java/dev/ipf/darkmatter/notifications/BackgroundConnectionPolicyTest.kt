@@ -1,7 +1,7 @@
 package dev.ipf.darkmatter.notifications
 
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BackgroundConnectionPolicyTest {

@@ -3,8 +3,8 @@ package dev.ipf.darkmatter.core
 import dev.ipf.marmotkit.MarmotEventFfi
 
 object DiagnosticFormatter {
-    fun describe(event: MarmotEventFfi): String {
-        return when (event) {
+    fun describe(event: MarmotEventFfi): String =
+        when (event) {
             is MarmotEventFfi.GroupJoined ->
                 "[${event.accountLabel}] joined group ${IdentityFormatter.short(event.groupIdHex)}"
             is MarmotEventFfi.GroupStateUpdated ->
@@ -20,7 +20,9 @@ object DiagnosticFormatter {
                     "kind=${msg.kind} len=${msg.plaintext.length}"
             }
             is MarmotEventFfi.ProjectionUpdated ->
-                "[${event.update.accountLabel}] projection ${IdentityFormatter.short(event.update.update.groupIdHex)} (${event.update.update.messages.size} messages)"
+                "[${event.update.accountLabel}] projection ${IdentityFormatter.short(
+                    event.update.update.groupIdHex,
+                )} (${event.update.update.messages.size} messages)"
             is MarmotEventFfi.GroupEvent ->
                 "[${event.accountLabel}] group event"
             is MarmotEventFfi.AccountError ->
@@ -28,5 +30,4 @@ object DiagnosticFormatter {
             is MarmotEventFfi.AgentStreamActivity ->
                 "[${event.accountLabel}] agent stream activity"
         }
-    }
 }

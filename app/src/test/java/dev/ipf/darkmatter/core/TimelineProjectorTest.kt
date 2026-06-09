@@ -11,25 +11,29 @@ import org.junit.Test
 class TimelineProjectorTest {
     @Test
     fun projectedRecordProvidesBodyReplyPreviewAndReactionTallies() {
-        val record = timelineRecord(
-            plaintext = "Current message",
-            replyPreview = TimelineReplyPreviewFfi(
-                messageIdHex = "parent",
-                sender = "alice",
-                plaintext = "Parent message",
-                kind = 9uL,
-                mediaJson = null,
-                agentTextStreamJson = null,
-                deleted = false,
-            ),
-            reactions = TimelineReactionSummaryFfi(
-                byEmoji = listOf(
-                    TimelineReactionEmojiFfi("👍", listOf("bob", "carol")),
-                    TimelineReactionEmojiFfi("🔥", listOf("alice")),
-                ),
-                userReactions = emptyList(),
-            ),
-        )
+        val record =
+            timelineRecord(
+                plaintext = "Current message",
+                replyPreview =
+                    TimelineReplyPreviewFfi(
+                        messageIdHex = "parent",
+                        sender = "alice",
+                        plaintext = "Parent message",
+                        kind = 9uL,
+                        mediaJson = null,
+                        agentTextStreamJson = null,
+                        deleted = false,
+                    ),
+                reactions =
+                    TimelineReactionSummaryFfi(
+                        byEmoji =
+                            listOf(
+                                TimelineReactionEmojiFfi("👍", listOf("bob", "carol")),
+                                TimelineReactionEmojiFfi("🔥", listOf("alice")),
+                            ),
+                        userReactions = emptyList(),
+                    ),
+            )
 
         assertEquals("Current message", TimelineProjector.displayBody(record))
         assertEquals(TimelineReplyDisplay(sender = "alice", body = "Parent message"), TimelineProjector.replyPreview(record))
@@ -44,13 +48,14 @@ class TimelineProjectorTest {
 
     @Test
     fun deletedProjectedRecordUsesDeletedCopyAndCanStillBecomeActionRecord() {
-        val record = timelineRecord(
-            id = "deleted",
-            plaintext = "Secret",
-            timelineAt = 42uL,
-            deleted = true,
-            deletedByMessageIdHex = "delete-event",
-        )
+        val record =
+            timelineRecord(
+                id = "deleted",
+                plaintext = "Secret",
+                timelineAt = 42uL,
+                deleted = true,
+                deletedByMessageIdHex = "delete-event",
+            )
 
         assertEquals("Deleted a message", TimelineProjector.displayBody(record))
 

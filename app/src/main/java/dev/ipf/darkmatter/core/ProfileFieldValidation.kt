@@ -7,7 +7,6 @@ package dev.ipf.darkmatter.core
  * optional, so a blank value is always acceptable. See issue #69.
  */
 object ProfileFieldValidation {
-
     // Internet identifier: <local>@<domain-with-a-dot>, no whitespace or extra '@'.
     private val NIP05 = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
