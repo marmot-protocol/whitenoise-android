@@ -376,6 +376,12 @@
     <string name="add_caption">Añadir un comentario…</string>
     <string name="attach_take_photo">Hacer foto</string>
     <string name="attach_photo_library">Fototeca</string>
+    <string name="attach_document">Documento</string>
+    <string name="media_no_app_to_open">Ninguna app instalada para abrir este archivo</string>
+    <string name="media_couldnt_open">No se pudo abrir el archivo</string>
+    <string name="media_open">Abrir</string>
+    <string name="media_file_too_large">Archivo demasiado grande para adjuntar</string>
+    <string name="media_album_too_large">Selección demasiado grande para enviar</string>
     <string name="media_auto_download_title">Descarga automática de medios</string>
     <string name="media_auto_download_always">Siempre</string>
     <string name="media_auto_download_wifi">Solo con Wi-Fi</string>

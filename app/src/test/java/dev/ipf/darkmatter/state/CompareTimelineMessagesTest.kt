@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -18,6 +19,7 @@ class CompareTimelineMessagesTest {
                 groupIdHex = "g",
                 sender = "s",
                 plaintext = "",
+                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                 kind = 9uL,
                 tags = emptyList(),
                 recordedAt = recordedAt,

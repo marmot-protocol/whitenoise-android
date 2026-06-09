@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.core
 
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.ReceivedMessageFfi
 import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
@@ -24,6 +25,7 @@ class DiagnosticFormatterTest {
                             sender = "0123456789abcdef",
                             senderDisplayName = null,
                             plaintext = "hello",
+                            contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                             kind = 9uL,
                             tags = emptyList(),
                             recordedAt = 1_779_926_400uL,

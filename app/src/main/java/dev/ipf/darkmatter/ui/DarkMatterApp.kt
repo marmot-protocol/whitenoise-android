@@ -26,9 +26,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -40,6 +42,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -55,9 +59,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -72,11 +79,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
@@ -88,6 +97,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.QrCode
@@ -146,6 +156,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -233,6 +244,7 @@ import dev.ipf.darkmatter.state.MediaAutoDownloadPolicy
 import dev.ipf.darkmatter.state.MessageStatus
 import dev.ipf.darkmatter.state.MessageStatusLabels
 import dev.ipf.darkmatter.state.OutgoingMessageIndicator
+import dev.ipf.darkmatter.state.PendingAttachment
 import dev.ipf.darkmatter.state.ReactionParticipant
 import dev.ipf.darkmatter.state.RelayListKind
 import dev.ipf.darkmatter.state.TimelineMessage
@@ -250,7 +262,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarmotKitException
-import dev.ipf.marmotkit.MediaReferenceFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.RelayHealthFfi
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -380,6 +392,13 @@ fun DarkMatterApp(
 
     LaunchedEffect(Unit) {
         appState.bootstrap()
+        // Stale share-temp janitor. Runs once per process start, off the
+        // main thread because directory walks on cold cache can take a
+        // moment. Files in `shared_media` from earlier sessions that
+        // any external reader has long since finished with are deleted.
+        withContext(Dispatchers.IO) {
+            sweepStaleSharedMedia(context, SHARED_MEDIA_MAX_AGE_MS)
+        }
     }
     LaunchedEffect(
         appState.phase,
@@ -1325,6 +1344,25 @@ private fun NewChatSheet(
 /** Within this many items of the trailing edge counts as "at bottom". */
 private const val ConversationNearBottomItemSlack = 3
 
+// Maximum images per multi-pick. The Android Photo Picker enforces this
+// cap on the system dialog side; 10 keeps the album payload bounded
+// (10 * 1920px JPEG ≈ a few MB encrypted) without feeling artificially low.
+private const val MEDIA_PICKER_MAX_ITEMS = 10
+
+// Per-file ceiling for a document attachment. Matches the retained-uploads
+// LRU cap so a single oversize pick can't OOM the picker pass before the
+// retained store gets a chance to evict. Anything larger is dropped with a
+// toast — the user can re-pick a smaller file or split the upload.
+private const val MEDIA_ATTACHMENT_MAX_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
+
+// Total bytes cap across one album send. Bound to the retained-uploads LRU
+// cap (NOT independently doubled): exceeding that cap on insert would cause
+// `ByteSizeLruCache` to evict the just-inserted RetainedMediaUpload during
+// its own `put()` pass, breaking retry. Keep the picker ceiling honest with
+// the actual heap budget rather than letting the user pick more than the
+// controller can ever hold.
+private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
+
 /** Fixed height of an in-timeline image bubble — constant across load states
  *  so async decode never reflows the list (would break the open-time anchor). */
 private val MediaBubbleHeight = 240.dp
@@ -1336,35 +1374,64 @@ private val NullableUriSaver: Saver<android.net.Uri?, String> =
         restore = { s -> s.takeIf { it.isNotEmpty() }?.let(android.net.Uri::parse) },
     )
 
+// Persist a multi-pick selection across rotation / process death. Empty list
+// encodes "no preview shown" so the parent re-render skips the sheet on
+// restore. Uses '\n' as the separator — content URIs don't contain newlines.
+private val UriListSaver: Saver<List<android.net.Uri>, String> =
+    Saver(
+        save = { it.joinToString("\n") { uri -> uri.toString() } },
+        restore = { s ->
+            if (s.isEmpty()) {
+                emptyList()
+            } else {
+                s.split('\n').mapNotNull { token ->
+                    token.takeIf { it.isNotEmpty() }?.let(android.net.Uri::parse)
+                }
+            }
+        },
+    )
+
 @Composable
 private fun MediaImageBubble(
     item: TimelineMessage,
-    reference: MediaReferenceFfi,
+    reference: MediaAttachmentReferenceFfi,
+    attachmentIndex: Int,
     controller: ConversationController,
     appState: DarkMatterAppState,
     mine: Boolean,
 ) {
     val record = item.record
     val key = record.messageIdHex
+    // Decode-state keys split into two buckets:
+    //   - Bytes-level state (bitmap, failed, reloadToken): keyed on
+    //     `sourceEpoch` so a typed-reference upgrade from imeta-fallback
+    //     (epoch = 0) to the real listMedia value clears a stuck failure.
+    //   - User-interaction state (viewerOpen, startDownload): NOT keyed on
+    //     epoch, because we never want a background typed-ref upgrade to
+    //     close a viewer the user just opened, or re-gate a download the
+    //     user just consented to.
+    val epoch = reference.sourceEpoch
     // Seed from the decoded-thumbnail cache so an already-fetched or just-sent
     // image paints on the first frame — no decode spinner, no visible "reload".
-    var bitmap by remember(key) { mutableStateOf(controller.thumbnailFor(key)?.asImageBitmap()) }
-    var failed by remember(key) { mutableStateOf(false) }
-    var viewerOpen by remember(key) { mutableStateOf(false) }
-    var reloadToken by remember(key) { mutableStateOf(0) }
+    var bitmap by remember(key, attachmentIndex, epoch) {
+        mutableStateOf(controller.thumbnailFor(key, attachmentIndex)?.asImageBitmap())
+    }
+    var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
+    var viewerOpen by remember(key, attachmentIndex) { mutableStateOf(false) }
+    var reloadToken by remember(key, attachmentIndex, epoch) { mutableStateOf(0) }
     // Auto-download gating (#10): own messages always render (bytes are cached
     // from the send), incoming honor the policy. Keyed on the policy so
     // flipping the setting re-gates undownloaded bubbles.
-    var startDownload by remember(key, appState.mediaAutoDownloadPolicy) {
+    var startDownload by remember(key, attachmentIndex, appState.mediaAutoDownloadPolicy) {
         mutableStateOf(mine || appState.shouldAutoDownloadMedia())
     }
 
-    LaunchedEffect(key, startDownload, reloadToken) {
+    LaunchedEffect(key, attachmentIndex, epoch, startDownload, reloadToken) {
         if (bitmap != null) return@LaunchedEffect // already have a decoded thumbnail
         if (!startDownload) return@LaunchedEffect
         failed = false
         try {
-            val data = controller.downloadAttachment(key, reference)
+            val data = controller.downloadAttachment(key, attachmentIndex, reference)
             // Decode a sampled bitmap sized to the bubble — a full 1920px
             // image would be a ~14 MB ARGB_8888 bitmap per visible row.
             val decoded =
@@ -1372,7 +1439,7 @@ private fun MediaImageBubble(
                     MediaPipeline.decodeSampledBitmap(data, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
                 }
             if (decoded != null) {
-                controller.cacheThumbnail(key, decoded)
+                controller.cacheThumbnail(key, attachmentIndex, decoded)
                 bitmap = decoded.asImageBitmap()
             } else {
                 failed = true
@@ -1442,9 +1509,402 @@ private fun MediaImageBubble(
             controller = controller,
             appState = appState,
             messageIdHex = key,
-            reference = reference,
+            attachments = listOf(IndexedValue(attachmentIndex, reference)),
+            startIndex = 0,
             onDismiss = { viewerOpen = false },
         )
+    }
+}
+
+/**
+ * Multi-image album bubble: a 2-column grid of square thumbnails. Used for
+ * any message carrying ≥2 image attachments. Each tile maintains its own
+ * download/cache state (keyed by `(messageId, attachmentIndex)`); tap any
+ * tile to open the full-screen viewer at that attachment. When the album
+ * holds more than four images, the fourth tile gets a "+N" overlay and the
+ * remaining images are reachable from the viewer (next-tile navigation
+ * lands with the pager-viewer follow-up).
+ */
+@Composable
+private fun MediaImageGridBubble(
+    item: TimelineMessage,
+    attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    mine: Boolean,
+) {
+    val record = item.record
+    val visible = attachments.take(4)
+    val overflow = (attachments.size - visible.size).coerceAtLeast(0)
+    // Pager position within the viewer (a position within `attachments`),
+    // not the protocol-level attachmentIndex. The viewer resolves the real
+    // attachmentIndex per page from the indexed-value entry.
+    var viewerOpenAt by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.padding(2.dp),
+        ) {
+            visible.chunked(2).forEachIndexed { rowIndex, row ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    row.forEachIndexed { colIndex, entry ->
+                        val tileIndex = rowIndex * 2 + colIndex
+                        val showOverflow = tileIndex == visible.lastIndex && overflow > 0
+                        MediaImageGridTile(
+                            messageIdHex = record.messageIdHex,
+                            attachmentIndex = entry.index,
+                            reference = entry.value,
+                            controller = controller,
+                            appState = appState,
+                            mine = mine,
+                            onTap = { viewerOpenAt = tileIndex },
+                            overflowCount = if (showOverflow) overflow else 0,
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f),
+                        )
+                    }
+                    // Pad odd-count rows so a single-tile last row stays
+                    // half-width instead of stretching across the bubble.
+                    if (row.size == 1) {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+
+    viewerOpenAt?.let { index ->
+        FullScreenImageViewer(
+            controller = controller,
+            appState = appState,
+            messageIdHex = record.messageIdHex,
+            attachments = attachments,
+            startIndex = index,
+            onDismiss = { viewerOpenAt = null },
+        )
+    }
+}
+
+/**
+ * One tile of the album grid: square thumbnail + per-tile download state.
+ * The thumbnail-cache lookup is keyed on `(messageId, attachmentIndex)` so
+ * tiles never clobber each other. Tap fires [onTap] (the parent opens the
+ * full-screen viewer at this attachment's index).
+ */
+@Composable
+private fun MediaImageGridTile(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    mine: Boolean,
+    onTap: () -> Unit,
+    overflowCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    // Two-bucket key model (mirrors `MediaImageBubble`):
+    //   - `decodeKey` includes `sourceEpoch`, scoped to bytes-level state
+    //     so a typed-reference upgrade clears a failed-at-epoch-0 tile.
+    //   - `tileSlot` omits the epoch, scoped to user-choice state
+    //     (startDownload) so a background ref upgrade can't re-gate a tile
+    //     the user already consented to fetch.
+    val decodeKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
+    val tileSlot = "$messageIdHex#$attachmentIndex"
+    var bitmap by remember(decodeKey) {
+        mutableStateOf(controller.thumbnailFor(messageIdHex, attachmentIndex)?.asImageBitmap())
+    }
+    var failed by remember(decodeKey) { mutableStateOf(false) }
+    var reloadToken by remember(decodeKey) { mutableStateOf(0) }
+    // Mirror the single-image bubble's auto-download gate (#10) so the
+    // policy applies to album tiles too. Outgoing tiles (`mine`) always
+    // download because the bytes are seeded from the send. Re-keyed on
+    // the policy so flipping the setting re-gates undownloaded tiles.
+    var startDownload by remember(tileSlot, appState.mediaAutoDownloadPolicy) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia())
+    }
+
+    LaunchedEffect(decodeKey, startDownload, reloadToken) {
+        if (bitmap != null) return@LaunchedEffect
+        if (!startDownload) return@LaunchedEffect
+        failed = false
+        try {
+            val data = controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+            val decoded =
+                withContext(Dispatchers.Default) {
+                    MediaPipeline.decodeSampledBitmap(data, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+                }
+            if (decoded != null) {
+                controller.cacheThumbnail(messageIdHex, attachmentIndex, decoded)
+                bitmap = decoded.asImageBitmap()
+            } else {
+                failed = true
+            }
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
+        } catch (_: Throwable) {
+            failed = true
+        }
+    }
+
+    Box(
+        modifier =
+            modifier.clickable(
+                // Two modes:
+                //   - Bytes ready (`bitmap != null`): tap opens the viewer.
+                //   - Auto-download gated: tap flips startDownload, so the
+                //     first tap fetches and the next tap (once decoded)
+                //     opens the viewer. Same UX as the single-image bubble.
+                onClick = {
+                    if (bitmap != null) {
+                        onTap()
+                    } else if (!startDownload) {
+                        startDownload = true
+                    }
+                },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        val current = bitmap
+        when {
+            current != null ->
+                Image(
+                    bitmap = current,
+                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            failed ->
+                IconButton(onClick = {
+                    failed = false
+                    reloadToken++
+                }) {
+                    Icon(
+                        Icons.Default.BrokenImage,
+                        contentDescription = stringResource(R.string.media_tap_to_retry),
+                    )
+                }
+            !startDownload ->
+                Icon(
+                    Icons.Default.Download,
+                    contentDescription = stringResource(R.string.media_tap_to_download),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(28.dp),
+                )
+            else ->
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp,
+                )
+        }
+        if (overflowCount > 0 && current != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "+$overflowCount",
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Receive-side bubble for any attachment whose MIME isn't an image. Renders
+ * as a tappable pill: icon (chosen by MIME family), filename, size + status.
+ * Tapping fetches the bytes (cached after first tap), writes a temp file
+ * routed through the app's FileProvider, and fires `ACTION_VIEW` so the
+ * system picks an external app (PDF reader, etc.) to open it.
+ */
+@Composable
+private fun MediaFileBubble(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val pillKey = "$messageIdHex#$attachmentIndex"
+    var inFlight by remember(pillKey) { mutableStateOf(false) }
+    var failed by remember(pillKey) { mutableStateOf(false) }
+    val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
+    val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !inFlight) {
+                    failed = false
+                    inFlight = true
+                    scope.launch {
+                        val outcome =
+                            runCatching {
+                                val data = controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+                                openAttachmentExternally(context, data, reference.fileName, reference.mediaType)
+                            }.getOrDefault(OpenAttachmentResult.Error)
+                        when (outcome) {
+                            OpenAttachmentResult.Opened -> Unit
+                            OpenAttachmentResult.NoHandler -> {
+                                failed = true
+                                appState.present(noOpenAppMessage)
+                            }
+                            OpenAttachmentResult.Error -> {
+                                failed = true
+                                appState.present(couldntOpenMessage)
+                            }
+                        }
+                        inFlight = false
+                    }
+                },
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Icon(
+                imageVector = fileIconFor(reference.mediaType),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(28.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    MediaPipeline.safeDisplayName(reference.fileName),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    reference.mediaType,
+                    style = MaterialTheme.typography.labelSmall,
+                    color =
+                        if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (inFlight) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Icon(
+                    imageVector =
+                        if (failed) Icons.Default.Refresh else Icons.Default.Download,
+                    contentDescription = stringResource(R.string.media_open),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+private fun fileIconFor(mediaType: String): androidx.compose.ui.graphics.vector.ImageVector =
+    when {
+        mediaType.startsWith("audio/", ignoreCase = true) -> Icons.Default.Audiotrack
+        mediaType.startsWith("video/", ignoreCase = true) -> Icons.Default.Movie
+        mediaType.startsWith("image/", ignoreCase = true) -> Icons.Default.Image
+        else -> Icons.Default.Description
+    }
+
+private fun formatFileSize(bytes: Long): String {
+    if (bytes < 0L) return ""
+    if (bytes < 1024L) return "$bytes B"
+    val kb = bytes / 1024.0
+    if (kb < 1024.0) return String.format(java.util.Locale.US, "%.1f KB", kb)
+    val mb = kb / 1024.0
+    if (mb < 1024.0) return String.format(java.util.Locale.US, "%.1f MB", mb)
+    val gb = mb / 1024.0
+    return String.format(java.util.Locale.US, "%.1f GB", gb)
+}
+
+private enum class OpenAttachmentResult { Opened, NoHandler, Error }
+
+/**
+ * Write [bytes] to a temp file in the cache directory and fire `ACTION_VIEW`
+ * for it via the app's FileProvider so an external app (PDF reader, etc.)
+ * can open it.
+ *
+ * Distinguishes "no app claims this MIME" ([OpenAttachmentResult.NoHandler])
+ * from "we couldn't even try" ([OpenAttachmentResult.Error]) so the caller
+ * can surface the right toast.
+ *
+ * `resolveActivity`/`queryIntentActivities` are intentionally NOT used to
+ * pre-flight the launch: under Android 11+ package visibility they return
+ * null for any handler whose package isn't declared in `<queries>`, even
+ * when the activity exists and `startActivity` would launch it. Catching
+ * `ActivityNotFoundException` from `startActivity` is the authoritative
+ * "nothing handles this MIME" signal.
+ *
+ * Suspends because the temp-file write can be a multi-megabyte hop —
+ * documents and videos picked from the document bubble are read whole
+ * into a `ByteArray` and need to land on disk before the intent fires.
+ * Doing that on the main dispatcher would jank the UI for the whole
+ * write; the `Dispatchers.IO` jump moves it off the main thread.
+ *
+ * The temp file is owned by the cache cleanup pass triggered on screen
+ * exit; we don't track it per-call because the handing-off intent may
+ * need it alive for an unbounded duration after this function returns.
+ */
+private suspend fun openAttachmentExternally(
+    context: android.content.Context,
+    bytes: ByteArray,
+    fileName: String,
+    mediaType: String,
+): OpenAttachmentResult {
+    val uri =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val dir = java.io.File(context.cacheDir, "shared_media").apply { mkdirs() }
+                val name = MediaPipeline.safeDisplayName(fileName)
+                val file = java.io.File.createTempFile("open_", "_$name", dir)
+                file.writeBytes(bytes)
+                fileProviderUri(context, file)
+            }.getOrNull()
+        } ?: return OpenAttachmentResult.Error
+    val mime = mediaType.ifBlank { "application/octet-stream" }
+    val intent =
+        android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mime)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    return try {
+        context.startActivity(intent)
+        OpenAttachmentResult.Opened
+    } catch (_: android.content.ActivityNotFoundException) {
+        OpenAttachmentResult.NoHandler
+    } catch (_: SecurityException) {
+        // FileProvider grant rejected, or target activity has no permission
+        // to access this URI for some reason. Surfacing this as a generic
+        // error is more useful than crashing.
+        OpenAttachmentResult.Error
     }
 }
 
@@ -1481,58 +1941,232 @@ private fun MediaBubbleAction(
 
 @Composable
 private fun MediaPendingPlaceholder(
-    previewBytes: ByteArray?,
+    pendingAttachments: List<PendingAttachment>,
     failed: Boolean,
 ) {
-    // The sender holds the local bytes, so preview the actual image while it
-    // uploads, with a centered status overlay (spinner / error) on top.
-    val preview = rememberSampledBitmap(previewBytes)
     val statusLabel = stringResource(if (failed) R.string.media_upload_failed else R.string.media_uploading)
     val statusColor = if (failed) MaterialTheme.colorScheme.error else Color.White
+
+    // Image-only sends keep the fixed-height image bubble. The moment a
+    // non-image attachment is part of the album the bubble shape switches to
+    // a stack of file-pill placeholders so the optimistic → confirmed swap
+    // matches the post-upload layout (image grid above, file pills below).
+    val allImages = pendingAttachments.isNotEmpty() && pendingAttachments.all { isImagePendingAttachment(it) }
+    if (!allImages) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            pendingAttachments.forEach { attachment ->
+                PendingFilePill(
+                    fileName = attachment.fileName,
+                    mediaType = attachment.mediaType,
+                    sizeBytes = attachment.plaintextBytes.size.toLong(),
+                    failed = failed,
+                    statusLabel = statusLabel,
+                )
+            }
+        }
+        return
+    }
+
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(MediaBubbleHeight),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            preview?.let {
-                Image(
-                    bitmap = it,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                // Scrim so the overlay stays legible over any image.
-                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)))
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (failed) {
-                    Icon(
-                        Icons.Default.BrokenImage,
-                        contentDescription = null,
-                        tint = statusColor,
-                        modifier = Modifier.size(28.dp),
-                    )
-                } else {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(28.dp),
-                        strokeWidth = 2.dp,
-                        color = if (preview != null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            if (pendingAttachments.size <= 1) {
+                // Single-image: keep the existing fixed-height bubble so the
+                // optimistic→projected swap doesn't reflow the timeline.
+                val preview = rememberSampledBitmap(pendingAttachments.firstOrNull()?.plaintextBytes)
+                Box(
+                    Modifier.fillMaxWidth().height(MediaBubbleHeight),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    preview?.let {
+                        Image(
+                            bitmap = it,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)))
+                    }
+                    PendingStatusOverlay(
+                        failed = failed,
+                        hasPreview = preview != null,
+                        statusLabel = statusLabel,
+                        statusColor = statusColor,
                     )
                 }
-                Spacer(Modifier.height(6.dp))
+            } else {
+                // Album: render the same 2-col grid the post-upload bubble
+                // uses, so the optimistic → confirmed transition is a visual
+                // no-op. Each tile decodes from local bytes (no network), and
+                // a single status overlay sits across the whole bubble.
+                val visible = pendingAttachments.take(4)
+                val overflow = (pendingAttachments.size - visible.size).coerceAtLeast(0)
+                Box(Modifier.fillMaxWidth()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.padding(2.dp),
+                    ) {
+                        visible.chunked(2).forEachIndexed { rowIndex, row ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                row.forEachIndexed { colIndex, attachment ->
+                                    val tileIndex = rowIndex * 2 + colIndex
+                                    val showOverflow = tileIndex == visible.lastIndex && overflow > 0
+                                    PendingGridTile(
+                                        bytes = attachment.plaintextBytes,
+                                        overflowCount = if (showOverflow) overflow else 0,
+                                        modifier = Modifier.weight(1f).aspectRatio(1f),
+                                    )
+                                }
+                                if (row.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    Box(
+                        Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)),
+                    )
+                    PendingStatusOverlay(
+                        failed = failed,
+                        hasPreview = true,
+                        statusLabel = statusLabel,
+                        statusColor = statusColor,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun isImagePendingAttachment(attachment: PendingAttachment): Boolean = attachment.mediaType.startsWith("image/", ignoreCase = true)
+
+@Composable
+private fun PendingFilePill(
+    fileName: String,
+    mediaType: String,
+    sizeBytes: Long,
+    failed: Boolean,
+    statusLabel: String,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Icon(
+                imageVector = fileIconFor(mediaType),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(28.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    statusLabel,
-                    style = MaterialTheme.typography.labelMedium,
+                    MediaPipeline.safeDisplayName(fileName),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${formatFileSize(sizeBytes)} · $statusLabel",
+                    style = MaterialTheme.typography.labelSmall,
                     color =
-                        if (preview != null) {
-                            statusColor
-                        } else {
-                            if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                        },
+                        if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (failed) {
+                Icon(
+                    Icons.Default.BrokenImage,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingStatusOverlay(
+    failed: Boolean,
+    hasPreview: Boolean,
+    statusLabel: String,
+    statusColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (failed) {
+            Icon(
+                Icons.Default.BrokenImage,
+                contentDescription = null,
+                tint = statusColor,
+                modifier = Modifier.size(28.dp),
+            )
+        } else {
+            CircularProgressIndicator(
+                modifier = Modifier.size(28.dp),
+                strokeWidth = 2.dp,
+                color = if (hasPreview) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            statusLabel,
+            style = MaterialTheme.typography.labelMedium,
+            color =
+                if (hasPreview) {
+                    statusColor
+                } else {
+                    if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                },
+        )
+    }
+}
+
+@Composable
+private fun PendingGridTile(
+    bytes: ByteArray,
+    overflowCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    val preview = rememberSampledBitmap(bytes)
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        preview?.let {
+            Image(
+                bitmap = it,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        if (overflowCount > 0 && preview != null) {
+            Box(
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "+$overflowCount",
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
@@ -1562,26 +2196,180 @@ private fun FullScreenImageViewer(
     controller: ConversationController,
     appState: DarkMatterAppState,
     messageIdHex: String,
-    reference: MediaReferenceFfi,
+    attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
+    startIndex: Int,
     onDismiss: () -> Unit,
 ) {
+    if (attachments.isEmpty()) {
+        // Defensive — callers shouldn't open an empty viewer, but guard so the
+        // pager doesn't NPE on a vanished album.
+        onDismiss()
+        return
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val savedMessage = stringResource(R.string.media_saved)
     val saveFailedMessage = stringResource(R.string.media_save_failed)
-    // Decode the full-resolution bitmap for display only. We deliberately don't
-    // keep the raw bytes in Compose state — save/share re-read them from
-    // [ConversationController.downloadAttachment], which is an instant hit on
-    // the app-level cache that already holds this image.
-    var androidBitmap by remember(messageIdHex) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var viewerFailed by remember(messageIdHex) { mutableStateOf(false) }
-    var viewerReloadToken by remember(messageIdHex) { mutableStateOf(0) }
+    val pagerState =
+        rememberPagerState(
+            initialPage = startIndex.coerceIn(0, attachments.lastIndex),
+            pageCount = { attachments.size },
+        )
+    val currentEntry = attachments[pagerState.currentPage]
+    val currentReference = currentEntry.value
+    val currentAttachmentIndex = currentEntry.index
+    // Zoom state is hoisted to the viewer scope (not per-page) so the pager
+    // can read it to gate horizontal swipe. Without this gate, the page's
+    // `detectTransformGestures` claims every horizontal drag and the pager
+    // never moves. Page change resets to identity below.
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    LaunchedEffect(pagerState.currentPage) {
+        scale = 1f
+        offset = Offset.Zero
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                // Disable pager swipe while the visible page is zoomed in —
+                // otherwise the pan gesture and the pager's swipe both want
+                // the horizontal drag. At scale 1× the pager wins.
+                userScrollEnabled = scale <= 1f,
+            ) { page ->
+                val pageEntry = attachments[page]
+                ViewerPage(
+                    controller = controller,
+                    messageIdHex = messageIdHex,
+                    attachmentIndex = pageEntry.index,
+                    reference = pageEntry.value,
+                    scale = if (page == pagerState.currentPage) scale else 1f,
+                    offset = if (page == pagerState.currentPage) offset else Offset.Zero,
+                    onScaleChange = { if (page == pagerState.currentPage) scale = it },
+                    onOffsetChange = { if (page == pagerState.currentPage) offset = it },
+                )
+            }
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
+                }
+                if (attachments.size > 1) {
+                    Text(
+                        text = "${pagerState.currentPage + 1} / ${attachments.size}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+                Row {
+                    IconButton(
+                        onClick = {
+                            val ref = currentReference
+                            val attachmentIndex = currentAttachmentIndex
+                            scope.launch {
+                                val data =
+                                    runCatching {
+                                        controller.downloadAttachment(messageIdHex, attachmentIndex, ref)
+                                    }.getOrNull()
+                                val ok =
+                                    data != null &&
+                                        withContext(Dispatchers.IO) {
+                                            saveImageToGallery(context, data, ref.fileName, ref.mediaType)
+                                        }
+                                snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = stringResource(R.string.media_save), tint = Color.White)
+                    }
+                    IconButton(
+                        onClick = {
+                            val ref = currentReference
+                            val attachmentIndex = currentAttachmentIndex
+                            scope.launch {
+                                runCatching {
+                                    controller.downloadAttachment(messageIdHex, attachmentIndex, ref)
+                                }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType) }
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
+                    }
+                }
+            }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding(),
+            )
+        }
+    }
+}
+
+/**
+ * One page of the full-screen pager. Owns its own download + decode + pan/zoom
+ * state so swiping to a sibling page doesn't carry zoom across, and disposing
+ * the page recycles the multi-MB native bitmap instead of leaning on GC. The
+ * pager prefetches one page either side by default, which is why
+ * `LaunchedEffect` doesn't need to wait for "page becomes visible" — it
+ * downloads as soon as the page composes.
+ */
+@Composable
+private fun ViewerPage(
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    scale: Float,
+    offset: Offset,
+    onScaleChange: (Float) -> Unit,
+    onOffsetChange: (Offset) -> Unit,
+) {
+    // `pointerInput(pageKey)` only restarts when the key changes — its
+    // coroutine outlives any single gesture. Function parameters
+    // (`scale`, `offset`, the callbacks) captured directly inside that
+    // coroutine would stay at their initial values for the lifetime of
+    // the gesture, causing jumpy zoom/pan and stale callback dispatch.
+    // `rememberUpdatedState` snapshots each parameter into a stable
+    // State<T> whose `.value` reads inside the coroutine always reflect
+    // the most recent recomposition's value.
+    val latestScale by rememberUpdatedState(scale)
+    val latestOffset by rememberUpdatedState(offset)
+    val latestOnScaleChange by rememberUpdatedState(onScaleChange)
+    val latestOnOffsetChange by rememberUpdatedState(onOffsetChange)
+    // `sourceEpoch` is folded into the page key so a viewer that failed
+    // its first decrypt at epoch 0 (typed reference not yet loaded) re-keys
+    // and retries when the real reference arrives.
+    val pageKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
+    var androidBitmap by remember(pageKey) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var viewerFailed by remember(pageKey) { mutableStateOf(false) }
+    var viewerReloadToken by remember(pageKey) { mutableStateOf(0) }
     val bitmap = remember(androidBitmap) { androidBitmap?.asImageBitmap() }
-    LaunchedEffect(messageIdHex, viewerReloadToken) {
+    LaunchedEffect(pageKey, viewerReloadToken) {
         viewerFailed = false
         try {
-            val data = controller.downloadAttachment(messageIdHex, reference)
+            val data = controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
             // Bounded sampled decode. A 5000px remote image decoded full-size
             // is ~100 MB ARGB_8888 and OOMs mid-class devices; the viewer
             // ceiling caps that while keeping quality high enough on phones.
@@ -1595,33 +2383,19 @@ private fun FullScreenImageViewer(
                 viewerFailed = true
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
-            // Composable left composition or key changed — propagate. Don't
-            // mark a failure state for a viewer that's no longer on-screen.
             throw cancel
         } catch (_: Throwable) {
             viewerFailed = true
         }
     }
-    // Free the multi-MB native buffer when the viewer closes instead of waiting
-    // for GC.
-    DisposableEffect(messageIdHex) {
+    DisposableEffect(pageKey) {
         onDispose { androidBitmap?.recycle() }
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
-        ) {
-            val current = bitmap
-            if (current != null) {
-                var scale by remember { mutableStateOf(1f) }
-                var offset by remember { mutableStateOf(Offset.Zero) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        val current = bitmap
+        when {
+            current != null ->
                 Image(
                     bitmap = current,
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
@@ -1629,19 +2403,45 @@ private fun FullScreenImageViewer(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .pointerInput(Unit) {
+                            .pointerInput(pageKey) {
                                 detectTapGestures(onDoubleTap = {
-                                    scale = 1f
-                                    offset = Offset.Zero
+                                    latestOnScaleChange(1f)
+                                    latestOnOffsetChange(Offset.Zero)
                                 })
-                            }.pointerInput(Unit) {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    scale = (scale * zoom).coerceIn(1f, 5f)
-                                    offset =
-                                        if (scale > 1f) {
-                                            // Clamp against the ContentScale.Fit image
-                                            // bounds (letterboxed), not the viewport, so
-                                            // pan can't drift into the empty margins.
+                            }.pointerInput(pageKey) {
+                                // Hand-rolled gesture loop instead of
+                                // `detectTransformGestures` because the latter
+                                // consumes single-pointer drags unconditionally,
+                                // which steals horizontal swipes from the
+                                // HorizontalPager parent. Here:
+                                //   - Pinch (≥2 pointers): consume → zoom + pan.
+                                //   - Single-pointer at scale > 1: consume → pan.
+                                //   - Single-pointer at scale 1×: DO NOT consume →
+                                //     pager handles the swipe between attachments.
+                                //
+                                // All references to scale/offset/callbacks go
+                                // through `latest*` delegates so each loop
+                                // iteration sees the freshest values — see the
+                                // `rememberUpdatedState` setup above for why.
+                                awaitEachGesture {
+                                    do {
+                                        val event = awaitPointerEvent()
+                                        val pressedCount =
+                                            event.changes.count { it.pressed }
+                                        if (pressedCount == 0) break
+                                        val zoom = event.calculateZoom()
+                                        val pan = event.calculatePan()
+                                        val currentScale = latestScale
+                                        val currentOffset = latestOffset
+                                        val handleAsTransform =
+                                            pressedCount >= 2 || currentScale > 1f
+                                        if (!handleAsTransform) {
+                                            // Let the pager have it.
+                                            continue
+                                        }
+                                        val nextScale = (currentScale * zoom).coerceIn(1f, 5f)
+                                        if (nextScale != currentScale) latestOnScaleChange(nextScale)
+                                        if (nextScale > 1f) {
                                             val viewportW = size.width.toFloat()
                                             val viewportH = size.height.toFloat()
                                             val imageAspect = current.width.toFloat() / current.height.toFloat()
@@ -1655,15 +2455,19 @@ private fun FullScreenImageViewer(
                                                 baseHeight = viewportH
                                                 baseWidth = viewportH * imageAspect
                                             }
-                                            val maxX = ((baseWidth * scale) - viewportW).coerceAtLeast(0f) / 2f
-                                            val maxY = ((baseHeight * scale) - viewportH).coerceAtLeast(0f) / 2f
-                                            Offset(
-                                                (offset.x + pan.x).coerceIn(-maxX, maxX),
-                                                (offset.y + pan.y).coerceIn(-maxY, maxY),
+                                            val maxX = ((baseWidth * nextScale) - viewportW).coerceAtLeast(0f) / 2f
+                                            val maxY = ((baseHeight * nextScale) - viewportH).coerceAtLeast(0f) / 2f
+                                            latestOnOffsetChange(
+                                                Offset(
+                                                    (currentOffset.x + pan.x).coerceIn(-maxX, maxX),
+                                                    (currentOffset.y + pan.y).coerceIn(-maxY, maxY),
+                                                ),
                                             )
-                                        } else {
-                                            Offset.Zero
+                                        } else if (currentOffset != Offset.Zero) {
+                                            latestOnOffsetChange(Offset.Zero)
                                         }
+                                        event.changes.forEach { it.consume() }
+                                    } while (true)
                                 }
                             }.graphicsLayer(
                                 scaleX = scale,
@@ -1672,7 +2476,7 @@ private fun FullScreenImageViewer(
                                 translationY = offset.y,
                             ),
                 )
-            } else if (viewerFailed) {
+            viewerFailed ->
                 Column(
                     modifier = Modifier.align(Alignment.Center).padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -1692,70 +2496,11 @@ private fun FullScreenImageViewer(
                         Text(stringResource(R.string.media_tap_to_retry), color = Color.White)
                     }
                 }
-            } else {
+            else ->
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
                     color = Color.White,
                 )
-            }
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
-                }
-                Row {
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                // Re-read from the app cache (instant hit) rather
-                                // than holding the bytes in Compose state.
-                                val data =
-                                    runCatching {
-                                        controller.downloadAttachment(messageIdHex, reference)
-                                    }.getOrNull()
-                                val ok =
-                                    data != null &&
-                                        withContext(Dispatchers.IO) {
-                                            saveImageToGallery(context, data, reference.fileName, reference.mediaType)
-                                        }
-                                // Snackbar lives inside the Dialog so the result
-                                // is visible without dismissing the viewer.
-                                snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
-                            }
-                        },
-                        enabled = bitmap != null,
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = stringResource(R.string.media_save), tint = Color.White)
-                    }
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                runCatching {
-                                    controller.downloadAttachment(messageIdHex, reference)
-                                }.getOrNull()?.let { shareImage(context, it, reference.fileName, reference.mediaType) }
-                            }
-                        },
-                        enabled = bitmap != null,
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
-                    }
-                }
-            }
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding(),
-            )
         }
     }
 }
@@ -1799,25 +2544,37 @@ private fun saveImageToGallery(
     }
 }
 
-/** Share [bytes] via a FileProvider Uri using the system share sheet. */
-private fun shareImage(
+/**
+ * Share [bytes] via a FileProvider Uri using the system share sheet.
+ *
+ * Suspends because the temp-file write is multi-megabyte for any non-trivial
+ * attachment; doing it on the main dispatcher would stall the UI for the
+ * write. The `startActivity` call has to run on Main, so the I/O is hopped
+ * to `Dispatchers.IO` and the chooser is fired back on Main.
+ */
+private suspend fun shareImage(
     context: android.content.Context,
     bytes: ByteArray,
     fileName: String,
     mediaType: String,
 ) {
-    try {
-        val dir = java.io.File(context.cacheDir, "shared_media").apply { mkdirs() }
-        // Unique temp keyed off a sanitized basename — avoids collisions and
-        // path traversal from a remote-supplied filename.
-        val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
-        file.outputStream().use { it.write(bytes) }
-        val uri =
-            androidx.core.content.FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                file,
-            )
+    val uri =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val dir = java.io.File(context.cacheDir, "shared_media").apply { mkdirs() }
+                // Unique temp keyed off a sanitized basename — avoids
+                // collisions and path traversal from a remote-supplied
+                // filename.
+                val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
+                file.outputStream().use { it.write(bytes) }
+                androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file,
+                )
+            }.getOrNull()
+        } ?: return
+    runCatching {
         val intent =
             android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                 type = mediaType.ifBlank { MediaPipeline.RECOMPRESSED_MIME }
@@ -1829,8 +2586,6 @@ private fun shareImage(
                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             },
         )
-    } catch (_: Throwable) {
-        // Best-effort; failure to share is non-fatal.
     }
 }
 
@@ -1850,11 +2605,46 @@ private fun fileProviderUri(
     androidx.core.content.FileProvider
         .getUriForFile(context, "${context.packageName}.fileprovider", file)
 
-/** Best-effort wipe of decrypted media temp files (share + camera) from cache. */
+/**
+ * Best-effort wipe of decrypted camera-capture temp files from cache.
+ *
+ * Intentionally does NOT touch `shared_media`. Those entries back live
+ * FileProvider URIs the system may still be reading after the user backs
+ * out of a chat (an external PDF reader holding the granted URI, the
+ * system share-sheet target, etc.). Yanking the file out from under
+ * those readers caused the "opened PDF goes blank when I leave the chat"
+ * class of bug — the [sweepStaleSharedMedia] janitor cleans those on a
+ * stale-age basis at app start instead.
+ */
 private fun clearMediaTempFiles(context: android.content.Context) {
-    runCatching { java.io.File(context.cacheDir, "shared_media").deleteRecursively() }
     runCatching { java.io.File(context.cacheDir, "camera").deleteRecursively() }
 }
+
+/**
+ * Delete `shared_media` files older than [maxAgeMillis]. Called once at
+ * app start so transient FileProvider temps for opened/shared
+ * attachments don't accumulate across sessions, without racing the
+ * external readers that may still be using them in the current session.
+ */
+private fun sweepStaleSharedMedia(
+    context: android.content.Context,
+    maxAgeMillis: Long,
+) {
+    runCatching {
+        val dir = java.io.File(context.cacheDir, "shared_media")
+        if (!dir.isDirectory) return@runCatching
+        val cutoff = System.currentTimeMillis() - maxAgeMillis
+        dir.listFiles()?.forEach { entry ->
+            if (entry.isFile && entry.lastModified() < cutoff) {
+                runCatching { entry.delete() }
+            }
+        }
+    }
+}
+
+/** Files in `shared_media` older than this are considered safe to delete —
+ *  any external reader has had ample time to finish loading the bytes. */
+private const val SHARED_MEDIA_MAX_AGE_MS: Long = 10L * 60L * 1000L
 
 /** Decode a downscaled preview bitmap for a local content Uri, off-thread. */
 @Composable
@@ -1905,13 +2695,13 @@ private fun LocalImagePreview(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MediaPreviewSheet(
-    uri: android.net.Uri,
+    uris: List<android.net.Uri>,
     onDismiss: () -> Unit,
     onSend: (caption: String) -> Unit,
 ) {
     var caption by remember { mutableStateOf("") }
     // Local guard against a rapid double-tap firing onSend twice before the
-    // parent clears pendingMediaUri and the sheet leaves composition.
+    // parent clears pendingMediaUris and the sheet leaves composition.
     var sending by remember { mutableStateOf(false) }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1925,14 +2715,39 @@ private fun MediaPreviewSheet(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            LocalImagePreview(
-                uri = uri,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 320.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-            )
+            if (uris.size == 1) {
+                LocalImagePreview(
+                    uri = uris.first(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 320.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                )
+            } else {
+                // Album preview: a horizontally-scrollable strip of square
+                // thumbnails. The strip-shape on the compose surface lets the
+                // user scan + reorder mentally before sending; the grid shape
+                // is reserved for the received-message bubble.
+                LazyRow(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 220.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(uris, key = { uri -> uri.toString() }) { uri ->
+                        LocalImagePreview(
+                            uri = uri,
+                            modifier =
+                                Modifier
+                                    .fillMaxHeight()
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(12.dp)),
+                        )
+                    }
+                }
+            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -2030,6 +2845,25 @@ private fun queryDisplayName(
     return uri.lastPathSegment
 }
 
+/**
+ * Best-effort byte size of a content Uri, queried via `OpenableColumns.SIZE`.
+ * Returns -1 when the provider doesn't report a size (some virtual / streamed
+ * providers omit it); callers must then enforce a cap via the bounded read.
+ */
+private fun queryContentSize(
+    contentResolver: android.content.ContentResolver,
+    uri: android.net.Uri,
+): Long {
+    contentResolver
+        .query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)
+        ?.use { cursor ->
+            if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                return cursor.getLong(0)
+            }
+        }
+    return -1L
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ConversationScreen(
@@ -2068,7 +2902,8 @@ private fun ConversationScreen(
     //   New incoming arrivals (which extend the timeline beyond HWM) bump
     //   the badge. On chat re-entry, the auto-scroll's snap to the bottom
     //   immediately advances HWM to the last timeline index, so the badge
-    //   shows 0 — matching WhatsApp/Signal semantics.
+    //   shows 0 — matching the convention that an "open chat" is read up to
+    //   the visible row, not the last delivered row.
     val nearBottom by remember {
         derivedStateOf {
             isNearBottom(listState, controller.timeline.size, controller.hasMoreBefore || controller.isLoadingOlder)
@@ -2116,11 +2951,15 @@ private fun ConversationScreen(
     var recentReactionEmojis by remember(context) {
         mutableStateOf(RecentEmojiPreferences.load(context))
     }
-    // Selected-but-not-yet-sent attachment: when non-null the preview/caption
-    // sheet is shown. Single image per send — the FFI publishes one imeta
-    // reference per kind-9, so album-as-one-message needs Rust support first.
-    var pendingMediaUri by rememberSaveable(stateSaver = NullableUriSaver) {
-        mutableStateOf<android.net.Uri?>(null)
+    // Selected-but-not-yet-sent image attachments: when non-empty the preview
+    // / caption sheet is shown. Multi-pick goes through
+    // `PickMultipleVisualMedia` with `MEDIA_PICKER_MAX_ITEMS` as the cap. The
+    // whole selection ships as a single kind:9 album (one event carrying N
+    // imeta tags) via `controller.sendAttachments(list, caption)`. Document
+    // picks bypass this sheet and route directly through
+    // `sendPickedDocuments`.
+    var pendingMediaUris by rememberSaveable(stateSaver = UriListSaver) {
+        mutableStateOf<List<android.net.Uri>>(emptyList())
     }
     // Survives process death while the camera app is foreground (the result
     // callback fires into a recreated activity, otherwise the capture is lost).
@@ -2129,14 +2968,16 @@ private fun ConversationScreen(
     }
     var cameraOutputFile by remember { mutableStateOf<java.io.File?>(null) }
 
-    // PickVisualMedia uses the system Photo Picker — no READ_MEDIA_IMAGES
+    // PickMultipleVisualMedia uses the system Photo Picker — no READ_MEDIA_IMAGES
     // permission needed (Android 13+ scopes the picker's own grant); on older
-    // devices it falls back to GET_CONTENT with the same UX.
+    // devices it falls back to GET_CONTENT with the same UX. The maxItems
+    // cap comes from MEDIA_PICKER_MAX_ITEMS; picking a single image still works
+    // (returns a one-element list).
     val imagePickerLauncher =
         rememberLauncherForActivityResult(
-            ActivityResultContracts.PickVisualMedia(),
-        ) { uri ->
-            if (uri != null) pendingMediaUri = uri
+            ActivityResultContracts.PickMultipleVisualMedia(maxItems = MEDIA_PICKER_MAX_ITEMS),
+        ) { uris ->
+            if (uris.isNotEmpty()) pendingMediaUris = uris
         }
     val cameraLauncher =
         rememberLauncherForActivityResult(
@@ -2144,7 +2985,7 @@ private fun ConversationScreen(
         ) { success ->
             val captured = cameraOutputUri
             if (success && captured != null) {
-                pendingMediaUri = captured
+                pendingMediaUris = listOf(captured)
             } else {
                 cameraOutputFile?.delete() // cancelled — don't leak the empty temp
             }
@@ -2172,33 +3013,165 @@ private fun ConversationScreen(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> if (granted) launchCameraCapture() }
 
-    // Decode/compress off the main thread, then hand the image to the controller.
+    // Decode/compress each URI off the main thread, then hand the album to
+    // the controller as a single `sendAttachments(list, caption)` call. One
+    // kind:9 carries N imeta tags; the caption is shared across the whole
+    // album. If any source fails to decode the rest still send (best
+    // effort), but if NONE decode we bail without surfacing an empty send.
     fun sendPickedMedia(
-        uri: android.net.Uri,
+        uris: List<android.net.Uri>,
         caption: String,
     ) {
+        if (uris.isEmpty()) return
+        val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
         appState.launchMutation {
-            val jpeg =
+            val attachments =
                 withContext(Dispatchers.Default) {
-                    MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
+                    uris.mapNotNull { uri ->
+                        val jpeg =
+                            MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
+                                ?: return@mapNotNull null
+                        val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
+                        val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
+                        PendingAttachment(
+                            plaintextBytes = jpeg,
+                            mediaType = MediaPipeline.RECOMPRESSED_MIME,
+                            fileName = fileName,
+                        )
+                    }
                 }
-            if (jpeg == null) {
+            if (attachments.size < uris.size) {
                 appState.present(R.string.toast_couldnt_decode_image)
-                return@launchMutation
+                if (attachments.isEmpty()) return@launchMutation
             }
-            val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
-            val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
-            controller.sendImageAttachment(
-                jpeg,
-                MediaPipeline.RECOMPRESSED_MIME,
-                fileName,
-                caption.trim().takeIf { it.isNotBlank() },
-            )
+            controller.sendAttachments(attachments, trimmedCaption)
         }
     }
 
-    // Wipe decrypted share/camera temp files and retained outgoing JPEG bytes
+    // Read each picked document URI as raw bytes (no recompression — PDFs,
+    // archives, audio etc. travel through the same kind:9 album path as
+    // images via `sendAttachments`). MIME comes from the content resolver;
+    // filename from `OpenableColumns.DISPLAY_NAME`.
+    //
+    // Two-layer size guard:
+    //   1. Per-attachment ceiling: skip any single pick that already declares
+    //      a `OpenableColumns.SIZE` greater than [MEDIA_ATTACHMENT_MAX_BYTES],
+    //      OR overruns the cap during a bounded streaming read (no fully-
+    //      buffered `readBytes()` so a 500 MB pick can't OOM the JVM heap
+    //      before the retained-uploads LRU has anything to evict).
+    //   2. Album-total ceiling: stop accumulating once the cumulative payload
+    //      crosses [MEDIA_ALBUM_MAX_TOTAL_BYTES]; remaining picks are dropped.
+    //
+    // Any reject surfaces a single user-visible toast; the rest of the album
+    // continues. If NOTHING survives the gates we bail without an empty send.
+    fun sendPickedDocuments(uris: List<android.net.Uri>) {
+        if (uris.isEmpty()) return
+        appState.launchMutation {
+            data class ReadOutcome(
+                val attachments: List<PendingAttachment>,
+                val rejected: Boolean,
+                val albumOverflowed: Boolean,
+            )
+            val outcome =
+                withContext(Dispatchers.IO) {
+                    val accepted = mutableListOf<PendingAttachment>()
+                    var albumBytes = 0L
+                    var rejected = false
+                    var albumOverflowed = false
+                    for (uri in uris) {
+                        val declaredSize = queryContentSize(context.contentResolver, uri)
+                        if (declaredSize > 0L && declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
+                            rejected = true
+                            continue
+                        }
+                        val remainingAlbumBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - albumBytes).coerceAtLeast(0L)
+                        if (remainingAlbumBudget <= 0L) {
+                            albumOverflowed = true
+                            break
+                        }
+                        // Cap the bounded read at whichever is smaller: the
+                        // single-file ceiling, or the remaining album budget.
+                        val perFileCap =
+                            minOf(MEDIA_ATTACHMENT_MAX_BYTES, remainingAlbumBudget)
+                                .coerceAtMost(Int.MAX_VALUE.toLong())
+                                .toInt()
+                        val bytes =
+                            runCatching {
+                                context.contentResolver.openInputStream(uri)?.use { stream ->
+                                    MediaPipeline.readBoundedBytes(stream, perFileCap)
+                                }
+                            }.getOrNull()
+                        if (bytes == null) {
+                            // null from runCatching = open failed; null from
+                            // readBoundedBytes = exceeded cap. Both surface as
+                            // "rejected" — the user sees one toast either way.
+                            rejected = true
+                            continue
+                        }
+                        if (bytes.isEmpty()) continue
+                        if (albumBytes + bytes.size > MEDIA_ALBUM_MAX_TOTAL_BYTES) {
+                            // Defensive: per-file cap already accounts for
+                            // remainingAlbumBudget, so this branch shouldn't
+                            // fire — keep it as a belt-and-braces guard.
+                            albumOverflowed = true
+                            continue
+                        }
+                        albumBytes += bytes.size
+                        val resolvedMime =
+                            context.contentResolver
+                                .getType(uri)
+                                .orEmpty()
+                                .takeIf { it.isNotBlank() }
+                                ?: "application/octet-stream"
+                        val name = queryDisplayName(context.contentResolver, uri) ?: "file"
+                        accepted +=
+                            PendingAttachment(
+                                plaintextBytes = bytes,
+                                mediaType = resolvedMime,
+                                fileName = name,
+                            )
+                    }
+                    ReadOutcome(accepted, rejected, albumOverflowed)
+                }
+            if (outcome.attachments.isEmpty()) {
+                appState.present(
+                    if (outcome.rejected || outcome.albumOverflowed) {
+                        R.string.media_file_too_large
+                    } else {
+                        R.string.toast_couldnt_decode_image
+                    },
+                )
+                return@launchMutation
+            }
+            if (outcome.albumOverflowed) {
+                appState.present(R.string.media_album_too_large)
+            } else if (outcome.rejected) {
+                appState.present(R.string.media_file_too_large)
+            }
+            controller.sendAttachments(outcome.attachments, caption = null)
+        }
+    }
+
+    // Documents take a separate launcher because `OpenMultipleDocuments`
+    // accepts any MIME — the image picker can't surface PDFs, archives, etc.
+    // Picked URIs go straight to `sendPickedDocuments` without recompression;
+    // the bytes ride the same `sendAttachments(list, caption)` path since
+    // the FFI is MIME-agnostic.
+    val documentPickerLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenMultipleDocuments(),
+        ) { uris ->
+            if (uris.isNotEmpty()) {
+                sendPickedDocuments(uris.take(MEDIA_PICKER_MAX_ITEMS))
+            }
+        }
+
+    // Wipe camera-capture temp files and retained outgoing attachment bytes
     // when leaving the conversation so plaintext media doesn't linger.
+    // `shared_media` is deliberately NOT touched here — an external reader
+    // (PDF viewer, etc.) may still be reading a granted FileProvider URI.
+    // Those are reaped by the age-based `sweepStaleSharedMedia` janitor at
+    // app start.
     DisposableEffect(Unit) {
         onDispose {
             clearMediaTempFiles(context)
@@ -2386,7 +3359,15 @@ private fun ConversationScreen(
         bottomBar = {
             when {
                 controller.error != null || controller.group.pendingConfirmation -> Unit
-                controller.canSendMessages -> {
+                // Only suppress the composer when we've *confirmed* the user
+                // is no longer a member. The kicked-notice branch must lose
+                // to the composer during the load window (`membersLoaded`
+                // still false) so the user isn't staring at a blank bottom
+                // bar while `refreshMembers()` round-trips. The controller's
+                // `canSendMessages` guard in send/upload/react/delete keeps
+                // any actual mutation safe until membership is confirmed.
+                controller.membersLoaded && !controller.isSelfMember -> RemovedMemberComposerNotice()
+                else -> {
                     val groupIdHex = controller.group.groupIdHex
                     ComposerBar(
                         replyingTo = controller.replyingTo,
@@ -2422,9 +3403,14 @@ private fun ConversationScreen(
                                 cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                             }
                         },
+                        onPickDocument = {
+                            // `*/*` lets the system file picker surface every
+                            // installed provider (Drive, Downloads, Files…)
+                            // without restricting by MIME. Bytes upload as-is.
+                            documentPickerLauncher.launch(arrayOf("*/*"))
+                        },
                     )
                 }
-                controller.membersLoaded && !controller.isSelfMember -> RemovedMemberComposerNotice()
             }
         },
     ) { padding ->
@@ -2556,13 +3542,14 @@ private fun ConversationScreen(
         )
     }
 
-    pendingMediaUri?.let { uri ->
+    if (pendingMediaUris.isNotEmpty()) {
+        val uris = pendingMediaUris
         MediaPreviewSheet(
-            uri = uri,
-            onDismiss = { pendingMediaUri = null },
+            uris = uris,
+            onDismiss = { pendingMediaUris = emptyList() },
             onSend = { caption ->
-                pendingMediaUri = null
-                sendPickedMedia(uri, caption)
+                pendingMediaUris = emptyList()
+                sendPickedMedia(uris, caption)
             },
         )
     }
@@ -3520,9 +4507,36 @@ private fun MessageBubble(
                                 }
                             }
                         }
-                        val mediaReference =
-                            remember(record.tags) {
-                                MediaReferenceParser.parseImetaTag(record.tags)
+                        // Prefer the controller's listMedia cache — it carries
+                        // the receive-side `sourceEpoch`, which the imeta-tag
+                        // parser can't recover (no epoch field in the wire
+                        // format). Fall back to the imeta parser for optimistic
+                        // bridge records that haven't been projected yet.
+                        val mediaReferences =
+                            remember(record.tags, record.messageIdHex, controller.mediaReferences) {
+                                controller.mediaReferences[record.messageIdHex]
+                                    ?: MediaReferenceParser.parseAllImetaTags(record.tags)
+                            }
+                        // Split media into image refs (rendered as a bubble or
+                        // 2-col grid) and file refs (a list of pills). Mixed
+                        // albums render both: images on top, file pills below.
+                        // `IndexedValue` preserves the real protocol-level
+                        // attachmentIndex from the full `mediaReferences`
+                        // list so per-tile cache lookups never collide across
+                        // image and file subsets.
+                        val imageAttachments =
+                            remember(mediaReferences) {
+                                mediaReferences
+                                    .withIndex()
+                                    .filter { (_, ref) -> MediaReferenceParser.isImageMedia(ref) }
+                                    .toList()
+                            }
+                        val fileAttachments =
+                            remember(mediaReferences) {
+                                mediaReferences
+                                    .withIndex()
+                                    .filter { (_, ref) -> !MediaReferenceParser.isImageMedia(ref) }
+                                    .toList()
                             }
                         val mediaPendingName =
                             remember(record.tags) {
@@ -3531,17 +4545,42 @@ private fun MessageBubble(
                                     ?.values
                                     ?.getOrNull(1)
                             }
-                        if (!deleted && !invalidated && mediaReference != null && MediaReferenceParser.isImageMedia(mediaReference)) {
-                            MediaImageBubble(
-                                item = item,
-                                reference = mediaReference,
-                                controller = controller,
-                                appState = appState,
-                                mine = mine,
-                            )
-                        } else if (!deleted && !invalidated && mediaPendingName != null) {
+                        if (!deleted && !invalidated && imageAttachments.isNotEmpty()) {
+                            if (imageAttachments.size == 1) {
+                                val entry = imageAttachments.first()
+                                MediaImageBubble(
+                                    item = item,
+                                    reference = entry.value,
+                                    attachmentIndex = entry.index,
+                                    controller = controller,
+                                    appState = appState,
+                                    mine = mine,
+                                )
+                            } else {
+                                MediaImageGridBubble(
+                                    item = item,
+                                    attachments = imageAttachments,
+                                    controller = controller,
+                                    appState = appState,
+                                    mine = mine,
+                                )
+                            }
+                        }
+                        if (!deleted && !invalidated && fileAttachments.isNotEmpty()) {
+                            fileAttachments.forEach { entry ->
+                                MediaFileBubble(
+                                    messageIdHex = record.messageIdHex,
+                                    attachmentIndex = entry.index,
+                                    reference = entry.value,
+                                    controller = controller,
+                                    appState = appState,
+                                )
+                            }
+                        }
+                        val anyConfirmedMedia = imageAttachments.isNotEmpty() || fileAttachments.isNotEmpty()
+                        if (!deleted && !invalidated && !anyConfirmedMedia && mediaPendingName != null) {
                             MediaPendingPlaceholder(
-                                previewBytes = controller.pendingMediaBytes(record.messageIdHex),
+                                pendingAttachments = controller.pendingAttachmentsList(record.messageIdHex),
                                 failed = item.status == MessageStatus.Failed,
                             )
                         }
@@ -3562,8 +4601,8 @@ private fun MessageBubble(
                                 // Deleted/invalidated tombstones show only the
                                 // tombstone copy, never an inline image/caption.
                                 deleted || invalidated -> displayedBody
-                                mediaPendingName != null -> null
-                                mediaReference != null -> record.plaintext.takeIf { it.isNotBlank() }
+                                mediaPendingName != null && !anyConfirmedMedia -> null
+                                anyConfirmedMedia -> record.plaintext.takeIf { it.isNotBlank() }
                                 else -> displayedBody
                             }
                         if (bodyTextToRender != null) {
@@ -4201,6 +5240,7 @@ private fun ComposerBar(
     onAfterSend: () -> Unit = {},
     onPickFromGallery: (() -> Unit)? = null,
     onCaptureFromCamera: (() -> Unit)? = null,
+    onPickDocument: (() -> Unit)? = null,
 ) {
     var attachMenuOpen by remember { mutableStateOf(false) }
     // Keyed on draftKey so switching to a different chat re-hydrates the text
@@ -4237,7 +5277,7 @@ private fun ComposerBar(
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (onPickFromGallery != null || onCaptureFromCamera != null) {
+            if (onPickFromGallery != null || onCaptureFromCamera != null || onPickDocument != null) {
                 Box {
                     IconButton(
                         onClick = { attachMenuOpen = true },
@@ -4270,6 +5310,16 @@ private fun ComposerBar(
                                 onClick = {
                                     attachMenuOpen = false
                                     onPickFromGallery()
+                                },
+                            )
+                        }
+                        if (onPickDocument != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.attach_document)) },
+                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                                onClick = {
+                                    attachMenuOpen = false
+                                    onPickDocument()
                                 },
                             )
                         }

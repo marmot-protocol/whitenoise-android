@@ -511,13 +511,16 @@ class DarkMatterAppState(
     }
 
     fun setActiveAccount(label: String) {
-        // Switching accounts (from the account picker) is a session boundary
-        // identical to sign-out for media-cache purposes: account A's
-        // decrypted bytes must not linger in process memory or on disk after
-        // account B is active. Re-opening a chat under B simply re-downloads.
+        // Account switch: drop in-process plaintext so account A's bytes
+        // aren't reachable from account B's UI loops, but keep L2 (disk)
+        // intact. The disk cache key is `mediaCacheKey(account, msg)`, so
+        // switching to B can never read A's files — and switching BACK to
+        // A re-hydrates L1 from L2 with a single file read instead of a
+        // re-download. Sign-out (signOutActiveAccount) is what actually
+        // wipes disk; switching is just a UI context flip.
         // Skip the wipe when the label is unchanged (no-op tap on the
-        // already-active account) so caches survive a redundant tap.
-        if (label != activeAccountRef) clearMediaCaches()
+        // already-active account).
+        if (label != activeAccountRef) clearInMemoryMediaCaches()
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
@@ -528,18 +531,28 @@ class DarkMatterAppState(
     }
 
     /**
-     * Wipe the decrypted-media caches at a session boundary (sign-out or
-     * account switch). L1 (in-memory) clears synchronously so account A's
-     * plaintext is unreachable immediately; L2 (disk) is scheduled to IO
-     * since many file deletes shouldn't stall the UI thread.
+     * Wipe in-memory media caches only — L1 plaintext, decoded thumbnails,
+     * and the URL-keyed avatar LRU. Used on account switch, where the L2
+     * disk cache (per-account-keyed) is deliberately preserved so the user
+     * doesn't re-download every image when bouncing between accounts.
      */
-    private fun clearMediaCaches() {
+    private fun clearInMemoryMediaCaches() {
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
-        // Avatars are keyed by URL and shared across accounts, so wipe them on
-        // sign-out / account switch too — otherwise the LRU grows unbounded
-        // across switches and account A's avatars linger for account B. See #77.
+        // Avatars are URL-keyed and shared across accounts; wiping on switch
+        // keeps the LRU bounded without per-switch growth, at the cost of a
+        // re-fetch when the user returns. Cheap relative to media bytes.
         AvatarImageLoader.clear()
+    }
+
+    /**
+     * Wipe in-memory caches AND the L2 disk cache. Used at sign-out, when
+     * we treat the device-side decrypted-media footprint as ending with
+     * the session. Re-opening a chat after the next sign-in re-downloads
+     * from Blossom.
+     */
+    private fun clearAllMediaCaches() {
+        clearInMemoryMediaCaches()
         notificationScope.launch(Dispatchers.IO) { diskMediaCache.clear() }
     }
 
@@ -551,13 +564,11 @@ class DarkMatterAppState(
         // place to call DraftStore.clearAllForAccount is a real
         // identity-delete flow, which doesn't exist yet.
         //
-        // Decrypted media is the exception: it's a process-wide in-memory cache
-        // (not per-account persistence), so account A's plaintext images must
-        // not linger in memory after switching to account B. Re-opening a chat
-        // simply re-downloads — no durable state is lost.
-        // Both sign-out and account-switch wipe decrypted-media caches; the
-        // helper centralises the L1-sync + L2-on-IO pattern.
-        clearMediaCaches()
+        // Decrypted media is the exception: a real sign-out is the end of the
+        // session, so we wipe both in-memory and disk caches. Account switch
+        // (setActiveAccount) is *not* a sign-out — it keeps the L2 disk cache
+        // so re-entry into the same account doesn't re-download every image.
+        clearAllMediaCaches()
         val outcome = signOutOutcome(accounts.map { it.label }, activeAccountRef)
         val next = outcome.nextActiveRef
         activeAccountRef = next

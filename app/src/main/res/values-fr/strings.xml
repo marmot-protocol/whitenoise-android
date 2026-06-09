@@ -376,6 +376,12 @@
     <string name="add_caption">Ajouter une légende…</string>
     <string name="attach_take_photo">Prendre une photo</string>
     <string name="attach_photo_library">Photothèque</string>
+    <string name="attach_document">Fichier</string>
+    <string name="media_no_app_to_open">Aucune application installée pour ouvrir ce fichier</string>
+    <string name="media_couldnt_open">Impossible d\'ouvrir le fichier</string>
+    <string name="media_open">Ouvrir</string>
+    <string name="media_file_too_large">Fichier trop volumineux pour être joint</string>
+    <string name="media_album_too_large">Sélection trop volumineuse pour être envoyée</string>
     <string name="media_auto_download_title">Téléchargement auto des médias</string>
     <string name="media_auto_download_always">Toujours</string>
     <string name="media_auto_download_wifi">Wi-Fi uniquement</string>

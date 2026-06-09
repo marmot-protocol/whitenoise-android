@@ -376,6 +376,12 @@
     <string name="add_caption">Aggiungi una didascalia…</string>
     <string name="attach_take_photo">Scatta foto</string>
     <string name="attach_photo_library">Galleria foto</string>
+    <string name="attach_document">Documento</string>
+    <string name="media_no_app_to_open">Nessuna app installata per aprire questo file</string>
+    <string name="media_couldnt_open">Impossibile aprire il file</string>
+    <string name="media_open">Apri</string>
+    <string name="media_file_too_large">File troppo grande da allegare</string>
+    <string name="media_album_too_large">Selezione troppo grande per essere inviata</string>
     <string name="media_auto_download_title">Download automatico dei media</string>
     <string name="media_auto_download_always">Sempre</string>
     <string name="media_auto_download_wifi">Solo Wi-Fi</string>

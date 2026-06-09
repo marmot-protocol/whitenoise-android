@@ -18,10 +18,10 @@ import java.io.ByteArrayOutputStream
  * clients prevents one platform from accidentally shipping multi-MB blobs
  * that the other side then has to download.
  *
- * The Rust `uploadMedia` FFI takes a single `ByteArray` (no streaming, no
- * progress callback), so the whole compressed payload sits in the JVM heap
- * during upload. Capping the edge is the only protection against
- * OOM on a 12MP source.
+ * The Rust `uploadMedia` FFI takes attachment plaintext as `ByteArray`s (no
+ * streaming, no progress callback), so each compressed payload sits in the JVM
+ * heap during upload. Capping the edge is the only protection against OOM on a
+ * 12MP source.
  */
 object MediaPipeline {
     /** 1920px max edge mirrors `ImagePicker(maxWidth: 1920, maxHeight: 1920)`. */
@@ -32,6 +32,37 @@ object MediaPipeline {
 
     /** MIME on the wire always matches the recompressed payload, not the source. */
     const val RECOMPRESSED_MIME: String = "image/jpeg"
+
+    /**
+     * Read at most [cap] bytes from [stream] into a freshly-allocated buffer
+     * and return them. Returns null if the stream would exceed the cap —
+     * caller decides whether to surface that as "file too large".
+     *
+     * Used by the document picker (`OpenMultipleDocuments` accepts any MIME
+     * and any size — a 500 MB pick would otherwise allocate the full payload
+     * via `InputStream.readBytes()` and crash the process before the
+     * retained-uploads LRU has anything to evict).
+     *
+     * Doesn't close [stream] — the caller owns the lifecycle via `use { }`.
+     */
+    fun readBoundedBytes(
+        stream: java.io.InputStream,
+        cap: Int,
+    ): ByteArray? {
+        require(cap >= 0) { "cap must be non-negative" }
+        val buffer = java.io.ByteArrayOutputStream()
+        val chunk = ByteArray(8 * 1024)
+        var total = 0L
+        while (true) {
+            val read = stream.read(chunk)
+            if (read < 0) break
+            total += read
+            // Strictly greater so a file exactly the cap size still goes through.
+            if (total > cap) return null
+            buffer.write(chunk, 0, read)
+        }
+        return buffer.toByteArray()
+    }
 
     /** Max longer-edge (px) for in-bubble thumbnail decodes (shared by the
      *  UI bubble and the send-path thumbnail seed). */

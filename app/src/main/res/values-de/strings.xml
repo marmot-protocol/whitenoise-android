@@ -376,6 +376,12 @@
     <string name="add_caption">Beschriftung hinzufügen…</string>
     <string name="attach_take_photo">Foto aufnehmen</string>
     <string name="attach_photo_library">Fotomediathek</string>
+    <string name="attach_document">Dokument</string>
+    <string name="media_no_app_to_open">Keine App installiert, um diese Datei zu öffnen</string>
+    <string name="media_couldnt_open">Datei konnte nicht geöffnet werden</string>
+    <string name="media_open">Öffnen</string>
+    <string name="media_file_too_large">Datei zu groß zum Anhängen</string>
+    <string name="media_album_too_large">Auswahl zu groß zum Senden</string>
     <string name="media_auto_download_title">Medien automatisch herunterladen</string>
     <string name="media_auto_download_always">Immer</string>
     <string name="media_auto_download_wifi">Nur über WLAN</string>
