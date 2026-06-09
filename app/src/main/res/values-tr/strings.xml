@@ -49,6 +49,7 @@
     <string name="leave">Ayrıl</string>
     <string name="couldnt_load_conversation">Konuşma yüklenemedi</string>
     <string name="no_messages_yet">Henüz mesaj yok</string>
+    <string name="you_are_no_longer_a_member">Artık bu grubun üyesi değilsiniz.</string>
     <string name="chat_row_draft_prefix">Taslak: </string>
     <string name="jump_to_newest">En yeniye atla</string>
     <string name="discard_failed_message">Başarısız mesajı sil</string>
@@ -56,7 +57,10 @@
     <string name="decline">Reddet</string>
     <string name="accept">Kabul et</string>
     <string name="profile">Profil</string>
+    <string name="dismiss">Kapat</string>
+    <string name="edit">Düzenle</string>
     <string name="save_group">Grubu Kaydet</string>
+    <string name="saving_group">Grup kaydediliyor...</string>
     <string name="no_description">Açıklama yok</string>
     <string name="info">Bilgi</string>
     <string name="group_id">Grup Kimliği</string>
@@ -67,10 +71,16 @@
     <string name="scan_member_qr_code">Üye QR kodunu tara</string>
     <string name="error_one_valid_member_reference">Geçerli bir npub, profil bağlantısı veya ortak anahtar girin.</string>
     <string name="add_member">Üye ekle</string>
+    <string name="adding_member">Üye ekleniyor...</string>
+    <string name="invite_pending">Davet bekliyor: %1$s</string>
+    <string name="latest_group_error">Son grup hatası: %1$s</string>
     <string name="actions">Eylemler</string>
     <string name="archive_chat">Arşivle</string>
     <string name="unarchive_chat">Arşivden çıkar</string>
+    <string name="archiving_chat">Sohbet arşivleniyor...</string>
+    <string name="restoring_chat">Sohbet geri yükleniyor...</string>
     <string name="leave_chat">Gruptan ayrıl</string>
+    <string name="leaving_chat">Sohbetten ayrılınıyor...</string>
     <string name="promote_admin_before_leaving">Ayrılmadan önce başka bir yöneticinin terfisini alın</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">MLS durumu yükleniyor...</string>
@@ -83,6 +93,9 @@
     <string name="you">Sen</string>
     <string name="member_actions">Üye eylemleri</string>
     <string name="remove_admin">Yöneticilikten çıkar</string>
+    <string name="adding_admin">Yönetici ekleniyor...</string>
+    <string name="removing_admin">Yönetici kaldırılıyor...</string>
+    <string name="removing_member">Üye kaldırılıyor...</string>
     <string name="make_admin">Yönetici yap</string>
     <string name="remove_member">Gruptan çıkar</string>
     <string name="confirm_remove_member_title">Üye çıkarılsın mı?</string>
@@ -267,7 +280,7 @@
     <string name="toast_background_connection_disabled">Arka plan bağlantısı devre dışı bırakıldı</string>
     <string name="toast_chat_started">Sohbet başlatıldı</string>
     <string name="toast_couldnt_start_chat">Sohbet başlatılamadı</string>
-    <string name="toast_profile_published">Profil yayınlandı</string>
+<string name="toast_profile_published">Profil yayınlandı</string>
     <string name="toast_profile_published_detail">kind:0 meta verileriniz %1$d aktarmalarında yayındadır.</string>
     <string name="toast_couldnt_publish_profile">Profil yayınlanamadı</string>
     <string name="toast_send_failed">Gönderim başarısız oldu</string>
