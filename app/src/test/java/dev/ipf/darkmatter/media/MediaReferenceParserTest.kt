@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.media
 
-import dev.ipf.marmotkit.MediaReferenceFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,30 +23,36 @@ class MediaReferenceParserTest {
     }
 
     @Test
-    fun parsesCanonicalSixFieldImeta() {
+    fun parsesCanonicalEncryptedMediaImeta() {
         val ref = MediaReferenceParser.parseImetaTag(listOf(canonicalImetaTag()))
         assertNotNull(ref)
-        assertEquals(URL, ref!!.url)
+        assertEquals(URL, ref!!.locators.single().value)
+        assertEquals("blossom-v1", ref.locators.single().kind)
         assertEquals(MIME_JPEG, ref.mediaType)
         assertEquals("photo.jpg", ref.fileName)
-        assertEquals(SHA256_HEX, ref.fileHashHex)
+        assertEquals(CIPHERTEXT_SHA256_HEX, ref.ciphertextSha256)
+        assertEquals(PLAINTEXT_SHA256_HEX, ref.plaintextSha256)
         assertEquals(NONCE_HEX, ref.nonceHex)
-        assertEquals("mip04-v2", ref.version)
+        assertEquals("encrypted-media-v1", ref.version)
+        assertEquals("640x480", ref.dim)
+        assertEquals(THUMBHASH, ref.thumbhash)
     }
 
     @Test
     fun isLenientAboutFieldOrder() {
-        // Reverse order — still parses.
         val reversed =
             MessageTagFfi(
                 listOf(
                     "imeta",
-                    "v mip04-v2",
-                    "n $NONCE_HEX",
-                    "x $SHA256_HEX",
+                    "thumbhash $THUMBHASH",
+                    "dim 640x480",
                     "filename photo.jpg",
                     "m $MIME_JPEG",
-                    "url $URL",
+                    "nonce $NONCE_HEX",
+                    "plaintext_sha256 $PLAINTEXT_SHA256_HEX",
+                    "ciphertext_sha256 $CIPHERTEXT_SHA256_HEX",
+                    "locator blossom-v1 $URL",
+                    "v encrypted-media-v1",
                 ),
             )
         assertNotNull(MediaReferenceParser.parseImetaTag(listOf(reversed)))
@@ -53,7 +60,7 @@ class MediaReferenceParserTest {
 
     @Test
     fun returnsNull_whenAnyRequiredFieldMissing() {
-        val required = listOf("url", "m", "filename", "x", "n", "v")
+        val required = listOf("locator", "m", "filename", "ciphertext_sha256", "plaintext_sha256", "nonce", "v")
         for (drop in required) {
             val entries = canonicalEntries().filterNot { it.startsWith("$drop ") }
             val tag = MessageTagFfi(listOf("imeta") + entries)
@@ -62,160 +69,152 @@ class MediaReferenceParserTest {
     }
 
     @Test
-    fun returnsNull_whenVersionIsNotMip04V2() {
-        val tag = imetaWithOverride("v" to "mip04-v1")
+    fun returnsNull_whenVersionIsNotEncryptedMediaV1() {
+        val tag = imetaWithOverride("v" to "mip04-v2")
         assertNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
     }
 
     @Test
-    fun returnsNull_whenSha256IsWrongLength() {
-        val tag = imetaWithOverride("x" to "abc123")
+    fun returnsNull_whenCiphertextSha256IsWrongLength() {
+        val tag = imetaWithOverride("ciphertext_sha256" to "abc123")
         assertNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
     }
 
     @Test
-    fun returnsNull_whenSha256HasNonHexChars() {
-        // 64 chars, but contains 'z'.
-        val bad = "z" + SHA256_HEX.drop(1)
-        val tag = imetaWithOverride("x" to bad)
+    fun returnsNull_whenPlaintextSha256HasNonHexChars() {
+        val bad = "z" + PLAINTEXT_SHA256_HEX.drop(1)
+        val tag = imetaWithOverride("plaintext_sha256" to bad)
         assertNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
     }
 
     @Test
     fun returnsNull_whenNonceIsWrongLength() {
-        val tag = imetaWithOverride("n" to "abcd")
+        val tag = imetaWithOverride("nonce" to "abcd")
         assertNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
     }
 
     @Test
     fun ignoresMalformedEntriesWithoutAValue() {
-        // "filename" with no space-value. Should NOT crash, just treat as missing.
         val tag =
             MessageTagFfi(
                 listOf(
                     "imeta",
-                    "url $URL",
+                    "v encrypted-media-v1",
+                    "locator blossom-v1 $URL",
                     "m $MIME_JPEG",
                     "filename",
-                    "x $SHA256_HEX",
-                    "n $NONCE_HEX",
-                    "v mip04-v2",
+                    "ciphertext_sha256 $CIPHERTEXT_SHA256_HEX",
+                    "plaintext_sha256 $PLAINTEXT_SHA256_HEX",
+                    "nonce $NONCE_HEX",
                 ),
+            )
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
+    }
+
+    @Test
+    fun returnsNull_whenLocatorIsMalformed() {
+        val tag =
+            MessageTagFfi(
+                listOf("imeta", "locator blossom-v1") +
+                    canonicalEntries().filterNot { it.startsWith("locator ") },
             )
         assertNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
     }
 
     @Test
     fun acceptsUppercaseHex() {
-        // The Rust validator accepts both cases; our parser must too.
-        val tag = imetaWithOverride("x" to SHA256_HEX.uppercase(), "n" to NONCE_HEX.uppercase())
+        val tag =
+            imetaWithOverride(
+                "ciphertext_sha256" to CIPHERTEXT_SHA256_HEX.uppercase(),
+                "plaintext_sha256" to PLAINTEXT_SHA256_HEX.uppercase(),
+                "nonce" to NONCE_HEX.uppercase(),
+            )
         assertNotNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
     }
 
     @Test
     fun firstImetaWinsWhenMultiplePresent() {
-        // Defensive — a malformed second imeta shouldn't poison the first.
         val first = canonicalImetaTag()
-        val second = MessageTagFfi(listOf("imeta", "url junk"))
+        val second = MessageTagFfi(listOf("imeta", "locator blossom-v1 junk"))
         val ref = MediaReferenceParser.parseImetaTag(listOf(first, second))
         assertNotNull(ref)
-        assertEquals(URL, ref!!.url)
+        assertEquals(URL, ref!!.locators.single().value)
     }
 
     @Test
-    fun returnsNull_whenUrlSchemeIsNotHttp() {
-        // SSRF / local-file guard: only http(s) media URLs are downloadable.
-        // See issue #98.
-        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "file:///etc/passwd"))))
-        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "gopher://example.com/x"))))
-        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "ftp://example.com/x.bin"))))
+    fun lastDuplicateFieldWins() {
+        val tag =
+            MessageTagFfi(
+                canonicalImetaTag().values + "filename final.jpg",
+            )
+        val ref = MediaReferenceParser.parseImetaTag(listOf(tag))
+        assertEquals("final.jpg", ref?.fileName)
     }
 
     @Test
-    fun returnsNull_whenUrlHostIsPrivateOrLoopback() {
-        // A malicious group member must not be able to point auto-download at
-        // the device's loopback or the local network. See issue #98.
-        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://127.0.0.1:8080/admin"))))
-        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "https://192.168.1.1/x.bin"))))
-        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "https://[::1]/x.bin"))))
-        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://localhost/x.bin"))))
-        // 172.16/12 boundary: .16-.31 are private, .32 is public (off-by-one guard).
-        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://172.31.255.255/x.bin"))))
+    fun returnsNull_whenLocatorSchemeIsNotHttp() {
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "file:///etc/passwd"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "gopher://example.com/x"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "ftp://example.com/x.bin"))))
     }
 
     @Test
-    fun acceptsPublicHttpAndHttpsMediaUrls() {
-        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://blossom.example/x.bin"))))
-        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "https://blossom.example/x.bin"))))
-        // Just outside the 172.16/12 private block — must be allowed.
-        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://172.32.0.1/x.bin"))))
+    fun returnsNull_whenLocatorHostIsPrivateOrLoopback() {
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "http://127.0.0.1:8080/admin"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "https://192.168.1.1/x.bin"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "https://[::1]/x.bin"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "http://localhost/x.bin"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "http://172.31.255.255/x.bin"))))
     }
 
-    // ---- toImetaTag (round-trip) -------------------------------------------
+    @Test
+    fun acceptsPublicHttpAndHttpsMediaLocators() {
+        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "http://blossom.example/x.bin"))))
+        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "https://blossom.example/x.bin"))))
+        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "http://172.32.0.1/x.bin"))))
+    }
+
+    @Test
+    fun returnsNull_whenLocatorKindIsNotBlossomV1() {
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("other-v1", URL))))
+    }
+
+    @Test
+    fun returnsNull_whenBlurhashIsPresent() {
+        val tag = MessageTagFfi(canonicalImetaTag().values + "blurhash legacy")
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
+    }
 
     @Test
     fun toImetaTag_roundTripsThroughParse() {
-        // The whole point of the builder is symmetry with the parser, so a
-        // ref written and re-parsed must equal the original.
-        val original =
-            MediaReferenceFfi(
-                url = URL,
-                fileHashHex = SHA256_HEX,
-                nonceHex = NONCE_HEX,
-                fileName = "photo.jpg",
-                mediaType = MIME_JPEG,
-                version = "mip04-v2",
-            )
+        val original = referenceFixture()
         val tag = MediaReferenceParser.toImetaTag(original)
         val parsed = MediaReferenceParser.parseImetaTag(listOf(tag))
-        assertEquals(original, parsed)
+        assertEquals(original.copy(sourceEpoch = 0uL), parsed)
     }
 
     @Test
     fun toImetaTag_preservesFilenameWithSpaces() {
-        // Picker emits names like "Screenshot 2026-06-05 at 12.34.56.jpg".
-        // The parser splits "key value" on the FIRST space, so the value
-        // (everything after) survives — but only if the writer doesn't add
-        // any escaping that the parser doesn't unescape.
-        val original =
-            MediaReferenceFfi(
-                url = URL,
-                fileHashHex = SHA256_HEX,
-                nonceHex = NONCE_HEX,
-                fileName = "Screenshot 2026-06-05 at 12.34.56.jpg",
-                mediaType = MIME_JPEG,
-                version = "mip04-v2",
-            )
+        val original = referenceFixture(fileName = "Screenshot 2026-06-05 at 12.34.56.jpg")
         val parsed = MediaReferenceParser.parseImetaTag(listOf(MediaReferenceParser.toImetaTag(original)))
         assertEquals("Screenshot 2026-06-05 at 12.34.56.jpg", parsed?.fileName)
     }
 
     @Test
     fun toImetaTag_emitsCanonicalFieldOrder() {
-        // Defensive: if the Rust receive-side validator ever became
-        // order-sensitive, our optimistic-injected tag must match what Rust
-        // emits. Document the canonical order via assertion.
-        val tag =
-            MediaReferenceParser.toImetaTag(
-                MediaReferenceFfi(
-                    url = URL,
-                    fileHashHex = SHA256_HEX,
-                    nonceHex = NONCE_HEX,
-                    fileName = "f.jpg",
-                    mediaType = MIME_JPEG,
-                    version = "mip04-v2",
-                ),
-            )
-        // The tag values include the "imeta" name plus the six fields in order.
+        val tag = MediaReferenceParser.toImetaTag(referenceFixture())
         val keys = tag.values.drop(1).map { it.substringBefore(' ') }
-        assertEquals(listOf("url", "m", "filename", "x", "n", "v"), keys)
+        assertEquals(
+            listOf("v", "locator", "ciphertext_sha256", "plaintext_sha256", "nonce", "m", "filename", "dim", "thumbhash"),
+            keys,
+        )
     }
 
     @Test
     fun isImageMedia_truthyForImageMimePrefix() {
         assertTrue(MediaReferenceParser.isImageMedia(parsedFixture(mime = "image/jpeg")))
         assertTrue(MediaReferenceParser.isImageMedia(parsedFixture(mime = "image/png")))
-        assertTrue(MediaReferenceParser.isImageMedia(parsedFixture(mime = "IMAGE/HEIC"))) // case-insensitive
+        assertTrue(MediaReferenceParser.isImageMedia(parsedFixture(mime = "IMAGE/HEIC")))
     }
 
     @Test
@@ -225,18 +224,19 @@ class MediaReferenceParserTest {
         assertFalse(MediaReferenceParser.isImageMedia(parsedFixture(mime = "text/plain")))
     }
 
-    // ---- helpers ------------------------------------------------------------
-
     private fun canonicalImetaTag() = MessageTagFfi(listOf("imeta") + canonicalEntries())
 
     private fun canonicalEntries() =
         listOf(
-            "url $URL",
+            "v encrypted-media-v1",
+            "locator blossom-v1 $URL",
+            "ciphertext_sha256 $CIPHERTEXT_SHA256_HEX",
+            "plaintext_sha256 $PLAINTEXT_SHA256_HEX",
+            "nonce $NONCE_HEX",
             "m $MIME_JPEG",
             "filename photo.jpg",
-            "x $SHA256_HEX",
-            "n $NONCE_HEX",
-            "v mip04-v2",
+            "dim 640x480",
+            "thumbhash $THUMBHASH",
         )
 
     private fun imetaWithOverride(vararg overrides: Pair<String, String>): MessageTagFfi {
@@ -245,47 +245,39 @@ class MediaReferenceParserTest {
         return MessageTagFfi(listOf("imeta") + byKey.values.toList())
     }
 
+    private fun imetaWithLocator(
+        kind: String,
+        url: String,
+    ): MessageTagFfi {
+        val entries = canonicalEntries().filterNot { it.startsWith("locator ") }
+        return MessageTagFfi(listOf("imeta", "locator $kind $url") + entries)
+    }
+
     private fun parsedFixture(mime: String) =
         MediaReferenceParser.parseImetaTag(
             listOf(imetaWithOverride("m" to mime)),
         )!!
 
-    @Test
-    fun toImetaTag_roundTripsThroughParser() {
-        val ref =
-            MediaReferenceFfi(
-                url = URL,
-                fileHashHex = SHA256_HEX,
-                nonceHex = NONCE_HEX,
-                fileName = "photo.jpg",
-                mediaType = MIME_JPEG,
-                version = "mip04-v2",
-            )
-        val parsed = MediaReferenceParser.parseImetaTag(listOf(MediaReferenceParser.toImetaTag(ref)))
-        assertEquals(ref, parsed)
-    }
-
-    @Test
-    fun toImetaTag_pinsVersionEvenWhenReferenceVersionIsWrong() {
-        // A stale/foreign version must not produce a tag our own parser rejects.
-        val ref =
-            MediaReferenceFfi(
-                url = URL,
-                fileHashHex = SHA256_HEX,
-                nonceHex = NONCE_HEX,
-                fileName = "photo.jpg",
-                mediaType = MIME_JPEG,
-                version = "mip04-v1",
-            )
-        val tag = MediaReferenceParser.toImetaTag(ref)
-        assertTrue(tag.values.contains("v mip04-v2"))
-        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
-    }
+    private fun referenceFixture(fileName: String = "photo.jpg") =
+        MediaAttachmentReferenceFfi(
+            locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = URL)),
+            ciphertextSha256 = CIPHERTEXT_SHA256_HEX,
+            plaintextSha256 = PLAINTEXT_SHA256_HEX,
+            nonceHex = NONCE_HEX,
+            fileName = fileName,
+            mediaType = MIME_JPEG,
+            version = "encrypted-media-v1",
+            sourceEpoch = 99uL,
+            dim = "640x480",
+            thumbhash = THUMBHASH,
+        )
 
     private companion object {
         const val URL = "https://blossom.primal.net/abcdef.bin"
         const val MIME_JPEG = "image/jpeg"
-        const val SHA256_HEX = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789" // 64
-        const val NONCE_HEX = "0123456789abcdef01234567" // 24
+        const val CIPHERTEXT_SHA256_HEX = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+        const val PLAINTEXT_SHA256_HEX = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        const val NONCE_HEX = "0123456789abcdef01234567"
+        const val THUMBHASH = "1QcSHQRnh493V4dIh4eXh1h4kJUI"
     }
 }

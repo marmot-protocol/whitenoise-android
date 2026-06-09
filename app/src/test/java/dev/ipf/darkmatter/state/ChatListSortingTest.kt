@@ -1,5 +1,7 @@
 package dev.ipf.darkmatter.state
 
+import dev.ipf.marmotkit.AppBlobEndpointFfi
+import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
@@ -125,11 +127,22 @@ class ChatListSortingTest {
         avatarUrl = null,
         avatarDim = null,
         avatarThumbhash = null,
+        encryptedMedia = encryptedMedia(),
         archived = false,
         pendingConfirmation = pending,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
     )
+
+    private fun encryptedMedia() =
+        AppGroupEncryptedMediaComponentFfi(
+            componentId = 0x8008u,
+            component = "marmot.group.encrypted-media.v1",
+            required = true,
+            mediaFormat = "encrypted-media-v1",
+            allowedLocatorKinds = listOf("blossom-v1"),
+            defaultBlobEndpoints = listOf(AppBlobEndpointFfi(locatorKind = "blossom-v1", baseUrl = "https://blossom.primal.net")),
+        )
 
     private fun message(
         groupId: String,
