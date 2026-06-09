@@ -262,6 +262,10 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import android.app.Activity
+import android.view.WindowManager
+import com.google.mlkit.vision.barcode.BarcodeScanner
 import kotlin.math.roundToInt
 
 private enum class MainSection {
@@ -609,6 +613,7 @@ private fun SignInContent(
     onBack: () -> Unit,
     onSignIn: () -> Unit,
 ) {
+    WindowSecureFlag()
     val canSignIn = identity.isNotBlank() && !busy
 
     Column(
@@ -5103,10 +5108,33 @@ private fun CameraQrScanner(
         return
     }
 
+    // Track the CameraX provider and ML Kit scanner so we can release them when
+    // the QR sheet is dismissed. CameraX binds use cases to the host activity's
+    // lifecycle, so without an explicit unbind the camera keeps streaming
+    // (and the OS in-use indicator stays lit) until the activity stops. The
+    // BarcodeScanner is Closeable and leaks native resources otherwise.
+    val providerRef = remember { AtomicReference<ProcessCameraProvider?>(null) }
+    val scannerRef = remember { AtomicReference<BarcodeScanner?>(null) }
+    DisposableEffect(Unit) {
+        onDispose {
+            runCatching { providerRef.getAndSet(null)?.unbindAll() }
+            runCatching { scannerRef.getAndSet(null)?.close() }
+        }
+    }
+
     AndroidView(
         factory = { viewContext ->
             PreviewView(viewContext).also { previewView ->
-                bindQrScannerCamera(context, lifecycleOwner, previewView, cameraUnavailable, onScan, onError)
+                bindQrScannerCamera(
+                    context,
+                    lifecycleOwner,
+                    previewView,
+                    cameraUnavailable,
+                    providerRef,
+                    scannerRef,
+                    onScan,
+                    onError,
+                )
             }
         },
         modifier = Modifier.fillMaxSize(),
@@ -5120,12 +5148,38 @@ private tailrec fun Context.lifecycleOwner(): LifecycleOwner? =
         else -> null
     }
 
+/**
+ * Marks the host activity's window as secure for the duration of this
+ * composition. `FLAG_SECURE` blocks the OS Recents/overview thumbnail,
+ * screenshots, screen recording, and casting from capturing the window's
+ * contents — the only practical protection for screens that handle the
+ * nsec/private key, since `PasswordVisualTransformation` only masks
+ * rendered glyphs. The flag is cleared on dispose so the rest of the
+ * (non-sensitive) UI remains screenshottable as users expect.
+ */
+@Composable
+private fun WindowSecureFlag() {
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val window = (context as? Activity)?.window
+        window?.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE,
+        )
+        onDispose {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+}
+
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
 private fun bindQrScannerCamera(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     previewView: PreviewView,
     cameraUnavailable: String,
+    providerRef: AtomicReference<ProcessCameraProvider?>,
+    scannerRef: AtomicReference<BarcodeScanner?>,
     onScan: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
@@ -5138,6 +5192,13 @@ private fun bindQrScannerCamera(
                     onError(cameraUnavailable)
                     return@addListener
                 }
+            // Publish the provider so the caller's DisposableEffect can unbind on
+            // sheet dismissal. If the composable was already disposed before the
+            // future resolved, release immediately and bail.
+            if (!providerRef.compareAndSet(null, provider)) {
+                runCatching { provider.unbindAll() }
+                return@addListener
+            }
             val preview =
                 Preview.Builder().build().also {
                     it.setSurfaceProvider(previewView.surfaceProvider)
@@ -5149,6 +5210,12 @@ private fun bindQrScannerCamera(
                         .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
                         .build(),
                 )
+            if (!scannerRef.compareAndSet(null, scanner)) {
+                runCatching { scanner.close() }
+                runCatching { provider.unbindAll() }
+                providerRef.set(null)
+                return@addListener
+            }
             val didScan = AtomicBoolean(false)
             val analyzerBusy = AtomicBoolean(false)
             val analysis =
@@ -5344,6 +5411,7 @@ private fun AddIdentitySheet(
     appState: DarkMatterAppState,
     onDismiss: () -> Unit,
 ) {
+    WindowSecureFlag()
     var identity by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
