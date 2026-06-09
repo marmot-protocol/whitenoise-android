@@ -22,18 +22,28 @@ object ProfileSanitizer {
         val uri = runCatching { URI(trimmed) }.getOrNull() ?: return null
         if (uri.scheme?.lowercase() != "https") return null
         if (uri.host.isNullOrBlank()) return null
+        // SSRF guard: never let an avatar URL point the app at loopback or the
+        // local network. See issue #89.
+        if (HostSafety.isPrivateOrLoopbackHost(uri.host)) return null
         return uri.toString()
     }
 
-    private fun singleLine(raw: String?, maxLength: Int): String? {
-        val collapsed = stripUnsafe(raw ?: "")
-            .split(Regex("\\s+"))
-            .filter { it.isNotBlank() }
-            .joinToString(" ")
+    private fun singleLine(
+        raw: String?,
+        maxLength: Int,
+    ): String? {
+        val collapsed =
+            stripUnsafe(raw ?: "")
+                .split(Regex("\\s+"))
+                .filter { it.isNotBlank() }
+                .joinToString(" ")
         return collapsed.takeIf { it.isNotEmpty() }?.let { safeTake(it, maxLength) }
     }
 
-    private fun multiline(raw: String?, maxLength: Int): String? {
+    private fun multiline(
+        raw: String?,
+        maxLength: Int,
+    ): String? {
         val cleaned = stripUnsafe(raw ?: "").trim()
         return cleaned.takeIf { it.isNotEmpty() }?.let { safeTake(it, maxLength) }
     }
@@ -42,14 +52,17 @@ object ProfileSanitizer {
     // becomes 40 for an emoji-heavy name and can also split a surrogate pair
     // at the boundary. Truncate by code points instead so MAX_NAME_LENGTH and
     // friends mean the same number of grapheme bases regardless of plane.
-    private fun safeTake(value: String, maxLength: Int): String {
+    private fun safeTake(
+        value: String,
+        maxLength: Int,
+    ): String {
         if (value.codePointCount(0, value.length) <= maxLength) return value
         val end = value.offsetByCodePoints(0, maxLength)
         return value.substring(0, end)
     }
 
-    fun stripUnsafe(value: String): String {
-        return buildString(value.length) {
+    fun stripUnsafe(value: String): String =
+        buildString(value.length) {
             value.forEach { char ->
                 when {
                     char == '\n' || char == '\t' || char == '\r' -> append(char)
@@ -63,5 +76,4 @@ object ProfileSanitizer {
                 }
             }
         }
-    }
 }

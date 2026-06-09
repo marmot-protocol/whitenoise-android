@@ -4,12 +4,11 @@ object RecipientReference {
     private val hexPublicKey = Regex("^[0-9a-fA-F]{64}$")
     private val separator = Regex("[,\\s]+")
 
-    fun tokenize(raw: String): List<String> {
-        return raw
+    fun tokenize(raw: String): List<String> =
+        raw
             .split(separator)
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-    }
 
     fun normalize(raw: String): String? {
         val trimmed = raw.trim()

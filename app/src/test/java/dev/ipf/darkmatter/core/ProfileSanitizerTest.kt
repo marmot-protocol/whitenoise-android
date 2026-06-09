@@ -22,6 +22,20 @@ class ProfileSanitizerTest {
     }
 
     @Test
+    fun imageUrlsRejectPrivateAndLoopbackHosts() {
+        // SSRF guard: an avatar URL must not point the app at the device's own
+        // loopback or the local network. See issue #89.
+        assertNull(ProfileSanitizer.imageUrl("https://127.0.0.1/avatar.png"))
+        assertNull(ProfileSanitizer.imageUrl("https://192.168.1.1/avatar.png"))
+        assertNull(ProfileSanitizer.imageUrl("https://10.0.0.5:8443/secret.png"))
+        assertNull(ProfileSanitizer.imageUrl("https://169.254.1.1/avatar.png"))
+        assertNull(ProfileSanitizer.imageUrl("https://[::1]/avatar.png"))
+        assertNull(ProfileSanitizer.imageUrl("https://localhost/avatar.png"))
+        // Public hosts still pass.
+        assertEquals("https://example.com/avatar.png", ProfileSanitizer.imageUrl("https://example.com/avatar.png"))
+    }
+
+    @Test
     fun messageBodyPreservesNormalNewlinesButClampsBlankRuns() {
         assertEquals("one\n\ntwo", ProfileSanitizer.messageBody(" one\n\n\n\ntwo "))
     }

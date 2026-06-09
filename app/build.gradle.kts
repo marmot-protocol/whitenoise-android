@@ -3,27 +3,33 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ktlint)
 }
 
-val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
-}
+val localProperties =
+    Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
 
-fun signingProperty(key: String): String? =
-    localProperties.getProperty(key) ?: System.getenv(key)
+fun signingProperty(key: String): String? = localProperties.getProperty(key) ?: System.getenv(key)
 
-fun runtimeConfigProperty(keys: List<String>, defaultValue: String = ""): String =
-    keys.asSequence()
+fun runtimeConfigProperty(
+    keys: List<String>,
+    defaultValue: String = "",
+): String =
+    keys
+        .asSequence()
         .mapNotNull { key -> localProperties.getProperty(key) ?: System.getenv(key) }
         .firstOrNull()
         ?: defaultValue
 
-fun runtimeConfigProperty(key: String, defaultValue: String = ""): String =
-    runtimeConfigProperty(listOf(key), defaultValue)
+fun runtimeConfigProperty(
+    key: String,
+    defaultValue: String = "",
+): String = runtimeConfigProperty(listOf(key), defaultValue)
 
-fun String.asBuildConfigString(): String =
-    "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+fun String.asBuildConfigString(): String = "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 val releaseKeystorePath = signingProperty("DARKMATTER_KEYSTORE_PATH")
 val releaseKeystorePassword = signingProperty("DARKMATTER_KEYSTORE_PASSWORD")
@@ -52,11 +58,27 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "DARKMATTER_OTLP_ENDPOINT", runtimeConfigProperty("DARKMATTER_OTLP_ENDPOINT").asBuildConfigString())
-        buildConfigField("String", "DARKMATTER_OTLP_AUTH_TOKEN", runtimeConfigProperty(listOf("DARKMATTER_OTLP_AUTH_TOKEN", "OTLP_TOKEN_DARKMATTER_ANDROID")).asBuildConfigString())
+        buildConfigField(
+            "String",
+            "DARKMATTER_OTLP_AUTH_TOKEN",
+            runtimeConfigProperty(listOf("DARKMATTER_OTLP_AUTH_TOKEN", "OTLP_TOKEN_DARKMATTER_ANDROID")).asBuildConfigString(),
+        )
         buildConfigField("String", "DARKMATTER_AUDIT_LOG_ENDPOINT", runtimeConfigProperty("DARKMATTER_AUDIT_LOG_ENDPOINT").asBuildConfigString())
-        buildConfigField("String", "DARKMATTER_AUDIT_LOG_AUTH_TOKEN", runtimeConfigProperty(listOf("DARKMATTER_AUDIT_LOG_AUTH_TOKEN", "OTLP_TOKEN_DARKMATTER_ANDROID")).asBuildConfigString())
-        buildConfigField("String", "DARKMATTER_DEPLOYMENT_ENVIRONMENT", runtimeConfigProperty("DARKMATTER_DEPLOYMENT_ENVIRONMENT", "production").asBuildConfigString())
-        buildConfigField("String", "DARKMATTER_TELEMETRY_TENANT", runtimeConfigProperty("DARKMATTER_TELEMETRY_TENANT", "darkmatter-android").asBuildConfigString())
+        buildConfigField(
+            "String",
+            "DARKMATTER_AUDIT_LOG_AUTH_TOKEN",
+            runtimeConfigProperty(listOf("DARKMATTER_AUDIT_LOG_AUTH_TOKEN", "OTLP_TOKEN_DARKMATTER_ANDROID")).asBuildConfigString(),
+        )
+        buildConfigField(
+            "String",
+            "DARKMATTER_DEPLOYMENT_ENVIRONMENT",
+            runtimeConfigProperty("DARKMATTER_DEPLOYMENT_ENVIRONMENT", "production").asBuildConfigString(),
+        )
+        buildConfigField(
+            "String",
+            "DARKMATTER_TELEMETRY_TENANT",
+            runtimeConfigProperty("DARKMATTER_TELEMETRY_TENANT", "darkmatter-android").asBuildConfigString(),
+        )
     }
 
     signingConfigs {
@@ -83,13 +105,14 @@ android {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
-            signingConfig = if (hasReleaseSigning) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig =
+                if (hasReleaseSigning) {
+                    signingConfigs.getByName("release")
+                } else {
+                    signingConfigs.getByName("debug")
+                }
         }
     }
     compileOptions {
@@ -102,11 +125,12 @@ android {
     }
     packaging {
         jniLibs {
-            excludes += setOf(
-                "lib/armeabi/libjnidispatch.so",
-                "lib/mips/libjnidispatch.so",
-                "lib/mips64/libjnidispatch.so"
-            )
+            excludes +=
+                setOf(
+                    "lib/armeabi/libjnidispatch.so",
+                    "lib/mips/libjnidispatch.so",
+                    "lib/mips64/libjnidispatch.so",
+                )
         }
     }
     splits {
@@ -116,6 +140,28 @@ android {
             include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
             isUniversalApk = true
         }
+    }
+}
+
+ktlint {
+    // Pin the ktlint engine from the version catalog so rule behavior is
+    // stable across plugin upgrades.
+    version.set(libs.versions.ktlint.get())
+    // Enable ktlint's Android rule set (this is an AGP application module).
+    android.set(true)
+    ignoreFailures.set(false)
+    filter {
+        // Never lint/format the UniFFI-generated bindings or the vendored
+        // keyring stub — they are regenerated wholesale and must stay
+        // byte-stable with the matching native libs. Normalize separators so
+        // the matches also hold on Windows paths.
+        fun normalized(path: String) = path.replace('\\', '/')
+        exclude { normalized(it.file.path).contains("/marmotkit/") }
+        exclude { normalized(it.file.path).contains("marmot_uniffi.kt") }
+        exclude { normalized(it.file.path).contains("/io/crates/") }
+        exclude { normalized(it.file.path).contains("Keyring.kt") }
+        // Generated outputs (BuildConfig, etc.).
+        exclude { normalized(it.file.path).contains("/build/") }
     }
 }
 

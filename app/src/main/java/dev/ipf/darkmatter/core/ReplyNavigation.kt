@@ -9,8 +9,8 @@ object ReplyNavigation {
     fun targetMessageId(
         record: AppMessageRecordFfi,
         projected: TimelineMessageRecordFfi?,
-    ): String? {
-        return projected
+    ): String? =
+        projected
             ?.replyPreview
             ?.messageIdHex
             ?.takeIf { it.isNotBlank() }
@@ -18,14 +18,11 @@ object ReplyNavigation {
                 ?.replyToMessageIdHex
                 ?.takeIf { it.isNotBlank() }
             ?: MessageProjector.replyTargetMessageId(record)
-    }
 
     fun shouldLoadOlder(
         targetLoaded: Boolean,
         hasMoreBefore: Boolean,
         loadedPageCount: Int,
         maxOlderPages: Int = MaxOlderPages,
-    ): Boolean {
-        return !targetLoaded && hasMoreBefore && loadedPageCount < maxOlderPages
-    }
+    ): Boolean = !targetLoaded && hasMoreBefore && loadedPageCount < maxOlderPages
 }

@@ -1,21 +1,22 @@
 package dev.ipf.darkmatter.core
 
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MessageTagFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.MessageTagFfi
 
 class MessageProjectorTest {
     @Test
     fun reactionTalliesNetAddsAndDeleteTombstonesBySender() {
-        val records = listOf(
-            reaction("r1", sender = "alice", target = "m1", emoji = "👍", at = 1u),
-            reaction("r2", sender = "bob", target = "m1", emoji = "👍", at = 2u),
-            delete("d1", sender = "alice", target = "r1", at = 3u),
-            reaction("r4", sender = "alice", target = "m1", emoji = "❤️", at = 4u),
-        )
+        val records =
+            listOf(
+                reaction("r1", sender = "alice", target = "m1", emoji = "👍", at = 1u),
+                reaction("r2", sender = "bob", target = "m1", emoji = "👍", at = 2u),
+                delete("d1", sender = "alice", target = "r1", at = 3u),
+                reaction("r4", sender = "alice", target = "m1", emoji = "❤️", at = 4u),
+            )
 
         val tallies = MessageProjector.reactionTallies(records, targetMessageId = "m1", myAccountId = "bob")
 
@@ -30,30 +31,34 @@ class MessageProjectorTest {
 
     @Test
     fun displayBodyUsesTextAndMediaTagsFromCurrentBindings() {
-        val reply = message(
-            id = "reply",
-            plaintext = "Visible reply",
-            tags = listOf(eventTag("m0"), quoteTag("m0")),
-        )
-        val media = message(
-            id = "media",
-            plaintext = "Lab capture",
-            tags = listOf(
-                MessageTagFfi(
+        val reply =
+            message(
+                id = "reply",
+                plaintext = "Visible reply",
+                tags = listOf(eventTag("m0"), quoteTag("m0")),
+            )
+        val media =
+            message(
+                id = "media",
+                plaintext = "Lab capture",
+                tags =
                     listOf(
-                        "imeta",
-                        "url https://example.invalid/scan.png",
-                        "m image/png",
-                        "filename scan.png",
+                        MessageTagFfi(
+                            listOf(
+                                "imeta",
+                                "url https://example.invalid/scan.png",
+                                "m image/png",
+                                "filename scan.png",
+                            ),
+                        ),
                     ),
-                ),
-            ),
-        )
-        val mediaWithoutCaption = message(
-            id = "media-no-caption",
-            plaintext = "",
-            tags = listOf(MessageTagFfi(listOf("imeta", "filename fallback.png"))),
-        )
+            )
+        val mediaWithoutCaption =
+            message(
+                id = "media-no-caption",
+                plaintext = "",
+                tags = listOf(MessageTagFfi(listOf("imeta", "filename fallback.png"))),
+            )
 
         assertEquals("Visible reply", MessageProjector.displayBody(reply))
         assertEquals("Lab capture", MessageProjector.displayBody(media))
@@ -62,21 +67,24 @@ class MessageProjectorTest {
 
     @Test
     fun previewTextRecognizesStreamStartAndFinalMessages() {
-        val start = message(
-            id = "start",
-            plaintext = "",
-            kind = 1200uL,
-            tags = listOf(MessageProjector.streamTag("abc123")),
-        )
-        val final = message(
-            id = "final",
-            plaintext = "Final transcript",
-            kind = 9uL,
-            tags = listOf(
-                MessageProjector.streamTag("abc123"),
-                MessageTagFfi(listOf("stream-start", "start")),
-            ),
-        )
+        val start =
+            message(
+                id = "start",
+                plaintext = "",
+                kind = 1200uL,
+                tags = listOf(MessageProjector.streamTag("abc123")),
+            )
+        val final =
+            message(
+                id = "final",
+                plaintext = "Final transcript",
+                kind = 9uL,
+                tags =
+                    listOf(
+                        MessageProjector.streamTag("abc123"),
+                        MessageTagFfi(listOf("stream-start", "start")),
+                    ),
+            )
 
         assertEquals("Agent stream started", MessageProjector.previewText(start))
         assertEquals("Final transcript", MessageProjector.previewText(final))
@@ -85,15 +93,16 @@ class MessageProjectorTest {
 
     @Test
     fun messageFallbackCopyCanBeLocalizedByUi() {
-        val copy = MessageTextCopy(
-            reactedFormat = "R:%1\$s",
-            reactionFallback = "target",
-            deleted = "deleted",
-            agentStreamStarted = "started",
-            streamFinished = "finished",
-            mediaAttachment = "media",
-            message = "message",
-        )
+        val copy =
+            MessageTextCopy(
+                reactedFormat = "R:%1\$s",
+                reactionFallback = "target",
+                deleted = "deleted",
+                agentStreamStarted = "started",
+                streamFinished = "finished",
+                mediaAttachment = "media",
+                message = "message",
+            )
         val reaction = reaction(id = "r1", sender = "alice", target = "m1", emoji = "", at = 1u)
         val delete = delete(id = "d1", sender = "alice", target = "m1", at = 2u)
         val blank = message(id = "blank", plaintext = "")

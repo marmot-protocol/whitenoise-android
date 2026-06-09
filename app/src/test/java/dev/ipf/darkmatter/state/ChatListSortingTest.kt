@@ -22,40 +22,43 @@ class ChatListSortingTest {
 
     @Test
     fun chatsWithoutMessagesCanSortBesideUnsignedLongMessageTimes() {
-        val sorted = sortChatListItems(
-            listOf(
-                item("no-message", latestAt = null),
-                item("newer", latestAt = ULong.MAX_VALUE),
-                item("older", latestAt = 1uL),
-            ),
-        )
+        val sorted =
+            sortChatListItems(
+                listOf(
+                    item("no-message", latestAt = null),
+                    item("newer", latestAt = ULong.MAX_VALUE),
+                    item("older", latestAt = 1uL),
+                ),
+            )
 
         assertEquals(listOf("newer", "older", "no-message"), sorted.map { it.id })
     }
 
     @Test
     fun pendingInvitesSortBeforeExistingChats() {
-        val sorted = sortChatListItems(
-            listOf(
-                item("active-chat", latestAt = 50uL),
-                item("pending-invite", latestAt = null, pending = true),
-            ),
-        )
+        val sorted =
+            sortChatListItems(
+                listOf(
+                    item("active-chat", latestAt = 50uL),
+                    item("pending-invite", latestAt = null, pending = true),
+                ),
+            )
 
         assertEquals(listOf("pending-invite", "active-chat"), sorted.map { it.id })
     }
 
     @Test
     fun projectedChatListRowCarriesTitlePreviewTimestampAndUnreadState() {
-        val item = chatListItemFromProjection(
-            row(
-                groupId = "group-a",
-                title = "Marmot Lab",
-                preview = "projected latest",
-                latestAt = 20uL,
-                unreadCount = 3uL,
-            ),
-        )
+        val item =
+            chatListItemFromProjection(
+                row(
+                    groupId = "group-a",
+                    title = "Marmot Lab",
+                    preview = "projected latest",
+                    latestAt = 20uL,
+                    unreadCount = 3uL,
+                ),
+            )
 
         assertEquals("Marmot Lab", item.projectedTitle)
         assertEquals("projected latest", item.projectedPreviewText(empty = "empty"))
@@ -64,15 +67,18 @@ class ChatListSortingTest {
         assertTrue(item.hasUnread)
     }
 
-    private fun item(id: String, latestAt: ULong?, pending: Boolean = false): ChatListItem {
-        return ChatListItem(
+    private fun item(
+        id: String,
+        latestAt: ULong?,
+        pending: Boolean = false,
+    ): ChatListItem =
+        ChatListItem(
             group = group(id, pending = pending),
             latest = latestAt?.let { message(groupId = id, recordedAt = it) },
             otherMemberAccount = null,
             memberCount = 0,
             memberSnapshot = null,
         )
-    }
 
     private fun row(
         groupId: String,
@@ -87,15 +93,16 @@ class ChatListSortingTest {
         title = title,
         groupName = "",
         avatar = null,
-        lastMessage = ChatListMessagePreviewFfi(
-            messageIdHex = "message-$groupId",
-            sender = "sender",
-            senderDisplayName = "Sender",
-            plaintext = preview,
-            kind = 9uL,
-            timelineAt = latestAt,
-            deleted = false,
-        ),
+        lastMessage =
+            ChatListMessagePreviewFfi(
+                messageIdHex = "message-$groupId",
+                sender = "sender",
+                senderDisplayName = "Sender",
+                plaintext = preview,
+                kind = 9uL,
+                timelineAt = latestAt,
+                deleted = false,
+            ),
         unreadCount = unreadCount,
         hasUnread = unreadCount > 0uL,
         firstUnreadMessageIdHex = "message-$groupId",
@@ -104,7 +111,10 @@ class ChatListSortingTest {
         updatedAt = latestAt,
     )
 
-    private fun group(id: String, pending: Boolean = false) = AppGroupRecordFfi(
+    private fun group(
+        id: String,
+        pending: Boolean = false,
+    ) = AppGroupRecordFfi(
         groupIdHex = id,
         endpoint = "endpoint-$id",
         name = "",

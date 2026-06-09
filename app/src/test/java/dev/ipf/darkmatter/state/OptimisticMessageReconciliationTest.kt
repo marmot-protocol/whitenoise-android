@@ -137,22 +137,21 @@ class OptimisticMessageReconciliationTest {
         plaintext: String = "hello",
         timelineOrder: ULong = 0uL,
         recordedAt: ULong = 1uL,
-    ): TimelineMessage {
-        return TimelineMessage(
+    ): TimelineMessage =
+        TimelineMessage(
             id = "msg:$id",
             record = message(id, plaintext, recordedAt),
             status = status,
             timelineOrder = timelineOrder,
         )
-    }
 
     private fun message(
         id: String,
         plaintext: String = "hello",
         recordedAt: ULong = 1uL,
         direction: String = "sent",
-    ): AppMessageRecordFfi {
-        return AppMessageRecordFfi(
+    ): AppMessageRecordFfi =
+        AppMessageRecordFfi(
             messageIdHex = id,
             direction = direction,
             groupIdHex = "group",
@@ -163,5 +162,4 @@ class OptimisticMessageReconciliationTest {
             recordedAt = recordedAt,
             receivedAt = recordedAt,
         )
-    }
 }

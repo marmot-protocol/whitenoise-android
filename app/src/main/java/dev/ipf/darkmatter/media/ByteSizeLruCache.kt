@@ -20,22 +20,26 @@ class ByteSizeLruCache<K : Any, V : Any>(
     private val maxBytes: Long,
     private val sizeOf: (V) -> Int,
 ) {
-    private val entries = LinkedHashMap<K, V>(8, 0.75f, /* accessOrder = */ true)
+    // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
+    private val entries = LinkedHashMap<K, V>(8, 0.75f, true)
     private var residentBytes: Long = 0L
 
     fun get(key: K): V? = entries[key]
+
+    // Every entry is charged at least 1 byte: a 0 or negative sizeOf would
+    // break the cap invariant (entries that never count toward eviction), so
+    // the cache could grow without bound. Clamp here, in one place.
+    private fun chargeOf(value: V): Long = sizeOf(value).coerceAtLeast(1).toLong()
 
     /**
      * Inserts or replaces an entry. Updates resident-byte accounting,
      * promotes the entry to MRU, and evicts LRU entries until total
      * resident bytes are within the cap.
      */
-    // Every entry is charged at least 1 byte: a 0 or negative sizeOf would
-    // break the cap invariant (entries that never count toward eviction), so
-    // the cache could grow without bound. Clamp here, in one place.
-    private fun chargeOf(value: V): Long = sizeOf(value).coerceAtLeast(1).toLong()
-
-    fun put(key: K, value: V): V? {
+    fun put(
+        key: K,
+        value: V,
+    ): V? {
         val previous = entries.put(key, value)
         if (previous != null) residentBytes -= chargeOf(previous)
         residentBytes += chargeOf(value)
@@ -56,6 +60,7 @@ class ByteSizeLruCache<K : Any, V : Any>(
     }
 
     fun size(): Int = entries.size
+
     fun residentBytes(): Long = residentBytes
 
     private fun evictUntilUnderCap() {

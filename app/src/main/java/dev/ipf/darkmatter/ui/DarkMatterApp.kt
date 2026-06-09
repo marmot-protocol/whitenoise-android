@@ -6,16 +6,27 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,7 +38,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,23 +45,14 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -61,48 +62,38 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.BrokenImage
-import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ExperimentalGetImage
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
-import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
@@ -114,11 +105,11 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -129,6 +120,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarHost
@@ -141,7 +133,6 @@ import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -151,6 +142,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -158,17 +150,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
-import androidx.core.os.ConfigurationCompat
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -189,38 +182,48 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.core.os.ConfigurationCompat
+import androidx.emoji2.emojipicker.EmojiPickerView
+import androidx.lifecycle.LifecycleOwner
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.AvatarImageLoader
 import dev.ipf.darkmatter.core.DiagnosticFormatter
 import dev.ipf.darkmatter.core.GroupProjector
-import dev.ipf.darkmatter.media.MediaPipeline
-import dev.ipf.darkmatter.media.MediaReferenceParser
-import dev.ipf.marmotkit.MediaReferenceFfi
 import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageTextCopy
+import dev.ipf.darkmatter.core.ProfileFieldValidation
 import dev.ipf.darkmatter.core.ProfileLink
+import dev.ipf.darkmatter.core.ProfileSanitizer
+import dev.ipf.darkmatter.core.QrCodeEncoder
+import dev.ipf.darkmatter.core.RecentEmojiList
+import dev.ipf.darkmatter.core.RecipientReference
+import dev.ipf.darkmatter.core.ReplySwipe
+import dev.ipf.darkmatter.core.TimelineProjector
+import dev.ipf.darkmatter.media.MediaPipeline
+import dev.ipf.darkmatter.media.MediaReferenceParser
 import dev.ipf.darkmatter.notifications.NotificationNavStep
 import dev.ipf.darkmatter.notifications.NotificationTarget
 import dev.ipf.darkmatter.notifications.resolveNotificationNav
-import dev.ipf.darkmatter.core.ProfileSanitizer
-import dev.ipf.darkmatter.core.QrCodeEncoder
-import dev.ipf.darkmatter.core.RecipientReference
-import dev.ipf.darkmatter.core.RecentEmojiList
-import dev.ipf.darkmatter.core.ReplySwipe
-import dev.ipf.darkmatter.core.TimelineProjector
 import dev.ipf.darkmatter.state.AppPhase
 import dev.ipf.darkmatter.state.AppText
 import dev.ipf.darkmatter.state.AppThemeMode
 import dev.ipf.darkmatter.state.ChatListItem
 import dev.ipf.darkmatter.state.ChatsController
-import dev.ipf.darkmatter.state.ConversationControllerCopy
 import dev.ipf.darkmatter.state.ConversationController
+import dev.ipf.darkmatter.state.ConversationControllerCopy
 import dev.ipf.darkmatter.state.DarkMatterAppState
 import dev.ipf.darkmatter.state.MediaAutoDownloadPolicy
 import dev.ipf.darkmatter.state.MessageStatus
+import dev.ipf.darkmatter.state.MessageStatusLabels
 import dev.ipf.darkmatter.state.OutgoingMessageIndicator
 import dev.ipf.darkmatter.state.RelayListKind
 import dev.ipf.darkmatter.state.TimelineMessage
@@ -228,17 +231,20 @@ import dev.ipf.darkmatter.state.countUnreadIncoming
 import dev.ipf.darkmatter.state.formatExactTimestamp
 import dev.ipf.darkmatter.state.isAcceptableRelayUrl
 import dev.ipf.darkmatter.state.labelFor
-import dev.ipf.darkmatter.state.MessageStatusLabels
 import dev.ipf.darkmatter.state.nextReadAnchor
+import dev.ipf.darkmatter.state.outgoingIndicator
 import dev.ipf.darkmatter.state.shortHex
 import dev.ipf.darkmatter.state.shouldShowOriginalTimestamp
-import dev.ipf.darkmatter.state.outgoingIndicator
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.UUID
+import dev.ipf.marmotkit.AccountKeyPackageFfi
+import dev.ipf.marmotkit.AccountRelayListsFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupMlsStateFfi
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MediaReferenceFfi
+import dev.ipf.marmotkit.RelayHealthFfi
+import dev.ipf.marmotkit.RelayListFfi
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -246,21 +252,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.lifecycle.LifecycleOwner
-import dev.ipf.marmotkit.AccountKeyPackageFfi
-import dev.ipf.marmotkit.AppGroupRecordFfi
-import dev.ipf.marmotkit.AppGroupMemberRecordFfi
-import dev.ipf.marmotkit.AppGroupMlsStateFfi
-import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.AccountRelayListsFfi
-import dev.ipf.marmotkit.RelayHealthFfi
-import dev.ipf.marmotkit.RelayListFfi
-import dev.ipf.marmotkit.UserProfileMetadataFfi
-import dev.ipf.marmotkit.MarmotKitException
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
 private enum class MainSection {
@@ -290,31 +287,31 @@ private data class LanguageOption(
     @param:StringRes val labelRes: Int,
 )
 
-private val languageOptions = listOf(
-    LanguageOption("", R.string.language_system),
-    LanguageOption("en", R.string.language_english),
-    LanguageOption("de", R.string.language_german),
-    LanguageOption("es", R.string.language_spanish),
-    LanguageOption("fr", R.string.language_french),
-    LanguageOption("it", R.string.language_italian),
-    LanguageOption("pt", R.string.language_portuguese),
-    LanguageOption("ru", R.string.language_russian),
-    LanguageOption("tr", R.string.language_turkish),
-    LanguageOption("zh", R.string.language_chinese_simplified),
-    LanguageOption("zh-Hant", R.string.language_chinese_traditional),
-)
+private val languageOptions =
+    listOf(
+        LanguageOption("", R.string.language_system),
+        LanguageOption("en", R.string.language_english),
+        LanguageOption("de", R.string.language_german),
+        LanguageOption("es", R.string.language_spanish),
+        LanguageOption("fr", R.string.language_french),
+        LanguageOption("it", R.string.language_italian),
+        LanguageOption("pt", R.string.language_portuguese),
+        LanguageOption("ru", R.string.language_russian),
+        LanguageOption("tr", R.string.language_turkish),
+        LanguageOption("zh", R.string.language_chinese_simplified),
+        LanguageOption("zh-Hant", R.string.language_chinese_traditional),
+    )
 
 @Composable
-private fun rememberGroupTitleCopy(): GroupTitleCopy {
-    return GroupTitleCopy(
+private fun rememberGroupTitleCopy(): GroupTitleCopy =
+    GroupTitleCopy(
         inviteFromFormat = stringResource(R.string.group_title_invite_from),
         groupOfPeopleFormat = stringResource(R.string.group_title_people_count),
     )
-}
 
 @Composable
-private fun rememberMessageTextCopy(): MessageTextCopy {
-    return MessageTextCopy(
+private fun rememberMessageTextCopy(): MessageTextCopy =
+    MessageTextCopy(
         reactedFormat = stringResource(R.string.message_reacted),
         reactionFallback = stringResource(R.string.message_reaction_fallback),
         deleted = stringResource(R.string.message_deleted_preview),
@@ -323,31 +320,31 @@ private fun rememberMessageTextCopy(): MessageTextCopy {
         mediaAttachment = stringResource(R.string.media_attachment),
         message = stringResource(R.string.generic_message),
     )
-}
 
 @Composable
-private fun rememberConversationControllerCopy(): ConversationControllerCopy {
-    return ConversationControllerCopy(
+private fun rememberConversationControllerCopy(): ConversationControllerCopy =
+    ConversationControllerCopy(
         waitingForStream = stringResource(R.string.waiting_for_stream),
         streamFailedFormat = stringResource(R.string.stream_failed_format),
     )
-}
 
 private val AppThemeMode.labelRes: Int
     @StringRes
-    get() = when (this) {
-        AppThemeMode.System -> R.string.theme_system
-        AppThemeMode.Light -> R.string.theme_light
-        AppThemeMode.Dark -> R.string.theme_dark
-    }
+    get() =
+        when (this) {
+            AppThemeMode.System -> R.string.theme_system
+            AppThemeMode.Light -> R.string.theme_light
+            AppThemeMode.Dark -> R.string.theme_dark
+        }
 
 private val MediaAutoDownloadPolicy.labelRes: Int
     @StringRes
-    get() = when (this) {
-        MediaAutoDownloadPolicy.Always -> R.string.media_auto_download_always
-        MediaAutoDownloadPolicy.WifiOnly -> R.string.media_auto_download_wifi
-        MediaAutoDownloadPolicy.Never -> R.string.media_auto_download_never
-    }
+    get() =
+        when (this) {
+            MediaAutoDownloadPolicy.Always -> R.string.media_auto_download_always
+            MediaAutoDownloadPolicy.WifiOnly -> R.string.media_auto_download_wifi
+            MediaAutoDownloadPolicy.Never -> R.string.media_auto_download_never
+        }
 
 @Composable
 fun DarkMatterApp(
@@ -360,14 +357,15 @@ fun DarkMatterApp(
     val snackbarHostState = remember { SnackbarHostState() }
     val toast = appState.toast
     val context = LocalContext.current
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        appState.refreshLocalNotificationPermission()
-        if (granted) {
-            appState.launchMutation { appState.enableDefaultNotificationsIfReady() }
-        } else {
-            appState.markDefaultNotificationsEnableAttempted()
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            appState.refreshLocalNotificationPermission()
+            if (granted) {
+                appState.launchMutation { appState.enableDefaultNotificationsIfReady() }
+            } else {
+                appState.markDefaultNotificationsEnableAttempted()
+            }
         }
-    }
 
     LaunchedEffect(Unit) {
         appState.bootstrap()
@@ -413,16 +411,18 @@ fun DarkMatterApp(
             when (val phase = appState.phase) {
                 AppPhase.Bootstrapping -> LoadingScreen()
                 AppPhase.Onboarding -> OnboardingScreen(appState)
-                AppPhase.Ready -> MainShell(
-                    appState = appState,
-                    inboundNotificationTarget = inboundNotificationTarget,
-                    onNotificationTargetHandled = onNotificationTargetHandled,
-                )
-                is AppPhase.Failed -> FailureScreen(
-                    message = phase.message,
-                    onRetry = { appState.present(R.string.toast_restarting) },
-                    onRetryAction = { appState.bootstrap() },
-                )
+                AppPhase.Ready ->
+                    MainShell(
+                        appState = appState,
+                        inboundNotificationTarget = inboundNotificationTarget,
+                        onNotificationTargetHandled = onNotificationTargetHandled,
+                    )
+                is AppPhase.Failed ->
+                    FailureScreen(
+                        message = phase.message,
+                        onRetry = { appState.present(R.string.toast_restarting) },
+                        onRetryAction = { appState.bootstrap() },
+                    )
             }
         }
     }
@@ -436,10 +436,11 @@ fun DarkMatterSnackbarHost(
 ) {
     SnackbarHost(
         hostState = hostState,
-        modifier = modifier
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp)
-            .padding(bottom = 16.dp),
+        modifier =
+            modifier
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 16.dp),
         snackbar = snackbar,
     )
 }
@@ -565,9 +566,10 @@ fun OnboardingContent(
             ) {
                 if (creatingIdentity) {
                     CircularProgressIndicator(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .semantics { contentDescription = creatingIdentityDescription },
+                        modifier =
+                            Modifier
+                                .size(20.dp)
+                                .semantics { contentDescription = creatingIdentityDescription },
                         strokeWidth = 2.dp,
                     )
                 } else {
@@ -630,17 +632,19 @@ private fun SignInContent(
                 // screen, and tells the IME not to retain it for suggestions,
                 // autofill, or third-party clipboard inspection.
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.None,
-                    autoCorrectEnabled = false,
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        if (canSignIn) onSignIn()
-                    },
-                ),
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                    ),
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = {
+                            if (canSignIn) onSignIn()
+                        },
+                    ),
             )
         }
         Button(
@@ -697,18 +701,21 @@ private fun MainShell(
     ) {
         val target = inboundNotificationTarget ?: return@LaunchedEffect
         if (appState.accounts.isEmpty()) return@LaunchedEffect // accounts not loaded yet
-        val chatListReady = chatsController.boundAccountRef == target.accountRef &&
-            !chatsController.isLoading
+        val chatListReady =
+            chatsController.boundAccountRef == target.accountRef &&
+                !chatsController.isLoading
         // Archived conversations still exist — include them so an archived
         // group isn't treated as a missing conversation.
         val allChats = chatsController.items + chatsController.archivedItems
-        val step = resolveNotificationNav(
-            target = target,
-            knownAccountRefs = appState.accounts.mapTo(mutableSetOf()) { it.label },
-            activeAccountRef = appState.activeAccountRef,
-            chatListReady = chatListReady,
-            availableGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex },
-        )
+        val step =
+            resolveNotificationNav(
+                target = target,
+                knownAccountRefs = appState.accounts.mapTo(mutableSetOf()) { it.label },
+                activeAccountRef = appState.activeAccountRef,
+                chatListReady = chatListReady,
+                availableGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex },
+            )
+
         fun fallBackToChatList() {
             sectionName = MainSection.Chats.name
             settingsDetailName = null
@@ -722,7 +729,8 @@ private fun MainShell(
                 // lands on the chat list, not whatever section was open.
                 sectionName = MainSection.Chats.name
                 settingsDetailName = null
-                allChats.firstOrNull { it.group.groupIdHex == step.groupIdHex }
+                allChats
+                    .firstOrNull { it.group.groupIdHex == step.groupIdHex }
                     ?.let { selectedChat = it }
                 onNotificationTargetHandled(target)
             }
@@ -771,40 +779,43 @@ private fun MainShell(
     }
 
     when (section) {
-        MainSection.Chats -> ChatsScreen(
-            appState = appState,
-            controller = chatsController,
-            onOpenSettings = {
-                sectionName = MainSection.Settings.name
-                settingsDetailName = null
-            },
-            onOpenGroup = { selectedChat = it },
-            onOpenProfile = {
-                appState.activeAccount?.accountIdHex?.let { accountId ->
-                    profileQrAccountId = accountId
-                } ?: appState.present(R.string.toast_no_active_account)
-            },
-        )
-        MainSection.Settings -> SettingsScreen(
-            appState = appState,
-            onBackToChats = {
-                sectionName = MainSection.Chats.name
-                settingsDetailName = null
-            },
-            onOpenDiagnostics = {
-                sectionName = MainSection.Diagnostics.name
-                settingsDetailName = null
-            },
-            detail = settingsDetail,
-            onDetailChange = { settingsDetailName = it?.name },
-        )
-        MainSection.Diagnostics -> DiagnosticsScreen(
-            appState = appState,
-            onBackToChats = {
-                sectionName = MainSection.Chats.name
-                settingsDetailName = null
-            },
-        )
+        MainSection.Chats ->
+            ChatsScreen(
+                appState = appState,
+                controller = chatsController,
+                onOpenSettings = {
+                    sectionName = MainSection.Settings.name
+                    settingsDetailName = null
+                },
+                onOpenGroup = { selectedChat = it },
+                onOpenProfile = {
+                    appState.activeAccount?.accountIdHex?.let { accountId ->
+                        profileQrAccountId = accountId
+                    } ?: appState.present(R.string.toast_no_active_account)
+                },
+            )
+        MainSection.Settings ->
+            SettingsScreen(
+                appState = appState,
+                onBackToChats = {
+                    sectionName = MainSection.Chats.name
+                    settingsDetailName = null
+                },
+                onOpenDiagnostics = {
+                    sectionName = MainSection.Diagnostics.name
+                    settingsDetailName = null
+                },
+                detail = settingsDetail,
+                onDetailChange = { settingsDetailName = it?.name },
+            )
+        MainSection.Diagnostics ->
+            DiagnosticsScreen(
+                appState = appState,
+                onBackToChats = {
+                    sectionName = MainSection.Chats.name
+                    settingsDetailName = null
+                },
+            )
     }
 }
 
@@ -820,9 +831,10 @@ fun AccountAvatarButton(
     val openSettingsDescription = stringResource(R.string.open_settings)
     IconButton(
         onClick = onClick,
-        modifier = modifier
-            .size(56.dp)
-            .semantics { contentDescription = openSettingsDescription },
+        modifier =
+            modifier
+                .size(56.dp)
+                .semantics { contentDescription = openSettingsDescription },
     ) {
         Avatar(
             title = title,
@@ -898,33 +910,36 @@ private fun ChatsScreen(
             when {
                 controller.isLoading && visibleItems.isEmpty() -> LoadingScreen()
                 controller.error != null -> ErrorContent(stringResource(R.string.couldnt_load_chats), controller.error.orEmpty())
-                visibleItems.isEmpty() && showArchived -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.no_archived_chats), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                visibleItems.isEmpty() -> EmptyChats(onCreate = {
-                    newChatTitle = R.string.new_chat
-                    showNewChat = true
-                })
-                else -> LazyColumn(Modifier.fillMaxSize()) {
-                    items(visibleItems, key = { it.id }) { item ->
-                        ChatRow(
-                            item = item,
-                            appState = appState,
-                            onClick = { onOpenGroup(item) },
-                        )
-                        HorizontalDivider()
+                visibleItems.isEmpty() && showArchived ->
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(stringResource(R.string.no_archived_chats), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    if (!showArchived && controller.archivedItems.isNotEmpty()) {
-                        item {
-                            ListItem(
-                                modifier = Modifier.clickable { showArchived = true },
-                                headlineContent = { Text(stringResource(R.string.archived)) },
-                                supportingContent = { Text(stringResource(R.string.chats_count, controller.archivedItems.size)) },
-                                leadingContent = { Icon(Icons.Default.Archive, contentDescription = null) },
+                visibleItems.isEmpty() ->
+                    EmptyChats(onCreate = {
+                        newChatTitle = R.string.new_chat
+                        showNewChat = true
+                    })
+                else ->
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(visibleItems, key = { it.id }) { item ->
+                            ChatRow(
+                                item = item,
+                                appState = appState,
+                                onClick = { onOpenGroup(item) },
                             )
+                            HorizontalDivider()
+                        }
+                        if (!showArchived && controller.archivedItems.isNotEmpty()) {
+                            item {
+                                ListItem(
+                                    modifier = Modifier.clickable { showArchived = true },
+                                    headlineContent = { Text(stringResource(R.string.archived)) },
+                                    supportingContent = { Text(stringResource(R.string.chats_count, controller.archivedItems.size)) },
+                                    leadingContent = { Icon(Icons.Default.Archive, contentDescription = null) },
+                                )
+                            }
                         }
                     }
-                }
             }
         }
     }
@@ -982,9 +997,10 @@ fun QuickActionFabMenu(
                 }
                 Icon(
                     painter = rememberVectorPainter(imageVector),
-                    contentDescription = stringResource(
-                        if (expanded) R.string.close_quick_actions else R.string.open_quick_actions,
-                    ),
+                    contentDescription =
+                        stringResource(
+                            if (expanded) R.string.close_quick_actions else R.string.open_quick_actions,
+                        ),
                     modifier = Modifier.animateIcon({ checkedProgress }),
                 )
             }
@@ -1031,8 +1047,9 @@ private fun ChatRow(
         }
     }
     val inviteAccount = GroupProjector.inviteAccount(item.group, item.otherMemberAccount)
-    val avatarAccount = inviteAccount
-        ?: item.otherMemberAccount.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
+    val avatarAccount =
+        inviteAccount
+            ?: item.otherMemberAccount.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
         leadingContent = {
@@ -1048,14 +1065,16 @@ private fun ChatRow(
         },
         supportingContent = {
             val draft = appState.draftFor(item.group.groupIdHex)?.takeIf { it.isNotBlank() }
-            val preview = when {
-                item.group.pendingConfirmation -> stringResource(R.string.invitation)
-                draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
-                else -> item.projectedPreviewText(
-                    copy = messageTextCopy,
-                    empty = stringResource(R.string.no_messages_yet),
-                )
-            }
+            val preview =
+                when {
+                    item.group.pendingConfirmation -> stringResource(R.string.invitation)
+                    draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
+                    else ->
+                        item.projectedPreviewText(
+                            copy = messageTextCopy,
+                            empty = stringResource(R.string.no_messages_yet),
+                        )
+                }
             Text(
                 text = preview,
                 maxLines = 1,
@@ -1143,8 +1162,8 @@ private fun NewChatSheet(
         tokens.forEach { addRecipient(it) }
     }
 
-    fun createGroupErrorMessage(throwable: Throwable): String {
-        return when (throwable) {
+    fun createGroupErrorMessage(throwable: Throwable): String =
+        when (throwable) {
             is MarmotKitException.MissingKeyPackage ->
                 missingKeyPackageError
             is MarmotKitException.InvalidIdentity ->
@@ -1153,7 +1172,6 @@ private fun NewChatSheet(
                 String.format(groupPublishFailedFormat, throwable.details)
             else -> throwable.message ?: throwable.javaClass.simpleName
         }
-    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -1183,11 +1201,12 @@ private fun NewChatSheet(
                     label = { Text(stringResource(R.string.npub_or_hex_public_key)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        autoCorrectEnabled = false,
-                        imeAction = ImeAction.Done,
-                    ),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrectEnabled = false,
+                            imeAction = ImeAction.Done,
+                        ),
                     keyboardActions = KeyboardActions(onDone = { addPending() }),
                 )
                 FloatingActionButton(onClick = { showScanner = true }, modifier = Modifier.size(48.dp)) {
@@ -1222,12 +1241,13 @@ private fun NewChatSheet(
             Button(
                 onClick = {
                     val pendingRecipients = RecipientReference.tokenize(pending)
-                    val normalizedPending = pendingRecipients.map { input ->
-                        RecipientReference.normalize(input) ?: run {
-                            error = validRecipientReferenceError
-                            return@Button
+                    val normalizedPending =
+                        pendingRecipients.map { input ->
+                            RecipientReference.normalize(input) ?: run {
+                                error = validRecipientReferenceError
+                                return@Button
+                            }
                         }
-                    }
                     val recipients = (members + normalizedPending).distinct()
                     members = recipients
                     pending = ""
@@ -1255,12 +1275,17 @@ private fun NewChatSheet(
                         busy = false
                     }
                 },
-                enabled = !busy && groupName.trim().isNotBlank() &&
-                    (members.isNotEmpty() || pending.isNotBlank()),
+                enabled =
+                    !busy &&
+                        groupName.trim().isNotBlank() &&
+                        (members.isNotEmpty() || pending.isNotBlank()),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (busy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Default.Check, contentDescription = null)
+                if (busy) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                }
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.create))
             }
@@ -1292,10 +1317,11 @@ private const val ConversationNearBottomItemSlack = 3
 private val MediaBubbleHeight = 240.dp
 
 /** Saves a nullable Uri across process death (camera capture round-trip). */
-private val NullableUriSaver: Saver<android.net.Uri?, String> = Saver(
-    save = { it?.toString() ?: "" },
-    restore = { s -> s.takeIf { it.isNotEmpty() }?.let(android.net.Uri::parse) },
-)
+private val NullableUriSaver: Saver<android.net.Uri?, String> =
+    Saver(
+        save = { it?.toString() ?: "" },
+        restore = { s -> s.takeIf { it.isNotEmpty() }?.let(android.net.Uri::parse) },
+    )
 
 @Composable
 private fun MediaImageBubble(
@@ -1328,9 +1354,10 @@ private fun MediaImageBubble(
             val data = controller.downloadAttachment(key, reference)
             // Decode a sampled bitmap sized to the bubble — a full 1920px
             // image would be a ~14 MB ARGB_8888 bitmap per visible row.
-            val decoded = withContext(Dispatchers.Default) {
-                MediaPipeline.decodeSampledBitmap(data, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
-            }
+            val decoded =
+                withContext(Dispatchers.Default) {
+                    MediaPipeline.decodeSampledBitmap(data, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+                }
             if (decoded != null) {
                 controller.cacheThumbnail(key, decoded)
                 bitmap = decoded.asImageBitmap()
@@ -1354,36 +1381,45 @@ private fun MediaImageBubble(
         // variable height would reflow the timeline after the open-time
         // scroll-to-bottom and strand the user mid-list (and cause visible
         // flips). Full aspect-ratio sizing needs `dim` in the imeta tag (Rust).
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(MediaBubbleHeight),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(MediaBubbleHeight),
     ) {
         Box(contentAlignment = Alignment.Center) {
             val current = bitmap
             when {
-                current != null -> Image(
-                    bitmap = current,
-                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clickable { viewerOpen = true },
-                )
-                failed -> MediaBubbleAction(
-                    icon = Icons.Default.BrokenImage,
-                    label = stringResource(R.string.media_tap_to_retry),
-                    onClick = { failed = false; reloadToken++ },
-                )
-                !startDownload -> MediaBubbleAction(
-                    icon = Icons.Default.Download,
-                    label = stringResource(R.string.media_tap_to_download),
-                    onClick = { startDownload = true },
-                )
-                else -> CircularProgressIndicator(
-                    modifier = Modifier.size(28.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                current != null ->
+                    Image(
+                        bitmap = current,
+                        contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
+                        contentScale = ContentScale.Crop,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .clickable { viewerOpen = true },
+                    )
+                failed ->
+                    MediaBubbleAction(
+                        icon = Icons.Default.BrokenImage,
+                        label = stringResource(R.string.media_tap_to_retry),
+                        onClick = {
+                            failed = false
+                            reloadToken++
+                        },
+                    )
+                !startDownload ->
+                    MediaBubbleAction(
+                        icon = Icons.Default.Download,
+                        label = stringResource(R.string.media_tap_to_download),
+                        onClick = { startDownload = true },
+                    )
+                else ->
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
             }
         }
     }
@@ -1408,11 +1444,12 @@ private fun MediaBubbleAction(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(onClick = onClick)
-            .wrapContentSize(Alignment.Center)
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .clickable(onClick = onClick)
+                .wrapContentSize(Alignment.Center)
+                .padding(16.dp),
     ) {
         Icon(
             icon,
@@ -1430,7 +1467,10 @@ private fun MediaBubbleAction(
 }
 
 @Composable
-private fun MediaPendingPlaceholder(previewBytes: ByteArray?, failed: Boolean) {
+private fun MediaPendingPlaceholder(
+    previewBytes: ByteArray?,
+    failed: Boolean,
+) {
     // The sender holds the local bytes, so preview the actual image while it
     // uploads, with a centered status overlay (spinner / error) on top.
     val preview = rememberSampledBitmap(previewBytes)
@@ -1439,9 +1479,10 @@ private fun MediaPendingPlaceholder(previewBytes: ByteArray?, failed: Boolean) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(MediaBubbleHeight),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(MediaBubbleHeight),
     ) {
         Box(contentAlignment = Alignment.Center) {
             preview?.let {
@@ -1473,9 +1514,12 @@ private fun MediaPendingPlaceholder(previewBytes: ByteArray?, failed: Boolean) {
                 Text(
                     statusLabel,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (preview != null) statusColor else {
-                        if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                    color =
+                        if (preview != null) {
+                            statusColor
+                        } else {
+                            if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 )
             }
         }
@@ -1488,13 +1532,14 @@ private fun MediaPendingPlaceholder(previewBytes: ByteArray?, failed: Boolean) {
 private fun rememberSampledBitmap(bytes: ByteArray?): ImageBitmap? {
     var bitmap by remember(bytes) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(bytes) {
-        bitmap = if (bytes == null) {
-            null
-        } else {
-            withContext(Dispatchers.Default) {
-                MediaPipeline.decodeSampledBitmap(bytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)?.asImageBitmap()
+        bitmap =
+            if (bytes == null) {
+                null
+            } else {
+                withContext(Dispatchers.Default) {
+                    MediaPipeline.decodeSampledBitmap(bytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)?.asImageBitmap()
+                }
             }
-        }
     }
     return bitmap
 }
@@ -1527,9 +1572,10 @@ private fun FullScreenImageViewer(
             // Bounded sampled decode. A 5000px remote image decoded full-size
             // is ~100 MB ARGB_8888 and OOMs mid-class devices; the viewer
             // ceiling caps that while keeping quality high enough on phones.
-            val decoded = withContext(Dispatchers.Default) {
-                MediaPipeline.decodeSampledBitmap(data, MediaPipeline.VIEWER_MAX_EDGE_PX)
-            }
+            val decoded =
+                withContext(Dispatchers.Default) {
+                    MediaPipeline.decodeSampledBitmap(data, MediaPipeline.VIEWER_MAX_EDGE_PX)
+                }
             if (decoded != null) {
                 androidBitmap = decoded
             } else {
@@ -1554,9 +1600,10 @@ private fun FullScreenImageViewer(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
         ) {
             val current = bitmap
             if (current != null) {
@@ -1566,48 +1613,51 @@ private fun FullScreenImageViewer(
                     bitmap = current,
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTapGestures(onDoubleTap = { scale = 1f; offset = Offset.Zero })
-                        }
-                        .pointerInput(Unit) {
-                            detectTransformGestures { _, pan, zoom, _ ->
-                                scale = (scale * zoom).coerceIn(1f, 5f)
-                                offset = if (scale > 1f) {
-                                    // Clamp against the ContentScale.Fit image
-                                    // bounds (letterboxed), not the viewport, so
-                                    // pan can't drift into the empty margins.
-                                    val viewportW = size.width.toFloat()
-                                    val viewportH = size.height.toFloat()
-                                    val imageAspect = current.width.toFloat() / current.height.toFloat()
-                                    val viewportAspect = viewportW / viewportH
-                                    val baseWidth: Float
-                                    val baseHeight: Float
-                                    if (imageAspect > viewportAspect) {
-                                        baseWidth = viewportW
-                                        baseHeight = viewportW / imageAspect
-                                    } else {
-                                        baseHeight = viewportH
-                                        baseWidth = viewportH * imageAspect
-                                    }
-                                    val maxX = ((baseWidth * scale) - viewportW).coerceAtLeast(0f) / 2f
-                                    val maxY = ((baseHeight * scale) - viewportH).coerceAtLeast(0f) / 2f
-                                    Offset(
-                                        (offset.x + pan.x).coerceIn(-maxX, maxX),
-                                        (offset.y + pan.y).coerceIn(-maxY, maxY),
-                                    )
-                                } else {
-                                    Offset.Zero
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectTapGestures(onDoubleTap = {
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                })
+                            }.pointerInput(Unit) {
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    scale = (scale * zoom).coerceIn(1f, 5f)
+                                    offset =
+                                        if (scale > 1f) {
+                                            // Clamp against the ContentScale.Fit image
+                                            // bounds (letterboxed), not the viewport, so
+                                            // pan can't drift into the empty margins.
+                                            val viewportW = size.width.toFloat()
+                                            val viewportH = size.height.toFloat()
+                                            val imageAspect = current.width.toFloat() / current.height.toFloat()
+                                            val viewportAspect = viewportW / viewportH
+                                            val baseWidth: Float
+                                            val baseHeight: Float
+                                            if (imageAspect > viewportAspect) {
+                                                baseWidth = viewportW
+                                                baseHeight = viewportW / imageAspect
+                                            } else {
+                                                baseHeight = viewportH
+                                                baseWidth = viewportH * imageAspect
+                                            }
+                                            val maxX = ((baseWidth * scale) - viewportW).coerceAtLeast(0f) / 2f
+                                            val maxY = ((baseHeight * scale) - viewportH).coerceAtLeast(0f) / 2f
+                                            Offset(
+                                                (offset.x + pan.x).coerceIn(-maxX, maxX),
+                                                (offset.y + pan.y).coerceIn(-maxY, maxY),
+                                            )
+                                        } else {
+                                            Offset.Zero
+                                        }
                                 }
-                            }
-                        }
-                        .graphicsLayer(
-                            scaleX = scale,
-                            scaleY = scale,
-                            translationX = offset.x,
-                            translationY = offset.y,
-                        ),
+                            }.graphicsLayer(
+                                scaleX = scale,
+                                scaleY = scale,
+                                translationX = offset.x,
+                                translationY = offset.y,
+                            ),
                 )
             } else if (viewerFailed) {
                 Column(
@@ -1636,11 +1686,12 @@ private fun FullScreenImageViewer(
                 )
             }
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(8.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1653,12 +1704,15 @@ private fun FullScreenImageViewer(
                             scope.launch {
                                 // Re-read from the app cache (instant hit) rather
                                 // than holding the bytes in Compose state.
-                                val data = runCatching {
-                                    controller.downloadAttachment(messageIdHex, reference)
-                                }.getOrNull()
-                                val ok = data != null && withContext(Dispatchers.IO) {
-                                    saveImageToGallery(context, data, reference.fileName, reference.mediaType)
-                                }
+                                val data =
+                                    runCatching {
+                                        controller.downloadAttachment(messageIdHex, reference)
+                                    }.getOrNull()
+                                val ok =
+                                    data != null &&
+                                        withContext(Dispatchers.IO) {
+                                            saveImageToGallery(context, data, reference.fileName, reference.mediaType)
+                                        }
                                 // Snackbar lives inside the Dialog so the result
                                 // is visible without dismissing the viewer.
                                 snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
@@ -1684,9 +1738,10 @@ private fun FullScreenImageViewer(
             }
             SnackbarHost(
                 hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding(),
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding(),
             )
         }
     }
@@ -1704,16 +1759,18 @@ private fun saveImageToGallery(
     mediaType: String,
 ): Boolean {
     val resolver = context.contentResolver
-    val values = android.content.ContentValues().apply {
-        put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, MediaPipeline.safeDisplayName(fileName))
-        // Preserve the attachment's real MIME (a peer may send PNG/WebP/HEIC),
-        // so gallery indexing matches the actual bytes.
-        put(android.provider.MediaStore.Images.Media.MIME_TYPE, mediaType.ifBlank { MediaPipeline.RECOMPRESSED_MIME })
-        put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/DarkMatter")
-        put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
-    }
-    val uri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-        ?: return false
+    val values =
+        android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, MediaPipeline.safeDisplayName(fileName))
+            // Preserve the attachment's real MIME (a peer may send PNG/WebP/HEIC),
+            // so gallery indexing matches the actual bytes.
+            put(android.provider.MediaStore.Images.Media.MIME_TYPE, mediaType.ifBlank { MediaPipeline.RECOMPRESSED_MIME })
+            put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/DarkMatter")
+            put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
+        }
+    val uri =
+        resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: return false
     return try {
         resolver.openOutputStream(uri).use { out ->
             if (out == null) throw java.io.IOException("null output stream")
@@ -1742,16 +1799,18 @@ private fun shareImage(
         // path traversal from a remote-supplied filename.
         val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
         file.outputStream().use { it.write(bytes) }
-        val uri = androidx.core.content.FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file,
-        )
-        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-            type = mediaType.ifBlank { MediaPipeline.RECOMPRESSED_MIME }
-            putExtra(android.content.Intent.EXTRA_STREAM, uri)
-            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
+        val uri =
+            androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file,
+            )
+        val intent =
+            android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = mediaType.ifBlank { MediaPipeline.RECOMPRESSED_MIME }
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
         context.startActivity(
             android.content.Intent.createChooser(intent, null).apply {
                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1763,17 +1822,20 @@ private fun shareImage(
 }
 
 /** Create a cache file for a camera capture. Returns null if it can't be made. */
-private fun createImageCaptureFile(context: android.content.Context): java.io.File? {
-    return try {
+private fun createImageCaptureFile(context: android.content.Context): java.io.File? =
+    try {
         val dir = java.io.File(context.cacheDir, "camera").apply { mkdirs() }
         java.io.File.createTempFile("capture_", ".jpg", dir)
     } catch (_: Throwable) {
         null
     }
-}
 
-private fun fileProviderUri(context: android.content.Context, file: java.io.File): android.net.Uri =
-    androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+private fun fileProviderUri(
+    context: android.content.Context,
+    file: java.io.File,
+): android.net.Uri =
+    androidx.core.content.FileProvider
+        .getUriForFile(context, "${context.packageName}.fileprovider", file)
 
 /** Best-effort wipe of decrypted media temp files (share + camera) from cache. */
 private fun clearMediaTempFiles(context: android.content.Context) {
@@ -1787,18 +1849,26 @@ private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
     val context = LocalContext.current
     var bitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(uri) {
-        bitmap = withContext(Dispatchers.Default) {
-            runCatching {
-                val bytes = MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
-                bytes?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
-            }.getOrNull()
-        }
+        bitmap =
+            withContext(Dispatchers.Default) {
+                runCatching {
+                    val bytes = MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
+                    bytes?.let {
+                        android.graphics.BitmapFactory
+                            .decodeByteArray(it, 0, it.size)
+                            ?.asImageBitmap()
+                    }
+                }.getOrNull()
+            }
     }
     return bitmap
 }
 
 @Composable
-private fun LocalImagePreview(uri: android.net.Uri, modifier: Modifier = Modifier) {
+private fun LocalImagePreview(
+    uri: android.net.Uri,
+    modifier: Modifier = Modifier,
+) {
     val bitmap = rememberLocalPreviewBitmap(uri)
     Box(modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
         val current = bitmap
@@ -1835,18 +1905,20 @@ private fun MediaPreviewSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             LocalImagePreview(
                 uri = uri,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 320.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)
+                        .clip(RoundedCornerShape(12.dp)),
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1883,9 +1955,10 @@ private fun MediaPreviewSheet(
 private fun UnreadMessagesDivider(count: Int) {
     val text = pluralStringResource(R.plurals.unread_messages_count, count, count)
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         HorizontalDivider(
@@ -1896,13 +1969,13 @@ private fun UnreadMessagesDivider(count: Int) {
             text = text,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(12.dp),
-                )
-                .padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier =
+                Modifier
+                    .padding(horizontal = 12.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                    ).padding(horizontal = 10.dp, vertical = 4.dp),
         )
         HorizontalDivider(
             modifier = Modifier.weight(1f),
@@ -1933,7 +2006,8 @@ private fun queryDisplayName(
     contentResolver: android.content.ContentResolver,
     uri: android.net.Uri,
 ): String? {
-    contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+    contentResolver
+        .query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
         ?.use { cursor ->
             if (cursor.moveToFirst()) {
                 val name = cursor.getString(0)
@@ -1951,15 +2025,17 @@ private fun ConversationScreen(
     onBack: () -> Unit,
 ) {
     val controllerCopy = rememberConversationControllerCopy()
-    val controller = remember(chat.id, appState.runtimeGeneration) {
-        ConversationController(
-            appState = appState,
-            initialGroup = chat.group,
-            initialMemberSnapshot = chat.memberSnapshot
-                ?: appState.cachedGroupMemberSnapshot(appState.activeAccountRef, chat.group.groupIdHex),
-            copy = controllerCopy,
-        )
-    }
+    val controller =
+        remember(chat.id, appState.runtimeGeneration) {
+            ConversationController(
+                appState = appState,
+                initialGroup = chat.group,
+                initialMemberSnapshot =
+                    chat.memberSnapshot
+                        ?: appState.cachedGroupMemberSnapshot(appState.activeAccountRef, chat.group.groupIdHex),
+                copy = controllerCopy,
+            )
+        }
     var menuOpen by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
     var confirmLeaveFromTopBar by remember { mutableStateOf(false) }
@@ -2043,23 +2119,25 @@ private fun ConversationScreen(
     // PickVisualMedia uses the system Photo Picker — no READ_MEDIA_IMAGES
     // permission needed (Android 13+ scopes the picker's own grant); on older
     // devices it falls back to GET_CONTENT with the same UX.
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia(),
-    ) { uri ->
-        if (uri != null) pendingMediaUri = uri
-    }
-    val cameraLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicture(),
-    ) { success ->
-        val captured = cameraOutputUri
-        if (success && captured != null) {
-            pendingMediaUri = captured
-        } else {
-            cameraOutputFile?.delete() // cancelled — don't leak the empty temp
+    val imagePickerLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.PickVisualMedia(),
+        ) { uri ->
+            if (uri != null) pendingMediaUri = uri
         }
-        cameraOutputUri = null
-        cameraOutputFile = null
-    }
+    val cameraLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.TakePicture(),
+        ) { success ->
+            val captured = cameraOutputUri
+            if (success && captured != null) {
+                pendingMediaUri = captured
+            } else {
+                cameraOutputFile?.delete() // cancelled — don't leak the empty temp
+            }
+            cameraOutputUri = null
+            cameraOutputFile = null
+        }
 
     fun launchCameraCapture() {
         val file = createImageCaptureFile(context)
@@ -2076,16 +2154,21 @@ private fun ConversationScreen(
     // TakePicture needs no permission of its own, but because CAMERA is declared
     // in the manifest (for the QR scanner) some OEMs require the runtime grant
     // before launching the capture intent — request it first if missing.
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) launchCameraCapture() }
+    val cameraPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted -> if (granted) launchCameraCapture() }
 
     // Decode/compress off the main thread, then hand the image to the controller.
-    fun sendPickedMedia(uri: android.net.Uri, caption: String) {
+    fun sendPickedMedia(
+        uri: android.net.Uri,
+        caption: String,
+    ) {
         appState.launchMutation {
-            val jpeg = withContext(Dispatchers.Default) {
-                MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
-            }
+            val jpeg =
+                withContext(Dispatchers.Default) {
+                    MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
+                }
             if (jpeg == null) {
                 appState.present(R.string.toast_couldnt_decode_image)
                 return@launchMutation
@@ -2116,25 +2199,26 @@ private fun ConversationScreen(
 
     fun navigateToReplyTarget(item: TimelineMessage) {
         navigateReplyJob?.cancel()
-        navigateReplyJob = scope.launch {
-            val targetMessageId = controller.replyTargetMessageId(item)
-            if (targetMessageId == null || !controller.loadUntilMessageAvailable(targetMessageId)) {
-                appState.present(R.string.toast_original_message_unavailable)
-                return@launch
+        navigateReplyJob =
+            scope.launch {
+                val targetMessageId = controller.replyTargetMessageId(item)
+                if (targetMessageId == null || !controller.loadUntilMessageAvailable(targetMessageId)) {
+                    appState.present(R.string.toast_original_message_unavailable)
+                    return@launch
+                }
+                val timelineIndex = controller.timelineIndexOf(targetMessageId)
+                if (timelineIndex < 0) {
+                    appState.present(R.string.toast_original_message_unavailable)
+                    return@launch
+                }
+                val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+                listState.animateScrollToItem(1 + olderMessagesHeaderCount + timelineIndex)
+                highlightedMessageId = targetMessageId
+                delay(1_500L)
+                if (highlightedMessageId == targetMessageId) {
+                    highlightedMessageId = null
+                }
             }
-            val timelineIndex = controller.timelineIndexOf(targetMessageId)
-            if (timelineIndex < 0) {
-                appState.present(R.string.toast_original_message_unavailable)
-                return@launch
-            }
-            val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-            listState.animateScrollToItem(1 + olderMessagesHeaderCount + timelineIndex)
-            highlightedMessageId = targetMessageId
-            delay(1_500L)
-            if (highlightedMessageId == targetMessageId) {
-                highlightedMessageId = null
-            }
-        }
     }
 
     BackHandler {
@@ -2157,8 +2241,10 @@ private fun ConversationScreen(
         if (entryFirstUnreadMessageId == null && entryUnreadCount > 0) {
             val firstUnreadIndex = controller.firstUnreadTimelineIndex(entryUnreadCount)
             if (firstUnreadIndex >= 0) {
-                entryFirstUnreadMessageId = controller.timeline[firstUnreadIndex].record.messageIdHex
-                    .takeIf { it.isNotBlank() }
+                entryFirstUnreadMessageId =
+                    controller.timeline[firstUnreadIndex]
+                        .record.messageIdHex
+                        .takeIf { it.isNotBlank() }
             }
         }
     }
@@ -2170,11 +2256,12 @@ private fun ConversationScreen(
                 // read forward from there; otherwise drop them at the
                 // newest message.
                 val firstUnreadTimelineIndex = controller.firstUnreadTimelineIndex(chat.unreadCount.toInt())
-                val targetIndex = if (firstUnreadTimelineIndex >= 0) {
-                    1 + olderHeaderCount + firstUnreadTimelineIndex
-                } else {
-                    bottomTimelineIndex
-                }
+                val targetIndex =
+                    if (firstUnreadTimelineIndex >= 0) {
+                        1 + olderHeaderCount + firstUnreadTimelineIndex
+                    } else {
+                        bottomTimelineIndex
+                    }
                 listState.scrollToItem(targetIndex)
                 initialTimelineAnchored = true
             } else if (nearBottom) {
@@ -2197,8 +2284,7 @@ private fun ConversationScreen(
             } else {
                 readAnchorMessageId
             }
-        }
-            .filterNotNull()
+        }.filterNotNull()
             .distinctUntilChanged()
             .collect { messageId ->
                 if (messageId.isNotBlank()) {
@@ -2224,10 +2310,11 @@ private fun ConversationScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { showDetails = true }
-                            .semantics { contentDescription = openDetailsDescription },
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { showDetails = true }
+                                .semantics { contentDescription = openDetailsDescription },
                     ) {
                         Avatar(
                             title = controller.title(groupTitleCopy),
@@ -2310,10 +2397,11 @@ private fun ConversationScreen(
                             )
                         },
                         onCaptureFromCamera = {
-                            val granted = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.CAMERA,
-                            ) == PackageManager.PERMISSION_GRANTED
+                            val granted =
+                                ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.CAMERA,
+                                ) == PackageManager.PERMISSION_GRANTED
                             if (granted) {
                                 launchCameraCapture()
                             } else {
@@ -2329,106 +2417,112 @@ private fun ConversationScreen(
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
                 controller.error != null -> ErrorContent(stringResource(R.string.couldnt_load_conversation), controller.error.orEmpty())
-                controller.group.pendingConfirmation -> PendingInviteContent(
-                    title = controller.title(groupTitleCopy),
-                    pictureUrl = controller.inviteAccount?.let { appState.avatarUrl(it) },
-                    avatarSeed = controller.inviteAccount ?: controller.group.groupIdHex,
-                    onAccept = {
-                        appState.launchMutation { controller.acceptInvite() }
-                    },
-                    onDecline = {
-                        appState.launchMutation {
-                            if (controller.declineInvite()) onBack()
-                        }
-                    },
-                )
-                controller.timeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted -> Box(
-                    Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(stringResource(R.string.no_messages_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                else -> Box(Modifier.fillMaxSize()) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 12.dp)
-                            .alpha(if (initialTimelineAnchored) 1f else 0f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(bottom = 8.dp),
+                controller.group.pendingConfirmation ->
+                    PendingInviteContent(
+                        title = controller.title(groupTitleCopy),
+                        pictureUrl = controller.inviteAccount?.let { appState.avatarUrl(it) },
+                        avatarSeed = controller.inviteAccount ?: controller.group.groupIdHex,
+                        onAccept = {
+                            appState.launchMutation { controller.acceptInvite() }
+                        },
+                        onDecline = {
+                            appState.launchMutation {
+                                if (controller.declineInvite()) onBack()
+                            }
+                        },
+                    )
+                controller.timeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted ->
+                    Box(
+                        Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        item { Spacer(Modifier.height(4.dp)) }
-                        if (controller.hasMoreBefore || controller.isLoadingOlder) {
-                            item(key = "older-messages-loading") {
-                                Box(
-                                    Modifier.fillMaxWidth().height(40.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    if (controller.isLoadingOlder) {
-                                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                                    } else {
-                                        IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
-                                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
+                        Text(stringResource(R.string.no_messages_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                else ->
+                    Box(Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            state = listState,
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 12.dp)
+                                    .alpha(if (initialTimelineAnchored) 1f else 0f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(bottom = 8.dp),
+                        ) {
+                            item { Spacer(Modifier.height(4.dp)) }
+                            if (controller.hasMoreBefore || controller.isLoadingOlder) {
+                                item(key = "older-messages-loading") {
+                                    Box(
+                                        Modifier.fillMaxWidth().height(40.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (controller.isLoadingOlder) {
+                                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                        } else {
+                                            IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
+                                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            items(controller.timeline, key = { it.id }) { item ->
+                                if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
+                                    UnreadMessagesDivider(count = entryUnreadCount)
+                                }
+                                MessageBubble(
+                                    item = item,
+                                    controller = controller,
+                                    appState = appState,
+                                    highlighted = item.record.messageIdHex == highlightedMessageId,
+                                    recentReactionEmojis = recentReactionEmojis,
+                                    onReactionEmojiPicked = ::recordReactionEmoji,
+                                    onReplyPreviewClick = ::navigateToReplyTarget,
+                                )
+                            }
+                            item { Spacer(Modifier.height(8.dp)) }
+                        }
+                        if (!initialTimelineAnchored) {
+                            LoadingScreen()
+                        }
+                        if (initialTimelineAnchored && !nearBottom) {
+                            SmallFloatingActionButton(
+                                onClick = {
+                                    scope.launch {
+                                        val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                                        listState.animateScrollToItem(lastIndex)
+                                    }
+                                },
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(12.dp),
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.ArrowDownward,
+                                        contentDescription = stringResource(R.string.jump_to_newest),
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                    if (unreadIncomingCount > 0) {
+                                        Badge(
+                                            modifier =
+                                                Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .offset(x = 10.dp, y = (-10).dp),
+                                        ) {
+                                            Text(
+                                                if (unreadIncomingCount > 99) "99+" else unreadIncomingCount.toString(),
+                                            )
                                         }
                                     }
                                 }
                             }
                         }
-                        items(controller.timeline, key = { it.id }) { item ->
-                            if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
-                                UnreadMessagesDivider(count = entryUnreadCount)
-                            }
-                            MessageBubble(
-                                item = item,
-                                controller = controller,
-                                appState = appState,
-                                highlighted = item.record.messageIdHex == highlightedMessageId,
-                                recentReactionEmojis = recentReactionEmojis,
-                                onReactionEmojiPicked = ::recordReactionEmoji,
-                                onReplyPreviewClick = ::navigateToReplyTarget,
-                            )
-                        }
-                        item { Spacer(Modifier.height(8.dp)) }
                     }
-                    if (!initialTimelineAnchored) {
-                        LoadingScreen()
-                    }
-                    if (initialTimelineAnchored && !nearBottom) {
-                        SmallFloatingActionButton(
-                            onClick = {
-                                scope.launch {
-                                    val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                                    listState.animateScrollToItem(lastIndex)
-                                }
-                            },
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(12.dp),
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.ArrowDownward,
-                                    contentDescription = stringResource(R.string.jump_to_newest),
-                                    modifier = Modifier.size(20.dp),
-                                )
-                                if (unreadIncomingCount > 0) {
-                                    Badge(
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .offset(x = 10.dp, y = (-10).dp),
-                                    ) {
-                                        Text(
-                                            if (unreadIncomingCount > 99) "99+" else unreadIncomingCount.toString(),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -2587,10 +2681,11 @@ private fun GroupDetailsScreen(
 
     LaunchedEffect(controller.members.map { it.memberIdHex }, pendingInvites) {
         val memberIds = controller.members.map { it.memberIdHex.lowercase() }.toSet()
-        val filtered = pendingInvites.filter { invite ->
-            val accountIdHex = appState.accountIdHex(invite)?.lowercase()
-            accountIdHex == null || accountIdHex !in memberIds
-        }
+        val filtered =
+            pendingInvites.filter { invite ->
+                val accountIdHex = appState.accountIdHex(invite)?.lowercase()
+                accountIdHex == null || accountIdHex !in memberIds
+            }
         if (filtered != pendingInvites) pendingInvites = filtered
     }
 
@@ -2648,7 +2743,19 @@ private fun GroupDetailsScreen(
                         )
                         if (controller.isSelfMember) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(if (activeMutation?.action == GroupMutationAction.Leave) R.string.leaving_chat else R.string.leave_chat)) },
+                                text = {
+                                    Text(
+                                        stringResource(
+                                            if (activeMutation?.action ==
+                                                GroupMutationAction.Leave
+                                            ) {
+                                                R.string.leaving_chat
+                                            } else {
+                                                R.string.leave_chat
+                                            },
+                                        ),
+                                    )
+                                },
                                 leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
                                 enabled = controller.canLeaveGroup && activeMutation == null && !controller.mutationInFlight,
                                 onClick = {
@@ -2673,11 +2780,12 @@ private fun GroupDetailsScreen(
         ) {
             GroupDetailsHeader(
                 title = controller.title(groupTitleCopy),
-                subtitle = controller.subtitle(
-                    justYou = stringResource(R.string.just_you),
-                    oneMember = stringResource(R.string.one_member),
-                    membersFormat = stringResource(R.string.members_count),
-                ),
+                subtitle =
+                    controller.subtitle(
+                        justYou = stringResource(R.string.just_you),
+                        oneMember = stringResource(R.string.one_member),
+                        membersFormat = stringResource(R.string.members_count),
+                    ),
                 description = controller.group.description,
                 groupIdHex = controller.group.groupIdHex,
                 archived = controller.group.archived,
@@ -2760,7 +2868,11 @@ private fun GroupDetailsScreen(
             SectionCard(title = stringResource(R.string.info)) {
                 DiagnosticRow(stringResource(R.string.group_id), IdentityFormatter.short(controller.group.groupIdHex))
                 DiagnosticRow(stringResource(R.string.nostr_group), IdentityFormatter.short(controller.group.nostrGroupIdHex))
-                DiagnosticRow(stringResource(R.string.relays), controller.group.relays.size.toString())
+                DiagnosticRow(
+                    stringResource(R.string.relays),
+                    controller.group.relays.size
+                        .toString(),
+                )
                 controller.group.relays.forEach { relay ->
                     Text(relay, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
                 }
@@ -2828,9 +2940,10 @@ private fun GroupDetailsScreen(
                             onSuccess = { showEditProfile = false },
                         )
                     },
-                    enabled = activeMutation == null &&
-                        !controller.mutationInFlight &&
-                        (name != controller.group.name || description != controller.group.description),
+                    enabled =
+                        activeMutation == null &&
+                            !controller.mutationInFlight &&
+                            (name != controller.group.name || description != controller.group.description),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (activeMutation?.action == GroupMutationAction.SaveProfile) {
@@ -2862,9 +2975,10 @@ private fun GroupDetailsScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     isError = pendingMemberError != null,
-                    supportingText = pendingMemberError?.let { message ->
-                        { Text(message) }
-                    },
+                    supportingText =
+                        pendingMemberError?.let { message ->
+                            { Text(message) }
+                        },
                     trailingIcon = {
                         IconButton(onClick = { showMemberScanner = true }) {
                             Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_member_qr_code))
@@ -2874,10 +2988,11 @@ private fun GroupDetailsScreen(
                 )
                 Button(
                     onClick = {
-                        val ref = RecipientReference.normalize(pendingMember) ?: run {
-                            pendingMemberError = oneValidMemberReferenceError
-                            return@Button
-                        }
+                        val ref =
+                            RecipientReference.normalize(pendingMember) ?: run {
+                                pendingMemberError = oneValidMemberReferenceError
+                                return@Button
+                            }
                         pendingMemberError = null
                         runGroupMutation(
                             action = GroupMutationAction.InviteMember,
@@ -2908,42 +3023,45 @@ private fun GroupDetailsScreen(
 
     pendingConfirm?.let { confirm ->
         when (confirm) {
-            is DetailsConfirm.RemoveMember -> ConfirmDialog(
-                title = stringResource(R.string.confirm_remove_member_title),
-                message = stringResource(
-                    R.string.confirm_remove_member_message,
-                    controller.memberDisplayName(confirm.member),
-                ),
-                confirmLabel = stringResource(R.string.remove_member),
-                onConfirm = {
-                    pendingConfirm = null
-                    runGroupMutation(
-                        action = GroupMutationAction.RemoveMember,
-                        mutation = { controller.removeMember(confirm.member) },
-                        target = confirm.member.memberIdHex,
-                    )
-                },
-                onDismiss = { pendingConfirm = null },
-            )
-            DetailsConfirm.Leave -> ConfirmDialog(
-                title = stringResource(R.string.confirm_leave_title),
-                message = stringResource(R.string.confirm_leave_message),
-                confirmLabel = stringResource(R.string.leave),
-                onConfirm = {
-                    pendingConfirm = null
-                    // Process-lifetime scope so a swipe-dismiss mid-leave doesn't
-                    // kill the toast/refresh; onDismiss + onLeft are safe Compose
-                    // state writes from Main.immediate.
-                    runGroupMutation(
-                        action = GroupMutationAction.Leave,
-                        mutation = { controller.leaveGroup() },
-                        onSuccess = {
-                            onLeft()
-                        },
-                    )
-                },
-                onDismiss = { pendingConfirm = null },
-            )
+            is DetailsConfirm.RemoveMember ->
+                ConfirmDialog(
+                    title = stringResource(R.string.confirm_remove_member_title),
+                    message =
+                        stringResource(
+                            R.string.confirm_remove_member_message,
+                            controller.memberDisplayName(confirm.member),
+                        ),
+                    confirmLabel = stringResource(R.string.remove_member),
+                    onConfirm = {
+                        pendingConfirm = null
+                        runGroupMutation(
+                            action = GroupMutationAction.RemoveMember,
+                            mutation = { controller.removeMember(confirm.member) },
+                            target = confirm.member.memberIdHex,
+                        )
+                    },
+                    onDismiss = { pendingConfirm = null },
+                )
+            DetailsConfirm.Leave ->
+                ConfirmDialog(
+                    title = stringResource(R.string.confirm_leave_title),
+                    message = stringResource(R.string.confirm_leave_message),
+                    confirmLabel = stringResource(R.string.leave),
+                    onConfirm = {
+                        pendingConfirm = null
+                        // Process-lifetime scope so a swipe-dismiss mid-leave doesn't
+                        // kill the toast/refresh; onDismiss + onLeft are safe Compose
+                        // state writes from Main.immediate.
+                        runGroupMutation(
+                            action = GroupMutationAction.Leave,
+                            mutation = { controller.leaveGroup() },
+                            onSuccess = {
+                                onLeft()
+                            },
+                        )
+                    },
+                    onDismiss = { pendingConfirm = null },
+                )
         }
     }
 }
@@ -3033,10 +3151,11 @@ private fun GroupActionRow(
     onClick: () -> Unit,
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(enabled = enabled, onClick = onClick),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(enabled = enabled, onClick = onClick),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (enabled) 0.5f else 0.28f),
         contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         shape = RoundedCornerShape(12.dp),
@@ -3055,7 +3174,10 @@ private fun GroupActionRow(
 }
 
 private sealed class DetailsConfirm {
-    data class RemoveMember(val member: AppGroupMemberRecordFfi) : DetailsConfirm()
+    data class RemoveMember(
+        val member: AppGroupMemberRecordFfi,
+    ) : DetailsConfirm()
+
     data object Leave : DetailsConfirm()
 }
 
@@ -3086,10 +3208,11 @@ private fun GroupMemberRow(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val isAdmin = controller.isAdmin(member)
-    val isSelfRow = GroupProjector.isActiveAccountMember(
-        member,
-        appState.activeAccount?.accountIdHex,
-    )
+    val isSelfRow =
+        GroupProjector.isActiveAccountMember(
+            member,
+            appState.activeAccount?.accountIdHex,
+        )
     val canManage = controller.isSelfMember && controller.isSelfAdmin && !isSelfRow
     val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
 
@@ -3178,12 +3301,13 @@ private fun GroupMemberRow(
 
 private val GroupMutationAction.memberStatusLabelRes: Int
     @StringRes
-    get() = when (this) {
-        GroupMutationAction.PromoteAdmin -> R.string.adding_admin
-        GroupMutationAction.DemoteAdmin -> R.string.removing_admin
-        GroupMutationAction.RemoveMember -> R.string.removing_member
-        else -> R.string.member_actions
-    }
+    get() =
+        when (this) {
+            GroupMutationAction.PromoteAdmin -> R.string.adding_admin
+            GroupMutationAction.DemoteAdmin -> R.string.removing_admin
+            GroupMutationAction.RemoveMember -> R.string.removing_member
+            else -> R.string.member_actions
+        }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -3199,11 +3323,12 @@ private fun MessageBubble(
     val record = item.record
     val mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex)
     val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
-    val bubbleColor = when {
-        deleted -> MaterialTheme.colorScheme.surfaceVariant
-        mine -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
+    val bubbleColor =
+        when {
+            deleted -> MaterialTheme.colorScheme.surfaceVariant
+            mine -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.surfaceVariant
+        }
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
     var swipeDrag by remember(record.messageIdHex) { mutableStateOf(0f) }
@@ -3213,36 +3338,40 @@ private fun MessageBubble(
     val replySwipeThresholdPx = with(density) { 64.dp.toPx() }
     val maxSwipeOffsetPx = with(density) { 72.dp.toPx() }
     val messageTextCopy = rememberMessageTextCopy()
-    val displayedBody = if (deleted) {
-        // Check `deleted` first so the optimistic tombstone (from
-        // controller.deletedMessageIds) renders immediately on tap. Otherwise
-        // the projected branch runs against the stale Rust-side `deleted`
-        // flag and the bubble keeps showing the original body until the
-        // delete echo arrives.
-        stringResource(R.string.message_deleted)
-    } else if (item.projected != null) {
-        TimelineProjector.displayBody(
-            item.projected,
-            messageTextCopy.copy(deleted = stringResource(R.string.message_deleted)),
+    val displayedBody =
+        if (deleted) {
+            // Check `deleted` first so the optimistic tombstone (from
+            // controller.deletedMessageIds) renders immediately on tap. Otherwise
+            // the projected branch runs against the stale Rust-side `deleted`
+            // flag and the bubble keeps showing the original body until the
+            // delete echo arrives.
+            stringResource(R.string.message_deleted)
+        } else if (item.projected != null) {
+            TimelineProjector.displayBody(
+                item.projected,
+                messageTextCopy.copy(deleted = stringResource(R.string.message_deleted)),
+            )
+        } else {
+            MessageProjector.displayBody(record, messageTextCopy)
+        }
+    val showSenderAvatar =
+        GroupProjector.shouldShowTranscriptSenderAvatar(
+            memberCount = controller.members.size,
+            mine = mine,
         )
-    } else {
-        MessageProjector.displayBody(record, messageTextCopy)
-    }
-    val showSenderAvatar = GroupProjector.shouldShowTranscriptSenderAvatar(
-        memberCount = controller.members.size,
-        mine = mine,
-    )
     // Match the timestamp to the bubble's on-color family. The mine bubble
     // fills with primaryContainer, so the M3 paired token is onPrimaryContainer;
     // using onSurfaceVariant there blends into the tint and reads as invisible.
-    val timestampColor = if (mine && !deleted) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val timestampColor =
+        if (mine && !deleted) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
     var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var infoSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     val quickReactionEmojis = RecentEmojiList.quickChoices(recentReactionEmojis)
+
     fun beginReply() {
         controller.replyingTo = record
         menuOpen = false
@@ -3276,9 +3405,10 @@ private fun MessageBubble(
         ) {
             if (showSenderAvatar) {
                 Box(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .clickable { appState.presentProfile(appState.npub(record.sender)) },
+                    modifier =
+                        Modifier
+                            .clip(CircleShape)
+                            .clickable { appState.presentProfile(appState.npub(record.sender)) },
                 ) {
                     Avatar(
                         title = appState.displayName(record.sender),
@@ -3294,28 +3424,28 @@ private fun MessageBubble(
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 Surface(
-                    modifier = Modifier
-                        .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) }
-                        .pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
-                            detectHorizontalDragGestures(
-                                onHorizontalDrag = { change, dragAmount ->
-                                    val next = ReplySwipe.visualOffset(swipeDrag + dragAmount, maxSwipeOffsetPx)
-                                    if (next != swipeDrag || dragAmount > 0f) change.consume()
-                                    swipeDrag = next
-                                },
-                                onDragEnd = {
-                                    if (ReplySwipe.shouldTriggerReply(swipeDrag, totalY = 0f, threshold = replySwipeThresholdPx)) {
-                                        beginReply()
-                                    }
-                                    swipeDrag = 0f
-                                },
-                                onDragCancel = { swipeDrag = 0f },
-                            )
-                        }
-                        .combinedClickable(
-                            onClick = {},
-                            onLongClick = { menuOpen = true },
-                        ),
+                    modifier =
+                        Modifier
+                            .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) }
+                            .pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
+                                detectHorizontalDragGestures(
+                                    onHorizontalDrag = { change, dragAmount ->
+                                        val next = ReplySwipe.visualOffset(swipeDrag + dragAmount, maxSwipeOffsetPx)
+                                        if (next != swipeDrag || dragAmount > 0f) change.consume()
+                                        swipeDrag = next
+                                    },
+                                    onDragEnd = {
+                                        if (ReplySwipe.shouldTriggerReply(swipeDrag, totalY = 0f, threshold = replySwipeThresholdPx)) {
+                                            beginReply()
+                                        }
+                                        swipeDrag = 0f
+                                    },
+                                    onDragCancel = { swipeDrag = 0f },
+                                )
+                            }.combinedClickable(
+                                onClick = {},
+                                onLongClick = { menuOpen = true },
+                            ),
                     color = bubbleColor,
                     shape = RoundedCornerShape(18.dp),
                     border = if (highlighted) BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary) else null,
@@ -3327,10 +3457,11 @@ private fun MessageBubble(
                                 appState.displayName(record.sender),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.combinedClickable(
-                                    onClick = { appState.presentProfile(appState.npub(record.sender)) },
-                                    onLongClick = { menuOpen = true },
-                                ),
+                                modifier =
+                                    Modifier.combinedClickable(
+                                        onClick = { appState.presentProfile(appState.npub(record.sender)) },
+                                        onLongClick = { menuOpen = true },
+                                    ),
                             )
                         }
                         controller.replyPreview(item, messageTextCopy)?.let { (name, body) ->
@@ -3345,14 +3476,17 @@ private fun MessageBubble(
                                 }
                             }
                         }
-                        val mediaReference = remember(record.tags) {
-                            MediaReferenceParser.parseImetaTag(record.tags)
-                        }
-                        val mediaPendingName = remember(record.tags) {
-                            record.tags
-                                .firstOrNull { it.values.firstOrNull() == "_media_pending" }
-                                ?.values?.getOrNull(1)
-                        }
+                        val mediaReference =
+                            remember(record.tags) {
+                                MediaReferenceParser.parseImetaTag(record.tags)
+                            }
+                        val mediaPendingName =
+                            remember(record.tags) {
+                                record.tags
+                                    .firstOrNull { it.values.firstOrNull() == "_media_pending" }
+                                    ?.values
+                                    ?.getOrNull(1)
+                            }
                         if (!deleted && mediaReference != null && MediaReferenceParser.isImageMedia(mediaReference)) {
                             MediaImageBubble(
                                 item = item,
@@ -3379,12 +3513,13 @@ private fun MessageBubble(
                         //   showing the image inline.
                         // - Non-media: render displayedBody (covers reactions,
                         //   deletions, agent streams, plain text).
-                        val bodyTextToRender: String? = when {
-                            deleted -> displayedBody
-                            mediaPendingName != null -> null
-                            mediaReference != null -> record.plaintext.takeIf { it.isNotBlank() }
-                            else -> displayedBody
-                        }
+                        val bodyTextToRender: String? =
+                            when {
+                                deleted -> displayedBody
+                                mediaPendingName != null -> null
+                                mediaReference != null -> record.plaintext.takeIf { it.isNotBlank() }
+                                else -> displayedBody
+                            }
                         if (bodyTextToRender != null) {
                             Text(
                                 bodyTextToRender,
@@ -3581,26 +3716,29 @@ private fun MessageInfoSheet(
 ) {
     val record = item.record
     val configuration = LocalConfiguration.current
-    val locale = remember(configuration) {
-        ConfigurationCompat.getLocales(configuration).get(0) ?: Locale.getDefault()
-    }
+    val locale =
+        remember(configuration) {
+            ConfigurationCompat.getLocales(configuration).get(0) ?: Locale.getDefault()
+        }
     val zone = remember { ZoneId.systemDefault() }
-    val statusLabels = MessageStatusLabels(
-        pending = stringResource(R.string.message_status_pending),
-        sent = stringResource(R.string.message_status_sent),
-        received = stringResource(R.string.message_status_received),
-        failed = stringResource(R.string.message_status_failed),
-        streaming = stringResource(R.string.message_status_streaming),
-    )
+    val statusLabels =
+        MessageStatusLabels(
+            pending = stringResource(R.string.message_status_pending),
+            sent = stringResource(R.string.message_status_sent),
+            received = stringResource(R.string.message_status_received),
+            failed = stringResource(R.string.message_status_failed),
+            streaming = stringResource(R.string.message_status_streaming),
+        )
     val statusText = labelFor(item.status, statusLabels)
     // Label derives from status, not `mine`, so an outgoing Failed bubble
     // doesn't read "Sent" while the Status row says "Failed". For outgoing
     // pending/failed the row reflects local composition time.
-    val timestampLabel = when (item.status) {
-        MessageStatus.Sent -> stringResource(R.string.message_info_sent_at)
-        MessageStatus.Received, MessageStatus.Streaming -> stringResource(R.string.message_info_received_at)
-        MessageStatus.Pending, MessageStatus.Failed -> stringResource(R.string.message_info_created_at)
-    }
+    val timestampLabel =
+        when (item.status) {
+            MessageStatus.Sent -> stringResource(R.string.message_info_sent_at)
+            MessageStatus.Received, MessageStatus.Streaming -> stringResource(R.string.message_info_received_at)
+            MessageStatus.Pending, MessageStatus.Failed -> stringResource(R.string.message_info_created_at)
+        }
     // For incoming, prefer the *local* arrival time — sender's claimed
     // `recordedAt` can be spoofed. Surface `recordedAt` as a second row only
     // when it diverges from receivedAt by more than a few seconds (anything
@@ -3608,9 +3746,12 @@ private fun MessageInfoSheet(
     val primarySeconds = if (!mine && record.receivedAt > 0uL) record.receivedAt else record.recordedAt
     val formattedTimestamp = formatExactTimestamp(primarySeconds, zone, locale)
     val showOriginal = !mine && shouldShowOriginalTimestamp(record.recordedAt, record.receivedAt)
-    val formattedOriginalTimestamp = if (showOriginal) {
-        formatExactTimestamp(record.recordedAt, zone, locale)
-    } else ""
+    val formattedOriginalTimestamp =
+        if (showOriginal) {
+            formatExactTimestamp(record.recordedAt, zone, locale)
+        } else {
+            ""
+        }
     val npubShort = shortHex(senderNpub, head = 12, tail = 6)
     val messageIdShort = shortHex(record.messageIdHex)
     val copyActionLabel = stringResource(R.string.copy_text)
@@ -3620,10 +3761,11 @@ private fun MessageInfoSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
@@ -3680,17 +3822,18 @@ private fun MessageInfoRow(
     onCopy: (() -> Unit)? = null,
     copyActionLabel: String? = null,
 ) {
-    val rowModifier = if (onCopy != null) {
-        Modifier
-            .fillMaxWidth()
-            .clickable(
-                onClickLabel = copyActionLabel,
-                role = Role.Button,
-                onClick = onCopy,
-            )
-    } else {
-        Modifier.fillMaxWidth()
-    }
+    val rowModifier =
+        if (onCopy != null) {
+            Modifier
+                .fillMaxWidth()
+                .clickable(
+                    onClickLabel = copyActionLabel,
+                    role = Role.Button,
+                    onClick = onCopy,
+                )
+        } else {
+            Modifier.fillMaxWidth()
+        }
     Row(
         modifier = rowModifier.padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -3787,44 +3930,52 @@ private fun MessageActionButton(
 }
 
 @Composable
-private fun OutgoingMessageStatusIcon(status: MessageStatus, tint: Color) {
+private fun OutgoingMessageStatusIcon(
+    status: MessageStatus,
+    tint: Color,
+) {
     val indicator = status.outgoingIndicator() ?: return
     when (indicator) {
-        OutgoingMessageIndicator.Sending -> Icon(
-            imageVector = Icons.Default.Schedule,
-            contentDescription = stringResource(R.string.sending),
-            modifier = Modifier.size(14.dp),
-            tint = tint.copy(alpha = 0.76f),
-        )
-        OutgoingMessageIndicator.Sent -> Icon(
-            imageVector = Icons.Default.Check,
-            contentDescription = stringResource(R.string.sent),
-            modifier = Modifier.size(14.dp),
-            tint = tint,
-        )
-        OutgoingMessageIndicator.Failed -> Icon(
-            imageVector = Icons.Default.ErrorOutline,
-            contentDescription = stringResource(R.string.send_failed),
-            modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.error,
-        )
+        OutgoingMessageIndicator.Sending ->
+            Icon(
+                imageVector = Icons.Default.Schedule,
+                contentDescription = stringResource(R.string.sending),
+                modifier = Modifier.size(14.dp),
+                tint = tint.copy(alpha = 0.76f),
+            )
+        OutgoingMessageIndicator.Sent ->
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = stringResource(R.string.sent),
+                modifier = Modifier.size(14.dp),
+                tint = tint,
+            )
+        OutgoingMessageIndicator.Failed ->
+            Icon(
+                imageVector = Icons.Default.ErrorOutline,
+                contentDescription = stringResource(R.string.send_failed),
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.error,
+            )
     }
 }
 
 @Composable
 private fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding(),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .navigationBarsPadding(),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp,
     ) {
         Text(
             text = stringResource(R.string.you_are_no_longer_a_member),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -3860,7 +4011,11 @@ private fun ComposerBar(
     ) {
         if (replyingTo != null) {
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(10.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -3925,17 +4080,19 @@ private fun ComposerBar(
                 modifier = Modifier.weight(1f),
                 placeholder = { Text(stringResource(R.string.message)) },
                 maxLines = 5,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledContainerColor = Color.Transparent,
-                    errorContainerColor = Color.Transparent,
-                ),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences,
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Default,
-                ),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                        errorContainerColor = Color.Transparent,
+                    ),
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Default,
+                    ),
             )
             FloatingActionButton(
                 onClick = {
@@ -3976,16 +4133,18 @@ private fun SettingsScreen(
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Notifications -> NotificationsScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.SecurityPrivacy -> SecurityPrivacyScreen(
-            appState = appState,
-            onBack = { onDetailChange(null) },
-            onOpenDiagnostics = onOpenDiagnostics,
-        )
-        null -> SettingsHomeScreen(
-            appState = appState,
-            onBackToChats = onBackToChats,
-            onOpenDetail = { onDetailChange(it) },
-        )
+        SettingsDetail.SecurityPrivacy ->
+            SecurityPrivacyScreen(
+                appState = appState,
+                onBack = { onDetailChange(null) },
+                onOpenDiagnostics = onOpenDiagnostics,
+            )
+        null ->
+            SettingsHomeScreen(
+                appState = appState,
+                onBackToChats = onBackToChats,
+                onOpenDetail = { onDetailChange(it) },
+            )
     }
 }
 
@@ -4036,16 +4195,30 @@ private fun SettingsHomeScreen(
                         )
                     }
                     SettingsRow(stringResource(R.string.profile), stringResource(R.string.profile_settings_subtitle)) { onOpenDetail(SettingsDetail.Profile) }
-                    SettingsRow(stringResource(R.string.identity_and_keys), stringResource(R.string.identity_settings_subtitle)) { onOpenDetail(SettingsDetail.Identity) }
+                    SettingsRow(
+                        stringResource(R.string.identity_and_keys),
+                        stringResource(R.string.identity_settings_subtitle),
+                    ) { onOpenDetail(SettingsDetail.Identity) }
                     SettingsRow(stringResource(R.string.relays), stringResource(R.string.relays_settings_subtitle)) { onOpenDetail(SettingsDetail.Relays) }
-                    SettingsRow(stringResource(R.string.key_packages), stringResource(R.string.key_packages_settings_subtitle)) { onOpenDetail(SettingsDetail.KeyPackages) }
+                    SettingsRow(
+                        stringResource(R.string.key_packages),
+                        stringResource(R.string.key_packages_settings_subtitle),
+                    ) { onOpenDetail(SettingsDetail.KeyPackages) }
                 }
             }
             item {
                 SectionCard(title = stringResource(R.string.app_preferences)) {
-                    SettingsRow(stringResource(R.string.appearance), stringResource(R.string.appearance_settings_subtitle)) { onOpenDetail(SettingsDetail.Appearance) }
-                    SettingsRow(stringResource(R.string.notifications), stringResource(R.string.notifications_settings_subtitle)) { onOpenDetail(SettingsDetail.Notifications) }
-                    SettingsRow(stringResource(R.string.security_and_privacy), stringResource(R.string.security_privacy_settings_subtitle)) { onOpenDetail(SettingsDetail.SecurityPrivacy) }
+                    SettingsRow(
+                        stringResource(R.string.appearance),
+                        stringResource(R.string.appearance_settings_subtitle),
+                    ) { onOpenDetail(SettingsDetail.Appearance) }
+                    SettingsRow(
+                        stringResource(R.string.notifications),
+                        stringResource(R.string.notifications_settings_subtitle),
+                    ) { onOpenDetail(SettingsDetail.Notifications) }
+                    SettingsRow(stringResource(R.string.security_and_privacy), stringResource(R.string.security_privacy_settings_subtitle)) {
+                        onOpenDetail(SettingsDetail.SecurityPrivacy)
+                    }
                 }
             }
         }
@@ -4075,7 +4248,10 @@ private fun SettingsHomeScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AppearanceScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
+private fun AppearanceScreen(
+    appState: DarkMatterAppState,
+    onBack: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -4145,23 +4321,27 @@ private fun SelectableSettingsRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NotificationsScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
+private fun NotificationsScreen(
+    appState: DarkMatterAppState,
+    onBack: () -> Unit,
+) {
     var pendingNotificationEnable by remember { mutableStateOf(false) }
     var pendingBackgroundConnectionEnable by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        appState.refreshLocalNotificationPermission()
-        if (granted && pendingNotificationEnable) {
-            scope.launch { appState.setLocalNotificationsEnabled(true) }
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            appState.refreshLocalNotificationPermission()
+            if (granted && pendingNotificationEnable) {
+                scope.launch { appState.setLocalNotificationsEnabled(true) }
+            }
+            if (granted && pendingBackgroundConnectionEnable) {
+                scope.launch { appState.setBackgroundConnectionEnabled(true) }
+            } else if (!granted) {
+                appState.present(R.string.toast_notification_permission_denied)
+            }
+            pendingNotificationEnable = false
+            pendingBackgroundConnectionEnable = false
         }
-        if (granted && pendingBackgroundConnectionEnable) {
-            scope.launch { appState.setBackgroundConnectionEnabled(true) }
-        } else if (!granted) {
-            appState.present(R.string.toast_notification_permission_denied)
-        }
-        pendingNotificationEnable = false
-        pendingBackgroundConnectionEnable = false
-    }
 
     LaunchedEffect(appState.activeAccountRef) {
         appState.refreshLocalNotificationPermission()
@@ -4351,9 +4531,10 @@ fun SettingsAccountHeader(
 ) {
     val switchAccountDescription = stringResource(R.string.switch_account)
     ListItem(
-        modifier = Modifier
-            .clickable(onClick = onOpenAccountSelector)
-            .semantics { contentDescription = switchAccountDescription },
+        modifier =
+            Modifier
+                .clickable(onClick = onOpenAccountSelector)
+                .semantics { contentDescription = switchAccountDescription },
         leadingContent = {
             Avatar(
                 title = title,
@@ -4388,10 +4569,11 @@ private fun AccountSelectorSheet(
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
                 items(appState.accounts, key = { it.label }) { account ->
                     ListItem(
-                        modifier = Modifier.clickable {
-                            appState.setActiveAccount(account.label)
-                            onDismiss()
-                        },
+                        modifier =
+                            Modifier.clickable {
+                                appState.setActiveAccount(account.label)
+                                onDismiss()
+                            },
                         leadingContent = {
                             Avatar(
                                 title = appState.displayName(account.accountIdHex),
@@ -4437,7 +4619,11 @@ private fun AccountSelectorSheet(
 }
 
 @Composable
-private fun SettingsRow(title: String, subtitle: String, onClick: () -> Unit) {
+private fun SettingsRow(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
         headlineContent = { Text(title) },
@@ -4492,9 +4678,10 @@ private fun ProfileQrSheet(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
                     onClick = {
-                        val sendIntent = Intent(Intent.ACTION_SEND)
-                            .setType("text/plain")
-                            .putExtra(Intent.EXTRA_TEXT, link.uri)
+                        val sendIntent =
+                            Intent(Intent.ACTION_SEND)
+                                .setType("text/plain")
+                                .putExtra(Intent.EXTRA_TEXT, link.uri)
                         context.startActivity(Intent.createChooser(sendIntent, shareProfileTitle))
                     },
                     modifier = Modifier.weight(1f),
@@ -4585,7 +4772,6 @@ private fun ProfileSheet(
                 // 1:1 DMs aren't a product feature yet; button is intentionally
                 // disabled until they are.
                 enabled = false,
-
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Default.Group, contentDescription = null)
@@ -4618,13 +4804,17 @@ private fun QrCodeImage(content: String) {
     }
 }
 
-private fun qrBitmap(content: String, size: Int): Bitmap {
-    val pixels = QrCodeEncoder.pixels(
-        content = content,
-        size = size,
-        onColor = android.graphics.Color.BLACK,
-        offColor = android.graphics.Color.WHITE,
-    )
+private fun qrBitmap(
+    content: String,
+    size: Int,
+): Bitmap {
+    val pixels =
+        QrCodeEncoder.pixels(
+            content = content,
+            size = size,
+            onColor = android.graphics.Color.BLACK,
+            offColor = android.graphics.Color.WHITE,
+        )
     return Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bitmap ->
         bitmap.setPixels(pixels, 0, size, 0, 0, size, size)
     }
@@ -4642,9 +4832,10 @@ private fun QrScannerSheet(
     var permissionGranted by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        permissionGranted = granted
-    }
+    val launcher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            permissionGranted = granted
+        }
 
     LaunchedEffect(Unit) {
         if (!permissionGranted) launcher.launch(Manifest.permission.CAMERA)
@@ -4663,14 +4854,23 @@ private fun QrScannerSheet(
             }
             if (permissionGranted) {
                 Box(
-                    Modifier.fillMaxWidth().height(520.dp).clip(RoundedCornerShape(16.dp)).background(Color.Black),
+                    Modifier
+                        .fillMaxWidth()
+                        .height(520.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black),
                     contentAlignment = Alignment.BottomCenter,
                 ) {
                     CameraQrScanner(onScan = onScan, onError = { scannerError = it })
                     Text(
                         scannerError ?: stringResource(R.string.point_camera_at_profile_qr),
                         color = Color.White,
-                        modifier = Modifier.padding(16.dp).background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp)).padding(horizontal = 14.dp, vertical = 8.dp),
+                        modifier =
+                            Modifier
+                                .padding(
+                                    16.dp,
+                                ).background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
                     )
                 }
             } else {
@@ -4696,7 +4896,12 @@ private fun CameraQrScanner(
     val cameraUnavailable = stringResource(R.string.camera_unavailable)
 
     if (lifecycleOwner == null) {
-        onError(cameraLifecycleUnavailable)
+        // Emit the error as a post-composition effect, not a side effect during
+        // composition (which violates Compose's rules and can fire on every
+        // recomposition). See #23.
+        LaunchedEffect(cameraLifecycleUnavailable) {
+            onError(cameraLifecycleUnavailable)
+        }
         return
     }
 
@@ -4710,13 +4915,12 @@ private fun CameraQrScanner(
     )
 }
 
-private tailrec fun Context.lifecycleOwner(): LifecycleOwner? {
-    return when (this) {
+private tailrec fun Context.lifecycleOwner(): LifecycleOwner? =
+    when (this) {
         is LifecycleOwner -> this
         is ContextWrapper -> baseContext.lifecycleOwner()
         else -> null
     }
-}
 
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
 private fun bindQrScannerCamera(
@@ -4731,23 +4935,29 @@ private fun bindQrScannerCamera(
     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
     cameraProviderFuture.addListener(
         {
-            val provider = runCatching { cameraProviderFuture.get() }.getOrElse {
-                onError(cameraUnavailable)
-                return@addListener
-            }
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
-            }
-            val scanner = BarcodeScanning.getClient(
-                BarcodeScannerOptions.Builder()
-                    .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                    .build(),
-            )
+            val provider =
+                runCatching { cameraProviderFuture.get() }.getOrElse {
+                    onError(cameraUnavailable)
+                    return@addListener
+                }
+            val preview =
+                Preview.Builder().build().also {
+                    it.setSurfaceProvider(previewView.surfaceProvider)
+                }
+            val scanner =
+                BarcodeScanning.getClient(
+                    BarcodeScannerOptions
+                        .Builder()
+                        .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                        .build(),
+                )
             val didScan = AtomicBoolean(false)
             val analyzerBusy = AtomicBoolean(false)
-            val analysis = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
+            val analysis =
+                ImageAnalysis
+                    .Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
 
             analysis.setAnalyzer(executor) { imageProxy ->
                 if (!analyzerBusy.compareAndSet(false, true)) {
@@ -4761,15 +4971,14 @@ private fun bindQrScannerCamera(
                     return@setAnalyzer
                 }
                 val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                scanner.process(image)
+                scanner
+                    .process(image)
                     .addOnSuccessListener { codes ->
                         val raw = codes.firstOrNull { it.rawValue != null }?.rawValue
                         if (raw != null && didScan.compareAndSet(false, true)) onScan(raw)
-                    }
-                    .addOnFailureListener {
+                    }.addOnFailureListener {
                         onError(it.message ?: it.javaClass.simpleName)
-                    }
-                    .addOnCompleteListener {
+                    }.addOnCompleteListener {
                         analyzerBusy.set(false)
                         imageProxy.close()
                     }
@@ -4788,7 +4997,10 @@ private fun bindQrScannerCamera(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
+private fun ProfileEditScreen(
+    appState: DarkMatterAppState,
+    onBack: () -> Unit,
+) {
     val active = appState.activeAccount
     var displayName by remember(active?.accountIdHex) { mutableStateOf("") }
     var about by remember(active?.accountIdHex) { mutableStateOf("") }
@@ -4858,23 +5070,31 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                         minLines = 2,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    // Client-side validation: flag a malformed picture URL or
+                    // nip-05 (red field) and block publish so we don't push junk
+                    // — or an SSRF-prone avatar URL — to relays. See #69.
+                    val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
+                    val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
                     OutlinedTextField(
                         value = picture,
                         onValueChange = { picture = it },
                         label = { Text(stringResource(R.string.picture_url)) },
                         singleLine = true,
+                        isError = !pictureValid,
                         modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.None,
-                            autoCorrectEnabled = false,
-                            keyboardType = KeyboardType.Uri,
-                        ),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                capitalization = KeyboardCapitalization.None,
+                                autoCorrectEnabled = false,
+                                keyboardType = KeyboardType.Uri,
+                            ),
                     )
                     OutlinedTextField(
                         value = nip05,
                         onValueChange = { nip05 = it },
                         label = { Text(stringResource(R.string.nip_05)) },
                         singleLine = true,
+                        isError = !nip05Valid,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                     )
@@ -4903,11 +5123,14 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
                                 busy = false
                             }
                         },
-                        enabled = !busy && active != null,
+                        enabled = !busy && active != null && pictureValid && nip05Valid,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        if (busy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Default.Check, contentDescription = null)
+                        if (busy) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                        }
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.publish_to_relays))
                     }
@@ -4919,7 +5142,10 @@ private fun ProfileEditScreen(appState: DarkMatterAppState, onBack: () -> Unit) 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddIdentitySheet(appState: DarkMatterAppState, onDismiss: () -> Unit) {
+private fun AddIdentitySheet(
+    appState: DarkMatterAppState,
+    onDismiss: () -> Unit,
+) {
     var identity by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -4944,9 +5170,10 @@ private fun AddIdentitySheet(appState: DarkMatterAppState, onDismiss: () -> Unit
             ) {
                 if (busy) {
                     CircularProgressIndicator(
-                        modifier = Modifier
-                            .size(18.dp)
-                            .semantics { contentDescription = creatingIdentityDescription },
+                        modifier =
+                            Modifier
+                                .size(18.dp)
+                                .semantics { contentDescription = creatingIdentityDescription },
                         strokeWidth = 2.dp,
                     )
                 } else {
@@ -4969,21 +5196,23 @@ private fun AddIdentitySheet(appState: DarkMatterAppState, onDismiss: () -> Unit
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = if (maskSecret) PasswordVisualTransformation() else VisualTransformation.None,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.None,
-                    autoCorrectEnabled = false,
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        busy = true
-                        scope.launch {
-                            appState.importIdentity(identity)
-                            busy = false
-                        }
-                    },
-                ),
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                    ),
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = {
+                            busy = true
+                            scope.launch {
+                                appState.importIdentity(identity)
+                                busy = false
+                            }
+                        },
+                    ),
             )
             OutlinedButton(
                 onClick = {
@@ -5006,7 +5235,10 @@ private fun AddIdentitySheet(appState: DarkMatterAppState, onDismiss: () -> Unit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun IdentityScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
+private fun IdentityScreen(
+    appState: DarkMatterAppState,
+    onBack: () -> Unit,
+) {
     val clipboard = LocalClipboardManager.current
     val active = appState.activeAccount
 
@@ -5098,7 +5330,10 @@ private fun CopyableValueRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
+private fun RelaysScreen(
+    appState: DarkMatterAppState,
+    onBack: () -> Unit,
+) {
     var pendingUrl by remember { mutableStateOf("") }
     var lists by remember(appState.activeAccountRef) { mutableStateOf<AccountRelayListsFfi?>(null) }
     var selectedKind by remember { mutableStateOf(RelayListKind.Nip65) }
@@ -5172,11 +5407,12 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                             textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                            keyboardOptions = KeyboardOptions(
-                                capitalization = KeyboardCapitalization.None,
-                                autoCorrectEnabled = false,
-                                keyboardType = KeyboardType.Uri,
-                            ),
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.None,
+                                    autoCorrectEnabled = false,
+                                    keyboardType = KeyboardType.Uri,
+                                ),
                         )
                         IconButton(
                             onClick = {
@@ -5189,11 +5425,13 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
                                 }
                             },
                             modifier = Modifier.size(48.dp),
-                            enabled = pendingUrl.trim().let {
-                                !saving && appState.activeAccountRef != null &&
-                                    isAcceptableRelayUrl(it) &&
-                                    !currentRelays.contains(it)
-                            },
+                            enabled =
+                                pendingUrl.trim().let {
+                                    !saving &&
+                                        appState.activeAccountRef != null &&
+                                        isAcceptableRelayUrl(it) &&
+                                        !currentRelays.contains(it)
+                                },
                         ) {
                             Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_relay))
                         }
@@ -5207,23 +5445,24 @@ private fun RelaysScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
     }
 }
 
-private val relayListKinds = listOf(
-    RelayListKind.Nip65,
-    RelayListKind.Inbox,
-)
+private val relayListKinds =
+    listOf(
+        RelayListKind.Nip65,
+        RelayListKind.Inbox,
+    )
 
 private val RelayListKind.labelRes: Int
-    get() = when (this) {
-        RelayListKind.Nip65 -> R.string.nip_65
-        RelayListKind.Inbox -> R.string.inbox
-    }
+    get() =
+        when (this) {
+            RelayListKind.Nip65 -> R.string.nip_65
+            RelayListKind.Inbox -> R.string.inbox
+        }
 
-private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> {
-    return when (kind) {
+private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =
+    when (kind) {
         RelayListKind.Nip65 -> nip65.relays
         RelayListKind.Inbox -> inbox.relays
     }
-}
 
 @Composable
 private fun PublishedRelayLists(lists: AccountRelayListsFfi?) {
@@ -5243,7 +5482,10 @@ private fun PublishedRelayLists(lists: AccountRelayListsFfi?) {
 }
 
 @Composable
-private fun RelayListRow(title: String, list: RelayListFfi) {
+private fun RelayListRow(
+    title: String,
+    list: RelayListFfi,
+) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(title, fontWeight = FontWeight.SemiBold)
@@ -5261,7 +5503,10 @@ private fun RelayListRow(title: String, list: RelayListFfi) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KeyPackagesScreen(appState: DarkMatterAppState, onBack: () -> Unit) {
+private fun KeyPackagesScreen(
+    appState: DarkMatterAppState,
+    onBack: () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     var packages by remember(appState.activeAccountRef) { mutableStateOf<List<AccountKeyPackageFfi>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
@@ -5489,7 +5734,11 @@ private fun keyPackageSourceLabels(
 private val publishedAtFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.getDefault()).withZone(ZoneId.systemDefault())
 
-private fun formatPublishedAt(unixSeconds: ULong, unknown: String, format: String): String {
+private fun formatPublishedAt(
+    unixSeconds: ULong,
+    unknown: String,
+    format: String,
+): String {
     if (unixSeconds == 0uL) return unknown
     // ULong > Long.MAX_VALUE wraps to a negative epoch; Instant then rejects
     // anything below Instant.MIN. Garbage from a malicious relay shouldn't
@@ -5501,7 +5750,10 @@ private fun formatPublishedAt(unixSeconds: ULong, unknown: String, format: Strin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () -> Unit) {
+private fun DiagnosticsScreen(
+    appState: DarkMatterAppState,
+    onBackToChats: () -> Unit,
+) {
     var health by remember { mutableStateOf<RelayHealthFfi?>(null) }
     var entries by remember { mutableStateOf<List<DiagnosticLogEntry>>(emptyList()) }
     var streaming by remember { mutableStateOf(false) }
@@ -5518,9 +5770,10 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () ->
         val subscription = appState.marmotIo { subscribeEvents() }
         try {
             while (true) {
-                val event = withContext(Dispatchers.IO) {
-                    subscription.next()
-                } ?: break
+                val event =
+                    withContext(Dispatchers.IO) {
+                        subscription.next()
+                    } ?: break
                 entries = (entries + DiagnosticLogEntry(text = DiagnosticFormatter.describe(event))).takeLast(500)
             }
         } catch (throwable: Throwable) {
@@ -5560,15 +5813,19 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () ->
                             scope.launch {
                                 val account = appState.activeAccountRef ?: return@launch
                                 runCatching {
-                                    val groupId = appState.marmotIo {
-                                        createGroup(
-                                            account,
-                                            "diagnostic-${System.currentTimeMillis() / 1000L}",
-                                            emptyList(),
-                                            null,
-                                        )
-                                    }
+                                    val groupId =
+                                        appState.marmotIo {
+                                            createGroup(
+                                                account,
+                                                "diagnostic-${System.currentTimeMillis() / 1000L}",
+                                                emptyList(),
+                                                null,
+                                            )
+                                        }
                                     appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }
+                                    // Archive the throwaway diagnostic group so it doesn't
+                                    // accumulate as an orphan in the chat list on every click. See #70.
+                                    appState.marmotIo { setGroupArchived(account, groupId, true) }
                                     appendLog(String.format(sentPingFormat, IdentityFormatter.short(groupId)))
                                 }.onFailure {
                                     appendLog(String.format(sendToSelfFailedFormat, it.message ?: it.javaClass.simpleName))
@@ -5618,22 +5875,31 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () ->
                     DiagnosticRow(stringResource(R.string.bootstrap_relays), appState.bootstrapRelayCount().toString())
                 }
             }
+            // Event log: emitted as top-level lazy items (keyed by the entry's
+            // id) rather than a forEach inside a single item, so the up-to-500
+            // rows are actually virtualized instead of all composing at once.
+            // See #35.
             item {
-                SectionCard(title = stringResource(R.string.event_log)) {
-                    if (entries.isEmpty()) {
-                        Text(stringResource(R.string.waiting_for_events), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else {
-                        entries.forEach { entry ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text(
-                                    IdentityFormatter.relativeTime(entry.timestamp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Text(entry.text, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
-                            }
-                        }
+                Text(
+                    stringResource(R.string.event_log),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            if (entries.isEmpty()) {
+                item {
+                    Text(stringResource(R.string.waiting_for_events), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                items(entries, key = { it.id }) { entry ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            IdentityFormatter.relativeTime(entry.timestamp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(entry.text, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
                     }
                 }
             }
@@ -5642,7 +5908,10 @@ private fun DiagnosticsScreen(appState: DarkMatterAppState, onBackToChats: () ->
 }
 
 @Composable
-private fun DiagnosticRow(label: String, value: String) {
+private fun DiagnosticRow(
+    label: String,
+    value: String,
+) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -5708,7 +5977,10 @@ private fun SectionCardWithAction(
 }
 
 @Composable
-private fun ErrorContent(title: String, message: String) {
+private fun ErrorContent(
+    title: String,
+    message: String,
+) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(40.dp))
@@ -5725,18 +5997,25 @@ private fun Avatar(
     size: androidx.compose.ui.unit.Dp,
     pictureUrl: String? = null,
 ) {
-    val palette = listOf(
-        Color(0xFF006A6A),
-        Color(0xFF8C4A00),
-        Color(0xFF5B5FC7),
-        Color(0xFF006D3B),
-        Color(0xFF9A4055),
-    )
+    val palette =
+        listOf(
+            Color(0xFF006A6A),
+            Color(0xFF8C4A00),
+            Color(0xFF5B5FC7),
+            Color(0xFF006D3B),
+            Color(0xFF9A4055),
+        )
     val color = palette[avatarPaletteIndex(seed.hashCode(), palette.size)]
-    val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, pictureUrl) {
-        value = null
-        val url = pictureUrl ?: return@produceState
-        value = AvatarImageLoader.load(url)
+    // Seed from the in-memory cache so re-entering a screen shows an
+    // already-loaded avatar immediately, with no placeholder flash and no
+    // re-fetch. See #31.
+    val image by produceState(AvatarImageLoader.peek(pictureUrl), pictureUrl) {
+        val url =
+            pictureUrl ?: run {
+                value = null
+                return@produceState
+            }
+        if (value == null) value = AvatarImageLoader.load(url)
     }
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(color),
@@ -5760,6 +6039,7 @@ private fun Avatar(
     }
 }
 
-internal fun avatarPaletteIndex(seedHash: Int, paletteSize: Int): Int {
-    return Math.floorMod(seedHash, paletteSize)
-}
+internal fun avatarPaletteIndex(
+    seedHash: Int,
+    paletteSize: Int,
+): Int = Math.floorMod(seedHash, paletteSize)

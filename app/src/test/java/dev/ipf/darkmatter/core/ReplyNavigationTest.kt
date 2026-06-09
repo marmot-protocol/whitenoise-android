@@ -58,17 +58,18 @@ class ReplyNavigationTest {
         )
     }
 
-    private fun message(tags: List<MessageTagFfi>) = AppMessageRecordFfi(
-        messageIdHex = "reply",
-        direction = "received",
-        groupIdHex = "group",
-        sender = "alice",
-        plaintext = "reply",
-        kind = 9uL,
-        tags = tags,
-        recordedAt = 1uL,
-        receivedAt = 1uL,
-    )
+    private fun message(tags: List<MessageTagFfi>) =
+        AppMessageRecordFfi(
+            messageIdHex = "reply",
+            direction = "received",
+            groupIdHex = "group",
+            sender = "alice",
+            plaintext = "reply",
+            kind = 9uL,
+            tags = tags,
+            recordedAt = 1uL,
+            receivedAt = 1uL,
+        )
 
     private fun timelineRecord(
         replyPreviewMessageId: String?,
@@ -85,17 +86,18 @@ class ReplyNavigationTest {
         timelineAt = 1uL,
         receivedAt = 1uL,
         replyToMessageIdHex = replyToMessageIdHex,
-        replyPreview = replyPreviewMessageId?.let {
-            TimelineReplyPreviewFfi(
-                messageIdHex = it,
-                sender = "bob",
-                plaintext = "parent",
-                kind = 9uL,
-                mediaJson = null,
-                agentTextStreamJson = null,
-                deleted = false,
-            )
-        },
+        replyPreview =
+            replyPreviewMessageId?.let {
+                TimelineReplyPreviewFfi(
+                    messageIdHex = it,
+                    sender = "bob",
+                    plaintext = "parent",
+                    kind = 9uL,
+                    mediaJson = null,
+                    agentTextStreamJson = null,
+                    deleted = false,
+                )
+            },
         mediaJson = null,
         agentTextStreamJson = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),

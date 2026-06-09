@@ -1,0 +1,36 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+indent_size = 4
+# Generous cap: the codebase already has long lines (some >140 cols) that
+# ktlint cannot always safely auto-wrap. 160 flags only the truly egregious
+# while leaving the bulk untouched. Tighten later if desired.
+max_line_length = 160
+ktlint_code_style = ktlint_official
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+# Compose: @Composable functions are intentionally PascalCase, so exempt them
+# from function-naming (the rule still applies to ordinary functions).
+ktlint_function_naming_ignore_when_annotated_with = Composable
+# The project consistently names its constants/immutable object vals in
+# PascalCase (e.g. KindChat, EventRefTag); ktlint_official wants SCREAMING_SNAKE.
+# Disable rather than churn the codebase away from its established convention.
+ktlint_standard_property-naming = disabled
+
+# Belt-and-suspenders guard for the generated / vendored binding sources, in
+# addition to the filter { exclude } predicates in app/build.gradle.kts.
+# (Valid ktlint glob form: directory segments + /*.kt — NOT "**.kt".)
+[**/dev/ipf/marmotkit/**/*.kt]
+ktlint = disabled
+
+[**/io/crates/**/*.kt]
+ktlint = disabled

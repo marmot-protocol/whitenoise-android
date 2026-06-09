@@ -6,14 +6,15 @@ package dev.ipf.darkmatter.state
  * leaking "online + viewing" timing to the Blossom server on cellular, while
  * still feeling automatic on Wi-Fi.
  */
-enum class MediaAutoDownloadPolicy(val preferenceValue: String) {
+enum class MediaAutoDownloadPolicy(
+    val preferenceValue: String,
+) {
     Always("always"),
     WifiOnly("wifi"),
-    Never("never");
+    Never("never"),
+    ;
 
     companion object {
-        fun fromPreference(value: String?): MediaAutoDownloadPolicy {
-            return entries.firstOrNull { it.preferenceValue == value } ?: WifiOnly
-        }
+        fun fromPreference(value: String?): MediaAutoDownloadPolicy = entries.firstOrNull { it.preferenceValue == value } ?: WifiOnly
     }
 }

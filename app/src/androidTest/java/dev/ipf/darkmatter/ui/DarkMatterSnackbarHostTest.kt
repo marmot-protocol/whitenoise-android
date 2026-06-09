@@ -1,5 +1,7 @@
 package dev.ipf.darkmatter.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
@@ -17,8 +19,6 @@ import dev.ipf.darkmatter.ui.theme.DarkMatterTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 
 class DarkMatterSnackbarHostTest {
     @get:Rule

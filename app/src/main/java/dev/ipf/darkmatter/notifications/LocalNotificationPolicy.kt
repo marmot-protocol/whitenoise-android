@@ -7,7 +7,5 @@ object LocalNotificationPolicy {
         update: NotificationUpdateFfi,
         appInForeground: Boolean,
         activeConversationGroupIdHex: String?,
-    ): Boolean {
-        return !(appInForeground && activeConversationGroupIdHex == update.groupIdHex)
-    }
+    ): Boolean = !(appInForeground && activeConversationGroupIdHex == update.groupIdHex)
 }

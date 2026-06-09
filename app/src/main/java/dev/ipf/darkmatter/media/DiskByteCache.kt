@@ -31,32 +31,56 @@ class DiskByteCache(
     private val cacheDir: File,
     private val maxBytes: Long,
 ) {
-    private val index = LinkedHashMap<String, Entry>(8, 0.75f, /* accessOrder = */ true)
+    // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
+    private val index = LinkedHashMap<String, Entry>(8, 0.75f, true)
     private var residentBytes: Long = 0L
+    private var hydrated = false
 
-    init {
+    // No directory I/O in the constructor: the scan + per-file stat are
+    // deferred to the first cache operation so they don't run on the main
+    // thread at app launch (the cache is constructed eagerly as an AppState
+    // field). First access happens on Dispatchers.IO. See #100.
+    private fun ensureHydrated() {
+        if (hydrated) return
         cacheDir.mkdirs()
         rehydrateIndex()
+        hydrated = true
     }
 
-    @Synchronized
     fun get(key: String): ByteArray? {
         val hashed = fileNameFor(key)
-        val entry = index[hashed] ?: return null
+        // Look up (and LRU-promote) the entry under the lock, then read the
+        // file OUTSIDE it. Holding the monitor across readBytes() serialized
+        // every concurrent media load and blocked clear() for the duration of
+        // disk I/O. See #99.
+        val entry =
+            synchronized(this) {
+                ensureHydrated()
+                index[hashed]
+            } ?: return null
         return try {
             entry.file.readBytes()
         } catch (_: IOException) {
             // File vanished (manual delete, OS cache reap, FS corruption).
             // Drop the index entry and report miss; the caller will re-fetch.
-            index.remove(hashed)
-            residentBytes -= entry.size
+            synchronized(this) {
+                // Only evict if a concurrent put() hasn't already replaced it.
+                if (index[hashed] === entry) {
+                    index.remove(hashed)
+                    residentBytes -= entry.size
+                }
+            }
             null
         }
     }
 
     @Synchronized
-    fun put(key: String, bytes: ByteArray) {
+    fun put(
+        key: String,
+        bytes: ByteArray,
+    ) {
         if (bytes.isEmpty()) return
+        ensureHydrated()
         val hashed = fileNameFor(key)
         val existing = index.remove(hashed)
         if (existing != null) {
@@ -90,21 +114,38 @@ class DiskByteCache(
 
     @Synchronized
     fun clear() {
+        // Hold the lock for the whole wipe. Deleting outside it (an earlier
+        // #99 attempt) let a concurrent put() recreate a `.bin` that the orphan
+        // sweep then removed — a race. clear() runs on sign-out/account-switch,
+        // so briefly blocking get()/put() is fine, and it keeps the privacy
+        // guarantee that ALL of this account's media (including orphan `.bin`s)
+        // is wiped. The #99 win — get() not holding the lock across readBytes —
+        // is unaffected, since that's in get(), not here.
+        ensureHydrated()
         index.values.forEach { runCatching { it.file.delete() } }
         index.clear()
         residentBytes = 0L
         // Catch any orphans that aren't in the index — e.g. a prior crash
-        // mid-put left a `.tmp`, or an entry whose index row was lost.
-        // Scoped to OUR file-naming convention (`.bin` + `.tmp`) so a
-        // future co-tenant in the same dir survives sign-out.
-        cacheDir.listFiles()
+        // mid-put left a `.tmp`, or an entry whose index row was lost. Scoped to
+        // OUR naming (`.bin` + `.tmp`) so a future co-tenant survives sign-out.
+        cacheDir
+            .listFiles()
             ?.asSequence()
             ?.filter { it.isFile && (it.name.endsWith(SUFFIX) || it.name.endsWith(TMP_SUFFIX)) }
             ?.forEach { runCatching { it.delete() } }
     }
 
-    fun size(): Int = synchronized(this) { index.size }
-    fun residentBytes(): Long = synchronized(this) { residentBytes }
+    fun size(): Int =
+        synchronized(this) {
+            ensureHydrated()
+            index.size
+        }
+
+    fun residentBytes(): Long =
+        synchronized(this) {
+            ensureHydrated()
+            residentBytes
+        }
 
     private fun evictUntilUnderCap() {
         if (residentBytes <= maxBytes) return
@@ -118,10 +159,12 @@ class DiskByteCache(
     }
 
     private fun rehydrateIndex() {
-        val files = cacheDir.listFiles()
-            ?.filter { it.isFile && it.name.endsWith(SUFFIX) }
-            ?.sortedBy { it.lastModified() }
-            ?: return
+        val files =
+            cacheDir
+                .listFiles()
+                ?.filter { it.isFile && it.name.endsWith(SUFFIX) }
+                ?.sortedBy { it.lastModified() }
+                ?: return
         for (file in files) {
             val size = file.length()
             if (size <= 0 || size > Int.MAX_VALUE) {
@@ -148,14 +191,32 @@ class DiskByteCache(
         return sb.toString()
     }
 
-    private data class Entry(val file: File, val size: Int)
+    private data class Entry(
+        val file: File,
+        val size: Int,
+    )
 
     private companion object {
         const val SUFFIX = ".bin"
         const val TMP_SUFFIX = ".tmp"
-        val HEX = charArrayOf(
-            '0', '1', '2', '3', '4', '5', '6', '7',
-            '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
-        )
+        val HEX =
+            charArrayOf(
+                '0',
+                '1',
+                '2',
+                '3',
+                '4',
+                '5',
+                '6',
+                '7',
+                '8',
+                '9',
+                'a',
+                'b',
+                'c',
+                'd',
+                'e',
+                'f',
+            )
     }
 }

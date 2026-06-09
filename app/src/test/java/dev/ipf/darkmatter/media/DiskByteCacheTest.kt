@@ -1,7 +1,5 @@
 package dev.ipf.darkmatter.media
 
-import java.io.File
-import java.nio.file.Files
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -9,9 +7,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
+import java.nio.file.Files
 
 class DiskByteCacheTest {
-
     private lateinit var dir: File
 
     @Before
@@ -115,6 +114,22 @@ class DiskByteCacheTest {
         val b = rehydrated.get("b")
         assertNotNull(b)
         assertTrue(b!!.all { it == 2.toByte() })
+    }
+
+    @Test
+    fun rehydration_isDeferredUntilFirstAccess() {
+        // #100: the constructor must not do directory I/O (it ran on the main
+        // thread at app launch). Proof: build the cache over an empty dir, then
+        // have a *separate* instance write an entry to the same dir. If the
+        // first instance only rehydrates on first access it scans the dir now
+        // and sees the entry; eager constructor rehydration would have missed
+        // it (the dir was empty at construction time).
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        DiskByteCache(dir, maxBytes = 1024).put("late", ByteArray(40) { 9 })
+
+        val out = cache.get("late")
+        assertNotNull(out)
+        assertTrue(out!!.all { it == 9.toByte() })
     }
 
     @Test

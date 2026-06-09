@@ -10,8 +10,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import dev.ipf.darkmatter.notifications.InboundIntentRouting
 import dev.ipf.darkmatter.notifications.NotificationNavigation
 import dev.ipf.darkmatter.notifications.NotificationTarget
+import dev.ipf.darkmatter.notifications.routeInboundIntent
 import dev.ipf.darkmatter.state.DarkMatterAppState
 import dev.ipf.darkmatter.ui.DarkMatterApp
 import dev.ipf.darkmatter.ui.theme.DarkMatterTheme
@@ -47,19 +49,19 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Route an inbound intent: a notification tap (our [NotificationNavigation.ACTION_OPEN]
-     * action) becomes a navigation target; anything else keeps the existing
-     * `darkmatter://` profile-link path. The two are mutually exclusive so a
-     * notification's data URI is never misread as a profile payload.
+     * action) becomes a navigation target; a `darkmatter://` data URI becomes a
+     * profile-link payload. A dataless, non-notification intent leaves any
+     * already-queued target/link intact (see [routeInboundIntent]).
      */
     private fun consumeIntent(intent: Intent?) {
-        val target = NotificationNavigation.parse(intent)
-        if (target != null) {
-            inboundNotificationTarget = target
-            inboundProfilePayload = null
-        } else {
-            inboundNotificationTarget = null
-            inboundProfilePayload = intent?.dataString
-        }
+        val routing =
+            routeInboundIntent(
+                parsedTarget = NotificationNavigation.parse(intent),
+                dataString = intent?.dataString,
+                current = InboundIntentRouting(inboundNotificationTarget, inboundProfilePayload),
+            )
+        inboundNotificationTarget = routing.notificationTarget
+        inboundProfilePayload = routing.profilePayload
     }
 
     override fun onStart() {
