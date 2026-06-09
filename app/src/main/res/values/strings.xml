@@ -92,6 +92,9 @@
     <string name="error_qr_not_valid_npub_or_public_key">That QR code is not a valid npub or public key.</string>
     <string name="admin">Admin</string>
     <string name="you">You</string>
+    <string name="reaction_filter_all">All</string>
+    <string name="view_reactors">View who reacted</string>
+    <string name="toggle_reaction">Toggle reaction</string>
     <string name="member_actions">Member actions</string>
     <string name="remove_admin">Remove admin</string>
     <string name="adding_admin">Adding admin...</string>

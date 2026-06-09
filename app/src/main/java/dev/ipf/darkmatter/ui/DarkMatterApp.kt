@@ -132,6 +132,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -166,6 +167,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -204,6 +206,7 @@ import dev.ipf.darkmatter.core.ProfileFieldValidation
 import dev.ipf.darkmatter.core.ProfileLink
 import dev.ipf.darkmatter.core.ProfileSanitizer
 import dev.ipf.darkmatter.core.QrCodeEncoder
+import dev.ipf.darkmatter.core.ReactionTally
 import dev.ipf.darkmatter.core.RecentEmojiList
 import dev.ipf.darkmatter.core.RecipientReference
 import dev.ipf.darkmatter.core.ReplySwipe
@@ -225,6 +228,7 @@ import dev.ipf.darkmatter.state.MediaAutoDownloadPolicy
 import dev.ipf.darkmatter.state.MessageStatus
 import dev.ipf.darkmatter.state.MessageStatusLabels
 import dev.ipf.darkmatter.state.OutgoingMessageIndicator
+import dev.ipf.darkmatter.state.ReactionParticipant
 import dev.ipf.darkmatter.state.RelayListKind
 import dev.ipf.darkmatter.state.TimelineMessage
 import dev.ipf.darkmatter.state.countUnreadIncoming
@@ -3402,6 +3406,7 @@ private fun MessageBubble(
         }
     var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var infoSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    var reactionSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     val quickReactionEmojis = RecentEmojiList.quickChoices(recentReactionEmojis)
 
     fun beginReply() {
@@ -3653,16 +3658,175 @@ private fun MessageBubble(
                 if (tallies.isNotEmpty()) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
                         tallies.forEach { tally ->
-                            FilterChip(
-                                selected = tally.mine,
-                                onClick = { appState.launchMutation { controller.toggleReaction(tally.emoji, record) } },
-                                label = { Text("${tally.emoji} ${tally.count}") },
+                            ReactionTallyChip(
+                                tally = tally,
+                                onClick = { reactionSheetOpen = true },
+                                onLongClick = {
+                                    appState.launchMutation { controller.toggleReaction(tally.emoji, record) }
+                                },
                             )
                         }
                     }
                 }
+                if (reactionSheetOpen) {
+                    val participants =
+                        remember(record.messageIdHex, item.projected?.reactions, tallies) {
+                            controller.reactionParticipantsFor(record.messageIdHex)
+                        }
+                    // Close when the participant list drains, without re-firing for every list update.
+                    LaunchedEffect(participants.isEmpty()) {
+                        if (participants.isEmpty()) reactionSheetOpen = false
+                    }
+                    if (participants.isNotEmpty()) {
+                        ReactionDetailsSheet(
+                            participants = participants,
+                            appState = appState,
+                            onDismissRequest = { reactionSheetOpen = false },
+                        )
+                    }
+                }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ReactionTallyChip(
+    tally: ReactionTally,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val viewReactorsLabel = stringResource(R.string.view_reactors)
+    val toggleReactionLabel = stringResource(R.string.toggle_reaction)
+    Surface(
+        modifier =
+            Modifier
+                .minimumInteractiveComponentSize()
+                .semantics { selected = tally.mine }
+                .clip(RoundedCornerShape(8.dp))
+                .combinedClickable(
+                    role = Role.Button,
+                    onClick = onClick,
+                    onClickLabel = viewReactorsLabel,
+                    onLongClick = onLongClick,
+                    onLongClickLabel = toggleReactionLabel,
+                ),
+        shape = RoundedCornerShape(8.dp),
+        color = if (tally.mine) colorScheme.secondaryContainer else colorScheme.surfaceContainerHigh,
+        contentColor = if (tally.mine) colorScheme.onSecondaryContainer else colorScheme.onSurface,
+        tonalElevation = 1.dp,
+    ) {
+        Text(
+            text = "${tally.emoji} ${tally.count}",
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReactionDetailsSheet(
+    participants: List<ReactionParticipant>,
+    appState: DarkMatterAppState,
+    onDismissRequest: () -> Unit,
+) {
+    var selectedEmoji by remember(participants) { mutableStateOf<String?>(null) }
+    val activeAccountId = appState.activeAccount?.accountIdHex
+    val emojiCounts =
+        remember(participants) {
+            participants
+                .groupingBy { it.emoji }
+                .eachCount()
+                .toList()
+                .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
+        }
+    val visibleParticipants =
+        remember(participants, selectedEmoji) {
+            selectedEmoji?.let { emoji -> participants.filter { it.emoji == emoji } } ?: participants
+        }
+
+    ModalBottomSheet(onDismissRequest = onDismissRequest) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = selectedEmoji == null,
+                    onClick = { selectedEmoji = null },
+                    label = { Text("${stringResource(R.string.reaction_filter_all)} · ${participants.size}") },
+                )
+                emojiCounts.forEach { (emoji, count) ->
+                    FilterChip(
+                        selected = selectedEmoji == emoji,
+                        onClick = { selectedEmoji = emoji },
+                        label = { Text("$emoji $count") },
+                    )
+                }
+            }
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                itemsIndexed(
+                    visibleParticipants,
+                    key = { index, participant -> "${participant.sender}:${participant.emoji}:${participant.reactedAt}:$index" },
+                ) { _, participant ->
+                    ReactionParticipantRow(
+                        participant = participant,
+                        appState = appState,
+                        mine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReactionParticipantRow(
+    participant: ReactionParticipant,
+    appState: DarkMatterAppState,
+    mine: Boolean,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .clickable { appState.presentProfile(appState.npub(participant.sender)) }
+                .padding(horizontal = 4.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Avatar(
+            title = appState.displayName(participant.sender),
+            seed = participant.sender,
+            size = 44.dp,
+            pictureUrl = appState.avatarUrl(participant.sender),
+        )
+        Text(
+            text = if (mine) stringResource(R.string.you) else appState.displayName(participant.sender),
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = participant.emoji,
+            style = MaterialTheme.typography.headlineSmall,
+        )
     }
 }
 
