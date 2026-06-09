@@ -18,10 +18,10 @@ import java.io.ByteArrayOutputStream
  * clients prevents one platform from accidentally shipping multi-MB blobs
  * that the other side then has to download.
  *
- * The Rust `uploadMedia` FFI takes a single `ByteArray` (no streaming, no
- * progress callback), so the whole compressed payload sits in the JVM heap
- * during upload. Capping the edge is the only protection against
- * OOM on a 12MP source.
+ * The Rust `uploadMedia` FFI takes attachment plaintext as `ByteArray`s (no
+ * streaming, no progress callback), so each compressed payload sits in the JVM
+ * heap during upload. Capping the edge is the only protection against OOM on a
+ * 12MP source.
  */
 object MediaPipeline {
     /** 1920px max edge mirrors `ImagePicker(maxWidth: 1920, maxHeight: 1920)`. */

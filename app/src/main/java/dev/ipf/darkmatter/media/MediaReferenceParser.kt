@@ -1,62 +1,65 @@
 package dev.ipf.darkmatter.media
 
 import dev.ipf.darkmatter.core.HostSafety
-import dev.ipf.marmotkit.MediaReferenceFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import java.net.URI
 
 /**
- * Pure parser for the MIP-04-v2 `imeta` tag carried on kind-9 messages that
- * reference an encrypted Blossom blob. Extracted from the Compose surface so
- * the validation rules (six required fields, hex lengths, version pin) are
- * unit-testable without an FFI runtime.
+ * Pure parser for the encrypted-media-v1 `imeta` tag carried on kind-9
+ * messages. Rust validates incoming tags before projection; this parser is
+ * used for optimistic UI bridge records that Android creates locally before
+ * the projected event echoes back.
  *
  * Wire shape — per `darkmatter/crates/marmot-app/src/media.rs::imeta_tag`:
  * ```
- * ["imeta", "url <URL>", "m <mime>", "filename <name>",
- *           "x <hex 32B sha256 of plaintext>",
- *           "n <hex 12B nonce>",
- *           "v mip04-v2"]
+ * ["imeta", "v encrypted-media-v1",
+ *           "locator blossom-v1 <URL>",
+ *           "ciphertext_sha256 <hex 32B>",
+ *           "plaintext_sha256 <hex 32B>",
+ *           "nonce <hex 12B>",
+ *           "m <mime>",
+ *           "filename <name>",
+ *           "dim <width>x<height>",
+ *           "thumbhash <base64>"]
  * ```
- * The Rust receive-side validator (`groups.rs::media_imeta_is_valid`) rejects
- * any imeta missing a field, with the wrong version, or with malformed hex —
- * but that runs upstream of us, so the parser here is defense-in-depth:
- * if the validator ever loosens, we still won't render junk.
  */
 object MediaReferenceParser {
     private const val TAG_NAME = "imeta"
-    private const val VERSION_VALUE = "mip04-v2"
+    private const val VERSION_VALUE = "encrypted-media-v1"
+    private const val BLOSSOM_LOCATOR_KIND = "blossom-v1"
     private const val SHA256_HEX_LEN = 64 // 32 bytes
     private const val NONCE_HEX_LEN = 24 // 12 bytes
     private const val HEX_CHARS = "0123456789abcdefABCDEF"
 
     /**
-     * Build the `imeta` tag for [reference] in the canonical MIP-04-v2 field
+     * Build the `imeta` tag for [reference] in the canonical encrypted-media-v1 field
      * order. Inverse of [parseImetaTag]; used to render a just-uploaded image
      * optimistically (bridging the gap until the published event echoes back)
      * without waiting for the projection round-trip.
      */
-    fun toImetaTag(reference: MediaReferenceFfi): MessageTagFfi =
+    fun toImetaTag(reference: MediaAttachmentReferenceFfi): MessageTagFfi =
         MessageTagFfi(
-            listOf(
-                TAG_NAME,
-                "url ${reference.url}",
-                "m ${reference.mediaType}",
-                "filename ${reference.fileName}",
-                "x ${reference.fileHashHex}",
-                "n ${reference.nonceHex}",
-                // Always emit the canonical version this parser accepts — never
-                // forward an unexpected reference.version that our own validator
-                // (and the Rust receiver) would then reject.
-                "v $VERSION_VALUE",
-            ),
+            buildList {
+                add(TAG_NAME)
+                add("v $VERSION_VALUE")
+                reference.locators.forEach { add("locator ${it.kind} ${it.value}") }
+                add("ciphertext_sha256 ${reference.ciphertextSha256}")
+                add("plaintext_sha256 ${reference.plaintextSha256}")
+                add("nonce ${reference.nonceHex}")
+                add("m ${reference.mediaType}")
+                add("filename ${reference.fileName}")
+                reference.dim?.takeIf { it.isNotBlank() }?.let { add("dim $it") }
+                reference.thumbhash?.takeIf { it.isNotBlank() }?.let { add("thumbhash $it") }
+            },
         )
 
     /**
      * Returns the first valid imeta-tag attachment reference in [tags], or
      * null when no imeta tag is present or no imeta tag passes validation.
      */
-    fun parseImetaTag(tags: List<MessageTagFfi>): MediaReferenceFfi? {
+    fun parseImetaTag(tags: List<MessageTagFfi>): MediaAttachmentReferenceFfi? {
         for (tag in tags) {
             val values = tag.values
             if (values.firstOrNull() != TAG_NAME) continue
@@ -68,34 +71,51 @@ object MediaReferenceParser {
 
     /**
      * Parses the imeta tag's value list (after the `"imeta"` name) into a
-     * [MediaReferenceFfi]. Returns null when any required field is missing
-     * or fails validation. Lenient about ordering — Rust emits in a fixed
-     * order today but the parser doesn't assume it.
+     * [MediaAttachmentReferenceFfi]. Returns null when any required field is
+     * missing or fails validation. Lenient about ordering — Rust emits in a
+     * fixed order today but the parser doesn't assume it.
      */
-    private fun parseImetaValues(values: List<String>): MediaReferenceFfi? {
+    private fun parseImetaValues(values: List<String>): MediaAttachmentReferenceFfi? {
         val fields = mutableMapOf<String, String>()
+        val locators = mutableListOf<MediaLocatorFfi>()
         for (entry in values) {
+            if (entry.startsWith("blurhash ")) return null
+            if (entry.startsWith("locator ")) {
+                val rest = entry.removePrefix("locator ")
+                val split = rest.indexOf(' ')
+                if (split <= 0 || split == rest.lastIndex) return null
+                val kind = rest.substring(0, split)
+                val value = rest.substring(split + 1)
+                if (kind.isBlank() || !isDownloadableLocator(kind, value)) return null
+                locators += MediaLocatorFfi(kind = kind, value = value)
+                continue
+            }
             val spaceIdx = entry.indexOf(' ')
             if (spaceIdx <= 0 || spaceIdx == entry.lastIndex) continue
             val key = entry.substring(0, spaceIdx)
             val value = entry.substring(spaceIdx + 1)
             if (key.isBlank() || value.isBlank()) continue
-            // First occurrence wins — matches Rust's HashMap-based parse.
-            fields.putIfAbsent(key, value)
+            // Last occurrence wins, matching Rust's parse into a map.
+            fields[key] = value
         }
-        val url = fields["url"]?.takeIf { isDownloadableUrl(it) } ?: return null
+        if (locators.isEmpty()) return null
         val mediaType = fields["m"]?.takeIf { it.isNotBlank() } ?: return null
         val fileName = fields["filename"]?.takeIf { it.isNotBlank() } ?: return null
-        val fileHash = fields["x"]?.takeIf { isHex(it, SHA256_HEX_LEN) } ?: return null
-        val nonce = fields["n"]?.takeIf { isHex(it, NONCE_HEX_LEN) } ?: return null
+        val ciphertextHash = fields["ciphertext_sha256"]?.takeIf { isHex(it, SHA256_HEX_LEN) } ?: return null
+        val plaintextHash = fields["plaintext_sha256"]?.takeIf { isHex(it, SHA256_HEX_LEN) } ?: return null
+        val nonce = fields["nonce"]?.takeIf { isHex(it, NONCE_HEX_LEN) } ?: return null
         val version = fields["v"]?.takeIf { it == VERSION_VALUE } ?: return null
-        return MediaReferenceFfi(
-            url = url,
-            fileHashHex = fileHash,
+        return MediaAttachmentReferenceFfi(
+            locators = locators,
+            ciphertextSha256 = ciphertextHash,
+            plaintextSha256 = plaintextHash,
             nonceHex = nonce,
             fileName = fileName,
             mediaType = mediaType,
             version = version,
+            sourceEpoch = 0uL,
+            dim = fields["dim"],
+            thumbhash = fields["thumbhash"],
         )
     }
 
@@ -106,7 +126,11 @@ object MediaReferenceParser {
      * could otherwise point auto-download at `http://127.0.0.1:8080/...` or an
      * RFC-1918 service. See issue #98.
      */
-    private fun isDownloadableUrl(raw: String): Boolean {
+    private fun isDownloadableLocator(
+        kind: String,
+        raw: String,
+    ): Boolean {
+        if (kind != BLOSSOM_LOCATOR_KIND) return false
         if (raw.isBlank()) return false
         val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return false
         val scheme = uri.scheme?.lowercase()
@@ -131,5 +155,5 @@ object MediaReferenceParser {
      * image bubble. Tied to mime prefix so non-image attachments (Phase 3)
      * route through a different surface.
      */
-    fun isImageMedia(reference: MediaReferenceFfi): Boolean = reference.mediaType.startsWith("image/", ignoreCase = true)
+    fun isImageMedia(reference: MediaAttachmentReferenceFfi): Boolean = reference.mediaType.startsWith("image/", ignoreCase = true)
 }

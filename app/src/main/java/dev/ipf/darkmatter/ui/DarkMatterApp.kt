@@ -250,7 +250,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarmotKitException
-import dev.ipf.marmotkit.MediaReferenceFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.RelayHealthFfi
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -1339,7 +1339,7 @@ private val NullableUriSaver: Saver<android.net.Uri?, String> =
 @Composable
 private fun MediaImageBubble(
     item: TimelineMessage,
-    reference: MediaReferenceFfi,
+    reference: MediaAttachmentReferenceFfi,
     controller: ConversationController,
     appState: DarkMatterAppState,
     mine: Boolean,
@@ -1562,7 +1562,7 @@ private fun FullScreenImageViewer(
     controller: ConversationController,
     appState: DarkMatterAppState,
     messageIdHex: String,
-    reference: MediaReferenceFfi,
+    reference: MediaAttachmentReferenceFfi,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current

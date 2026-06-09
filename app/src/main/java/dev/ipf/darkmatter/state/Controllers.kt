@@ -17,6 +17,8 @@ import dev.ipf.darkmatter.media.MediaPipeline
 import dev.ipf.darkmatter.media.MediaReferenceParser
 import dev.ipf.marmotkit.AgentStreamSubscription
 import dev.ipf.marmotkit.AgentStreamUpdateFfi
+import dev.ipf.marmotkit.AppBlobEndpointFfi
+import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -28,7 +30,8 @@ import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupStateSubscription
-import dev.ipf.marmotkit.MediaReferenceFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
@@ -139,10 +142,27 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         avatarUrl = null,
         avatarDim = null,
         avatarThumbhash = null,
+        encryptedMedia = defaultEncryptedMediaComponent(),
         archived = row.archived,
         pendingConfirmation = row.pendingConfirmation,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
+    )
+
+private fun defaultEncryptedMediaComponent(): AppGroupEncryptedMediaComponentFfi =
+    AppGroupEncryptedMediaComponentFfi(
+        componentId = 0x8008u,
+        component = "marmot.group.encrypted-media.v1",
+        required = true,
+        mediaFormat = "encrypted-media-v1",
+        allowedLocatorKinds = listOf("blossom-v1"),
+        defaultBlobEndpoints =
+            listOf(
+                AppBlobEndpointFfi(
+                    locatorKind = "blossom-v1",
+                    baseUrl = "https://blossom.primal.net",
+                ),
+            ),
     )
 
 data class GroupMemberSnapshot(
@@ -350,7 +370,7 @@ private class RetainedMediaUpload(
     // Set once the Blossom upload succeeds. On a publish-only failure, retry
     // reuses this reference instead of re-uploading the blob (which would
     // orphan a duplicate on the Blossom server).
-    var uploadedReference: MediaReferenceFfi? = null,
+    var uploadedReference: MediaAttachmentReferenceFfi? = null,
 )
 
 class ChatsController(
@@ -987,17 +1007,25 @@ class ConversationController(
                             account,
                             group.groupIdHex,
                             MediaUploadRequestFfi(
-                                fileName = retained.fileName,
-                                mediaType = retained.mediaType,
-                                plaintext = retained.jpegBytes,
+                                attachments =
+                                    listOf(
+                                        MediaUploadAttachmentRequestFfi(
+                                            fileName = retained.fileName,
+                                            mediaType = retained.mediaType,
+                                            plaintext = retained.jpegBytes,
+                                            dim = null,
+                                            thumbhash = null,
+                                        ),
+                                    ),
                                 caption = retained.caption,
                                 send = false,
                                 blossomServer = null,
                             ),
-                        ).reference
+                        ).attachments.firstOrNull()?.reference
+                            ?: error("media upload returned no attachments")
                     }.also { retained.uploadedReference = it }
             // Discard window #1: blob is uploaded but not yet published. If the
-            // user discarded here, bail BEFORE sendMediaReference so we don't
+            // user discarded here, bail BEFORE sendMediaAttachments so we don't
             // publish a kind-9 they cancelled (unlike a published event, an
             // unreferenced Blossom blob is inert).
             if (discardedDuringRetry.remove(key)) {
@@ -1009,7 +1037,7 @@ class ConversationController(
             }
             val summary =
                 appState.marmotIo {
-                    sendMediaReference(account, group.groupIdHex, reference, retained.caption)
+                    sendMediaAttachments(account, group.groupIdHex, listOf(reference), retained.caption)
                 }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             optimisticMessages.remove(key)
@@ -1174,7 +1202,7 @@ class ConversationController(
      */
     suspend fun downloadAttachment(
         messageIdHex: String,
-        reference: MediaReferenceFfi,
+        reference: MediaAttachmentReferenceFfi,
     ): ByteArray {
         // Resolve the account first so the cache key is never unanchored
         // ("|group|msg"), which a later sign-in could collide with.
