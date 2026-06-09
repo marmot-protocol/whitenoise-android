@@ -91,6 +91,9 @@
     <string name="error_qr_not_valid_npub_or_public_key">該 QR 程式碼不是有效的 npub 或公鑰。</string>
     <string name="admin">管理員</string>
     <string name="you">你</string>
+    <string name="reaction_filter_all">全部</string>
+    <string name="view_reactors">查看誰做出了回應</string>
+    <string name="toggle_reaction">切換回應</string>
     <string name="member_actions">會員行動</string>
     <string name="remove_admin">移除管理員身分</string>
     <string name="adding_admin">正在加入管理員...</string>

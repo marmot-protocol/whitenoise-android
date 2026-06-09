@@ -91,6 +91,9 @@
     <string name="error_qr_not_valid_npub_or_public_key">Bu QR kodu geçerli bir npub veya genel anahtar değil.</string>
     <string name="admin">Yönetici</string>
     <string name="you">Sen</string>
+    <string name="reaction_filter_all">Tümü</string>
+    <string name="view_reactors">Kimlerin tepki verdiğini gör</string>
+    <string name="toggle_reaction">Tepkiyi aç/kapat</string>
     <string name="member_actions">Üye eylemleri</string>
     <string name="remove_admin">Yöneticilikten çıkar</string>
     <string name="adding_admin">Yönetici ekleniyor...</string>

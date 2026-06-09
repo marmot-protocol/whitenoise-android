@@ -185,6 +185,12 @@ data class TimelineMessage(
     val timelineOrder: ULong = 0uL,
 )
 
+data class ReactionParticipant(
+    val sender: String,
+    val emoji: String,
+    val reactedAt: ULong,
+)
+
 internal fun optimisticMessageIdForProjection(
     optimisticMessages: Collection<TimelineMessage>,
     projected: AppMessageRecordFfi,
@@ -1749,6 +1755,7 @@ class ConversationController(
                 )
             appState.requestProfile(record.sender)
             record.replyPreview?.let { appState.requestProfile(it.sender) }
+            appState.requestProfiles(record.reactions.userReactions.map { it.sender })
             if (record.deleted) {
                 deletedMessageIds = deletedMessageIds - record.messageIdHex
             }
@@ -1796,6 +1803,7 @@ class ConversationController(
                     }
                     appState.requestProfile(record.sender)
                     record.replyPreview?.let { appState.requestProfile(it.sender) }
+                    appState.requestProfiles(record.reactions.userReactions.map { it.sender })
                     if (record.deleted) {
                         deletedMessageIds = deletedMessageIds - record.messageIdHex
                     }
@@ -2173,6 +2181,46 @@ class ConversationController(
                     .thenByDescending { it.mine }
                     .thenBy { it.emoji },
             )
+    }
+
+    fun reactionParticipantsFor(targetMessageId: String): List<ReactionParticipant> {
+        val mine = appState.activeAccount?.accountIdHex
+        val participants =
+            timelineRecords[targetMessageId]
+                ?.reactions
+                ?.userReactions
+                ?.map {
+                    ReactionParticipant(
+                        sender = it.sender,
+                        emoji = it.emoji,
+                        reactedAt = it.reactedAt,
+                    )
+                }?.toMutableList() ?: mutableListOf()
+
+        if (mine != null) {
+            optimisticReactionChanges.values
+                .filter { it.targetMessageId == targetMessageId }
+                .forEach { change ->
+                    participants.removeAll {
+                        it.sender.equals(mine, ignoreCase = true) && it.emoji == change.emoji
+                    }
+                    if (change.add) {
+                        participants +=
+                            ReactionParticipant(
+                                sender = mine,
+                                emoji = change.emoji,
+                                reactedAt = nowSeconds(),
+                            )
+                    }
+                }
+        }
+
+        return participants.sortedWith(
+            compareBy<ReactionParticipant> { !it.sender.equals(mine, ignoreCase = true) }
+                .thenBy { it.reactedAt }
+                .thenBy { it.sender.lowercase() }
+                .thenBy { it.emoji },
+        )
     }
 
     private fun baseReactionSenders(): LinkedHashMap<String, LinkedHashMap<String, MutableSet<String>>> {
