@@ -381,4 +381,7 @@
         <item quantity="one">%1$d imagen seleccionada</item>
         <item quantity="other">%1$d imágenes seleccionadas</item>
     </plurals>
+    <string name="message_invalidated">Este mensaje no llegó al grupo</string>
+    <string name="message_invalidated_preview">No llegó al grupo</string>
+    <string name="group_avatar_url">URL del avatar</string>
 </resources>

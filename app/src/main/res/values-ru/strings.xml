@@ -385,4 +385,7 @@
         <item quantity="many">%1$d изображений выбрано</item>
         <item quantity="other">%1$d изображений выбрано</item>
     </plurals>
+    <string name="message_invalidated">Это сообщение не дошло до группы</string>
+    <string name="message_invalidated_preview">Не дошло до группы</string>
+    <string name="group_avatar_url">URL аватара</string>
 </resources>

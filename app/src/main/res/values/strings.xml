@@ -40,6 +40,7 @@
     <string name="scan_recipient_qr_code">Scan recipient QR code</string>
     <string name="add_recipient">Add recipient</string>
     <string name="group_name">Group name</string>
+    <string name="group_avatar_url">Avatar URL</string>
     <string name="description">Description</string>
     <string name="create">Create</string>
     <string name="chat_actions">Chat actions</string>
@@ -103,12 +104,14 @@
     <string name="confirm_leave_title">Leave chat?</string>
     <string name="confirm_leave_message">You will be removed from this group. You will need a new invite to rejoin.</string>
     <string name="message_deleted">Message deleted</string>
+    <string name="message_invalidated">This message didn\'t reach the group</string>
     <string name="toast_original_message_unavailable">Original message is unavailable</string>
     <string name="toast_notification_account_unavailable">That account is no longer available</string>
     <string name="toast_notification_conversation_unavailable">That conversation is no longer available</string>
     <string name="message_reacted">Reacted %1$s</string>
     <string name="message_reaction_fallback">to a message</string>
     <string name="message_deleted_preview">Deleted a message</string>
+    <string name="message_invalidated_preview">Didn\'t reach the group</string>
     <string name="agent_stream_started">Agent stream started</string>
     <string name="stream_finished">Stream finished</string>
     <string name="media_attachment">Media attachment</string>

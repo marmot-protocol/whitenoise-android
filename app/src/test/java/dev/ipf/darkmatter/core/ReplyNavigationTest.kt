@@ -85,6 +85,7 @@ class ReplyNavigationTest {
         tags = emptyList(),
         timelineAt = 1uL,
         receivedAt = 1uL,
+        invalidationStatus = null,
         replyToMessageIdHex = replyToMessageIdHex,
         replyPreview =
             replyPreviewMessageId?.let {

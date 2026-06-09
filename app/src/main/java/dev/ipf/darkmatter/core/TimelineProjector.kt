@@ -28,6 +28,11 @@ object TimelineProjector {
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): String {
         if (record.deleted) return copy.deleted
+        // A non-null invalidationStatus means convergence dropped this message
+        // onto a losing branch: it never reached the group. The record is kept
+        // as a tombstone, so render the "didn't reach the group" copy instead
+        // of the original body.
+        if (record.invalidationStatus != null) return copy.invalidated
         return projectedBody(
             plaintext = record.plaintext,
             kind = record.kind,

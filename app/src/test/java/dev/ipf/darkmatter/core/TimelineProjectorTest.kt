@@ -65,6 +65,32 @@ class TimelineProjectorTest {
         assertEquals(42uL, actionRecord.recordedAt)
     }
 
+    @Test
+    fun invalidatedProjectedRecordUsesInvalidatedCopy() {
+        val record =
+            timelineRecord(
+                id = "invalidated",
+                plaintext = "Secret",
+                invalidationStatus = "LosingBranch",
+            )
+
+        assertEquals("Didn't reach the group", TimelineProjector.displayBody(record))
+    }
+
+    @Test
+    fun deletedTakesPrecedenceOverInvalidation() {
+        val record =
+            timelineRecord(
+                id = "both",
+                plaintext = "Secret",
+                deleted = true,
+                deletedByMessageIdHex = "delete-event",
+                invalidationStatus = "LosingBranch",
+            )
+
+        assertEquals("Deleted a message", TimelineProjector.displayBody(record))
+    }
+
     private fun timelineRecord(
         id: String = "message",
         plaintext: String = "hello",
@@ -73,6 +99,7 @@ class TimelineProjectorTest {
         reactions: TimelineReactionSummaryFfi = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         deleted: Boolean = false,
         deletedByMessageIdHex: String? = null,
+        invalidationStatus: String? = null,
     ) = TimelineMessageRecordFfi(
         messageIdHex = id,
         sourceMessageIdHex = null,
@@ -91,5 +118,6 @@ class TimelineProjectorTest {
         reactions = reactions,
         deleted = deleted,
         deletedByMessageIdHex = deletedByMessageIdHex,
+        invalidationStatus = invalidationStatus,
     )
 }

@@ -379,4 +379,7 @@
     <plurals name="media_selected_count">
         <item quantity="other">已选择 %1$d 张图片</item>
     </plurals>
+    <string name="message_invalidated">此消息未送达群组</string>
+    <string name="message_invalidated_preview">未送达群组</string>
+    <string name="group_avatar_url">头像 URL</string>
 </resources>
