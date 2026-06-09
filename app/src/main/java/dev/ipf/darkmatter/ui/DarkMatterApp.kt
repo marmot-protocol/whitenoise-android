@@ -156,6 +156,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -391,6 +392,13 @@ fun DarkMatterApp(
 
     LaunchedEffect(Unit) {
         appState.bootstrap()
+        // Stale share-temp janitor. Runs once per process start, off the
+        // main thread because directory walks on cold cache can take a
+        // moment. Files in `shared_media` from earlier sessions that
+        // any external reader has long since finished with are deleted.
+        withContext(Dispatchers.IO) {
+            sweepStaleSharedMedia(context, SHARED_MEDIA_MAX_AGE_MS)
+        }
     }
     LaunchedEffect(
         appState.phase,
@@ -2338,6 +2346,18 @@ private fun ViewerPage(
     onScaleChange: (Float) -> Unit,
     onOffsetChange: (Offset) -> Unit,
 ) {
+    // `pointerInput(pageKey)` only restarts when the key changes — its
+    // coroutine outlives any single gesture. Function parameters
+    // (`scale`, `offset`, the callbacks) captured directly inside that
+    // coroutine would stay at their initial values for the lifetime of
+    // the gesture, causing jumpy zoom/pan and stale callback dispatch.
+    // `rememberUpdatedState` snapshots each parameter into a stable
+    // State<T> whose `.value` reads inside the coroutine always reflect
+    // the most recent recomposition's value.
+    val latestScale by rememberUpdatedState(scale)
+    val latestOffset by rememberUpdatedState(offset)
+    val latestOnScaleChange by rememberUpdatedState(onScaleChange)
+    val latestOnOffsetChange by rememberUpdatedState(onOffsetChange)
     // `sourceEpoch` is folded into the page key so a viewer that failed
     // its first decrypt at epoch 0 (typed reference not yet loaded) re-keys
     // and retries when the real reference arrives.
@@ -2385,8 +2405,8 @@ private fun ViewerPage(
                             .fillMaxSize()
                             .pointerInput(pageKey) {
                                 detectTapGestures(onDoubleTap = {
-                                    onScaleChange(1f)
-                                    onOffsetChange(Offset.Zero)
+                                    latestOnScaleChange(1f)
+                                    latestOnOffsetChange(Offset.Zero)
                                 })
                             }.pointerInput(pageKey) {
                                 // Hand-rolled gesture loop instead of
@@ -2398,6 +2418,11 @@ private fun ViewerPage(
                                 //   - Single-pointer at scale > 1: consume → pan.
                                 //   - Single-pointer at scale 1×: DO NOT consume →
                                 //     pager handles the swipe between attachments.
+                                //
+                                // All references to scale/offset/callbacks go
+                                // through `latest*` delegates so each loop
+                                // iteration sees the freshest values — see the
+                                // `rememberUpdatedState` setup above for why.
                                 awaitEachGesture {
                                     do {
                                         val event = awaitPointerEvent()
@@ -2406,14 +2431,16 @@ private fun ViewerPage(
                                         if (pressedCount == 0) break
                                         val zoom = event.calculateZoom()
                                         val pan = event.calculatePan()
+                                        val currentScale = latestScale
+                                        val currentOffset = latestOffset
                                         val handleAsTransform =
-                                            pressedCount >= 2 || scale > 1f
+                                            pressedCount >= 2 || currentScale > 1f
                                         if (!handleAsTransform) {
                                             // Let the pager have it.
                                             continue
                                         }
-                                        val nextScale = (scale * zoom).coerceIn(1f, 5f)
-                                        if (nextScale != scale) onScaleChange(nextScale)
+                                        val nextScale = (currentScale * zoom).coerceIn(1f, 5f)
+                                        if (nextScale != currentScale) latestOnScaleChange(nextScale)
                                         if (nextScale > 1f) {
                                             val viewportW = size.width.toFloat()
                                             val viewportH = size.height.toFloat()
@@ -2430,14 +2457,14 @@ private fun ViewerPage(
                                             }
                                             val maxX = ((baseWidth * nextScale) - viewportW).coerceAtLeast(0f) / 2f
                                             val maxY = ((baseHeight * nextScale) - viewportH).coerceAtLeast(0f) / 2f
-                                            onOffsetChange(
+                                            latestOnOffsetChange(
                                                 Offset(
-                                                    (offset.x + pan.x).coerceIn(-maxX, maxX),
-                                                    (offset.y + pan.y).coerceIn(-maxY, maxY),
+                                                    (currentOffset.x + pan.x).coerceIn(-maxX, maxX),
+                                                    (currentOffset.y + pan.y).coerceIn(-maxY, maxY),
                                                 ),
                                             )
-                                        } else if (offset != Offset.Zero) {
-                                            onOffsetChange(Offset.Zero)
+                                        } else if (currentOffset != Offset.Zero) {
+                                            latestOnOffsetChange(Offset.Zero)
                                         }
                                         event.changes.forEach { it.consume() }
                                     } while (true)
@@ -2578,11 +2605,46 @@ private fun fileProviderUri(
     androidx.core.content.FileProvider
         .getUriForFile(context, "${context.packageName}.fileprovider", file)
 
-/** Best-effort wipe of decrypted media temp files (share + camera) from cache. */
+/**
+ * Best-effort wipe of decrypted camera-capture temp files from cache.
+ *
+ * Intentionally does NOT touch `shared_media`. Those entries back live
+ * FileProvider URIs the system may still be reading after the user backs
+ * out of a chat (an external PDF reader holding the granted URI, the
+ * system share-sheet target, etc.). Yanking the file out from under
+ * those readers caused the "opened PDF goes blank when I leave the chat"
+ * class of bug — the [sweepStaleSharedMedia] janitor cleans those on a
+ * stale-age basis at app start instead.
+ */
 private fun clearMediaTempFiles(context: android.content.Context) {
-    runCatching { java.io.File(context.cacheDir, "shared_media").deleteRecursively() }
     runCatching { java.io.File(context.cacheDir, "camera").deleteRecursively() }
 }
+
+/**
+ * Delete `shared_media` files older than [maxAgeMillis]. Called once at
+ * app start so transient FileProvider temps for opened/shared
+ * attachments don't accumulate across sessions, without racing the
+ * external readers that may still be using them in the current session.
+ */
+private fun sweepStaleSharedMedia(
+    context: android.content.Context,
+    maxAgeMillis: Long,
+) {
+    runCatching {
+        val dir = java.io.File(context.cacheDir, "shared_media")
+        if (!dir.isDirectory) return@runCatching
+        val cutoff = System.currentTimeMillis() - maxAgeMillis
+        dir.listFiles()?.forEach { entry ->
+            if (entry.isFile && entry.lastModified() < cutoff) {
+                runCatching { entry.delete() }
+            }
+        }
+    }
+}
+
+/** Files in `shared_media` older than this are considered safe to delete —
+ *  any external reader has had ample time to finish loading the bytes. */
+private const val SHARED_MEDIA_MAX_AGE_MS: Long = 10L * 60L * 1000L
 
 /** Decode a downscaled preview bitmap for a local content Uri, off-thread. */
 @Composable
