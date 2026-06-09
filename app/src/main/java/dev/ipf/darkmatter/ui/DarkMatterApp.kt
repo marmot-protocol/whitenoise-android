@@ -2619,7 +2619,15 @@ private fun ConversationScreen(
         bottomBar = {
             when {
                 controller.error != null || controller.group.pendingConfirmation -> Unit
-                controller.canSendMessages -> {
+                // Only suppress the composer when we've *confirmed* the user
+                // is no longer a member. The kicked-notice branch must lose
+                // to the composer during the load window (`membersLoaded`
+                // still false) so the user isn't staring at a blank bottom
+                // bar while `refreshMembers()` round-trips. The controller's
+                // `canSendMessages` guard in send/upload/react/delete keeps
+                // any actual mutation safe until membership is confirmed.
+                controller.membersLoaded && !controller.isSelfMember -> RemovedMemberComposerNotice()
+                else -> {
                     val groupIdHex = controller.group.groupIdHex
                     ComposerBar(
                         replyingTo = controller.replyingTo,
@@ -2657,7 +2665,6 @@ private fun ConversationScreen(
                         },
                     )
                 }
-                controller.membersLoaded && !controller.isSelfMember -> RemovedMemberComposerNotice()
             }
         },
     ) { padding ->
