@@ -49,6 +49,7 @@
     <string name="leave">Salir</string>
     <string name="couldnt_load_conversation">No se pudo cargar la conversación</string>
     <string name="no_messages_yet">Aún no hay mensajes</string>
+    <string name="you_are_no_longer_a_member">Ya no eres miembro de este grupo.</string>
     <string name="chat_row_draft_prefix">Borrador: </string>
     <string name="jump_to_newest">Saltar al más reciente</string>
     <string name="discard_failed_message">Descartar mensaje fallido</string>
@@ -56,7 +57,10 @@
     <string name="decline">Rechazar</string>
     <string name="accept">Aceptar</string>
     <string name="profile">Perfil</string>
+    <string name="dismiss">Cerrar</string>
+    <string name="edit">Editar</string>
     <string name="save_group">Guardar grupo</string>
+    <string name="saving_group">Guardando grupo...</string>
     <string name="no_description">Sin descripción</string>
     <string name="info">Información</string>
     <string name="group_id">ID del Grupo</string>
@@ -67,10 +71,16 @@
     <string name="scan_member_qr_code">Escanear código QR de miembro</string>
     <string name="error_one_valid_member_reference">Ingrese un npub válido, un enlace de perfil o una clave pública.</string>
     <string name="add_member">Añadir miembros</string>
+    <string name="adding_member">Añadiendo miembro...</string>
+    <string name="invite_pending">Invitación pendiente: %1$s</string>
+    <string name="latest_group_error">Último error del grupo: %1$s</string>
     <string name="actions">Acciones</string>
     <string name="archive_chat">Archivar</string>
     <string name="unarchive_chat">Desarchivar</string>
+    <string name="archiving_chat">Archivando chat...</string>
+    <string name="restoring_chat">Restaurando chat...</string>
     <string name="leave_chat">Salir del grupo</string>
+    <string name="leaving_chat">Saliendo del chat...</string>
     <string name="promote_admin_before_leaving">Promocionar a otro administrador antes de irse</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">Cargando estado MLS...</string>
@@ -83,6 +93,9 @@
     <string name="you">Tú</string>
     <string name="member_actions">Acciones de miembros</string>
     <string name="remove_admin">Quitar admin</string>
+    <string name="adding_admin">Añadiendo admin...</string>
+    <string name="removing_admin">Quitando admin...</string>
+    <string name="removing_member">Eliminando miembro...</string>
     <string name="make_admin">Hacer admin</string>
     <string name="remove_member">Eliminar del grupo</string>
     <string name="confirm_remove_member_title">¿Eliminar miembro?</string>
@@ -267,7 +280,7 @@
     <string name="toast_background_connection_disabled">Conexión en segundo plano deshabilitada</string>
     <string name="toast_chat_started">Chat iniciado</string>
     <string name="toast_couldnt_start_chat">No se pudo iniciar el chat</string>
-    <string name="toast_profile_published">Perfil publicado</string>
+<string name="toast_profile_published">Perfil publicado</string>
     <string name="toast_profile_published_detail">Sus metadatos kind:0 están activos en los relés %1$d.</string>
     <string name="toast_couldnt_publish_profile">No se pudo publicar el perfil</string>
     <string name="toast_send_failed">Envío fallido</string>
