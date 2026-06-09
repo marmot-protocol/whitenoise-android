@@ -1,11 +1,13 @@
 package dev.ipf.darkmatter.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -116,6 +118,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -186,10 +189,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.core.content.ContextCompat
 import androidx.core.os.ConfigurationCompat
 import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.lifecycle.LifecycleOwner
+import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -262,6 +267,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.roundToInt
 
 private enum class MainSection {
@@ -609,6 +615,7 @@ private fun SignInContent(
     onBack: () -> Unit,
     onSignIn: () -> Unit,
 ) {
+    WindowSecureFlag()
     val canSignIn = identity.isNotBlank() && !busy
 
     Column(
@@ -5103,10 +5110,43 @@ private fun CameraQrScanner(
         return
     }
 
+    // Track the CameraX provider and ML Kit scanner so we can release them when
+    // the QR sheet is dismissed. CameraX binds use cases to the host activity's
+    // lifecycle, so without an explicit unbind the camera keeps streaming
+    // (and the OS in-use indicator stays lit) until the activity stops. The
+    // BarcodeScanner is Closeable and leaks native resources otherwise.
+    //
+    // `disposedRef` is a separate teardown signal so a late
+    // ProcessCameraProvider.getInstance() callback (fired after the sheet
+    // dismissed) can bail and clean up instead of binding into refs we just
+    // nulled out. Using `null` to mean both "not yet set" and "torn down"
+    // would let `compareAndSet(null, …)` succeed after onDispose, leaking the
+    // camera again.
+    val providerRef = remember { AtomicReference<ProcessCameraProvider?>(null) }
+    val scannerRef = remember { AtomicReference<BarcodeScanner?>(null) }
+    val disposedRef = remember { AtomicBoolean(false) }
+    DisposableEffect(Unit) {
+        onDispose {
+            disposedRef.set(true)
+            runCatching { providerRef.getAndSet(null)?.unbindAll() }
+            runCatching { scannerRef.getAndSet(null)?.close() }
+        }
+    }
+
     AndroidView(
         factory = { viewContext ->
             PreviewView(viewContext).also { previewView ->
-                bindQrScannerCamera(context, lifecycleOwner, previewView, cameraUnavailable, onScan, onError)
+                bindQrScannerCamera(
+                    context,
+                    lifecycleOwner,
+                    previewView,
+                    cameraUnavailable,
+                    providerRef,
+                    scannerRef,
+                    disposedRef,
+                    onScan,
+                    onError,
+                )
             }
         },
         modifier = Modifier.fillMaxSize(),
@@ -5120,12 +5160,51 @@ private tailrec fun Context.lifecycleOwner(): LifecycleOwner? =
         else -> null
     }
 
+// Compose's `LocalContext.current` is whatever the host wired in — often
+// the Activity directly, but themed/wrapped contexts (test surfaces, custom
+// theme wrappers) return a `ContextWrapper`. A direct `as? Activity` cast on
+// those silently yields null, which for a FLAG_SECURE setter is the worst
+// failure mode (looks like it works, doesn't). Walk the wrapper chain.
+private tailrec fun Context.activity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.activity()
+        else -> null
+    }
+
+/**
+ * Marks the host activity's window as secure for the duration of this
+ * composition. `FLAG_SECURE` blocks the OS Recents/overview thumbnail,
+ * screenshots, screen recording, and casting from capturing the window's
+ * contents — the only practical protection for screens that handle the
+ * nsec/private key, since `PasswordVisualTransformation` only masks
+ * rendered glyphs. The flag is cleared on dispose so the rest of the
+ * (non-sensitive) UI remains screenshottable as users expect.
+ */
+@Composable
+private fun WindowSecureFlag() {
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val window = context.activity()?.window
+        window?.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE,
+        )
+        onDispose {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+}
+
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
 private fun bindQrScannerCamera(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     previewView: PreviewView,
     cameraUnavailable: String,
+    providerRef: AtomicReference<ProcessCameraProvider?>,
+    scannerRef: AtomicReference<BarcodeScanner?>,
+    disposedRef: AtomicBoolean,
     onScan: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
@@ -5138,6 +5217,14 @@ private fun bindQrScannerCamera(
                     onError(cameraUnavailable)
                     return@addListener
                 }
+            // If the sheet dismissed before this listener fired, the caller's
+            // onDispose already ran and nulled the refs. Without disposedRef,
+            // compareAndSet(null, provider) would succeed here and bind a
+            // camera that nothing will ever unbind. Bail and clean up locally.
+            if (disposedRef.get() || !providerRef.compareAndSet(null, provider)) {
+                runCatching { provider.unbindAll() }
+                return@addListener
+            }
             val preview =
                 Preview.Builder().build().also {
                     it.setSurfaceProvider(previewView.surfaceProvider)
@@ -5149,6 +5236,12 @@ private fun bindQrScannerCamera(
                         .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
                         .build(),
                 )
+            if (disposedRef.get() || !scannerRef.compareAndSet(null, scanner)) {
+                runCatching { scanner.close() }
+                runCatching { provider.unbindAll() }
+                providerRef.set(null)
+                return@addListener
+            }
             val didScan = AtomicBoolean(false)
             val analyzerBusy = AtomicBoolean(false)
             val analysis =
@@ -5186,6 +5279,12 @@ private fun bindQrScannerCamera(
                 provider.unbindAll()
                 provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
             }.onFailure {
+                // Failed before lifecycle binding could take over — the
+                // composable's onDispose has nothing to unbind, so release
+                // provider + scanner here instead of leaking them until the
+                // sheet dismisses.
+                runCatching { scannerRef.getAndSet(null)?.close() }
+                runCatching { providerRef.getAndSet(null)?.unbindAll() }
                 onError(it.message ?: it.javaClass.simpleName)
             }
         },
@@ -5344,12 +5443,21 @@ private fun AddIdentitySheet(
     appState: DarkMatterAppState,
     onDismiss: () -> Unit,
 ) {
+    WindowSecureFlag()
     var identity by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val creatingIdentityDescription = stringResource(R.string.creating_identity)
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // ModalBottomSheet renders in its own window on Android, separate from
+    // the host activity window — `WindowSecureFlag()` (which flags the
+    // activity window) doesn't reach it. Set the sheet's own securePolicy
+    // so the nsec field inside is also protected from Recents/screenshot
+    // capture.
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
+    ) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.add_account), style = MaterialTheme.typography.titleLarge)
             Button(
