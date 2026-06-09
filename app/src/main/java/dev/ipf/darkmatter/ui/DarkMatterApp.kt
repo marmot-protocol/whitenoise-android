@@ -1325,8 +1325,9 @@ private fun NewChatSheet(
 /** Within this many items of the trailing edge counts as "at bottom". */
 private const val ConversationNearBottomItemSlack = 3
 
-// Maximum images per multi-pick — mirrors WhatsApp's album cap. The Android
-// Photo Picker enforces this on the system dialog side.
+// Maximum images per multi-pick. The Android Photo Picker enforces this
+// cap on the system dialog side; 10 keeps the album payload bounded
+// (10 * 1920px JPEG ≈ a few MB encrypted) without feeling artificially low.
 private const val MEDIA_PICKER_MAX_ITEMS = 10
 
 /** Fixed height of an in-timeline image bubble — constant across load states
@@ -1957,8 +1958,9 @@ private fun MediaPreviewSheet(
                 )
             } else {
                 // Album preview: a horizontally-scrollable strip of square
-                // thumbnails. WhatsApp/iMessage both use this strip-shape on
-                // the compose surface (vs the grid they use on the bubble).
+                // thumbnails. The strip-shape on the compose surface lets the
+                // user scan + reorder mentally before sending; the grid shape
+                // is reserved for the received-message bubble.
                 LazyRow(
                     modifier =
                         Modifier
@@ -2113,7 +2115,8 @@ private fun ConversationScreen(
     //   New incoming arrivals (which extend the timeline beyond HWM) bump
     //   the badge. On chat re-entry, the auto-scroll's snap to the bottom
     //   immediately advances HWM to the last timeline index, so the badge
-    //   shows 0 — matching WhatsApp/Signal semantics.
+    //   shows 0 — matching the convention that an "open chat" is read up to
+    //   the visible row, not the last delivered row.
     val nearBottom by remember {
         derivedStateOf {
             isNearBottom(listState, controller.timeline.size, controller.hasMoreBefore || controller.isLoadingOlder)
@@ -2163,9 +2166,10 @@ private fun ConversationScreen(
     }
     // Selected-but-not-yet-sent attachments: when non-empty the preview /
     // caption sheet is shown. Multi-pick goes through `PickMultipleVisualMedia`
-    // (up to 10 like WhatsApp). Each picked URI is sent as its own kind:9 for
-    // now (album-as-N-messages); the protocol-level album-as-one-message uses
-    // the same `sendMediaAttachments(list, caption)` FFI and is the next
+    // with `MEDIA_PICKER_MAX_ITEMS` as the cap. Each picked URI is sent as
+    // its own kind:9 for now (album-as-N-messages); the protocol-level
+    // album-as-one-message uses the same `sendMediaAttachments(list, caption)`
+    // FFI and is the next
     // follow-up — that one requires `RetainedMediaUpload` to hold a list.
     var pendingMediaUris by rememberSaveable(stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
@@ -2180,7 +2184,7 @@ private fun ConversationScreen(
     // PickMultipleVisualMedia uses the system Photo Picker — no READ_MEDIA_IMAGES
     // permission needed (Android 13+ scopes the picker's own grant); on older
     // devices it falls back to GET_CONTENT with the same UX. The maxItems
-    // cap mirrors WhatsApp's album limit; pick a single image still works
+    // cap comes from MEDIA_PICKER_MAX_ITEMS; picking a single image still works
     // (returns a one-element list).
     val imagePickerLauncher =
         rememberLauncherForActivityResult(
@@ -2224,7 +2228,7 @@ private fun ConversationScreen(
 
     // Decode/compress each URI off the main thread in parallel, then hand
     // the album to the controller. Caption is applied to every send;
-    // matches WhatsApp's behaviour where one caption belongs to the whole
+    // the convention for an album is one caption belonging to the whole
     // album. For now we fan out one send call per image (controller's
     // single-attachment path); the protocol-level album that ships all N
     // in one `sendMediaAttachments(list, caption)` is the next refactor.
