@@ -1778,6 +1778,16 @@ private fun FullScreenImageViewer(
             pageCount = { references.size },
         )
     val currentReference = references[pagerState.currentPage]
+    // Zoom state is hoisted to the viewer scope (not per-page) so the pager
+    // can read it to gate horizontal swipe. Without this gate, the page's
+    // `detectTransformGestures` claims every horizontal drag and the pager
+    // never moves. Page change resets to identity below.
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    LaunchedEffect(pagerState.currentPage) {
+        scale = 1f
+        offset = Offset.Zero
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1792,12 +1802,20 @@ private fun FullScreenImageViewer(
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
+                // Disable pager swipe while the visible page is zoomed in —
+                // otherwise the pan gesture and the pager's swipe both want
+                // the horizontal drag. At scale 1× the pager wins.
+                userScrollEnabled = scale <= 1f,
             ) { page ->
                 ViewerPage(
                     controller = controller,
                     messageIdHex = messageIdHex,
                     attachmentIndex = page,
                     reference = references[page],
+                    scale = if (page == pagerState.currentPage) scale else 1f,
+                    offset = if (page == pagerState.currentPage) offset else Offset.Zero,
+                    onScaleChange = { if (page == pagerState.currentPage) scale = it },
+                    onOffsetChange = { if (page == pagerState.currentPage) offset = it },
                 )
             }
             Row(
@@ -1881,6 +1899,10 @@ private fun ViewerPage(
     messageIdHex: String,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
+    scale: Float,
+    offset: Offset,
+    onScaleChange: (Float) -> Unit,
+    onOffsetChange: (Offset) -> Unit,
 ) {
     val pageKey = "$messageIdHex#$attachmentIndex"
     var androidBitmap by remember(pageKey) { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -1916,9 +1938,7 @@ private fun ViewerPage(
     Box(modifier = Modifier.fillMaxSize()) {
         val current = bitmap
         when {
-            current != null -> {
-                var scale by remember(pageKey) { mutableStateOf(1f) }
-                var offset by remember(pageKey) { mutableStateOf(Offset.Zero) }
+            current != null ->
                 Image(
                     bitmap = current,
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
@@ -1928,36 +1948,38 @@ private fun ViewerPage(
                             .fillMaxSize()
                             .pointerInput(pageKey) {
                                 detectTapGestures(onDoubleTap = {
-                                    scale = 1f
-                                    offset = Offset.Zero
+                                    onScaleChange(1f)
+                                    onOffsetChange(Offset.Zero)
                                 })
                             }.pointerInput(pageKey) {
                                 detectTransformGestures { _, pan, zoom, _ ->
-                                    scale = (scale * zoom).coerceIn(1f, 5f)
-                                    offset =
-                                        if (scale > 1f) {
-                                            val viewportW = size.width.toFloat()
-                                            val viewportH = size.height.toFloat()
-                                            val imageAspect = current.width.toFloat() / current.height.toFloat()
-                                            val viewportAspect = viewportW / viewportH
-                                            val baseWidth: Float
-                                            val baseHeight: Float
-                                            if (imageAspect > viewportAspect) {
-                                                baseWidth = viewportW
-                                                baseHeight = viewportW / imageAspect
-                                            } else {
-                                                baseHeight = viewportH
-                                                baseWidth = viewportH * imageAspect
-                                            }
-                                            val maxX = ((baseWidth * scale) - viewportW).coerceAtLeast(0f) / 2f
-                                            val maxY = ((baseHeight * scale) - viewportH).coerceAtLeast(0f) / 2f
+                                    val nextScale = (scale * zoom).coerceIn(1f, 5f)
+                                    onScaleChange(nextScale)
+                                    if (nextScale > 1f) {
+                                        val viewportW = size.width.toFloat()
+                                        val viewportH = size.height.toFloat()
+                                        val imageAspect = current.width.toFloat() / current.height.toFloat()
+                                        val viewportAspect = viewportW / viewportH
+                                        val baseWidth: Float
+                                        val baseHeight: Float
+                                        if (imageAspect > viewportAspect) {
+                                            baseWidth = viewportW
+                                            baseHeight = viewportW / imageAspect
+                                        } else {
+                                            baseHeight = viewportH
+                                            baseWidth = viewportH * imageAspect
+                                        }
+                                        val maxX = ((baseWidth * nextScale) - viewportW).coerceAtLeast(0f) / 2f
+                                        val maxY = ((baseHeight * nextScale) - viewportH).coerceAtLeast(0f) / 2f
+                                        onOffsetChange(
                                             Offset(
                                                 (offset.x + pan.x).coerceIn(-maxX, maxX),
                                                 (offset.y + pan.y).coerceIn(-maxY, maxY),
-                                            )
-                                        } else {
-                                            Offset.Zero
-                                        }
+                                            ),
+                                        )
+                                    } else {
+                                        onOffsetChange(Offset.Zero)
+                                    }
                                 }
                             }.graphicsLayer(
                                 scaleX = scale,
@@ -1966,7 +1988,6 @@ private fun ViewerPage(
                                 translationY = offset.y,
                             ),
                 )
-            }
             viewerFailed ->
                 Column(
                     modifier = Modifier.align(Alignment.Center).padding(24.dp),
