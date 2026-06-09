@@ -15,6 +15,8 @@ jna = "5.18.1"
 zxing = "3.5.4"
 cameraX = "1.6.1"
 mlkitBarcode = "17.3.0"
+ktlint = "1.5.0"
+ktlintGradle = "14.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -44,3 +46,4 @@ mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning"
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
