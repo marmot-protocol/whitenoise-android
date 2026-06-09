@@ -1368,13 +1368,10 @@ class ConversationController(
     }
 
     /**
-     * Bytes of the first pending attachment in the optimistic message's album,
-     * used by the sender's preview bubble during upload. [messageIdHex] is
-     * the optimistic record's temp id; null once the send confirms.
-     *
-     * Multi-attachment album previews wait on the receive-side grid-bubble
-     * refactor that extends the cache key with the attachment index — for
-     * now the bubble shows the first attachment as a single-image preview.
+     * Bytes of the first pending attachment — used by callers that only want
+     * a single preview. For the optimistic upload bubble in the timeline,
+     * use [pendingMediaBytesList] so the pending UI matches the post-upload
+     * grid layout instead of showing only the first tile.
      */
     fun pendingMediaBytes(messageIdHex: String): ByteArray? =
         retainedMediaUploads
@@ -1382,6 +1379,19 @@ class ConversationController(
             ?.attachments
             ?.firstOrNull()
             ?.jpegBytes
+
+    /**
+     * Bytes for every pending attachment in the optimistic album, ordered by
+     * attachment index. Empty when no upload is queued under the temp id.
+     * Used by the upload placeholder so the sender sees the full grid render
+     * during upload — same shape as the post-upload bubble.
+     */
+    fun pendingMediaBytesList(messageIdHex: String): List<ByteArray> =
+        retainedMediaUploads
+            .get("msg:$messageIdHex")
+            ?.attachments
+            ?.map { it.jpegBytes }
+            .orEmpty()
 
     /**
      * Drop all retained outgoing JPEG bytes. Called when leaving the

@@ -1676,58 +1676,154 @@ private fun MediaBubbleAction(
 
 @Composable
 private fun MediaPendingPlaceholder(
-    previewBytes: ByteArray?,
+    previewBytesList: List<ByteArray>,
     failed: Boolean,
 ) {
-    // The sender holds the local bytes, so preview the actual image while it
-    // uploads, with a centered status overlay (spinner / error) on top.
-    val preview = rememberSampledBitmap(previewBytes)
     val statusLabel = stringResource(if (failed) R.string.media_upload_failed else R.string.media_uploading)
     val statusColor = if (failed) MaterialTheme.colorScheme.error else Color.White
+
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(MediaBubbleHeight),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            preview?.let {
-                Image(
-                    bitmap = it,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                // Scrim so the overlay stays legible over any image.
-                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)))
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (failed) {
-                    Icon(
-                        Icons.Default.BrokenImage,
-                        contentDescription = null,
-                        tint = statusColor,
-                        modifier = Modifier.size(28.dp),
-                    )
-                } else {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(28.dp),
-                        strokeWidth = 2.dp,
-                        color = if (preview != null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            if (previewBytesList.size <= 1) {
+                // Single-image: keep the existing fixed-height bubble so the
+                // optimistic→projected swap doesn't reflow the timeline.
+                val preview = rememberSampledBitmap(previewBytesList.firstOrNull())
+                Box(
+                    Modifier.fillMaxWidth().height(MediaBubbleHeight),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    preview?.let {
+                        Image(
+                            bitmap = it,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)))
+                    }
+                    PendingStatusOverlay(
+                        failed = failed,
+                        hasPreview = preview != null,
+                        statusLabel = statusLabel,
+                        statusColor = statusColor,
                     )
                 }
-                Spacer(Modifier.height(6.dp))
+            } else {
+                // Album: render the same 2-col grid the post-upload bubble
+                // uses, so the optimistic → confirmed transition is a visual
+                // no-op. Each tile decodes from local bytes (no network), and
+                // a single status overlay sits across the whole bubble.
+                val visible = previewBytesList.take(4)
+                val overflow = (previewBytesList.size - visible.size).coerceAtLeast(0)
+                Box(Modifier.fillMaxWidth()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.padding(2.dp),
+                    ) {
+                        visible.chunked(2).forEachIndexed { rowIndex, row ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                row.forEachIndexed { colIndex, bytes ->
+                                    val tileIndex = rowIndex * 2 + colIndex
+                                    val showOverflow = tileIndex == visible.lastIndex && overflow > 0
+                                    PendingGridTile(
+                                        bytes = bytes,
+                                        overflowCount = if (showOverflow) overflow else 0,
+                                        modifier = Modifier.weight(1f).aspectRatio(1f),
+                                    )
+                                }
+                                if (row.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    Box(
+                        Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)),
+                    )
+                    PendingStatusOverlay(
+                        failed = failed,
+                        hasPreview = true,
+                        statusLabel = statusLabel,
+                        statusColor = statusColor,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingStatusOverlay(
+    failed: Boolean,
+    hasPreview: Boolean,
+    statusLabel: String,
+    statusColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (failed) {
+            Icon(
+                Icons.Default.BrokenImage,
+                contentDescription = null,
+                tint = statusColor,
+                modifier = Modifier.size(28.dp),
+            )
+        } else {
+            CircularProgressIndicator(
+                modifier = Modifier.size(28.dp),
+                strokeWidth = 2.dp,
+                color = if (hasPreview) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            statusLabel,
+            style = MaterialTheme.typography.labelMedium,
+            color =
+                if (hasPreview) {
+                    statusColor
+                } else {
+                    if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                },
+        )
+    }
+}
+
+@Composable
+private fun PendingGridTile(
+    bytes: ByteArray,
+    overflowCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    val preview = rememberSampledBitmap(bytes)
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        preview?.let {
+            Image(
+                bitmap = it,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        if (overflowCount > 0 && preview != null) {
+            Box(
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text(
-                    statusLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color =
-                        if (preview != null) {
-                            statusColor
-                        } else {
-                            if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                        },
+                    "+$overflowCount",
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
@@ -3867,7 +3963,7 @@ private fun MessageBubble(
                             }
                         } else if (!deleted && !invalidated && mediaPendingName != null) {
                             MediaPendingPlaceholder(
-                                previewBytes = controller.pendingMediaBytes(record.messageIdHex),
+                                previewBytesList = controller.pendingMediaBytesList(record.messageIdHex),
                                 failed = item.status == MessageStatus.Failed,
                             )
                         }
