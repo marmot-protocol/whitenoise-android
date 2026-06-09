@@ -949,6 +949,10 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1092,6 +1096,8 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_npub(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_parse_markdown(`ptr`: Pointer,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_file(`ptr`: Pointer,`path`: RustBuffer.ByValue,`endpoint`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_tracker_update(`ptr`: Pointer,
@@ -1122,6 +1128,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_remove_members_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_replace_encrypted_media_blob_endpoints(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`endpoints`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_reply_to_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_republish_key_package(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
@@ -1130,7 +1138,7 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_self_demote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_send_media_reference(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,`caption`: RustBuffer.ByValue,
+    fun uniffi_marmot_uniffi_fn_method_marmot_send_media_attachments(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`attachments`: RustBuffer.ByValue,`caption`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_send_text(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,
     ): Long
@@ -1424,6 +1432,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_npub(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_parse_markdown(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_post_audit_log_file(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_post_audit_log_tracker_update(
@@ -1454,6 +1464,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_remove_members_detailed(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_replace_encrypted_media_blob_endpoints(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_reply_to_message(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_republish_key_package(
@@ -1462,7 +1474,7 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_self_demote_admin_detailed(
     ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_send_media_reference(
+    fun uniffi_marmot_uniffi_checksum_method_marmot_send_media_attachments(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_send_text(
     ): Short
@@ -1643,7 +1655,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_display_name() != 65469.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_download_media() != 38941.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_download_media() != 56125.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_details() != 55062.toShort()) {
@@ -1700,6 +1712,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_npub() != 20744.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_parse_markdown() != 44161.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_post_audit_log_file() != 63080.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1745,6 +1760,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_remove_members_detailed() != 52572.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_replace_encrypted_media_blob_endpoints() != 42018.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_reply_to_message() != 49057.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1757,7 +1775,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_self_demote_admin_detailed() != 31187.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_send_media_reference() != 20496.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_send_media_attachments() != 3385.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_send_text() != 60625.toShort()) {
@@ -1835,7 +1853,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_update_group_profile() != 53035.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_upload_media() != 3159.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_upload_media() != 20405.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_upsert_push_registration() != 36089.toShort()) {
@@ -1954,6 +1972,29 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
  * @suppress
  * */
 object NoPointer
+
+/**
+ * @suppress
+ */
+public object FfiConverterUByte: FfiConverter<UByte, Byte> {
+    override fun lift(value: Byte): UByte {
+        return value.toUByte()
+    }
+
+    override fun read(buf: ByteBuffer): UByte {
+        return lift(buf.get())
+    }
+
+    override fun lower(value: UByte): Byte {
+        return value.toByte()
+    }
+
+    override fun allocationSize(value: UByte) = 1UL
+
+    override fun write(value: UByte, buf: ByteBuffer) {
+        buf.put(value.toByte())
+    }
+}
 
 /**
  * @suppress
@@ -3721,10 +3762,10 @@ public interface MarmotInterface {
     fun `displayName`(`accountIdHex`: kotlin.String): kotlin.String?
     
     /**
-     * Fetch an encrypted Blossom blob and decrypt it using the group's
-     * MIP-04 encrypted-media exporter secret.
+     * Fetch an encrypted media blob and decrypt it using the group's
+     * encrypted media component secret.
      */
-    suspend fun `downloadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaReferenceFfi): MediaDownloadResultFfi
+    suspend fun `downloadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaAttachmentReferenceFfi): MediaDownloadResultFfi
     
     /**
      * Group plus enriched member rows for detail screens.
@@ -3817,6 +3858,13 @@ public interface MarmotInterface {
     fun `npub`(`accountIdHex`: kotlin.String): kotlin.String?
     
     /**
+     * Parse plaintext message content into the same Markdown AST returned on
+     * message and timeline records. Useful for draft previews and host-side
+     * fallback rendering.
+     */
+    fun `parseMarkdown`(`text`: kotlin.String): MarkdownDocumentFfi
+    
+    /**
      * POST one selected JSONL audit log to a forensic analyzer endpoint.
      */
     suspend fun `postAuditLogFile`(`path`: kotlin.String, `endpoint`: kotlin.String): AuditLogUploadResultFfi
@@ -3891,6 +3939,13 @@ public interface MarmotInterface {
     suspend fun `removeMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): GroupMutationResultFfi
     
     /**
+     * Replace the group's encrypted-media default blob endpoints as a full
+     * `marmot.group.encrypted-media.v1` component update. Requires the caller
+     * to be an admin.
+     */
+    suspend fun `replaceEncryptedMediaBlobEndpoints`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `endpoints`: List<AppBlobEndpointFfi>): SendSummaryFfi
+    
+    /**
      * Send `text` as a reply that quotes `target_message_id`.
      */
     suspend fun `replyToMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String, `text`: kotlin.String): SendSummaryFfi
@@ -3909,10 +3964,10 @@ public interface MarmotInterface {
     suspend fun `selfDemoteAdminDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupMutationResultFfi
     
     /**
-     * Send an already-uploaded encrypted media reference as a kind-9 chat
-     * carrying a NIP-92 `imeta` tag.
+     * Send already-uploaded encrypted media attachments as a kind-9 chat
+     * carrying ordered NIP-92 `imeta` tags.
      */
-    suspend fun `sendMediaReference`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaReferenceFfi, `caption`: kotlin.String?): SendSummaryFfi
+    suspend fun `sendMediaAttachments`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `attachments`: List<MediaAttachmentReferenceFfi>, `caption`: kotlin.String?): SendSummaryFfi
     
     /**
      * Send a plain UTF-8 text message. Structured payloads (reactions,
@@ -4060,8 +4115,8 @@ public interface MarmotInterface {
     suspend fun `updateGroupProfile`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `name`: kotlin.String?, `description`: kotlin.String?): SendSummaryFfi
     
     /**
-     * Encrypt plaintext, upload the ciphertext to Blossom, and optionally
-     * send the resulting media reference into the group.
+     * Encrypt plaintext attachments, upload the ciphertext blobs, and
+     * optionally send the resulting media references into the group.
      */
     suspend fun `uploadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `request`: MediaUploadRequestFfi): MediaUploadResultFfi
     
@@ -4598,17 +4653,17 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
-     * Fetch an encrypted Blossom blob and decrypt it using the group's
-     * MIP-04 encrypted-media exporter secret.
+     * Fetch an encrypted media blob and decrypt it using the group's
+     * encrypted media component secret.
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `downloadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaReferenceFfi) : MediaDownloadResultFfi {
+    override suspend fun `downloadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaAttachmentReferenceFfi) : MediaDownloadResultFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_download_media(
                 thisPtr,
-                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterTypeMediaReferenceFfi.lower(`reference`),
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterTypeMediaAttachmentReferenceFfi.lower(`reference`),
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -4981,6 +5036,23 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Parse plaintext message content into the same Markdown AST returned on
+     * message and timeline records. Useful for draft previews and host-side
+     * fallback rendering.
+     */override fun `parseMarkdown`(`text`: kotlin.String): MarkdownDocumentFfi {
+            return FfiConverterTypeMarkdownDocumentFfi.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_parse_markdown(
+        it, FfiConverterString.lower(`text`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * POST one selected JSONL audit log to a forensic analyzer endpoint.
      */
     @Throws(MarmotKitException::class)
@@ -5326,6 +5398,32 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Replace the group's encrypted-media default blob endpoints as a full
+     * `marmot.group.encrypted-media.v1` component update. Requires the caller
+     * to be an admin.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `replaceEncryptedMediaBlobEndpoints`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `endpoints`: List<AppBlobEndpointFfi>) : SendSummaryFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_replace_encrypted_media_blob_endpoints(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterSequenceTypeAppBlobEndpointFfi.lower(`endpoints`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeSendSummaryFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Send `text` as a reply that quotes `target_message_id`.
      */
     @Throws(MarmotKitException::class)
@@ -5420,17 +5518,17 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
-     * Send an already-uploaded encrypted media reference as a kind-9 chat
-     * carrying a NIP-92 `imeta` tag.
+     * Send already-uploaded encrypted media attachments as a kind-9 chat
+     * carrying ordered NIP-92 `imeta` tags.
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `sendMediaReference`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaReferenceFfi, `caption`: kotlin.String?) : SendSummaryFfi {
+    override suspend fun `sendMediaAttachments`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `attachments`: List<MediaAttachmentReferenceFfi>, `caption`: kotlin.String?) : SendSummaryFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_send_media_reference(
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_send_media_attachments(
                 thisPtr,
-                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterTypeMediaReferenceFfi.lower(`reference`),FfiConverterOptionalString.lower(`caption`),
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterSequenceTypeMediaAttachmentReferenceFfi.lower(`attachments`),FfiConverterOptionalString.lower(`caption`),
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -6010,8 +6108,8 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
-     * Encrypt plaintext, upload the ciphertext to Blossom, and optionally
-     * send the resulting media reference into the group.
+     * Encrypt plaintext attachments, upload the ciphertext blobs, and
+     * optionally send the resulting media references into the group.
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -7113,6 +7211,86 @@ public object FfiConverterTypeAgentStreamStartFfi: FfiConverterRustBuffer<AgentS
 
 
 
+data class AppBlobEndpointFfi (
+    var `locatorKind`: kotlin.String, 
+    var `baseUrl`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAppBlobEndpointFfi: FfiConverterRustBuffer<AppBlobEndpointFfi> {
+    override fun read(buf: ByteBuffer): AppBlobEndpointFfi {
+        return AppBlobEndpointFfi(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AppBlobEndpointFfi) = (
+            FfiConverterString.allocationSize(value.`locatorKind`) +
+            FfiConverterString.allocationSize(value.`baseUrl`)
+    )
+
+    override fun write(value: AppBlobEndpointFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`locatorKind`, buf)
+            FfiConverterString.write(value.`baseUrl`, buf)
+    }
+}
+
+
+
+data class AppGroupEncryptedMediaComponentFfi (
+    var `componentId`: kotlin.UInt, 
+    var `component`: kotlin.String, 
+    var `required`: kotlin.Boolean, 
+    var `mediaFormat`: kotlin.String, 
+    var `allowedLocatorKinds`: List<kotlin.String>, 
+    var `defaultBlobEndpoints`: List<AppBlobEndpointFfi>
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAppGroupEncryptedMediaComponentFfi: FfiConverterRustBuffer<AppGroupEncryptedMediaComponentFfi> {
+    override fun read(buf: ByteBuffer): AppGroupEncryptedMediaComponentFfi {
+        return AppGroupEncryptedMediaComponentFfi(
+            FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceTypeAppBlobEndpointFfi.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AppGroupEncryptedMediaComponentFfi) = (
+            FfiConverterUInt.allocationSize(value.`componentId`) +
+            FfiConverterString.allocationSize(value.`component`) +
+            FfiConverterBoolean.allocationSize(value.`required`) +
+            FfiConverterString.allocationSize(value.`mediaFormat`) +
+            FfiConverterSequenceString.allocationSize(value.`allowedLocatorKinds`) +
+            FfiConverterSequenceTypeAppBlobEndpointFfi.allocationSize(value.`defaultBlobEndpoints`)
+    )
+
+    override fun write(value: AppGroupEncryptedMediaComponentFfi, buf: ByteBuffer) {
+            FfiConverterUInt.write(value.`componentId`, buf)
+            FfiConverterString.write(value.`component`, buf)
+            FfiConverterBoolean.write(value.`required`, buf)
+            FfiConverterString.write(value.`mediaFormat`, buf)
+            FfiConverterSequenceString.write(value.`allowedLocatorKinds`, buf)
+            FfiConverterSequenceTypeAppBlobEndpointFfi.write(value.`defaultBlobEndpoints`, buf)
+    }
+}
+
+
+
 data class AppGroupMemberRecordFfi (
     var `memberIdHex`: kotlin.String, 
     var `account`: kotlin.String?, 
@@ -7208,6 +7386,7 @@ data class AppGroupRecordFfi (
     var `avatarUrl`: kotlin.String?, 
     var `avatarDim`: kotlin.String?, 
     var `avatarThumbhash`: kotlin.String?, 
+    var `encryptedMedia`: AppGroupEncryptedMediaComponentFfi, 
     var `archived`: kotlin.Boolean, 
     var `pendingConfirmation`: kotlin.Boolean, 
     var `welcomerAccountIdHex`: kotlin.String?, 
@@ -7233,6 +7412,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterTypeAppGroupEncryptedMediaComponentFfi.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -7251,6 +7431,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.allocationSize(value.`avatarUrl`) +
             FfiConverterOptionalString.allocationSize(value.`avatarDim`) +
             FfiConverterOptionalString.allocationSize(value.`avatarThumbhash`) +
+            FfiConverterTypeAppGroupEncryptedMediaComponentFfi.allocationSize(value.`encryptedMedia`) +
             FfiConverterBoolean.allocationSize(value.`archived`) +
             FfiConverterBoolean.allocationSize(value.`pendingConfirmation`) +
             FfiConverterOptionalString.allocationSize(value.`welcomerAccountIdHex`) +
@@ -7268,6 +7449,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.write(value.`avatarUrl`, buf)
             FfiConverterOptionalString.write(value.`avatarDim`, buf)
             FfiConverterOptionalString.write(value.`avatarThumbhash`, buf)
+            FfiConverterTypeAppGroupEncryptedMediaComponentFfi.write(value.`encryptedMedia`, buf)
             FfiConverterBoolean.write(value.`archived`, buf)
             FfiConverterBoolean.write(value.`pendingConfirmation`, buf)
             FfiConverterOptionalString.write(value.`welcomerAccountIdHex`, buf)
@@ -7283,6 +7465,7 @@ data class AppMessageRecordFfi (
     var `groupIdHex`: kotlin.String, 
     var `sender`: kotlin.String, 
     var `plaintext`: kotlin.String, 
+    var `contentTokens`: MarkdownDocumentFfi, 
     /**
      * Nostr `kind` of the inner Marmot app event (9 chat, 7 reaction, …).
      */
@@ -7309,6 +7492,7 @@ public object FfiConverterTypeAppMessageRecordFfi: FfiConverterRustBuffer<AppMes
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
+            FfiConverterTypeMarkdownDocumentFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterSequenceTypeMessageTagFfi.read(buf),
             FfiConverterULong.read(buf),
@@ -7322,6 +7506,7 @@ public object FfiConverterTypeAppMessageRecordFfi: FfiConverterRustBuffer<AppMes
             FfiConverterString.allocationSize(value.`groupIdHex`) +
             FfiConverterString.allocationSize(value.`sender`) +
             FfiConverterString.allocationSize(value.`plaintext`) +
+            FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
             FfiConverterSequenceTypeMessageTagFfi.allocationSize(value.`tags`) +
             FfiConverterULong.allocationSize(value.`recordedAt`) +
@@ -7334,6 +7519,7 @@ public object FfiConverterTypeAppMessageRecordFfi: FfiConverterRustBuffer<AppMes
             FfiConverterString.write(value.`groupIdHex`, buf)
             FfiConverterString.write(value.`sender`, buf)
             FfiConverterString.write(value.`plaintext`, buf)
+            FfiConverterTypeMarkdownDocumentFfi.write(value.`contentTokens`, buf)
             FfiConverterULong.write(value.`kind`, buf)
             FfiConverterSequenceTypeMessageTagFfi.write(value.`tags`, buf)
             FfiConverterULong.write(value.`recordedAt`, buf)
@@ -7648,6 +7834,7 @@ data class ChatListMessagePreviewFfi (
     var `sender`: kotlin.String, 
     var `senderDisplayName`: kotlin.String?, 
     var `plaintext`: kotlin.String, 
+    var `contentTokens`: MarkdownDocumentFfi, 
     var `kind`: kotlin.ULong, 
     var `timelineAt`: kotlin.ULong, 
     var `deleted`: kotlin.Boolean
@@ -7666,6 +7853,7 @@ public object FfiConverterTypeChatListMessagePreviewFfi: FfiConverterRustBuffer<
             FfiConverterString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterString.read(buf),
+            FfiConverterTypeMarkdownDocumentFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterBoolean.read(buf),
@@ -7677,6 +7865,7 @@ public object FfiConverterTypeChatListMessagePreviewFfi: FfiConverterRustBuffer<
             FfiConverterString.allocationSize(value.`sender`) +
             FfiConverterOptionalString.allocationSize(value.`senderDisplayName`) +
             FfiConverterString.allocationSize(value.`plaintext`) +
+            FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
             FfiConverterULong.allocationSize(value.`timelineAt`) +
             FfiConverterBoolean.allocationSize(value.`deleted`)
@@ -7687,6 +7876,7 @@ public object FfiConverterTypeChatListMessagePreviewFfi: FfiConverterRustBuffer<
             FfiConverterString.write(value.`sender`, buf)
             FfiConverterOptionalString.write(value.`senderDisplayName`, buf)
             FfiConverterString.write(value.`plaintext`, buf)
+            FfiConverterTypeMarkdownDocumentFfi.write(value.`contentTokens`, buf)
             FfiConverterULong.write(value.`kind`, buf)
             FfiConverterULong.write(value.`timelineAt`, buf)
             FfiConverterBoolean.write(value.`deleted`, buf)
@@ -7701,6 +7891,7 @@ data class ChatListRowFfi (
     var `pendingConfirmation`: kotlin.Boolean, 
     var `title`: kotlin.String, 
     var `groupName`: kotlin.String, 
+    var `avatarUrl`: kotlin.String?, 
     var `avatar`: ChatListAvatarFfi?, 
     var `lastMessage`: ChatListMessagePreviewFfi?, 
     var `unreadCount`: kotlin.ULong, 
@@ -7725,6 +7916,7 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterBoolean.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterOptionalTypeChatListAvatarFfi.read(buf),
             FfiConverterOptionalTypeChatListMessagePreviewFfi.read(buf),
             FfiConverterULong.read(buf),
@@ -7742,6 +7934,7 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterBoolean.allocationSize(value.`pendingConfirmation`) +
             FfiConverterString.allocationSize(value.`title`) +
             FfiConverterString.allocationSize(value.`groupName`) +
+            FfiConverterOptionalString.allocationSize(value.`avatarUrl`) +
             FfiConverterOptionalTypeChatListAvatarFfi.allocationSize(value.`avatar`) +
             FfiConverterOptionalTypeChatListMessagePreviewFfi.allocationSize(value.`lastMessage`) +
             FfiConverterULong.allocationSize(value.`unreadCount`) +
@@ -7758,6 +7951,7 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterBoolean.write(value.`pendingConfirmation`, buf)
             FfiConverterString.write(value.`title`, buf)
             FfiConverterString.write(value.`groupName`, buf)
+            FfiConverterOptionalString.write(value.`avatarUrl`, buf)
             FfiConverterOptionalTypeChatListAvatarFfi.write(value.`avatar`, buf)
             FfiConverterOptionalTypeChatListMessagePreviewFfi.write(value.`lastMessage`, buf)
             FfiConverterULong.write(value.`unreadCount`, buf)
@@ -8187,6 +8381,194 @@ public object FfiConverterTypeLocalPushRegistrationDebugFfi: FfiConverterRustBuf
 
 
 
+data class MarkdownDocumentFfi (
+    var `blocks`: List<MarkdownBlockFfi>
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownDocumentFfi: FfiConverterRustBuffer<MarkdownDocumentFfi> {
+    override fun read(buf: ByteBuffer): MarkdownDocumentFfi {
+        return MarkdownDocumentFfi(
+            FfiConverterSequenceTypeMarkdownBlockFfi.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MarkdownDocumentFfi) = (
+            FfiConverterSequenceTypeMarkdownBlockFfi.allocationSize(value.`blocks`)
+    )
+
+    override fun write(value: MarkdownDocumentFfi, buf: ByteBuffer) {
+            FfiConverterSequenceTypeMarkdownBlockFfi.write(value.`blocks`, buf)
+    }
+}
+
+
+
+data class MarkdownListItemFfi (
+    var `blocks`: List<MarkdownBlockFfi>, 
+    /**
+     * `None` for plain bullets/ordered items, `Some(false)` for `[ ]`,
+     * `Some(true)` for `[x]`.
+     */
+    var `checked`: kotlin.Boolean?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownListItemFfi: FfiConverterRustBuffer<MarkdownListItemFfi> {
+    override fun read(buf: ByteBuffer): MarkdownListItemFfi {
+        return MarkdownListItemFfi(
+            FfiConverterSequenceTypeMarkdownBlockFfi.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MarkdownListItemFfi) = (
+            FfiConverterSequenceTypeMarkdownBlockFfi.allocationSize(value.`blocks`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`checked`)
+    )
+
+    override fun write(value: MarkdownListItemFfi, buf: ByteBuffer) {
+            FfiConverterSequenceTypeMarkdownBlockFfi.write(value.`blocks`, buf)
+            FfiConverterOptionalBoolean.write(value.`checked`, buf)
+    }
+}
+
+
+
+data class MarkdownNostrEntityFfi (
+    var `hrp`: MarkdownNostrHrpFfi, 
+    var `bech32`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownNostrEntityFfi: FfiConverterRustBuffer<MarkdownNostrEntityFfi> {
+    override fun read(buf: ByteBuffer): MarkdownNostrEntityFfi {
+        return MarkdownNostrEntityFfi(
+            FfiConverterTypeMarkdownNostrHrpFfi.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MarkdownNostrEntityFfi) = (
+            FfiConverterTypeMarkdownNostrHrpFfi.allocationSize(value.`hrp`) +
+            FfiConverterString.allocationSize(value.`bech32`)
+    )
+
+    override fun write(value: MarkdownNostrEntityFfi, buf: ByteBuffer) {
+            FfiConverterTypeMarkdownNostrHrpFfi.write(value.`hrp`, buf)
+            FfiConverterString.write(value.`bech32`, buf)
+    }
+}
+
+
+
+data class MarkdownTableCellFfi (
+    var `inlines`: List<MarkdownInlineFfi>
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownTableCellFfi: FfiConverterRustBuffer<MarkdownTableCellFfi> {
+    override fun read(buf: ByteBuffer): MarkdownTableCellFfi {
+        return MarkdownTableCellFfi(
+            FfiConverterSequenceTypeMarkdownInlineFfi.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MarkdownTableCellFfi) = (
+            FfiConverterSequenceTypeMarkdownInlineFfi.allocationSize(value.`inlines`)
+    )
+
+    override fun write(value: MarkdownTableCellFfi, buf: ByteBuffer) {
+            FfiConverterSequenceTypeMarkdownInlineFfi.write(value.`inlines`, buf)
+    }
+}
+
+
+
+data class MediaAttachmentReferenceFfi (
+    var `locators`: List<MediaLocatorFfi>, 
+    var `ciphertextSha256`: kotlin.String, 
+    var `plaintextSha256`: kotlin.String, 
+    var `nonceHex`: kotlin.String, 
+    var `fileName`: kotlin.String, 
+    var `mediaType`: kotlin.String, 
+    var `version`: kotlin.String, 
+    var `sourceEpoch`: kotlin.ULong, 
+    var `dim`: kotlin.String?, 
+    var `thumbhash`: kotlin.String?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMediaAttachmentReferenceFfi: FfiConverterRustBuffer<MediaAttachmentReferenceFfi> {
+    override fun read(buf: ByteBuffer): MediaAttachmentReferenceFfi {
+        return MediaAttachmentReferenceFfi(
+            FfiConverterSequenceTypeMediaLocatorFfi.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MediaAttachmentReferenceFfi) = (
+            FfiConverterSequenceTypeMediaLocatorFfi.allocationSize(value.`locators`) +
+            FfiConverterString.allocationSize(value.`ciphertextSha256`) +
+            FfiConverterString.allocationSize(value.`plaintextSha256`) +
+            FfiConverterString.allocationSize(value.`nonceHex`) +
+            FfiConverterString.allocationSize(value.`fileName`) +
+            FfiConverterString.allocationSize(value.`mediaType`) +
+            FfiConverterString.allocationSize(value.`version`) +
+            FfiConverterULong.allocationSize(value.`sourceEpoch`) +
+            FfiConverterOptionalString.allocationSize(value.`dim`) +
+            FfiConverterOptionalString.allocationSize(value.`thumbhash`)
+    )
+
+    override fun write(value: MediaAttachmentReferenceFfi, buf: ByteBuffer) {
+            FfiConverterSequenceTypeMediaLocatorFfi.write(value.`locators`, buf)
+            FfiConverterString.write(value.`ciphertextSha256`, buf)
+            FfiConverterString.write(value.`plaintextSha256`, buf)
+            FfiConverterString.write(value.`nonceHex`, buf)
+            FfiConverterString.write(value.`fileName`, buf)
+            FfiConverterString.write(value.`mediaType`, buf)
+            FfiConverterString.write(value.`version`, buf)
+            FfiConverterULong.write(value.`sourceEpoch`, buf)
+            FfiConverterOptionalString.write(value.`dim`, buf)
+            FfiConverterOptionalString.write(value.`thumbhash`, buf)
+    }
+}
+
+
+
 data class MediaDownloadResultFfi (
     var `plaintext`: kotlin.ByteArray, 
     var `fileName`: kotlin.String, 
@@ -8227,12 +8609,45 @@ public object FfiConverterTypeMediaDownloadResultFfi: FfiConverterRustBuffer<Med
 
 
 
+data class MediaLocatorFfi (
+    var `kind`: kotlin.String, 
+    var `value`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMediaLocatorFfi: FfiConverterRustBuffer<MediaLocatorFfi> {
+    override fun read(buf: ByteBuffer): MediaLocatorFfi {
+        return MediaLocatorFfi(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MediaLocatorFfi) = (
+            FfiConverterString.allocationSize(value.`kind`) +
+            FfiConverterString.allocationSize(value.`value`)
+    )
+
+    override fun write(value: MediaLocatorFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`kind`, buf)
+            FfiConverterString.write(value.`value`, buf)
+    }
+}
+
+
+
 data class MediaRecordFfi (
     var `messageIdHex`: kotlin.String, 
+    var `attachmentIndex`: kotlin.UInt, 
     var `direction`: kotlin.String, 
     var `groupIdHex`: kotlin.String, 
     var `sender`: kotlin.String, 
-    var `reference`: MediaReferenceFfi, 
+    var `reference`: MediaAttachmentReferenceFfi, 
     var `caption`: kotlin.String?, 
     var `recordedAt`: kotlin.ULong, 
     var `receivedAt`: kotlin.ULong
@@ -8248,10 +8663,11 @@ public object FfiConverterTypeMediaRecordFfi: FfiConverterRustBuffer<MediaRecord
     override fun read(buf: ByteBuffer): MediaRecordFfi {
         return MediaRecordFfi(
             FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
-            FfiConverterTypeMediaReferenceFfi.read(buf),
+            FfiConverterTypeMediaAttachmentReferenceFfi.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterULong.read(buf),
@@ -8260,10 +8676,11 @@ public object FfiConverterTypeMediaRecordFfi: FfiConverterRustBuffer<MediaRecord
 
     override fun allocationSize(value: MediaRecordFfi) = (
             FfiConverterString.allocationSize(value.`messageIdHex`) +
+            FfiConverterUInt.allocationSize(value.`attachmentIndex`) +
             FfiConverterString.allocationSize(value.`direction`) +
             FfiConverterString.allocationSize(value.`groupIdHex`) +
             FfiConverterString.allocationSize(value.`sender`) +
-            FfiConverterTypeMediaReferenceFfi.allocationSize(value.`reference`) +
+            FfiConverterTypeMediaAttachmentReferenceFfi.allocationSize(value.`reference`) +
             FfiConverterOptionalString.allocationSize(value.`caption`) +
             FfiConverterULong.allocationSize(value.`recordedAt`) +
             FfiConverterULong.allocationSize(value.`receivedAt`)
@@ -8271,10 +8688,11 @@ public object FfiConverterTypeMediaRecordFfi: FfiConverterRustBuffer<MediaRecord
 
     override fun write(value: MediaRecordFfi, buf: ByteBuffer) {
             FfiConverterString.write(value.`messageIdHex`, buf)
+            FfiConverterUInt.write(value.`attachmentIndex`, buf)
             FfiConverterString.write(value.`direction`, buf)
             FfiConverterString.write(value.`groupIdHex`, buf)
             FfiConverterString.write(value.`sender`, buf)
-            FfiConverterTypeMediaReferenceFfi.write(value.`reference`, buf)
+            FfiConverterTypeMediaAttachmentReferenceFfi.write(value.`reference`, buf)
             FfiConverterOptionalString.write(value.`caption`, buf)
             FfiConverterULong.write(value.`recordedAt`, buf)
             FfiConverterULong.write(value.`receivedAt`, buf)
@@ -8283,13 +8701,12 @@ public object FfiConverterTypeMediaRecordFfi: FfiConverterRustBuffer<MediaRecord
 
 
 
-data class MediaReferenceFfi (
-    var `url`: kotlin.String, 
-    var `fileHashHex`: kotlin.String, 
-    var `nonceHex`: kotlin.String, 
+data class MediaUploadAttachmentRequestFfi (
     var `fileName`: kotlin.String, 
     var `mediaType`: kotlin.String, 
-    var `version`: kotlin.String
+    var `plaintext`: kotlin.ByteArray, 
+    var `dim`: kotlin.String?, 
+    var `thumbhash`: kotlin.String?
 ) {
     
     companion object
@@ -8298,43 +8715,70 @@ data class MediaReferenceFfi (
 /**
  * @suppress
  */
-public object FfiConverterTypeMediaReferenceFfi: FfiConverterRustBuffer<MediaReferenceFfi> {
-    override fun read(buf: ByteBuffer): MediaReferenceFfi {
-        return MediaReferenceFfi(
+public object FfiConverterTypeMediaUploadAttachmentRequestFfi: FfiConverterRustBuffer<MediaUploadAttachmentRequestFfi> {
+    override fun read(buf: ByteBuffer): MediaUploadAttachmentRequestFfi {
+        return MediaUploadAttachmentRequestFfi(
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
+            FfiConverterByteArray.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
-    override fun allocationSize(value: MediaReferenceFfi) = (
-            FfiConverterString.allocationSize(value.`url`) +
-            FfiConverterString.allocationSize(value.`fileHashHex`) +
-            FfiConverterString.allocationSize(value.`nonceHex`) +
+    override fun allocationSize(value: MediaUploadAttachmentRequestFfi) = (
             FfiConverterString.allocationSize(value.`fileName`) +
             FfiConverterString.allocationSize(value.`mediaType`) +
-            FfiConverterString.allocationSize(value.`version`)
+            FfiConverterByteArray.allocationSize(value.`plaintext`) +
+            FfiConverterOptionalString.allocationSize(value.`dim`) +
+            FfiConverterOptionalString.allocationSize(value.`thumbhash`)
     )
 
-    override fun write(value: MediaReferenceFfi, buf: ByteBuffer) {
-            FfiConverterString.write(value.`url`, buf)
-            FfiConverterString.write(value.`fileHashHex`, buf)
-            FfiConverterString.write(value.`nonceHex`, buf)
+    override fun write(value: MediaUploadAttachmentRequestFfi, buf: ByteBuffer) {
             FfiConverterString.write(value.`fileName`, buf)
             FfiConverterString.write(value.`mediaType`, buf)
-            FfiConverterString.write(value.`version`, buf)
+            FfiConverterByteArray.write(value.`plaintext`, buf)
+            FfiConverterOptionalString.write(value.`dim`, buf)
+            FfiConverterOptionalString.write(value.`thumbhash`, buf)
+    }
+}
+
+
+
+data class MediaUploadAttachmentResultFfi (
+    var `reference`: MediaAttachmentReferenceFfi, 
+    var `encryptedSizeBytes`: kotlin.ULong
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMediaUploadAttachmentResultFfi: FfiConverterRustBuffer<MediaUploadAttachmentResultFfi> {
+    override fun read(buf: ByteBuffer): MediaUploadAttachmentResultFfi {
+        return MediaUploadAttachmentResultFfi(
+            FfiConverterTypeMediaAttachmentReferenceFfi.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MediaUploadAttachmentResultFfi) = (
+            FfiConverterTypeMediaAttachmentReferenceFfi.allocationSize(value.`reference`) +
+            FfiConverterULong.allocationSize(value.`encryptedSizeBytes`)
+    )
+
+    override fun write(value: MediaUploadAttachmentResultFfi, buf: ByteBuffer) {
+            FfiConverterTypeMediaAttachmentReferenceFfi.write(value.`reference`, buf)
+            FfiConverterULong.write(value.`encryptedSizeBytes`, buf)
     }
 }
 
 
 
 data class MediaUploadRequestFfi (
-    var `fileName`: kotlin.String, 
-    var `mediaType`: kotlin.String, 
-    var `plaintext`: kotlin.ByteArray, 
+    var `attachments`: List<MediaUploadAttachmentRequestFfi>, 
     var `caption`: kotlin.String?, 
     var `send`: kotlin.Boolean, 
     var `blossomServer`: kotlin.String?
@@ -8349,9 +8793,7 @@ data class MediaUploadRequestFfi (
 public object FfiConverterTypeMediaUploadRequestFfi: FfiConverterRustBuffer<MediaUploadRequestFfi> {
     override fun read(buf: ByteBuffer): MediaUploadRequestFfi {
         return MediaUploadRequestFfi(
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterByteArray.read(buf),
+            FfiConverterSequenceTypeMediaUploadAttachmentRequestFfi.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -8359,18 +8801,14 @@ public object FfiConverterTypeMediaUploadRequestFfi: FfiConverterRustBuffer<Medi
     }
 
     override fun allocationSize(value: MediaUploadRequestFfi) = (
-            FfiConverterString.allocationSize(value.`fileName`) +
-            FfiConverterString.allocationSize(value.`mediaType`) +
-            FfiConverterByteArray.allocationSize(value.`plaintext`) +
+            FfiConverterSequenceTypeMediaUploadAttachmentRequestFfi.allocationSize(value.`attachments`) +
             FfiConverterOptionalString.allocationSize(value.`caption`) +
             FfiConverterBoolean.allocationSize(value.`send`) +
             FfiConverterOptionalString.allocationSize(value.`blossomServer`)
     )
 
     override fun write(value: MediaUploadRequestFfi, buf: ByteBuffer) {
-            FfiConverterString.write(value.`fileName`, buf)
-            FfiConverterString.write(value.`mediaType`, buf)
-            FfiConverterByteArray.write(value.`plaintext`, buf)
+            FfiConverterSequenceTypeMediaUploadAttachmentRequestFfi.write(value.`attachments`, buf)
             FfiConverterOptionalString.write(value.`caption`, buf)
             FfiConverterBoolean.write(value.`send`, buf)
             FfiConverterOptionalString.write(value.`blossomServer`, buf)
@@ -8380,9 +8818,7 @@ public object FfiConverterTypeMediaUploadRequestFfi: FfiConverterRustBuffer<Medi
 
 
 data class MediaUploadResultFfi (
-    var `reference`: MediaReferenceFfi, 
-    var `encryptedHashHex`: kotlin.String, 
-    var `encryptedSizeBytes`: kotlin.ULong, 
+    var `attachments`: List<MediaUploadAttachmentResultFfi>, 
     var `sent`: SendSummaryFfi?
 ) {
     
@@ -8395,24 +8831,18 @@ data class MediaUploadResultFfi (
 public object FfiConverterTypeMediaUploadResultFfi: FfiConverterRustBuffer<MediaUploadResultFfi> {
     override fun read(buf: ByteBuffer): MediaUploadResultFfi {
         return MediaUploadResultFfi(
-            FfiConverterTypeMediaReferenceFfi.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterULong.read(buf),
+            FfiConverterSequenceTypeMediaUploadAttachmentResultFfi.read(buf),
             FfiConverterOptionalTypeSendSummaryFfi.read(buf),
         )
     }
 
     override fun allocationSize(value: MediaUploadResultFfi) = (
-            FfiConverterTypeMediaReferenceFfi.allocationSize(value.`reference`) +
-            FfiConverterString.allocationSize(value.`encryptedHashHex`) +
-            FfiConverterULong.allocationSize(value.`encryptedSizeBytes`) +
+            FfiConverterSequenceTypeMediaUploadAttachmentResultFfi.allocationSize(value.`attachments`) +
             FfiConverterOptionalTypeSendSummaryFfi.allocationSize(value.`sent`)
     )
 
     override fun write(value: MediaUploadResultFfi, buf: ByteBuffer) {
-            FfiConverterTypeMediaReferenceFfi.write(value.`reference`, buf)
-            FfiConverterString.write(value.`encryptedHashHex`, buf)
-            FfiConverterULong.write(value.`encryptedSizeBytes`, buf)
+            FfiConverterSequenceTypeMediaUploadAttachmentResultFfi.write(value.`attachments`, buf)
             FfiConverterOptionalTypeSendSummaryFfi.write(value.`sent`, buf)
     }
 }
@@ -8710,6 +9140,7 @@ data class ReceivedMessageFfi (
     var `sender`: kotlin.String, 
     var `senderDisplayName`: kotlin.String?, 
     var `plaintext`: kotlin.String, 
+    var `contentTokens`: MarkdownDocumentFfi, 
     /**
      * Nostr `kind` of the inner Marmot app event.
      */
@@ -8741,6 +9172,7 @@ public object FfiConverterTypeReceivedMessageFfi: FfiConverterRustBuffer<Receive
             FfiConverterString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterString.read(buf),
+            FfiConverterTypeMarkdownDocumentFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterSequenceTypeMessageTagFfi.read(buf),
             FfiConverterULong.read(buf),
@@ -8753,6 +9185,7 @@ public object FfiConverterTypeReceivedMessageFfi: FfiConverterRustBuffer<Receive
             FfiConverterString.allocationSize(value.`sender`) +
             FfiConverterOptionalString.allocationSize(value.`senderDisplayName`) +
             FfiConverterString.allocationSize(value.`plaintext`) +
+            FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
             FfiConverterSequenceTypeMessageTagFfi.allocationSize(value.`tags`) +
             FfiConverterULong.allocationSize(value.`recordedAt`)
@@ -8764,6 +9197,7 @@ public object FfiConverterTypeReceivedMessageFfi: FfiConverterRustBuffer<Receive
             FfiConverterString.write(value.`sender`, buf)
             FfiConverterOptionalString.write(value.`senderDisplayName`, buf)
             FfiConverterString.write(value.`plaintext`, buf)
+            FfiConverterTypeMarkdownDocumentFfi.write(value.`contentTokens`, buf)
             FfiConverterULong.write(value.`kind`, buf)
             FfiConverterSequenceTypeMessageTagFfi.write(value.`tags`, buf)
             FfiConverterULong.write(value.`recordedAt`, buf)
@@ -9162,6 +9596,7 @@ data class TimelineMessageRecordFfi (
     var `groupIdHex`: kotlin.String, 
     var `sender`: kotlin.String, 
     var `plaintext`: kotlin.String, 
+    var `contentTokens`: MarkdownDocumentFfi, 
     var `kind`: kotlin.ULong, 
     var `tags`: List<MessageTagFfi>, 
     var `timelineAt`: kotlin.ULong, 
@@ -9197,6 +9632,7 @@ public object FfiConverterTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<T
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
+            FfiConverterTypeMarkdownDocumentFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterSequenceTypeMessageTagFfi.read(buf),
             FfiConverterULong.read(buf),
@@ -9219,6 +9655,7 @@ public object FfiConverterTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<T
             FfiConverterString.allocationSize(value.`groupIdHex`) +
             FfiConverterString.allocationSize(value.`sender`) +
             FfiConverterString.allocationSize(value.`plaintext`) +
+            FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
             FfiConverterSequenceTypeMessageTagFfi.allocationSize(value.`tags`) +
             FfiConverterULong.allocationSize(value.`timelineAt`) +
@@ -9240,6 +9677,7 @@ public object FfiConverterTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<T
             FfiConverterString.write(value.`groupIdHex`, buf)
             FfiConverterString.write(value.`sender`, buf)
             FfiConverterString.write(value.`plaintext`, buf)
+            FfiConverterTypeMarkdownDocumentFfi.write(value.`contentTokens`, buf)
             FfiConverterULong.write(value.`kind`, buf)
             FfiConverterSequenceTypeMessageTagFfi.write(value.`tags`, buf)
             FfiConverterULong.write(value.`timelineAt`, buf)
@@ -9405,6 +9843,7 @@ data class TimelineReplyPreviewFfi (
     var `messageIdHex`: kotlin.String, 
     var `sender`: kotlin.String, 
     var `plaintext`: kotlin.String, 
+    var `contentTokens`: MarkdownDocumentFfi, 
     var `kind`: kotlin.ULong, 
     var `mediaJson`: kotlin.String?, 
     var `agentTextStreamJson`: kotlin.String?, 
@@ -9423,6 +9862,7 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
+            FfiConverterTypeMarkdownDocumentFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -9434,6 +9874,7 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterString.allocationSize(value.`messageIdHex`) +
             FfiConverterString.allocationSize(value.`sender`) +
             FfiConverterString.allocationSize(value.`plaintext`) +
+            FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
             FfiConverterOptionalString.allocationSize(value.`mediaJson`) +
             FfiConverterOptionalString.allocationSize(value.`agentTextStreamJson`) +
@@ -9444,6 +9885,7 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterString.write(value.`messageIdHex`, buf)
             FfiConverterString.write(value.`sender`, buf)
             FfiConverterString.write(value.`plaintext`, buf)
+            FfiConverterTypeMarkdownDocumentFfi.write(value.`contentTokens`, buf)
             FfiConverterULong.write(value.`kind`, buf)
             FfiConverterOptionalString.write(value.`mediaJson`, buf)
             FfiConverterOptionalString.write(value.`agentTextStreamJson`, buf)
@@ -9557,6 +9999,25 @@ sealed class AgentStreamUpdateFfi {
         companion object
     }
     
+    data class Status(
+        val `seq`: kotlin.ULong, 
+        val `status`: kotlin.String) : AgentStreamUpdateFfi() {
+        companion object
+    }
+    
+    data class Progress(
+        val `seq`: kotlin.ULong, 
+        val `text`: kotlin.String) : AgentStreamUpdateFfi() {
+        companion object
+    }
+    
+    data class Record(
+        val `seq`: kotlin.ULong, 
+        val `recordType`: kotlin.UByte, 
+        val `text`: kotlin.String) : AgentStreamUpdateFfi() {
+        companion object
+    }
+    
     data class Finished(
         val `text`: kotlin.String, 
         val `transcriptHashHex`: kotlin.String, 
@@ -9584,12 +10045,25 @@ public object FfiConverterTypeAgentStreamUpdateFfi : FfiConverterRustBuffer<Agen
                 FfiConverterULong.read(buf),
                 FfiConverterString.read(buf),
                 )
-            2 -> AgentStreamUpdateFfi.Finished(
+            2 -> AgentStreamUpdateFfi.Status(
+                FfiConverterULong.read(buf),
+                FfiConverterString.read(buf),
+                )
+            3 -> AgentStreamUpdateFfi.Progress(
+                FfiConverterULong.read(buf),
+                FfiConverterString.read(buf),
+                )
+            4 -> AgentStreamUpdateFfi.Record(
+                FfiConverterULong.read(buf),
+                FfiConverterUByte.read(buf),
+                FfiConverterString.read(buf),
+                )
+            5 -> AgentStreamUpdateFfi.Finished(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 FfiConverterULong.read(buf),
                 )
-            3 -> AgentStreamUpdateFfi.Failed(
+            6 -> AgentStreamUpdateFfi.Failed(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
@@ -9602,6 +10076,31 @@ public object FfiConverterTypeAgentStreamUpdateFfi : FfiConverterRustBuffer<Agen
             (
                 4UL
                 + FfiConverterULong.allocationSize(value.`seq`)
+                + FfiConverterString.allocationSize(value.`text`)
+            )
+        }
+        is AgentStreamUpdateFfi.Status -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterULong.allocationSize(value.`seq`)
+                + FfiConverterString.allocationSize(value.`status`)
+            )
+        }
+        is AgentStreamUpdateFfi.Progress -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterULong.allocationSize(value.`seq`)
+                + FfiConverterString.allocationSize(value.`text`)
+            )
+        }
+        is AgentStreamUpdateFfi.Record -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterULong.allocationSize(value.`seq`)
+                + FfiConverterUByte.allocationSize(value.`recordType`)
                 + FfiConverterString.allocationSize(value.`text`)
             )
         }
@@ -9631,15 +10130,34 @@ public object FfiConverterTypeAgentStreamUpdateFfi : FfiConverterRustBuffer<Agen
                 FfiConverterString.write(value.`text`, buf)
                 Unit
             }
-            is AgentStreamUpdateFfi.Finished -> {
+            is AgentStreamUpdateFfi.Status -> {
                 buf.putInt(2)
+                FfiConverterULong.write(value.`seq`, buf)
+                FfiConverterString.write(value.`status`, buf)
+                Unit
+            }
+            is AgentStreamUpdateFfi.Progress -> {
+                buf.putInt(3)
+                FfiConverterULong.write(value.`seq`, buf)
+                FfiConverterString.write(value.`text`, buf)
+                Unit
+            }
+            is AgentStreamUpdateFfi.Record -> {
+                buf.putInt(4)
+                FfiConverterULong.write(value.`seq`, buf)
+                FfiConverterUByte.write(value.`recordType`, buf)
+                FfiConverterString.write(value.`text`, buf)
+                Unit
+            }
+            is AgentStreamUpdateFfi.Finished -> {
+                buf.putInt(5)
                 FfiConverterString.write(value.`text`, buf)
                 FfiConverterString.write(value.`transcriptHashHex`, buf)
                 FfiConverterULong.write(value.`chunkCount`, buf)
                 Unit
             }
             is AgentStreamUpdateFfi.Failed -> {
-                buf.putInt(3)
+                buf.putInt(6)
                 FfiConverterString.write(value.`message`, buf)
                 Unit
             }
@@ -9760,6 +10278,730 @@ public object FfiConverterTypeChatListUpdateTriggerFfi: FfiConverterRustBuffer<C
     override fun allocationSize(value: ChatListUpdateTriggerFfi) = 4UL
 
     override fun write(value: ChatListUpdateTriggerFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class MarkdownAlignmentFfi {
+    
+    NONE,
+    LEFT,
+    CENTER,
+    RIGHT;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownAlignmentFfi: FfiConverterRustBuffer<MarkdownAlignmentFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        MarkdownAlignmentFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MarkdownAlignmentFfi) = 4UL
+
+    override fun write(value: MarkdownAlignmentFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class MarkdownAutolinkKindFfi {
+    
+    URI,
+    EMAIL;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownAutolinkKindFfi: FfiConverterRustBuffer<MarkdownAutolinkKindFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        MarkdownAutolinkKindFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MarkdownAutolinkKindFfi) = 4UL
+
+    override fun write(value: MarkdownAutolinkKindFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+sealed class MarkdownBlockFfi {
+    
+    data class Paragraph(
+        val `inlines`: kotlin.collections.List<MarkdownInlineFfi>) : MarkdownBlockFfi() {
+        companion object
+    }
+    
+    data class Heading(
+        val `level`: kotlin.UByte, 
+        val `inlines`: kotlin.collections.List<MarkdownInlineFfi>) : MarkdownBlockFfi() {
+        companion object
+    }
+    
+    object ThematicBreak : MarkdownBlockFfi()
+    
+    
+    data class CodeBlock(
+        val `kind`: MarkdownCodeBlockKindFfi, 
+        val `info`: kotlin.String, 
+        val `content`: kotlin.String) : MarkdownBlockFfi() {
+        companion object
+    }
+    
+    data class BlockQuote(
+        val `blocks`: kotlin.collections.List<MarkdownBlockFfi>) : MarkdownBlockFfi() {
+        companion object
+    }
+    
+    data class List(
+        val `kind`: MarkdownListKindFfi, 
+        val `tight`: kotlin.Boolean, 
+        val `items`: kotlin.collections.List<MarkdownListItemFfi>) : MarkdownBlockFfi() {
+        companion object
+    }
+    
+    data class Table(
+        val `alignments`: kotlin.collections.List<MarkdownAlignmentFfi>,
+        val `header`: kotlin.collections.List<MarkdownTableCellFfi>,
+        val `rows`: kotlin.collections.List<kotlin.collections.List<MarkdownTableCellFfi>>) : MarkdownBlockFfi() {
+        companion object
+    }
+    
+    data class MathBlock(
+        val `content`: kotlin.String) : MarkdownBlockFfi() {
+        companion object
+    }
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownBlockFfi : FfiConverterRustBuffer<MarkdownBlockFfi>{
+    override fun read(buf: ByteBuffer): MarkdownBlockFfi {
+        return when(buf.getInt()) {
+            1 -> MarkdownBlockFfi.Paragraph(
+                FfiConverterSequenceTypeMarkdownInlineFfi.read(buf),
+                )
+            2 -> MarkdownBlockFfi.Heading(
+                FfiConverterUByte.read(buf),
+                FfiConverterSequenceTypeMarkdownInlineFfi.read(buf),
+                )
+            3 -> MarkdownBlockFfi.ThematicBreak
+            4 -> MarkdownBlockFfi.CodeBlock(
+                FfiConverterTypeMarkdownCodeBlockKindFfi.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                )
+            5 -> MarkdownBlockFfi.BlockQuote(
+                FfiConverterSequenceTypeMarkdownBlockFfi.read(buf),
+                )
+            6 -> MarkdownBlockFfi.List(
+                FfiConverterTypeMarkdownListKindFfi.read(buf),
+                FfiConverterBoolean.read(buf),
+                FfiConverterSequenceTypeMarkdownListItemFfi.read(buf),
+                )
+            7 -> MarkdownBlockFfi.Table(
+                FfiConverterSequenceTypeMarkdownAlignmentFfi.read(buf),
+                FfiConverterSequenceTypeMarkdownTableCellFfi.read(buf),
+                FfiConverterSequenceSequenceTypeMarkdownTableCellFfi.read(buf),
+                )
+            8 -> MarkdownBlockFfi.MathBlock(
+                FfiConverterString.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: MarkdownBlockFfi) = when(value) {
+        is MarkdownBlockFfi.Paragraph -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterSequenceTypeMarkdownInlineFfi.allocationSize(value.`inlines`)
+            )
+        }
+        is MarkdownBlockFfi.Heading -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterUByte.allocationSize(value.`level`)
+                + FfiConverterSequenceTypeMarkdownInlineFfi.allocationSize(value.`inlines`)
+            )
+        }
+        is MarkdownBlockFfi.ThematicBreak -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is MarkdownBlockFfi.CodeBlock -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeMarkdownCodeBlockKindFfi.allocationSize(value.`kind`)
+                + FfiConverterString.allocationSize(value.`info`)
+                + FfiConverterString.allocationSize(value.`content`)
+            )
+        }
+        is MarkdownBlockFfi.BlockQuote -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterSequenceTypeMarkdownBlockFfi.allocationSize(value.`blocks`)
+            )
+        }
+        is MarkdownBlockFfi.List -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeMarkdownListKindFfi.allocationSize(value.`kind`)
+                + FfiConverterBoolean.allocationSize(value.`tight`)
+                + FfiConverterSequenceTypeMarkdownListItemFfi.allocationSize(value.`items`)
+            )
+        }
+        is MarkdownBlockFfi.Table -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterSequenceTypeMarkdownAlignmentFfi.allocationSize(value.`alignments`)
+                + FfiConverterSequenceTypeMarkdownTableCellFfi.allocationSize(value.`header`)
+                + FfiConverterSequenceSequenceTypeMarkdownTableCellFfi.allocationSize(value.`rows`)
+            )
+        }
+        is MarkdownBlockFfi.MathBlock -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`content`)
+            )
+        }
+    }
+
+    override fun write(value: MarkdownBlockFfi, buf: ByteBuffer) {
+        when(value) {
+            is MarkdownBlockFfi.Paragraph -> {
+                buf.putInt(1)
+                FfiConverterSequenceTypeMarkdownInlineFfi.write(value.`inlines`, buf)
+                Unit
+            }
+            is MarkdownBlockFfi.Heading -> {
+                buf.putInt(2)
+                FfiConverterUByte.write(value.`level`, buf)
+                FfiConverterSequenceTypeMarkdownInlineFfi.write(value.`inlines`, buf)
+                Unit
+            }
+            is MarkdownBlockFfi.ThematicBreak -> {
+                buf.putInt(3)
+                Unit
+            }
+            is MarkdownBlockFfi.CodeBlock -> {
+                buf.putInt(4)
+                FfiConverterTypeMarkdownCodeBlockKindFfi.write(value.`kind`, buf)
+                FfiConverterString.write(value.`info`, buf)
+                FfiConverterString.write(value.`content`, buf)
+                Unit
+            }
+            is MarkdownBlockFfi.BlockQuote -> {
+                buf.putInt(5)
+                FfiConverterSequenceTypeMarkdownBlockFfi.write(value.`blocks`, buf)
+                Unit
+            }
+            is MarkdownBlockFfi.List -> {
+                buf.putInt(6)
+                FfiConverterTypeMarkdownListKindFfi.write(value.`kind`, buf)
+                FfiConverterBoolean.write(value.`tight`, buf)
+                FfiConverterSequenceTypeMarkdownListItemFfi.write(value.`items`, buf)
+                Unit
+            }
+            is MarkdownBlockFfi.Table -> {
+                buf.putInt(7)
+                FfiConverterSequenceTypeMarkdownAlignmentFfi.write(value.`alignments`, buf)
+                FfiConverterSequenceTypeMarkdownTableCellFfi.write(value.`header`, buf)
+                FfiConverterSequenceSequenceTypeMarkdownTableCellFfi.write(value.`rows`, buf)
+                Unit
+            }
+            is MarkdownBlockFfi.MathBlock -> {
+                buf.putInt(8)
+                FfiConverterString.write(value.`content`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+
+enum class MarkdownCodeBlockKindFfi {
+    
+    INDENTED,
+    FENCED;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownCodeBlockKindFfi: FfiConverterRustBuffer<MarkdownCodeBlockKindFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        MarkdownCodeBlockKindFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MarkdownCodeBlockKindFfi) = 4UL
+
+    override fun write(value: MarkdownCodeBlockKindFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+sealed class MarkdownInlineFfi {
+    
+    data class Text(
+        val `content`: kotlin.String) : MarkdownInlineFfi() {
+        companion object
+    }
+    
+    object SoftBreak : MarkdownInlineFfi()
+    
+    
+    object HardBreak : MarkdownInlineFfi()
+    
+    
+    data class Code(
+        val `content`: kotlin.String) : MarkdownInlineFfi() {
+        companion object
+    }
+    
+    data class Emph(
+        val `children`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        companion object
+    }
+    
+    data class Strong(
+        val `children`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        companion object
+    }
+    
+    data class Strikethrough(
+        val `children`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        companion object
+    }
+    
+    data class Link(
+        val `dest`: kotlin.String, 
+        val `title`: kotlin.String?, 
+        val `children`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        companion object
+    }
+    
+    data class Image(
+        val `dest`: kotlin.String, 
+        val `title`: kotlin.String?, 
+        val `alt`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        companion object
+    }
+    
+    data class Autolink(
+        val `url`: kotlin.String, 
+        val `kind`: MarkdownAutolinkKindFfi) : MarkdownInlineFfi() {
+        companion object
+    }
+    
+    data class Math(
+        val `content`: kotlin.String) : MarkdownInlineFfi() {
+        companion object
+    }
+    
+    data class NostrMention(
+        val `entity`: MarkdownNostrEntityFfi) : MarkdownInlineFfi() {
+        companion object
+    }
+    
+    data class NostrUri(
+        val `entity`: MarkdownNostrEntityFfi) : MarkdownInlineFfi() {
+        companion object
+    }
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownInlineFfi : FfiConverterRustBuffer<MarkdownInlineFfi>{
+    override fun read(buf: ByteBuffer): MarkdownInlineFfi {
+        return when(buf.getInt()) {
+            1 -> MarkdownInlineFfi.Text(
+                FfiConverterString.read(buf),
+                )
+            2 -> MarkdownInlineFfi.SoftBreak
+            3 -> MarkdownInlineFfi.HardBreak
+            4 -> MarkdownInlineFfi.Code(
+                FfiConverterString.read(buf),
+                )
+            5 -> MarkdownInlineFfi.Emph(
+                FfiConverterSequenceTypeMarkdownInlineFfi.read(buf),
+                )
+            6 -> MarkdownInlineFfi.Strong(
+                FfiConverterSequenceTypeMarkdownInlineFfi.read(buf),
+                )
+            7 -> MarkdownInlineFfi.Strikethrough(
+                FfiConverterSequenceTypeMarkdownInlineFfi.read(buf),
+                )
+            8 -> MarkdownInlineFfi.Link(
+                FfiConverterString.read(buf),
+                FfiConverterOptionalString.read(buf),
+                FfiConverterSequenceTypeMarkdownInlineFfi.read(buf),
+                )
+            9 -> MarkdownInlineFfi.Image(
+                FfiConverterString.read(buf),
+                FfiConverterOptionalString.read(buf),
+                FfiConverterSequenceTypeMarkdownInlineFfi.read(buf),
+                )
+            10 -> MarkdownInlineFfi.Autolink(
+                FfiConverterString.read(buf),
+                FfiConverterTypeMarkdownAutolinkKindFfi.read(buf),
+                )
+            11 -> MarkdownInlineFfi.Math(
+                FfiConverterString.read(buf),
+                )
+            12 -> MarkdownInlineFfi.NostrMention(
+                FfiConverterTypeMarkdownNostrEntityFfi.read(buf),
+                )
+            13 -> MarkdownInlineFfi.NostrUri(
+                FfiConverterTypeMarkdownNostrEntityFfi.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: MarkdownInlineFfi) = when(value) {
+        is MarkdownInlineFfi.Text -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`content`)
+            )
+        }
+        is MarkdownInlineFfi.SoftBreak -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is MarkdownInlineFfi.HardBreak -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is MarkdownInlineFfi.Code -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`content`)
+            )
+        }
+        is MarkdownInlineFfi.Emph -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterSequenceTypeMarkdownInlineFfi.allocationSize(value.`children`)
+            )
+        }
+        is MarkdownInlineFfi.Strong -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterSequenceTypeMarkdownInlineFfi.allocationSize(value.`children`)
+            )
+        }
+        is MarkdownInlineFfi.Strikethrough -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterSequenceTypeMarkdownInlineFfi.allocationSize(value.`children`)
+            )
+        }
+        is MarkdownInlineFfi.Link -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`dest`)
+                + FfiConverterOptionalString.allocationSize(value.`title`)
+                + FfiConverterSequenceTypeMarkdownInlineFfi.allocationSize(value.`children`)
+            )
+        }
+        is MarkdownInlineFfi.Image -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`dest`)
+                + FfiConverterOptionalString.allocationSize(value.`title`)
+                + FfiConverterSequenceTypeMarkdownInlineFfi.allocationSize(value.`alt`)
+            )
+        }
+        is MarkdownInlineFfi.Autolink -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`url`)
+                + FfiConverterTypeMarkdownAutolinkKindFfi.allocationSize(value.`kind`)
+            )
+        }
+        is MarkdownInlineFfi.Math -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`content`)
+            )
+        }
+        is MarkdownInlineFfi.NostrMention -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeMarkdownNostrEntityFfi.allocationSize(value.`entity`)
+            )
+        }
+        is MarkdownInlineFfi.NostrUri -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeMarkdownNostrEntityFfi.allocationSize(value.`entity`)
+            )
+        }
+    }
+
+    override fun write(value: MarkdownInlineFfi, buf: ByteBuffer) {
+        when(value) {
+            is MarkdownInlineFfi.Text -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`content`, buf)
+                Unit
+            }
+            is MarkdownInlineFfi.SoftBreak -> {
+                buf.putInt(2)
+                Unit
+            }
+            is MarkdownInlineFfi.HardBreak -> {
+                buf.putInt(3)
+                Unit
+            }
+            is MarkdownInlineFfi.Code -> {
+                buf.putInt(4)
+                FfiConverterString.write(value.`content`, buf)
+                Unit
+            }
+            is MarkdownInlineFfi.Emph -> {
+                buf.putInt(5)
+                FfiConverterSequenceTypeMarkdownInlineFfi.write(value.`children`, buf)
+                Unit
+            }
+            is MarkdownInlineFfi.Strong -> {
+                buf.putInt(6)
+                FfiConverterSequenceTypeMarkdownInlineFfi.write(value.`children`, buf)
+                Unit
+            }
+            is MarkdownInlineFfi.Strikethrough -> {
+                buf.putInt(7)
+                FfiConverterSequenceTypeMarkdownInlineFfi.write(value.`children`, buf)
+                Unit
+            }
+            is MarkdownInlineFfi.Link -> {
+                buf.putInt(8)
+                FfiConverterString.write(value.`dest`, buf)
+                FfiConverterOptionalString.write(value.`title`, buf)
+                FfiConverterSequenceTypeMarkdownInlineFfi.write(value.`children`, buf)
+                Unit
+            }
+            is MarkdownInlineFfi.Image -> {
+                buf.putInt(9)
+                FfiConverterString.write(value.`dest`, buf)
+                FfiConverterOptionalString.write(value.`title`, buf)
+                FfiConverterSequenceTypeMarkdownInlineFfi.write(value.`alt`, buf)
+                Unit
+            }
+            is MarkdownInlineFfi.Autolink -> {
+                buf.putInt(10)
+                FfiConverterString.write(value.`url`, buf)
+                FfiConverterTypeMarkdownAutolinkKindFfi.write(value.`kind`, buf)
+                Unit
+            }
+            is MarkdownInlineFfi.Math -> {
+                buf.putInt(11)
+                FfiConverterString.write(value.`content`, buf)
+                Unit
+            }
+            is MarkdownInlineFfi.NostrMention -> {
+                buf.putInt(12)
+                FfiConverterTypeMarkdownNostrEntityFfi.write(value.`entity`, buf)
+                Unit
+            }
+            is MarkdownInlineFfi.NostrUri -> {
+                buf.putInt(13)
+                FfiConverterTypeMarkdownNostrEntityFfi.write(value.`entity`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+sealed class MarkdownListKindFfi {
+    
+    /**
+     * `marker` is a single-character string: "-", "*", or "+".
+     */
+    data class Bullet(
+        val `marker`: kotlin.String) : MarkdownListKindFfi() {
+        companion object
+    }
+    
+    /**
+     * `delimiter` is a single-character string: "." or ")".
+     */
+    data class Ordered(
+        val `start`: kotlin.UInt, 
+        val `delimiter`: kotlin.String) : MarkdownListKindFfi() {
+        companion object
+    }
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownListKindFfi : FfiConverterRustBuffer<MarkdownListKindFfi>{
+    override fun read(buf: ByteBuffer): MarkdownListKindFfi {
+        return when(buf.getInt()) {
+            1 -> MarkdownListKindFfi.Bullet(
+                FfiConverterString.read(buf),
+                )
+            2 -> MarkdownListKindFfi.Ordered(
+                FfiConverterUInt.read(buf),
+                FfiConverterString.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: MarkdownListKindFfi) = when(value) {
+        is MarkdownListKindFfi.Bullet -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`marker`)
+            )
+        }
+        is MarkdownListKindFfi.Ordered -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterUInt.allocationSize(value.`start`)
+                + FfiConverterString.allocationSize(value.`delimiter`)
+            )
+        }
+    }
+
+    override fun write(value: MarkdownListKindFfi, buf: ByteBuffer) {
+        when(value) {
+            is MarkdownListKindFfi.Bullet -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`marker`, buf)
+                Unit
+            }
+            is MarkdownListKindFfi.Ordered -> {
+                buf.putInt(2)
+                FfiConverterUInt.write(value.`start`, buf)
+                FfiConverterString.write(value.`delimiter`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+
+enum class MarkdownNostrHrpFfi {
+    
+    NPUB,
+    NOTE,
+    NEVENT,
+    NPROFILE,
+    NADDR,
+    NRELAY;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMarkdownNostrHrpFfi: FfiConverterRustBuffer<MarkdownNostrHrpFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        MarkdownNostrHrpFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MarkdownNostrHrpFfi) = 4UL
+
+    override fun write(value: MarkdownNostrHrpFfi, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }
@@ -10761,6 +12003,9 @@ enum class TimelineUpdateTriggerFfi {
     REPLY_PREVIEW_CHANGED,
     AGENT_STREAM_STARTED,
     AGENT_STREAM_FINISHED,
+    AGENT_ACTIVITY,
+    AGENT_OPERATION,
+    GROUP_SYSTEM,
     DELIVERY_OR_SEND_STATE_CHANGED,
     RECEIPT_CHANGED,
     SNAPSHOT_REFRESH;
@@ -10881,6 +12126,38 @@ public object FfiConverterOptionalLong: FfiConverterRustBuffer<kotlin.Long?> {
         } else {
             buf.put(1)
             FfiConverterLong.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalBoolean: FfiConverterRustBuffer<kotlin.Boolean?> {
+    override fun read(buf: ByteBuffer): kotlin.Boolean? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterBoolean.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.Boolean?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterBoolean.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.Boolean?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterBoolean.write(value, buf)
         }
     }
 }
@@ -11579,6 +12856,34 @@ public object FfiConverterSequenceTypeAccountSummaryFfi: FfiConverterRustBuffer<
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeAppBlobEndpointFfi: FfiConverterRustBuffer<List<AppBlobEndpointFfi>> {
+    override fun read(buf: ByteBuffer): List<AppBlobEndpointFfi> {
+        val len = buf.getInt()
+        return List<AppBlobEndpointFfi>(len) {
+            FfiConverterTypeAppBlobEndpointFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<AppBlobEndpointFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeAppBlobEndpointFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<AppBlobEndpointFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeAppBlobEndpointFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeAppGroupMemberRecordFfi: FfiConverterRustBuffer<List<AppGroupMemberRecordFfi>> {
     override fun read(buf: ByteBuffer): List<AppGroupMemberRecordFfi> {
         val len = buf.getInt()
@@ -11831,6 +13136,118 @@ public object FfiConverterSequenceTypeGroupPushTokenDebugEntryFfi: FfiConverterR
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeMarkdownListItemFfi: FfiConverterRustBuffer<List<MarkdownListItemFfi>> {
+    override fun read(buf: ByteBuffer): List<MarkdownListItemFfi> {
+        val len = buf.getInt()
+        return List<MarkdownListItemFfi>(len) {
+            FfiConverterTypeMarkdownListItemFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MarkdownListItemFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMarkdownListItemFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MarkdownListItemFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMarkdownListItemFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMarkdownTableCellFfi: FfiConverterRustBuffer<List<MarkdownTableCellFfi>> {
+    override fun read(buf: ByteBuffer): List<MarkdownTableCellFfi> {
+        val len = buf.getInt()
+        return List<MarkdownTableCellFfi>(len) {
+            FfiConverterTypeMarkdownTableCellFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MarkdownTableCellFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMarkdownTableCellFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MarkdownTableCellFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMarkdownTableCellFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMediaAttachmentReferenceFfi: FfiConverterRustBuffer<List<MediaAttachmentReferenceFfi>> {
+    override fun read(buf: ByteBuffer): List<MediaAttachmentReferenceFfi> {
+        val len = buf.getInt()
+        return List<MediaAttachmentReferenceFfi>(len) {
+            FfiConverterTypeMediaAttachmentReferenceFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MediaAttachmentReferenceFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMediaAttachmentReferenceFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MediaAttachmentReferenceFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMediaAttachmentReferenceFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMediaLocatorFfi: FfiConverterRustBuffer<List<MediaLocatorFfi>> {
+    override fun read(buf: ByteBuffer): List<MediaLocatorFfi> {
+        val len = buf.getInt()
+        return List<MediaLocatorFfi>(len) {
+            FfiConverterTypeMediaLocatorFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MediaLocatorFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMediaLocatorFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MediaLocatorFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMediaLocatorFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeMediaRecordFfi: FfiConverterRustBuffer<List<MediaRecordFfi>> {
     override fun read(buf: ByteBuffer): List<MediaRecordFfi> {
         val len = buf.getInt()
@@ -11849,6 +13266,62 @@ public object FfiConverterSequenceTypeMediaRecordFfi: FfiConverterRustBuffer<Lis
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMediaRecordFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMediaUploadAttachmentRequestFfi: FfiConverterRustBuffer<List<MediaUploadAttachmentRequestFfi>> {
+    override fun read(buf: ByteBuffer): List<MediaUploadAttachmentRequestFfi> {
+        val len = buf.getInt()
+        return List<MediaUploadAttachmentRequestFfi>(len) {
+            FfiConverterTypeMediaUploadAttachmentRequestFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MediaUploadAttachmentRequestFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMediaUploadAttachmentRequestFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MediaUploadAttachmentRequestFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMediaUploadAttachmentRequestFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMediaUploadAttachmentResultFfi: FfiConverterRustBuffer<List<MediaUploadAttachmentResultFfi>> {
+    override fun read(buf: ByteBuffer): List<MediaUploadAttachmentResultFfi> {
+        val len = buf.getInt()
+        return List<MediaUploadAttachmentResultFfi>(len) {
+            FfiConverterTypeMediaUploadAttachmentResultFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MediaUploadAttachmentResultFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMediaUploadAttachmentResultFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MediaUploadAttachmentResultFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMediaUploadAttachmentResultFfi.write(it, buf)
         }
     }
 }
@@ -11999,6 +13472,90 @@ public object FfiConverterSequenceTypeTimelineUserReactionFfi: FfiConverterRustB
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeMarkdownAlignmentFfi: FfiConverterRustBuffer<List<MarkdownAlignmentFfi>> {
+    override fun read(buf: ByteBuffer): List<MarkdownAlignmentFfi> {
+        val len = buf.getInt()
+        return List<MarkdownAlignmentFfi>(len) {
+            FfiConverterTypeMarkdownAlignmentFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MarkdownAlignmentFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMarkdownAlignmentFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MarkdownAlignmentFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMarkdownAlignmentFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMarkdownBlockFfi: FfiConverterRustBuffer<List<MarkdownBlockFfi>> {
+    override fun read(buf: ByteBuffer): List<MarkdownBlockFfi> {
+        val len = buf.getInt()
+        return List<MarkdownBlockFfi>(len) {
+            FfiConverterTypeMarkdownBlockFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MarkdownBlockFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMarkdownBlockFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MarkdownBlockFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMarkdownBlockFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMarkdownInlineFfi: FfiConverterRustBuffer<List<MarkdownInlineFfi>> {
+    override fun read(buf: ByteBuffer): List<MarkdownInlineFfi> {
+        val len = buf.getInt()
+        return List<MarkdownInlineFfi>(len) {
+            FfiConverterTypeMarkdownInlineFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MarkdownInlineFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMarkdownInlineFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MarkdownInlineFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMarkdownInlineFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeTimelineMessageChangeFfi: FfiConverterRustBuffer<List<TimelineMessageChangeFfi>> {
     override fun read(buf: ByteBuffer): List<TimelineMessageChangeFfi> {
         val len = buf.getInt()
@@ -12017,6 +13574,34 @@ public object FfiConverterSequenceTypeTimelineMessageChangeFfi: FfiConverterRust
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeTimelineMessageChangeFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceSequenceTypeMarkdownTableCellFfi: FfiConverterRustBuffer<List<List<MarkdownTableCellFfi>>> {
+    override fun read(buf: ByteBuffer): List<List<MarkdownTableCellFfi>> {
+        val len = buf.getInt()
+        return List<List<MarkdownTableCellFfi>>(len) {
+            FfiConverterSequenceTypeMarkdownTableCellFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<List<MarkdownTableCellFfi>>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterSequenceTypeMarkdownTableCellFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<List<MarkdownTableCellFfi>>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterSequenceTypeMarkdownTableCellFfi.write(it, buf)
         }
     }
 }

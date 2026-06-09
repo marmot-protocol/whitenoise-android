@@ -376,6 +376,12 @@
     <string name="add_caption">Başlık ekle…</string>
     <string name="attach_take_photo">Fotoğraf çek</string>
     <string name="attach_photo_library">Fotoğraf galerisi</string>
+    <string name="attach_document">Belge</string>
+    <string name="media_no_app_to_open">Bu dosyayı açacak uygulama yok</string>
+    <string name="media_couldnt_open">Dosya açılamadı</string>
+    <string name="media_open">Aç</string>
+    <string name="media_file_too_large">Dosya eklenemeyecek kadar büyük</string>
+    <string name="media_album_too_large">Seçim gönderilemeyecek kadar büyük</string>
     <string name="media_auto_download_title">Medyayı otomatik indir</string>
     <string name="media_auto_download_always">Her zaman</string>
     <string name="media_auto_download_wifi">Yalnızca Wi-Fi\'de</string>

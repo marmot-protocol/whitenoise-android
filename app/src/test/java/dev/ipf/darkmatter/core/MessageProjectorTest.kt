@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -167,6 +168,7 @@ class MessageProjectorTest {
         groupIdHex = "group",
         sender = sender,
         plaintext = plaintext,
+        contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
         kind = kind,
         tags = tags,
         recordedAt = at.toULong(),

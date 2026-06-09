@@ -375,6 +375,12 @@
     <string name="add_caption">新增說明…</string>
     <string name="attach_take_photo">拍照</string>
     <string name="attach_photo_library">圖庫</string>
+    <string name="attach_document">檔案</string>
+    <string name="media_no_app_to_open">未安裝可開啟此檔案的應用程式</string>
+    <string name="media_couldnt_open">無法開啟檔案</string>
+    <string name="media_open">開啟</string>
+    <string name="media_file_too_large">檔案太大,無法附加</string>
+    <string name="media_album_too_large">選取內容太大,無法傳送</string>
     <string name="media_auto_download_title">自動下載媒體</string>
     <string name="media_auto_download_always">一律</string>
     <string name="media_auto_download_wifi">僅限 Wi-Fi</string>

@@ -379,6 +379,12 @@
     <string name="add_caption">Add a caption…</string>
     <string name="attach_take_photo">Take photo</string>
     <string name="attach_photo_library">Photo library</string>
+    <string name="attach_document">Document</string>
+    <string name="media_no_app_to_open">No app installed to open this file</string>
+    <string name="media_couldnt_open">Couldn\'t open file</string>
+    <string name="media_open">Open</string>
+    <string name="media_file_too_large">File too large to attach</string>
+    <string name="media_album_too_large">Selection too large to send</string>
     <string name="media_auto_download_title">Auto-download media</string>
     <string name="media_auto_download_always">Always</string>
     <string name="media_auto_download_wifi">On Wi-Fi only</string>

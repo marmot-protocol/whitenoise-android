@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -261,6 +262,7 @@ class ConversationUnreadTest {
                     groupIdHex = "group",
                     sender = if (direction == "received") "bob" else "alice",
                     plaintext = "text-$id",
+                    contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                     kind = 9uL,
                     tags = emptyList(),
                     recordedAt = recordedAt,

@@ -17,6 +17,7 @@ object TimelineProjector {
             groupIdHex = record.groupIdHex,
             sender = record.sender,
             plaintext = record.plaintext,
+            contentTokens = record.contentTokens,
             kind = record.kind,
             tags = record.tags,
             recordedAt = record.timelineAt,

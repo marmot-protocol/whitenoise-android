@@ -1,5 +1,6 @@
 package dev.ipf.darkmatter.core
 
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionEmojiFfi
@@ -19,6 +20,7 @@ class TimelineProjectorTest {
                         messageIdHex = "parent",
                         sender = "alice",
                         plaintext = "Parent message",
+                        contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                         kind = 9uL,
                         mediaJson = null,
                         agentTextStreamJson = null,
@@ -107,6 +109,7 @@ class TimelineProjectorTest {
         groupIdHex = "group",
         sender = "alice",
         plaintext = plaintext,
+        contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
         kind = 9uL,
         tags = emptyList<MessageTagFfi>(),
         timelineAt = timelineAt,

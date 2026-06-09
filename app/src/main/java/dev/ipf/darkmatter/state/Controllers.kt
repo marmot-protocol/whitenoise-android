@@ -17,6 +17,8 @@ import dev.ipf.darkmatter.media.MediaPipeline
 import dev.ipf.darkmatter.media.MediaReferenceParser
 import dev.ipf.marmotkit.AgentStreamSubscription
 import dev.ipf.marmotkit.AgentStreamUpdateFfi
+import dev.ipf.marmotkit.AppBlobEndpointFfi
+import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -28,7 +30,9 @@ import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupStateSubscription
-import dev.ipf.marmotkit.MediaReferenceFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
@@ -114,6 +118,7 @@ internal fun chatListItemFromProjection(
                     groupIdHex = row.groupIdHex,
                     sender = preview.sender,
                     plaintext = preview.plaintext,
+                    contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                     kind = preview.kind,
                     tags = emptyList(),
                     recordedAt = preview.timelineAt,
@@ -139,10 +144,27 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         avatarUrl = null,
         avatarDim = null,
         avatarThumbhash = null,
+        encryptedMedia = defaultEncryptedMediaComponent(),
         archived = row.archived,
         pendingConfirmation = row.pendingConfirmation,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
+    )
+
+private fun defaultEncryptedMediaComponent(): AppGroupEncryptedMediaComponentFfi =
+    AppGroupEncryptedMediaComponentFfi(
+        componentId = 0x8008u,
+        component = "marmot.group.encrypted-media.v1",
+        required = true,
+        mediaFormat = "encrypted-media-v1",
+        allowedLocatorKinds = listOf("blossom-v1"),
+        defaultBlobEndpoints =
+            listOf(
+                AppBlobEndpointFfi(
+                    locatorKind = "blossom-v1",
+                    baseUrl = "https://blossom.primal.net",
+                ),
+            ),
     )
 
 data class GroupMemberSnapshot(
@@ -341,16 +363,47 @@ private data class OptimisticReactionChange(
     val add: Boolean,
 )
 
-/** Compressed bytes + metadata retained for an in-flight/failed media send. */
-private class RetainedMediaUpload(
-    val jpegBytes: ByteArray,
+/**
+ * One named attachment queued for upload as part of an album. The bytes are
+ * pre-processed plaintext (e.g. downscaled JPEG for images, raw bytes for
+ * documents) — the upload path encrypts these as-is, so callers must apply
+ * any MIME-specific transforms (recompression, etc.) before constructing this.
+ */
+data class PendingAttachment(
+    val plaintextBytes: ByteArray,
     val mediaType: String,
     val fileName: String,
+) {
+    // Manual equality so two attachments with identical bytes content count as
+    // equal — the default data-class equality on ByteArray uses reference
+    // equality, which would surprise callers comparing pending attachments.
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is PendingAttachment) return false
+        if (mediaType != other.mediaType) return false
+        if (fileName != other.fileName) return false
+        return plaintextBytes.contentEquals(other.plaintextBytes)
+    }
+
+    override fun hashCode(): Int {
+        var result = plaintextBytes.contentHashCode()
+        result = 31 * result + mediaType.hashCode()
+        result = 31 * result + fileName.hashCode()
+        return result
+    }
+}
+
+/**
+ * Compressed bytes + metadata retained for an in-flight/failed media send.
+ * The whole album is one unit: all attachments succeed/fail together, retry
+ * re-runs the whole upload, discard drops them all. `uploadedReferences`
+ * caches the per-attachment Blossom result so a publish-only failure retries
+ * the publish without re-uploading every blob.
+ */
+private class RetainedMediaUpload(
+    val attachments: List<PendingAttachment>,
     val caption: String?,
-    // Set once the Blossom upload succeeds. On a publish-only failure, retry
-    // reuses this reference instead of re-uploading the blob (which would
-    // orphan a duplicate on the Blossom server).
-    var uploadedReference: MediaReferenceFfi? = null,
+    var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null,
 )
 
 class ChatsController(
@@ -544,6 +597,14 @@ private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
         TimelineUpdateTriggerFfi.AGENT_STREAM_FINISHED,
         TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
         TimelineUpdateTriggerFfi.RECEIPT_CHANGED,
+        // New triggers from the typed Hermes-agent / group-system surface.
+        // None of these mutate reaction tallies, so they fall in the false
+        // bucket — kept explicit so a future trigger that *does* change
+        // reactions fails the exhaustiveness check rather than silently
+        // missing a recompute.
+        TimelineUpdateTriggerFfi.AGENT_ACTIVITY,
+        TimelineUpdateTriggerFfi.AGENT_OPERATION,
+        TimelineUpdateTriggerFfi.GROUP_SYSTEM,
         -> false
     }
 
@@ -575,6 +636,15 @@ class ConversationController(
     // Use cached members immediately to avoid a blank composer gap while the
     // first refresh verifies the roster.
     var membersLoaded by mutableStateOf(initialMemberSnapshot?.members?.isNotEmpty() == true)
+        private set
+
+    // Typed media references keyed by `messageIdHex`. Populated from Rust's
+    // `listMedia` FFI — the only place the receive-side `source_epoch` is
+    // surfaced (TimelineMessageRecordFfi / AppMessageRecordFfi don't expose
+    // it). Without this, `downloadMedia` would be called with the imeta-tag
+    // parser's `sourceEpoch = 0` fallback and the Rust core would error
+    // with `missing encrypted media secret for epoch 0`.
+    var mediaReferences: Map<String, List<MediaAttachmentReferenceFfi>> by mutableStateOf(emptyMap())
         private set
     private var membersVerified by mutableStateOf(false)
     var timeline by mutableStateOf<List<TimelineMessage>>(emptyList())
@@ -723,6 +793,7 @@ class ConversationController(
             timelineSubscription = timelineStream
             val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
             val snapshotStreamIds = snapshot?.let { applyTimelinePage(it, replaceWindow = true, updatePagination = true) }.orEmpty()
+            refreshMediaReferences()
             initializeReadState(account)
             // Don't blanket-mark the absolute newest as read here — the UI
             // layer now drives mark-read as the user scrolls so partial-read
@@ -773,6 +844,26 @@ class ConversationController(
                                     }
                                 }
                             }
+                        // New messages may include media; refresh the cached
+                        // references so the bubble's download path finds the
+                        // correct `sourceEpoch`. The `listMedia(group, null)`
+                        // FFI scan is unbounded — gate it on "this update
+                        // actually touches media" so text-only / reaction-only
+                        // updates don't trigger a full-table scan every time
+                        // (a real cost in media-heavy groups). The Page
+                        // initial snapshot always refreshes (the cache is
+                        // empty on first load anyway).
+                        val touchedMedia =
+                            when (update) {
+                                is TimelineSubscriptionUpdateFfi.Page -> pageContainsMedia(update.page)
+                                is TimelineSubscriptionUpdateFfi.Projection ->
+                                    if (update.update.update.groupIdHex == group.groupIdHex) {
+                                        changesContainMedia(update.update.update.changes)
+                                    } else {
+                                        false
+                                    }
+                            }
+                        if (touchedMedia) refreshMediaReferences()
                         // Scroll-driven mark-read in the UI layer handles the
                         // user-visible read pointer. The projection-update
                         // path no longer force-marks the absolute newest as
@@ -836,6 +927,7 @@ class ConversationController(
                 groupIdHex = group.groupIdHex,
                 sender = appState.activeAccount?.accountIdHex ?: "",
                 plaintext = trimmed,
+                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                 kind = 9uL,
                 tags =
                     replyTarget
@@ -893,22 +985,34 @@ class ConversationController(
     }
 
     /**
-     * Encrypt+upload a JPEG to Blossom and then publish a kind-9 referencing
-     * it. Two-step (upload then publish) — see the Phase-1 decision matrix —
-     * so a publish-time failure doesn't force a re-upload, and the optimistic
-     * bubble can flip to Failed with the existing retry/discard surface.
+     * Send one or more attachments as a single kind:9 album. MIME-agnostic:
+     * images, documents (PDF/zip/etc.), audio, video — anything the picker
+     * surfaces — funnel through this same path. Callers are responsible for
+     * any MIME-specific pre-processing (image downscale via
+     * [MediaPipeline.readDownscaledJpeg]; documents pass through as-is)
+     * because the FFI encrypts the bytes exactly as supplied.
      *
-     * Callers downscale before this point ([MediaPipeline.readDownscaledJpeg])
-     * because the FFI takes the whole payload in memory.
+     * All attachments upload via one `uploadMedia(list)` FFI call and publish
+     * via one `sendMediaAttachments(list, caption)`; the receiving group sees
+     * a single message carrying N imeta tags. A single-attachment call is
+     * the degenerate case (list of one) and routes through the same path.
      */
-    suspend fun sendImageAttachment(
-        jpegBytes: ByteArray,
-        mediaType: String,
-        fileName: String,
+    suspend fun sendAttachments(
+        attachments: List<PendingAttachment>,
         caption: String?,
     ) {
         val account = conversationAccountRef ?: return
-        if (!canSendMessages || jpegBytes.isEmpty()) return
+        if (!canSendMessages || attachments.isEmpty()) return
+        if (attachments.any { it.plaintextBytes.isEmpty() }) return
+        // Reject albums whose summed plaintext exceeds the retained-uploads
+        // LRU cap BEFORE inserting an optimistic bubble. The cache's
+        // evict-until-under-cap pass would otherwise drop the just-inserted
+        // entry on its own oversize, and the user would see the bubble
+        // immediately flip to "reattach to retry" with no retainable bytes.
+        if (albumExceedsRetainedCap(attachments)) {
+            appState.present(R.string.media_album_too_large)
+            return
+        }
 
         val tempId = UUID.randomUUID().toString()
         val key = "msg:$tempId"
@@ -916,8 +1020,14 @@ class ConversationController(
         val trimmedCaption = caption?.trim()?.takeIf { it.isNotBlank() }
         // Body: the caption if present, otherwise a legible placeholder while
         // the upload runs. The real message arriving after publish carries the
-        // imeta tag and supersedes this optimistic one.
-        val body = trimmedCaption ?: "📎 $fileName"
+        // imeta tags and supersedes this optimistic one.
+        val placeholderName =
+            if (attachments.size == 1) {
+                attachments.first().fileName
+            } else {
+                "${attachments.size} attachments"
+            }
+        val body = trimmedCaption ?: "📎 $placeholderName"
         val optimistic =
             AppMessageRecordFfi(
                 messageIdHex = tempId,
@@ -925,20 +1035,23 @@ class ConversationController(
                 groupIdHex = group.groupIdHex,
                 sender = appState.activeAccount?.accountIdHex ?: "",
                 plaintext = body,
+                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                 kind = 9uL,
-                // Sentinel tag distinguishes a pending-media optimistic record from
-                // a normal text optimistic record. retryFailedSend uses it to route
-                // into the media re-upload path (bytes are held in
-                // [retainedMediaUploads] so retry doesn't need a re-attach).
-                tags = listOf(MessageTagFfi(listOf("_media_pending", fileName, mediaType))),
+                // One `_media_pending` tag per attachment. retryFailedSend
+                // detects ANY of these as a media-retry trigger and re-runs
+                // the whole album through performMediaUpload.
+                tags =
+                    attachments.map {
+                        MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
+                    },
                 recordedAt = now,
                 receivedAt = now,
             )
         val optimisticOrder = nextOptimisticTimelineOrder()
-        // Retain the compressed bytes so a failed upload can be retried in
-        // place, and so the sender's own bubble renders from memory after
-        // confirm instead of round-tripping Blossom.
-        retainedMediaUploads.put(key, RetainedMediaUpload(jpegBytes, mediaType, fileName, trimmedCaption))
+        // Retain the compressed bytes for the whole album so a failed upload
+        // can be retried in place. uploadedReferences caches the Blossom
+        // results so a publish-only failure doesn't re-upload every blob.
+        retainedMediaUploads.put(key, RetainedMediaUpload(attachments, trimmedCaption))
         optimisticMessages[key] =
             TimelineMessage(
                 key,
@@ -977,27 +1090,41 @@ class ConversationController(
             }
         discardedDuringRetry.remove(key)
         try {
-            // Reuse the reference if a prior attempt already uploaded the blob
-            // (publish-only failure) — re-uploading would orphan a duplicate
-            // on the Blossom server.
-            val reference =
-                retained.uploadedReference ?: appState
+            // Reuse the references if a prior attempt already uploaded the
+            // blobs (publish-only failure) — re-uploading would orphan
+            // duplicates on the Blossom server.
+            val references =
+                retained.uploadedReferences ?: appState
                     .marmotIo {
                         uploadMedia(
                             account,
                             group.groupIdHex,
                             MediaUploadRequestFfi(
-                                fileName = retained.fileName,
-                                mediaType = retained.mediaType,
-                                plaintext = retained.jpegBytes,
+                                attachments =
+                                    retained.attachments.map { attachment ->
+                                        MediaUploadAttachmentRequestFfi(
+                                            fileName = attachment.fileName,
+                                            mediaType = attachment.mediaType,
+                                            plaintext = attachment.plaintextBytes,
+                                            dim = null,
+                                            thumbhash = null,
+                                        )
+                                    },
                                 caption = retained.caption,
                                 send = false,
                                 blossomServer = null,
                             ),
-                        ).reference
-                    }.also { retained.uploadedReference = it }
-            // Discard window #1: blob is uploaded but not yet published. If the
-            // user discarded here, bail BEFORE sendMediaReference so we don't
+                        ).attachments.map { it.reference }.also { uploaded ->
+                            if (uploaded.size != retained.attachments.size) {
+                                error(
+                                    "media upload returned ${uploaded.size} references " +
+                                        "for ${retained.attachments.size} attachments",
+                                )
+                            }
+                        }
+                    }.also { retained.uploadedReferences = it }
+            // Discard window #1: blobs uploaded but not yet published. If the
+            // user discarded here, bail BEFORE sendMediaAttachments so we don't
             // publish a kind-9 they cancelled (unlike a published event, an
             // unreferenced Blossom blob is inert).
             if (discardedDuringRetry.remove(key)) {
@@ -1009,7 +1136,7 @@ class ConversationController(
             }
             val summary =
                 appState.marmotIo {
-                    sendMediaReference(account, group.groupIdHex, reference, retained.caption)
+                    sendMediaAttachments(account, group.groupIdHex, references, retained.caption)
                 }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             optimisticMessages.remove(key)
@@ -1026,24 +1153,25 @@ class ConversationController(
             }
             // Seed the decrypted-bytes AND decoded-thumbnail caches under the
             // confirmed id so the sender's own bubble renders instantly — no
-            // Blossom round-trip and no decode spinner.
+            // Blossom round-trip and no decode spinner. One cache entry per
+            // attachment under `(account, messageId, attachmentIndex)`.
             if (confirmedId.isNotEmpty()) {
-                val confirmedKey = mediaCacheKey(account, confirmedId)
-                appState.mediaPlaintextCache.put(confirmedKey, retained.jpegBytes)
-                MediaPipeline.decodeSampledBitmap(retained.jpegBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)?.let {
-                    appState.mediaThumbnailCache.put(confirmedKey, it)
-                }
-                // Also persist to L2 so own-sent images survive process
-                // restart, matching the receive-path's L2 behaviour.
-                val bytesToPersist = retained.jpegBytes
-                appState.launchMutation {
-                    withContext(Dispatchers.IO) { appState.diskMediaCache.put(confirmedKey, bytesToPersist) }
+                retained.attachments.forEachIndexed { index, attachment ->
+                    val confirmedKey = mediaCacheKey(account, confirmedId, index)
+                    appState.mediaPlaintextCache.put(confirmedKey, attachment.plaintextBytes)
+                    MediaPipeline
+                        .decodeSampledBitmap(attachment.plaintextBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+                        ?.let { appState.mediaThumbnailCache.put(confirmedKey, it) }
+                    val bytesToPersist = attachment.plaintextBytes
+                    appState.launchMutation {
+                        withContext(Dispatchers.IO) { appState.diskMediaCache.put(confirmedKey, bytesToPersist) }
+                    }
                 }
             }
             retainedMediaUploads.remove(key)
             // Bridge the gap until the published event echoes back via the
             // projection: insert a confirmed *image* optimistic carrying the
-            // imeta tag (built from the upload reference), keyed on confirmedId.
+            // imeta tags (one per uploaded reference), keyed on confirmedId.
             // Same key as the eventual projected item, so the bubble never
             // disappears/reappears, and it renders from the seeded thumbnail.
             // pruneConfirmedOptimisticMessages reconciles it on arrival.
@@ -1055,7 +1183,7 @@ class ConversationController(
                         // sent), not the "📎 filename" optimistic placeholder, so
                         // the bridge bubble is identical to the projected one.
                         plaintext = retained.caption.orEmpty(),
-                        tags = listOf(MediaReferenceParser.toImetaTag(reference)),
+                        tags = references.map { MediaReferenceParser.toImetaTag(it) },
                     )
                 messageById[confirmedId] = confirmedRecord
                 optimisticMessages["msg:$confirmedId"] =
@@ -1151,7 +1279,7 @@ class ConversationController(
     private val retainedMediaUploads =
         ByteSizeLruCache<String, RetainedMediaUpload>(
             maxBytes = MEDIA_RETAINED_MAX_BYTES,
-            sizeOf = { it.jpegBytes.size },
+            sizeOf = { upload -> upload.attachments.sumOf { it.plaintextBytes.size } },
         )
 
     /**
@@ -1164,7 +1292,8 @@ class ConversationController(
     private fun mediaCacheKey(
         account: String,
         messageIdHex: String,
-    ): String = "$account|${group.groupIdHex}|$messageIdHex"
+        attachmentIndex: Int,
+    ): String = "$account|${group.groupIdHex}|$messageIdHex|$attachmentIndex"
 
     /**
      * Fetch and decrypt a Blossom-stored attachment. Backed by the app-level
@@ -1174,12 +1303,13 @@ class ConversationController(
      */
     suspend fun downloadAttachment(
         messageIdHex: String,
-        reference: MediaReferenceFfi,
+        attachmentIndex: Int,
+        reference: MediaAttachmentReferenceFfi,
     ): ByteArray {
         // Resolve the account first so the cache key is never unanchored
-        // ("|group|msg"), which a later sign-in could collide with.
+        // ("|group|msg|idx"), which a later sign-in could collide with.
         val account = conversationAccountRef ?: error("no active account")
-        val cacheKey = mediaCacheKey(account, messageIdHex)
+        val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
         // L1: in-memory LRU (hottest cache, instant return).
         appState.mediaPlaintextCache.get(cacheKey)?.let { return it }
         // L2: disk LRU (survives process restart). Read off the main thread
@@ -1189,7 +1319,17 @@ class ConversationController(
             appState.mediaPlaintextCache.put(cacheKey, onDisk)
             return onDisk
         }
-        val result = appState.marmotIo { downloadMedia(account, group.groupIdHex, reference) }
+        val result =
+            runCatching {
+                appState.marmotIo { downloadMedia(account, group.groupIdHex, reference) }
+            }.onFailure {
+                if (it is CancellationException) throw it
+                Log.w(
+                    "DMConversation",
+                    "downloadAttachment failed for ${group.groupIdHex.take(8)} message=${messageIdHex.take(8)}",
+                    it,
+                )
+            }.getOrThrow()
         // Never cache empty plaintext — a zero-byte result would render as a
         // permanent broken image and short-circuit tap-to-retry.
         if (result.plaintext.isNotEmpty()) {
@@ -1207,18 +1347,22 @@ class ConversationController(
 
     /** Decoded thumbnail for [messageIdHex] if one is cached (renders with no
      *  spinner). Null when unanchored or not yet decoded. */
-    fun thumbnailFor(messageIdHex: String): android.graphics.Bitmap? {
+    fun thumbnailFor(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): android.graphics.Bitmap? {
         val account = conversationAccountRef ?: return null
-        return appState.mediaThumbnailCache.get(mediaCacheKey(account, messageIdHex))
+        return appState.mediaThumbnailCache.get(mediaCacheKey(account, messageIdHex, attachmentIndex))
     }
 
     /** Cache a decoded thumbnail so re-renders / re-entry skip the decode. */
     fun cacheThumbnail(
         messageIdHex: String,
+        attachmentIndex: Int,
         bitmap: android.graphics.Bitmap,
     ) {
         val account = conversationAccountRef ?: return
-        appState.mediaThumbnailCache.put(mediaCacheKey(account, messageIdHex), bitmap)
+        appState.mediaThumbnailCache.put(mediaCacheKey(account, messageIdHex, attachmentIndex), bitmap)
     }
 
     /**
@@ -1240,23 +1384,35 @@ class ConversationController(
     ) {
         val retained = retainedMediaUploads.get(optimisticKey) ?: return
         val account = conversationAccountRef ?: return
-        val cacheKey = mediaCacheKey(account, projectedMessageIdHex)
-        appState.mediaPlaintextCache.put(cacheKey, retained.jpegBytes)
-        MediaPipeline.decodeSampledBitmap(retained.jpegBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)?.let {
-            appState.mediaThumbnailCache.put(cacheKey, it)
-        }
-        val bytesToPersist = retained.jpegBytes
-        appState.launchMutation {
-            withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, bytesToPersist) }
+        // Seed every attachment under its own (messageId, attachmentIndex)
+        // key so the projected album bubble's per-tile cache lookups all
+        // hit immediately on reconcile.
+        retained.attachments.forEachIndexed { index, attachment ->
+            val cacheKey = mediaCacheKey(account, projectedMessageIdHex, index)
+            appState.mediaPlaintextCache.put(cacheKey, attachment.plaintextBytes)
+            MediaPipeline
+                .decodeSampledBitmap(attachment.plaintextBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+                ?.let { appState.mediaThumbnailCache.put(cacheKey, it) }
+            val bytesToPersist = attachment.plaintextBytes
+            appState.launchMutation {
+                withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, bytesToPersist) }
+            }
         }
     }
 
     /**
-     * Compressed bytes for an in-flight/failed optimistic media send, so the
-     * sender's bubble can preview the local image while it uploads. [messageIdHex]
-     * is the optimistic record's temp id; null once the send confirms.
+     * Every pending attachment in the optimistic album, ordered by attachment
+     * index. Empty when no upload is queued under the temp id. Used by the
+     * upload placeholder so the sender sees the same grid/file-pill shape
+     * during upload as the post-upload bubble — the placeholder needs the
+     * filename + MIME alongside the bytes so non-image attachments render
+     * with their original name instead of a generic preview.
      */
-    fun pendingMediaBytes(messageIdHex: String): ByteArray? = retainedMediaUploads.get("msg:$messageIdHex")?.jpegBytes
+    fun pendingAttachmentsList(messageIdHex: String): List<PendingAttachment> =
+        retainedMediaUploads
+            .get("msg:$messageIdHex")
+            ?.attachments
+            .orEmpty()
 
     /**
      * Drop all retained outgoing JPEG bytes. Called when leaving the
@@ -1345,6 +1501,11 @@ class ConversationController(
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
+            Log.w(
+                "DMConversation",
+                "retryFailedSend failed for ${group.groupIdHex.take(8)} key=${key.take(8)}",
+                throwable,
+            )
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; don't restore the Failed bubble.
                 optimisticMessages.remove(key)
@@ -1685,6 +1846,14 @@ class ConversationController(
                 }
             hasLoadedOlderPages = true
             applyTimelinePage(page, replaceWindow = false, updatePagination = true)
+            // The cached `mediaReferences` map only carries entries for
+            // messages that have been listMedia-projected at some prior
+            // point. Older-page rows landing fresh here would otherwise
+            // fall back to the imeta-tag parser, which hard-codes
+            // `sourceEpoch = 0` and breaks decryption on every image. Gate
+            // on whether the page actually contains a media-bearing row so
+            // a text-only history pull doesn't trigger the unbounded scan.
+            if (pageContainsMedia(page)) refreshMediaReferences()
             page.messages.isNotEmpty()
         } catch (cancel: CancellationException) {
             throw cancel
@@ -1713,7 +1882,12 @@ class ConversationController(
                 )
             }
         hasLoadedOlderPages = false
-        return applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+        val streamIds = applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+        // Full-window replacement: re-seed the typed media cache too so any
+        // freshly-projected media in the new window resolves to its real
+        // `sourceEpoch` instead of the imeta-tag fallback of 0.
+        if (pageContainsMedia(page)) refreshMediaReferences()
+        return streamIds
     }
 
     fun replyPreview(
@@ -1914,6 +2088,11 @@ class ConversationController(
      */
     suspend fun markReadUpTo(messageId: String) {
         val trimmed = messageId.takeIf { it.isNotBlank() } ?: return
+        // Optimistic messages carry a Kotlin UUID as their messageIdHex
+        // ("xxxxxxxx-xxxx-..."). The FFI rejects anything that isn't a 64-char
+        // hex blob (InvalidHex at the first '-'). Skip — the projection will
+        // call markReadUpTo again with the confirmed hex id once it echoes.
+        if (!HEX_MESSAGE_ID.matches(trimmed)) return
         if (trimmed == lastReadMessageId) return
         val account = conversationAccountRef ?: return
         lastReadMessageId = trimmed
@@ -2253,6 +2432,49 @@ class ConversationController(
         }
     }
 
+    /**
+     * Whether [page] holds at least one record carrying a media attachment.
+     * Used to gate the hot-path call to [refreshMediaReferences] so a
+     * text-only / reaction-only timeline update doesn't trigger a full
+     * `listMedia(group, null)` SQLite scan on every projection batch.
+     */
+    private fun pageContainsMedia(page: TimelinePageFfi): Boolean = page.messages.any(::recordCarriesMedia)
+
+    private fun changesContainMedia(changes: List<TimelineMessageChangeFfi>): Boolean =
+        changes.any { change ->
+            change is TimelineMessageChangeFfi.Upsert && recordCarriesMedia(change.message)
+        }
+
+    /** Cheap structural check: a kind:9 record whose tag list includes an
+     *  `imeta` entry is a media-bearing message under encrypted-media-v1. */
+    private fun recordCarriesMedia(record: TimelineMessageRecordFfi): Boolean = record.kind == 9uL && record.tags.any { it.values.firstOrNull() == "imeta" }
+
+    /**
+     * Pull typed media references from Rust and cache them by `messageIdHex`.
+     * Required so `downloadMedia` is called with the real `sourceEpoch`; the
+     * imeta-tag parser fallback hard-codes `sourceEpoch = 0` (no field in the
+     * wire format) and would otherwise fail every receive-side decryption
+     * with `missing encrypted media secret for epoch 0`.
+     */
+    private suspend fun refreshMediaReferences() {
+        val account = appState.activeAccountRef ?: return
+        runCatching {
+            appState.marmotIo { listMedia(account, group.groupIdHex, null) }
+        }.onSuccess { records ->
+            // Group by messageId (one message → N attachments); sort each
+            // bucket by attachmentIndex so the bubble renders in album order.
+            mediaReferences =
+                records
+                    .groupBy { it.messageIdHex }
+                    .mapValues { (_, group) ->
+                        group.sortedBy { it.attachmentIndex }.map { it.reference }
+                    }
+        }.onFailure {
+            if (it is CancellationException) throw it
+            Log.w("DMConversation", "listMedia failed for ${group.groupIdHex.take(8)}", it)
+        }
+    }
+
     private fun markActiveAccountRemovedFromMembers(account: String) {
         val activeAccountIdHex = appState.activeAccount?.accountIdHex ?: return
         val updatedMembers =
@@ -2354,6 +2576,14 @@ class ConversationController(
                     is AgentStreamUpdateFfi.Failed -> {
                         updateStreamPreview(streamId, copy.streamFailed(update.message), MessageStatus.Failed)
                     }
+                    // Typed Hermes-agent variants (Progress / Record / Status)
+                    // arrived with the recent Rust regen. We don't surface
+                    // them in the streaming preview yet — drop silently so
+                    // the loop keeps consuming the next chunk.
+                    is AgentStreamUpdateFfi.Progress,
+                    is AgentStreamUpdateFfi.Record,
+                    is AgentStreamUpdateFfi.Status,
+                    -> Unit
                 }
             }
         } catch (throwable: Throwable) {
@@ -2387,6 +2617,7 @@ class ConversationController(
                     groupIdHex = group.groupIdHex,
                     sender = inferStreamSender(streamId),
                     plaintext = "",
+                    contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                     kind = 1200uL,
                     tags = listOf(MessageProjector.streamTag(streamId)),
                     recordedAt = nowSeconds(),
@@ -2447,10 +2678,31 @@ class ConversationController(
             a.agentTextStreamJson == b.agentTextStreamJson &&
             a.reactions == b.reactions
 
-    private companion object {
-        // 32 MiB cap on retained compressed bytes for in-flight/failed
-        // uploads. A few failed images stay retryable without letting an
-        // undiscarded backlog accrete unbounded heap.
+    companion object {
+        /**
+         * 32 MiB cap on retained compressed bytes for in-flight/failed
+         * uploads. A few failed images stay retryable without letting an
+         * undiscarded backlog accrete unbounded heap. Exposed so the UI
+         * picker can bound the album payload against the SAME ceiling
+         * (otherwise an oversize album would self-evict its retained
+         * bytes on insertion and turn into a "reattach to retry" loop).
+         */
         const val MEDIA_RETAINED_MAX_BYTES: Long = 32L * 1024L * 1024L
+
+        /** True iff the cumulative plaintext bytes across [attachments]
+         *  would exceed the retained-bytes cap. Pure for unit-testing. */
+        fun albumExceedsRetainedCap(attachments: List<PendingAttachment>): Boolean {
+            var total = 0L
+            for (a in attachments) {
+                total += a.plaintextBytes.size.toLong()
+                if (total > MEDIA_RETAINED_MAX_BYTES) return true
+            }
+            return false
+        }
+
+        // 32-byte (64 hex char) message id as Rust expects on the FFI
+        // boundary. Used to filter optimistic UUID-format ids out of FFI
+        // calls that would otherwise throw InvalidHex.
+        internal val HEX_MESSAGE_ID: Regex = Regex("^[0-9a-fA-F]{64}$")
     }
 }

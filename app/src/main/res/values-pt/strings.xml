@@ -376,6 +376,12 @@
     <string name="add_caption">Adicionar uma legenda…</string>
     <string name="attach_take_photo">Tirar foto</string>
     <string name="attach_photo_library">Galeria de fotos</string>
+    <string name="attach_document">Documento</string>
+    <string name="media_no_app_to_open">Nenhum app instalado para abrir este arquivo</string>
+    <string name="media_couldnt_open">Não foi possível abrir o arquivo</string>
+    <string name="media_open">Abrir</string>
+    <string name="media_file_too_large">Arquivo muito grande para anexar</string>
+    <string name="media_album_too_large">Seleção muito grande para enviar</string>
     <string name="media_auto_download_title">Baixar mídia automaticamente</string>
     <string name="media_auto_download_always">Sempre</string>
     <string name="media_auto_download_wifi">Somente no Wi-Fi</string>

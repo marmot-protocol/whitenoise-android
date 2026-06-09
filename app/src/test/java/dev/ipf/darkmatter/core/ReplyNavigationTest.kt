@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
@@ -65,6 +66,7 @@ class ReplyNavigationTest {
             groupIdHex = "group",
             sender = "alice",
             plaintext = "reply",
+            contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
             kind = 9uL,
             tags = tags,
             recordedAt = 1uL,
@@ -81,6 +83,7 @@ class ReplyNavigationTest {
         groupIdHex = "group",
         sender = "alice",
         plaintext = "reply",
+        contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
         kind = 9uL,
         tags = emptyList(),
         timelineAt = 1uL,
@@ -93,6 +96,7 @@ class ReplyNavigationTest {
                     messageIdHex = it,
                     sender = "bob",
                     plaintext = "parent",
+                    contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                     kind = 9uL,
                     mediaJson = null,
                     agentTextStreamJson = null,
