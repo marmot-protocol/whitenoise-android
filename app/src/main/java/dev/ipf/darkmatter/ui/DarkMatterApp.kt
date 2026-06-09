@@ -1341,6 +1341,18 @@ private const val ConversationNearBottomItemSlack = 3
 // (10 * 1920px JPEG ≈ a few MB encrypted) without feeling artificially low.
 private const val MEDIA_PICKER_MAX_ITEMS = 10
 
+// Per-file ceiling for a document attachment. Matches the retained-uploads
+// LRU cap so a single oversize pick can't OOM the picker pass before the
+// retained store gets a chance to evict. Anything larger is dropped with a
+// toast — the user can re-pick a smaller file or split the upload.
+private const val MEDIA_ATTACHMENT_MAX_BYTES = 32L * 1024L * 1024L
+
+// Total bytes cap across one album send. 64 MiB allows a healthy mix
+// (e.g. 10 images at the recompressed cap plus one document near the
+// single-file ceiling) without the album-as-one-event pinning more heap
+// than the retained store can evict.
+private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = 64L * 1024L * 1024L
+
 /** Fixed height of an in-timeline image bubble — constant across load states
  *  so async decode never reflows the list (would break the open-time anchor). */
 private val MediaBubbleHeight = 240.dp
@@ -2698,6 +2710,49 @@ private fun queryDisplayName(
     return uri.lastPathSegment
 }
 
+/**
+ * Best-effort byte size of a content Uri, queried via `OpenableColumns.SIZE`.
+ * Returns -1 when the provider doesn't report a size (some virtual / streamed
+ * providers omit it); callers must then enforce a cap via the bounded read.
+ */
+private fun queryContentSize(
+    contentResolver: android.content.ContentResolver,
+    uri: android.net.Uri,
+): Long {
+    contentResolver
+        .query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)
+        ?.use { cursor ->
+            if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                return cursor.getLong(0)
+            }
+        }
+    return -1L
+}
+
+/**
+ * Read up to [cap] bytes from [stream] and return them; return null if the
+ * stream would exceed the cap. The stream is consumed but not closed —
+ * callers manage the lifecycle (typically a `use { … }` block). Closes the
+ * accumulator on either path.
+ */
+private fun readBoundedBytes(
+    stream: java.io.InputStream,
+    cap: Int,
+): ByteArray? {
+    val buffer = java.io.ByteArrayOutputStream()
+    val chunk = ByteArray(8 * 1024)
+    var total = 0L
+    while (true) {
+        val read = stream.read(chunk)
+        if (read < 0) break
+        total += read
+        // Strictly greater so a file exactly the cap size still goes through.
+        if (total > cap) return null
+        buffer.write(chunk, 0, read)
+    }
+    return buffer.toByteArray()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ConversationScreen(
@@ -2885,22 +2940,72 @@ private fun ConversationScreen(
     // Read each picked document URI as raw bytes (no recompression — PDFs,
     // archives, audio etc. travel through the same kind:9 album path as
     // images via `sendAttachments`). MIME comes from the content resolver;
-    // filename from `OpenableColumns.DISPLAY_NAME`. Per-attachment failures
-    // skip silently — if NONE survive we bail without an empty send. The
-    // shared 32 MiB retained-bytes cap means very large picks may evict
-    // earlier sends from the in-flight cache; surface that here as the size
-    // counter rather than a silent drop.
+    // filename from `OpenableColumns.DISPLAY_NAME`.
+    //
+    // Two-layer size guard:
+    //   1. Per-attachment ceiling: skip any single pick that already declares
+    //      a `OpenableColumns.SIZE` greater than [MEDIA_ATTACHMENT_MAX_BYTES],
+    //      OR overruns the cap during a bounded streaming read (no fully-
+    //      buffered `readBytes()` so a 500 MB pick can't OOM the JVM heap
+    //      before the retained-uploads LRU has anything to evict).
+    //   2. Album-total ceiling: stop accumulating once the cumulative payload
+    //      crosses [MEDIA_ALBUM_MAX_TOTAL_BYTES]; remaining picks are dropped.
+    //
+    // Any reject surfaces a single user-visible toast; the rest of the album
+    // continues. If NOTHING survives the gates we bail without an empty send.
     fun sendPickedDocuments(uris: List<android.net.Uri>) {
         if (uris.isEmpty()) return
         appState.launchMutation {
-            val attachments =
+            data class ReadOutcome(
+                val attachments: List<PendingAttachment>,
+                val rejected: Boolean,
+                val albumOverflowed: Boolean,
+            )
+            val outcome =
                 withContext(Dispatchers.IO) {
-                    uris.mapNotNull { uri ->
+                    val accepted = mutableListOf<PendingAttachment>()
+                    var albumBytes = 0L
+                    var rejected = false
+                    var albumOverflowed = false
+                    for (uri in uris) {
+                        val declaredSize = queryContentSize(context.contentResolver, uri)
+                        if (declaredSize > 0L && declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
+                            rejected = true
+                            continue
+                        }
+                        val remainingAlbumBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - albumBytes).coerceAtLeast(0L)
+                        if (remainingAlbumBudget <= 0L) {
+                            albumOverflowed = true
+                            break
+                        }
+                        // Cap the bounded read at whichever is smaller: the
+                        // single-file ceiling, or the remaining album budget.
+                        val perFileCap =
+                            minOf(MEDIA_ATTACHMENT_MAX_BYTES, remainingAlbumBudget)
+                                .coerceAtMost(Int.MAX_VALUE.toLong())
+                                .toInt()
                         val bytes =
                             runCatching {
-                                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                            }.getOrNull() ?: return@mapNotNull null
-                        if (bytes.isEmpty()) return@mapNotNull null
+                                context.contentResolver.openInputStream(uri)?.use { stream ->
+                                    readBoundedBytes(stream, perFileCap)
+                                }
+                            }.getOrNull()
+                        if (bytes == null) {
+                            // null from runCatching = open failed; null from
+                            // readBoundedBytes = exceeded cap. Both surface as
+                            // "rejected" — the user sees one toast either way.
+                            rejected = true
+                            continue
+                        }
+                        if (bytes.isEmpty()) continue
+                        if (albumBytes + bytes.size > MEDIA_ALBUM_MAX_TOTAL_BYTES) {
+                            // Defensive: per-file cap already accounts for
+                            // remainingAlbumBudget, so this branch shouldn't
+                            // fire — keep it as a belt-and-braces guard.
+                            albumOverflowed = true
+                            continue
+                        }
+                        albumBytes += bytes.size
                         val resolvedMime =
                             context.contentResolver
                                 .getType(uri)
@@ -2908,18 +3013,31 @@ private fun ConversationScreen(
                                 .takeIf { it.isNotBlank() }
                                 ?: "application/octet-stream"
                         val name = queryDisplayName(context.contentResolver, uri) ?: "file"
-                        PendingAttachment(
-                            plaintextBytes = bytes,
-                            mediaType = resolvedMime,
-                            fileName = name,
-                        )
+                        accepted +=
+                            PendingAttachment(
+                                plaintextBytes = bytes,
+                                mediaType = resolvedMime,
+                                fileName = name,
+                            )
                     }
+                    ReadOutcome(accepted, rejected, albumOverflowed)
                 }
-            if (attachments.isEmpty()) {
-                appState.present(R.string.toast_couldnt_decode_image)
+            if (outcome.attachments.isEmpty()) {
+                appState.present(
+                    if (outcome.rejected || outcome.albumOverflowed) {
+                        R.string.media_file_too_large
+                    } else {
+                        R.string.toast_couldnt_decode_image
+                    },
+                )
                 return@launchMutation
             }
-            controller.sendAttachments(attachments, caption = null)
+            if (outcome.albumOverflowed) {
+                appState.present(R.string.media_album_too_large)
+            } else if (outcome.rejected) {
+                appState.present(R.string.media_file_too_large)
+            }
+            controller.sendAttachments(outcome.attachments, caption = null)
         }
     }
 
