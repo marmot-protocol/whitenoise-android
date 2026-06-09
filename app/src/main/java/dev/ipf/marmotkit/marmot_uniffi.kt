@@ -949,6 +949,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -961,78 +963,78 @@ internal interface UniffiLib : Library {
                 uniffiCheckApiChecksums(lib)
                 }
         }
-        
+
         // The Cleaner for the whole library
         internal val CLEANER: UniffiCleaner by lazy {
             UniffiCleaner.create()
         }
     }
 
-    fun uniffi_marmot_uniffi_fn_clone_agentstreamsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_clone_agentstreamsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_agentstreamsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_free_agentstreamsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
     fun uniffi_marmot_uniffi_fn_method_agentstreamsubscription_next(`ptr`: Pointer,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_agentstreamsubscription_stream_id_hex(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_agentstreamsubscription_stream_id_hex(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_chatlistsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_clone_chatlistsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_chatlistsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_free_chatlistsubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
     fun uniffi_marmot_uniffi_fn_method_chatlistsubscription_next(`ptr`: Pointer,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_chatlistsubscription_next_update(`ptr`: Pointer,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_chatlistsubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_chatlistsubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_chatssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_clone_chatssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_chatssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_free_chatssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
     fun uniffi_marmot_uniffi_fn_method_chatssubscription_next(`ptr`: Pointer,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_chatssubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_chatssubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_eventssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_clone_eventssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_eventssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_free_eventssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
     fun uniffi_marmot_uniffi_fn_method_eventssubscription_next(`ptr`: Pointer,
     ): Long
-    fun uniffi_marmot_uniffi_fn_clone_groupstatesubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_clone_groupstatesubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_groupstatesubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_free_groupstatesubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
     fun uniffi_marmot_uniffi_fn_method_groupstatesubscription_next(`ptr`: Pointer,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_groupstatesubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_groupstatesubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_marmot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_clone_marmot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_marmot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_free_marmot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
-    fun uniffi_marmot_uniffi_fn_constructor_marmot_new(`rootPath`: RustBuffer.ByValue,`relayUrls`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_constructor_marmot_new(`rootPath`: RustBuffer.ByValue,`relayUrls`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
     fun uniffi_marmot_uniffi_fn_method_marmot_accept_group_invite(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_id_hex(`ptr`: Pointer,`reference`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_account_id_hex(`ptr`: Pointer,`reference`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_inbox_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_account_inbox_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_account_key_packages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_nip65_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_account_nip65_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_account_relay_lists(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_account_relay_lists(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_files(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_files(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_settings(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_audit_log_settings(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_catch_up_accounts(`ptr`: Pointer,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_chat_list(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_chat_list(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_clear_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
     ): Long
@@ -1052,7 +1054,7 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_demote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_display_name(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_display_name(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_download_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,
     ): Long
@@ -1066,31 +1068,31 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_group_push_debug_info(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_initialize_chat_read_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_initialize_chat_read_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_invite_members(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_invite_members_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_is_stopping(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_is_stopping(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Byte
     fun uniffi_marmot_uniffi_fn_method_marmot_leave_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_list_accounts(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_list_accounts(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_list_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_list_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_login(`ptr`: Pointer,`identity`: RustBuffer.ByValue,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_mark_timeline_message_read(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`messageIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_mark_timeline_message_read(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`messageIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_normalize_member_ref(`ptr`: Pointer,`memberRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_normalize_member_ref(`ptr`: Pointer,`memberRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_notification_settings(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_notification_settings(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_npub(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_npub(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_file(`ptr`: Pointer,`path`: RustBuffer.ByValue,`endpoint`: RustBuffer.ByValue,
     ): Long
@@ -1106,7 +1108,7 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_publish_user_profile(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`profile`: RustBuffer.ByValue,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_react_to_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`emoji`: RustBuffer.ByValue,
     ): Long
@@ -1114,13 +1116,15 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_relay_health(`ptr`: Pointer,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_relay_telemetry_settings(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_relay_telemetry_settings(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_remove_account(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_remove_members(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_remove_members_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRefs`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_replace_encrypted_media_blob_endpoints(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`endpoints`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_reply_to_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,
     ): Long
@@ -1130,7 +1134,7 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_self_demote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_send_media_reference(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,`caption`: RustBuffer.ByValue,
+    fun uniffi_marmot_uniffi_fn_method_marmot_send_media_attachments(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`attachments`: RustBuffer.ByValue,`caption`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_send_text(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,
     ): Long
@@ -1138,13 +1142,13 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_set_account_nip65_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_tracker_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_tracker_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_group_archived(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`archived`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_group_archived(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`archived`: Byte,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_local_notifications_enabled(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`enabled`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_local_notifications_enabled(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`enabled`: Byte,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_set_native_push_enabled(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`enabled`: Byte,
     ): Long
@@ -1162,7 +1166,7 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_chats(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`includeArchived`: Byte,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_events(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_events(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
     fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_group_state(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
@@ -1172,9 +1176,9 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_subscribe_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_telemetry_install_id(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_telemetry_install_id(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`query`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_timeline_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`query`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_unreact_from_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,
     ): Long
@@ -1186,41 +1190,41 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_upsert_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`platform`: RustBuffer.ByValue,`rawToken`: RustBuffer.ByValue,`serverPubkeyHex`: RustBuffer.ByValue,`relayHint`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_user_profile(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_marmot_user_profile(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_watch_agent_text_stream(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`streamIdHex`: RustBuffer.ByValue,`serverCertDer`: RustBuffer.ByValue,`insecureLocal`: Byte,
     ): Long
-    fun uniffi_marmot_uniffi_fn_clone_messagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_clone_messagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_messagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_free_messagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
     fun uniffi_marmot_uniffi_fn_method_messagessubscription_next(`ptr`: Pointer,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_messagessubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_messagessubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_clone_notificationssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_clone_notificationssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_notificationssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_free_notificationssubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
     fun uniffi_marmot_uniffi_fn_method_notificationssubscription_next(`ptr`: Pointer,
     ): Long
-    fun uniffi_marmot_uniffi_fn_clone_timelinemessagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_clone_timelinemessagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
-    fun uniffi_marmot_uniffi_fn_free_timelinemessagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_free_timelinemessagessubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
     fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_next(`ptr`: Pointer,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_next_update(`ptr`: Pointer,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun ffi_marmot_uniffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun ffi_marmot_uniffi_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun ffi_marmot_uniffi_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
-    fun ffi_marmot_uniffi_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun ffi_marmot_uniffi_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1228,7 +1232,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_u8(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Byte
     fun ffi_marmot_uniffi_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1236,7 +1240,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_i8(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Byte
     fun ffi_marmot_uniffi_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1244,7 +1248,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_u16(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Short
     fun ffi_marmot_uniffi_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1252,7 +1256,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_i16(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Short
     fun ffi_marmot_uniffi_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1260,7 +1264,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_u32(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Int
     fun ffi_marmot_uniffi_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1268,7 +1272,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_i32(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Int
     fun ffi_marmot_uniffi_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1276,7 +1280,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_u64(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Long
     fun ffi_marmot_uniffi_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1284,7 +1288,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_i64(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Long
     fun ffi_marmot_uniffi_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1292,7 +1296,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_f32(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Float
     fun ffi_marmot_uniffi_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1300,7 +1304,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_f64(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Double
     fun ffi_marmot_uniffi_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1308,7 +1312,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_pointer(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Pointer
     fun ffi_marmot_uniffi_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1316,7 +1320,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_rust_buffer(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun ffi_marmot_uniffi_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
     ): Unit
@@ -1324,7 +1328,7 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_marmot_uniffi_rust_future_free_void(`handle`: Long,
     ): Unit
-    fun ffi_marmot_uniffi_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    fun ffi_marmot_uniffi_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
     fun uniffi_marmot_uniffi_checksum_method_agentstreamsubscription_next(
     ): Short
@@ -1454,6 +1458,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_remove_members_detailed(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_replace_encrypted_media_blob_endpoints(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_reply_to_message(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_republish_key_package(
@@ -1462,7 +1468,7 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_self_demote_admin_detailed(
     ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_send_media_reference(
+    fun uniffi_marmot_uniffi_checksum_method_marmot_send_media_attachments(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_send_text(
     ): Short
@@ -1538,7 +1544,7 @@ internal interface UniffiLib : Library {
     ): Short
     fun ffi_marmot_uniffi_uniffi_contract_version(
     ): Int
-    
+
 }
 
 private fun uniffiCheckContractApiVersion(lib: UniffiLib) {
@@ -1643,7 +1649,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_display_name() != 65469.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_download_media() != 38941.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_download_media() != 56125.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_details() != 55062.toShort()) {
@@ -1745,6 +1751,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_remove_members_detailed() != 52572.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_replace_encrypted_media_blob_endpoints() != 42018.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_reply_to_message() != 49057.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1757,7 +1766,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_self_demote_admin_detailed() != 31187.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_send_media_reference() != 20496.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_send_media_attachments() != 3385.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_send_text() != 60625.toShort()) {
@@ -1835,7 +1844,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_update_group_profile() != 53035.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_upload_media() != 3159.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_upload_media() != 20405.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_upsert_push_registration() != 36089.toShort()) {
@@ -1948,7 +1957,7 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
         }
     }
 
-/** 
+/**
  * Used to instantiate an interface without an actual pointer, for fakes in tests, mostly.
  *
  * @suppress
@@ -2314,14 +2323,14 @@ private class AndroidSystemCleanable(
  * after which it returns `None`.
  */
 public interface AgentStreamSubscriptionInterface {
-    
+
     suspend fun `next`(): AgentStreamUpdateFfi?
-    
+
     /**
      * The resolved stream id this watch is following (hex).
      */
     fun `streamIdHex`(): kotlin.String
-    
+
     companion object
 }
 
@@ -2411,14 +2420,14 @@ open class AgentStreamSubscription: Disposable, AutoCloseable, AgentStreamSubscr
         }
     }
 
-    
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `next`() : AgentStreamUpdateFfi? {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_agentstreamsubscription_next(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -2431,7 +2440,7 @@ open class AgentStreamSubscription: Disposable, AutoCloseable, AgentStreamSubscr
     )
     }
 
-    
+
     /**
      * The resolved stream id this watch is following (hex).
      */override fun `streamIdHex`(): kotlin.String {
@@ -2444,14 +2453,14 @@ open class AgentStreamSubscription: Disposable, AutoCloseable, AgentStreamSubscr
     }
     )
     }
-    
 
-    
 
-    
-    
+
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -2582,13 +2591,13 @@ public object FfiConverterTypeAgentStreamSubscription: FfiConverter<AgentStreamS
 
 
 public interface ChatListSubscriptionInterface {
-    
+
     suspend fun `next`(): ChatListRowFfi?
-    
+
     suspend fun `nextUpdate`(): ChatListSubscriptionUpdateFfi?
-    
+
     fun `snapshot`(): List<ChatListRowFfi>
-    
+
     companion object
 }
 
@@ -2673,14 +2682,14 @@ open class ChatListSubscription: Disposable, AutoCloseable, ChatListSubscription
         }
     }
 
-    
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `next`() : ChatListRowFfi? {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_chatlistsubscription_next(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -2693,14 +2702,14 @@ open class ChatListSubscription: Disposable, AutoCloseable, ChatListSubscription
     )
     }
 
-    
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `nextUpdate`() : ChatListSubscriptionUpdateFfi? {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_chatlistsubscription_next_update(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -2723,14 +2732,14 @@ open class ChatListSubscription: Disposable, AutoCloseable, ChatListSubscription
     }
     )
     }
-    
 
-    
 
-    
-    
+
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -2861,11 +2870,11 @@ public object FfiConverterTypeChatListSubscription: FfiConverter<ChatListSubscri
 
 
 public interface ChatsSubscriptionInterface {
-    
+
     suspend fun `next`(): AppGroupRecordFfi?
-    
+
     fun `snapshot`(): List<AppGroupRecordFfi>
-    
+
     companion object
 }
 
@@ -2950,14 +2959,14 @@ open class ChatsSubscription: Disposable, AutoCloseable, ChatsSubscriptionInterf
         }
     }
 
-    
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `next`() : AppGroupRecordFfi? {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_chatssubscription_next(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -2980,14 +2989,14 @@ open class ChatsSubscription: Disposable, AutoCloseable, ChatsSubscriptionInterf
     }
     )
     }
-    
 
-    
 
-    
-    
+
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -3124,9 +3133,9 @@ public object FfiConverterTypeChatsSubscription: FfiConverter<ChatsSubscription,
  * the per-account chats/messages subscriptions).
  */
 public interface EventsSubscriptionInterface {
-    
+
     suspend fun `next`(): MarmotEventFfi?
-    
+
     companion object
 }
 
@@ -3217,14 +3226,14 @@ open class EventsSubscription: Disposable, AutoCloseable, EventsSubscriptionInte
         }
     }
 
-    
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `next`() : MarmotEventFfi? {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_eventssubscription_next(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -3237,12 +3246,12 @@ open class EventsSubscription: Disposable, AutoCloseable, EventsSubscriptionInte
     )
     }
 
-    
 
-    
-    
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -3373,11 +3382,11 @@ public object FfiConverterTypeEventsSubscription: FfiConverter<EventsSubscriptio
 
 
 public interface GroupStateSubscriptionInterface {
-    
+
     suspend fun `next`(): AppGroupRecordFfi?
-    
+
     fun `snapshot`(): AppGroupRecordFfi?
-    
+
     companion object
 }
 
@@ -3462,14 +3471,14 @@ open class GroupStateSubscription: Disposable, AutoCloseable, GroupStateSubscrip
         }
     }
 
-    
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `next`() : AppGroupRecordFfi? {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_groupstatesubscription_next(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -3492,14 +3501,14 @@ open class GroupStateSubscription: Disposable, AutoCloseable, GroupStateSubscrip
     }
     )
     }
-    
 
-    
 
-    
-    
+
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -3630,88 +3639,88 @@ public object FfiConverterTypeGroupStateSubscription: FfiConverter<GroupStateSub
 
 
 public interface MarmotInterface {
-    
+
     suspend fun `acceptGroupInvite`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): AppGroupRecordFfi
-    
+
     /**
      * Normalize a public-key reference (npub or hex) to canonical hex.
      * `None` if it isn't a valid public key. Used to resolve a scanned or
      * deep-linked npub back to the account id the rest of the API expects.
      */
     fun `accountIdHex`(`reference`: kotlin.String): kotlin.String?
-    
+
     fun `accountInboxRelays`(`accountRef`: kotlin.String): List<kotlin.String>
-    
+
     /**
      * List the local and relay-discovered Marmot KeyPackage publications for
      * `account_ref`.
      */
     suspend fun `accountKeyPackages`(`accountRef`: kotlin.String, `bootstrapRelays`: List<kotlin.String>): List<AccountKeyPackageFfi>
-    
+
     fun `accountNip65Relays`(`accountRef`: kotlin.String): List<kotlin.String>
-    
+
     /**
      * Per-account relay lists: the NIP-65 and inbox lists the account has
      * published, plus the configured default/bootstrap sets.
      */
     fun `accountRelayLists`(`accountRef`: kotlin.String): AccountRelayListsFfi
-    
+
     /**
      * Local JSONL audit logs available for explicit forensic upload.
      */
     fun `auditLogFiles`(): List<AuditLogFileFfi>
-    
+
     /**
      * Local forensic audit-log recording settings. Recording is opt-in and only
      * applies to account sessions opened after the setting is enabled.
      */
     fun `auditLogSettings`(): AuditLogSettingsFfi
-    
+
     suspend fun `catchUpAccounts`()
-    
+
     /**
      * Durable chat-list rows for fast app launch. Rows include the group
      * title/avatar, last kind-9 preview, unread count, and read anchors.
      */
     fun `chatList`(`accountRef`: kotlin.String, `includeArchived`: kotlin.Boolean): List<ChatListRowFfi>
-    
+
     suspend fun `clearPushRegistration`(`accountRef`: kotlin.String)
-    
+
     suspend fun `collectNotificationsAfterWake`(`maxWaitMs`: kotlin.UInt, `source`: NotificationWakeSourceFfi): BackgroundNotificationCollectionFfi
-    
+
     /**
      * Create a new MLS group with `name` and the given members. Members are
      * referenced by `npub` or hex account id. Returns the group id as hex.
      */
     suspend fun `createGroup`(`accountRef`: kotlin.String, `name`: kotlin.String, `memberRefs`: List<kotlin.String>, `description`: kotlin.String?): kotlin.String
-    
+
     /**
      * Create a brand-new Nostr identity, store its secret in the platform
      * keychain, and publish initial relay lists + key package.
      */
     suspend fun `createIdentity`(`defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountSummaryFfi
-    
+
     suspend fun `declineGroupInvite`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupInviteDeclineResultFfi
-    
+
     /**
      * Publish a NIP-09 deletion for a KeyPackage event.
      */
     suspend fun `deleteAccountKeyPackage`(`accountRef`: kotlin.String, `eventIdHex`: kotlin.String, `relays`: List<kotlin.String>): kotlin.ULong
-    
+
     /**
      * Mark `target_message_id` deleted for the whole group. This is a
      * tombstone — the original stays in everyone's store; clients render a
      * "message deleted" placeholder.
      */
     suspend fun `deleteMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String): SendSummaryFfi
-    
+
     /**
      * Revoke `member_ref`'s admin rights.
      */
     suspend fun `demoteAdmin`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRef`: kotlin.String): SendSummaryFfi
-    
+
     suspend fun `demoteAdminDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRef`: kotlin.String): GroupMutationResultFfi
-    
+
     /**
      * Best-effort cached display name for an account id. Returns the Nostr
      * kind:0 display_name/name when the runtime has projected one, or the
@@ -3719,261 +3728,268 @@ public interface MarmotInterface {
      * `None` when nothing is known yet — call `refresh_directory` to fetch.
      */
     fun `displayName`(`accountIdHex`: kotlin.String): kotlin.String?
-    
+
     /**
-     * Fetch an encrypted Blossom blob and decrypt it using the group's
-     * MIP-04 encrypted-media exporter secret.
+     * Fetch an encrypted media blob and decrypt it using the group's
+     * encrypted media component secret.
      */
-    suspend fun `downloadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaReferenceFfi): MediaDownloadResultFfi
-    
+    suspend fun `downloadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaAttachmentReferenceFfi): MediaDownloadResultFfi
+
     /**
      * Group plus enriched member rows for detail screens.
      */
     suspend fun `groupDetails`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupDetailsFfi
-    
+
     /**
      * Current caller permissions plus per-member action availability.
      */
     suspend fun `groupManagementState`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupManagementStateFfi
-    
+
     /**
      * Membership roster for `group_id_hex`.
      */
     suspend fun `groupMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): List<AppGroupMemberRecordFfi>
-    
+
     /**
      * Current MLS state (epoch, member count, required components) for the
      * conversation developer/debug view.
      */
     suspend fun `groupMlsState`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): AppGroupMlsStateFfi
-    
+
     suspend fun `groupPushDebugInfo`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupPushDebugInfoFfi
-    
+
     /**
      * Establish the unread baseline the first time a user opens a group.
      * Existing kind-9 history remains read; later remote kind-9 messages count
      * until marked visible via `mark_timeline_message_read`.
      */
     fun `initializeChatReadState`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): ChatListRowFfi?
-    
+
     suspend fun `inviteMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): SendSummaryFfi
-    
+
     suspend fun `inviteMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): GroupMutationResultFfi
-    
+
     /**
      * True once shutdown has started. Host apps can use this to avoid
      * launching more subscriptions or account work while they are moving to
      * the background.
      */
     fun `isStopping`(): kotlin.Boolean
-    
+
     suspend fun `leaveGroup`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): SendSummaryFfi
-    
+
     /**
      * All accounts known to the runtime, in stable order. `running` is
      * `false` for accounts that haven't been brought up by the current
      * process yet.
      */
     fun `listAccounts`(): List<AccountSummaryFfi>
-    
+
     /**
      * Typed media references projected from group message history. Host apps
      * can pass a returned `reference` back to `download_media`.
      */
     fun `listMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `limit`: kotlin.UInt?): List<MediaRecordFfi>
-    
+
     /**
      * Log in with an existing identity. `identity` can be an `nsec` (private
      * key) for a local-signing account, or an `npub` to track a public
      * identity without local signing.
      */
     suspend fun `login`(`identity`: kotlin.String, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountSummaryFfi
-    
+
     /**
      * Mark a kind-9 timeline message visible/read. Own kind-9 messages can
      * advance the marker too, which clears any earlier unread messages.
      */
     fun `markTimelineMessageRead`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `messageIdHex`: kotlin.String): ChatListRowFfi?
-    
+
     /**
      * Initial history fetch for a group (or, when `group_id_hex` is None,
      * the account-wide tail). Used to populate the conversation view before
      * the subscription stream takes over.
      */
     fun `messages`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String?, `limit`: kotlin.UInt?): List<AppMessageRecordFfi>
-    
+
     /**
      * Normalize a member reference for group-management UI. Accepts hex,
      * `npub`, `nostr:npub...`, and `darkmatter://profile/...` references.
      */
     fun `normalizeMemberRef`(`memberRef`: kotlin.String): MemberRefFfi
-    
+
     fun `notificationSettings`(`accountRef`: kotlin.String): NotificationSettingsFfi
-    
+
     /**
      * Convert a hex account id (Nostr public key) into its `npub…` bech32
      * form for display. `None` if the hex isn't a valid public key.
      */
     fun `npub`(`accountIdHex`: kotlin.String): kotlin.String?
-    
+
     /**
      * POST one selected JSONL audit log to a forensic analyzer endpoint.
      */
     suspend fun `postAuditLogFile`(`path`: kotlin.String, `endpoint`: kotlin.String): AuditLogUploadResultFfi
-    
+
     /**
      * POST all local audit logs to the configured tracker when audit logging is
      * enabled. This is safe for host apps to call unconditionally; disabled or
      * unconfigured states return a structured skip result.
      */
     suspend fun `postAuditLogTrackerUpdate`(): AuditLogTrackerUpdateResultFfi
-    
+
     /**
      * Grant admin rights to `member_ref` (npub or hex). Requires the caller
      * to be an admin; publishes a group state update.
      */
     suspend fun `promoteAdmin`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRef`: kotlin.String): SendSummaryFfi
-    
+
     suspend fun `promoteAdminDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRef`: kotlin.String): GroupMutationResultFfi
-    
+
     /**
      * Publish a new fresh KeyPackage for `account_ref`.
      */
     suspend fun `publishNewKeyPackage`(`accountRef`: kotlin.String): kotlin.ULong
-    
+
     /**
      * Publish (or re-publish) the NIP-65 and inbox relay lists for
      * `account_ref`. Idempotent — safe to call on every launch.
      */
     suspend fun `publishRelayLists`(`accountRef`: kotlin.String, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>)
-    
+
     /**
      * Publish the Nostr kind:0 metadata for `account_ref`. The returned
      * metadata is what marmot-app actually published (any server-applied
      * defaults are reflected here).
      */
     suspend fun `publishUserProfile`(`accountRef`: kotlin.String, `profile`: UserProfileMetadataFfi, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): UserProfileMetadataFfi
-    
+
     fun `pushRegistration`(`accountRef`: kotlin.String): PushRegistrationFfi?
-    
+
     /**
      * React to `target_message_id` with `emoji` (an "add" reaction).
      */
     suspend fun `reactToMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String, `emoji`: kotlin.String): SendSummaryFfi
-    
+
     /**
      * Fetch and cache an account's own Nostr kind:0 profile from `relays`.
      * After this resolves, `user_profile` / `display_name` return the
      * freshly-fetched metadata (name, picture, etc.) for that account.
      */
     suspend fun `refreshProfile`(`accountIdHex`: kotlin.String, `relays`: List<kotlin.String>)
-    
+
     /**
      * Live relay-plane connection health (connected / connecting /
      * disconnected counts, etc.) for the relay diagnostics view.
      */
     suspend fun `relayHealth`(): RelayHealthFfi
-    
+
     /**
      * Device-wide relay telemetry export settings. Export is opt-in and stays
      * inert until `export_enabled` is true and runtime/default config supplies
      * a valid OTLP endpoint, bearer token, and resource attributes.
      */
     fun `relayTelemetrySettings`(): RelayTelemetrySettingsFfi
-    
+
     /**
      * Remove a local-signing account from this device.
      */
     suspend fun `removeAccount`(`accountRef`: kotlin.String)
-    
+
     suspend fun `removeMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): SendSummaryFfi
-    
+
     suspend fun `removeMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): GroupMutationResultFfi
-    
+
+    /**
+     * Replace the group's encrypted-media default blob endpoints as a full
+     * `marmot.group.encrypted-media.v1` component update. Requires the caller
+     * to be an admin.
+     */
+    suspend fun `replaceEncryptedMediaBlobEndpoints`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `endpoints`: List<AppBlobEndpointFfi>): SendSummaryFfi
+
     /**
      * Send `text` as a reply that quotes `target_message_id`.
      */
     suspend fun `replyToMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String, `text`: kotlin.String): SendSummaryFfi
-    
+
     /**
      * Re-publish the latest cached KeyPackage when possible, otherwise
      * publish a fresh one.
      */
     suspend fun `republishKeyPackage`(`accountRef`: kotlin.String): kotlin.ULong
-    
+
     /**
      * Step down as an admin of `group_id_hex` (demote the active account).
      */
     suspend fun `selfDemoteAdmin`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): SendSummaryFfi
-    
+
     suspend fun `selfDemoteAdminDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupMutationResultFfi
-    
+
     /**
-     * Send an already-uploaded encrypted media reference as a kind-9 chat
-     * carrying a NIP-92 `imeta` tag.
+     * Send already-uploaded encrypted media attachments as a kind-9 chat
+     * carrying ordered NIP-92 `imeta` tags.
      */
-    suspend fun `sendMediaReference`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaReferenceFfi, `caption`: kotlin.String?): SendSummaryFfi
-    
+    suspend fun `sendMediaAttachments`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `attachments`: List<MediaAttachmentReferenceFfi>, `caption`: kotlin.String?): SendSummaryFfi
+
     /**
      * Send a plain UTF-8 text message. Structured payloads (reactions,
      * replies, deletes, media) go through dedicated methods.
      */
     suspend fun `sendText`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `text`: kotlin.String): SendSummaryFfi
-    
+
     suspend fun `setAccountInboxRelays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountRelayListsFfi
-    
+
     suspend fun `setAccountNip65Relays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountRelayListsFfi
-    
+
     /**
      * Persist local forensic audit-log recording settings and return the stored
      * value.
      */
     fun `setAuditLogSettings`(`settings`: AuditLogSettingsFfi): AuditLogSettingsFfi
-    
+
     /**
      * Supply non-persisted audit tracker upload metadata: optional Goggles
      * upload URL override, bearer token from the host app, and optional human
      * source labels.
      */
     fun `setAuditLogTrackerConfig`(`config`: AuditLogTrackerConfigFfi): AuditLogTrackerConfigFfi
-    
+
     /**
      * Flag a group archived (or restore it). Local-only projection state —
      * it does not change membership or publish anything. The chats list
      * filters archived groups unless `include_archived` is set.
      */
     fun `setGroupArchived`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `archived`: kotlin.Boolean): AppGroupRecordFfi
-    
+
     fun `setLocalNotificationsEnabled`(`accountRef`: kotlin.String, `enabled`: kotlin.Boolean): NotificationSettingsFfi
-    
+
     suspend fun `setNativePushEnabled`(`accountRef`: kotlin.String, `enabled`: kotlin.Boolean): NotificationSettingsFfi
-    
+
     /**
      * Supply non-persisted OTLP runtime metadata: optional metrics URL
      * override, bearer token from the host app's build-time secret, and
      * resource attributes from the platform shell.
      */
     suspend fun `setRelayTelemetryRuntimeConfig`(`config`: RelayTelemetryRuntimeConfigFfi)
-    
+
     /**
      * Persist device-wide relay telemetry export settings and return the
      * normalized settings that were stored.
      */
     suspend fun `setRelayTelemetrySettings`(`settings`: RelayTelemetrySettingsFfi): RelayTelemetrySettingsFfi
-    
+
     /**
      * Tear the runtime down. Drops all subscriptions; long-lived
      * [`EventsSubscription`] / [`ChatsSubscription`] / etc. instances on the
      * host side will see their `next()` return `None` shortly after.
      */
     suspend fun `shutdown`()
-    
+
     /**
      * Bring the runtime online: reconcile known accounts, start workers,
      * subscribe to transport events.
      */
     suspend fun `start`()
-    
+
     /**
      * Anchor a live agent text stream start in the encrypted group history.
      * Host apps pass the broker candidate(s) they will publish to, such as
@@ -3981,13 +3997,13 @@ public interface MarmotInterface {
      * generate a 32-byte stream id.
      */
     suspend fun `startAgentTextStream`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `streamIdHex`: kotlin.String?, `quicCandidates`: List<kotlin.String>): AgentStreamStartFfi
-    
+
     /**
      * Per-account durable chat-list projection. Async for the same
      * tokio-runtime reason as [`Marmot::subscribe_chats`].
      */
     suspend fun `subscribeChatList`(`accountRef`: kotlin.String, `includeArchived`: kotlin.Boolean): ChatListSubscription
-    
+
     /**
      * Per-account chats list. Emits whenever a group's projection changes.
      *
@@ -3998,42 +4014,42 @@ public interface MarmotInterface {
      * the subscribe methods that spawn must be async.
      */
     suspend fun `subscribeChats`(`accountRef`: kotlin.String, `includeArchived`: kotlin.Boolean): ChatsSubscription
-    
+
     /**
      * Top-level event firehose. One subscription, every account, every event
      * type. Useful for global diagnostics; specific UIs prefer the
      * per-account chats/messages/group-state subscriptions below.
      */
     fun `subscribeEvents`(): EventsSubscription
-    
+
     /**
      * Member/profile/roster changes for one group. Async for the same
      * tokio-runtime reason as [`Marmot::subscribe_chats`].
      */
     suspend fun `subscribeGroupState`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupStateSubscription
-    
+
     /**
      * Messages for a specific group (when `group_id_hex` is `Some`) or
      * every message across the account (when `None`). Async for the same
      * tokio-runtime reason as [`Marmot::subscribe_chats`].
      */
     suspend fun `subscribeMessages`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String?): MessagesSubscription
-    
+
     suspend fun `subscribeNotifications`(): NotificationsSubscription
-    
+
     /**
      * Live materialized timeline updates for a group or account-wide tail.
      * The snapshot and each update are full pages for the supplied query.
      */
     suspend fun `subscribeTimelineMessages`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String?, `limit`: kotlin.UInt?): TimelineMessagesSubscription
-    
+
     /**
      * Stable random identifier for this app install, suitable for the OTLP
      * `service.instance.id` resource attribute. Separate from audit-log device
      * identity.
      */
     fun `telemetryInstallId`(): kotlin.String
-    
+
     /**
      * Materialized conversation timeline for a group or account-wide tail.
      *
@@ -4044,29 +4060,29 @@ public interface MarmotInterface {
      * diagnostics.
      */
     fun `timelineMessages`(`accountRef`: kotlin.String, `query`: TimelineMessageQueryFfi): TimelinePageFfi
-    
+
     /**
      * Remove this account's reaction from `target_message_id`.
      */
     suspend fun `unreactFromMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String): SendSummaryFfi
-    
+
     /**
      * Set (or clear, with `url = None`) the group's URL-based avatar
      * (`marmot.group.avatar-url.v1`). The URL is validated (https-only, no
      * localhost/private hosts) and normalized before it is committed.
      */
     suspend fun `updateGroupAvatarUrl`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `url`: kotlin.String?, `dim`: kotlin.String?, `thumbhash`: kotlin.String?): SendSummaryFfi
-    
+
     suspend fun `updateGroupProfile`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `name`: kotlin.String?, `description`: kotlin.String?): SendSummaryFfi
-    
+
     /**
-     * Encrypt plaintext, upload the ciphertext to Blossom, and optionally
-     * send the resulting media reference into the group.
+     * Encrypt plaintext attachments, upload the ciphertext blobs, and
+     * optionally send the resulting media references into the group.
      */
     suspend fun `uploadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `request`: MediaUploadRequestFfi): MediaUploadResultFfi
-    
+
     suspend fun `upsertPushRegistration`(`accountRef`: kotlin.String, `platform`: PushPlatformFfi, `rawToken`: kotlin.String, `serverPubkeyHex`: kotlin.String, `relayHint`: kotlin.String?): PushRegistrationFfi
-    
+
     /**
      * Full cached Nostr kind:0 profile for an account id (name, display
      * name, about, picture, nip05, lud16), if the runtime has one
@@ -4075,7 +4091,7 @@ public interface MarmotInterface {
      * `refresh_directory`. Returns `None` when nothing is cached yet.
      */
     fun `userProfile`(`accountIdHex`: kotlin.String): UserProfileMetadataFfi?
-    
+
     /**
      * Watch a live agent text stream over the brokered QUIC channel. Pass
      * `stream_id_hex = None` to follow the latest stream in the group (the
@@ -4090,7 +4106,7 @@ public interface MarmotInterface {
      * `subscribe_messages`.
      */
     suspend fun `watchAgentTextStream`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `streamIdHex`: kotlin.String?, `serverCertDer`: kotlin.ByteArray?, `insecureLocal`: kotlin.Boolean): AgentStreamSubscription
-    
+
     companion object
 }
 
@@ -4191,7 +4207,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         }
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `acceptGroupInvite`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : AppGroupRecordFfi {
@@ -4212,7 +4228,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Normalize a public-key reference (npub or hex) to canonical hex.
      * `None` if it isn't a valid public key. Used to resolve a scanned or
@@ -4227,9 +4243,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     @Throws(MarmotKitException::class)override fun `accountInboxRelays`(`accountRef`: kotlin.String): List<kotlin.String> {
             return FfiConverterSequenceString.lift(
     callWithPointer {
@@ -4240,9 +4256,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * List the local and relay-discovered Marmot KeyPackage publications for
      * `account_ref`.
@@ -4267,7 +4283,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)override fun `accountNip65Relays`(`accountRef`: kotlin.String): List<kotlin.String> {
             return FfiConverterSequenceString.lift(
     callWithPointer {
@@ -4278,9 +4294,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Per-account relay lists: the NIP-65 and inbox lists the account has
      * published, plus the configured default/bootstrap sets.
@@ -4295,9 +4311,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Local JSONL audit logs available for explicit forensic upload.
      */
@@ -4311,9 +4327,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Local forensic audit-log recording settings. Recording is opt-in and only
      * applies to account sessions opened after the setting is enabled.
@@ -4328,9 +4344,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `catchUpAccounts`() {
@@ -4338,7 +4354,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_catch_up_accounts(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_void(future, callback, continuation) },
@@ -4346,13 +4362,13 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
         // lift function
         { Unit },
-        
+
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
     }
 
-    
+
     /**
      * Durable chat-list rows for fast app launch. Rows include the group
      * title/avatar, last kind-9 preview, unread count, and read anchors.
@@ -4367,9 +4383,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `clearPushRegistration`(`accountRef`: kotlin.String) {
@@ -4385,13 +4401,13 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
         // lift function
         { Unit },
-        
+
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `collectNotificationsAfterWake`(`maxWaitMs`: kotlin.UInt, `source`: NotificationWakeSourceFfi) : BackgroundNotificationCollectionFfi {
@@ -4412,7 +4428,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Create a new MLS group with `name` and the given members. Members are
      * referenced by `npub` or hex account id. Returns the group id as hex.
@@ -4437,7 +4453,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Create a brand-new Nostr identity, store its secret in the platform
      * keychain, and publish initial relay lists + key package.
@@ -4462,7 +4478,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `declineGroupInvite`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : GroupInviteDeclineResultFfi {
@@ -4483,7 +4499,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Publish a NIP-09 deletion for a KeyPackage event.
      */
@@ -4507,7 +4523,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Mark `target_message_id` deleted for the whole group. This is a
      * tombstone — the original stays in everyone's store; clients render a
@@ -4533,7 +4549,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Revoke `member_ref`'s admin rights.
      */
@@ -4557,7 +4573,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `demoteAdminDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRef`: kotlin.String) : GroupMutationResultFfi {
@@ -4578,7 +4594,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Best-effort cached display name for an account id. Returns the Nostr
      * kind:0 display_name/name when the runtime has projected one, or the
@@ -4594,21 +4610,21 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
-     * Fetch an encrypted Blossom blob and decrypt it using the group's
-     * MIP-04 encrypted-media exporter secret.
+     * Fetch an encrypted media blob and decrypt it using the group's
+     * encrypted media component secret.
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `downloadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaReferenceFfi) : MediaDownloadResultFfi {
+    override suspend fun `downloadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaAttachmentReferenceFfi) : MediaDownloadResultFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_download_media(
                 thisPtr,
-                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterTypeMediaReferenceFfi.lower(`reference`),
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterTypeMediaAttachmentReferenceFfi.lower(`reference`),
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -4621,7 +4637,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Group plus enriched member rows for detail screens.
      */
@@ -4645,7 +4661,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Current caller permissions plus per-member action availability.
      */
@@ -4669,7 +4685,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Membership roster for `group_id_hex`.
      */
@@ -4693,7 +4709,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Current MLS state (epoch, member count, required components) for the
      * conversation developer/debug view.
@@ -4718,7 +4734,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `groupPushDebugInfo`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : GroupPushDebugInfoFfi {
@@ -4739,7 +4755,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Establish the unread baseline the first time a user opens a group.
      * Existing kind-9 history remains read; later remote kind-9 messages count
@@ -4755,9 +4771,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `inviteMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>) : SendSummaryFfi {
@@ -4778,7 +4794,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `inviteMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>) : GroupMutationResultFfi {
@@ -4799,7 +4815,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * True once shutdown has started. Host apps can use this to avoid
      * launching more subscriptions or account work while they are moving to
@@ -4814,9 +4830,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `leaveGroup`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : SendSummaryFfi {
@@ -4837,7 +4853,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * All accounts known to the runtime, in stable order. `running` is
      * `false` for accounts that haven't been brought up by the current
@@ -4853,9 +4869,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Typed media references projected from group message history. Host apps
      * can pass a returned `reference` back to `download_media`.
@@ -4870,9 +4886,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Log in with an existing identity. `identity` can be an `nsec` (private
      * key) for a local-signing account, or an `npub` to track a public
@@ -4898,7 +4914,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Mark a kind-9 timeline message visible/read. Own kind-9 messages can
      * advance the marker too, which clears any earlier unread messages.
@@ -4913,9 +4929,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Initial history fetch for a group (or, when `group_id_hex` is None,
      * the account-wide tail). Used to populate the conversation view before
@@ -4931,9 +4947,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Normalize a member reference for group-management UI. Accepts hex,
      * `npub`, `nostr:npub...`, and `darkmatter://profile/...` references.
@@ -4948,9 +4964,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     @Throws(MarmotKitException::class)override fun `notificationSettings`(`accountRef`: kotlin.String): NotificationSettingsFfi {
             return FfiConverterTypeNotificationSettingsFfi.lift(
     callWithPointer {
@@ -4961,9 +4977,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Convert a hex account id (Nostr public key) into its `npub…` bech32
      * form for display. `None` if the hex isn't a valid public key.
@@ -4977,9 +4993,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * POST one selected JSONL audit log to a forensic analyzer endpoint.
      */
@@ -5003,7 +5019,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * POST all local audit logs to the configured tracker when audit logging is
      * enabled. This is safe for host apps to call unconditionally; disabled or
@@ -5016,7 +5032,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_post_audit_log_tracker_update(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -5029,7 +5045,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Grant admin rights to `member_ref` (npub or hex). Requires the caller
      * to be an admin; publishes a group state update.
@@ -5054,7 +5070,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `promoteAdminDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRef`: kotlin.String) : GroupMutationResultFfi {
@@ -5075,7 +5091,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Publish a new fresh KeyPackage for `account_ref`.
      */
@@ -5099,7 +5115,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Publish (or re-publish) the NIP-65 and inbox relay lists for
      * `account_ref`. Idempotent — safe to call on every launch.
@@ -5119,13 +5135,13 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
         // lift function
         { Unit },
-        
+
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
     }
 
-    
+
     /**
      * Publish the Nostr kind:0 metadata for `account_ref`. The returned
      * metadata is what marmot-app actually published (any server-applied
@@ -5151,7 +5167,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)override fun `pushRegistration`(`accountRef`: kotlin.String): PushRegistrationFfi? {
             return FfiConverterOptionalTypePushRegistrationFfi.lift(
     callWithPointer {
@@ -5162,9 +5178,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * React to `target_message_id` with `emoji` (an "add" reaction).
      */
@@ -5188,7 +5204,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Fetch and cache an account's own Nostr kind:0 profile from `relays`.
      * After this resolves, `user_profile` / `display_name` return the
@@ -5209,13 +5225,13 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
         // lift function
         { Unit },
-        
+
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
     }
 
-    
+
     /**
      * Live relay-plane connection health (connected / connecting /
      * disconnected counts, etc.) for the relay diagnostics view.
@@ -5226,7 +5242,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_relay_health(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -5239,7 +5255,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Device-wide relay telemetry export settings. Export is opt-in and stays
      * inert until `export_enabled` is true and runtime/default config supplies
@@ -5255,9 +5271,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Remove a local-signing account from this device.
      */
@@ -5276,13 +5292,13 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
         // lift function
         { Unit },
-        
+
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `removeMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>) : SendSummaryFfi {
@@ -5303,7 +5319,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `removeMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>) : GroupMutationResultFfi {
@@ -5324,7 +5340,33 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
+    /**
+     * Replace the group's encrypted-media default blob endpoints as a full
+     * `marmot.group.encrypted-media.v1` component update. Requires the caller
+     * to be an admin.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `replaceEncryptedMediaBlobEndpoints`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `endpoints`: List<AppBlobEndpointFfi>) : SendSummaryFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_replace_encrypted_media_blob_endpoints(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterSequenceTypeAppBlobEndpointFfi.lower(`endpoints`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeSendSummaryFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+
     /**
      * Send `text` as a reply that quotes `target_message_id`.
      */
@@ -5348,7 +5390,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Re-publish the latest cached KeyPackage when possible, otherwise
      * publish a fresh one.
@@ -5373,7 +5415,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Step down as an admin of `group_id_hex` (demote the active account).
      */
@@ -5397,7 +5439,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `selfDemoteAdminDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : GroupMutationResultFfi {
@@ -5418,19 +5460,19 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
-     * Send an already-uploaded encrypted media reference as a kind-9 chat
-     * carrying a NIP-92 `imeta` tag.
+     * Send already-uploaded encrypted media attachments as a kind-9 chat
+     * carrying ordered NIP-92 `imeta` tags.
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `sendMediaReference`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaReferenceFfi, `caption`: kotlin.String?) : SendSummaryFfi {
+    override suspend fun `sendMediaAttachments`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `attachments`: List<MediaAttachmentReferenceFfi>, `caption`: kotlin.String?) : SendSummaryFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_send_media_reference(
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_send_media_attachments(
                 thisPtr,
-                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterTypeMediaReferenceFfi.lower(`reference`),FfiConverterOptionalString.lower(`caption`),
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterSequenceTypeMediaAttachmentReferenceFfi.lower(`attachments`),FfiConverterOptionalString.lower(`caption`),
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -5443,7 +5485,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Send a plain UTF-8 text message. Structured payloads (reactions,
      * replies, deletes, media) go through dedicated methods.
@@ -5468,7 +5510,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `setAccountInboxRelays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>) : AccountRelayListsFfi {
@@ -5489,7 +5531,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `setAccountNip65Relays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>) : AccountRelayListsFfi {
@@ -5510,7 +5552,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Persist local forensic audit-log recording settings and return the stored
      * value.
@@ -5525,9 +5567,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Supply non-persisted audit tracker upload metadata: optional Goggles
      * upload URL override, bearer token from the host app, and optional human
@@ -5543,9 +5585,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Flag a group archived (or restore it). Local-only projection state —
      * it does not change membership or publish anything. The chats list
@@ -5561,9 +5603,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     @Throws(MarmotKitException::class)override fun `setLocalNotificationsEnabled`(`accountRef`: kotlin.String, `enabled`: kotlin.Boolean): NotificationSettingsFfi {
             return FfiConverterTypeNotificationSettingsFfi.lift(
     callWithPointer {
@@ -5574,9 +5616,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `setNativePushEnabled`(`accountRef`: kotlin.String, `enabled`: kotlin.Boolean) : NotificationSettingsFfi {
@@ -5597,7 +5639,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Supply non-persisted OTLP runtime metadata: optional metrics URL
      * override, bearer token from the host app's build-time secret, and
@@ -5618,13 +5660,13 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
         // lift function
         { Unit },
-        
+
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
     }
 
-    
+
     /**
      * Persist device-wide relay telemetry export settings and return the
      * normalized settings that were stored.
@@ -5649,7 +5691,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Tear the runtime down. Drops all subscriptions; long-lived
      * [`EventsSubscription`] / [`ChatsSubscription`] / etc. instances on the
@@ -5661,7 +5703,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_shutdown(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_void(future, callback, continuation) },
@@ -5669,13 +5711,13 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
         // lift function
         { Unit },
-        
+
         // Error FFI converter
         UniffiNullRustCallStatusErrorHandler,
     )
     }
 
-    
+
     /**
      * Bring the runtime online: reconcile known accounts, start workers,
      * subscribe to transport events.
@@ -5687,7 +5729,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_start(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_void(future, callback, continuation) },
@@ -5695,13 +5737,13 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
         // lift function
         { Unit },
-        
+
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
     }
 
-    
+
     /**
      * Anchor a live agent text stream start in the encrypted group history.
      * Host apps pass the broker candidate(s) they will publish to, such as
@@ -5728,7 +5770,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Per-account durable chat-list projection. Async for the same
      * tokio-runtime reason as [`Marmot::subscribe_chats`].
@@ -5753,7 +5795,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Per-account chats list. Emits whenever a group's projection changes.
      *
@@ -5783,7 +5825,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Top-level event firehose. One subscription, every account, every event
      * type. Useful for global diagnostics; specific UIs prefer the
@@ -5798,9 +5840,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Member/profile/roster changes for one group. Async for the same
      * tokio-runtime reason as [`Marmot::subscribe_chats`].
@@ -5825,7 +5867,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Messages for a specific group (when `group_id_hex` is `Some`) or
      * every message across the account (when `None`). Async for the same
@@ -5851,7 +5893,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `subscribeNotifications`() : NotificationsSubscription {
@@ -5859,7 +5901,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_subscribe_notifications(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_pointer(future, callback, continuation) },
@@ -5872,7 +5914,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Live materialized timeline updates for a group or account-wide tail.
      * The snapshot and each update are full pages for the supplied query.
@@ -5897,7 +5939,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Stable random identifier for this app install, suitable for the OTLP
      * `service.instance.id` resource attribute. Separate from audit-log device
@@ -5913,9 +5955,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Materialized conversation timeline for a group or account-wide tail.
      *
@@ -5935,9 +5977,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Remove this account's reaction from `target_message_id`.
      */
@@ -5961,7 +6003,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Set (or clear, with `url = None`) the group's URL-based avatar
      * (`marmot.group.avatar-url.v1`). The URL is validated (https-only, no
@@ -5987,7 +6029,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `updateGroupProfile`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `name`: kotlin.String?, `description`: kotlin.String?) : SendSummaryFfi {
@@ -6008,10 +6050,10 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
-     * Encrypt plaintext, upload the ciphertext to Blossom, and optionally
-     * send the resulting media reference into the group.
+     * Encrypt plaintext attachments, upload the ciphertext blobs, and
+     * optionally send the resulting media references into the group.
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -6033,7 +6075,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `upsertPushRegistration`(`accountRef`: kotlin.String, `platform`: PushPlatformFfi, `rawToken`: kotlin.String, `serverPubkeyHex`: kotlin.String, `relayHint`: kotlin.String?) : PushRegistrationFfi {
@@ -6054,7 +6096,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
+
     /**
      * Full cached Nostr kind:0 profile for an account id (name, display
      * name, about, picture, nip05, lud16), if the runtime has one
@@ -6072,9 +6114,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
     )
     }
-    
 
-    
+
+
     /**
      * Watch a live agent text stream over the brokered QUIC channel. Pass
      * `stream_id_hex = None` to follow the latest stream in the group (the
@@ -6108,12 +6150,12 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
 
-    
 
-    
-    
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -6244,11 +6286,11 @@ public object FfiConverterTypeMarmot: FfiConverter<Marmot, Pointer> {
 
 
 public interface MessagesSubscriptionInterface {
-    
+
     suspend fun `next`(): MessageUpdateFfi?
-    
+
     fun `snapshot`(): List<AppMessageRecordFfi>
-    
+
     companion object
 }
 
@@ -6333,14 +6375,14 @@ open class MessagesSubscription: Disposable, AutoCloseable, MessagesSubscription
         }
     }
 
-    
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `next`() : MessageUpdateFfi? {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_messagessubscription_next(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -6363,14 +6405,14 @@ open class MessagesSubscription: Disposable, AutoCloseable, MessagesSubscription
     }
     )
     }
-    
 
-    
 
-    
-    
+
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -6501,9 +6543,9 @@ public object FfiConverterTypeMessagesSubscription: FfiConverter<MessagesSubscri
 
 
 public interface NotificationsSubscriptionInterface {
-    
+
     suspend fun `next`(): NotificationUpdateFfi?
-    
+
     companion object
 }
 
@@ -6588,14 +6630,14 @@ open class NotificationsSubscription: Disposable, AutoCloseable, NotificationsSu
         }
     }
 
-    
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `next`() : NotificationUpdateFfi? {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_notificationssubscription_next(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -6608,12 +6650,12 @@ open class NotificationsSubscription: Disposable, AutoCloseable, NotificationsSu
     )
     }
 
-    
 
-    
-    
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -6744,13 +6786,13 @@ public object FfiConverterTypeNotificationsSubscription: FfiConverter<Notificati
 
 
 public interface TimelineMessagesSubscriptionInterface {
-    
+
     suspend fun `next`(): TimelinePageFfi?
-    
+
     suspend fun `nextUpdate`(): TimelineSubscriptionUpdateFfi?
-    
+
     fun `snapshot`(): TimelinePageFfi?
-    
+
     companion object
 }
 
@@ -6835,14 +6877,14 @@ open class TimelineMessagesSubscription: Disposable, AutoCloseable, TimelineMess
         }
     }
 
-    
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `next`() : TimelinePageFfi? {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_next(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -6855,14 +6897,14 @@ open class TimelineMessagesSubscription: Disposable, AutoCloseable, TimelineMess
     )
     }
 
-    
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `nextUpdate`() : TimelineSubscriptionUpdateFfi? {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_timelinemessagessubscription_next_update(
                 thisPtr,
-                
+
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -6885,14 +6927,14 @@ open class TimelineMessagesSubscription: Disposable, AutoCloseable, TimelineMess
     }
     )
     }
-    
 
-    
 
-    
-    
+
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -6926,18 +6968,18 @@ public object FfiConverterTypeTimelineMessagesSubscription: FfiConverter<Timelin
 
 
 data class AccountKeyPackageFfi (
-    var `accountRef`: kotlin.String?, 
-    var `accountIdHex`: kotlin.String, 
-    var `keyPackageId`: kotlin.String, 
-    var `keyPackageRefHex`: kotlin.String, 
-    var `eventIdHex`: kotlin.String, 
-    var `publishedAt`: kotlin.ULong, 
-    var `keyPackageBytes`: kotlin.ULong, 
-    var `sourceRelays`: List<kotlin.String>, 
-    var `local`: kotlin.Boolean, 
+    var `accountRef`: kotlin.String?,
+    var `accountIdHex`: kotlin.String,
+    var `keyPackageId`: kotlin.String,
+    var `keyPackageRefHex`: kotlin.String,
+    var `eventIdHex`: kotlin.String,
+    var `publishedAt`: kotlin.ULong,
+    var `keyPackageBytes`: kotlin.ULong,
+    var `sourceRelays`: List<kotlin.String>,
+    var `local`: kotlin.Boolean,
     var `relay`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -6990,14 +7032,14 @@ public object FfiConverterTypeAccountKeyPackageFfi: FfiConverterRustBuffer<Accou
 
 
 data class AccountRelayListsFfi (
-    var `complete`: kotlin.Boolean, 
-    var `missing`: List<kotlin.String>, 
-    var `defaultRelays`: List<kotlin.String>, 
-    var `bootstrapRelays`: List<kotlin.String>, 
-    var `nip65`: RelayListFfi, 
+    var `complete`: kotlin.Boolean,
+    var `missing`: List<kotlin.String>,
+    var `defaultRelays`: List<kotlin.String>,
+    var `bootstrapRelays`: List<kotlin.String>,
+    var `nip65`: RelayListFfi,
     var `inbox`: RelayListFfi
 ) {
-    
+
     companion object
 }
 
@@ -7038,12 +7080,12 @@ public object FfiConverterTypeAccountRelayListsFfi: FfiConverterRustBuffer<Accou
 
 
 data class AccountSummaryFfi (
-    var `label`: kotlin.String, 
-    var `accountIdHex`: kotlin.String, 
-    var `localSigning`: kotlin.Boolean, 
+    var `label`: kotlin.String,
+    var `accountIdHex`: kotlin.String,
+    var `localSigning`: kotlin.Boolean,
     var `running`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -7078,11 +7120,11 @@ public object FfiConverterTypeAccountSummaryFfi: FfiConverterRustBuffer<AccountS
 
 
 data class AgentStreamStartFfi (
-    var `streamIdHex`: kotlin.String, 
-    var `published`: kotlin.UInt, 
+    var `streamIdHex`: kotlin.String,
+    var `published`: kotlin.UInt,
     var `messageIds`: List<kotlin.String>
 ) {
-    
+
     companion object
 }
 
@@ -7113,12 +7155,92 @@ public object FfiConverterTypeAgentStreamStartFfi: FfiConverterRustBuffer<AgentS
 
 
 
+data class AppBlobEndpointFfi (
+    var `locatorKind`: kotlin.String,
+    var `baseUrl`: kotlin.String
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAppBlobEndpointFfi: FfiConverterRustBuffer<AppBlobEndpointFfi> {
+    override fun read(buf: ByteBuffer): AppBlobEndpointFfi {
+        return AppBlobEndpointFfi(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AppBlobEndpointFfi) = (
+            FfiConverterString.allocationSize(value.`locatorKind`) +
+            FfiConverterString.allocationSize(value.`baseUrl`)
+    )
+
+    override fun write(value: AppBlobEndpointFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`locatorKind`, buf)
+            FfiConverterString.write(value.`baseUrl`, buf)
+    }
+}
+
+
+
+data class AppGroupEncryptedMediaComponentFfi (
+    var `componentId`: kotlin.UInt,
+    var `component`: kotlin.String,
+    var `required`: kotlin.Boolean,
+    var `mediaFormat`: kotlin.String,
+    var `allowedLocatorKinds`: List<kotlin.String>,
+    var `defaultBlobEndpoints`: List<AppBlobEndpointFfi>
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAppGroupEncryptedMediaComponentFfi: FfiConverterRustBuffer<AppGroupEncryptedMediaComponentFfi> {
+    override fun read(buf: ByteBuffer): AppGroupEncryptedMediaComponentFfi {
+        return AppGroupEncryptedMediaComponentFfi(
+            FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceTypeAppBlobEndpointFfi.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AppGroupEncryptedMediaComponentFfi) = (
+            FfiConverterUInt.allocationSize(value.`componentId`) +
+            FfiConverterString.allocationSize(value.`component`) +
+            FfiConverterBoolean.allocationSize(value.`required`) +
+            FfiConverterString.allocationSize(value.`mediaFormat`) +
+            FfiConverterSequenceString.allocationSize(value.`allowedLocatorKinds`) +
+            FfiConverterSequenceTypeAppBlobEndpointFfi.allocationSize(value.`defaultBlobEndpoints`)
+    )
+
+    override fun write(value: AppGroupEncryptedMediaComponentFfi, buf: ByteBuffer) {
+            FfiConverterUInt.write(value.`componentId`, buf)
+            FfiConverterString.write(value.`component`, buf)
+            FfiConverterBoolean.write(value.`required`, buf)
+            FfiConverterString.write(value.`mediaFormat`, buf)
+            FfiConverterSequenceString.write(value.`allowedLocatorKinds`, buf)
+            FfiConverterSequenceTypeAppBlobEndpointFfi.write(value.`defaultBlobEndpoints`, buf)
+    }
+}
+
+
+
 data class AppGroupMemberRecordFfi (
-    var `memberIdHex`: kotlin.String, 
-    var `account`: kotlin.String?, 
+    var `memberIdHex`: kotlin.String,
+    var `account`: kotlin.String?,
     var `local`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -7154,12 +7276,12 @@ public object FfiConverterTypeAppGroupMemberRecordFfi: FfiConverterRustBuffer<Ap
  * current epoch, live member count, and the app components the group requires.
  */
 data class AppGroupMlsStateFfi (
-    var `groupIdHex`: kotlin.String, 
-    var `epoch`: kotlin.ULong, 
-    var `memberCount`: kotlin.UInt, 
+    var `groupIdHex`: kotlin.String,
+    var `epoch`: kotlin.ULong,
+    var `memberCount`: kotlin.UInt,
     var `requiredAppComponents`: List<kotlin.UShort>
 ) {
-    
+
     companion object
 }
 
@@ -7194,26 +7316,27 @@ public object FfiConverterTypeAppGroupMlsStateFfi: FfiConverterRustBuffer<AppGro
 
 
 data class AppGroupRecordFfi (
-    var `groupIdHex`: kotlin.String, 
-    var `endpoint`: kotlin.String, 
-    var `name`: kotlin.String, 
-    var `description`: kotlin.String, 
-    var `admins`: List<kotlin.String>, 
-    var `relays`: List<kotlin.String>, 
-    var `nostrGroupIdHex`: kotlin.String, 
+    var `groupIdHex`: kotlin.String,
+    var `endpoint`: kotlin.String,
+    var `name`: kotlin.String,
+    var `description`: kotlin.String,
+    var `admins`: List<kotlin.String>,
+    var `relays`: List<kotlin.String>,
+    var `nostrGroupIdHex`: kotlin.String,
     /**
      * URL-based group avatar (`marmot.group.avatar-url.v1`), `None` when absent.
      * When set it takes precedence over a Blossom image avatar.
      */
-    var `avatarUrl`: kotlin.String?, 
-    var `avatarDim`: kotlin.String?, 
-    var `avatarThumbhash`: kotlin.String?, 
-    var `archived`: kotlin.Boolean, 
-    var `pendingConfirmation`: kotlin.Boolean, 
-    var `welcomerAccountIdHex`: kotlin.String?, 
+    var `avatarUrl`: kotlin.String?,
+    var `avatarDim`: kotlin.String?,
+    var `avatarThumbhash`: kotlin.String?,
+    var `encryptedMedia`: AppGroupEncryptedMediaComponentFfi,
+    var `archived`: kotlin.Boolean,
+    var `pendingConfirmation`: kotlin.Boolean,
+    var `welcomerAccountIdHex`: kotlin.String?,
     var `viaWelcomeMessageIdHex`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -7233,6 +7356,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterTypeAppGroupEncryptedMediaComponentFfi.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -7251,6 +7375,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.allocationSize(value.`avatarUrl`) +
             FfiConverterOptionalString.allocationSize(value.`avatarDim`) +
             FfiConverterOptionalString.allocationSize(value.`avatarThumbhash`) +
+            FfiConverterTypeAppGroupEncryptedMediaComponentFfi.allocationSize(value.`encryptedMedia`) +
             FfiConverterBoolean.allocationSize(value.`archived`) +
             FfiConverterBoolean.allocationSize(value.`pendingConfirmation`) +
             FfiConverterOptionalString.allocationSize(value.`welcomerAccountIdHex`) +
@@ -7268,6 +7393,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.write(value.`avatarUrl`, buf)
             FfiConverterOptionalString.write(value.`avatarDim`, buf)
             FfiConverterOptionalString.write(value.`avatarThumbhash`, buf)
+            FfiConverterTypeAppGroupEncryptedMediaComponentFfi.write(value.`encryptedMedia`, buf)
             FfiConverterBoolean.write(value.`archived`, buf)
             FfiConverterBoolean.write(value.`pendingConfirmation`, buf)
             FfiConverterOptionalString.write(value.`welcomerAccountIdHex`, buf)
@@ -7278,23 +7404,23 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
 
 
 data class AppMessageRecordFfi (
-    var `messageIdHex`: kotlin.String, 
-    var `direction`: kotlin.String, 
-    var `groupIdHex`: kotlin.String, 
-    var `sender`: kotlin.String, 
-    var `plaintext`: kotlin.String, 
+    var `messageIdHex`: kotlin.String,
+    var `direction`: kotlin.String,
+    var `groupIdHex`: kotlin.String,
+    var `sender`: kotlin.String,
+    var `plaintext`: kotlin.String,
     /**
      * Nostr `kind` of the inner Marmot app event (9 chat, 7 reaction, …).
      */
-    var `kind`: kotlin.ULong, 
+    var `kind`: kotlin.ULong,
     /**
      * Nostr `tags` of the inner Marmot app event.
      */
-    var `tags`: List<MessageTagFfi>, 
-    var `recordedAt`: kotlin.ULong, 
+    var `tags`: List<MessageTagFfi>,
+    var `recordedAt`: kotlin.ULong,
     var `receivedAt`: kotlin.ULong
 ) {
-    
+
     companion object
 }
 
@@ -7344,13 +7470,13 @@ public object FfiConverterTypeAppMessageRecordFfi: FfiConverterRustBuffer<AppMes
 
 
 data class AuditLogFileFfi (
-    var `accountRef`: kotlin.String, 
-    var `path`: kotlin.String, 
-    var `fileName`: kotlin.String, 
-    var `sizeBytes`: kotlin.ULong, 
+    var `accountRef`: kotlin.String,
+    var `path`: kotlin.String,
+    var `fileName`: kotlin.String,
+    var `sizeBytes`: kotlin.ULong,
     var `modifiedAtMs`: kotlin.ULong?
 ) {
-    
+
     companion object
 }
 
@@ -7390,7 +7516,7 @@ public object FfiConverterTypeAuditLogFileFfi: FfiConverterRustBuffer<AuditLogFi
 data class AuditLogSettingsFfi (
     var `enabled`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -7416,11 +7542,11 @@ public object FfiConverterTypeAuditLogSettingsFfi: FfiConverterRustBuffer<AuditL
 
 
 data class AuditLogTrackerConfigFfi (
-    var `endpoint`: kotlin.String?, 
-    var `authorizationBearerToken`: kotlin.String?, 
+    var `endpoint`: kotlin.String?,
+    var `authorizationBearerToken`: kotlin.String?,
     var `source`: AuditLogUploadSourceFfi
 ) {
-    
+
     companion object
 }
 
@@ -7452,11 +7578,11 @@ public object FfiConverterTypeAuditLogTrackerConfigFfi: FfiConverterRustBuffer<A
 
 
 data class AuditLogTrackerUpdateResultFfi (
-    var `enabled`: kotlin.Boolean, 
-    var `uploaded`: List<AuditLogUploadResultFfi>, 
+    var `enabled`: kotlin.Boolean,
+    var `uploaded`: List<AuditLogUploadResultFfi>,
     var `skippedReason`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -7488,11 +7614,11 @@ public object FfiConverterTypeAuditLogTrackerUpdateResultFfi: FfiConverterRustBu
 
 
 data class AuditLogUploadResultFfi (
-    var `path`: kotlin.String, 
-    var `status`: kotlin.UShort, 
+    var `path`: kotlin.String,
+    var `status`: kotlin.UShort,
     var `bytesSent`: kotlin.ULong
 ) {
-    
+
     companion object
 }
 
@@ -7524,12 +7650,12 @@ public object FfiConverterTypeAuditLogUploadResultFfi: FfiConverterRustBuffer<Au
 
 
 data class AuditLogUploadSourceFfi (
-    var `accountLabel`: kotlin.String?, 
-    var `deviceLabel`: kotlin.String?, 
-    var `platform`: kotlin.String?, 
+    var `accountLabel`: kotlin.String?,
+    var `deviceLabel`: kotlin.String?,
+    var `platform`: kotlin.String?,
     var `appVersion`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -7564,11 +7690,11 @@ public object FfiConverterTypeAuditLogUploadSourceFfi: FfiConverterRustBuffer<Au
 
 
 data class BackgroundNotificationCollectionFfi (
-    var `status`: NotificationCollectionStatusFfi, 
-    var `notifications`: List<NotificationUpdateFfi>, 
+    var `status`: NotificationCollectionStatusFfi,
+    var `notifications`: List<NotificationUpdateFfi>,
     var `error`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -7600,13 +7726,13 @@ public object FfiConverterTypeBackgroundNotificationCollectionFfi: FfiConverterR
 
 
 data class ChatListAvatarFfi (
-    var `imageHashHex`: kotlin.String, 
-    var `imageKeyHex`: kotlin.String, 
-    var `imageNonceHex`: kotlin.String, 
-    var `imageUploadKeyHex`: kotlin.String, 
+    var `imageHashHex`: kotlin.String,
+    var `imageKeyHex`: kotlin.String,
+    var `imageNonceHex`: kotlin.String,
+    var `imageUploadKeyHex`: kotlin.String,
     var `mediaType`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -7644,15 +7770,15 @@ public object FfiConverterTypeChatListAvatarFfi: FfiConverterRustBuffer<ChatList
 
 
 data class ChatListMessagePreviewFfi (
-    var `messageIdHex`: kotlin.String, 
-    var `sender`: kotlin.String, 
-    var `senderDisplayName`: kotlin.String?, 
-    var `plaintext`: kotlin.String, 
-    var `kind`: kotlin.ULong, 
-    var `timelineAt`: kotlin.ULong, 
+    var `messageIdHex`: kotlin.String,
+    var `sender`: kotlin.String,
+    var `senderDisplayName`: kotlin.String?,
+    var `plaintext`: kotlin.String,
+    var `kind`: kotlin.ULong,
+    var `timelineAt`: kotlin.ULong,
     var `deleted`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -7696,21 +7822,21 @@ public object FfiConverterTypeChatListMessagePreviewFfi: FfiConverterRustBuffer<
 
 
 data class ChatListRowFfi (
-    var `groupIdHex`: kotlin.String, 
-    var `archived`: kotlin.Boolean, 
-    var `pendingConfirmation`: kotlin.Boolean, 
-    var `title`: kotlin.String, 
-    var `groupName`: kotlin.String, 
-    var `avatar`: ChatListAvatarFfi?, 
-    var `lastMessage`: ChatListMessagePreviewFfi?, 
-    var `unreadCount`: kotlin.ULong, 
-    var `hasUnread`: kotlin.Boolean, 
-    var `firstUnreadMessageIdHex`: kotlin.String?, 
-    var `lastReadMessageIdHex`: kotlin.String?, 
-    var `lastReadTimelineAt`: kotlin.ULong?, 
+    var `groupIdHex`: kotlin.String,
+    var `archived`: kotlin.Boolean,
+    var `pendingConfirmation`: kotlin.Boolean,
+    var `title`: kotlin.String,
+    var `groupName`: kotlin.String,
+    var `avatar`: ChatListAvatarFfi?,
+    var `lastMessage`: ChatListMessagePreviewFfi?,
+    var `unreadCount`: kotlin.ULong,
+    var `hasUnread`: kotlin.Boolean,
+    var `firstUnreadMessageIdHex`: kotlin.String?,
+    var `lastReadMessageIdHex`: kotlin.String?,
+    var `lastReadTimelineAt`: kotlin.ULong?,
     var `updatedAt`: kotlin.ULong
 ) {
-    
+
     companion object
 }
 
@@ -7772,10 +7898,10 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
 
 
 data class GroupDetailsFfi (
-    var `group`: AppGroupRecordFfi, 
+    var `group`: AppGroupRecordFfi,
     var `members`: List<GroupMemberDetailsFfi>
 ) {
-    
+
     companion object
 }
 
@@ -7804,10 +7930,10 @@ public object FfiConverterTypeGroupDetailsFfi: FfiConverterRustBuffer<GroupDetai
 
 
 data class GroupInviteDeclineResultFfi (
-    var `group`: AppGroupRecordFfi, 
+    var `group`: AppGroupRecordFfi,
     var `summary`: SendSummaryFfi
 ) {
-    
+
     companion object
 }
 
@@ -7836,15 +7962,15 @@ public object FfiConverterTypeGroupInviteDeclineResultFfi: FfiConverterRustBuffe
 
 
 data class GroupManagementStateFfi (
-    var `myAccountIdHex`: kotlin.String, 
-    var `isSelfAdmin`: kotlin.Boolean, 
-    var `isLastAdmin`: kotlin.Boolean, 
-    var `canInvite`: kotlin.Boolean, 
-    var `canLeave`: kotlin.Boolean, 
-    var `requiresSelfDemoteBeforeLeave`: kotlin.Boolean, 
+    var `myAccountIdHex`: kotlin.String,
+    var `isSelfAdmin`: kotlin.Boolean,
+    var `isLastAdmin`: kotlin.Boolean,
+    var `canInvite`: kotlin.Boolean,
+    var `canLeave`: kotlin.Boolean,
+    var `requiresSelfDemoteBeforeLeave`: kotlin.Boolean,
     var `memberActions`: List<GroupMemberActionStateFfi>
 ) {
-    
+
     companion object
 }
 
@@ -7888,14 +8014,14 @@ public object FfiConverterTypeGroupManagementStateFfi: FfiConverterRustBuffer<Gr
 
 
 data class GroupMemberActionStateFfi (
-    var `memberIdHex`: kotlin.String, 
-    var `isSelf`: kotlin.Boolean, 
-    var `isAdmin`: kotlin.Boolean, 
-    var `canRemove`: kotlin.Boolean, 
-    var `canPromote`: kotlin.Boolean, 
+    var `memberIdHex`: kotlin.String,
+    var `isSelf`: kotlin.Boolean,
+    var `isAdmin`: kotlin.Boolean,
+    var `canRemove`: kotlin.Boolean,
+    var `canPromote`: kotlin.Boolean,
     var `canDemote`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -7936,15 +8062,15 @@ public object FfiConverterTypeGroupMemberActionStateFfi: FfiConverterRustBuffer<
 
 
 data class GroupMemberDetailsFfi (
-    var `memberIdHex`: kotlin.String, 
-    var `account`: kotlin.String?, 
-    var `local`: kotlin.Boolean, 
-    var `isAdmin`: kotlin.Boolean, 
-    var `isSelf`: kotlin.Boolean, 
-    var `npub`: kotlin.String, 
+    var `memberIdHex`: kotlin.String,
+    var `account`: kotlin.String?,
+    var `local`: kotlin.Boolean,
+    var `isAdmin`: kotlin.Boolean,
+    var `isSelf`: kotlin.Boolean,
+    var `npub`: kotlin.String,
     var `displayName`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -7988,11 +8114,11 @@ public object FfiConverterTypeGroupMemberDetailsFfi: FfiConverterRustBuffer<Grou
 
 
 data class GroupMutationResultFfi (
-    var `summary`: SendSummaryFfi, 
-    var `details`: GroupDetailsFfi, 
+    var `summary`: SendSummaryFfi,
+    var `details`: GroupDetailsFfi,
     var `managementState`: GroupManagementStateFfi
 ) {
-    
+
     companion object
 }
 
@@ -8024,15 +8150,15 @@ public object FfiConverterTypeGroupMutationResultFfi: FfiConverterRustBuffer<Gro
 
 
 data class GroupPushDebugInfoFfi (
-    var `totalTokenCount`: kotlin.UInt, 
-    var `activeTokenCount`: kotlin.UInt, 
-    var `staleTokenCount`: kotlin.UInt, 
-    var `missingRelayHintCount`: kotlin.UInt, 
-    var `lastTokenListUpdatedAtMs`: kotlin.Long?, 
-    var `localRegistration`: LocalPushRegistrationDebugFfi, 
+    var `totalTokenCount`: kotlin.UInt,
+    var `activeTokenCount`: kotlin.UInt,
+    var `staleTokenCount`: kotlin.UInt,
+    var `missingRelayHintCount`: kotlin.UInt,
+    var `lastTokenListUpdatedAtMs`: kotlin.Long?,
+    var `localRegistration`: LocalPushRegistrationDebugFfi,
     var `tokens`: List<GroupPushTokenDebugEntryFfi>
 ) {
-    
+
     companion object
 }
 
@@ -8076,18 +8202,18 @@ public object FfiConverterTypeGroupPushDebugInfoFfi: FfiConverterRustBuffer<Grou
 
 
 data class GroupPushTokenDebugEntryFfi (
-    var `memberIdHex`: kotlin.String, 
-    var `leafIndex`: kotlin.UInt, 
-    var `platform`: PushPlatformFfi, 
-    var `tokenFingerprint`: kotlin.String, 
-    var `serverPubkeyHex`: kotlin.String, 
-    var `hasRelayHint`: kotlin.Boolean, 
-    var `activeLeaf`: kotlin.Boolean, 
-    var `memberMatchesActiveLeaf`: kotlin.Boolean, 
-    var `isLocalMember`: kotlin.Boolean, 
+    var `memberIdHex`: kotlin.String,
+    var `leafIndex`: kotlin.UInt,
+    var `platform`: PushPlatformFfi,
+    var `tokenFingerprint`: kotlin.String,
+    var `serverPubkeyHex`: kotlin.String,
+    var `hasRelayHint`: kotlin.Boolean,
+    var `activeLeaf`: kotlin.Boolean,
+    var `memberMatchesActiveLeaf`: kotlin.Boolean,
+    var `isLocalMember`: kotlin.Boolean,
     var `updatedAtMs`: kotlin.Long
 ) {
-    
+
     companion object
 }
 
@@ -8140,14 +8266,14 @@ public object FfiConverterTypeGroupPushTokenDebugEntryFfi: FfiConverterRustBuffe
 
 
 data class LocalPushRegistrationDebugFfi (
-    var `registered`: kotlin.Boolean, 
-    var `shareable`: kotlin.Boolean, 
-    var `localNotificationsEnabled`: kotlin.Boolean, 
-    var `nativePushEnabled`: kotlin.Boolean, 
-    var `localLeafIndex`: kotlin.UInt?, 
+    var `registered`: kotlin.Boolean,
+    var `shareable`: kotlin.Boolean,
+    var `localNotificationsEnabled`: kotlin.Boolean,
+    var `nativePushEnabled`: kotlin.Boolean,
+    var `localLeafIndex`: kotlin.UInt?,
     var `localTokenCached`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -8187,13 +8313,77 @@ public object FfiConverterTypeLocalPushRegistrationDebugFfi: FfiConverterRustBuf
 
 
 
+data class MediaAttachmentReferenceFfi (
+    var `locators`: List<MediaLocatorFfi>,
+    var `ciphertextSha256`: kotlin.String,
+    var `plaintextSha256`: kotlin.String,
+    var `nonceHex`: kotlin.String,
+    var `fileName`: kotlin.String,
+    var `mediaType`: kotlin.String,
+    var `version`: kotlin.String,
+    var `sourceEpoch`: kotlin.ULong,
+    var `dim`: kotlin.String?,
+    var `thumbhash`: kotlin.String?
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMediaAttachmentReferenceFfi: FfiConverterRustBuffer<MediaAttachmentReferenceFfi> {
+    override fun read(buf: ByteBuffer): MediaAttachmentReferenceFfi {
+        return MediaAttachmentReferenceFfi(
+            FfiConverterSequenceTypeMediaLocatorFfi.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MediaAttachmentReferenceFfi) = (
+            FfiConverterSequenceTypeMediaLocatorFfi.allocationSize(value.`locators`) +
+            FfiConverterString.allocationSize(value.`ciphertextSha256`) +
+            FfiConverterString.allocationSize(value.`plaintextSha256`) +
+            FfiConverterString.allocationSize(value.`nonceHex`) +
+            FfiConverterString.allocationSize(value.`fileName`) +
+            FfiConverterString.allocationSize(value.`mediaType`) +
+            FfiConverterString.allocationSize(value.`version`) +
+            FfiConverterULong.allocationSize(value.`sourceEpoch`) +
+            FfiConverterOptionalString.allocationSize(value.`dim`) +
+            FfiConverterOptionalString.allocationSize(value.`thumbhash`)
+    )
+
+    override fun write(value: MediaAttachmentReferenceFfi, buf: ByteBuffer) {
+            FfiConverterSequenceTypeMediaLocatorFfi.write(value.`locators`, buf)
+            FfiConverterString.write(value.`ciphertextSha256`, buf)
+            FfiConverterString.write(value.`plaintextSha256`, buf)
+            FfiConverterString.write(value.`nonceHex`, buf)
+            FfiConverterString.write(value.`fileName`, buf)
+            FfiConverterString.write(value.`mediaType`, buf)
+            FfiConverterString.write(value.`version`, buf)
+            FfiConverterULong.write(value.`sourceEpoch`, buf)
+            FfiConverterOptionalString.write(value.`dim`, buf)
+            FfiConverterOptionalString.write(value.`thumbhash`, buf)
+    }
+}
+
+
+
 data class MediaDownloadResultFfi (
-    var `plaintext`: kotlin.ByteArray, 
-    var `fileName`: kotlin.String, 
-    var `mediaType`: kotlin.String, 
+    var `plaintext`: kotlin.ByteArray,
+    var `fileName`: kotlin.String,
+    var `mediaType`: kotlin.String,
     var `sizeBytes`: kotlin.ULong
 ) {
-    
+
     companion object
 }
 
@@ -8227,17 +8417,50 @@ public object FfiConverterTypeMediaDownloadResultFfi: FfiConverterRustBuffer<Med
 
 
 
+data class MediaLocatorFfi (
+    var `kind`: kotlin.String,
+    var `value`: kotlin.String
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMediaLocatorFfi: FfiConverterRustBuffer<MediaLocatorFfi> {
+    override fun read(buf: ByteBuffer): MediaLocatorFfi {
+        return MediaLocatorFfi(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MediaLocatorFfi) = (
+            FfiConverterString.allocationSize(value.`kind`) +
+            FfiConverterString.allocationSize(value.`value`)
+    )
+
+    override fun write(value: MediaLocatorFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`kind`, buf)
+            FfiConverterString.write(value.`value`, buf)
+    }
+}
+
+
+
 data class MediaRecordFfi (
-    var `messageIdHex`: kotlin.String, 
-    var `direction`: kotlin.String, 
-    var `groupIdHex`: kotlin.String, 
-    var `sender`: kotlin.String, 
-    var `reference`: MediaReferenceFfi, 
-    var `caption`: kotlin.String?, 
-    var `recordedAt`: kotlin.ULong, 
+    var `messageIdHex`: kotlin.String,
+    var `attachmentIndex`: kotlin.UInt,
+    var `direction`: kotlin.String,
+    var `groupIdHex`: kotlin.String,
+    var `sender`: kotlin.String,
+    var `reference`: MediaAttachmentReferenceFfi,
+    var `caption`: kotlin.String?,
+    var `recordedAt`: kotlin.ULong,
     var `receivedAt`: kotlin.ULong
 ) {
-    
+
     companion object
 }
 
@@ -8248,10 +8471,11 @@ public object FfiConverterTypeMediaRecordFfi: FfiConverterRustBuffer<MediaRecord
     override fun read(buf: ByteBuffer): MediaRecordFfi {
         return MediaRecordFfi(
             FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
-            FfiConverterTypeMediaReferenceFfi.read(buf),
+            FfiConverterTypeMediaAttachmentReferenceFfi.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterULong.read(buf),
@@ -8260,10 +8484,11 @@ public object FfiConverterTypeMediaRecordFfi: FfiConverterRustBuffer<MediaRecord
 
     override fun allocationSize(value: MediaRecordFfi) = (
             FfiConverterString.allocationSize(value.`messageIdHex`) +
+            FfiConverterUInt.allocationSize(value.`attachmentIndex`) +
             FfiConverterString.allocationSize(value.`direction`) +
             FfiConverterString.allocationSize(value.`groupIdHex`) +
             FfiConverterString.allocationSize(value.`sender`) +
-            FfiConverterTypeMediaReferenceFfi.allocationSize(value.`reference`) +
+            FfiConverterTypeMediaAttachmentReferenceFfi.allocationSize(value.`reference`) +
             FfiConverterOptionalString.allocationSize(value.`caption`) +
             FfiConverterULong.allocationSize(value.`recordedAt`) +
             FfiConverterULong.allocationSize(value.`receivedAt`)
@@ -8271,10 +8496,11 @@ public object FfiConverterTypeMediaRecordFfi: FfiConverterRustBuffer<MediaRecord
 
     override fun write(value: MediaRecordFfi, buf: ByteBuffer) {
             FfiConverterString.write(value.`messageIdHex`, buf)
+            FfiConverterUInt.write(value.`attachmentIndex`, buf)
             FfiConverterString.write(value.`direction`, buf)
             FfiConverterString.write(value.`groupIdHex`, buf)
             FfiConverterString.write(value.`sender`, buf)
-            FfiConverterTypeMediaReferenceFfi.write(value.`reference`, buf)
+            FfiConverterTypeMediaAttachmentReferenceFfi.write(value.`reference`, buf)
             FfiConverterOptionalString.write(value.`caption`, buf)
             FfiConverterULong.write(value.`recordedAt`, buf)
             FfiConverterULong.write(value.`receivedAt`, buf)
@@ -8283,63 +8509,89 @@ public object FfiConverterTypeMediaRecordFfi: FfiConverterRustBuffer<MediaRecord
 
 
 
-data class MediaReferenceFfi (
-    var `url`: kotlin.String, 
-    var `fileHashHex`: kotlin.String, 
-    var `nonceHex`: kotlin.String, 
-    var `fileName`: kotlin.String, 
-    var `mediaType`: kotlin.String, 
-    var `version`: kotlin.String
+data class MediaUploadAttachmentRequestFfi (
+    var `fileName`: kotlin.String,
+    var `mediaType`: kotlin.String,
+    var `plaintext`: kotlin.ByteArray,
+    var `dim`: kotlin.String?,
+    var `thumbhash`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
 /**
  * @suppress
  */
-public object FfiConverterTypeMediaReferenceFfi: FfiConverterRustBuffer<MediaReferenceFfi> {
-    override fun read(buf: ByteBuffer): MediaReferenceFfi {
-        return MediaReferenceFfi(
+public object FfiConverterTypeMediaUploadAttachmentRequestFfi: FfiConverterRustBuffer<MediaUploadAttachmentRequestFfi> {
+    override fun read(buf: ByteBuffer): MediaUploadAttachmentRequestFfi {
+        return MediaUploadAttachmentRequestFfi(
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
+            FfiConverterByteArray.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
-    override fun allocationSize(value: MediaReferenceFfi) = (
-            FfiConverterString.allocationSize(value.`url`) +
-            FfiConverterString.allocationSize(value.`fileHashHex`) +
-            FfiConverterString.allocationSize(value.`nonceHex`) +
+    override fun allocationSize(value: MediaUploadAttachmentRequestFfi) = (
             FfiConverterString.allocationSize(value.`fileName`) +
             FfiConverterString.allocationSize(value.`mediaType`) +
-            FfiConverterString.allocationSize(value.`version`)
+            FfiConverterByteArray.allocationSize(value.`plaintext`) +
+            FfiConverterOptionalString.allocationSize(value.`dim`) +
+            FfiConverterOptionalString.allocationSize(value.`thumbhash`)
     )
 
-    override fun write(value: MediaReferenceFfi, buf: ByteBuffer) {
-            FfiConverterString.write(value.`url`, buf)
-            FfiConverterString.write(value.`fileHashHex`, buf)
-            FfiConverterString.write(value.`nonceHex`, buf)
+    override fun write(value: MediaUploadAttachmentRequestFfi, buf: ByteBuffer) {
             FfiConverterString.write(value.`fileName`, buf)
             FfiConverterString.write(value.`mediaType`, buf)
-            FfiConverterString.write(value.`version`, buf)
+            FfiConverterByteArray.write(value.`plaintext`, buf)
+            FfiConverterOptionalString.write(value.`dim`, buf)
+            FfiConverterOptionalString.write(value.`thumbhash`, buf)
+    }
+}
+
+
+
+data class MediaUploadAttachmentResultFfi (
+    var `reference`: MediaAttachmentReferenceFfi,
+    var `encryptedSizeBytes`: kotlin.ULong
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMediaUploadAttachmentResultFfi: FfiConverterRustBuffer<MediaUploadAttachmentResultFfi> {
+    override fun read(buf: ByteBuffer): MediaUploadAttachmentResultFfi {
+        return MediaUploadAttachmentResultFfi(
+            FfiConverterTypeMediaAttachmentReferenceFfi.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MediaUploadAttachmentResultFfi) = (
+            FfiConverterTypeMediaAttachmentReferenceFfi.allocationSize(value.`reference`) +
+            FfiConverterULong.allocationSize(value.`encryptedSizeBytes`)
+    )
+
+    override fun write(value: MediaUploadAttachmentResultFfi, buf: ByteBuffer) {
+            FfiConverterTypeMediaAttachmentReferenceFfi.write(value.`reference`, buf)
+            FfiConverterULong.write(value.`encryptedSizeBytes`, buf)
     }
 }
 
 
 
 data class MediaUploadRequestFfi (
-    var `fileName`: kotlin.String, 
-    var `mediaType`: kotlin.String, 
-    var `plaintext`: kotlin.ByteArray, 
-    var `caption`: kotlin.String?, 
-    var `send`: kotlin.Boolean, 
+    var `attachments`: List<MediaUploadAttachmentRequestFfi>,
+    var `caption`: kotlin.String?,
+    var `send`: kotlin.Boolean,
     var `blossomServer`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -8349,9 +8601,7 @@ data class MediaUploadRequestFfi (
 public object FfiConverterTypeMediaUploadRequestFfi: FfiConverterRustBuffer<MediaUploadRequestFfi> {
     override fun read(buf: ByteBuffer): MediaUploadRequestFfi {
         return MediaUploadRequestFfi(
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterByteArray.read(buf),
+            FfiConverterSequenceTypeMediaUploadAttachmentRequestFfi.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -8359,18 +8609,14 @@ public object FfiConverterTypeMediaUploadRequestFfi: FfiConverterRustBuffer<Medi
     }
 
     override fun allocationSize(value: MediaUploadRequestFfi) = (
-            FfiConverterString.allocationSize(value.`fileName`) +
-            FfiConverterString.allocationSize(value.`mediaType`) +
-            FfiConverterByteArray.allocationSize(value.`plaintext`) +
+            FfiConverterSequenceTypeMediaUploadAttachmentRequestFfi.allocationSize(value.`attachments`) +
             FfiConverterOptionalString.allocationSize(value.`caption`) +
             FfiConverterBoolean.allocationSize(value.`send`) +
             FfiConverterOptionalString.allocationSize(value.`blossomServer`)
     )
 
     override fun write(value: MediaUploadRequestFfi, buf: ByteBuffer) {
-            FfiConverterString.write(value.`fileName`, buf)
-            FfiConverterString.write(value.`mediaType`, buf)
-            FfiConverterByteArray.write(value.`plaintext`, buf)
+            FfiConverterSequenceTypeMediaUploadAttachmentRequestFfi.write(value.`attachments`, buf)
             FfiConverterOptionalString.write(value.`caption`, buf)
             FfiConverterBoolean.write(value.`send`, buf)
             FfiConverterOptionalString.write(value.`blossomServer`, buf)
@@ -8380,12 +8626,10 @@ public object FfiConverterTypeMediaUploadRequestFfi: FfiConverterRustBuffer<Medi
 
 
 data class MediaUploadResultFfi (
-    var `reference`: MediaReferenceFfi, 
-    var `encryptedHashHex`: kotlin.String, 
-    var `encryptedSizeBytes`: kotlin.ULong, 
+    var `attachments`: List<MediaUploadAttachmentResultFfi>,
     var `sent`: SendSummaryFfi?
 ) {
-    
+
     companion object
 }
 
@@ -8395,24 +8639,18 @@ data class MediaUploadResultFfi (
 public object FfiConverterTypeMediaUploadResultFfi: FfiConverterRustBuffer<MediaUploadResultFfi> {
     override fun read(buf: ByteBuffer): MediaUploadResultFfi {
         return MediaUploadResultFfi(
-            FfiConverterTypeMediaReferenceFfi.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterULong.read(buf),
+            FfiConverterSequenceTypeMediaUploadAttachmentResultFfi.read(buf),
             FfiConverterOptionalTypeSendSummaryFfi.read(buf),
         )
     }
 
     override fun allocationSize(value: MediaUploadResultFfi) = (
-            FfiConverterTypeMediaReferenceFfi.allocationSize(value.`reference`) +
-            FfiConverterString.allocationSize(value.`encryptedHashHex`) +
-            FfiConverterULong.allocationSize(value.`encryptedSizeBytes`) +
+            FfiConverterSequenceTypeMediaUploadAttachmentResultFfi.allocationSize(value.`attachments`) +
             FfiConverterOptionalTypeSendSummaryFfi.allocationSize(value.`sent`)
     )
 
     override fun write(value: MediaUploadResultFfi, buf: ByteBuffer) {
-            FfiConverterTypeMediaReferenceFfi.write(value.`reference`, buf)
-            FfiConverterString.write(value.`encryptedHashHex`, buf)
-            FfiConverterULong.write(value.`encryptedSizeBytes`, buf)
+            FfiConverterSequenceTypeMediaUploadAttachmentResultFfi.write(value.`attachments`, buf)
             FfiConverterOptionalTypeSendSummaryFfi.write(value.`sent`, buf)
     }
 }
@@ -8420,11 +8658,11 @@ public object FfiConverterTypeMediaUploadResultFfi: FfiConverterRustBuffer<Media
 
 
 data class MemberRefFfi (
-    var `memberRef`: kotlin.String, 
-    var `accountIdHex`: kotlin.String, 
+    var `memberRef`: kotlin.String,
+    var `accountIdHex`: kotlin.String,
     var `npub`: kotlin.String
 ) {
-    
+
     companion object
 }
 
@@ -8463,7 +8701,7 @@ public object FfiConverterTypeMemberRefFfi: FfiConverterRustBuffer<MemberRefFfi>
 data class MessageTagFfi (
     var `values`: List<kotlin.String>
 ) {
-    
+
     companion object
 }
 
@@ -8489,12 +8727,12 @@ public object FfiConverterTypeMessageTagFfi: FfiConverterRustBuffer<MessageTagFf
 
 
 data class NotificationSettingsFfi (
-    var `accountRef`: kotlin.String, 
-    var `accountIdHex`: kotlin.String, 
-    var `localNotificationsEnabled`: kotlin.Boolean, 
+    var `accountRef`: kotlin.String,
+    var `accountIdHex`: kotlin.String,
+    var `localNotificationsEnabled`: kotlin.Boolean,
     var `nativePushEnabled`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -8529,22 +8767,22 @@ public object FfiConverterTypeNotificationSettingsFfi: FfiConverterRustBuffer<No
 
 
 data class NotificationUpdateFfi (
-    var `notificationKey`: kotlin.String, 
-    var `conversationKey`: kotlin.String, 
-    var `trigger`: NotificationTriggerFfi, 
-    var `accountRef`: kotlin.String, 
-    var `accountIdHex`: kotlin.String, 
-    var `groupIdHex`: kotlin.String, 
-    var `groupName`: kotlin.String?, 
-    var `isDm`: kotlin.Boolean, 
-    var `messageIdHex`: kotlin.String?, 
-    var `sender`: NotificationUserFfi, 
-    var `receiver`: NotificationUserFfi, 
-    var `previewText`: kotlin.String?, 
-    var `timestampMs`: kotlin.Long, 
+    var `notificationKey`: kotlin.String,
+    var `conversationKey`: kotlin.String,
+    var `trigger`: NotificationTriggerFfi,
+    var `accountRef`: kotlin.String,
+    var `accountIdHex`: kotlin.String,
+    var `groupIdHex`: kotlin.String,
+    var `groupName`: kotlin.String?,
+    var `isDm`: kotlin.Boolean,
+    var `messageIdHex`: kotlin.String?,
+    var `sender`: NotificationUserFfi,
+    var `receiver`: NotificationUserFfi,
+    var `previewText`: kotlin.String?,
+    var `timestampMs`: kotlin.Long,
     var `isFromSelf`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -8609,11 +8847,11 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
 
 
 data class NotificationUserFfi (
-    var `accountIdHex`: kotlin.String, 
-    var `displayName`: kotlin.String?, 
+    var `accountIdHex`: kotlin.String,
+    var `displayName`: kotlin.String?,
     var `pictureUrl`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -8645,17 +8883,17 @@ public object FfiConverterTypeNotificationUserFfi: FfiConverterRustBuffer<Notifi
 
 
 data class PushRegistrationFfi (
-    var `accountRef`: kotlin.String, 
-    var `accountIdHex`: kotlin.String, 
-    var `platform`: PushPlatformFfi, 
-    var `tokenFingerprint`: kotlin.String, 
-    var `serverPubkeyHex`: kotlin.String, 
-    var `relayHint`: kotlin.String?, 
-    var `createdAtMs`: kotlin.Long, 
-    var `updatedAtMs`: kotlin.Long, 
+    var `accountRef`: kotlin.String,
+    var `accountIdHex`: kotlin.String,
+    var `platform`: PushPlatformFfi,
+    var `tokenFingerprint`: kotlin.String,
+    var `serverPubkeyHex`: kotlin.String,
+    var `relayHint`: kotlin.String?,
+    var `createdAtMs`: kotlin.Long,
+    var `updatedAtMs`: kotlin.Long,
     var `lastSharedAtMs`: kotlin.Long?
 ) {
-    
+
     companion object
 }
 
@@ -8705,19 +8943,19 @@ public object FfiConverterTypePushRegistrationFfi: FfiConverterRustBuffer<PushRe
 
 
 data class ReceivedMessageFfi (
-    var `messageIdHex`: kotlin.String, 
-    var `groupIdHex`: kotlin.String, 
-    var `sender`: kotlin.String, 
-    var `senderDisplayName`: kotlin.String?, 
-    var `plaintext`: kotlin.String, 
+    var `messageIdHex`: kotlin.String,
+    var `groupIdHex`: kotlin.String,
+    var `sender`: kotlin.String,
+    var `senderDisplayName`: kotlin.String?,
+    var `plaintext`: kotlin.String,
     /**
      * Nostr `kind` of the inner Marmot app event.
      */
-    var `kind`: kotlin.ULong, 
+    var `kind`: kotlin.ULong,
     /**
      * Nostr `tags` of the inner Marmot app event.
      */
-    var `tags`: List<MessageTagFfi>, 
+    var `tags`: List<MessageTagFfi>,
     /**
      * Source-event timestamp (seconds since epoch) for the MLS-delivered
      * message. Clients should sort the timeline by this value so chronology
@@ -8726,7 +8964,7 @@ data class ReceivedMessageFfi (
      */
     var `recordedAt`: kotlin.ULong
 ) {
-    
+
     companion object
 }
 
@@ -8776,20 +9014,20 @@ public object FfiConverterTypeReceivedMessageFfi: FfiConverterRustBuffer<Receive
  * Live relay-plane connection health for the diagnostics view.
  */
 data class RelayHealthFfi (
-    var `sdkBacked`: kotlin.Boolean, 
-    var `totalRelays`: kotlin.UInt, 
-    var `initialized`: kotlin.UInt, 
-    var `pending`: kotlin.UInt, 
-    var `connecting`: kotlin.UInt, 
-    var `connected`: kotlin.UInt, 
-    var `disconnected`: kotlin.UInt, 
-    var `terminated`: kotlin.UInt, 
-    var `banned`: kotlin.UInt, 
-    var `sleeping`: kotlin.UInt, 
-    var `connectionAttempts`: kotlin.UInt, 
+    var `sdkBacked`: kotlin.Boolean,
+    var `totalRelays`: kotlin.UInt,
+    var `initialized`: kotlin.UInt,
+    var `pending`: kotlin.UInt,
+    var `connecting`: kotlin.UInt,
+    var `connected`: kotlin.UInt,
+    var `disconnected`: kotlin.UInt,
+    var `terminated`: kotlin.UInt,
+    var `banned`: kotlin.UInt,
+    var `sleeping`: kotlin.UInt,
+    var `connectionAttempts`: kotlin.UInt,
     var `connectionSuccesses`: kotlin.UInt
 ) {
-    
+
     companion object
 }
 
@@ -8848,10 +9086,10 @@ public object FfiConverterTypeRelayHealthFfi: FfiConverterRustBuffer<RelayHealth
 
 
 data class RelayListFfi (
-    var `kind`: kotlin.ULong, 
+    var `kind`: kotlin.ULong,
     var `relays`: List<kotlin.String>
 ) {
-    
+
     companion object
 }
 
@@ -8880,15 +9118,15 @@ public object FfiConverterTypeRelayListFfi: FfiConverterRustBuffer<RelayListFfi>
 
 
 data class RelayTelemetryResourceFfi (
-    var `serviceVersion`: kotlin.String, 
-    var `serviceInstanceId`: kotlin.String, 
-    var `deploymentEnvironment`: kotlin.String, 
-    var `tenant`: kotlin.String, 
-    var `osType`: kotlin.String, 
-    var `osVersion`: kotlin.String, 
+    var `serviceVersion`: kotlin.String,
+    var `serviceInstanceId`: kotlin.String,
+    var `deploymentEnvironment`: kotlin.String,
+    var `tenant`: kotlin.String,
+    var `osType`: kotlin.String,
+    var `osVersion`: kotlin.String,
     var `deviceModelIdentifier`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -8932,11 +9170,11 @@ public object FfiConverterTypeRelayTelemetryResourceFfi: FfiConverterRustBuffer<
 
 
 data class RelayTelemetryRuntimeConfigFfi (
-    var `otlpEndpoint`: kotlin.String?, 
-    var `authorizationBearerToken`: kotlin.String?, 
+    var `otlpEndpoint`: kotlin.String?,
+    var `authorizationBearerToken`: kotlin.String?,
     var `resource`: RelayTelemetryResourceFfi?
 ) {
-    
+
     companion object
 }
 
@@ -8968,10 +9206,10 @@ public object FfiConverterTypeRelayTelemetryRuntimeConfigFfi: FfiConverterRustBu
 
 
 data class RelayTelemetrySettingsFfi (
-    var `exportEnabled`: kotlin.Boolean, 
+    var `exportEnabled`: kotlin.Boolean,
     var `exportIntervalSeconds`: kotlin.ULong
 ) {
-    
+
     companion object
 }
 
@@ -9000,11 +9238,11 @@ public object FfiConverterTypeRelayTelemetrySettingsFfi: FfiConverterRustBuffer<
 
 
 data class RuntimeMessageReceivedFfi (
-    var `accountIdHex`: kotlin.String, 
-    var `accountLabel`: kotlin.String, 
+    var `accountIdHex`: kotlin.String,
+    var `accountLabel`: kotlin.String,
     var `message`: ReceivedMessageFfi
 ) {
-    
+
     companion object
 }
 
@@ -9036,11 +9274,11 @@ public object FfiConverterTypeRuntimeMessageReceivedFfi: FfiConverterRustBuffer<
 
 
 data class RuntimeProjectionUpdateFfi (
-    var `accountIdHex`: kotlin.String, 
-    var `accountLabel`: kotlin.String, 
+    var `accountIdHex`: kotlin.String,
+    var `accountLabel`: kotlin.String,
     var `update`: TimelineProjectionUpdateFfi
 ) {
-    
+
     companion object
 }
 
@@ -9072,10 +9310,10 @@ public object FfiConverterTypeRuntimeProjectionUpdateFfi: FfiConverterRustBuffer
 
 
 data class SendSummaryFfi (
-    var `published`: kotlin.UInt, 
+    var `published`: kotlin.UInt,
     var `messageIds`: List<kotlin.String>
 ) {
-    
+
     companion object
 }
 
@@ -9104,15 +9342,15 @@ public object FfiConverterTypeSendSummaryFfi: FfiConverterRustBuffer<SendSummary
 
 
 data class TimelineMessageQueryFfi (
-    var `groupIdHex`: kotlin.String?, 
-    var `search`: kotlin.String?, 
-    var `before`: kotlin.ULong?, 
-    var `beforeMessageId`: kotlin.String?, 
-    var `after`: kotlin.ULong?, 
-    var `afterMessageId`: kotlin.String?, 
+    var `groupIdHex`: kotlin.String?,
+    var `search`: kotlin.String?,
+    var `before`: kotlin.ULong?,
+    var `beforeMessageId`: kotlin.String?,
+    var `after`: kotlin.ULong?,
+    var `afterMessageId`: kotlin.String?,
     var `limit`: kotlin.UInt?
 ) {
-    
+
     companion object
 }
 
@@ -9156,23 +9394,23 @@ public object FfiConverterTypeTimelineMessageQueryFfi: FfiConverterRustBuffer<Ti
 
 
 data class TimelineMessageRecordFfi (
-    var `messageIdHex`: kotlin.String, 
-    var `sourceMessageIdHex`: kotlin.String?, 
-    var `direction`: kotlin.String, 
-    var `groupIdHex`: kotlin.String, 
-    var `sender`: kotlin.String, 
-    var `plaintext`: kotlin.String, 
-    var `kind`: kotlin.ULong, 
-    var `tags`: List<MessageTagFfi>, 
-    var `timelineAt`: kotlin.ULong, 
-    var `receivedAt`: kotlin.ULong, 
-    var `replyToMessageIdHex`: kotlin.String?, 
-    var `replyPreview`: TimelineReplyPreviewFfi?, 
-    var `mediaJson`: kotlin.String?, 
-    var `agentTextStreamJson`: kotlin.String?, 
-    var `reactions`: TimelineReactionSummaryFfi, 
-    var `deleted`: kotlin.Boolean, 
-    var `deletedByMessageIdHex`: kotlin.String?, 
+    var `messageIdHex`: kotlin.String,
+    var `sourceMessageIdHex`: kotlin.String?,
+    var `direction`: kotlin.String,
+    var `groupIdHex`: kotlin.String,
+    var `sender`: kotlin.String,
+    var `plaintext`: kotlin.String,
+    var `kind`: kotlin.ULong,
+    var `tags`: List<MessageTagFfi>,
+    var `timelineAt`: kotlin.ULong,
+    var `receivedAt`: kotlin.ULong,
+    var `replyToMessageIdHex`: kotlin.String?,
+    var `replyPreview`: TimelineReplyPreviewFfi?,
+    var `mediaJson`: kotlin.String?,
+    var `agentTextStreamJson`: kotlin.String?,
+    var `reactions`: TimelineReactionSummaryFfi,
+    var `deleted`: kotlin.Boolean,
+    var `deletedByMessageIdHex`: kotlin.String?,
     /**
      * Set when convergence invalidated this message (it landed on a losing
      * branch). The message is kept as a "did not reach the group" tombstone
@@ -9181,7 +9419,7 @@ data class TimelineMessageRecordFfi (
      */
     var `invalidationStatus`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -9258,11 +9496,11 @@ public object FfiConverterTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<T
 
 
 data class TimelinePageFfi (
-    var `messages`: List<TimelineMessageRecordFfi>, 
-    var `hasMoreBefore`: kotlin.Boolean, 
+    var `messages`: List<TimelineMessageRecordFfi>,
+    var `hasMoreBefore`: kotlin.Boolean,
     var `hasMoreAfter`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -9294,13 +9532,13 @@ public object FfiConverterTypeTimelinePageFfi: FfiConverterRustBuffer<TimelinePa
 
 
 data class TimelineProjectionUpdateFfi (
-    var `groupIdHex`: kotlin.String, 
-    var `messages`: List<TimelineMessageRecordFfi>, 
-    var `changes`: List<TimelineMessageChangeFfi>, 
-    var `chatListRow`: ChatListRowFfi?, 
+    var `groupIdHex`: kotlin.String,
+    var `messages`: List<TimelineMessageRecordFfi>,
+    var `changes`: List<TimelineMessageChangeFfi>,
+    var `chatListRow`: ChatListRowFfi?,
     var `chatListTrigger`: ChatListUpdateTriggerFfi
 ) {
-    
+
     companion object
 }
 
@@ -9338,10 +9576,10 @@ public object FfiConverterTypeTimelineProjectionUpdateFfi: FfiConverterRustBuffe
 
 
 data class TimelineReactionEmojiFfi (
-    var `emoji`: kotlin.String, 
+    var `emoji`: kotlin.String,
     var `senders`: List<kotlin.String>
 ) {
-    
+
     companion object
 }
 
@@ -9370,10 +9608,10 @@ public object FfiConverterTypeTimelineReactionEmojiFfi: FfiConverterRustBuffer<T
 
 
 data class TimelineReactionSummaryFfi (
-    var `byEmoji`: List<TimelineReactionEmojiFfi>, 
+    var `byEmoji`: List<TimelineReactionEmojiFfi>,
     var `userReactions`: List<TimelineUserReactionFfi>
 ) {
-    
+
     companion object
 }
 
@@ -9402,15 +9640,15 @@ public object FfiConverterTypeTimelineReactionSummaryFfi: FfiConverterRustBuffer
 
 
 data class TimelineReplyPreviewFfi (
-    var `messageIdHex`: kotlin.String, 
-    var `sender`: kotlin.String, 
-    var `plaintext`: kotlin.String, 
-    var `kind`: kotlin.ULong, 
-    var `mediaJson`: kotlin.String?, 
-    var `agentTextStreamJson`: kotlin.String?, 
+    var `messageIdHex`: kotlin.String,
+    var `sender`: kotlin.String,
+    var `plaintext`: kotlin.String,
+    var `kind`: kotlin.ULong,
+    var `mediaJson`: kotlin.String?,
+    var `agentTextStreamJson`: kotlin.String?,
     var `deleted`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -9454,13 +9692,13 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
 
 
 data class TimelineUserReactionFfi (
-    var `reactionMessageIdHex`: kotlin.String, 
-    var `targetMessageIdHex`: kotlin.String, 
-    var `sender`: kotlin.String, 
-    var `emoji`: kotlin.String, 
+    var `reactionMessageIdHex`: kotlin.String,
+    var `targetMessageIdHex`: kotlin.String,
+    var `sender`: kotlin.String,
+    var `emoji`: kotlin.String,
     var `reactedAt`: kotlin.ULong
 ) {
-    
+
     companion object
 }
 
@@ -9498,14 +9736,14 @@ public object FfiConverterTypeTimelineUserReactionFfi: FfiConverterRustBuffer<Ti
 
 
 data class UserProfileMetadataFfi (
-    var `name`: kotlin.String?, 
-    var `displayName`: kotlin.String?, 
-    var `about`: kotlin.String?, 
-    var `picture`: kotlin.String?, 
-    var `nip05`: kotlin.String?, 
+    var `name`: kotlin.String?,
+    var `displayName`: kotlin.String?,
+    var `about`: kotlin.String?,
+    var `picture`: kotlin.String?,
+    var `nip05`: kotlin.String?,
     var `lud16`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -9550,27 +9788,27 @@ public object FfiConverterTypeUserProfileMetadataFfi: FfiConverterRustBuffer<Use
  * incremental fragment; `Finished.text` is the complete transcript.
  */
 sealed class AgentStreamUpdateFfi {
-    
+
     data class Chunk(
-        val `seq`: kotlin.ULong, 
+        val `seq`: kotlin.ULong,
         val `text`: kotlin.String) : AgentStreamUpdateFfi() {
         companion object
     }
-    
+
     data class Finished(
-        val `text`: kotlin.String, 
-        val `transcriptHashHex`: kotlin.String, 
+        val `text`: kotlin.String,
+        val `transcriptHashHex`: kotlin.String,
         val `chunkCount`: kotlin.ULong) : AgentStreamUpdateFfi() {
         companion object
     }
-    
+
     data class Failed(
         val `message`: kotlin.String) : AgentStreamUpdateFfi() {
         companion object
     }
-    
 
-    
+
+
     companion object
 }
 
@@ -9652,21 +9890,21 @@ public object FfiConverterTypeAgentStreamUpdateFfi : FfiConverterRustBuffer<Agen
 
 
 sealed class ChatListSubscriptionUpdateFfi {
-    
+
     data class Row(
-        val `trigger`: ChatListUpdateTriggerFfi, 
+        val `trigger`: ChatListUpdateTriggerFfi,
         val `row`: ChatListRowFfi) : ChatListSubscriptionUpdateFfi() {
         companion object
     }
-    
+
     data class RemoveRow(
-        val `trigger`: ChatListUpdateTriggerFfi, 
+        val `trigger`: ChatListUpdateTriggerFfi,
         val `groupIdHex`: kotlin.String) : ChatListSubscriptionUpdateFfi() {
         companion object
     }
-    
 
-    
+
+
     companion object
 }
 
@@ -9731,7 +9969,7 @@ public object FfiConverterTypeChatListSubscriptionUpdateFfi : FfiConverterRustBu
 
 
 enum class ChatListUpdateTriggerFfi {
-    
+
     NEW_GROUP,
     NEW_LAST_MESSAGE,
     LAST_MESSAGE_DELETED,
@@ -9750,9 +9988,9 @@ enum class ChatListUpdateTriggerFfi {
  */
 public object FfiConverterTypeChatListUpdateTriggerFfi: FfiConverterRustBuffer<ChatListUpdateTriggerFfi> {
     override fun read(buf: ByteBuffer) = try {
-        
+
         ChatListUpdateTriggerFfi.entries[buf.getInt() - 1]
-        
+
     } catch (e: IndexOutOfBoundsException) {
         throw RuntimeException("invalid enum value, something is very wrong!!", e)
     }
@@ -9774,52 +10012,52 @@ public object FfiConverterTypeChatListUpdateTriggerFfi: FfiConverterRustBuffer<C
  * the surface level for v1.
  */
 sealed class MarmotEventFfi {
-    
+
     data class GroupJoined(
-        val `accountIdHex`: kotlin.String, 
-        val `accountLabel`: kotlin.String, 
+        val `accountIdHex`: kotlin.String,
+        val `accountLabel`: kotlin.String,
         val `groupIdHex`: kotlin.String) : MarmotEventFfi() {
         companion object
     }
-    
+
     data class GroupStateUpdated(
-        val `accountIdHex`: kotlin.String, 
-        val `accountLabel`: kotlin.String, 
+        val `accountIdHex`: kotlin.String,
+        val `accountLabel`: kotlin.String,
         val `groupIdHex`: kotlin.String) : MarmotEventFfi() {
         companion object
     }
-    
+
     data class MessageReceived(
         val `received`: RuntimeMessageReceivedFfi) : MarmotEventFfi() {
         companion object
     }
-    
+
     data class ProjectionUpdated(
         val `update`: RuntimeProjectionUpdateFfi) : MarmotEventFfi() {
         companion object
     }
-    
+
     data class GroupEvent(
-        val `accountIdHex`: kotlin.String, 
+        val `accountIdHex`: kotlin.String,
         val `accountLabel`: kotlin.String) : MarmotEventFfi() {
         companion object
     }
-    
+
     data class AccountError(
-        val `accountIdHex`: kotlin.String, 
-        val `accountLabel`: kotlin.String, 
+        val `accountIdHex`: kotlin.String,
+        val `accountLabel`: kotlin.String,
         val `message`: kotlin.String) : MarmotEventFfi() {
         companion object
     }
-    
+
     data class AgentStreamActivity(
-        val `accountIdHex`: kotlin.String, 
+        val `accountIdHex`: kotlin.String,
         val `accountLabel`: kotlin.String) : MarmotEventFfi() {
         companion object
     }
-    
 
-    
+
+
     companion object
 }
 
@@ -9978,143 +10216,143 @@ public object FfiConverterTypeMarmotEventFfi : FfiConverterRustBuffer<MarmotEven
 
 
 sealed class MarmotKitException: kotlin.Exception() {
-    
+
     class DuplicateIdentity(
-        
+
         val `account`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "account=${ `account` }"
     }
-    
+
     class UnknownAccount(
-        
+
         val `accountRef`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "accountRef=${ `accountRef` }"
     }
-    
+
     class UnknownGroup(
-        
+
         val `groupIdHex`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "groupIdHex=${ `groupIdHex` }"
     }
-    
+
     class InvalidHex(
-        
+
         val `details`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "details=${ `details` }"
     }
-    
+
     class InvalidIdentity(
-        
+
         val `details`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "details=${ `details` }"
     }
-    
+
     class MissingKeyPackage(
-        
+
         val `account`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "account=${ `account` }"
     }
-    
+
     class Publish(
-        
+
         val `details`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "details=${ `details` }"
     }
-    
+
     class TransportClosed(
         ) : MarmotKitException() {
         override val message
             get() = ""
     }
-    
+
     class RuntimeStopping(
         ) : MarmotKitException() {
         override val message
             get() = ""
     }
-    
+
     class NotGroupAdmin(
-        
+
         val `groupIdHex`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "groupIdHex=${ `groupIdHex` }"
     }
-    
+
     class AdminCannotSelfRemove(
-        
+
         val `groupIdHex`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "groupIdHex=${ `groupIdHex` }"
     }
-    
+
     class WouldRemoveLastAdmin(
-        
+
         val `groupIdHex`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "groupIdHex=${ `groupIdHex` }"
     }
-    
+
     class MemberNotInGroup(
-        
-        val `groupIdHex`: kotlin.String, 
-        
+
+        val `groupIdHex`: kotlin.String,
+
         val `memberIdHex`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "groupIdHex=${ `groupIdHex` }, memberIdHex=${ `memberIdHex` }"
     }
-    
+
     class AlreadyAdmin(
-        
-        val `groupIdHex`: kotlin.String, 
-        
+
+        val `groupIdHex`: kotlin.String,
+
         val `memberIdHex`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "groupIdHex=${ `groupIdHex` }, memberIdHex=${ `memberIdHex` }"
     }
-    
+
     class NotAdmin(
-        
-        val `groupIdHex`: kotlin.String, 
-        
+
+        val `groupIdHex`: kotlin.String,
+
         val `memberIdHex`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "groupIdHex=${ `groupIdHex` }, memberIdHex=${ `memberIdHex` }"
     }
-    
+
     class Runtime(
-        
+
         val `details`: kotlin.String
         ) : MarmotKitException() {
         override val message
             get() = "details=${ `details` }"
     }
-    
+
 
     companion object ErrorHandler : UniffiRustCallStatusErrorHandler<MarmotKitException> {
         override fun lift(error_buf: RustBuffer.ByValue): MarmotKitException = FfiConverterTypeMarmotKitError.lift(error_buf)
     }
 
-    
+
 }
 
 /**
@@ -10122,7 +10360,7 @@ sealed class MarmotKitException: kotlin.Exception() {
  */
 public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitException> {
     override fun read(buf: ByteBuffer): MarmotKitException {
-        
+
 
         return when(buf.getInt()) {
             1 -> MarmotKitException.DuplicateIdentity(
@@ -10358,7 +10596,7 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
  * onto the underlying marmot-app types.
  */
 sealed class MessageUpdateFfi {
-    
+
     /**
      * A raw message update: chat, reply, media, reaction, delete, or the kind-9
      * stream-final. Materialized timeline pages also include kind-1200 stream
@@ -10368,7 +10606,7 @@ sealed class MessageUpdateFfi {
         val `received`: RuntimeMessageReceivedFfi) : MessageUpdateFfi() {
         companion object
     }
-    
+
     /**
      * A kind-1200 agent text stream start — the signal to open the QUIC
      * preview for raw message subscribers. Its stream id, route, and brokers
@@ -10378,9 +10616,9 @@ sealed class MessageUpdateFfi {
         val `received`: RuntimeMessageReceivedFfi) : MessageUpdateFfi() {
         companion object
     }
-    
 
-    
+
+
     companion object
 }
 
@@ -10439,7 +10677,7 @@ public object FfiConverterTypeMessageUpdateFfi : FfiConverterRustBuffer<MessageU
 
 
 enum class NotificationCollectionStatusFfi {
-    
+
     NEW_DATA,
     NO_DATA,
     FAILED;
@@ -10452,9 +10690,9 @@ enum class NotificationCollectionStatusFfi {
  */
 public object FfiConverterTypeNotificationCollectionStatusFfi: FfiConverterRustBuffer<NotificationCollectionStatusFfi> {
     override fun read(buf: ByteBuffer) = try {
-        
+
         NotificationCollectionStatusFfi.entries[buf.getInt() - 1]
-        
+
     } catch (e: IndexOutOfBoundsException) {
         throw RuntimeException("invalid enum value, something is very wrong!!", e)
     }
@@ -10472,7 +10710,7 @@ public object FfiConverterTypeNotificationCollectionStatusFfi: FfiConverterRustB
 
 
 enum class NotificationTriggerFfi {
-    
+
     NEW_MESSAGE,
     GROUP_INVITE;
     companion object
@@ -10484,9 +10722,9 @@ enum class NotificationTriggerFfi {
  */
 public object FfiConverterTypeNotificationTriggerFfi: FfiConverterRustBuffer<NotificationTriggerFfi> {
     override fun read(buf: ByteBuffer) = try {
-        
+
         NotificationTriggerFfi.entries[buf.getInt() - 1]
-        
+
     } catch (e: IndexOutOfBoundsException) {
         throw RuntimeException("invalid enum value, something is very wrong!!", e)
     }
@@ -10504,7 +10742,7 @@ public object FfiConverterTypeNotificationTriggerFfi: FfiConverterRustBuffer<Not
 
 
 enum class NotificationWakeSourceFfi {
-    
+
     APNS_NSE,
     FCM_DATA_MESSAGE,
     ANDROID_FOREGROUND_SERVICE,
@@ -10518,9 +10756,9 @@ enum class NotificationWakeSourceFfi {
  */
 public object FfiConverterTypeNotificationWakeSourceFfi: FfiConverterRustBuffer<NotificationWakeSourceFfi> {
     override fun read(buf: ByteBuffer) = try {
-        
+
         NotificationWakeSourceFfi.entries[buf.getInt() - 1]
-        
+
     } catch (e: IndexOutOfBoundsException) {
         throw RuntimeException("invalid enum value, something is very wrong!!", e)
     }
@@ -10538,7 +10776,7 @@ public object FfiConverterTypeNotificationWakeSourceFfi: FfiConverterRustBuffer<
 
 
 enum class PushPlatformFfi {
-    
+
     APNS,
     FCM;
     companion object
@@ -10550,9 +10788,9 @@ enum class PushPlatformFfi {
  */
 public object FfiConverterTypePushPlatformFfi: FfiConverterRustBuffer<PushPlatformFfi> {
     override fun read(buf: ByteBuffer) = try {
-        
+
         PushPlatformFfi.entries[buf.getInt() - 1]
-        
+
     } catch (e: IndexOutOfBoundsException) {
         throw RuntimeException("invalid enum value, something is very wrong!!", e)
     }
@@ -10569,21 +10807,21 @@ public object FfiConverterTypePushPlatformFfi: FfiConverterRustBuffer<PushPlatfo
 
 
 sealed class TimelineMessageChangeFfi {
-    
+
     data class Upsert(
-        val `trigger`: TimelineUpdateTriggerFfi, 
+        val `trigger`: TimelineUpdateTriggerFfi,
         val `message`: TimelineMessageRecordFfi) : TimelineMessageChangeFfi() {
         companion object
     }
-    
+
     data class Remove(
-        val `messageIdHex`: kotlin.String, 
+        val `messageIdHex`: kotlin.String,
         val `reason`: TimelineRemoveReasonFfi) : TimelineMessageChangeFfi() {
         companion object
     }
-    
 
-    
+
+
     companion object
 }
 
@@ -10648,7 +10886,7 @@ public object FfiConverterTypeTimelineMessageChangeFfi : FfiConverterRustBuffer<
 
 
 enum class TimelineRemoveReasonFfi {
-    
+
     INVALIDATED,
     CLEARED,
     PRUNED,
@@ -10662,9 +10900,9 @@ enum class TimelineRemoveReasonFfi {
  */
 public object FfiConverterTypeTimelineRemoveReasonFfi: FfiConverterRustBuffer<TimelineRemoveReasonFfi> {
     override fun read(buf: ByteBuffer) = try {
-        
+
         TimelineRemoveReasonFfi.entries[buf.getInt() - 1]
-        
+
     } catch (e: IndexOutOfBoundsException) {
         throw RuntimeException("invalid enum value, something is very wrong!!", e)
     }
@@ -10681,19 +10919,19 @@ public object FfiConverterTypeTimelineRemoveReasonFfi: FfiConverterRustBuffer<Ti
 
 
 sealed class TimelineSubscriptionUpdateFfi {
-    
+
     data class Page(
         val `page`: TimelinePageFfi) : TimelineSubscriptionUpdateFfi() {
         companion object
     }
-    
+
     data class Projection(
         val `update`: RuntimeProjectionUpdateFfi) : TimelineSubscriptionUpdateFfi() {
         companion object
     }
-    
 
-    
+
+
     companion object
 }
 
@@ -10752,7 +10990,7 @@ public object FfiConverterTypeTimelineSubscriptionUpdateFfi : FfiConverterRustBu
 
 
 enum class TimelineUpdateTriggerFfi {
-    
+
     NEW_MESSAGE,
     MESSAGE_EDITED_OR_REPROJECTED,
     REACTION_ADDED,
@@ -10773,9 +11011,9 @@ enum class TimelineUpdateTriggerFfi {
  */
 public object FfiConverterTypeTimelineUpdateTriggerFfi: FfiConverterRustBuffer<TimelineUpdateTriggerFfi> {
     override fun read(buf: ByteBuffer) = try {
-        
+
         TimelineUpdateTriggerFfi.entries[buf.getInt() - 1]
-        
+
     } catch (e: IndexOutOfBoundsException) {
         throw RuntimeException("invalid enum value, something is very wrong!!", e)
     }
@@ -11579,6 +11817,34 @@ public object FfiConverterSequenceTypeAccountSummaryFfi: FfiConverterRustBuffer<
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeAppBlobEndpointFfi: FfiConverterRustBuffer<List<AppBlobEndpointFfi>> {
+    override fun read(buf: ByteBuffer): List<AppBlobEndpointFfi> {
+        val len = buf.getInt()
+        return List<AppBlobEndpointFfi>(len) {
+            FfiConverterTypeAppBlobEndpointFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<AppBlobEndpointFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeAppBlobEndpointFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<AppBlobEndpointFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeAppBlobEndpointFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeAppGroupMemberRecordFfi: FfiConverterRustBuffer<List<AppGroupMemberRecordFfi>> {
     override fun read(buf: ByteBuffer): List<AppGroupMemberRecordFfi> {
         val len = buf.getInt()
@@ -11831,6 +12097,62 @@ public object FfiConverterSequenceTypeGroupPushTokenDebugEntryFfi: FfiConverterR
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeMediaAttachmentReferenceFfi: FfiConverterRustBuffer<List<MediaAttachmentReferenceFfi>> {
+    override fun read(buf: ByteBuffer): List<MediaAttachmentReferenceFfi> {
+        val len = buf.getInt()
+        return List<MediaAttachmentReferenceFfi>(len) {
+            FfiConverterTypeMediaAttachmentReferenceFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MediaAttachmentReferenceFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMediaAttachmentReferenceFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MediaAttachmentReferenceFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMediaAttachmentReferenceFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMediaLocatorFfi: FfiConverterRustBuffer<List<MediaLocatorFfi>> {
+    override fun read(buf: ByteBuffer): List<MediaLocatorFfi> {
+        val len = buf.getInt()
+        return List<MediaLocatorFfi>(len) {
+            FfiConverterTypeMediaLocatorFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MediaLocatorFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMediaLocatorFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MediaLocatorFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMediaLocatorFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeMediaRecordFfi: FfiConverterRustBuffer<List<MediaRecordFfi>> {
     override fun read(buf: ByteBuffer): List<MediaRecordFfi> {
         val len = buf.getInt()
@@ -11849,6 +12171,62 @@ public object FfiConverterSequenceTypeMediaRecordFfi: FfiConverterRustBuffer<Lis
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMediaRecordFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMediaUploadAttachmentRequestFfi: FfiConverterRustBuffer<List<MediaUploadAttachmentRequestFfi>> {
+    override fun read(buf: ByteBuffer): List<MediaUploadAttachmentRequestFfi> {
+        val len = buf.getInt()
+        return List<MediaUploadAttachmentRequestFfi>(len) {
+            FfiConverterTypeMediaUploadAttachmentRequestFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MediaUploadAttachmentRequestFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMediaUploadAttachmentRequestFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MediaUploadAttachmentRequestFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMediaUploadAttachmentRequestFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMediaUploadAttachmentResultFfi: FfiConverterRustBuffer<List<MediaUploadAttachmentResultFfi>> {
+    override fun read(buf: ByteBuffer): List<MediaUploadAttachmentResultFfi> {
+        val len = buf.getInt()
+        return List<MediaUploadAttachmentResultFfi>(len) {
+            FfiConverterTypeMediaUploadAttachmentResultFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MediaUploadAttachmentResultFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMediaUploadAttachmentResultFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MediaUploadAttachmentResultFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMediaUploadAttachmentResultFfi.write(it, buf)
         }
     }
 }
