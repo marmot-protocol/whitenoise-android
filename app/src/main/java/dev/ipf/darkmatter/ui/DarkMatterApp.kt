@@ -3518,7 +3518,7 @@ private fun MessageBubble(
                                     ?.values
                                     ?.getOrNull(1)
                             }
-                        if (!deleted && mediaReference != null && MediaReferenceParser.isImageMedia(mediaReference)) {
+                        if (!deleted && !invalidated && mediaReference != null && MediaReferenceParser.isImageMedia(mediaReference)) {
                             MediaImageBubble(
                                 item = item,
                                 reference = mediaReference,
@@ -3526,7 +3526,7 @@ private fun MessageBubble(
                                 appState = appState,
                                 mine = mine,
                             )
-                        } else if (!deleted && mediaPendingName != null) {
+                        } else if (!deleted && !invalidated && mediaPendingName != null) {
                             MediaPendingPlaceholder(
                                 previewBytes = controller.pendingMediaBytes(record.messageIdHex),
                                 failed = item.status == MessageStatus.Failed,
@@ -3546,7 +3546,9 @@ private fun MessageBubble(
                         //   deletions, agent streams, plain text).
                         val bodyTextToRender: String? =
                             when {
-                                deleted -> displayedBody
+                                // Deleted/invalidated tombstones show only the
+                                // tombstone copy, never an inline image/caption.
+                                deleted || invalidated -> displayedBody
                                 mediaPendingName != null -> null
                                 mediaReference != null -> record.plaintext.takeIf { it.isNotBlank() }
                                 else -> displayedBody
