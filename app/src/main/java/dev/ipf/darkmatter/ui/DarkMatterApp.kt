@@ -2718,6 +2718,7 @@ private fun GroupDetailsScreen(
                                     menuOpen = false
                                     name = controller.group.name
                                     description = controller.group.description
+                                    avatarUrl = controller.group.avatarUrl.orEmpty()
                                     showEditProfile = true
                                 },
                             )
