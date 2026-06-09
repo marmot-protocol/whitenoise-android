@@ -87,11 +87,15 @@ internal fun signOutOutcome(
     return SignOutOutcome(next, if (next == null) AppPhase.Onboarding else AppPhase.Ready)
 }
 
-/** Next exponential-backoff delay: double [current], clamped to [maxMillis]. */
+/**
+ * Next exponential-backoff delay: double [current], clamped to [maxMillis].
+ * Guards the multiply so a near-`Long.MAX_VALUE` input can't overflow to a
+ * negative value below the clamp (returns [maxMillis] once at/over the cap).
+ */
 internal fun nextRetryBackoffMillis(
     current: Long,
     maxMillis: Long,
-): Long = (current * 2).coerceAtMost(maxMillis)
+): Long = if (current >= maxMillis) maxMillis else (current * 2).coerceAtMost(maxMillis)
 
 data class ToastMessage(
     val title: AppText,

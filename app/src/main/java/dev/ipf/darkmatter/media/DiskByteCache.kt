@@ -112,24 +112,22 @@ class DiskByteCache(
         evictUntilUnderCap()
     }
 
+    @Synchronized
     fun clear() {
-        // Drop the index and reset accounting under the lock, then delete files
-        // OUTSIDE it so a sign-out doesn't block concurrent get()s for the
-        // duration of (potentially many) file deletions. See #99.
-        val toDelete =
-            synchronized(this) {
-                ensureHydrated()
-                val files = index.values.map { it.file }
-                index.clear()
-                residentBytes = 0L
-                files
-            }
-        toDelete.forEach { runCatching { it.delete() } }
+        // Hold the lock for the whole wipe. Deleting outside it (an earlier
+        // #99 attempt) let a concurrent put() recreate a `.bin` that the orphan
+        // sweep then removed — a race. clear() runs on sign-out/account-switch,
+        // so briefly blocking get()/put() is fine, and it keeps the privacy
+        // guarantee that ALL of this account's media (including orphan `.bin`s)
+        // is wiped. The #99 win — get() not holding the lock across readBytes —
+        // is unaffected, since that's in get(), not here.
+        ensureHydrated()
+        index.values.forEach { runCatching { it.file.delete() } }
+        index.clear()
+        residentBytes = 0L
         // Catch any orphans that aren't in the index — e.g. a prior crash
-        // mid-put left a `.tmp`, or an entry whose index row was lost.
-        // Scoped to OUR file-naming convention (`.bin` + `.tmp`) so a
-        // future co-tenant in the same dir survives sign-out. Touches no
-        // shared state, so it is safe outside the lock.
+        // mid-put left a `.tmp`, or an entry whose index row was lost. Scoped to
+        // OUR naming (`.bin` + `.tmp`) so a future co-tenant survives sign-out.
         cacheDir
             .listFiles()
             ?.asSequence()

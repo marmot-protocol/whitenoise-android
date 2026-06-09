@@ -17,6 +17,10 @@ object HostSafety {
      * True when [host] is an IP literal in a private/loopback/link-local range,
      * a loopback hostname (`localhost` / `*.localhost`), or unparseable/blank.
      * Ordinary public hostnames and public IP literals return false.
+     *
+     * [host] must be a hostname or IP only, with NO port — pass `URI.getHost()`
+     * (or an already-port-stripped authority), never `host:port`. A trailing
+     * `:port` would be misread as part of an IPv6 literal.
      */
     fun isPrivateOrLoopbackHost(host: String?): Boolean {
         val normalized =

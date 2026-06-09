@@ -139,12 +139,16 @@ class MediaReferenceParserTest {
         assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "https://192.168.1.1/x.bin"))))
         assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "https://[::1]/x.bin"))))
         assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://localhost/x.bin"))))
+        // 172.16/12 boundary: .16-.31 are private, .32 is public (off-by-one guard).
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://172.31.255.255/x.bin"))))
     }
 
     @Test
     fun acceptsPublicHttpAndHttpsMediaUrls() {
         assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://blossom.example/x.bin"))))
         assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "https://blossom.example/x.bin"))))
+        // Just outside the 172.16/12 private block — must be allowed.
+        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithOverride("url" to "http://172.32.0.1/x.bin"))))
     }
 
     // ---- toImetaTag (round-trip) -------------------------------------------

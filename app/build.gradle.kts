@@ -153,13 +153,15 @@ ktlint {
     filter {
         // Never lint/format the UniFFI-generated bindings or the vendored
         // keyring stub — they are regenerated wholesale and must stay
-        // byte-stable with the matching native libs.
-        exclude { it.file.path.contains("/marmotkit/") }
-        exclude { it.file.path.contains("marmot_uniffi.kt") }
-        exclude { it.file.path.contains("/io/crates/") }
-        exclude { it.file.path.contains("Keyring.kt") }
+        // byte-stable with the matching native libs. Normalize separators so
+        // the matches also hold on Windows paths.
+        fun normalized(path: String) = path.replace('\\', '/')
+        exclude { normalized(it.file.path).contains("/marmotkit/") }
+        exclude { normalized(it.file.path).contains("marmot_uniffi.kt") }
+        exclude { normalized(it.file.path).contains("/io/crates/") }
+        exclude { normalized(it.file.path).contains("Keyring.kt") }
         // Generated outputs (BuildConfig, etc.).
-        exclude { it.file.path.contains("/build/") }
+        exclude { normalized(it.file.path).contains("/build/") }
     }
 }
 

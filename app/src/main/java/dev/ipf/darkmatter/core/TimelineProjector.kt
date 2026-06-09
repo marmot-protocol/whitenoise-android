@@ -61,7 +61,10 @@ object TimelineProjector {
                     ReactionTally(
                         emoji = summary.emoji,
                         count = summary.senders.size,
-                        mine = myAccountId != null && summary.senders.contains(myAccountId),
+                        // Case-insensitive: hex account-id casing can drift
+                        // between the active account and reaction senders, and
+                        // a mismatch would render your own reaction as not-mine.
+                        mine = myAccountId != null && summary.senders.any { it.equals(myAccountId, ignoreCase = true) },
                     )
                 }
             }.sortedWith(
