@@ -64,10 +64,14 @@ android {
             runtimeConfigProperty(listOf("DARKMATTER_OTLP_AUTH_TOKEN", "OTLP_TOKEN_DARKMATTER_ANDROID")).asBuildConfigString(),
         )
         buildConfigField("String", "DARKMATTER_AUDIT_LOG_ENDPOINT", runtimeConfigProperty("DARKMATTER_AUDIT_LOG_ENDPOINT").asBuildConfigString())
+        // Deliberately no OTLP fallback: the audit-log tracker (Goggles) is a
+        // separate service from the OTLP metrics collector. If the dedicated
+        // audit token is unset, leave it empty so uploads skip rather than
+        // authenticating against the wrong API with the OTLP token.
         buildConfigField(
             "String",
             "DARKMATTER_AUDIT_LOG_AUTH_TOKEN",
-            runtimeConfigProperty(listOf("DARKMATTER_AUDIT_LOG_AUTH_TOKEN", "OTLP_TOKEN_DARKMATTER_ANDROID")).asBuildConfigString(),
+            runtimeConfigProperty("DARKMATTER_AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
         )
         buildConfigField(
             "String",
