@@ -1745,6 +1745,9 @@ class ConversationController(
             .map { TimelineProjector.toAppMessageRecord(it) }
             .filter { MessageProjector.isStreamStart(it) }
             .mapNotNull { MessageProjector.streamId(it) }
+            // Don't relaunch a watcher for a stream whose final record was in
+            // this same page — it was just marked removed. See #25.
+            .filterNot { it in removedStreamIds }
     }
 
     private fun applyTimelineChanges(changes: List<TimelineMessageChangeFfi>): List<String> {
@@ -1811,7 +1814,9 @@ class ConversationController(
         pruneConfirmedOptimisticReactions()
         recomputeReactions(reactionTargets)
         publishTimelineFromIndexes()
-        return streamIds
+        // Don't relaunch a watcher for a stream finalized in this same batch
+        // (start + final records together) — it was just marked removed. See #25.
+        return streamIds.filterNot { it in removedStreamIds }
     }
 
     private fun applyChatListProjection(
