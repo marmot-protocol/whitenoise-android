@@ -136,6 +136,9 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         admins = emptyList(),
         relays = emptyList(),
         nostrGroupIdHex = "",
+        avatarUrl = null,
+        avatarDim = null,
+        avatarThumbhash = null,
         archived = row.archived,
         pendingConfirmation = row.pendingConfirmation,
         welcomerAccountIdHex = null,
@@ -1483,6 +1486,31 @@ class ConversationController(
                         description.trim().takeIf { it.isNotEmpty() },
                     )
                 }
+                appState.present(R.string.toast_group_updated)
+                true
+            }.onFailure {
+                it.rethrowIfCancellation()
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message))
+            }.getOrDefault(false)
+        }
+
+    suspend fun updateGroupAvatarUrl(url: String?): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            // The Rust side validates + normalizes the URL (https-only, no
+            // private hosts). We only set the URL here; dim/thumbhash are
+            // optimization hints we don't compute on Android, so clear them.
+            val normalized = url?.trim()?.takeIf { it.isNotEmpty() }
+            runCatching {
+                appState.marmotIo {
+                    updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
+                }
+                // Reflect the change locally so the avatar updates immediately,
+                // without waiting for the group-state subscription to converge.
+                group = group.copy(avatarUrl = normalized, avatarDim = null, avatarThumbhash = null)
                 appState.present(R.string.toast_group_updated)
                 true
             }.onFailure {

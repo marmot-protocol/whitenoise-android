@@ -315,6 +315,7 @@ private fun rememberMessageTextCopy(): MessageTextCopy =
         reactedFormat = stringResource(R.string.message_reacted),
         reactionFallback = stringResource(R.string.message_reaction_fallback),
         deleted = stringResource(R.string.message_deleted_preview),
+        invalidated = stringResource(R.string.message_invalidated_preview),
         agentStreamStarted = stringResource(R.string.agent_stream_started),
         streamFinished = stringResource(R.string.stream_finished),
         mediaAttachment = stringResource(R.string.media_attachment),
@@ -1057,7 +1058,8 @@ private fun ChatRow(
                 title = title,
                 seed = avatarAccount ?: item.group.groupIdHex,
                 size = 44.dp,
-                pictureUrl = avatarAccount?.let { appState.avatarUrl(it) },
+                // A group's own avatar URL wins over the member-derived avatar.
+                pictureUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
             )
         },
         headlineContent = {
@@ -2320,6 +2322,7 @@ private fun ConversationScreen(
                             title = controller.title(groupTitleCopy),
                             seed = controller.group.groupIdHex,
                             size = 36.dp,
+                            pictureUrl = controller.group.avatarUrl,
                         )
                         Column {
                             Text(controller.title(groupTitleCopy), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -2618,6 +2621,7 @@ private fun GroupDetailsScreen(
 ) {
     var name by remember(controller.group.groupIdHex, controller.group.name) { mutableStateOf(controller.group.name) }
     var description by remember(controller.group.groupIdHex, controller.group.description) { mutableStateOf(controller.group.description) }
+    var avatarUrl by remember(controller.group.groupIdHex, controller.group.avatarUrl) { mutableStateOf(controller.group.avatarUrl.orEmpty()) }
     var pendingMember by remember { mutableStateOf("") }
     var pendingMemberError by remember { mutableStateOf<String?>(null) }
     var showMemberScanner by remember { mutableStateOf(false) }
@@ -2714,6 +2718,7 @@ private fun GroupDetailsScreen(
                                     menuOpen = false
                                     name = controller.group.name
                                     description = controller.group.description
+                                    avatarUrl = controller.group.avatarUrl.orEmpty()
                                     showEditProfile = true
                                 },
                             )
@@ -2932,18 +2937,38 @@ private fun GroupDetailsScreen(
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedTextField(
+                    value = avatarUrl,
+                    onValueChange = { avatarUrl = it },
+                    label = { Text(stringResource(R.string.group_avatar_url)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 Button(
                     onClick = {
                         runGroupMutation(
                             action = GroupMutationAction.SaveProfile,
-                            mutation = { controller.updateGroupProfile(name, description) },
+                            mutation = {
+                                // Name/description and the avatar are separate MLS
+                                // commits; only fire the ones that actually changed.
+                                val profileChanged =
+                                    name != controller.group.name || description != controller.group.description
+                                val avatarChanged = avatarUrl.trim() != controller.group.avatarUrl.orEmpty()
+                                val profileOk = !profileChanged || controller.updateGroupProfile(name, description)
+                                val avatarOk = !avatarChanged || controller.updateGroupAvatarUrl(avatarUrl)
+                                profileOk && avatarOk
+                            },
                             onSuccess = { showEditProfile = false },
                         )
                     },
                     enabled =
                         activeMutation == null &&
                             !controller.mutationInFlight &&
-                            (name != controller.group.name || description != controller.group.description),
+                            (
+                                name != controller.group.name ||
+                                    description != controller.group.description ||
+                                    avatarUrl.trim() != controller.group.avatarUrl.orEmpty()
+                            ),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (activeMutation?.action == GroupMutationAction.SaveProfile) {
@@ -3323,9 +3348,14 @@ private fun MessageBubble(
     val record = item.record
     val mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex)
     val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
+    // Convergence dropped this message onto a losing branch: it never reached
+    // the group. The record survives as a tombstone, so flag it (an explicit
+    // delete takes precedence over an invalidation tombstone).
+    val invalidated = !deleted && item.projected?.invalidationStatus != null
     val bubbleColor =
         when {
             deleted -> MaterialTheme.colorScheme.surfaceVariant
+            invalidated -> MaterialTheme.colorScheme.errorContainer
             mine -> MaterialTheme.colorScheme.primaryContainer
             else -> MaterialTheme.colorScheme.surfaceVariant
         }
@@ -3346,6 +3376,8 @@ private fun MessageBubble(
             // flag and the bubble keeps showing the original body until the
             // delete echo arrives.
             stringResource(R.string.message_deleted)
+        } else if (invalidated) {
+            stringResource(R.string.message_invalidated)
         } else if (item.projected != null) {
             TimelineProjector.displayBody(
                 item.projected,
@@ -3363,10 +3395,10 @@ private fun MessageBubble(
     // fills with primaryContainer, so the M3 paired token is onPrimaryContainer;
     // using onSurfaceVariant there blends into the tint and reads as invisible.
     val timestampColor =
-        if (mine && !deleted) {
-            MaterialTheme.colorScheme.onPrimaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+        when {
+            invalidated -> MaterialTheme.colorScheme.onErrorContainer
+            mine && !deleted -> MaterialTheme.colorScheme.onPrimaryContainer
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
     var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var infoSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
@@ -3487,7 +3519,7 @@ private fun MessageBubble(
                                     ?.values
                                     ?.getOrNull(1)
                             }
-                        if (!deleted && mediaReference != null && MediaReferenceParser.isImageMedia(mediaReference)) {
+                        if (!deleted && !invalidated && mediaReference != null && MediaReferenceParser.isImageMedia(mediaReference)) {
                             MediaImageBubble(
                                 item = item,
                                 reference = mediaReference,
@@ -3495,7 +3527,7 @@ private fun MessageBubble(
                                 appState = appState,
                                 mine = mine,
                             )
-                        } else if (!deleted && mediaPendingName != null) {
+                        } else if (!deleted && !invalidated && mediaPendingName != null) {
                             MediaPendingPlaceholder(
                                 previewBytes = controller.pendingMediaBytes(record.messageIdHex),
                                 failed = item.status == MessageStatus.Failed,
@@ -3515,7 +3547,9 @@ private fun MessageBubble(
                         //   deletions, agent streams, plain text).
                         val bodyTextToRender: String? =
                             when {
-                                deleted -> displayedBody
+                                // Deleted/invalidated tombstones show only the
+                                // tombstone copy, never an inline image/caption.
+                                deleted || invalidated -> displayedBody
                                 mediaPendingName != null -> null
                                 mediaReference != null -> record.plaintext.takeIf { it.isNotBlank() }
                                 else -> displayedBody

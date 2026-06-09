@@ -98,6 +98,7 @@ class MessageProjectorTest {
                 reactedFormat = "R:%1\$s",
                 reactionFallback = "target",
                 deleted = "deleted",
+                invalidated = "invalidated",
                 agentStreamStarted = "started",
                 streamFinished = "finished",
                 mediaAttachment = "media",

@@ -381,4 +381,7 @@
         <item quantity="one">%1$d görüntü seçildi</item>
         <item quantity="other">%1$d görüntü seçildi</item>
     </plurals>
+    <string name="message_invalidated">Bu mesaj gruba ulaşmadı</string>
+    <string name="message_invalidated_preview">Gruba ulaşmadı</string>
+    <string name="group_avatar_url">Avatar URL\'si</string>
 </resources>
