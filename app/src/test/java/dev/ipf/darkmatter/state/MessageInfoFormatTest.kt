@@ -1,15 +1,14 @@
 package dev.ipf.darkmatter.state
 
-import java.time.Instant
-import java.time.ZoneId
-import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
+import java.time.ZoneId
+import java.util.Locale
 
 class MessageInfoFormatTest {
-
     // ---- formatExactTimestamp ----------------------------------------------
 
     @Test
@@ -160,9 +159,14 @@ class MessageInfoFormatTest {
 
     @Test
     fun labelFor_mapsEveryEnumVariant() {
-        val labels = MessageStatusLabels(
-            pending = "p", sent = "s", received = "r", failed = "f", streaming = "stream",
-        )
+        val labels =
+            MessageStatusLabels(
+                pending = "p",
+                sent = "s",
+                received = "r",
+                failed = "f",
+                streaming = "stream",
+            )
         assertEquals("p", labelFor(MessageStatus.Pending, labels))
         assertEquals("s", labelFor(MessageStatus.Sent, labels))
         assertEquals("r", labelFor(MessageStatus.Received, labels))

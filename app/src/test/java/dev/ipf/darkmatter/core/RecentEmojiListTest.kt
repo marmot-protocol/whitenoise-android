@@ -6,21 +6,23 @@ import org.junit.Test
 class RecentEmojiListTest {
     @Test
     fun pickedEmojiMovesToTheFrontWithoutDuplicates() {
-        val recents = RecentEmojiList.recordPicked(
-            existing = listOf("👍", "😂", "🎉"),
-            picked = "😂",
-        )
+        val recents =
+            RecentEmojiList.recordPicked(
+                existing = listOf("👍", "😂", "🎉"),
+                picked = "😂",
+            )
 
         assertEquals(listOf("😂", "👍", "🎉"), recents)
     }
 
     @Test
     fun quickChoicesPreferRecentsAndFillFromDefaults() {
-        val choices = RecentEmojiList.quickChoices(
-            recent = listOf("🔥", "👍"),
-            defaults = listOf("👍", "❤️", "😂", "🎉", "😮"),
-            limit = 5,
-        )
+        val choices =
+            RecentEmojiList.quickChoices(
+                recent = listOf("🔥", "👍"),
+                defaults = listOf("👍", "❤️", "😂", "🎉", "😮"),
+                limit = 5,
+            )
 
         assertEquals(listOf("🔥", "👍", "❤️", "😂", "🎉"), choices)
     }

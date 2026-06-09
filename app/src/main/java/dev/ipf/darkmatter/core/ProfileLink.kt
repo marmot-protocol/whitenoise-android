@@ -2,7 +2,9 @@ package dev.ipf.darkmatter.core
 
 import java.net.URI
 
-data class ProfileLink(val npub: String) {
+data class ProfileLink(
+    val npub: String,
+) {
     val uri: String = "darkmatter://profile/$npub"
 
     companion object {

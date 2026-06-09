@@ -8,13 +8,15 @@ data class GroupTitleCopy(
     val groupOfPeopleFormat: String,
 ) {
     fun inviteFrom(name: String): String = String.format(inviteFromFormat, name)
+
     fun groupOfPeople(count: Int): String = String.format(groupOfPeopleFormat, count)
 
     companion object {
-        val Default = GroupTitleCopy(
-            inviteFromFormat = "Invite from %1\$s",
-            groupOfPeopleFormat = "Group of %1\$d people",
-        )
+        val Default =
+            GroupTitleCopy(
+                inviteFromFormat = "Invite from %1\$s",
+                groupOfPeopleFormat = "Group of %1\$d people",
+            )
     }
 }
 
@@ -26,7 +28,10 @@ object GroupProjector {
         memberTitle: (String) -> String,
         copy: GroupTitleCopy = GroupTitleCopy.Default,
     ): String {
-        group.name.trim().takeIf { it.isNotBlank() }?.let { return it }
+        group.name
+            .trim()
+            .takeIf { it.isNotBlank() }
+            ?.let { return it }
         if (group.pendingConfirmation) {
             inviteAccount(group, otherMemberAccount)?.let { return copy.inviteFrom(memberTitle(it)) }
         }
@@ -37,7 +42,10 @@ object GroupProjector {
         return IdentityFormatter.short(group.groupIdHex)
     }
 
-    fun inviteAccount(group: AppGroupRecordFfi, otherMemberAccount: String?): String? {
+    fun inviteAccount(
+        group: AppGroupRecordFfi,
+        otherMemberAccount: String?,
+    ): String? {
         if (!group.pendingConfirmation) return null
         return group.welcomerAccountIdHex?.takeIf { it.isNotBlank() }
             ?: otherMemberAccount?.takeIf { it.isNotBlank() }
@@ -50,29 +58,36 @@ object GroupProjector {
         // memberIdHex is the Nostr pubkey/account id; account is a local label.
         val active = activeAccountIdHex?.takeIf { it.isNotBlank() }
         if (active != null) {
-            members.firstOrNull { member ->
-                member.memberIdHex.isNotBlank() && !member.memberIdHex.equals(active, ignoreCase = true)
-            }?.memberIdHex?.let { return it }
+            members
+                .firstOrNull { member ->
+                    member.memberIdHex.isNotBlank() && !member.memberIdHex.equals(active, ignoreCase = true)
+                }?.memberIdHex
+                ?.let { return it }
         }
         return members.firstOrNull { !it.local && it.memberIdHex.isNotBlank() }?.memberIdHex
             ?: members.firstOrNull { it.memberIdHex.isNotBlank() }?.memberIdHex
     }
 
-    fun shouldShowTranscriptSenderAvatar(memberCount: Int, mine: Boolean): Boolean {
-        return !mine && memberCount > 2
-    }
+    fun shouldShowTranscriptSenderAvatar(
+        memberCount: Int,
+        mine: Boolean,
+    ): Boolean = !mine && memberCount > 2
 
-    fun memberRef(member: AppGroupMemberRecordFfi): String {
-        return member.account?.takeIf { it.isNotBlank() } ?: member.memberIdHex
-    }
+    fun memberRef(member: AppGroupMemberRecordFfi): String = member.account?.takeIf { it.isNotBlank() } ?: member.memberIdHex
 
-    fun isAdmin(group: AppGroupRecordFfi, member: AppGroupMemberRecordFfi): Boolean {
+    fun isAdmin(
+        group: AppGroupRecordFfi,
+        member: AppGroupMemberRecordFfi,
+    ): Boolean {
         val ref = memberRef(member)
         // Case-insensitive: hex casing can drift between admins and member ids.
         return isAdminRef(group, ref) || isAdminRef(group, member.memberIdHex)
     }
 
-    fun isAdminRef(group: AppGroupRecordFfi, accountIdHex: String?): Boolean {
+    fun isAdminRef(
+        group: AppGroupRecordFfi,
+        accountIdHex: String?,
+    ): Boolean {
         val id = accountIdHex?.takeIf { it.isNotBlank() } ?: return false
         return group.admins.any { it.equals(id, ignoreCase = true) }
     }
@@ -94,12 +109,25 @@ object GroupProjector {
         return member.memberIdHex.equals(active, ignoreCase = true)
     }
 
-    fun canLeaveGroup(group: AppGroupRecordFfi, activeAccountIdHex: String?): Boolean {
+    fun canLeaveGroup(
+        group: AppGroupRecordFfi,
+        activeAccountIdHex: String?,
+        memberCount: Int,
+    ): Boolean {
         if (!isAdminRef(group, activeAccountIdHex)) return true
+        // A sole admin who is also the only remaining member can always leave:
+        // dissolving the group orphans no one. Without this they'd be stuck.
+        if (memberCount == 1) return true
         return group.admins.size > 1
     }
 
-    fun requiresSelfDemoteBeforeLeave(group: AppGroupRecordFfi, activeAccountIdHex: String?): Boolean {
+    fun requiresSelfDemoteBeforeLeave(
+        group: AppGroupRecordFfi,
+        activeAccountIdHex: String?,
+        memberCount: Int,
+    ): Boolean {
+        // No one to hand admin to when you're the only member — just leave.
+        if (memberCount == 1) return false
         return isAdminRef(group, activeAccountIdHex)
     }
 }

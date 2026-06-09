@@ -44,6 +44,15 @@ uninstall-debug:
 test:
     ./gradlew :app:testDebugUnitTest
 
+# Lint Kotlin sources with ktlint (read-only; fails on violations). Also runs
+# as part of `./gradlew check`.
+lint:
+    ./gradlew ktlintCheck
+
+# Auto-format Kotlin sources with ktlint (rewrites files in place).
+format:
+    ./gradlew ktlintFormat
+
 # Build signed release APKs (per-ABI splits + universal). Requires signing
 # creds in local.properties. Rebuilds the marmot bindings + native libs.
 release:

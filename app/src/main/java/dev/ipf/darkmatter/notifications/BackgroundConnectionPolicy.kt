@@ -8,7 +8,5 @@ object BackgroundConnectionPolicy {
     fun shouldStartFromSystemWake(
         action: String?,
         backgroundConnectionEnabled: Boolean,
-    ): Boolean {
-        return backgroundConnectionEnabled && action in systemWakeActions
-    }
+    ): Boolean = backgroundConnectionEnabled && action in systemWakeActions
 }

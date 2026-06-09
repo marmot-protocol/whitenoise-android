@@ -6,7 +6,9 @@ import androidx.annotation.StringRes
 sealed interface AppText {
     fun resolve(context: Context): String
 
-    data class Plain(val value: String) : AppText {
+    data class Plain(
+        val value: String,
+    ) : AppText {
         override fun resolve(context: Context): String = value
     }
 
@@ -14,8 +16,6 @@ sealed interface AppText {
         @param:StringRes val resId: Int,
         val args: List<Any> = emptyList(),
     ) : AppText {
-        override fun resolve(context: Context): String {
-            return if (args.isEmpty()) context.getString(resId) else context.getString(resId, *args.toTypedArray())
-        }
+        override fun resolve(context: Context): String = if (args.isEmpty()) context.getString(resId) else context.getString(resId, *args.toTypedArray())
     }
 }

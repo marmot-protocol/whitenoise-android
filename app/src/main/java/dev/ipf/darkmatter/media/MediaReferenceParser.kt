@@ -1,7 +1,9 @@
 package dev.ipf.darkmatter.media
 
+import dev.ipf.darkmatter.core.HostSafety
 import dev.ipf.marmotkit.MediaReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import java.net.URI
 
 /**
  * Pure parser for the MIP-04-v2 `imeta` tag carried on kind-9 messages that
@@ -22,11 +24,10 @@ import dev.ipf.marmotkit.MessageTagFfi
  * if the validator ever loosens, we still won't render junk.
  */
 object MediaReferenceParser {
-
     private const val TAG_NAME = "imeta"
     private const val VERSION_VALUE = "mip04-v2"
     private const val SHA256_HEX_LEN = 64 // 32 bytes
-    private const val NONCE_HEX_LEN = 24  // 12 bytes
+    private const val NONCE_HEX_LEN = 24 // 12 bytes
     private const val HEX_CHARS = "0123456789abcdefABCDEF"
 
     /**
@@ -35,20 +36,21 @@ object MediaReferenceParser {
      * optimistically (bridging the gap until the published event echoes back)
      * without waiting for the projection round-trip.
      */
-    fun toImetaTag(reference: MediaReferenceFfi): MessageTagFfi = MessageTagFfi(
-        listOf(
-            TAG_NAME,
-            "url ${reference.url}",
-            "m ${reference.mediaType}",
-            "filename ${reference.fileName}",
-            "x ${reference.fileHashHex}",
-            "n ${reference.nonceHex}",
-            // Always emit the canonical version this parser accepts — never
-            // forward an unexpected reference.version that our own validator
-            // (and the Rust receiver) would then reject.
-            "v $VERSION_VALUE",
-        ),
-    )
+    fun toImetaTag(reference: MediaReferenceFfi): MessageTagFfi =
+        MessageTagFfi(
+            listOf(
+                TAG_NAME,
+                "url ${reference.url}",
+                "m ${reference.mediaType}",
+                "filename ${reference.fileName}",
+                "x ${reference.fileHashHex}",
+                "n ${reference.nonceHex}",
+                // Always emit the canonical version this parser accepts — never
+                // forward an unexpected reference.version that our own validator
+                // (and the Rust receiver) would then reject.
+                "v $VERSION_VALUE",
+            ),
+        )
 
     /**
      * Returns the first valid imeta-tag attachment reference in [tags], or
@@ -81,7 +83,7 @@ object MediaReferenceParser {
             // First occurrence wins — matches Rust's HashMap-based parse.
             fields.putIfAbsent(key, value)
         }
-        val url = fields["url"]?.takeIf { it.isNotBlank() } ?: return null
+        val url = fields["url"]?.takeIf { isDownloadableUrl(it) } ?: return null
         val mediaType = fields["m"]?.takeIf { it.isNotBlank() } ?: return null
         val fileName = fields["filename"]?.takeIf { it.isNotBlank() } ?: return null
         val fileHash = fields["x"]?.takeIf { isHex(it, SHA256_HEX_LEN) } ?: return null
@@ -97,8 +99,28 @@ object MediaReferenceParser {
         )
     }
 
+    /**
+     * Whether [raw] is a media URL we're willing to download: a non-blank
+     * http(s) URL whose host is not loopback / the local network. Defense in
+     * depth against SSRF via a malicious imeta tag — a hostile group member
+     * could otherwise point auto-download at `http://127.0.0.1:8080/...` or an
+     * RFC-1918 service. See issue #98.
+     */
+    private fun isDownloadableUrl(raw: String): Boolean {
+        if (raw.isBlank()) return false
+        val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return false
+        val scheme = uri.scheme?.lowercase()
+        if (scheme != "http" && scheme != "https") return false
+        val host = uri.host ?: return false
+        if (host.isBlank()) return false
+        return !HostSafety.isPrivateOrLoopbackHost(host)
+    }
+
     /** True iff [s] has [requiredLength] characters, all hex. */
-    private fun isHex(s: String, requiredLength: Int): Boolean {
+    private fun isHex(
+        s: String,
+        requiredLength: Int,
+    ): Boolean {
         if (s.length != requiredLength) return false
         for (c in s) if (c !in HEX_CHARS) return false
         return true
@@ -109,6 +131,5 @@ object MediaReferenceParser {
      * image bubble. Tied to mime prefix so non-image attachments (Phase 3)
      * route through a different surface.
      */
-    fun isImageMedia(reference: MediaReferenceFfi): Boolean =
-        reference.mediaType.startsWith("image/", ignoreCase = true)
+    fun isImageMedia(reference: MediaReferenceFfi): Boolean = reference.mediaType.startsWith("image/", ignoreCase = true)
 }

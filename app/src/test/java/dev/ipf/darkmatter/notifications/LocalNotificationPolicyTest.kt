@@ -41,22 +41,23 @@ class LocalNotificationPolicyTest {
         )
     }
 
-    private fun update(groupIdHex: String) = NotificationUpdateFfi(
-        notificationKey = "message:account:message",
-        conversationKey = "conversation:account:$groupIdHex",
-        trigger = NotificationTriggerFfi.NEW_MESSAGE,
-        accountRef = "account",
-        accountIdHex = "account",
-        groupIdHex = groupIdHex,
-        groupName = "General",
-        isDm = false,
-        messageIdHex = "message",
-        sender = user(),
-        receiver = user(accountIdHex = "account", displayName = "Me"),
-        previewText = "Hello",
-        timestampMs = 1234,
-        isFromSelf = false,
-    )
+    private fun update(groupIdHex: String) =
+        NotificationUpdateFfi(
+            notificationKey = "message:account:message",
+            conversationKey = "conversation:account:$groupIdHex",
+            trigger = NotificationTriggerFfi.NEW_MESSAGE,
+            accountRef = "account",
+            accountIdHex = "account",
+            groupIdHex = groupIdHex,
+            groupName = "General",
+            isDm = false,
+            messageIdHex = "message",
+            sender = user(),
+            receiver = user(accountIdHex = "account", displayName = "Me"),
+            previewText = "Hello",
+            timestampMs = 1234,
+            isFromSelf = false,
+        )
 
     private fun user(
         accountIdHex: String = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",

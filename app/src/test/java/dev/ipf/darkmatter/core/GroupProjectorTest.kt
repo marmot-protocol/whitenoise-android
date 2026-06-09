@@ -1,11 +1,11 @@
 package dev.ipf.darkmatter.core
 
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import dev.ipf.marmotkit.AppGroupMemberRecordFfi
-import dev.ipf.marmotkit.AppGroupRecordFfi
 
 class GroupProjectorTest {
     @Test
@@ -27,11 +27,21 @@ class GroupProjectorTest {
     }
 
     @Test
-    fun lastAdminCannotLeaveGroup() {
-        assertFalse(GroupProjector.canLeaveGroup(group(admins = listOf("alice")), activeAccountIdHex = "alice"))
-        assertFalse(GroupProjector.canLeaveGroup(group(admins = listOf("ALICE")), activeAccountIdHex = "alice"))
-        assertTrue(GroupProjector.canLeaveGroup(group(admins = listOf("alice", "bob")), activeAccountIdHex = "alice"))
-        assertTrue(GroupProjector.canLeaveGroup(group(admins = listOf("alice")), activeAccountIdHex = "carol"))
+    fun lastAdminCannotLeaveGroupWhileOtherMembersRemain() {
+        assertFalse(GroupProjector.canLeaveGroup(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 3))
+        assertFalse(GroupProjector.canLeaveGroup(group(admins = listOf("ALICE")), activeAccountIdHex = "alice", memberCount = 3))
+        assertTrue(GroupProjector.canLeaveGroup(group(admins = listOf("alice", "bob")), activeAccountIdHex = "alice", memberCount = 3))
+        assertTrue(GroupProjector.canLeaveGroup(group(admins = listOf("alice")), activeAccountIdHex = "carol", memberCount = 3))
+    }
+
+    @Test
+    fun soleAdminCanLeaveWhenTheyAreTheOnlyMember() {
+        // Regression for #46: a sole admin who is also the last remaining member
+        // was stuck in their own group. There is no one to orphan, so leaving
+        // (dissolving the group) must be allowed...
+        assertTrue(GroupProjector.canLeaveGroup(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 1))
+        // ...and they must not be asked to self-demote the last admin first.
+        assertFalse(GroupProjector.requiresSelfDemoteBeforeLeave(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 1))
     }
 
     @Test
@@ -40,18 +50,21 @@ class GroupProjectorTest {
             GroupProjector.requiresSelfDemoteBeforeLeave(
                 group(admins = listOf("alice", "bob")),
                 activeAccountIdHex = "alice",
+                memberCount = 3,
             ),
         )
         assertTrue(
             GroupProjector.requiresSelfDemoteBeforeLeave(
                 group(admins = listOf("ALICE", "bob")),
                 activeAccountIdHex = "alice",
+                memberCount = 3,
             ),
         )
         assertFalse(
             GroupProjector.requiresSelfDemoteBeforeLeave(
                 group(admins = listOf("alice", "bob")),
                 activeAccountIdHex = "carol",
+                memberCount = 3,
             ),
         )
     }
@@ -140,30 +153,33 @@ class GroupProjectorTest {
 
     @Test
     fun otherMemberUsesMemberIdHexInsteadOfLocalAccountLabel() {
-        val members = listOf(
-            member(memberId = "alice", account = "Jeff", local = true),
-            member(memberId = "bob", account = null, local = false),
-        )
+        val members =
+            listOf(
+                member(memberId = "alice", account = "Jeff", local = true),
+                member(memberId = "bob", account = null, local = false),
+            )
 
         assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = "alice"))
     }
 
     @Test
     fun otherMemberFallsBackToNonLocalMemberIdWhenActiveAccountIsMissing() {
-        val members = listOf(
-            member(memberId = "alice", account = "Jeff", local = true),
-            member(memberId = "bob", account = null, local = false),
-        )
+        val members =
+            listOf(
+                member(memberId = "alice", account = "Jeff", local = true),
+                member(memberId = "bob", account = null, local = false),
+            )
 
         assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = null))
     }
 
     @Test
     fun otherMemberFallsBackToActiveAccountComparisonWhenLocalFlagIsUnavailable() {
-        val members = listOf(
-            member(memberId = "alice", account = null, local = false),
-            member(memberId = "bob", account = null, local = false),
-        )
+        val members =
+            listOf(
+                member(memberId = "alice", account = null, local = false),
+                member(memberId = "bob", account = null, local = false),
+            )
 
         assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = "alice"))
     }

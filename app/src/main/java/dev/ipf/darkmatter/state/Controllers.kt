@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.core.MessageProjector
@@ -11,7 +12,32 @@ import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ReactionTally
 import dev.ipf.darkmatter.core.ReplyNavigation
 import dev.ipf.darkmatter.core.TimelineProjector
-import java.util.UUID
+import dev.ipf.darkmatter.media.ByteSizeLruCache
+import dev.ipf.darkmatter.media.MediaPipeline
+import dev.ipf.darkmatter.media.MediaReferenceParser
+import dev.ipf.marmotkit.AgentStreamSubscription
+import dev.ipf.marmotkit.AgentStreamUpdateFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupMlsStateFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListSubscription
+import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.ChatsSubscription
+import dev.ipf.marmotkit.GroupDetailsFfi
+import dev.ipf.marmotkit.GroupStateSubscription
+import dev.ipf.marmotkit.MediaReferenceFfi
+import dev.ipf.marmotkit.MediaUploadRequestFfi
+import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
+import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelineMessagesSubscription
+import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
+import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,32 +48,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import dev.ipf.marmotkit.AppGroupMemberRecordFfi
-import dev.ipf.marmotkit.AppGroupMlsStateFfi
-import dev.ipf.marmotkit.AppGroupRecordFfi
-import dev.ipf.darkmatter.media.ByteSizeLruCache
-import dev.ipf.darkmatter.media.MediaPipeline
-import dev.ipf.darkmatter.media.MediaReferenceParser
-import dev.ipf.marmotkit.MediaReferenceFfi
-import dev.ipf.marmotkit.MediaUploadRequestFfi
-import dev.ipf.marmotkit.MessageTagFfi
-import dev.ipf.marmotkit.AgentStreamUpdateFfi
-import dev.ipf.marmotkit.AgentStreamSubscription
-import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.marmotkit.ChatListSubscription
-import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
-import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
-import dev.ipf.marmotkit.ChatsSubscription
-import dev.ipf.marmotkit.GroupDetailsFfi
-import dev.ipf.marmotkit.GroupStateSubscription
-import dev.ipf.marmotkit.TimelineMessageQueryFfi
-import dev.ipf.marmotkit.TimelineMessageChangeFfi
-import dev.ipf.marmotkit.TimelineMessageRecordFfi
-import dev.ipf.marmotkit.TimelineMessagesSubscription
-import dev.ipf.marmotkit.TimelinePageFfi
-import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
-import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import java.util.UUID
 
 data class ChatListItem(
     val group: AppGroupRecordFfi,
@@ -85,39 +86,40 @@ data class ChatListItem(
     }
 }
 
-internal fun sortChatListItems(items: List<ChatListItem>): List<ChatListItem> {
-    return items.sortedWith(
+internal fun sortChatListItems(items: List<ChatListItem>): List<ChatListItem> =
+    items.sortedWith(
         compareByDescending<ChatListItem> { it.group.pendingConfirmation }
             .thenByDescending { it.latestAt ?: 0uL }
             .thenBy { (it.projectedTitle ?: it.group.name.ifBlank { it.group.groupIdHex }).lowercase() },
     )
-}
 
 internal fun chatListItemFromProjection(
     row: ChatListRowFfi,
     group: AppGroupRecordFfi? = null,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
-    val displayGroup = baseGroup.copy(
-        name = row.groupName.ifBlank { baseGroup.name },
-        archived = row.archived,
-        pendingConfirmation = row.pendingConfirmation,
-    )
+    val displayGroup =
+        baseGroup.copy(
+            name = row.groupName.ifBlank { baseGroup.name },
+            archived = row.archived,
+            pendingConfirmation = row.pendingConfirmation,
+        )
     return ChatListItem(
         group = displayGroup,
-        latest = row.lastMessage?.let { preview ->
-            AppMessageRecordFfi(
-                messageIdHex = preview.messageIdHex,
-                direction = "received",
-                groupIdHex = row.groupIdHex,
-                sender = preview.sender,
-                plaintext = preview.plaintext,
-                kind = preview.kind,
-                tags = emptyList(),
-                recordedAt = preview.timelineAt,
-                receivedAt = preview.timelineAt,
-            )
-        },
+        latest =
+            row.lastMessage?.let { preview ->
+                AppMessageRecordFfi(
+                    messageIdHex = preview.messageIdHex,
+                    direction = "received",
+                    groupIdHex = row.groupIdHex,
+                    sender = preview.sender,
+                    plaintext = preview.plaintext,
+                    kind = preview.kind,
+                    tags = emptyList(),
+                    recordedAt = preview.timelineAt,
+                    receivedAt = preview.timelineAt,
+                )
+            },
         otherMemberAccount = null,
         memberCount = 0,
         memberSnapshot = null,
@@ -125,8 +127,8 @@ internal fun chatListItemFromProjection(
     )
 }
 
-private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi {
-    return AppGroupRecordFfi(
+private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
+    AppGroupRecordFfi(
         groupIdHex = row.groupIdHex,
         endpoint = "",
         name = row.groupName,
@@ -139,16 +141,13 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi {
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
     )
-}
 
 data class GroupMemberSnapshot(
     val members: List<AppGroupMemberRecordFfi>,
 ) {
     val memberCount: Int = members.size
 
-    fun otherMemberAccount(activeAccountIdHex: String?): String? {
-        return GroupProjector.otherMemberAccount(members, activeAccountIdHex)
-    }
+    fun otherMemberAccount(activeAccountIdHex: String?): String? = GroupProjector.otherMemberAccount(members, activeAccountIdHex)
 }
 
 enum class MessageStatus {
@@ -165,15 +164,15 @@ enum class OutgoingMessageIndicator {
     Failed,
 }
 
-fun MessageStatus.outgoingIndicator(): OutgoingMessageIndicator? {
-    return when (this) {
+fun MessageStatus.outgoingIndicator(): OutgoingMessageIndicator? =
+    when (this) {
         MessageStatus.Pending -> OutgoingMessageIndicator.Sending
         MessageStatus.Received,
-        MessageStatus.Sent -> OutgoingMessageIndicator.Sent
+        MessageStatus.Sent,
+        -> OutgoingMessageIndicator.Sent
         MessageStatus.Failed -> OutgoingMessageIndicator.Failed
         MessageStatus.Streaming -> null
     }
-}
 
 data class TimelineMessage(
     val id: String,
@@ -189,51 +188,66 @@ internal fun optimisticMessageIdForProjection(
     allowDelayedProjection: Boolean = false,
 ): String? {
     val projectedIsMedia = projected.tags.any { it.values.firstOrNull() == "imeta" }
-    return optimisticMessages.firstOrNull { optimistic ->
-        val sendable = optimistic.status == MessageStatus.Pending || optimistic.status == MessageStatus.Sent
-        if (!sendable) return@firstOrNull false
-        if (optimistic.record.direction != projected.direction) return@firstOrNull false
-        if (optimistic.record.groupIdHex != projected.groupIdHex) return@firstOrNull false
-        if (optimistic.record.sender != projected.sender) return@firstOrNull false
-        if (optimistic.record.kind != projected.kind) return@firstOrNull false
-        val timestampsOk = timestampsAreNear(optimistic.record.recordedAt, projected.recordedAt) ||
-            (allowDelayedProjection && projected.recordedAt >= optimistic.record.recordedAt)
-        if (!timestampsOk) return@firstOrNull false
+    return optimisticMessages
+        .firstOrNull { optimistic ->
+            val sendable = optimistic.status == MessageStatus.Pending || optimistic.status == MessageStatus.Sent
+            if (!sendable) return@firstOrNull false
+            if (optimistic.record.direction != projected.direction) return@firstOrNull false
+            if (optimistic.record.groupIdHex != projected.groupIdHex) return@firstOrNull false
+            if (optimistic.record.sender != projected.sender) return@firstOrNull false
+            if (optimistic.record.kind != projected.kind) return@firstOrNull false
+            val timestampsOk =
+                timestampsAreNear(optimistic.record.recordedAt, projected.recordedAt) ||
+                    (allowDelayedProjection && projected.recordedAt >= optimistic.record.recordedAt)
+            if (!timestampsOk) return@firstOrNull false
 
-        // Media-pending optimistic ↔ media projection: the pending bubble
-        // carries plaintext = "📎 filename" + the "_media_pending" sentinel
-        // tag, while the projection carries plaintext = caption (often
-        // empty) + the real imeta tag. Plain field-by-field equality won't
-        // match. The sentinel tag on the optimistic side plus an imeta tag
-        // on the projection side, combined with the identity fields above,
-        // uniquely identifies the pending → confirmed pair.
-        val optimisticIsMediaPending = optimistic.record.tags.any { it.values.firstOrNull() == "_media_pending" }
-        if (optimisticIsMediaPending && projectedIsMedia) return@firstOrNull true
+            // Media-pending optimistic ↔ media projection: the pending bubble
+            // carries plaintext = "📎 filename" + the "_media_pending" sentinel
+            // tag, while the projection carries plaintext = caption (often
+            // empty) + the real imeta tag. Plain field-by-field equality won't
+            // match. The sentinel tag on the optimistic side plus an imeta tag
+            // on the projection side, combined with the identity fields above,
+            // uniquely identifies the pending → confirmed pair.
+            val optimisticIsMediaPending = optimistic.record.tags.any { it.values.firstOrNull() == "_media_pending" }
+            if (optimisticIsMediaPending && projectedIsMedia) return@firstOrNull true
 
-        // Standard match for text sends: plaintext + tags equal.
-        optimistic.record.plaintext == projected.plaintext &&
-            optimistic.record.tags == projected.tags
-    }?.record?.messageIdHex
+            // Standard match for text sends: plaintext + tags equal.
+            optimistic.record.plaintext == projected.plaintext &&
+                optimistic.record.tags == projected.tags
+        }?.record
+        ?.messageIdHex
 }
 
-private fun timestampsAreNear(left: ULong, right: ULong): Boolean {
-    return if (left >= right) left - right <= 1uL else right - left <= 1uL
-}
+private fun timestampsAreNear(
+    left: ULong,
+    right: ULong,
+): Boolean = if (left >= right) left - right <= 1uL else right - left <= 1uL
 
 internal fun shouldInsertSentOptimisticMessage(
     confirmedId: String,
     projectedMessageIds: Set<String>,
-): Boolean {
-    return confirmedId !in projectedMessageIds
-}
+): Boolean = confirmedId !in projectedMessageIds
 
-internal fun compareTimelineMessages(left: TimelineMessage, right: TimelineMessage): Int {
-    return compareValuesBy(left, right, { it.record.recordedAt }, { it.timelineOrder }, { it.id })
-}
+internal fun compareTimelineMessages(
+    left: TimelineMessage,
+    right: TimelineMessage,
+): Int =
+    compareValuesBy(left, right, {
+        it.record.recordedAt
+    }, { it.timelineOrder }, { it.id })
 
-internal fun AppMessageRecordFfi.withRecordedAtOverride(recordedAt: ULong?): AppMessageRecordFfi {
-    return recordedAt?.let { copy(recordedAt = it) } ?: this
-}
+internal fun AppMessageRecordFfi.withRecordedAtOverride(recordedAt: ULong?): AppMessageRecordFfi = recordedAt?.let { copy(recordedAt = it) } ?: this
+
+/**
+ * The timeline position to reuse when retrying a failed optimistic send.
+ * [stored] is non-nullable (`TimelineMessage.timelineOrder` defaults to `0uL`),
+ * so an elvis against it is dead code; `0uL` is the "unset" sentinel and is the
+ * only case that should mint a fresh order via [freshOrder]. See #101.
+ */
+internal fun retriedTimelineOrder(
+    stored: ULong,
+    freshOrder: () -> ULong,
+): ULong = stored.takeIf { it != 0uL } ?: freshOrder()
 
 /**
  * Index of the first (oldest) still-unread received message in [timeline]
@@ -241,7 +255,10 @@ internal fun AppMessageRecordFfi.withRecordedAtOverride(recordedAt: ULong?): App
  * unread, the timeline is empty, or the loaded window holds fewer than
  * [unreadCount] received messages (caller falls back to the bottom).
  */
-internal fun firstUnreadReceivedIndex(timeline: List<TimelineMessage>, unreadCount: Int): Int {
+internal fun firstUnreadReceivedIndex(
+    timeline: List<TimelineMessage>,
+    unreadCount: Int,
+): Int {
     if (unreadCount <= 0 || timeline.isEmpty()) return -1
     var seen = 0
     for (index in timeline.indices.reversed()) {
@@ -263,11 +280,15 @@ internal fun firstUnreadReceivedIndex(timeline: List<TimelineMessage>, unreadCou
  * Anchoring on a message id (not an index) keeps the count stable when
  * load-older prepends shift every index by the same offset.
  */
-internal fun countUnreadIncoming(timeline: List<TimelineMessage>, readAnchorMessageId: String?): Int {
+internal fun countUnreadIncoming(
+    timeline: List<TimelineMessage>,
+    readAnchorMessageId: String?,
+): Int {
     if (timeline.isEmpty()) return 0
-    val anchorIdx = readAnchorMessageId?.let { id ->
-        timeline.indexOfFirst { it.record.messageIdHex == id }
-    } ?: -1
+    val anchorIdx =
+        readAnchorMessageId?.let { id ->
+            timeline.indexOfFirst { it.record.messageIdHex == id }
+        } ?: -1
     return timeline.drop(anchorIdx + 1).count { it.record.direction == "received" }
 }
 
@@ -297,7 +318,10 @@ data class ConversationControllerCopy(
     fun streamFailed(message: String): String = String.format(streamFailedFormat, message)
 }
 
-internal fun agentStreamFailureText(throwable: Throwable, copy: ConversationControllerCopy): String {
+internal fun agentStreamFailureText(
+    throwable: Throwable,
+    copy: ConversationControllerCopy,
+): String {
     if (throwable is CancellationException) throw throwable
     return copy.streamFailed(throwable.message ?: throwable.javaClass.simpleName)
 }
@@ -320,7 +344,9 @@ private class RetainedMediaUpload(
     var uploadedReference: MediaReferenceFfi? = null,
 )
 
-class ChatsController(private val appState: DarkMatterAppState) {
+class ChatsController(
+    private val appState: DarkMatterAppState,
+) {
     var items by mutableStateOf<List<ChatListItem>>(emptyList())
         private set
     var archivedItems by mutableStateOf<List<ChatListItem>>(emptyList())
@@ -329,6 +355,7 @@ class ChatsController(private val appState: DarkMatterAppState) {
         private set
     var error by mutableStateOf<String?>(null)
         private set
+
     /** The account this controller is currently bound to (observable so
      *  notification routing can tell when the right account's list is ready). */
     var boundAccountRef by mutableStateOf<String?>(null)
@@ -356,13 +383,15 @@ class ChatsController(private val appState: DarkMatterAppState) {
             chatListSubscription = chatListStream
             val chatStream = appState.marmotIo { subscribeChats(accountRef, includeArchived = true) }
             chatsSubscription = chatStream
-            chatRows = withContext(Dispatchers.IO) {
-                chatListStream.snapshot()
-            }
+            chatRows =
+                withContext(Dispatchers.IO) {
+                    chatListStream.snapshot()
+                }
             chatRows.forEach(::requestChatRowProfiles)
-            groupRecordsById = withContext(Dispatchers.IO) {
-                chatStream.snapshot()
-            }.associateBy { it.groupIdHex }
+            groupRecordsById =
+                withContext(Dispatchers.IO) {
+                    chatStream.snapshot()
+                }.associateBy { it.groupIdHex }
             groupRecordsById.values.forEach(::requestGroupProfiles)
             chatsDebug {
                 "snapshot account=${accountRef.take(8)} rows=${chatRows.size} groups=${groupRecordsById.size} " +
@@ -374,9 +403,10 @@ class ChatsController(private val appState: DarkMatterAppState) {
             coroutineScope {
                 launch {
                     while (isActive) {
-                        val update = withContext(Dispatchers.IO) {
-                            chatListStream.nextUpdate()
-                        } ?: break
+                        val update =
+                            withContext(Dispatchers.IO) {
+                                chatListStream.nextUpdate()
+                            } ?: break
                         when (update) {
                             is ChatListSubscriptionUpdateFfi.Row -> {
                                 val row = update.row
@@ -397,9 +427,10 @@ class ChatsController(private val appState: DarkMatterAppState) {
                 }
                 launch {
                     while (isActive) {
-                        val update = withContext(Dispatchers.IO) {
-                            chatStream.next()
-                        } ?: break
+                        val update =
+                            withContext(Dispatchers.IO) {
+                                chatStream.next()
+                            } ?: break
                         requestGroupProfiles(update)
                         chatsDebug { "chat update account=${accountRef.take(8)} ${update.debugSummary()}" }
                         foldGroup(update)
@@ -438,18 +469,20 @@ class ChatsController(private val appState: DarkMatterAppState) {
         if (groupRecordsById[record.groupIdHex] == null) return
         // chatListItemFromProjection reads row.archived (not group.archived), so
         // patch both the chat row and the group record to keep them consistent.
-        chatRows = chatRows.map { row ->
-            if (row.groupIdHex == record.groupIdHex) row.copy(archived = record.archived) else row
-        }
+        chatRows =
+            chatRows.map { row ->
+                if (row.groupIdHex == record.groupIdHex) row.copy(archived = record.archived) else row
+            }
         foldGroup(record)
     }
 
     private fun foldChatRow(row: ChatListRowFfi) {
-        chatRows = if (chatRows.any { it.groupIdHex == row.groupIdHex }) {
-            chatRows.map { if (it.groupIdHex == row.groupIdHex) row else it }
-        } else {
-            chatRows + row
-        }
+        chatRows =
+            if (chatRows.any { it.groupIdHex == row.groupIdHex }) {
+                chatRows.map { if (it.groupIdHex == row.groupIdHex) row else it }
+            } else {
+                chatRows + row
+            }
         recompute()
     }
 
@@ -469,46 +502,51 @@ class ChatsController(private val appState: DarkMatterAppState) {
     }
 
     private fun recompute() {
-        val all = chatRows.map { row ->
-            chatListItemFromProjection(row, groupRecordsById[row.groupIdHex])
-        }.let(::sortChatListItems)
+        val all =
+            chatRows
+                .map { row ->
+                    chatListItemFromProjection(row, groupRecordsById[row.groupIdHex])
+                }.let(::sortChatListItems)
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
         chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }
     }
 }
 
-private fun AppGroupRecordFfi.debugSummary(): String {
-    return "id=${groupIdHex.take(8)} archived=$archived pending=$pendingConfirmation " +
+private fun AppGroupRecordFfi.debugSummary(): String =
+    "id=${groupIdHex.take(8)} archived=$archived pending=$pendingConfirmation " +
         "welcomer=${welcomerAccountIdHex?.take(8)} relays=${relays.size} name=${name.ifBlank { "<blank>" }}"
-}
 
-private fun ChatListRowFfi.debugSummary(): String {
-    return "id=${groupIdHex.take(8)} archived=$archived pending=$pendingConfirmation unread=$unreadCount " +
+private fun ChatListRowFfi.debugSummary(): String =
+    "id=${groupIdHex.take(8)} archived=$archived pending=$pendingConfirmation unread=$unreadCount " +
         "last=${lastMessage?.messageIdHex?.take(8)} title=${title.ifBlank { "<blank>" }}"
-}
 
-private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean {
-    return when (this) {
+private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
+    when (this) {
         TimelineUpdateTriggerFfi.REACTION_ADDED,
         TimelineUpdateTriggerFfi.REACTION_REMOVED,
         TimelineUpdateTriggerFfi.MESSAGE_DELETED,
         TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED,
-        TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH -> true
+        TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH,
+        -> true
         TimelineUpdateTriggerFfi.NEW_MESSAGE,
         TimelineUpdateTriggerFfi.REPLY_PREVIEW_CHANGED,
         TimelineUpdateTriggerFfi.AGENT_STREAM_STARTED,
         TimelineUpdateTriggerFfi.AGENT_STREAM_FINISHED,
         TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
-        TimelineUpdateTriggerFfi.RECEIPT_CHANGED -> false
+        TimelineUpdateTriggerFfi.RECEIPT_CHANGED,
+        -> false
     }
-}
 
 private inline fun chatsDebug(message: () -> String) {
-    Log.i("DMChats", message())
+    // Debug-only so operational INFO logs don't ship in release logcat. See #39.
+    if (BuildConfig.DEBUG) Log.i("DMChats", message())
 }
 
-private inline fun chatsDebug(error: Throwable, message: () -> String) {
+private inline fun chatsDebug(
+    error: Throwable,
+    message: () -> String,
+) {
     Log.e("DMChats", message(), error)
 }
 
@@ -524,6 +562,7 @@ class ConversationController(
         private set
     var members by mutableStateOf<List<AppGroupMemberRecordFfi>>(initialMemberSnapshot?.members.orEmpty())
         private set
+
     // Use cached members immediately to avoid a blank composer gap while the
     // first refresh verifies the roster.
     var membersLoaded by mutableStateOf(initialMemberSnapshot?.members?.isNotEmpty() == true)
@@ -542,6 +581,7 @@ class ConversationController(
         private set
     var hasMoreBefore by mutableStateOf(false)
         private set
+
     // Single guard for archive/leave/member-management mutations so the UI can
     // disable buttons while one is in flight and prevent double-submits.
     var mutationInFlight by mutableStateOf(false)
@@ -570,15 +610,16 @@ class ConversationController(
         lastMutationError = null
     }
 
-    private fun mutationError(throwable: Throwable): String {
-        return throwable.message ?: throwable.javaClass.simpleName
-    }
+    private fun mutationError(throwable: Throwable): String = throwable.message ?: throwable.javaClass.simpleName
 
     private fun Throwable.rethrowIfCancellation() {
         if (this is CancellationException) throw this
     }
 
-    private suspend inline fun <T> withMutationLockResult(defaultValue: T, block: () -> T): T {
+    private suspend inline fun <T> withMutationLockResult(
+        defaultValue: T,
+        block: () -> T,
+    ): T {
         if (mutationInFlight) return defaultValue
         mutationInFlight = true
         return try {
@@ -603,6 +644,7 @@ class ConversationController(
     private val activeStreamIds = mutableSetOf<String>()
     private val removedStreamIds = mutableSetOf<String>()
     private var hasLoadedOlderPages = false
+
     // Last message id we successfully marked as read on the Rust side.
     // Dedupes scroll-driven [markReadUpTo] calls so settling on the same row
     // doesn't issue redundant FFI hops.
@@ -633,7 +675,11 @@ class ConversationController(
     val subtitle: String
         get() = subtitle(justYou = "Just you", oneMember = "1 member", membersFormat = "%1\$d members")
 
-    fun subtitle(justYou: String, oneMember: String, membersFormat: String): String {
+    fun subtitle(
+        justYou: String,
+        oneMember: String,
+        membersFormat: String,
+    ): String {
         val count = members.size
         return when (count) {
             0 -> justYou
@@ -652,7 +698,7 @@ class ConversationController(
         get() = membersVerified && isSelfMember
 
     val canLeaveGroup: Boolean
-        get() = GroupProjector.canLeaveGroup(group, appState.activeAccount?.accountIdHex)
+        get() = GroupProjector.canLeaveGroup(group, appState.activeAccount?.accountIdHex, members.size)
 
     suspend fun start() {
         val account = conversationAccountRef ?: return
@@ -661,9 +707,10 @@ class ConversationController(
         var timelineSubscription: TimelineMessagesSubscription? = null
         var groupSubscription: GroupStateSubscription? = null
         try {
-            val timelineStream = appState.marmotIo {
-                subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
-            }
+            val timelineStream =
+                appState.marmotIo {
+                    subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
+                }
             timelineSubscription = timelineStream
             val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
             val snapshotStreamIds = snapshot?.let { applyTimelinePage(it, replaceWindow = true, updatePagination = true) }.orEmpty()
@@ -674,9 +721,10 @@ class ConversationController(
 
             val groupStream = appState.marmotIo { subscribeGroupState(account, group.groupIdHex) }
             groupSubscription = groupStream
-            val groupSnapshot = withContext(Dispatchers.IO) {
-                groupStream.snapshot()
-            }
+            val groupSnapshot =
+                withContext(Dispatchers.IO) {
+                    groupStream.snapshot()
+                }
             groupSnapshot?.let { group = it }
             refreshMembers()
             isLoading = false
@@ -689,31 +737,33 @@ class ConversationController(
                 }
                 launch {
                     while (isActive) {
-                        val update = withContext(Dispatchers.IO) {
-                            timelineStream.nextUpdate()
-                        } ?: break
-                        val streamIds = when (update) {
-                            is TimelineSubscriptionUpdateFfi.Page -> {
-                                val replaceWindow = !hasLoadedOlderPages
-                                applyTimelinePage(
-                                    update.page,
-                                    replaceWindow = replaceWindow,
-                                    updatePagination = replaceWindow,
-                                )
-                            }
-                            is TimelineSubscriptionUpdateFfi.Projection -> {
-                                val projection = update.update.update
-                                if (projection.groupIdHex == group.groupIdHex) {
-                                    applyChatListProjection(
-                                        projection.chatListTrigger,
-                                        projection.chatListRow,
+                        val update =
+                            withContext(Dispatchers.IO) {
+                                timelineStream.nextUpdate()
+                            } ?: break
+                        val streamIds =
+                            when (update) {
+                                is TimelineSubscriptionUpdateFfi.Page -> {
+                                    val replaceWindow = !hasLoadedOlderPages
+                                    applyTimelinePage(
+                                        update.page,
+                                        replaceWindow = replaceWindow,
+                                        updatePagination = replaceWindow,
                                     )
-                                    applyTimelineChanges(projection.changes)
-                                } else {
-                                    emptyList()
+                                }
+                                is TimelineSubscriptionUpdateFfi.Projection -> {
+                                    val projection = update.update.update
+                                    if (projection.groupIdHex == group.groupIdHex) {
+                                        applyChatListProjection(
+                                            projection.chatListTrigger,
+                                            projection.chatListRow,
+                                        )
+                                        applyTimelineChanges(projection.changes)
+                                    } else {
+                                        emptyList()
+                                    }
                                 }
                             }
-                        }
                         // Scroll-driven mark-read in the UI layer handles the
                         // user-visible read pointer. The projection-update
                         // path no longer force-marks the absolute newest as
@@ -729,9 +779,10 @@ class ConversationController(
                 }
                 launch {
                     while (isActive) {
-                        val update = withContext(Dispatchers.IO) {
-                            groupStream.next()
-                        } ?: break
+                        val update =
+                            withContext(Dispatchers.IO) {
+                                groupStream.next()
+                            } ?: break
                         group = update
                         refreshMembers()
                     }
@@ -769,57 +820,64 @@ class ConversationController(
         val replyTarget = replyingTo?.messageIdHex?.takeIf { it.isNotBlank() }
         val tempId = UUID.randomUUID().toString()
         val now = nowSeconds()
-        val optimistic = AppMessageRecordFfi(
-            messageIdHex = tempId,
-            direction = "sent",
-            groupIdHex = group.groupIdHex,
-            sender = appState.activeAccount?.accountIdHex ?: "",
-            plaintext = trimmed,
-            kind = 9uL,
-            tags = replyTarget?.let {
-                listOf(MessageProjector.eventTag(it), MessageProjector.quoteTag(it))
-            }.orEmpty(),
-            recordedAt = now,
-            receivedAt = now,
-        )
+        val optimistic =
+            AppMessageRecordFfi(
+                messageIdHex = tempId,
+                direction = "sent",
+                groupIdHex = group.groupIdHex,
+                sender = appState.activeAccount?.accountIdHex ?: "",
+                plaintext = trimmed,
+                kind = 9uL,
+                tags =
+                    replyTarget
+                        ?.let {
+                            listOf(MessageProjector.eventTag(it), MessageProjector.quoteTag(it))
+                        }.orEmpty(),
+                recordedAt = now,
+                receivedAt = now,
+            )
         val optimisticOrder = nextOptimisticTimelineOrder()
-        optimisticMessages["msg:$tempId"] = TimelineMessage(
-            "msg:$tempId",
-            optimistic,
-            MessageStatus.Pending,
-            timelineOrder = optimisticOrder,
-        )
+        optimisticMessages["msg:$tempId"] =
+            TimelineMessage(
+                "msg:$tempId",
+                optimistic,
+                MessageStatus.Pending,
+                timelineOrder = optimisticOrder,
+            )
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
         replyingTo = null
         try {
-            val summary = if (replyTarget != null) {
-                appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, trimmed) }
-            } else {
-                appState.marmotIo { sendText(account, group.groupIdHex, trimmed) }
-            }
+            val summary =
+                if (replyTarget != null) {
+                    appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, trimmed) }
+                } else {
+                    appState.marmotIo { sendText(account, group.groupIdHex, trimmed) }
+                }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = optimistic.copy(messageIdHex = confirmedId)
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
             optimisticMessages.remove("msg:$tempId")
             messageById.remove(tempId)
             if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
-                optimisticMessages["msg:$confirmedId"] = TimelineMessage(
-                    "msg:$confirmedId",
-                    confirmed,
-                    MessageStatus.Sent,
-                    timelineOrder = optimisticOrder,
-                )
+                optimisticMessages["msg:$confirmedId"] =
+                    TimelineMessage(
+                        "msg:$confirmedId",
+                        confirmed,
+                        MessageStatus.Sent,
+                        timelineOrder = optimisticOrder,
+                    )
             }
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
-            optimisticMessages["msg:$tempId"] = TimelineMessage(
-                "msg:$tempId",
-                optimistic,
-                MessageStatus.Failed,
-                timelineOrder = optimisticOrder,
-            )
+            optimisticMessages["msg:$tempId"] =
+                TimelineMessage(
+                    "msg:$tempId",
+                    optimistic,
+                    MessageStatus.Failed,
+                    timelineOrder = optimisticOrder,
+                )
             publishTimelineFromIndexes()
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
@@ -851,32 +909,34 @@ class ConversationController(
         // the upload runs. The real message arriving after publish carries the
         // imeta tag and supersedes this optimistic one.
         val body = trimmedCaption ?: "📎 $fileName"
-        val optimistic = AppMessageRecordFfi(
-            messageIdHex = tempId,
-            direction = "sent",
-            groupIdHex = group.groupIdHex,
-            sender = appState.activeAccount?.accountIdHex ?: "",
-            plaintext = body,
-            kind = 9uL,
-            // Sentinel tag distinguishes a pending-media optimistic record from
-            // a normal text optimistic record. retryFailedSend uses it to route
-            // into the media re-upload path (bytes are held in
-            // [retainedMediaUploads] so retry doesn't need a re-attach).
-            tags = listOf(MessageTagFfi(listOf("_media_pending", fileName, mediaType))),
-            recordedAt = now,
-            receivedAt = now,
-        )
+        val optimistic =
+            AppMessageRecordFfi(
+                messageIdHex = tempId,
+                direction = "sent",
+                groupIdHex = group.groupIdHex,
+                sender = appState.activeAccount?.accountIdHex ?: "",
+                plaintext = body,
+                kind = 9uL,
+                // Sentinel tag distinguishes a pending-media optimistic record from
+                // a normal text optimistic record. retryFailedSend uses it to route
+                // into the media re-upload path (bytes are held in
+                // [retainedMediaUploads] so retry doesn't need a re-attach).
+                tags = listOf(MessageTagFfi(listOf("_media_pending", fileName, mediaType))),
+                recordedAt = now,
+                receivedAt = now,
+            )
         val optimisticOrder = nextOptimisticTimelineOrder()
         // Retain the compressed bytes so a failed upload can be retried in
         // place, and so the sender's own bubble renders from memory after
         // confirm instead of round-tripping Blossom.
         retainedMediaUploads.put(key, RetainedMediaUpload(jpegBytes, mediaType, fileName, trimmedCaption))
-        optimisticMessages[key] = TimelineMessage(
-            key,
-            optimistic,
-            MessageStatus.Pending,
-            timelineOrder = optimisticOrder,
-        )
+        optimisticMessages[key] =
+            TimelineMessage(
+                key,
+                optimistic,
+                MessageStatus.Pending,
+                timelineOrder = optimisticOrder,
+            )
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
         performMediaUpload(account, key, tempId, optimisticOrder, optimistic)
@@ -897,33 +957,36 @@ class ConversationController(
         order: ULong,
         optimistic: AppMessageRecordFfi,
     ) {
-        val retained = retainedMediaUploads.get(key) ?: run {
-            // Bytes are gone (evicted under cap, or process death) — can't
-            // retry without a re-attach. Leave the bubble Failed.
-            optimisticMessages[key] = TimelineMessage(key, optimistic, MessageStatus.Failed, timelineOrder = order)
-            publishTimelineFromIndexes()
-            appState.present(R.string.toast_reattach_to_retry_media)
-            return
-        }
+        val retained =
+            retainedMediaUploads.get(key) ?: run {
+                // Bytes are gone (evicted under cap, or process death) — can't
+                // retry without a re-attach. Leave the bubble Failed.
+                optimisticMessages[key] = TimelineMessage(key, optimistic, MessageStatus.Failed, timelineOrder = order)
+                publishTimelineFromIndexes()
+                appState.present(R.string.toast_reattach_to_retry_media)
+                return
+            }
         discardedDuringRetry.remove(key)
         try {
             // Reuse the reference if a prior attempt already uploaded the blob
             // (publish-only failure) — re-uploading would orphan a duplicate
             // on the Blossom server.
-            val reference = retained.uploadedReference ?: appState.marmotIo {
-                uploadMedia(
-                    account,
-                    group.groupIdHex,
-                    MediaUploadRequestFfi(
-                        fileName = retained.fileName,
-                        mediaType = retained.mediaType,
-                        plaintext = retained.jpegBytes,
-                        caption = retained.caption,
-                        send = false,
-                        blossomServer = null,
-                    ),
-                ).reference
-            }.also { retained.uploadedReference = it }
+            val reference =
+                retained.uploadedReference ?: appState
+                    .marmotIo {
+                        uploadMedia(
+                            account,
+                            group.groupIdHex,
+                            MediaUploadRequestFfi(
+                                fileName = retained.fileName,
+                                mediaType = retained.mediaType,
+                                plaintext = retained.jpegBytes,
+                                caption = retained.caption,
+                                send = false,
+                                blossomServer = null,
+                            ),
+                        ).reference
+                    }.also { retained.uploadedReference = it }
             // Discard window #1: blob is uploaded but not yet published. If the
             // user discarded here, bail BEFORE sendMediaReference so we don't
             // publish a kind-9 they cancelled (unlike a published event, an
@@ -935,9 +998,10 @@ class ConversationController(
                 publishTimelineFromIndexes()
                 return
             }
-            val summary = appState.marmotIo {
-                sendMediaReference(account, group.groupIdHex, reference, retained.caption)
-            }
+            val summary =
+                appState.marmotIo {
+                    sendMediaReference(account, group.groupIdHex, reference, retained.caption)
+                }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             optimisticMessages.remove(key)
             messageById.remove(tempId)
@@ -975,21 +1039,23 @@ class ConversationController(
             // disappears/reappears, and it renders from the seeded thumbnail.
             // pruneConfirmedOptimisticMessages reconciles it on arrival.
             if (confirmedId.isNotEmpty() && shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
-                val confirmedRecord = optimistic.copy(
-                    messageIdHex = confirmedId,
-                    // Match what the published event carries (the caption we
-                    // sent), not the "📎 filename" optimistic placeholder, so
-                    // the bridge bubble is identical to the projected one.
-                    plaintext = retained.caption.orEmpty(),
-                    tags = listOf(MediaReferenceParser.toImetaTag(reference)),
-                )
+                val confirmedRecord =
+                    optimistic.copy(
+                        messageIdHex = confirmedId,
+                        // Match what the published event carries (the caption we
+                        // sent), not the "📎 filename" optimistic placeholder, so
+                        // the bridge bubble is identical to the projected one.
+                        plaintext = retained.caption.orEmpty(),
+                        tags = listOf(MediaReferenceParser.toImetaTag(reference)),
+                    )
                 messageById[confirmedId] = confirmedRecord
-                optimisticMessages["msg:$confirmedId"] = TimelineMessage(
-                    "msg:$confirmedId",
-                    confirmedRecord,
-                    MessageStatus.Sent,
-                    timelineOrder = order,
-                )
+                optimisticMessages["msg:$confirmedId"] =
+                    TimelineMessage(
+                        "msg:$confirmedId",
+                        confirmedRecord,
+                        MessageStatus.Sent,
+                        timelineOrder = order,
+                    )
             }
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
@@ -1003,28 +1069,33 @@ class ConversationController(
                 publishTimelineFromIndexes()
                 return
             }
-            optimisticMessages[key] = TimelineMessage(
-                key,
-                optimistic,
-                MessageStatus.Failed,
-                timelineOrder = order,
-            )
+            optimisticMessages[key] =
+                TimelineMessage(
+                    key,
+                    optimistic,
+                    MessageStatus.Failed,
+                    timelineOrder = order,
+                )
             publishTimelineFromIndexes()
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
     }
 
-    suspend fun toggleReaction(emoji: String, message: AppMessageRecordFfi) {
+    suspend fun toggleReaction(
+        emoji: String,
+        message: AppMessageRecordFfi,
+    ) {
         val account = appState.activeAccountRef ?: return
         if (!canSendMessages) return
         val target = message.messageIdHex.takeIf { it.isNotBlank() } ?: return
         val alreadyMine = reactions[target]?.any { it.emoji == emoji && it.mine } == true
         val optimisticId = UUID.randomUUID().toString()
-        optimisticReactionChanges[optimisticId] = OptimisticReactionChange(
-            targetMessageId = target,
-            emoji = emoji,
-            add = !alreadyMine,
-        )
+        optimisticReactionChanges[optimisticId] =
+            OptimisticReactionChange(
+                targetMessageId = target,
+                emoji = emoji,
+                add = !alreadyMine,
+            )
         recomputeReactions()
         try {
             if (alreadyMine) {
@@ -1068,10 +1139,11 @@ class ConversationController(
      * so the optimistic bubble can preview the local image while uploading.
      * Bounded by bytes so undiscarded failures can't accrete unbounded heap.
      */
-    private val retainedMediaUploads = ByteSizeLruCache<String, RetainedMediaUpload>(
-        maxBytes = MEDIA_RETAINED_MAX_BYTES,
-        sizeOf = { it.jpegBytes.size },
-    )
+    private val retainedMediaUploads =
+        ByteSizeLruCache<String, RetainedMediaUpload>(
+            maxBytes = MEDIA_RETAINED_MAX_BYTES,
+            sizeOf = { it.jpegBytes.size },
+        )
 
     /**
      * App-level cache key for a decrypted attachment. Scoped to
@@ -1080,8 +1152,10 @@ class ConversationController(
      * defense-in-depth against an evicted/rejoined member replaying an old
      * event id to read plaintext it shouldn't.
      */
-    private fun mediaCacheKey(account: String, messageIdHex: String): String =
-        "$account|${group.groupIdHex}|$messageIdHex"
+    private fun mediaCacheKey(
+        account: String,
+        messageIdHex: String,
+    ): String = "$account|${group.groupIdHex}|$messageIdHex"
 
     /**
      * Fetch and decrypt a Blossom-stored attachment. Backed by the app-level
@@ -1089,7 +1163,10 @@ class ConversationController(
      * so re-opening a conversation doesn't re-download media already fetched
      * this session. Throws on download/decrypt failure — the caller surfaces it.
      */
-    suspend fun downloadAttachment(messageIdHex: String, reference: MediaReferenceFfi): ByteArray {
+    suspend fun downloadAttachment(
+        messageIdHex: String,
+        reference: MediaReferenceFfi,
+    ): ByteArray {
         // Resolve the account first so the cache key is never unanchored
         // ("|group|msg"), which a later sign-in could collide with.
         val account = conversationAccountRef ?: error("no active account")
@@ -1127,7 +1204,10 @@ class ConversationController(
     }
 
     /** Cache a decoded thumbnail so re-renders / re-entry skip the decode. */
-    fun cacheThumbnail(messageIdHex: String, bitmap: android.graphics.Bitmap) {
+    fun cacheThumbnail(
+        messageIdHex: String,
+        bitmap: android.graphics.Bitmap,
+    ) {
         val account = conversationAccountRef ?: return
         appState.mediaThumbnailCache.put(mediaCacheKey(account, messageIdHex), bitmap)
     }
@@ -1145,7 +1225,10 @@ class ConversationController(
      * L2 (disk) write is scheduled in the background, same pattern as
      * `downloadAttachment`'s post-fetch path.
      */
-    private fun handoffOwnMediaCacheOnReconcile(optimisticKey: String, projectedMessageIdHex: String) {
+    private fun handoffOwnMediaCacheOnReconcile(
+        optimisticKey: String,
+        projectedMessageIdHex: String,
+    ) {
         val retained = retainedMediaUploads.get(optimisticKey) ?: return
         val account = conversationAccountRef ?: return
         val cacheKey = mediaCacheKey(account, projectedMessageIdHex)
@@ -1164,8 +1247,7 @@ class ConversationController(
      * sender's bubble can preview the local image while it uploads. [messageIdHex]
      * is the optimistic record's temp id; null once the send confirms.
      */
-    fun pendingMediaBytes(messageIdHex: String): ByteArray? =
-        retainedMediaUploads.get("msg:$messageIdHex")?.jpegBytes
+    fun pendingMediaBytes(messageIdHex: String): ByteArray? = retainedMediaUploads.get("msg:$messageIdHex")?.jpegBytes
 
     /**
      * Drop all retained outgoing JPEG bytes. Called when leaving the
@@ -1197,14 +1279,15 @@ class ConversationController(
         // the shared path. If the bytes were evicted/lost, performMediaUpload
         // flips back to Failed and prompts a re-attach.
         if (current.record.tags.any { it.values.firstOrNull() == "_media_pending" }) {
-            val mediaOrder = current.timelineOrder ?: nextOptimisticTimelineOrder()
+            val mediaOrder = retriedTimelineOrder(current.timelineOrder) { nextOptimisticTimelineOrder() }
             val mediaTempId = current.record.messageIdHex
-            optimisticMessages[key] = TimelineMessage(
-                key,
-                current.record,
-                MessageStatus.Pending,
-                timelineOrder = mediaOrder,
-            )
+            optimisticMessages[key] =
+                TimelineMessage(
+                    key,
+                    current.record,
+                    MessageStatus.Pending,
+                    timelineOrder = mediaOrder,
+                )
             publishTimelineFromIndexes()
             performMediaUpload(account, key, mediaTempId, mediaOrder, current.record)
             return
@@ -1213,22 +1296,24 @@ class ConversationController(
         val text = current.record.plaintext.takeIf { it.isNotBlank() } ?: return
         val replyTarget = MessageProjector.replyTargetMessageId(current.record)
         val refreshedRecord = current.record.copy()
-        val order = current.timelineOrder ?: nextOptimisticTimelineOrder()
+        val order = retriedTimelineOrder(current.timelineOrder) { nextOptimisticTimelineOrder() }
         discardedDuringRetry.remove(key)
-        optimisticMessages[key] = TimelineMessage(
-            key,
-            refreshedRecord,
-            MessageStatus.Pending,
-            timelineOrder = order,
-        )
+        optimisticMessages[key] =
+            TimelineMessage(
+                key,
+                refreshedRecord,
+                MessageStatus.Pending,
+                timelineOrder = order,
+            )
         messageById[tempId] = refreshedRecord
         publishTimelineFromIndexes()
         try {
-            val summary = if (replyTarget != null) {
-                appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, text) }
-            } else {
-                appState.marmotIo { sendText(account, group.groupIdHex, text) }
-            }
+            val summary =
+                if (replyTarget != null) {
+                    appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, text) }
+                } else {
+                    appState.marmotIo { sendText(account, group.groupIdHex, text) }
+                }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = refreshedRecord.copy(messageIdHex = confirmedId)
             optimisticMessages.remove(key)
@@ -1240,15 +1325,17 @@ class ConversationController(
             }
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
             if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
-                optimisticMessages["msg:$confirmedId"] = TimelineMessage(
-                    "msg:$confirmedId",
-                    confirmed,
-                    MessageStatus.Sent,
-                    timelineOrder = order,
-                )
+                optimisticMessages["msg:$confirmedId"] =
+                    TimelineMessage(
+                        "msg:$confirmedId",
+                        confirmed,
+                        MessageStatus.Sent,
+                        timelineOrder = order,
+                    )
             }
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
+            throwable.rethrowIfCancellation()
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; don't restore the Failed bubble.
                 optimisticMessages.remove(key)
@@ -1256,12 +1343,13 @@ class ConversationController(
                 publishTimelineFromIndexes()
                 return
             }
-            optimisticMessages[key] = TimelineMessage(
-                key,
-                refreshedRecord,
-                MessageStatus.Failed,
-                timelineOrder = order,
-            )
+            optimisticMessages[key] =
+                TimelineMessage(
+                    key,
+                    refreshedRecord,
+                    MessageStatus.Failed,
+                    timelineOrder = order,
+                )
             publishTimelineFromIndexes()
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
@@ -1297,35 +1385,37 @@ class ConversationController(
         publishTimelineFromIndexes()
     }
 
-    suspend fun leaveGroup(): Boolean = withMutationLockResult(false) {
-        lastMutationError = null
-        val account = appState.activeAccountRef ?: return false
-        if (!canLeaveGroup) {
-            appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
-            return false
-        }
-        runCatching {
-            val activeAccountIdHex = appState.activeAccount?.accountIdHex
-            if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex)) {
-                appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
-                // Case-insensitive so hex-casing drift between the admin
-                // list and the active account id doesn't leave the UI
-                // showing you as admin after a successful self-demote.
-                group = group.copy(
-                    admins = group.admins.filterNot { it.equals(activeAccountIdHex, ignoreCase = true) },
-                )
+    suspend fun leaveGroup(): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = appState.activeAccountRef ?: return false
+            if (!canLeaveGroup) {
+                appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
+                return false
             }
-            appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-            appState.present(R.string.toast_left_chat)
-            true
-        }.getOrElse {
-            if (it is CancellationException) throw it
-            val message = mutationError(it)
-            lastMutationError = message
-            appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(message))
-            false
+            runCatching {
+                val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, members.size)) {
+                    appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
+                    // Case-insensitive so hex-casing drift between the admin
+                    // list and the active account id doesn't leave the UI
+                    // showing you as admin after a successful self-demote.
+                    group =
+                        group.copy(
+                            admins = group.admins.filterNot { it.equals(activeAccountIdHex, ignoreCase = true) },
+                        )
+                }
+                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+                appState.present(R.string.toast_left_chat)
+                true
+            }.getOrElse {
+                if (it is CancellationException) throw it
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(message))
+                false
+            }
         }
-    }
 
     suspend fun acceptInvite(): Boolean {
         val account = appState.activeAccountRef ?: return false
@@ -1359,137 +1449,143 @@ class ConversationController(
         }
     }
 
-    suspend fun setArchived(archived: Boolean): Boolean = withMutationLockResult(false) {
-        lastMutationError = null
-        val account = appState.activeAccountRef ?: return@withMutationLockResult false
-        runCatching {
-            val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
-            group = updated
-            appState.applyLocalGroupUpdate(updated)
-            appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
-            true
-        }.onFailure {
-            it.rethrowIfCancellation()
-            val message = mutationError(it)
-            lastMutationError = message
-            appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(message))
-        }.getOrDefault(false)
-    }
-
-    suspend fun updateGroupProfile(name: String, description: String): Boolean = withMutationLockResult(false) {
-        lastMutationError = null
-        val account = appState.activeAccountRef ?: return@withMutationLockResult false
-        runCatching {
-            appState.marmotIo {
-                updateGroupProfile(
-                    account,
-                    group.groupIdHex,
-                    name.trim().takeIf { it.isNotEmpty() },
-                    description.trim().takeIf { it.isNotEmpty() },
-                )
-            }
-            appState.present(R.string.toast_group_updated)
-            true
-        }.onFailure {
-            it.rethrowIfCancellation()
-            val message = mutationError(it)
-            lastMutationError = message
-            appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message))
-        }.getOrDefault(false)
-    }
-
-    suspend fun inviteMembers(memberRefs: List<String>): Boolean = withMutationLockResult(false) {
-        lastMutationError = null
-        val account = appState.activeAccountRef ?: return@withMutationLockResult false
-        val refs = memberRefs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-        if (refs.isEmpty()) return@withMutationLockResult false
-        runCatching {
-            appState.marmotIo { inviteMembers(account, group.groupIdHex, refs) }
-            refreshMembers()
-            appState.present(R.string.toast_invite_sent)
-            true
-        }.onFailure {
-            it.rethrowIfCancellation()
-            val message = mutationError(it)
-            lastMutationError = message
-            appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message))
-        }.getOrDefault(false)
-    }
-
-    suspend fun removeMember(member: AppGroupMemberRecordFfi): Boolean = withMutationLockResult(false) {
-        lastMutationError = null
-        val account = appState.activeAccountRef ?: return@withMutationLockResult false
-        // remove_members signs a roster update for a Nostr pubkey, so use the
-        // stable member id. memberRef may be a local account label.
-        val target = member.memberIdHex
-        runCatching {
-            appState.marmotIo { removeMembers(account, group.groupIdHex, listOf(target)) }
-            // The group-state subscription should eventually converge from the
-            // published MLS commit. Update this controller immediately so the
-            // admin does not need an account switch to see the removed row leave.
-            removeMemberLocally(account, target)
-            appState.present(R.string.toast_member_removed)
-            true
-        }.onFailure {
-            it.rethrowIfCancellation()
-            val message = mutationError(it)
-            lastMutationError = message
-            appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(message))
-        }.getOrDefault(false)
-    }
-
-    suspend fun setMemberAdmin(member: AppGroupMemberRecordFfi, admin: Boolean): Boolean = withMutationLockResult(false) {
-        lastMutationError = null
-        val account = appState.activeAccountRef ?: return@withMutationLockResult false
-        // promote_admin / demote_admin sign the new admin list onto the MLS
-        // group, so they require a Nostr pubkey hex — not a local-account
-        // label. memberRef can return either; memberIdHex is always the hex.
-        val target = member.memberIdHex
-        if (!admin && isAdmin(member) && group.admins.size <= 1) {
-            appState.present(R.string.toast_keep_one_admin, R.string.toast_promote_before_removing_admin)
-            return@withMutationLockResult false
+    suspend fun setArchived(archived: Boolean): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            runCatching {
+                val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
+                group = updated
+                appState.applyLocalGroupUpdate(updated)
+                appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
+                true
+            }.onFailure {
+                it.rethrowIfCancellation()
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(message))
+            }.getOrDefault(false)
         }
-        runCatching {
-            if (admin) {
-                appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
-                val updatedAdmins = group.admins.toMutableList()
-                if (updatedAdmins.none { it.equals(target, ignoreCase = true) }) {
-                    updatedAdmins += target
+
+    suspend fun updateGroupProfile(
+        name: String,
+        description: String,
+    ): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            runCatching {
+                appState.marmotIo {
+                    updateGroupProfile(
+                        account,
+                        group.groupIdHex,
+                        name.trim().takeIf { it.isNotEmpty() },
+                        description.trim().takeIf { it.isNotEmpty() },
+                    )
                 }
-                group = group.copy(admins = updatedAdmins)
-                appState.present(R.string.toast_admin_added)
-            } else {
-                appState.marmotIo { demoteAdmin(account, group.groupIdHex, target) }
-                // Case-insensitive so admin hex casing variations don't keep
-                // the local UI showing the member as admin until next refresh.
-                group = group.copy(
-                    admins = group.admins.filterNot { it.equals(target, ignoreCase = true) },
-                )
-                appState.present(R.string.toast_admin_removed)
+                appState.present(R.string.toast_group_updated)
+                true
+            }.onFailure {
+                it.rethrowIfCancellation()
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message))
+            }.getOrDefault(false)
+        }
+
+    suspend fun inviteMembers(memberRefs: List<String>): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            val refs = memberRefs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+            if (refs.isEmpty()) return@withMutationLockResult false
+            runCatching {
+                appState.marmotIo { inviteMembers(account, group.groupIdHex, refs) }
+                refreshMembers()
+                appState.present(R.string.toast_invite_sent)
+                true
+            }.onFailure {
+                it.rethrowIfCancellation()
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message))
+            }.getOrDefault(false)
+        }
+
+    suspend fun removeMember(member: AppGroupMemberRecordFfi): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            // remove_members signs a roster update for a Nostr pubkey, so use the
+            // stable member id. memberRef may be a local account label.
+            val target = member.memberIdHex
+            runCatching {
+                appState.marmotIo { removeMembers(account, group.groupIdHex, listOf(target)) }
+                // The group-state subscription should eventually converge from the
+                // published MLS commit. Update this controller immediately so the
+                // admin does not need an account switch to see the removed row leave.
+                removeMemberLocally(account, target)
+                appState.present(R.string.toast_member_removed)
+                true
+            }.onFailure {
+                it.rethrowIfCancellation()
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(message))
+            }.getOrDefault(false)
+        }
+
+    suspend fun setMemberAdmin(
+        member: AppGroupMemberRecordFfi,
+        admin: Boolean,
+    ): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            // promote_admin / demote_admin sign the new admin list onto the MLS
+            // group, so they require a Nostr pubkey hex — not a local-account
+            // label. memberRef can return either; memberIdHex is always the hex.
+            val target = member.memberIdHex
+            if (!admin && isAdmin(member) && group.admins.size <= 1) {
+                appState.present(R.string.toast_keep_one_admin, R.string.toast_promote_before_removing_admin)
+                return@withMutationLockResult false
             }
-            refreshMembers()
-            true
-        }.onFailure {
-            it.rethrowIfCancellation()
-            val message = mutationError(it)
-            lastMutationError = message
-            appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message))
-        }.getOrDefault(false)
-    }
+            runCatching {
+                if (admin) {
+                    appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
+                    val updatedAdmins = group.admins.toMutableList()
+                    if (updatedAdmins.none { it.equals(target, ignoreCase = true) }) {
+                        updatedAdmins += target
+                    }
+                    group = group.copy(admins = updatedAdmins)
+                    appState.present(R.string.toast_admin_added)
+                } else {
+                    appState.marmotIo { demoteAdmin(account, group.groupIdHex, target) }
+                    // Case-insensitive so admin hex casing variations don't keep
+                    // the local UI showing the member as admin until next refresh.
+                    group =
+                        group.copy(
+                            admins = group.admins.filterNot { it.equals(target, ignoreCase = true) },
+                        )
+                    appState.present(R.string.toast_admin_removed)
+                }
+                refreshMembers()
+                true
+            }.onFailure {
+                it.rethrowIfCancellation()
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message))
+            }.getOrDefault(false)
+        }
 
     fun isAdmin(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.isAdmin(group, member)
 
-    fun memberDisplayName(member: AppGroupMemberRecordFfi): String {
-        return appState.displayName(member.memberIdHex)
-    }
+    fun memberDisplayName(member: AppGroupMemberRecordFfi): String = appState.displayName(member.memberIdHex)
 
-    fun memberSubtitle(member: AppGroupMemberRecordFfi): String {
-        return appState.shortNpub(member.memberIdHex)
-    }
+    fun memberSubtitle(member: AppGroupMemberRecordFfi): String = appState.shortNpub(member.memberIdHex)
 
-    fun memberAvatarUrl(member: AppGroupMemberRecordFfi): String? {
-        return appState.avatarUrl(member.memberIdHex)
-    }
+    fun memberAvatarUrl(member: AppGroupMemberRecordFfi): String? = appState.avatarUrl(member.memberIdHex)
 
     suspend fun groupMlsState(): AppGroupMlsStateFfi? {
         val account = appState.activeAccountRef ?: return null
@@ -1520,20 +1616,17 @@ class ConversationController(
         return timelineRecords.containsKey(messageIdHex)
     }
 
-    fun replyTargetMessageId(item: TimelineMessage): String? {
-        return ReplyNavigation.targetMessageId(item.record, item.projected)
-    }
+    fun replyTargetMessageId(item: TimelineMessage): String? = ReplyNavigation.targetMessageId(item.record, item.projected)
 
-    fun timelineIndexOf(messageIdHex: String): Int {
-        return timeline.indexOfFirst { it.record.messageIdHex == messageIdHex }
-    }
+    fun timelineIndexOf(messageIdHex: String): Int = timeline.indexOfFirst { it.record.messageIdHex == messageIdHex }
 
     private suspend fun loadOlderPage(): Boolean {
         val account = appState.activeAccountRef ?: return false
         if (!hasMoreBefore || isLoadingOlder) return false
-        val oldest = timelineRecords.values.minWithOrNull(
-            compareBy<TimelineMessageRecordFfi> { it.timelineAt }.thenBy { it.messageIdHex },
-        ) ?: return false
+        val oldest =
+            timelineRecords.values.minWithOrNull(
+                compareBy<TimelineMessageRecordFfi> { it.timelineAt }.thenBy { it.messageIdHex },
+            ) ?: return false
         // A previous loadOlderPage failure leaves `error` set; clear it now
         // that we're actually retrying, otherwise the stale banner sits over
         // a successful retry and a developer can't distinguish "still broken"
@@ -1541,20 +1634,21 @@ class ConversationController(
         error = null
         isLoadingOlder = true
         return try {
-            val page = appState.marmotIo {
-                timelineMessages(
-                    account,
-                    TimelineMessageQueryFfi(
-                        groupIdHex = group.groupIdHex,
-                        search = null,
-                        before = oldest.timelineAt,
-                        beforeMessageId = oldest.messageIdHex,
-                        after = null,
-                        afterMessageId = null,
-                        limit = ConversationTimelinePageLimit,
-                    ),
-                )
-            }
+            val page =
+                appState.marmotIo {
+                    timelineMessages(
+                        account,
+                        TimelineMessageQueryFfi(
+                            groupIdHex = group.groupIdHex,
+                            search = null,
+                            before = oldest.timelineAt,
+                            beforeMessageId = oldest.messageIdHex,
+                            after = null,
+                            afterMessageId = null,
+                            limit = ConversationTimelinePageLimit,
+                        ),
+                    )
+                }
             hasLoadedOlderPages = true
             applyTimelinePage(page, replaceWindow = false, updatePagination = true)
             page.messages.isNotEmpty()
@@ -1569,25 +1663,29 @@ class ConversationController(
     }
 
     private suspend fun refreshCurrentTimeline(account: String): List<String> {
-        val page = appState.marmotIo {
-            timelineMessages(
-                account,
-                TimelineMessageQueryFfi(
-                    groupIdHex = group.groupIdHex,
-                    search = null,
-                    before = null,
-                    beforeMessageId = null,
-                    after = null,
-                    afterMessageId = null,
-                    limit = ConversationTimelinePageLimit,
-                ),
-            )
-        }
+        val page =
+            appState.marmotIo {
+                timelineMessages(
+                    account,
+                    TimelineMessageQueryFfi(
+                        groupIdHex = group.groupIdHex,
+                        search = null,
+                        before = null,
+                        beforeMessageId = null,
+                        after = null,
+                        afterMessageId = null,
+                        limit = ConversationTimelinePageLimit,
+                    ),
+                )
+            }
         hasLoadedOlderPages = false
         return applyTimelinePage(page, replaceWindow = true, updatePagination = true)
     }
 
-    fun replyPreview(item: TimelineMessage, copy: MessageTextCopy = MessageTextCopy.Default): Pair<String, String>? {
+    fun replyPreview(
+        item: TimelineMessage,
+        copy: MessageTextCopy = MessageTextCopy.Default,
+    ): Pair<String, String>? {
         item.projected?.let { record ->
             TimelineProjector.replyPreview(record, copy)?.let { preview ->
                 return appState.displayName(preview.sender) to preview.body
@@ -1608,13 +1706,19 @@ class ConversationController(
             timelineItemsById.clear()
             timelineOrder.clear()
             projectedMessageIds.clear()
+            // Drop stale projected records so messageById doesn't grow unbounded
+            // as older pages are loaded; keep in-flight optimistic records so a
+            // pending send still reconciles across a window replacement. See #68.
+            val optimisticIds = optimisticMessages.values.mapTo(mutableSetOf()) { it.record.messageIdHex }
+            messageById.keys.retainAll(optimisticIds)
         }
         page.messages.forEach { record ->
-            val actionRecord = upsertProjectedRecord(
-                record,
-                reconcileOptimistic = replaceWindow,
-                allowDelayedProjection = replaceWindow,
-            )
+            val actionRecord =
+                upsertProjectedRecord(
+                    record,
+                    reconcileOptimistic = replaceWindow,
+                    allowDelayedProjection = replaceWindow,
+                )
             appState.requestProfile(record.sender)
             record.replyPreview?.let { appState.requestProfile(it.sender) }
             if (record.deleted) {
@@ -1623,6 +1727,9 @@ class ConversationController(
             if (MessageProjector.isStreamFinal(actionRecord)) {
                 MessageProjector.streamId(actionRecord)?.let { streamId ->
                     activeStreamIds.remove(streamId)
+                    // Mark removed so a late AgentStreamUpdateFfi.Finished event
+                    // can't recreate the optimistic preview as a duplicate. See #25.
+                    removedStreamIds.add(streamId)
                     optimisticMessages.remove("stream:$streamId")
                 }
             }
@@ -1638,6 +1745,9 @@ class ConversationController(
             .map { TimelineProjector.toAppMessageRecord(it) }
             .filter { MessageProjector.isStreamStart(it) }
             .mapNotNull { MessageProjector.streamId(it) }
+            // Don't relaunch a watcher for a stream whose final record was in
+            // this same page — it was just marked removed. See #25.
+            .filterNot { it in removedStreamIds }
     }
 
     private fun applyTimelineChanges(changes: List<TimelineMessageChangeFfi>): List<String> {
@@ -1647,11 +1757,12 @@ class ConversationController(
             when (change) {
                 is TimelineMessageChangeFfi.Upsert -> {
                     val record = change.message
-                    val actionRecord = upsertProjectedRecord(
-                        record,
-                        reconcileOptimistic = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
-                        allowDelayedProjection = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
-                    )
+                    val actionRecord =
+                        upsertProjectedRecord(
+                            record,
+                            reconcileOptimistic = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                            allowDelayedProjection = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                        )
                     if (change.trigger.recomputesReactions()) {
                         reactionTargets.add(record.messageIdHex)
                     }
@@ -1669,6 +1780,9 @@ class ConversationController(
                     if (MessageProjector.isStreamFinal(actionRecord)) {
                         MessageProjector.streamId(actionRecord)?.let { streamId ->
                             activeStreamIds.remove(streamId)
+                            // Mark removed so a late Finished event can't recreate
+                            // the optimistic preview as a duplicate. See #25.
+                            removedStreamIds.add(streamId)
                             optimisticMessages.remove("stream:$streamId")
                         }
                     }
@@ -1700,27 +1814,35 @@ class ConversationController(
         pruneConfirmedOptimisticReactions()
         recomputeReactions(reactionTargets)
         publishTimelineFromIndexes()
-        return streamIds
+        // Don't relaunch a watcher for a stream finalized in this same batch
+        // (start + final records together) — it was just marked removed. See #25.
+        return streamIds.filterNot { it in removedStreamIds }
     }
 
-    private fun applyChatListProjection(trigger: ChatListUpdateTriggerFfi, row: ChatListRowFfi?) {
+    private fun applyChatListProjection(
+        trigger: ChatListUpdateTriggerFfi,
+        row: ChatListRowFfi?,
+    ) {
         val projected = row ?: return
         when (trigger) {
             ChatListUpdateTriggerFfi.ARCHIVE_CHANGED,
             ChatListUpdateTriggerFfi.PENDING_CONFIRMATION_CHANGED,
             ChatListUpdateTriggerFfi.NEW_GROUP,
             ChatListUpdateTriggerFfi.MEMBERSHIP_CHANGED,
-            ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH -> {
-                group = group.copy(
-                    name = projected.groupName.ifBlank { group.name },
-                    archived = projected.archived,
-                    pendingConfirmation = projected.pendingConfirmation,
-                )
+            ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH,
+            -> {
+                group =
+                    group.copy(
+                        name = projected.groupName.ifBlank { group.name },
+                        archived = projected.archived,
+                        pendingConfirmation = projected.pendingConfirmation,
+                    )
             }
             ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
             ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
             ChatListUpdateTriggerFfi.UNREAD_CHANGED,
-            ChatListUpdateTriggerFfi.REMOVED -> Unit
+            ChatListUpdateTriggerFfi.REMOVED,
+            -> Unit
         }
     }
 
@@ -1733,9 +1855,10 @@ class ConversationController(
     }
 
     private suspend fun markLatestVisibleRead(account: String) {
-        val latest = timelineRecords.values.maxWithOrNull(
-            compareBy<TimelineMessageRecordFfi> { it.timelineAt }.thenBy { it.messageIdHex },
-        ) ?: return
+        val latest =
+            timelineRecords.values.maxWithOrNull(
+                compareBy<TimelineMessageRecordFfi> { it.timelineAt }.thenBy { it.messageIdHex },
+            ) ?: return
         val messageId = latest.messageIdHex.takeIf { it.isNotBlank() } ?: return
         runCatching {
             appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, messageId) }
@@ -1773,8 +1896,7 @@ class ConversationController(
      * the unread count exceeds the loaded window (caller falls back to the
      * bottom in that case).
      */
-    fun firstUnreadTimelineIndex(unreadCount: Int): Int =
-        firstUnreadReceivedIndex(timeline, unreadCount)
+    fun firstUnreadTimelineIndex(unreadCount: Int): Int = firstUnreadReceivedIndex(timeline, unreadCount)
 
     private fun pruneConfirmedOptimisticMessages() {
         val projectedIds = timelineRecords.keys.mapTo(mutableSetOf()) { "msg:$it" }
@@ -1788,8 +1910,7 @@ class ConversationController(
             .filter { (_, change) ->
                 val senders = base[change.targetMessageId]?.get(change.emoji).orEmpty()
                 senders.contains(mine) == change.add
-            }
-            .map { it.key }
+            }.map { it.key }
             .forEach(optimisticReactionChanges::remove)
     }
 
@@ -1844,30 +1965,32 @@ class ConversationController(
             optimisticMessages.values,
             actionRecord,
             allowDelayedProjection = allowDelayedProjection,
-        )
-            ?.takeIf { reconcileOptimistic }
+        )?.takeIf { reconcileOptimistic }
             ?.let { optimisticId ->
-            preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
-            val optimisticKey = "msg:$optimisticId"
-            // Hand off own-sent media bytes from the pending optimistic to
-            // the projection's cache key BEFORE the bubble's LaunchedEffect
-            // can fire and ask Blossom for them. Without this, the projected
-            // bubble starts rendering, finds the thumbnail/plaintext caches
-            // empty for the confirmed messageIdHex, and triggers an FFI
-            // downloadMedia round-trip — re-downloading bytes we literally
-            // just uploaded.
-            handoffOwnMediaCacheOnReconcile(optimisticKey, record.messageIdHex)
-            optimisticMessages.remove(optimisticKey)
-            messageById.remove(optimisticId)
-        }
+                preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
+                val optimisticKey = "msg:$optimisticId"
+                // Hand off own-sent media bytes from the pending optimistic to
+                // the projection's cache key BEFORE the bubble's LaunchedEffect
+                // can fire and ask Blossom for them. Without this, the projected
+                // bubble starts rendering, finds the thumbnail/plaintext caches
+                // empty for the confirmed messageIdHex, and triggers an FFI
+                // downloadMedia round-trip — re-downloading bytes we literally
+                // just uploaded.
+                handoffOwnMediaCacheOnReconcile(optimisticKey, record.messageIdHex)
+                optimisticMessages.remove(optimisticKey)
+                messageById.remove(optimisticId)
+            }
         messageById[record.messageIdHex] = actionRecord
         val item = timelineMessageFromProjection(record, actionRecord)
         timelineItemsById[item.id] = item
-        insertTimelineItemId(item.id, item)
+        insertTimelineItemId(item.id)
         return actionRecord
     }
 
-    private fun preserveOptimisticDisplayPosition(projectedId: String, optimisticId: String) {
+    private fun preserveOptimisticDisplayPosition(
+        projectedId: String,
+        optimisticId: String,
+    ) {
         val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
         localTimelineOrderOverrides[projectedId] = optimistic.timelineOrder
         localTimelineTimestampOverrides[projectedId] = optimistic.record.recordedAt
@@ -1888,19 +2011,21 @@ class ConversationController(
         actionRecord: AppMessageRecordFfi = TimelineProjector.toAppMessageRecord(record),
     ): TimelineMessage {
         val streamId = MessageProjector.streamId(actionRecord).takeIf { MessageProjector.isStreamStart(actionRecord) }
-        val displayRecord = if (streamId != null) {
-            actionRecord.copy(plaintext = actionRecord.plaintext.ifBlank { copy.waitingForStream })
-        } else {
-            actionRecord
-        }.withRecordedAtOverride(localTimelineTimestampOverrides[record.messageIdHex])
+        val displayRecord =
+            if (streamId != null) {
+                actionRecord.copy(plaintext = actionRecord.plaintext.ifBlank { copy.waitingForStream })
+            } else {
+                actionRecord
+            }.withRecordedAtOverride(localTimelineTimestampOverrides[record.messageIdHex])
         return TimelineMessage(
             id = streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}",
             record = displayRecord,
-            status = when {
-                streamId != null -> MessageStatus.Streaming
-                MessageProjector.isMine(actionRecord, appState.activeAccount?.accountIdHex) -> MessageStatus.Sent
-                else -> MessageStatus.Received
-            },
+            status =
+                when {
+                    streamId != null -> MessageStatus.Streaming
+                    MessageProjector.isMine(actionRecord, appState.activeAccount?.accountIdHex) -> MessageStatus.Sent
+                    else -> MessageStatus.Received
+                },
             projected = record,
             timelineOrder = localTimelineOrderOverrides[record.messageIdHex] ?: 0uL,
         )
@@ -1912,32 +2037,29 @@ class ConversationController(
         return streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}"
     }
 
-    private fun insertTimelineItemId(itemId: String, item: TimelineMessage) {
-        val insertAt = timelineOrder.indexOfFirst { existingId ->
-            val existing = timelineItemsById[existingId] ?: return@indexOfFirst false
-            compareTimelineMessages(item, existing) < 0
-        }
-        if (insertAt == -1) {
-            timelineOrder.add(itemId)
-        } else {
-            timelineOrder.add(insertAt, itemId)
-        }
+    private fun insertTimelineItemId(itemId: String) {
+        // Append in O(1). Position is irrelevant: publishTimelineFromIndexes
+        // re-sorts the whole list with compareTimelineMessages (a total order),
+        // so timelineOrder is only a membership set. The previous sorted insert
+        // did an O(n) scan per item, making each page load O(n²). See #74.
+        timelineOrder.add(itemId)
     }
 
     private fun publishTimelineFromIndexes() {
         val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
-        timeline = (optimisticMessages.values + projected)
-            .distinctBy { it.id }
-            .sortedWith(::compareTimelineMessages)
+        timeline =
+            (optimisticMessages.values + projected)
+                .distinctBy { it.id }
+                .sortedWith(::compareTimelineMessages)
     }
 
-    private fun nextOptimisticTimelineOrder(): ULong {
-        return timeline.asSequence()
+    private fun nextOptimisticTimelineOrder(): ULong =
+        timeline
+            .asSequence()
             .map { it.timelineOrder }
             .maxOrNull()
             ?.plus(1uL)
             ?: 1uL
-    }
 
     private fun recomputeReactions() {
         val mine = appState.activeAccount?.accountIdHex
@@ -1953,23 +2075,26 @@ class ConversationController(
                 }
             }
         }
-        reactions = sendersByTarget.mapValues { (_, byEmoji) ->
-            byEmoji.mapNotNull { (emoji, senders) ->
-                if (senders.isEmpty()) {
-                    null
-                } else {
-                    ReactionTally(
-                        emoji = emoji,
-                        count = senders.size,
-                        mine = mine != null && senders.contains(mine),
-                    )
-                }
-            }.sortedWith(
-                compareByDescending<ReactionTally> { it.count }
-                    .thenByDescending { it.mine }
-                    .thenBy { it.emoji },
-            )
-        }.filterValues { it.isNotEmpty() }
+        reactions =
+            sendersByTarget
+                .mapValues { (_, byEmoji) ->
+                    byEmoji
+                        .mapNotNull { (emoji, senders) ->
+                            if (senders.isEmpty()) {
+                                null
+                            } else {
+                                ReactionTally(
+                                    emoji = emoji,
+                                    count = senders.size,
+                                    mine = mine != null && senders.contains(mine),
+                                )
+                            }
+                        }.sortedWith(
+                            compareByDescending<ReactionTally> { it.count }
+                                .thenByDescending { it.mine }
+                                .thenBy { it.emoji },
+                        )
+                }.filterValues { it.isNotEmpty() }
     }
 
     private fun recomputeReactions(targetMessageIds: Set<String>) {
@@ -2004,21 +2129,22 @@ class ConversationController(
                     }
                 }
         }
-        return sendersByEmoji.mapNotNull { (emoji, senders) ->
-            if (senders.isEmpty()) {
-                null
-            } else {
-                ReactionTally(
-                    emoji = emoji,
-                    count = senders.size,
-                    mine = mine != null && senders.contains(mine),
-                )
-            }
-        }.sortedWith(
-            compareByDescending<ReactionTally> { it.count }
-                .thenByDescending { it.mine }
-                .thenBy { it.emoji },
-        )
+        return sendersByEmoji
+            .mapNotNull { (emoji, senders) ->
+                if (senders.isEmpty()) {
+                    null
+                } else {
+                    ReactionTally(
+                        emoji = emoji,
+                        count = senders.size,
+                        mine = mine != null && senders.contains(mine),
+                    )
+                }
+            }.sortedWith(
+                compareByDescending<ReactionTally> { it.count }
+                    .thenByDescending { it.mine }
+                    .thenBy { it.emoji },
+            )
     }
 
     private fun baseReactionSenders(): LinkedHashMap<String, LinkedHashMap<String, MutableSet<String>>> {
@@ -2053,26 +2179,32 @@ class ConversationController(
 
     private fun markActiveAccountRemovedFromMembers(account: String) {
         val activeAccountIdHex = appState.activeAccount?.accountIdHex ?: return
-        val updatedMembers = members.filterNot {
-            GroupProjector.isActiveAccountMember(it, activeAccountIdHex)
-        }
+        val updatedMembers =
+            members.filterNot {
+                GroupProjector.isActiveAccountMember(it, activeAccountIdHex)
+            }
         members = updatedMembers
         membersLoaded = true
         membersVerified = true
-        group = group.copy(
-            admins = group.admins.filterNot { it.equals(activeAccountIdHex, ignoreCase = true) },
-        )
+        group =
+            group.copy(
+                admins = group.admins.filterNot { it.equals(activeAccountIdHex, ignoreCase = true) },
+            )
         appState.cacheGroupMemberSnapshot(account, group.groupIdHex, updatedMembers)
     }
 
-    private fun removeMemberLocally(account: String, target: String) {
+    private fun removeMemberLocally(
+        account: String,
+        target: String,
+    ) {
         val updatedMembers = members.filterNot { it.memberIdHex.equals(target, ignoreCase = true) }
         members = updatedMembers
         membersLoaded = true
         membersVerified = true
-        group = group.copy(
-            admins = group.admins.filterNot { it.equals(target, ignoreCase = true) },
-        )
+        group =
+            group.copy(
+                admins = group.admins.filterNot { it.equals(target, ignoreCase = true) },
+            )
         appState.cacheGroupMemberSnapshot(account, group.groupIdHex, updatedMembers)
     }
 
@@ -2080,46 +2212,56 @@ class ConversationController(
         // Stopgap until Marmot exposes a typed UniFFI error/code for
         // GroupStateError::UseAfterEviction. Keep this in sync with the Rust
         // OpenMLS group-state error variant name.
-        val text = generateSequence(this) { it.cause }
-            .joinToString(separator = "\n") { error ->
-                listOfNotNull(error.message, error.javaClass.simpleName).joinToString(" ")
-            }
+        val text =
+            generateSequence(this) { it.cause }
+                .joinToString(separator = "\n") { error ->
+                    listOfNotNull(error.message, error.javaClass.simpleName).joinToString(" ")
+                }
         return "UseAfterEviction" in text || ("GroupStateError" in text && "eviction" in text.lowercase())
     }
 
-    private fun applyGroupDetails(account: String, details: GroupDetailsFfi) {
+    private fun applyGroupDetails(
+        account: String,
+        details: GroupDetailsFfi,
+    ) {
         group = details.group
-        members = details.members.map {
-            AppGroupMemberRecordFfi(
-                memberIdHex = it.memberIdHex,
-                account = it.account,
-                local = it.local,
-            )
-        }
+        members =
+            details.members.map {
+                AppGroupMemberRecordFfi(
+                    memberIdHex = it.memberIdHex,
+                    account = it.account,
+                    local = it.local,
+                )
+            }
         membersLoaded = true
         membersVerified = true
         appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
         appState.requestProfiles(members.map { it.memberIdHex })
     }
 
-    private suspend fun watchAgentTextStream(account: String, streamId: String) {
+    private suspend fun watchAgentTextStream(
+        account: String,
+        streamId: String,
+    ) {
         val text = StringBuilder()
         var subscription: AgentStreamSubscription? = null
         try {
-            val streamSubscription = appState.marmotIo {
-                watchAgentTextStream(
-                    accountRef = account,
-                    groupIdHex = group.groupIdHex,
-                    streamIdHex = streamId,
-                    serverCertDer = null,
-                    insecureLocal = false,
-                )
-            }
+            val streamSubscription =
+                appState.marmotIo {
+                    watchAgentTextStream(
+                        accountRef = account,
+                        groupIdHex = group.groupIdHex,
+                        streamIdHex = streamId,
+                        serverCertDer = null,
+                        insecureLocal = false,
+                    )
+                }
             subscription = streamSubscription
             while (true) {
-                val update = withContext(Dispatchers.IO) {
-                    streamSubscription.next()
-                } ?: break
+                val update =
+                    withContext(Dispatchers.IO) {
+                        streamSubscription.next()
+                    } ?: break
                 if (streamId in removedStreamIds) {
                     break
                 }
@@ -2152,28 +2294,36 @@ class ConversationController(
         }
     }
 
-    private fun updateStreamPreview(streamId: String, plaintext: String, status: MessageStatus) {
+    private fun updateStreamPreview(
+        streamId: String,
+        plaintext: String,
+        status: MessageStatus,
+    ) {
         if (streamId in removedStreamIds) return
         val id = "stream:$streamId"
         val existingItem = optimisticMessages[id] ?: timelineItemsById[id]
         val existing = existingItem?.record
-        val record = (existing ?: AppMessageRecordFfi(
-            messageIdHex = "stream-$streamId",
-            direction = "received",
-            groupIdHex = group.groupIdHex,
-            sender = inferStreamSender(streamId),
-            plaintext = "",
-            kind = 1200uL,
-            tags = listOf(MessageProjector.streamTag(streamId)),
-            recordedAt = nowSeconds(),
-            receivedAt = nowSeconds(),
-        )).copy(plaintext = plaintext)
-        optimisticMessages[id] = TimelineMessage(
-            id,
-            record,
-            status,
-            timelineOrder = existingItem?.timelineOrder ?: nextOptimisticTimelineOrder(),
-        )
+        val record =
+            (
+                existing ?: AppMessageRecordFfi(
+                    messageIdHex = "stream-$streamId",
+                    direction = "received",
+                    groupIdHex = group.groupIdHex,
+                    sender = inferStreamSender(streamId),
+                    plaintext = "",
+                    kind = 1200uL,
+                    tags = listOf(MessageProjector.streamTag(streamId)),
+                    recordedAt = nowSeconds(),
+                    receivedAt = nowSeconds(),
+                )
+            ).copy(plaintext = plaintext)
+        optimisticMessages[id] =
+            TimelineMessage(
+                id,
+                record,
+                status,
+                timelineOrder = existingItem?.timelineOrder ?: nextOptimisticTimelineOrder(),
+            )
         publishTimelineFromIndexes()
     }
 
@@ -2206,8 +2356,8 @@ class ConversationController(
     private fun recordsRenderEqual(
         a: TimelineMessageRecordFfi,
         b: TimelineMessageRecordFfi,
-    ): Boolean {
-        return a.messageIdHex == b.messageIdHex &&
+    ): Boolean =
+        a.messageIdHex == b.messageIdHex &&
             a.sourceMessageIdHex == b.sourceMessageIdHex &&
             a.direction == b.direction &&
             a.groupIdHex == b.groupIdHex &&
@@ -2220,7 +2370,6 @@ class ConversationController(
             a.mediaJson == b.mediaJson &&
             a.agentTextStreamJson == b.agentTextStreamJson &&
             a.reactions == b.reactions
-    }
 
     private companion object {
         // 32 MiB cap on retained compressed bytes for in-flight/failed

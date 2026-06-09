@@ -17,16 +17,21 @@ data class LocalNotificationContent(
 )
 
 object LocalNotificationFormatter {
-    fun content(update: NotificationUpdateFfi, context: Context? = null): LocalNotificationContent? {
+    fun content(
+        update: NotificationUpdateFfi,
+        context: Context? = null,
+    ): LocalNotificationContent? {
         if (update.isFromSelf) return null
-        val title = when (update.trigger) {
-            NotificationTriggerFfi.NEW_MESSAGE -> messageTitle(update, context)
-            NotificationTriggerFfi.GROUP_INVITE -> text(context, R.string.notification_group_invite, "Group invite")
-        }
-        val body = when (update.trigger) {
-            NotificationTriggerFfi.NEW_MESSAGE -> clean(update.previewText) ?: text(context, R.string.notification_new_message, "New message")
-            NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context)
-        }
+        val title =
+            when (update.trigger) {
+                NotificationTriggerFfi.NEW_MESSAGE -> messageTitle(update, context)
+                NotificationTriggerFfi.GROUP_INVITE -> text(context, R.string.notification_group_invite, "Group invite")
+            }
+        val body =
+            when (update.trigger) {
+                NotificationTriggerFfi.NEW_MESSAGE -> clean(update.previewText) ?: text(context, R.string.notification_new_message, "New message")
+                NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context)
+            }
         return LocalNotificationContent(
             notificationTag = update.notificationKey,
             notificationId = 0,
@@ -36,7 +41,10 @@ object LocalNotificationFormatter {
         )
     }
 
-    private fun messageTitle(update: NotificationUpdateFfi, context: Context?): String {
+    private fun messageTitle(
+        update: NotificationUpdateFfi,
+        context: Context?,
+    ): String {
         val sender = displayName(update.sender)
         val group = clean(update.groupName)
         return when {
@@ -45,7 +53,10 @@ object LocalNotificationFormatter {
         }
     }
 
-    private fun inviteBody(update: NotificationUpdateFfi, context: Context?): String {
+    private fun inviteBody(
+        update: NotificationUpdateFfi,
+        context: Context?,
+    ): String {
         val sender = displayName(update.sender)
         val group = clean(update.groupName)
         return if (group == null) {
@@ -55,23 +66,26 @@ object LocalNotificationFormatter {
         }
     }
 
-    private fun displayName(user: NotificationUserFfi): String {
-        return clean(user.displayName) ?: IdentityFormatter.short(user.accountIdHex)
-    }
+    private fun displayName(user: NotificationUserFfi): String = clean(user.displayName) ?: IdentityFormatter.short(user.accountIdHex)
 
     private fun clean(value: String?): String? {
         if (value == null) return null
-        return ProfileSanitizer.stripUnsafe(value)
+        return ProfileSanitizer
+            .stripUnsafe(value)
             .replace(Regex("\\s+"), " ")
             .trim()
             .takeIf { it.isNotEmpty() }
     }
 
-    private fun text(context: Context?, resId: Int, fallback: String, vararg args: Any): String {
-        return if (context == null) {
+    private fun text(
+        context: Context?,
+        resId: Int,
+        fallback: String,
+        vararg args: Any,
+    ): String =
+        if (context == null) {
             String.format(fallback, *args)
         } else {
             context.getString(resId, *args)
         }
-    }
 }
