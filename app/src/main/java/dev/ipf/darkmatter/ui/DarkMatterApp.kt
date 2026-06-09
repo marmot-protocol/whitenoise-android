@@ -61,6 +61,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -1468,7 +1470,8 @@ private fun MediaImageBubble(
             controller = controller,
             appState = appState,
             messageIdHex = key,
-            reference = reference,
+            references = listOf(reference),
+            startIndex = 0,
             onDismiss = { viewerOpen = false },
         )
     }
@@ -1540,7 +1543,8 @@ private fun MediaImageGridBubble(
             controller = controller,
             appState = appState,
             messageIdHex = record.messageIdHex,
-            reference = references[index],
+            references = references,
+            startIndex = index,
             onDismiss = { viewerOpenAt = null },
         )
     }
@@ -1753,26 +1757,140 @@ private fun FullScreenImageViewer(
     controller: ConversationController,
     appState: DarkMatterAppState,
     messageIdHex: String,
-    reference: MediaAttachmentReferenceFfi,
+    references: List<MediaAttachmentReferenceFfi>,
+    startIndex: Int,
     onDismiss: () -> Unit,
 ) {
+    if (references.isEmpty()) {
+        // Defensive — callers shouldn't open an empty viewer, but guard so the
+        // pager doesn't NPE on a vanished album.
+        onDismiss()
+        return
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val savedMessage = stringResource(R.string.media_saved)
     val saveFailedMessage = stringResource(R.string.media_save_failed)
-    // Decode the full-resolution bitmap for display only. We deliberately don't
-    // keep the raw bytes in Compose state — save/share re-read them from
-    // [ConversationController.downloadAttachment], which is an instant hit on
-    // the app-level cache that already holds this image.
-    var androidBitmap by remember(messageIdHex) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var viewerFailed by remember(messageIdHex) { mutableStateOf(false) }
-    var viewerReloadToken by remember(messageIdHex) { mutableStateOf(0) }
+    val pagerState =
+        rememberPagerState(
+            initialPage = startIndex.coerceIn(0, references.lastIndex),
+            pageCount = { references.size },
+        )
+    val currentReference = references[pagerState.currentPage]
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
+                ViewerPage(
+                    controller = controller,
+                    messageIdHex = messageIdHex,
+                    attachmentIndex = page,
+                    reference = references[page],
+                )
+            }
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
+                }
+                if (references.size > 1) {
+                    Text(
+                        text = "${pagerState.currentPage + 1} / ${references.size}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+                Row {
+                    IconButton(
+                        onClick = {
+                            val ref = currentReference
+                            val pageIndex = pagerState.currentPage
+                            scope.launch {
+                                val data =
+                                    runCatching {
+                                        controller.downloadAttachment(messageIdHex, pageIndex, ref)
+                                    }.getOrNull()
+                                val ok =
+                                    data != null &&
+                                        withContext(Dispatchers.IO) {
+                                            saveImageToGallery(context, data, ref.fileName, ref.mediaType)
+                                        }
+                                snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = stringResource(R.string.media_save), tint = Color.White)
+                    }
+                    IconButton(
+                        onClick = {
+                            val ref = currentReference
+                            val pageIndex = pagerState.currentPage
+                            scope.launch {
+                                runCatching {
+                                    controller.downloadAttachment(messageIdHex, pageIndex, ref)
+                                }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType) }
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
+                    }
+                }
+            }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding(),
+            )
+        }
+    }
+}
+
+/**
+ * One page of the full-screen pager. Owns its own download + decode + pan/zoom
+ * state so swiping to a sibling page doesn't carry zoom across, and disposing
+ * the page recycles the multi-MB native bitmap instead of leaning on GC. The
+ * pager prefetches one page either side by default, which is why
+ * `LaunchedEffect` doesn't need to wait for "page becomes visible" — it
+ * downloads as soon as the page composes.
+ */
+@Composable
+private fun ViewerPage(
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+) {
+    val pageKey = "$messageIdHex#$attachmentIndex"
+    var androidBitmap by remember(pageKey) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var viewerFailed by remember(pageKey) { mutableStateOf(false) }
+    var viewerReloadToken by remember(pageKey) { mutableStateOf(0) }
     val bitmap = remember(androidBitmap) { androidBitmap?.asImageBitmap() }
-    LaunchedEffect(messageIdHex, viewerReloadToken) {
+    LaunchedEffect(pageKey, viewerReloadToken) {
         viewerFailed = false
         try {
-            val data = controller.downloadAttachment(messageIdHex, 0, reference)
+            val data = controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
             // Bounded sampled decode. A 5000px remote image decoded full-size
             // is ~100 MB ARGB_8888 and OOMs mid-class devices; the viewer
             // ceiling caps that while keeping quality high enough on phones.
@@ -1786,33 +1904,21 @@ private fun FullScreenImageViewer(
                 viewerFailed = true
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
-            // Composable left composition or key changed — propagate. Don't
-            // mark a failure state for a viewer that's no longer on-screen.
             throw cancel
         } catch (_: Throwable) {
             viewerFailed = true
         }
     }
-    // Free the multi-MB native buffer when the viewer closes instead of waiting
-    // for GC.
-    DisposableEffect(messageIdHex) {
+    DisposableEffect(pageKey) {
         onDispose { androidBitmap?.recycle() }
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
-        ) {
-            val current = bitmap
-            if (current != null) {
-                var scale by remember { mutableStateOf(1f) }
-                var offset by remember { mutableStateOf(Offset.Zero) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        val current = bitmap
+        when {
+            current != null -> {
+                var scale by remember(pageKey) { mutableStateOf(1f) }
+                var offset by remember(pageKey) { mutableStateOf(Offset.Zero) }
                 Image(
                     bitmap = current,
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
@@ -1820,19 +1926,16 @@ private fun FullScreenImageViewer(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .pointerInput(Unit) {
+                            .pointerInput(pageKey) {
                                 detectTapGestures(onDoubleTap = {
                                     scale = 1f
                                     offset = Offset.Zero
                                 })
-                            }.pointerInput(Unit) {
+                            }.pointerInput(pageKey) {
                                 detectTransformGestures { _, pan, zoom, _ ->
                                     scale = (scale * zoom).coerceIn(1f, 5f)
                                     offset =
                                         if (scale > 1f) {
-                                            // Clamp against the ContentScale.Fit image
-                                            // bounds (letterboxed), not the viewport, so
-                                            // pan can't drift into the empty margins.
                                             val viewportW = size.width.toFloat()
                                             val viewportH = size.height.toFloat()
                                             val imageAspect = current.width.toFloat() / current.height.toFloat()
@@ -1863,7 +1966,8 @@ private fun FullScreenImageViewer(
                                 translationY = offset.y,
                             ),
                 )
-            } else if (viewerFailed) {
+            }
+            viewerFailed ->
                 Column(
                     modifier = Modifier.align(Alignment.Center).padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -1883,70 +1987,11 @@ private fun FullScreenImageViewer(
                         Text(stringResource(R.string.media_tap_to_retry), color = Color.White)
                     }
                 }
-            } else {
+            else ->
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
                     color = Color.White,
                 )
-            }
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
-                }
-                Row {
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                // Re-read from the app cache (instant hit) rather
-                                // than holding the bytes in Compose state.
-                                val data =
-                                    runCatching {
-                                        controller.downloadAttachment(messageIdHex, 0, reference)
-                                    }.getOrNull()
-                                val ok =
-                                    data != null &&
-                                        withContext(Dispatchers.IO) {
-                                            saveImageToGallery(context, data, reference.fileName, reference.mediaType)
-                                        }
-                                // Snackbar lives inside the Dialog so the result
-                                // is visible without dismissing the viewer.
-                                snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
-                            }
-                        },
-                        enabled = bitmap != null,
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = stringResource(R.string.media_save), tint = Color.White)
-                    }
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                runCatching {
-                                    controller.downloadAttachment(messageIdHex, 0, reference)
-                                }.getOrNull()?.let { shareImage(context, it, reference.fileName, reference.mediaType) }
-                            }
-                        },
-                        enabled = bitmap != null,
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
-                    }
-                }
-            }
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding(),
-            )
         }
     }
 }
