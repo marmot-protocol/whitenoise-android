@@ -2785,13 +2785,13 @@ private fun ConversationScreen(
     var recentReactionEmojis by remember(context) {
         mutableStateOf(RecentEmojiPreferences.load(context))
     }
-    // Selected-but-not-yet-sent attachments: when non-empty the preview /
-    // caption sheet is shown. Multi-pick goes through `PickMultipleVisualMedia`
-    // with `MEDIA_PICKER_MAX_ITEMS` as the cap. Each picked URI is sent as
-    // its own kind:9 for now (album-as-N-messages); the protocol-level
-    // album-as-one-message uses the same `sendMediaAttachments(list, caption)`
-    // FFI and is the next
-    // follow-up — that one requires `RetainedMediaUpload` to hold a list.
+    // Selected-but-not-yet-sent image attachments: when non-empty the preview
+    // / caption sheet is shown. Multi-pick goes through
+    // `PickMultipleVisualMedia` with `MEDIA_PICKER_MAX_ITEMS` as the cap. The
+    // whole selection ships as a single kind:9 album (one event carrying N
+    // imeta tags) via `controller.sendAttachments(list, caption)`. Document
+    // picks bypass this sheet and route directly through
+    // `sendPickedDocuments`.
     var pendingMediaUris by rememberSaveable(stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
     }
