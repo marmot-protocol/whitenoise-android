@@ -3166,8 +3166,12 @@ private fun ConversationScreen(
             }
         }
 
-    // Wipe decrypted share/camera temp files and retained outgoing JPEG bytes
+    // Wipe camera-capture temp files and retained outgoing attachment bytes
     // when leaving the conversation so plaintext media doesn't linger.
+    // `shared_media` is deliberately NOT touched here — an external reader
+    // (PDF viewer, etc.) may still be reading a granted FileProvider URI.
+    // Those are reaped by the age-based `sweepStaleSharedMedia` janitor at
+    // app start.
     DisposableEffect(Unit) {
         onDispose {
             clearMediaTempFiles(context)
