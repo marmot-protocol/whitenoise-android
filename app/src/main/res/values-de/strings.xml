@@ -50,6 +50,7 @@
     <string name="no_chats_yet">Noch keine Chats</string>
     <string name="empty_chats_invite_npub">Beginnen Sie ein Gespräch, indem Sie jemanden mit seinem npub einladen.</string>
     <string name="new_chat">Neuer Chat</string>
+    <string name="new_chat_optional_section">Optional</string>
     <string name="error_not_dark_matter_profile_qr">Dieser QR-Code ist kein Dark Matter-Profil.</string>
     <string name="error_valid_recipient_reference">Geben Sie einen gültigen öffentlichen Schlüssel npub, Profillink oder hex ein.</string>
     <string name="error_missing_key_package">Für dieses Konto ist noch kein veröffentlichtes Schlüsselpaket vorhanden. Bitten Sie sie, Dark Matter zu öffnen, und versuchen Sie es dann erneut.</string>
@@ -347,10 +348,12 @@
     <string name="appearance">Darstellung</string>
     <string name="appearance_settings_subtitle">Design und Sprache</string>
     <string name="app_preferences">App</string>
+    <string name="settings_version_label">Version %1$s</string>
     <string name="theme">Design</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Hell</string>
     <string name="theme_dark">Dunkel</string>
+    <string name="theme_amoled">AMOLED (Tiefschwarz)</string>
     <string name="language">Sprache</string>
     <string name="language_system">Systemsprache</string>
     <string name="language_english">English</string>

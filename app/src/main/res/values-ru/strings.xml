@@ -52,6 +52,7 @@
     <string name="no_chats_yet">Пока нет чатов</string>
     <string name="empty_chats_invite_npub">Начните разговор, пригласив кого-нибудь с помощью npub.</string>
     <string name="new_chat">Новый чат</string>
+    <string name="new_chat_optional_section">Необязательно</string>
     <string name="error_not_dark_matter_profile_qr">Этот код QR не является профилем Dark Matter.</string>
     <string name="error_valid_recipient_reference">Введите действительный npub, ссылку на профиль или открытый ключ hex.</string>
     <string name="error_missing_key_package">Для этой учетной записи еще нет опубликованного пакета ключей. Попросите их открыть Dark Matter и повторите попытку.</string>
@@ -349,10 +350,12 @@
     <string name="appearance">Оформление</string>
     <string name="appearance_settings_subtitle">Тема и язык</string>
     <string name="app_preferences">Приложение</string>
+    <string name="settings_version_label">Версия %1$s</string>
     <string name="theme">Тема</string>
     <string name="theme_system">Системная</string>
     <string name="theme_light">Светлая</string>
     <string name="theme_dark">Темная</string>
+    <string name="theme_amoled">AMOLED (истинно чёрный)</string>
     <string name="language">Язык</string>
     <string name="language_system">Язык системы</string>
     <string name="language_english">English</string>

@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme =
@@ -36,6 +37,7 @@ private val LightColorScheme =
 @Composable
 fun DarkMatterTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    amoled: Boolean = false,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
@@ -50,8 +52,25 @@ fun DarkMatterTheme(
             darkTheme -> DarkColorScheme
             else -> LightColorScheme
         }
+    val amoledAdjusted =
+        if (darkTheme && amoled) {
+            baseColorScheme.copy(
+                background = Color.Black,
+                surface = Color.Black,
+                surfaceContainerLowest = Color.Black,
+                surfaceContainerLow = Color(0xFF050505),
+                surfaceContainer = Color(0xFF0A0A0A),
+                surfaceContainerHigh = Color(0xFF101010),
+                surfaceContainerHighest = Color(0xFF161616),
+                surfaceVariant = Color(0xFF1A1A1A),
+                surfaceBright = Color(0xFF161616),
+                surfaceDim = Color.Black,
+            )
+        } else {
+            baseColorScheme
+        }
     val colorScheme =
-        baseColorScheme.copy(
+        amoledAdjusted.copy(
             primary = Highlight,
             onPrimary = OnHighlight,
             primaryContainer = Highlight,

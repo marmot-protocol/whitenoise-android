@@ -159,8 +159,10 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -172,6 +174,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -223,6 +226,7 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.AvatarImageLoader
 import dev.ipf.darkmatter.core.DiagnosticFormatter
@@ -377,6 +381,7 @@ private val AppThemeMode.labelRes: Int
             AppThemeMode.System -> R.string.theme_system
             AppThemeMode.Light -> R.string.theme_light
             AppThemeMode.Dark -> R.string.theme_dark
+            AppThemeMode.Amoled -> R.string.theme_amoled
         }
 
 private val MediaAutoDownloadPolicy.labelRes: Int
@@ -397,6 +402,11 @@ fun DarkMatterApp(
     onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    // Mutable bottom-chrome inset so screens further down the tree
+    // (e.g. ConversationScreen) can push the snackbar above their
+    // composer. Owned here so the host — which lives at this level —
+    // can read it; child screens mutate via [LocalSnackbarBottomInset].
+    val snackbarBottomInset = remember { mutableStateOf(0.dp) }
     val toast = appState.toast
     val context = LocalContext.current
     val notificationPermissionLauncher =
@@ -452,30 +462,48 @@ fun DarkMatterApp(
         }
     }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0.dp),
-        snackbarHost = { DarkMatterSnackbarHost(snackbarHostState) },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when (val phase = appState.phase) {
-                AppPhase.Bootstrapping -> LoadingScreen()
-                AppPhase.Onboarding -> OnboardingScreen(appState)
-                AppPhase.Ready ->
-                    MainShell(
-                        appState = appState,
-                        inboundNotificationTarget = inboundNotificationTarget,
-                        onNotificationTargetHandled = onNotificationTargetHandled,
-                    )
-                is AppPhase.Failed ->
-                    FailureScreen(
-                        message = phase.message,
-                        onRetry = { appState.present(R.string.toast_restarting) },
-                        onRetryAction = { appState.bootstrap() },
-                    )
+    CompositionLocalProvider(LocalSnackbarBottomInset provides snackbarBottomInset) {
+        Scaffold(
+            contentWindowInsets = WindowInsets(0.dp),
+            snackbarHost = { DarkMatterSnackbarHost(snackbarHostState) },
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                when (val phase = appState.phase) {
+                    AppPhase.Bootstrapping -> LoadingScreen()
+                    AppPhase.Onboarding -> OnboardingScreen(appState)
+                    AppPhase.Ready ->
+                        MainShell(
+                            appState = appState,
+                            inboundNotificationTarget = inboundNotificationTarget,
+                            onNotificationTargetHandled = onNotificationTargetHandled,
+                        )
+                    is AppPhase.Failed ->
+                        FailureScreen(
+                            message = phase.message,
+                            onRetry = { appState.present(R.string.toast_restarting) },
+                            onRetryAction = { appState.bootstrap() },
+                        )
+                }
             }
         }
     }
 }
+
+/**
+ * Bottom inset the global snackbar host should reserve to clear any
+ * persistent bottom chrome on the currently visible surface (e.g. the
+ * conversation composer). Held as a `MutableState<Dp>` so screens
+ * BELOW the host in the composition tree can push their chrome height
+ * up to the parent-owned state — a plain CompositionLocal would only
+ * flow values DOWN and couldn't reach the host. Default `0.dp` keeps
+ * non-composer surfaces unaffected.
+ *
+ * See issue #122 (post-invite-accept toast overlapping message input).
+ */
+private val LocalSnackbarBottomInset =
+    staticCompositionLocalOf<MutableState<Dp>> {
+        error("LocalSnackbarBottomInset not provided")
+    }
 
 @Composable
 fun DarkMatterSnackbarHost(
@@ -483,13 +511,15 @@ fun DarkMatterSnackbarHost(
     modifier: Modifier = Modifier,
     snackbar: @Composable (SnackbarData) -> Unit = { Snackbar(snackbarData = it) },
 ) {
+    val extraInset = LocalSnackbarBottomInset.current.value
     SnackbarHost(
         hostState = hostState,
         modifier =
             modifier
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp),
+                .padding(bottom = 16.dp + extraInset),
         snackbar = snackbar,
     )
 }
@@ -1804,6 +1834,17 @@ private fun NewChatSheet(
                     Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_recipient))
                 }
             }
+            // Both name and description are optional. With no name, the
+            // chat-list row resolves to the other member's display name
+            // for a two-person group or the "Group of N" copy for
+            // larger ones, so requiring a name for every new chat is
+            // ceremony the dominant single-recipient case doesn't need.
+            Text(
+                stringResource(R.string.new_chat_optional_section),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            )
             OutlinedTextField(
                 value = groupName,
                 onValueChange = { groupName = it },
@@ -1865,7 +1906,6 @@ private fun NewChatSheet(
                 },
                 enabled =
                     !busy &&
-                        groupName.trim().isNotBlank() &&
                         (members.isNotEmpty() || pending.isNotBlank()),
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -1903,6 +1943,17 @@ private const val ConversationNearBottomItemSlack = 3
 // Maximum images per multi-pick. The Android Photo Picker enforces this
 // cap on the system dialog side; 10 keeps the album payload bounded
 // (10 * 1920px JPEG ≈ a few MB encrypted) without feeling artificially low.
+// Approximate clearance the conversation composer occupies above the
+// navigation bar. Used by ConversationScreen to push the global
+// snackbar host above the composer so toasts don't intercept touches
+// on the message input — see [LocalSnackbarBottomInset] + issue #122.
+// 72.dp covers the single-line composer plus its vertical padding; a
+// multi-line composer can grow taller but the snackbar still clears
+// the input row that needs to remain tappable. TODO: derive from the
+// composer's measured height instead of hardcoding so multi-line and
+// attachment-preview states stay covered exactly.
+private val COMPOSER_SNACKBAR_INSET = 72.dp
+
 private const val MEDIA_PICKER_MAX_ITEMS = 10
 
 // Per-file ceiling for a document attachment. Matches the retained-uploads
@@ -3431,6 +3482,19 @@ private fun ConversationScreen(
     chat: ChatListItem,
     onBack: () -> Unit,
 ) {
+    // Push the global snackbar host above the conversation composer so
+    // a toast (e.g. the post-invite-accept confirmation) doesn't
+    // overlap and intercept touches on the message input. Resets to
+    // zero on dispose so other surfaces aren't affected. Issue #122.
+    val snackbarBottomInset = LocalSnackbarBottomInset.current
+    // Keyed on chat.id so that a back-to-back conversation push (Compose
+    // reusing the same node across nav) re-runs the effect: the
+    // previous chat's onDispose may not have fired before the next
+    // enters, leaving the inset at zero on a stale snackbar host.
+    DisposableEffect(chat.id) {
+        snackbarBottomInset.value = COMPOSER_SNACKBAR_INSET
+        onDispose { snackbarBottomInset.value = 0.dp }
+    }
     val controllerCopy = rememberConversationControllerCopy()
     val controller =
         remember(chat.id, appState.runtimeGeneration) {
@@ -6351,8 +6415,17 @@ private fun SettingsScreen(
     detail: SettingsDetail?,
     onDetailChange: (SettingsDetail?) -> Unit,
 ) {
-    BackHandler(enabled = detail != null) {
-        onDetailChange(null)
+    // Issue #121: the prior shape only handled back from a detail
+    // subscreen; when on the Settings home (detail == null) the system
+    // back fell through to the Activity and exited the app. Always
+    // claim back here — pop the detail when on a subscreen, otherwise
+    // hand control to the chats list (mirroring the top-bar back arrow).
+    BackHandler {
+        if (detail != null) {
+            onDetailChange(null)
+        } else {
+            onBackToChats()
+        }
     }
 
     when (detail) {
@@ -6449,6 +6522,27 @@ private fun SettingsHomeScreen(
                         onOpenDetail(SettingsDetail.SecurityPrivacy)
                     }
                 }
+            }
+            item {
+                // Version footer. Marketing string only — the integer
+                // `VERSION_CODE` is intentionally hidden from this
+                // surface to keep the line uncluttered; triage that
+                // needs the code can read it via `dumpsys package`,
+                // logcat, or the Diagnostics screen.
+                Text(
+                    text =
+                        stringResource(
+                            R.string.settings_version_label,
+                            BuildConfig.VERSION_NAME,
+                        ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 24.dp),
+                )
             }
         }
     }

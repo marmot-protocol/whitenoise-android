@@ -50,6 +50,7 @@
     <string name="no_chats_yet">Henüz sohbet yok</string>
     <string name="empty_chats_invite_npub">Birisini npub ile davet ederek bir sohbet başlatın.</string>
     <string name="new_chat">Yeni sohbet</string>
+    <string name="new_chat_optional_section">İsteğe bağlı</string>
     <string name="error_not_dark_matter_profile_qr">Bu QR kodu bir Dark Matter profili değil.</string>
     <string name="error_valid_recipient_reference">Geçerli bir npub, profil bağlantısı veya hex genel anahtarı girin.</string>
     <string name="error_missing_key_package">Bu hesabın henüz yayınlanmış bir anahtar paketi yok. Onlardan Dark Matter açmalarını isteyin ve tekrar deneyin.</string>
@@ -347,10 +348,12 @@
     <string name="appearance">Görünüm</string>
     <string name="appearance_settings_subtitle">Tema ve dil</string>
     <string name="app_preferences">Uygulama</string>
+    <string name="settings_version_label">Sürüm %1$s</string>
     <string name="theme">Tema</string>
     <string name="theme_system">Sistem</string>
     <string name="theme_light">Açık</string>
     <string name="theme_dark">Koyu</string>
+    <string name="theme_amoled">AMOLED (tam siyah)</string>
     <string name="language">Dil</string>
     <string name="language_system">Sistem dili</string>
     <string name="language_english">English</string>

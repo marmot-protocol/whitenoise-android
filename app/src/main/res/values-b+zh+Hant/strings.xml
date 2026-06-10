@@ -49,6 +49,7 @@
     <string name="no_chats_yet">尚無聊天</string>
     <string name="empty_chats_invite_npub">透過邀請某人及其 npub 來開始對話。</string>
     <string name="new_chat">新聊天</string>
+    <string name="new_chat_optional_section">選用</string>
     <string name="error_not_dark_matter_profile_qr">該 QR 程式碼不是 Dark Matter 設定檔。</string>
     <string name="error_valid_recipient_reference">輸入有效的 npub、設定檔連結或 hex 公鑰。</string>
     <string name="error_missing_key_package">該帳戶尚未發布密鑰包。請他們打開 Dark Matter，然後再試一次。</string>
@@ -346,10 +347,12 @@
     <string name="appearance">外觀</string>
     <string name="appearance_settings_subtitle">主題和語言</string>
     <string name="app_preferences">應用程式</string>
+    <string name="settings_version_label">版本 %1$s</string>
     <string name="theme">主題</string>
     <string name="theme_system">跟隨系統</string>
     <string name="theme_light">淺色</string>
     <string name="theme_dark">深色</string>
+    <string name="theme_amoled">AMOLED (純黑)</string>
     <string name="language">語言</string>
     <string name="language_system">系統語言</string>
     <string name="language_english">English</string>

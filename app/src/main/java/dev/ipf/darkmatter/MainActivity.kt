@@ -31,7 +31,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state = remember { appState }
             val systemDarkTheme = isSystemInDarkTheme()
-            DarkMatterTheme(darkTheme = state.themeMode.resolveDarkTheme(systemDarkTheme)) {
+            DarkMatterTheme(
+                darkTheme = state.themeMode.resolveDarkTheme(systemDarkTheme),
+                amoled = state.themeMode.isAmoled,
+            ) {
                 DarkMatterApp(
                     appState = state,
                     inboundProfilePayload = inboundProfilePayload,
