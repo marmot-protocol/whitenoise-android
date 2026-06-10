@@ -34,6 +34,12 @@
     <string name="chat_row_action_unarchive">Восстановить</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
     <string name="chat_row_action_leave">Выйти из группы</string>
+    <plurals name="archived_chats_count">
+        <item quantity="one">%1$d чат</item>
+        <item quantity="few">%1$d чата</item>
+        <item quantity="many">%1$d чатов</item>
+        <item quantity="other">%1$d чата</item>
+    </plurals>
     <string name="close_quick_actions">Закрыть быстрые действия</string>
     <string name="open_quick_actions">Открыть быстрые действия</string>
     <string name="my_profile">Поделиться профилем</string>

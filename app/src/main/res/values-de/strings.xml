@@ -34,6 +34,10 @@
     <string name="chat_row_action_unarchive">Aus dem Archiv</string>
     <string name="chat_row_action_mark_read">Als gelesen markieren</string>
     <string name="chat_row_action_leave">Gruppe verlassen</string>
+    <plurals name="archived_chats_count">
+        <item quantity="one">%1$d Chat</item>
+        <item quantity="other">%1$d Chats</item>
+    </plurals>
     <string name="close_quick_actions">Schließen Sie Schnellaktionen</string>
     <string name="open_quick_actions">Schnellaktionen öffnen</string>
     <string name="my_profile">Profil teilen</string>

@@ -34,6 +34,10 @@
     <string name="chat_row_action_unarchive">Arşivden çıkar</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
     <string name="chat_row_action_leave">Gruptan ayrıl</string>
+    <plurals name="archived_chats_count">
+        <item quantity="one">%1$d sohbet</item>
+        <item quantity="other">%1$d sohbet</item>
+    </plurals>
     <string name="close_quick_actions">Hızlı işlemleri kapat</string>
     <string name="open_quick_actions">Hızlı işlemleri aç</string>
     <string name="my_profile">Profilini paylaş</string>

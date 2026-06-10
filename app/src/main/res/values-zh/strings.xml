@@ -34,6 +34,9 @@
     <string name="chat_row_action_unarchive">取消归档</string>
     <string name="chat_row_action_mark_read">标记为已读</string>
     <string name="chat_row_action_leave">退出群组</string>
+    <plurals name="archived_chats_count">
+        <item quantity="other">%1$d 个聊天</item>
+    </plurals>
     <string name="close_quick_actions">关闭快速操作</string>
     <string name="open_quick_actions">打开快速操作</string>
     <string name="my_profile">分享您的个人资料</string>

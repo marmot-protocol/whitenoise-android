@@ -578,13 +578,36 @@ class ChatsController(
     }
 
     /**
-     * Leave `groupIdHex` from the chat-list long-press menu. Same FFI call
-     * the per-conversation `leaveGroup` action makes; surfaces success /
-     * error through the same toast keys.
+     * Leave `groupIdHex` from the chat-list long-press menu. Mirrors the
+     * conversation-screen guard: a sole admin in a multi-member group is
+     * blocked (the group would lose its only admin); a sole admin in a
+     * single-member group self-demotes before the leave so the engine
+     * doesn't refuse the publish. Both paths share `GroupProjector`'s
+     * pure predicates so the safety levels stay aligned — see
+     * [ConversationController.leaveGroup] for the canonical reference.
+     *
+     * The chat-list row doesn't carry a member count (`memberCount = 0`
+     * in `chatListItemFromProjection`), so this fetches members via the
+     * `groupMembers` FFI before evaluating the guard. The fetch is the
+     * only added IO vs the conversation path.
      */
     suspend fun leaveGroup(groupIdHex: String): Boolean {
         val account = accountRef ?: return false
+        val group = groupRecordsById[groupIdHex] ?: return false
+        val activeAccountIdHex = appState.activeAccount?.accountIdHex
         return runCatching {
+            val members = appState.marmotIo { groupMembers(account, groupIdHex) }
+            val memberCount = members.size
+            if (!GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)) {
+                appState.present(
+                    R.string.toast_make_another_admin_before_leaving,
+                    R.string.toast_group_needs_admin,
+                )
+                return@runCatching false
+            }
+            if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
+                appState.marmotIo { selfDemoteAdmin(account, groupIdHex) }
+            }
             appState.marmotIo { leaveGroup(account, groupIdHex) }
             appState.present(R.string.toast_left_chat)
             true

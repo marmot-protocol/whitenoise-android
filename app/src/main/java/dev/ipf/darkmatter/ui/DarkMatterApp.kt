@@ -1023,6 +1023,25 @@ private fun ChatsScreen(
                         },
                 )
             }
+            // Archived folder tile hoisted out of the LazyColumn so it
+            // survives the empty-active-list case (when every chat has
+            // been archived, the LazyColumn never mounts and an
+            // in-list tile would vanish with it). Same gating as
+            // before: hidden in the archived view, while search is
+            // open, and when the Unread filter is on.
+            if (
+                !showArchived &&
+                !searchOpen &&
+                filter == ChatListFilter.All &&
+                controller.archivedItems.isNotEmpty()
+            ) {
+                ArchivedFolderRow(
+                    totalCount = controller.archivedItems.size,
+                    unreadCount = archivedUnreadCount,
+                    onClick = { showArchived = true },
+                )
+                HorizontalDivider()
+            }
             Box(Modifier.fillMaxSize()) {
                 when {
                     controller.isLoading && sourceList.isEmpty() -> LoadingScreen()
@@ -1050,26 +1069,6 @@ private fun ChatsScreen(
                         )
                     else ->
                         LazyColumn(Modifier.fillMaxSize()) {
-                            // Archived folder tile at the TOP — only when not
-                            // already in the archived view, search is closed
-                            // (otherwise it competes with the typed query),
-                            // and the All filter is active (Unread filter
-                            // shouldn't surface a folder of "everything").
-                            if (
-                                !showArchived &&
-                                !searchOpen &&
-                                filter == ChatListFilter.All &&
-                                controller.archivedItems.isNotEmpty()
-                            ) {
-                                item(key = "archived-folder") {
-                                    ArchivedFolderRow(
-                                        totalCount = controller.archivedItems.size,
-                                        unreadCount = archivedUnreadCount,
-                                        onClick = { showArchived = true },
-                                    )
-                                    HorizontalDivider()
-                                }
-                            }
                             items(visibleItems, key = { it.id }) { item ->
                                 SwipeableChatRow(
                                     item = item,
@@ -1358,30 +1357,28 @@ private fun SwipeableChatRow(
     onMarkRead: () -> Unit,
     onLeave: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
     val dismissState =
         rememberSwipeToDismissBoxState(
             confirmValueChange = { target ->
                 if (target == SwipeToDismissBoxValue.StartToEnd) {
                     onArchiveToggle()
-                    // Snap back to settled so the row stays visible until the
-                    // projection echo removes it from the source list — the
-                    // archive flip is reflected by the list filter, not by
-                    // the swipe-box "dismiss" animation.
-                    true
-                } else {
-                    false
                 }
+                // Always return false so the dismiss state never escapes
+                // Settled. `rememberSwipeToDismissBoxState` uses
+                // rememberSaveable under the hood — if we commit to a
+                // StartToEnd value, that value persists per `it.id` in
+                // the LazyColumn's saveable registry and gets restored
+                // the next time the same row composes (e.g. when the
+                // user enters the archived view). Restoring StartToEnd
+                // re-fires the dismissal path through anchored-draggable
+                // and ends up unarchiving the row a moment after the
+                // user navigates into the archive. Letting the box
+                // spring back to Settled side-steps the whole race —
+                // the source list updates on its own when the
+                // controller mutation propagates.
+                false
             },
         )
-    LaunchedEffect(item.group.archived) {
-        // After the source list reshuffles (the row is now in archived /
-        // active depending on the toggle), reset the swipe gesture so a
-        // future swipe starts from a clean Settled state.
-        if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) {
-            scope.launch { dismissState.reset() }
-        }
-    }
     var menuOpen by remember { mutableStateOf(false) }
     SwipeToDismissBox(
         state = dismissState,
