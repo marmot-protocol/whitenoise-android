@@ -20,6 +20,25 @@
     <string name="chats_count">%1$d 聊天</string>
     <string name="couldnt_load_chats">無法載入聊天</string>
     <string name="no_archived_chats">沒有已封存的聊天</string>
+    <string name="chat_list_search_open">搜尋聊天</string>
+    <string name="chat_list_search_clear">清除搜尋</string>
+    <string name="chat_list_search_voice">語音搜尋</string>
+    <string name="chat_list_voice_unavailable">此裝置不支援語音搜尋</string>
+    <string name="toast_demoted_but_couldnt_leave">您不再是管理員,但無法離開群組</string>
+    <string name="chat_list_search_hint">搜尋聊天</string>
+    <string name="chat_list_filter_all">全部</string>
+    <string name="chat_list_filter_unread">未讀</string>
+    <string name="chat_list_no_unread">全部已讀</string>
+    <string name="chat_list_no_results_for">找不到「%1$s」</string>
+    <string name="chat_row_swipe_archive">封存</string>
+    <string name="chat_row_swipe_unarchive">取消封存</string>
+    <string name="chat_row_action_archive">封存</string>
+    <string name="chat_row_action_unarchive">取消封存</string>
+    <string name="chat_row_action_mark_read">標示為已讀</string>
+    <string name="chat_row_action_leave">離開群組</string>
+    <plurals name="archived_chats_count">
+        <item quantity="other">%1$d 個聊天</item>
+    </plurals>
     <string name="close_quick_actions">關閉快速操作</string>
     <string name="open_quick_actions">開啟快速操作</string>
     <string name="my_profile">分享您的個人檔案</string>

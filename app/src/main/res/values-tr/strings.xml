@@ -20,6 +20,26 @@
     <string name="chats_count">%1$d sohbetleri</string>
     <string name="couldnt_load_chats">Sohbetler yüklenemedi</string>
     <string name="no_archived_chats">Arşivlenmiş sohbet yok</string>
+    <string name="chat_list_search_open">Sohbet ara</string>
+    <string name="chat_list_search_clear">Aramayı temizle</string>
+    <string name="chat_list_search_voice">Sesli arama</string>
+    <string name="chat_list_voice_unavailable">Sesli arama bu cihazda kullanılamıyor</string>
+    <string name="toast_demoted_but_couldnt_leave">Artık yönetici değilsiniz, ancak gruptan ayrılınamadı</string>
+    <string name="chat_list_search_hint">Sohbet ara</string>
+    <string name="chat_list_filter_all">Tümü</string>
+    <string name="chat_list_filter_unread">Okunmamış</string>
+    <string name="chat_list_no_unread">Hepsi okundu</string>
+    <string name="chat_list_no_results_for">\"%1$s\" için sonuç yok</string>
+    <string name="chat_row_swipe_archive">Arşivle</string>
+    <string name="chat_row_swipe_unarchive">Arşivden çıkar</string>
+    <string name="chat_row_action_archive">Arşivle</string>
+    <string name="chat_row_action_unarchive">Arşivden çıkar</string>
+    <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
+    <string name="chat_row_action_leave">Gruptan ayrıl</string>
+    <plurals name="archived_chats_count">
+        <item quantity="one">%1$d sohbet</item>
+        <item quantity="other">%1$d sohbet</item>
+    </plurals>
     <string name="close_quick_actions">Hızlı işlemleri kapat</string>
     <string name="open_quick_actions">Hızlı işlemleri aç</string>
     <string name="my_profile">Profilini paylaş</string>
