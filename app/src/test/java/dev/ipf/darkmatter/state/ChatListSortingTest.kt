@@ -51,6 +51,37 @@ class ChatListSortingTest {
     }
 
     @Test
+    fun unnamedGroupsSortByPeerAccountNotGroupHex() {
+        // Two unnamed groups, identical latestAt → tie-break falls through to
+        // the title key. The raw group hex must NOT be the key: a peer
+        // account is always preferred when present so the sort tracks the
+        // display title rather than the cosmetic group id ordering.
+        val zeebra =
+            ChatListItem(
+                group = group("ffff-comes-first-by-hex"),
+                latest = message(groupId = "ffff-comes-first-by-hex", recordedAt = 100uL),
+                otherMemberAccount = "zeebra-account",
+                memberCount = 2,
+                memberSnapshot = null,
+            )
+        val alpha =
+            ChatListItem(
+                group = group("0000-comes-last-by-hex"),
+                latest = message(groupId = "0000-comes-last-by-hex", recordedAt = 100uL),
+                otherMemberAccount = "alpha-account",
+                memberCount = 2,
+                memberSnapshot = null,
+            )
+
+        val sorted = sortChatListItems(listOf(zeebra, alpha))
+
+        assertEquals(
+            listOf("0000-comes-last-by-hex", "ffff-comes-first-by-hex"),
+            sorted.map { it.id },
+        )
+    }
+
+    @Test
     fun projectedChatListRowCarriesTitlePreviewTimestampAndUnreadState() {
         val item =
             chatListItemFromProjection(

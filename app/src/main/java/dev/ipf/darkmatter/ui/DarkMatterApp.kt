@@ -1194,19 +1194,37 @@ private fun applyChatListSearchAndFilter(
  * Display title shown for a chat-list row. Shared between `ChatRow` (the
  * visible label) and `applyChatListSearchAndFilter` (the searchable
  * label) so a typed query always matches what the user sees on screen.
+ *
+ * For NAMED groups (`group.name` non-blank) we honour whatever the
+ * projection's title field carries — it's a localized rendering of the
+ * group name and may differ from the raw `group.name`.
+ *
+ * For UNNAMED groups we deliberately ignore `projectedTitle`: the
+ * upstream projection emits the group id hex there when no name is set,
+ * and using it would leak hex into the UI. Instead we route through
+ * `GroupProjector.displayTitle`, which falls back to (in order)
+ * inviter-welcomer copy for pending invites, the other member's title
+ * for two-member groups, the "Group of N people" copy for ≥3-member
+ * groups, and finally a short hex if no member data has resolved yet.
+ * The local fallback then live-updates once `ChatsController` populates
+ * the member cache from the `groupMembers` FFI.
  */
 private fun chatListItemDisplayTitle(
     item: ChatListItem,
     appState: DarkMatterAppState,
     copy: GroupTitleCopy,
-): String =
-    item.projectedTitle ?: GroupProjector.displayTitle(
+): String {
+    if (item.group.name.isNotBlank()) {
+        return item.projectedTitle ?: item.group.name
+    }
+    return GroupProjector.displayTitle(
         group = item.group,
         otherMemberAccount = item.otherMemberAccount,
         memberCount = item.memberCount,
         memberTitle = { appState.chatMemberTitle(it) },
         copy = copy,
     )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

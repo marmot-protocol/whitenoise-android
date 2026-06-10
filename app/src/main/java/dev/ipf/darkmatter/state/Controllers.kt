@@ -94,12 +94,41 @@ internal fun sortChatListItems(items: List<ChatListItem>): List<ChatListItem> =
     items.sortedWith(
         compareByDescending<ChatListItem> { it.group.pendingConfirmation }
             .thenByDescending { it.latestAt ?: 0uL }
-            .thenBy { (it.projectedTitle ?: it.group.name.ifBlank { it.group.groupIdHex }).lowercase() },
+            .thenBy { chatListItemSortKey(it) },
     )
 
+/**
+ * Sort tie-breaker key. Mirrors the gating that the UI uses to derive a
+ * display title: named groups sort by the projected/raw name; unnamed
+ * groups sort by the peer account (stable; co-locates the same DM-shaped
+ * conversation across renders) or, lacking that, the member count. The
+ * raw group hex must never leak into the sort key — that's what the UI
+ * stopped showing, and the sort would otherwise drift away from it.
+ */
+internal fun chatListItemSortKey(item: ChatListItem): String =
+    if (item.group.name.isNotBlank()) {
+        (item.projectedTitle ?: item.group.name).lowercase()
+    } else {
+        (item.otherMemberAccount ?: "~${item.memberCount}").lowercase()
+    }
+
+/**
+ * Build a `ChatListItem` from the FFI projection. The optional [members]
+ * snapshot lets the caller hand in the group's member roster fetched
+ * separately (the chat-list FFI doesn't include members on each row).
+ * When present, the snapshot drives the `otherMemberAccount` /
+ * `memberCount` fields that `GroupProjector.displayTitle` reads — that's
+ * how an unnamed group resolves to "Group of N people" or the other
+ * member's display name instead of leaking the group hex into the UI.
+ * Without it, both fields fall back to null/0 and the local projection
+ * shows a short group hex until [ChatsController]'s async members fetch
+ * fills the cache.
+ */
 internal fun chatListItemFromProjection(
     row: ChatListRowFfi,
     group: AppGroupRecordFfi? = null,
+    activeAccountIdHex: String? = null,
+    members: List<AppGroupMemberRecordFfi>? = null,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
     val displayGroup =
@@ -108,6 +137,9 @@ internal fun chatListItemFromProjection(
             archived = row.archived,
             pendingConfirmation = row.pendingConfirmation,
         )
+    val otherMember =
+        members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) }
+    val memberCount = members?.size ?: 0
     return ChatListItem(
         group = displayGroup,
         latest =
@@ -125,8 +157,8 @@ internal fun chatListItemFromProjection(
                     receivedAt = preview.timelineAt,
                 )
             },
-        otherMemberAccount = null,
-        memberCount = 0,
+        otherMemberAccount = otherMember,
+        memberCount = memberCount,
         memberSnapshot = null,
         projection = row,
     )
@@ -427,12 +459,31 @@ class ChatsController(
     private var chatRows = listOf<ChatListRowFfi>()
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
 
+    // Per-group member snapshots fetched via the `groupMembers` FFI.
+    // The chat-list FFI doesn't include member rosters on each row, so
+    // for unnamed groups we'd otherwise have nothing to feed the
+    // GroupProjector.displayTitle fallback and the UI would leak the
+    // raw group id hex. Filled lazily on first `recompute()` per group;
+    // re-fetched on bind.
+    private var memberCacheByGroup: Map<String, List<AppGroupMemberRecordFfi>> = emptyMap()
+
+    // Tracks groups whose member fetch is currently in flight, so we don't
+    // fan out duplicate work for the same group. Invariant: an id sits in
+    // exactly one state at a time — pending (not in either set), in-flight
+    // (here), or cached (in [memberCacheByGroup]). Entries are added in
+    // [schedulePendingMemberFetches] and removed in the same coroutine's
+    // `finally` so a failed fetch can be retried on the next recompute;
+    // `bind()` clears the set alongside the cache to reset both at once.
+    private val inFlightMemberFetches = mutableSetOf<String>()
+
     suspend fun bind(accountRef: String?) {
         chatsDebug { "bind account=${accountRef?.take(8)}" }
         this.accountRef = accountRef
         this.boundAccountRef = accountRef
         chatRows = emptyList()
         groupRecordsById = emptyMap()
+        memberCacheByGroup = emptyMap()
+        inFlightMemberFetches.clear()
         recompute()
         error = null
 
@@ -696,14 +747,68 @@ class ChatsController(
     }
 
     private fun recompute() {
+        val me = appState.activeAccount?.accountIdHex
         val all =
             chatRows
                 .map { row ->
-                    chatListItemFromProjection(row, groupRecordsById[row.groupIdHex])
+                    chatListItemFromProjection(
+                        row = row,
+                        group = groupRecordsById[row.groupIdHex],
+                        activeAccountIdHex = me,
+                        members = memberCacheByGroup[row.groupIdHex],
+                    )
                 }.let(::sortChatListItems)
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
         chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }
+        // For any unnamed group we don't yet have members cached for,
+        // fan out a one-shot members fetch so the title can resolve from
+        // the local projector. Only unnamed groups need this — named
+        // groups display `group.name` directly without member data.
+        schedulePendingMemberFetches()
+    }
+
+    /**
+     * Walk the current chat rows and, for any unnamed group without
+     * cached members or an in-flight fetch, kick off a `groupMembers`
+     * FFI call. On success the cache updates and `recompute()` runs
+     * again so the row reshuffles into its proper title.
+     */
+    private fun schedulePendingMemberFetches() {
+        val account = accountRef ?: return
+        val pending =
+            chatRows
+                .asSequence()
+                .filter {
+                    val groupName = groupRecordsById[it.groupIdHex]?.name ?: it.groupName
+                    groupName.isBlank()
+                }.map { it.groupIdHex }
+                .filterNot { memberCacheByGroup.containsKey(it) }
+                .filterNot { it in inFlightMemberFetches }
+                .toList()
+        if (pending.isEmpty()) return
+        inFlightMemberFetches.addAll(pending)
+        pending.forEach { groupIdHex ->
+            appState.launchMutation {
+                try {
+                    val members = appState.marmotIo { groupMembers(account, groupIdHex) }
+                    members
+                        .map { it.memberIdHex }
+                        .filter { it.isNotBlank() }
+                        .forEach(appState::requestProfile)
+                    memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
+                    recompute()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    // Best-effort. Leave the cache empty so a future
+                    // bind retries; the row falls back to the short
+                    // hex projector branch until then.
+                } finally {
+                    inFlightMemberFetches.remove(groupIdHex)
+                }
+            }
+        }
     }
 }
 
