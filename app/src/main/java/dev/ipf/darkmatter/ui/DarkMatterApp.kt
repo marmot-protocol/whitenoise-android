@@ -76,7 +76,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
@@ -1083,9 +1082,6 @@ private fun ChatsScreen(
                                     onMarkRead = {
                                         scope.launch { controller.markAllRead(item) }
                                     },
-                                    onLeave = {
-                                        scope.launch { controller.leaveGroup(item.group.groupIdHex) }
-                                    },
                                 )
                                 HorizontalDivider()
                             }
@@ -1355,7 +1351,6 @@ private fun SwipeableChatRow(
     onOpen: () -> Unit,
     onArchiveToggle: () -> Unit,
     onMarkRead: () -> Unit,
-    onLeave: () -> Unit,
 ) {
     val dismissState =
         rememberSwipeToDismissBoxState(
@@ -1461,16 +1456,11 @@ private fun SwipeableChatRow(
                         },
                     )
                 }
-                if (!item.group.pendingConfirmation) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.chat_row_action_leave)) },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null) },
-                        onClick = {
-                            menuOpen = false
-                            onLeave()
-                        },
-                    )
-                }
+                // Leave-group is reachable from the conversation Details
+                // screen, which carries the sole-admin guard + confirmation
+                // context in one place. The chat-list menu stays focused on
+                // archive + mark-as-read for now; Pin / Mute slot in here
+                // once the FFI exposes them.
             }
         }
     }
