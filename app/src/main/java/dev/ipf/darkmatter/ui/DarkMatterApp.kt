@@ -926,9 +926,9 @@ private fun ChatsScreen(
     }
     LaunchedEffect(searchOpen) {
         if (searchOpen) {
-            // Defer to the next frame so the TextField is in composition
-            // before we ask for focus; without this the request lands
-            // before the node is attached and the keyboard never opens.
+            // LaunchedEffect runs after composition + layout, so the
+            // TextField node is already attached by the time we call
+            // requestFocus — no explicit frame deferral needed.
             searchFocusRequester.requestFocus()
         } else {
             searchQuery = ""
@@ -1093,9 +1093,7 @@ private fun ChatsScreen(
                                     isInArchivedView = showArchived,
                                     onOpen = { onOpenGroup(item) },
                                     onArchiveToggle = {
-                                        scope.launch {
-                                            controller.setArchived(item.group.groupIdHex, !item.group.archived)
-                                        }
+                                        controller.setArchived(item.group.groupIdHex, !item.group.archived)
                                     },
                                     onMarkRead = {
                                         scope.launch { controller.markAllRead(item) }
@@ -1405,17 +1403,22 @@ private fun SwipeableChatRow(
     appState: DarkMatterAppState,
     isInArchivedView: Boolean,
     onOpen: () -> Unit,
-    onArchiveToggle: () -> Unit,
+    onArchiveToggle: suspend () -> Unit,
     onMarkRead: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
     // Tracks the archive-state we've already fired against. A wavering
     // swipe gesture can cross the dismissal threshold more than once
     // (user drags past → back → past again as they hesitate), which
     // would otherwise re-fire `onArchiveToggle()` and toggle archived
     // back to its previous state. Reset to `null` when the row's
     // backing `archived` flips (the source-list reshuffle replaces
-    // this composable instance, so this is mostly defensive) or when
-    // a fresh `item.id` lands in this slot.
+    // this composable instance), when a fresh `item.id` lands in this
+    // slot, OR when the toggle coroutine completes — that last reset
+    // is what unlocks a retry if `setArchived` failed silently and
+    // left `item.archived` unchanged (without it the guard would stay
+    // armed against the same archived value and the row would refuse
+    // a second swipe). See CodeRabbit's third-pass note.
     var firedForArchived by remember(item.id) { mutableStateOf<Boolean?>(null) }
     val dismissState =
         rememberSwipeToDismissBoxState(
@@ -1424,7 +1427,20 @@ private fun SwipeableChatRow(
                     firedForArchived != item.group.archived
                 ) {
                     firedForArchived = item.group.archived
-                    onArchiveToggle()
+                    scope.launch {
+                        try {
+                            onArchiveToggle()
+                        } finally {
+                            // Whether the mutation succeeded (then
+                            // `item.group.archived` has flipped and the
+                            // guard naturally invalidates) or failed
+                            // (`item.group.archived` is still the value
+                            // we fired against, so the guard would
+                            // refuse a second swipe), clearing the
+                            // sentinel is always safe.
+                            firedForArchived = null
+                        }
+                    }
                 }
                 // Always return false so the dismiss state never escapes
                 // Settled. `rememberSwipeToDismissBoxState` uses
@@ -1511,7 +1527,7 @@ private fun SwipeableChatRow(
                     },
                     onClick = {
                         menuOpen = false
-                        onArchiveToggle()
+                        scope.launch { onArchiveToggle() }
                     },
                 )
                 if (item.hasUnread) {
