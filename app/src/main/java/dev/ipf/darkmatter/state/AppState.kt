@@ -283,6 +283,17 @@ class DarkMatterAppState(
 
     private val npubs = ConcurrentHashMap<String, String>()
     private var profileRevision by mutableStateOf(0)
+
+    /**
+     * Read-only Compose-tracked snapshot of [profileRevision] so callers
+     * outside this file can subscribe to profile-cache invalidations
+     * without exposing the mutable backing field. Includes this in a
+     * `remember(...)` key list to re-fire a derivation when a profile
+     * update lands (e.g. the chat-list search filter must re-evaluate
+     * its title projection when a DM peer's display name resolves).
+     */
+    val profileRevisionForCompose: Int
+        get() = profileRevision
     private val profilePresentations = mutableMapOf<String, ProfilePresentation>()
     private val profilePresentationLock = Any()
     private val groupMemberSnapshots = mutableMapOf<String, GroupMemberSnapshot>()

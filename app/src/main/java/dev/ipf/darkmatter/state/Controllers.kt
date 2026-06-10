@@ -553,6 +553,138 @@ class ChatsController(
         recompute()
     }
 
+    /**
+     * Flip the archived flag on `groupIdHex` from the chat-list surface
+     * (swipe / long-press menu). Mirrors `ConversationController.setArchived`
+     * but takes the id by parameter since the caller doesn't have an open
+     * conversation. Standard mutation-lock + toast pattern; local group
+     * record is updated immediately so the row reflows without waiting on
+     * the projection echo.
+     */
+    suspend fun setArchived(
+        groupIdHex: String,
+        archived: Boolean,
+    ): Boolean {
+        val account = accountRef ?: return false
+        return runCatching {
+            val updated = appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
+            appState.applyLocalGroupUpdate(updated)
+            appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
+            true
+        }.onFailure {
+            if (it is CancellationException) throw it
+            appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Leave `groupIdHex` from the chat-list long-press menu. Mirrors the
+     * conversation-screen guard: a sole admin in a multi-member group is
+     * blocked (the group would lose its only admin); a sole admin in a
+     * single-member group self-demotes before the leave so the engine
+     * doesn't refuse the publish. Both paths share `GroupProjector`'s
+     * pure predicates so the safety levels stay aligned — see
+     * [ConversationController.leaveGroup] for the canonical reference.
+     *
+     * The chat-list row doesn't carry a member count (`memberCount = 0`
+     * in `chatListItemFromProjection`), so this fetches members via the
+     * `groupMembers` FFI before evaluating the guard. The fetch is the
+     * only added IO vs the conversation path.
+     */
+    suspend fun leaveGroup(groupIdHex: String): Boolean {
+        val account = accountRef ?: return false
+        val group = groupRecordsById[groupIdHex] ?: return false
+        val activeAccountIdHex = appState.activeAccount?.accountIdHex
+        // Tracks whether selfDemoteAdmin succeeded before the leaveGroup
+        // attempt. If leaveGroup then fails, we surface a partial-failure
+        // toast that names the inconsistency (user is demoted but still
+        // in the group) rather than the generic "couldn't leave" copy.
+        var demotedBeforeLeave = false
+        return runCatching {
+            val members = appState.marmotIo { groupMembers(account, groupIdHex) }
+            val memberCount = members.size
+            if (!GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)) {
+                appState.present(
+                    R.string.toast_make_another_admin_before_leaving,
+                    R.string.toast_group_needs_admin,
+                )
+                return@runCatching false
+            }
+            if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
+                appState.marmotIo { selfDemoteAdmin(account, groupIdHex) }
+                demotedBeforeLeave = true
+                // Mirror the conversation-controller path: drop the local
+                // admin entry so the cached record matches the engine's
+                // post-demote state even if the subsequent leaveGroup
+                // fails (the user is no longer an admin regardless of
+                // whether they end up leaving). Case-insensitive because
+                // admin-list hex casing can drift from the active
+                // account id, same as in [ConversationController.leaveGroup].
+                if (activeAccountIdHex != null) {
+                    groupRecordsById[groupIdHex]?.let { cached ->
+                        val patched =
+                            cached.copy(
+                                admins =
+                                    cached.admins.filterNot {
+                                        it.equals(activeAccountIdHex, ignoreCase = true)
+                                    },
+                            )
+                        groupRecordsById = groupRecordsById + (groupIdHex to patched)
+                        recompute()
+                    }
+                }
+            }
+            appState.marmotIo { leaveGroup(account, groupIdHex) }
+            appState.present(R.string.toast_left_chat)
+            true
+        }.onFailure {
+            if (it is CancellationException) throw it
+            val errorText = AppText.Plain(it.message ?: it.javaClass.simpleName)
+            if (demotedBeforeLeave) {
+                // User was demoted but we couldn't complete the leave.
+                // Tell them so they know to ask another admin to restore
+                // their role (or retry); the generic "couldn't leave"
+                // toast misses that they're now mid-state.
+                appState.present(R.string.toast_demoted_but_couldnt_leave, errorText)
+            } else {
+                appState.present(R.string.toast_couldnt_leave_chat, errorText)
+            }
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Mark the chat's unread count to zero by advancing the read pointer to
+     * its latest projected message. No-op when the chat has no unread or no
+     * known last-message id. Called from the long-press "Mark as read"
+     * action — the per-conversation scroll-driven path remains the
+     * normal mechanism while a chat is open.
+     */
+    suspend fun markAllRead(item: ChatListItem): Boolean {
+        val account = accountRef ?: return false
+        val lastId =
+            item.projection
+                ?.lastMessage
+                ?.messageIdHex
+                ?.takeIf { it.isNotBlank() } ?: return false
+        return runCatching {
+            appState.marmotIo { markTimelineMessageRead(account, item.group.groupIdHex, lastId) }
+            true
+        }.onFailure {
+            if (it is CancellationException) throw it
+            // Quiet for the user (marking read is an idempotent
+            // affordance and surfacing a toast on every flake would be
+            // noisy) — but still log the failure so the trace surfaces
+            // in `adb logcat` when someone reports "mark read does
+            // nothing". `take(8)` on the group id keeps the privacy
+            // posture: no full ids in logs.
+            Log.w(
+                "DMChatsController",
+                "markAllRead failed for group=${item.group.groupIdHex.take(8)}",
+                it,
+            )
+        }.getOrDefault(false)
+    }
+
     private fun requestGroupProfiles(group: AppGroupRecordFfi) {
         appState.requestProfiles(
             listOfNotNull(group.welcomerAccountIdHex) + group.admins,
