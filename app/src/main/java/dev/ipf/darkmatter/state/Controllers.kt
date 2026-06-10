@@ -553,6 +553,71 @@ class ChatsController(
         recompute()
     }
 
+    /**
+     * Flip the archived flag on `groupIdHex` from the chat-list surface
+     * (swipe / long-press menu). Mirrors `ConversationController.setArchived`
+     * but takes the id by parameter since the caller doesn't have an open
+     * conversation. Standard mutation-lock + toast pattern; local group
+     * record is updated immediately so the row reflows without waiting on
+     * the projection echo.
+     */
+    suspend fun setArchived(
+        groupIdHex: String,
+        archived: Boolean,
+    ): Boolean {
+        val account = accountRef ?: return false
+        return runCatching {
+            val updated = appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
+            appState.applyLocalGroupUpdate(updated)
+            appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
+            true
+        }.onFailure {
+            if (it is CancellationException) throw it
+            appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Leave `groupIdHex` from the chat-list long-press menu. Same FFI call
+     * the per-conversation `leaveGroup` action makes; surfaces success /
+     * error through the same toast keys.
+     */
+    suspend fun leaveGroup(groupIdHex: String): Boolean {
+        val account = accountRef ?: return false
+        return runCatching {
+            appState.marmotIo { leaveGroup(account, groupIdHex) }
+            appState.present(R.string.toast_left_chat)
+            true
+        }.onFailure {
+            if (it is CancellationException) throw it
+            appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Mark the chat's unread count to zero by advancing the read pointer to
+     * its latest projected message. No-op when the chat has no unread or no
+     * known last-message id. Called from the long-press "Mark as read"
+     * action — the per-conversation scroll-driven path remains the
+     * normal mechanism while a chat is open.
+     */
+    suspend fun markAllRead(item: ChatListItem): Boolean {
+        val account = accountRef ?: return false
+        val lastId =
+            item.projection
+                ?.lastMessage
+                ?.messageIdHex
+                ?.takeIf { it.isNotBlank() } ?: return false
+        return runCatching {
+            appState.marmotIo { markTimelineMessageRead(account, item.group.groupIdHex, lastId) }
+            true
+        }.onFailure {
+            if (it is CancellationException) throw it
+            // Quiet failure — marking read is an idempotent affordance
+            // and surfacing a toast on every flake would be noisy.
+        }.getOrDefault(false)
+    }
+
     private fun requestGroupProfiles(group: AppGroupRecordFfi) {
         appState.requestProfiles(
             listOfNotNull(group.welcomerAccountIdHex) + group.admins,

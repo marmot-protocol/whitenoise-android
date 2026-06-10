@@ -76,6 +76,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
@@ -99,6 +100,8 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MarkChatRead
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Person
@@ -110,6 +113,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
@@ -144,6 +148,8 @@ import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -152,6 +158,7 @@ import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -170,6 +177,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -901,39 +910,89 @@ private fun ChatsScreen(
     var showScanner by remember { mutableStateOf(false) }
     var showArchived by remember { mutableStateOf(false) }
     var quickActionsExpanded by remember { mutableStateOf(false) }
+    // Search expand/collapse + live query. The search input is anchored in
+    // the top bar; tapping the magnifier swaps the chrome (account avatar
+    // + nav icons) for a TextField that filters in real time on title +
+    // last-message preview. Closing the search clears the query so the
+    // next open starts fresh.
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(ChatListFilter.All) }
+    val searchFocusRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(showArchived) {
         if (showArchived) quickActionsExpanded = false
     }
+    LaunchedEffect(searchOpen) {
+        if (searchOpen) {
+            // Defer to the next frame so the TextField is in composition
+            // before we ask for focus; without this the request lands
+            // before the node is attached and the keyboard never opens.
+            searchFocusRequester.requestFocus()
+        } else {
+            searchQuery = ""
+        }
+    }
+
+    // System voice-input integration for the dictation button. The recognizer
+    // is invoked via the standard `ACTION_RECOGNIZE_SPEECH` intent; on a
+    // successful capture we paste the spoken text straight into the search
+    // field. No permissions to declare ourselves — the system dialog handles
+    // mic access on the user's behalf.
+    val voiceSearchLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) { result ->
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
+                val recognized =
+                    result.data
+                        ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+                        ?.firstOrNull()
+                        ?.trim()
+                if (!recognized.isNullOrBlank()) {
+                    searchQuery = recognized
+                }
+            }
+        }
+
+    val sourceList = if (showArchived) controller.archivedItems else controller.items
+    val visibleItems =
+        remember(sourceList, searchQuery, filter) {
+            applyChatListSearchAndFilter(sourceList, searchQuery, filter)
+        }
+    val archivedUnreadCount =
+        remember(controller.archivedItems) {
+            controller.archivedItems.count { it.hasUnread }
+        }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    if (showArchived) Text(stringResource(R.string.archived))
-                },
-                navigationIcon = {
-                    val active = appState.activeAccount
-                    if (showArchived) {
-                        IconButton(onClick = { showArchived = false }) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.back),
+            ChatListTopBar(
+                appState = appState,
+                showArchived = showArchived,
+                searchOpen = searchOpen,
+                searchQuery = searchQuery,
+                searchFocusRequester = searchFocusRequester,
+                onSearchQueryChange = { searchQuery = it },
+                onSearchOpen = { searchOpen = true },
+                onSearchClose = { searchOpen = false },
+                onMic = {
+                    val intent =
+                        android.content
+                            .Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                            .putExtra(
+                                android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
                             )
-                        }
-                    } else {
-                        AccountAvatarButton(
-                            title = active?.let { appState.displayName(it.accountIdHex) } ?: stringResource(R.string.app_name),
-                            seed = active?.accountIdHex ?: "darkmatter",
-                            pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
-                            onClick = onOpenSettings,
-                        )
-                    }
+                    runCatching { voiceSearchLauncher.launch(intent) }
                 },
+                onArchivedBack = { showArchived = false },
+                onOpenSettings = onOpenSettings,
             )
         },
         floatingActionButton = {
-            if (!showArchived) {
+            if (!showArchived && !searchOpen) {
                 QuickActionFabMenu(
                     expanded = quickActionsExpanded,
                     onExpandedChange = { quickActionsExpanded = it },
@@ -947,41 +1006,92 @@ private fun ChatsScreen(
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            val visibleItems = if (showArchived) controller.archivedItems else controller.items
-            when {
-                controller.isLoading && visibleItems.isEmpty() -> LoadingScreen()
-                controller.error != null -> ErrorContent(stringResource(R.string.couldnt_load_chats), controller.error.orEmpty())
-                visibleItems.isEmpty() && showArchived ->
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.no_archived_chats), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                visibleItems.isEmpty() ->
-                    EmptyChats(onCreate = {
-                        newChatTitle = R.string.new_chat
-                        showNewChat = true
-                    })
-                else ->
-                    LazyColumn(Modifier.fillMaxSize()) {
-                        items(visibleItems, key = { it.id }) { item ->
-                            ChatRow(
-                                item = item,
-                                appState = appState,
-                                onClick = { onOpenGroup(item) },
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            // Filter chips visible whenever there's content to filter — both
+            // in the active and archived lists. They're sticky above the
+            // list rather than sticky inside the LazyColumn so they survive
+            // an empty-state swap without flicker.
+            if (sourceList.isNotEmpty()) {
+                ChatListFilterChips(
+                    filter = filter,
+                    onChange = { filter = it },
+                    activeHasUnread =
+                        if (showArchived) {
+                            archivedUnreadCount > 0
+                        } else {
+                            controller.items.any { it.hasUnread }
+                        },
+                )
+            }
+            Box(Modifier.fillMaxSize()) {
+                when {
+                    controller.isLoading && sourceList.isEmpty() -> LoadingScreen()
+                    controller.error != null ->
+                        ErrorContent(
+                            stringResource(R.string.couldnt_load_chats),
+                            controller.error.orEmpty(),
+                        )
+                    sourceList.isEmpty() && showArchived ->
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                stringResource(R.string.no_archived_chats),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            HorizontalDivider()
                         }
-                        if (!showArchived && controller.archivedItems.isNotEmpty()) {
-                            item {
-                                ListItem(
-                                    modifier = Modifier.clickable { showArchived = true },
-                                    headlineContent = { Text(stringResource(R.string.archived)) },
-                                    supportingContent = { Text(stringResource(R.string.chats_count, controller.archivedItems.size)) },
-                                    leadingContent = { Icon(Icons.Default.Archive, contentDescription = null) },
+                    sourceList.isEmpty() ->
+                        EmptyChats(onCreate = {
+                            newChatTitle = R.string.new_chat
+                            showNewChat = true
+                        })
+                    visibleItems.isEmpty() ->
+                        ChatListNoResults(
+                            query = searchQuery.trim(),
+                            filter = filter,
+                        )
+                    else ->
+                        LazyColumn(Modifier.fillMaxSize()) {
+                            // Archived folder tile at the TOP — only when not
+                            // already in the archived view, search is closed
+                            // (otherwise it competes with the typed query),
+                            // and the All filter is active (Unread filter
+                            // shouldn't surface a folder of "everything").
+                            if (
+                                !showArchived &&
+                                !searchOpen &&
+                                filter == ChatListFilter.All &&
+                                controller.archivedItems.isNotEmpty()
+                            ) {
+                                item(key = "archived-folder") {
+                                    ArchivedFolderRow(
+                                        totalCount = controller.archivedItems.size,
+                                        unreadCount = archivedUnreadCount,
+                                        onClick = { showArchived = true },
+                                    )
+                                    HorizontalDivider()
+                                }
+                            }
+                            items(visibleItems, key = { it.id }) { item ->
+                                SwipeableChatRow(
+                                    item = item,
+                                    appState = appState,
+                                    isInArchivedView = showArchived,
+                                    onOpen = { onOpenGroup(item) },
+                                    onArchiveToggle = {
+                                        scope.launch {
+                                            controller.setArchived(item.group.groupIdHex, !item.group.archived)
+                                        }
+                                    },
+                                    onMarkRead = {
+                                        scope.launch { controller.markAllRead(item) }
+                                    },
+                                    onLeave = {
+                                        scope.launch { controller.leaveGroup(item.group.groupIdHex) }
+                                    },
                                 )
+                                HorizontalDivider()
                             }
                         }
-                    }
+                }
             }
         }
     }
@@ -1003,6 +1113,369 @@ private fun ChatsScreen(
                 }
             },
         )
+    }
+}
+
+/** Three-way filter state for the chat list. `Groups` is held back from
+ *  v1 because the direct-vs-group distinction is partly inferred from
+ *  `memberCount`, which isn't always populated for archived rows. */
+private enum class ChatListFilter { All, Unread }
+
+private fun applyChatListSearchAndFilter(
+    source: List<ChatListItem>,
+    rawQuery: String,
+    filter: ChatListFilter,
+): List<ChatListItem> {
+    val byFilter =
+        when (filter) {
+            ChatListFilter.All -> source
+            ChatListFilter.Unread -> source.filter { it.hasUnread }
+        }
+    val needle = rawQuery.trim()
+    if (needle.isEmpty()) return byFilter
+    val ciNeedle = needle.lowercase()
+    return byFilter.filter { item ->
+        val title = (item.projectedTitle ?: item.group.name).lowercase()
+        if (title.contains(ciNeedle)) return@filter true
+        val preview = item.projectedPreviewText().lowercase()
+        preview.contains(ciNeedle)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatListTopBar(
+    appState: DarkMatterAppState,
+    showArchived: Boolean,
+    searchOpen: Boolean,
+    searchQuery: String,
+    searchFocusRequester: FocusRequester,
+    onSearchQueryChange: (String) -> Unit,
+    onSearchOpen: () -> Unit,
+    onSearchClose: () -> Unit,
+    onMic: () -> Unit,
+    onArchivedBack: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    TopAppBar(
+        title = {
+            when {
+                searchOpen ->
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .focusRequester(searchFocusRequester),
+                        singleLine = true,
+                        placeholder = { Text(stringResource(R.string.chat_list_search_hint)) },
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                            ),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Sentences,
+                                imeAction = ImeAction.Search,
+                            ),
+                    )
+                showArchived -> Text(stringResource(R.string.archived))
+                else -> Unit
+            }
+        },
+        navigationIcon = {
+            when {
+                searchOpen ->
+                    IconButton(onClick = onSearchClose) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back),
+                        )
+                    }
+                showArchived ->
+                    IconButton(onClick = onArchivedBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back),
+                        )
+                    }
+                else -> {
+                    val active = appState.activeAccount
+                    AccountAvatarButton(
+                        title = active?.let { appState.displayName(it.accountIdHex) } ?: stringResource(R.string.app_name),
+                        seed = active?.accountIdHex ?: "darkmatter",
+                        pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
+                        onClick = onOpenSettings,
+                    )
+                }
+            }
+        },
+        actions = {
+            if (searchOpen) {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { onSearchQueryChange("") }) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(R.string.chat_list_search_clear),
+                        )
+                    }
+                }
+                IconButton(onClick = onMic) {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = stringResource(R.string.chat_list_search_voice),
+                    )
+                }
+            } else {
+                IconButton(onClick = onSearchOpen) {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = stringResource(R.string.chat_list_search_open),
+                    )
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun ChatListFilterChips(
+    filter: ChatListFilter,
+    onChange: (ChatListFilter) -> Unit,
+    activeHasUnread: Boolean,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(
+            selected = filter == ChatListFilter.All,
+            onClick = { onChange(ChatListFilter.All) },
+            label = { Text(stringResource(R.string.chat_list_filter_all)) },
+        )
+        FilterChip(
+            selected = filter == ChatListFilter.Unread,
+            onClick = { onChange(ChatListFilter.Unread) },
+            label = { Text(stringResource(R.string.chat_list_filter_unread)) },
+            enabled = activeHasUnread || filter == ChatListFilter.Unread,
+        )
+    }
+}
+
+@Composable
+private fun ChatListNoResults(
+    query: String,
+    filter: ChatListFilter,
+) {
+    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(40.dp),
+            )
+            val copy =
+                when {
+                    query.isNotEmpty() -> stringResource(R.string.chat_list_no_results_for, query)
+                    filter == ChatListFilter.Unread -> stringResource(R.string.chat_list_no_unread)
+                    else -> stringResource(R.string.no_chats_yet)
+                }
+            Text(
+                copy,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ArchivedFolderRow(
+    totalCount: Int,
+    unreadCount: Int,
+    onClick: () -> Unit,
+) {
+    // Folder-style tile at the top of the active list: same row shape as a
+    // ChatRow (44.dp leading slot + headline + supporting + trailing badge)
+    // so the rhythm doesn't break. Trailing badge shows unread-within-
+    // archived (folder-of-mail style); supporting text shows the total.
+    ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
+        leadingContent = {
+            Box(
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Archive,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        headlineContent = { Text(stringResource(R.string.archived)) },
+        supportingContent = {
+            Text(pluralStringResource(R.plurals.archived_chats_count, totalCount, totalCount))
+        },
+        trailingContent = {
+            if (unreadCount > 0) {
+                Badge {
+                    Text(if (unreadCount > 99) "99+" else unreadCount.toString())
+                }
+            }
+        },
+    )
+}
+
+/** Chat row wrapped in a SwipeToDismissBox + long-press menu. The swipe is
+ *  StartToEnd only (left-to-right in LTR; flips for RTL), and the action
+ *  is Archive in the active list / Unarchive in the archived list. The
+ *  swipe state is reset to Settled if the controller mutation fails so the
+ *  row doesn't end up off-screen with no backing model change. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableChatRow(
+    item: ChatListItem,
+    appState: DarkMatterAppState,
+    isInArchivedView: Boolean,
+    onOpen: () -> Unit,
+    onArchiveToggle: () -> Unit,
+    onMarkRead: () -> Unit,
+    onLeave: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val dismissState =
+        rememberSwipeToDismissBoxState(
+            confirmValueChange = { target ->
+                if (target == SwipeToDismissBoxValue.StartToEnd) {
+                    onArchiveToggle()
+                    // Snap back to settled so the row stays visible until the
+                    // projection echo removes it from the source list — the
+                    // archive flip is reflected by the list filter, not by
+                    // the swipe-box "dismiss" animation.
+                    true
+                } else {
+                    false
+                }
+            },
+        )
+    LaunchedEffect(item.group.archived) {
+        // After the source list reshuffles (the row is now in archived /
+        // active depending on the toggle), reset the swipe gesture so a
+        // future swipe starts from a clean Settled state.
+        if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) {
+            scope.launch { dismissState.reset() }
+        }
+    }
+    var menuOpen by remember { mutableStateOf(false) }
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = false,
+        backgroundContent = {
+            // Coloured background only when the gesture is actively
+            // dragging — otherwise the row paints over a transparent box.
+            val tinted = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+            if (tinted) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .padding(start = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        if (isInArchivedView) Icons.Default.Unarchive else Icons.Default.Archive,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        stringResource(
+                            if (isInArchivedView) {
+                                R.string.chat_row_swipe_unarchive
+                            } else {
+                                R.string.chat_row_swipe_archive
+                            },
+                        ),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+            }
+        },
+    ) {
+        Box {
+            ChatRow(
+                item = item,
+                appState = appState,
+                onClick = onOpen,
+                onLongClick = { menuOpen = true },
+            )
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+            ) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(
+                                if (item.group.archived) {
+                                    R.string.chat_row_action_unarchive
+                                } else {
+                                    R.string.chat_row_action_archive
+                                },
+                            ),
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            if (item.group.archived) Icons.Default.Unarchive else Icons.Default.Archive,
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = {
+                        menuOpen = false
+                        onArchiveToggle()
+                    },
+                )
+                if (item.hasUnread) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.chat_row_action_mark_read)) },
+                        leadingIcon = { Icon(Icons.Default.MarkChatRead, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            onMarkRead()
+                        },
+                    )
+                }
+                if (!item.group.pendingConfirmation) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.chat_row_action_leave)) },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            onLeave()
+                        },
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -1071,6 +1544,7 @@ private fun ChatRow(
     item: ChatListItem,
     appState: DarkMatterAppState,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     val messageTextCopy = rememberMessageTextCopy()
@@ -1092,8 +1566,14 @@ private fun ChatRow(
     val avatarAccount =
         inviteAccount
             ?: item.otherMemberAccount.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
+    val rowModifier =
+        if (onLongClick != null) {
+            Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+        } else {
+            Modifier.clickable(onClick = onClick)
+        }
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = rowModifier,
         leadingContent = {
             Avatar(
                 title = title,
