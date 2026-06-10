@@ -10358,35 +10358,35 @@ sealed class MarkdownBlockFfi {
         val `inlines`: kotlin.collections.List<MarkdownInlineFfi>) : MarkdownBlockFfi() {
         companion object
     }
-    
+
     data class Heading(
-        val `level`: kotlin.UByte, 
+        val `level`: kotlin.UByte,
         val `inlines`: kotlin.collections.List<MarkdownInlineFfi>) : MarkdownBlockFfi() {
         companion object
     }
-    
+
     object ThematicBreak : MarkdownBlockFfi()
-    
-    
+
+
     data class CodeBlock(
-        val `kind`: MarkdownCodeBlockKindFfi, 
-        val `info`: kotlin.String, 
+        val `kind`: MarkdownCodeBlockKindFfi,
+        val `info`: kotlin.String,
         val `content`: kotlin.String) : MarkdownBlockFfi() {
         companion object
     }
-    
+
     data class BlockQuote(
         val `blocks`: kotlin.collections.List<MarkdownBlockFfi>) : MarkdownBlockFfi() {
         companion object
     }
-    
+
     data class List(
-        val `kind`: MarkdownListKindFfi, 
-        val `tight`: kotlin.Boolean, 
+        val `kind`: MarkdownListKindFfi,
+        val `tight`: kotlin.Boolean,
         val `items`: kotlin.collections.List<MarkdownListItemFfi>) : MarkdownBlockFfi() {
         companion object
     }
-    
+
     data class Table(
         val `alignments`: kotlin.collections.List<MarkdownAlignmentFfi>,
         val `header`: kotlin.collections.List<MarkdownTableCellFfi>,
