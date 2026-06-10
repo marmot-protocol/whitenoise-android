@@ -60,6 +60,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -104,12 +107,14 @@ import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -227,8 +232,13 @@ import dev.ipf.darkmatter.core.RecentEmojiList
 import dev.ipf.darkmatter.core.RecipientReference
 import dev.ipf.darkmatter.core.ReplySwipe
 import dev.ipf.darkmatter.core.TimelineProjector
+import dev.ipf.darkmatter.media.DuckDuckGoImageSearchClient
+import dev.ipf.darkmatter.media.ImageSearchClient
+import dev.ipf.darkmatter.media.ImageSearchException
+import dev.ipf.darkmatter.media.ImageSearchResult
 import dev.ipf.darkmatter.media.MediaPipeline
 import dev.ipf.darkmatter.media.MediaReferenceParser
+import dev.ipf.darkmatter.media.sanitizeHttpsAvatarUrl
 import dev.ipf.darkmatter.notifications.NotificationNavStep
 import dev.ipf.darkmatter.notifications.NotificationTarget
 import dev.ipf.darkmatter.notifications.resolveNotificationNav
@@ -266,6 +276,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.RelayHealthFfi
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -1845,6 +1856,10 @@ private fun formatFileSize(bytes: Long): String {
 }
 
 private enum class OpenAttachmentResult { Opened, NoHandler, Error }
+
+/** Which `GroupImageSearchSheet` button is currently driving an in-flight
+ *  mutation, so the sheet can place the spinner on it. */
+private enum class GroupImageAction { Apply, Remove }
 
 /**
  * Write [bytes] to a temp file in the cache directory and fire `ACTION_VIEW`
@@ -3619,12 +3634,12 @@ private fun GroupDetailsScreen(
 ) {
     var name by remember(controller.group.groupIdHex, controller.group.name) { mutableStateOf(controller.group.name) }
     var description by remember(controller.group.groupIdHex, controller.group.description) { mutableStateOf(controller.group.description) }
-    var avatarUrl by remember(controller.group.groupIdHex, controller.group.avatarUrl) { mutableStateOf(controller.group.avatarUrl.orEmpty()) }
     var pendingMember by remember { mutableStateOf("") }
     var pendingMemberError by remember { mutableStateOf<String?>(null) }
     var showMemberScanner by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var showEditProfile by remember { mutableStateOf(false) }
+    var showImageSearch by remember { mutableStateOf(false) }
     var showAddMember by remember { mutableStateOf(false) }
     var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
     var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -3716,8 +3731,26 @@ private fun GroupDetailsScreen(
                                     menuOpen = false
                                     name = controller.group.name
                                     description = controller.group.description
-                                    avatarUrl = controller.group.avatarUrl.orEmpty()
                                     showEditProfile = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(
+                                            if (controller.group.avatarUrl.isNullOrBlank()) {
+                                                R.string.group_image_search_set
+                                            } else {
+                                                R.string.group_image_search_edit
+                                            },
+                                        ),
+                                    )
+                                },
+                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                enabled = activeMutation == null && !controller.mutationInFlight,
+                                onClick = {
+                                    menuOpen = false
+                                    showImageSearch = true
                                 },
                             )
                         }
@@ -3791,6 +3824,7 @@ private fun GroupDetailsScreen(
                     ),
                 description = controller.group.description,
                 groupIdHex = controller.group.groupIdHex,
+                pictureUrl = controller.group.avatarUrl,
                 archived = controller.group.archived,
             )
 
@@ -3935,38 +3969,18 @@ private fun GroupDetailsScreen(
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = avatarUrl,
-                    onValueChange = { avatarUrl = it },
-                    label = { Text(stringResource(R.string.group_avatar_url)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 Button(
                     onClick = {
                         runGroupMutation(
                             action = GroupMutationAction.SaveProfile,
-                            mutation = {
-                                // Name/description and the avatar are separate MLS
-                                // commits; only fire the ones that actually changed.
-                                val profileChanged =
-                                    name != controller.group.name || description != controller.group.description
-                                val avatarChanged = avatarUrl.trim() != controller.group.avatarUrl.orEmpty()
-                                val profileOk = !profileChanged || controller.updateGroupProfile(name, description)
-                                val avatarOk = !avatarChanged || controller.updateGroupAvatarUrl(avatarUrl)
-                                profileOk && avatarOk
-                            },
+                            mutation = { controller.updateGroupProfile(name, description) },
                             onSuccess = { showEditProfile = false },
                         )
                     },
                     enabled =
                         activeMutation == null &&
                             !controller.mutationInFlight &&
-                            (
-                                name != controller.group.name ||
-                                    description != controller.group.description ||
-                                    avatarUrl.trim() != controller.group.avatarUrl.orEmpty()
-                            ),
+                            (name != controller.group.name || description != controller.group.description),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (activeMutation?.action == GroupMutationAction.SaveProfile) {
@@ -3979,6 +3993,31 @@ private fun GroupDetailsScreen(
                 }
             }
         }
+    }
+
+    if (showImageSearch) {
+        GroupImageSearchSheet(
+            initialUrl = controller.group.avatarUrl.orEmpty(),
+            groupTitle = controller.title(groupTitleCopy),
+            groupSeed = controller.group.groupIdHex,
+            // True whenever ANY mutation is running on this controller — not
+            // just one started by this sheet. Prevents queuing a second
+            // avatar update on top of an in-flight one and prevents
+            // racing Remove against Apply if the user double-taps.
+            applyInFlight = activeMutation != null || controller.mutationInFlight,
+            onApply = { picked ->
+                // Controller handles success/failure toasts via its standard
+                // mutation-lock path (toast_group_updated /
+                // toast_couldnt_update_group); the sheet only owns its own
+                // lifecycle here.
+                runGroupMutation(
+                    action = GroupMutationAction.SaveProfile,
+                    mutation = { controller.updateGroupAvatarUrl(picked) },
+                    onSuccess = { showImageSearch = false },
+                )
+            },
+            onDismiss = { showImageSearch = false },
+        )
     }
 
     if (showAddMember) {
@@ -4089,12 +4128,402 @@ private fun GroupDetailsScreen(
     }
 }
 
+/**
+ * Bottom sheet that lets an admin pick a new group avatar.
+ *
+ * Two entry points: (1) the URL TextField (manual HTTPS paste with live
+ * preview + validation), (2) the search field (DuckDuckGo image search,
+ * results shown as a grid of thumbnails). The sheet commits the change
+ * itself via [onApply] — the caller wires that to the avatar-update FFI
+ * and presents a success toast.
+ *
+ * When the group already has an avatar, a destructive "Remove image"
+ * button is exposed, which calls [onApply] with `null` (caller maps that
+ * to clearing the avatar).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GroupImageSearchSheet(
+    initialUrl: String,
+    groupTitle: String,
+    groupSeed: String,
+    applyInFlight: Boolean,
+    onApply: (String?) -> Unit,
+    onDismiss: () -> Unit,
+    searchClient: ImageSearchClient = remember { DuckDuckGoImageSearchClient() },
+) {
+    // Tracks which button initiated the current in-flight mutation, so the
+    // spinner lands on THAT button and the other one just greys out. Local
+    // to the sheet because the caller's `applyInFlight` is a binary
+    // "anything running" flag. Reset to null when the mutation completes
+    // (success closes the sheet via the caller; failure keeps the sheet
+    // open and unlocks the buttons for a retry).
+    var pendingAction by remember { mutableStateOf<GroupImageAction?>(null) }
+    LaunchedEffect(applyInFlight) {
+        if (!applyInFlight) pendingAction = null
+    }
+    val scope = rememberCoroutineScope()
+    var urlDraft by remember(initialUrl) { mutableStateOf(initialUrl) }
+    var queryDraft by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<ImageSearchResult>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
+    var searchErrorRes by remember { mutableStateOf<Int?>(null) }
+    // Ticket counter for stale-result guarding. Each `launchSearch()` bumps
+    // it and the in-flight coroutine captures that ticket value; on
+    // completion, the coroutine only writes back to `results` /
+    // `searchErrorRes` / `isSearching` if `requestId` still equals its
+    // captured ticket. Without this, a slow first search can resolve AFTER
+    // a faster second search has already populated the UI, clobbering the
+    // new view with stale thumbnails. `Job.cancel()` alone isn't enough
+    // because cancellation is cooperative — a returning coroutine still
+    // executes its tail past the suspension point.
+    var requestId by remember { mutableStateOf(0) }
+    var searchJob by remember { mutableStateOf<Job?>(null) }
+    val trimmedUrl = urlDraft.trim()
+    val previewUrl =
+        remember(trimmedUrl) {
+            // Same HTTPS-only safety check the picker applies; an
+            // unsanitized URL won't render in the preview avatar either.
+            sanitizeHttpsAvatarUrl(trimmedUrl)
+        }
+    val emptyQueryRes = R.string.group_image_search_enter_query
+    val missingTokenRes = R.string.group_image_search_unavailable
+    val badResponseRes = R.string.group_image_search_bad_response
+    val noResultsRes = R.string.group_image_search_no_results
+
+    DisposableEffect(Unit) {
+        onDispose { searchJob?.cancel() }
+    }
+
+    fun launchSearch() {
+        searchJob?.cancel()
+        val q = queryDraft.trim()
+        if (q.isEmpty()) {
+            searchErrorRes = emptyQueryRes
+            results = emptyList()
+            return
+        }
+        val ticket = requestId + 1
+        requestId = ticket
+        searchErrorRes = null
+        results = emptyList()
+        isSearching = true
+        searchJob =
+            scope.launch {
+                try {
+                    val hits = searchClient.search(q)
+                    if (requestId != ticket) return@launch
+                    results = hits
+                    searchErrorRes = if (hits.isEmpty()) noResultsRes else null
+                } catch (_: ImageSearchException.EmptyQuery) {
+                    if (requestId == ticket) searchErrorRes = emptyQueryRes
+                } catch (_: ImageSearchException.MissingToken) {
+                    if (requestId == ticket) searchErrorRes = missingTokenRes
+                } catch (e: CancellationException) {
+                    // Rethrow the original so the cause chain stays
+                    // intact for downstream loggers + structured
+                    // concurrency tracking.
+                    throw e
+                } catch (_: Throwable) {
+                    if (requestId == ticket) searchErrorRes = badResponseRes
+                } finally {
+                    if (requestId == ticket) isSearching = false
+                }
+            }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                stringResource(R.string.group_image_search_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            // Live preview row: avatar bubble seeded from the current draft
+            // URL, plus the group's name so the user knows what they're
+            // editing.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Avatar(
+                    title = groupTitle,
+                    seed = groupSeed,
+                    size = 64.dp,
+                    pictureUrl = previewUrl,
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        groupTitle.ifBlank { stringResource(R.string.group_image_search_title) },
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val subtitleRes =
+                        when {
+                            trimmedUrl.isEmpty() -> R.string.group_image_search_preview_subtitle_empty
+                            previewUrl == null -> R.string.group_image_search_preview_subtitle_invalid
+                            else -> R.string.group_image_search_preview_subtitle_ready
+                        }
+                    Text(
+                        stringResource(subtitleRes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = urlDraft,
+                onValueChange = { urlDraft = it },
+                label = { Text(stringResource(R.string.group_avatar_url)) },
+                placeholder = { Text("https://example.com/image.jpg") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = queryDraft,
+                    onValueChange = { queryDraft = it },
+                    label = { Text(stringResource(R.string.group_image_search_query_label)) },
+                    placeholder = { Text(stringResource(R.string.group_image_search_query_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Search,
+                            keyboardType = KeyboardType.Text,
+                        ),
+                    keyboardActions = KeyboardActions(onSearch = { launchSearch() }),
+                )
+                IconButton(
+                    onClick = { launchSearch() },
+                    enabled = !isSearching && queryDraft.trim().isNotEmpty(),
+                ) {
+                    if (isSearching) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = stringResource(R.string.group_image_search_action),
+                        )
+                    }
+                }
+            }
+            searchErrorRes?.let { errRes ->
+                Text(
+                    stringResource(errRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color =
+                        if (errRes == noResultsRes || errRes == emptyQueryRes) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                )
+            }
+            if (results.isNotEmpty()) {
+                // Bounded height so the grid scrolls inside the sheet rather
+                // than fighting the sheet's own gesture for vertical scrolling.
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 100.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 360.dp),
+                ) {
+                    items(results, key = { it.imageUrl }) { hit ->
+                        GroupImageSearchTile(
+                            hit = hit,
+                            isSelected = hit.imageUrl == trimmedUrl,
+                            onTap = { urlDraft = hit.imageUrl },
+                        )
+                    }
+                }
+            }
+            // Destructive "Remove image" only when the group ALREADY has an
+            // avatar — for a group without one there's nothing to remove.
+            // Greyed out while the mutation is running (no double-tap into
+            // a silently no-op'd second call inside withMutationLockResult).
+            if (initialUrl.isNotBlank()) {
+                TextButton(
+                    onClick = {
+                        pendingAction = GroupImageAction.Remove
+                        onApply(null)
+                    },
+                    enabled = !applyInFlight,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors =
+                        ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                ) {
+                    if (pendingAction == GroupImageAction.Remove) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        Icon(Icons.Default.Delete, contentDescription = null)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.group_image_search_remove))
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    enabled = !applyInFlight,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+                Button(
+                    // Persist the SANITIZED URL so any normalization
+                    // (schemeless `//host/path` upgrade, trim) survives
+                    // through to storage — saving the raw draft would
+                    // drop the work `sanitizeHttpsAvatarUrl` already did.
+                    onClick = {
+                        previewUrl?.let { sanitized ->
+                            pendingAction = GroupImageAction.Apply
+                            onApply(sanitized)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    // Apply is the additive path ONLY. Clearing the avatar
+                    // is exclusively the "Remove image" button's job — a
+                    // primary button that doubles as a destructive action
+                    // makes accidental avatar loss one mistap away.
+                    enabled = previewUrl != null && !applyInFlight,
+                ) {
+                    if (pendingAction == GroupImageAction.Apply) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Text(stringResource(R.string.group_image_search_apply))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroupImageSearchTile(
+    hit: ImageSearchResult,
+    isSelected: Boolean,
+    onTap: () -> Unit,
+) {
+    val thumbnailKey = hit.thumbnailUrl ?: hit.imageUrl
+    val thumbnail by produceState<ImageBitmap?>(
+        initialValue = AvatarImageLoader.peek(thumbnailKey),
+        key1 = thumbnailKey,
+    ) {
+        if (value == null) value = AvatarImageLoader.load(thumbnailKey)
+    }
+    val borderColor =
+        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+    Surface(
+        modifier =
+            Modifier
+                .aspectRatio(1f)
+                // TalkBack: announce the current selection so users hear
+                // which thumbnail is staged. Without this, the only cue is
+                // the border color change, which is inaccessible.
+                .semantics { selected = isSelected }
+                .clickable(onClick = onTap),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            val bmp = thumbnail
+            if (bmp != null) {
+                Image(
+                    bitmap = bmp,
+                    contentDescription = hit.title.ifBlank { hit.sourceHost ?: "" },
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // Footer strip: source host (left) and pixel dimensions (right).
+            // Surfacing the host helps avoid picking trackable hotlinked
+            // images by mistake; the dimensions hint at "is this big enough
+            // to use as an avatar" before the user commits.
+            val host = hit.sourceHost?.takeIf { it.isNotBlank() }
+            val dims = hit.dimensionsLabel?.takeIf { it.isNotBlank() }
+            if (host != null || dims != null) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter)
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (host != null) {
+                        Text(
+                            host,
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                    }
+                    if (dims != null) {
+                        if (host != null) Spacer(Modifier.weight(1f))
+                        Text(
+                            dims,
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun GroupDetailsHeader(
     title: String,
     subtitle: String,
     description: String,
     groupIdHex: String,
+    pictureUrl: String?,
     archived: Boolean,
 ) {
     Box(Modifier.fillMaxWidth()) {
@@ -4103,7 +4532,7 @@ private fun GroupDetailsHeader(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Avatar(title = title, seed = groupIdHex, size = 88.dp)
+            Avatar(title = title, seed = groupIdHex, size = 88.dp, pictureUrl = pictureUrl)
             Text(
                 title,
                 style = MaterialTheme.typography.headlineSmall,
