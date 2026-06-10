@@ -1857,6 +1857,10 @@ private fun formatFileSize(bytes: Long): String {
 
 private enum class OpenAttachmentResult { Opened, NoHandler, Error }
 
+/** Which `GroupImageSearchSheet` button is currently driving an in-flight
+ *  mutation, so the sheet can place the spinner on it. */
+private enum class GroupImageAction { Apply, Remove }
+
 /**
  * Write [bytes] to a temp file in the cache directory and fire `ACTION_VIEW`
  * for it via the app's FileProvider so an external app (PDF reader, etc.)
@@ -3996,6 +4000,11 @@ private fun GroupDetailsScreen(
             initialUrl = controller.group.avatarUrl.orEmpty(),
             groupTitle = controller.title(groupTitleCopy),
             groupSeed = controller.group.groupIdHex,
+            // True whenever ANY mutation is running on this controller — not
+            // just one started by this sheet. Prevents queuing a second
+            // avatar update on top of an in-flight one and prevents
+            // racing Remove against Apply if the user double-taps.
+            applyInFlight = activeMutation != null || controller.mutationInFlight,
             onApply = { picked ->
                 // Controller handles success/failure toasts via its standard
                 // mutation-lock path (toast_group_updated /
@@ -4138,10 +4147,21 @@ private fun GroupImageSearchSheet(
     initialUrl: String,
     groupTitle: String,
     groupSeed: String,
+    applyInFlight: Boolean,
     onApply: (String?) -> Unit,
     onDismiss: () -> Unit,
     searchClient: ImageSearchClient = remember { DuckDuckGoImageSearchClient() },
 ) {
+    // Tracks which button initiated the current in-flight mutation, so the
+    // spinner lands on THAT button and the other one just greys out. Local
+    // to the sheet because the caller's `applyInFlight` is a binary
+    // "anything running" flag. Reset to null when the mutation completes
+    // (success closes the sheet via the caller; failure keeps the sheet
+    // open and unlocks the buttons for a retry).
+    var pendingAction by remember { mutableStateOf<GroupImageAction?>(null) }
+    LaunchedEffect(applyInFlight) {
+        if (!applyInFlight) pendingAction = null
+    }
     val scope = rememberCoroutineScope()
     var urlDraft by remember(initialUrl) { mutableStateOf(initialUrl) }
     var queryDraft by remember { mutableStateOf("") }
@@ -4339,16 +4359,30 @@ private fun GroupImageSearchSheet(
             }
             // Destructive "Remove image" only when the group ALREADY has an
             // avatar — for a group without one there's nothing to remove.
+            // Greyed out while the mutation is running (no double-tap into
+            // a silently no-op'd second call inside withMutationLockResult).
             if (initialUrl.isNotBlank()) {
                 TextButton(
-                    onClick = { onApply(null) },
+                    onClick = {
+                        pendingAction = GroupImageAction.Remove
+                        onApply(null)
+                    },
+                    enabled = !applyInFlight,
                     modifier = Modifier.fillMaxWidth(),
                     colors =
                         ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.error,
                         ),
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = null)
+                    if (pendingAction == GroupImageAction.Remove) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        Icon(Icons.Default.Delete, contentDescription = null)
+                    }
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.group_image_search_remove))
                 }
@@ -4359,20 +4393,38 @@ private fun GroupImageSearchSheet(
             ) {
                 OutlinedButton(
                     onClick = onDismiss,
+                    enabled = !applyInFlight,
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.cancel))
                 }
                 Button(
-                    onClick = { onApply(trimmedUrl.takeIf { it.isNotEmpty() }) },
+                    // Persist the SANITIZED URL so any normalization
+                    // (schemeless `//host/path` upgrade, trim) survives
+                    // through to storage — saving the raw draft would
+                    // drop the work `sanitizeHttpsAvatarUrl` already did.
+                    onClick = {
+                        previewUrl?.let { sanitized ->
+                            pendingAction = GroupImageAction.Apply
+                            onApply(sanitized)
+                        }
+                    },
                     modifier = Modifier.weight(1f),
-                    // Enable when either there's a valid HTTPS URL to apply
-                    // OR the field is blank AND there's an initial URL (i.e.
-                    // user can apply "no image" via the main button too,
-                    // though the destructive Remove path is more discoverable).
-                    enabled = previewUrl != null || (trimmedUrl.isEmpty() && initialUrl.isNotBlank()),
+                    // Apply is the additive path ONLY. Clearing the avatar
+                    // is exclusively the "Remove image" button's job — a
+                    // primary button that doubles as a destructive action
+                    // makes accidental avatar loss one mistap away.
+                    enabled = previewUrl != null && !applyInFlight,
                 ) {
-                    Text(stringResource(R.string.group_image_search_apply))
+                    if (pendingAction == GroupImageAction.Apply) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Text(stringResource(R.string.group_image_search_apply))
+                    }
                 }
             }
         }
