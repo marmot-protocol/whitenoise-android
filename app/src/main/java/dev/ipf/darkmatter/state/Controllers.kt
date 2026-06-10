@@ -150,6 +150,10 @@ internal fun chatListItemFromProjection(
                     groupIdHex = row.groupIdHex,
                     sender = preview.sender,
                     plaintext = preview.plaintext,
+                    // Deliberately empty: this synthesized record only feeds
+                    // the chat-list preview line, which renders plaintext —
+                    // never the markdown path. Parsing here would also force
+                    // an FFI hop into what is a pure projection helper.
                     contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                     kind = preview.kind,
                     tags = emptyList(),
@@ -1178,7 +1182,10 @@ class ConversationController(
                 groupIdHex = group.groupIdHex,
                 sender = appState.activeAccount?.accountIdHex ?: "",
                 plaintext = trimmed,
-                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                // Parse locally so the optimistic bubble renders the same
+                // markdown the projected record will carry once the send
+                // round-trips — no plain→styled flash on confirm.
+                contentTokens = parseMarkdownOrEmpty(trimmed),
                 kind = 9uL,
                 tags =
                     replyTarget
@@ -1286,7 +1293,11 @@ class ConversationController(
                 groupIdHex = group.groupIdHex,
                 sender = appState.activeAccount?.accountIdHex ?: "",
                 plaintext = body,
-                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                // Markdown in a media caption renders styled from the first
+                // optimistic frame. The 📎 placeholder parses to a plain
+                // paragraph, and the bubble suppresses body text while the
+                // upload is pending anyway, so parsing `body` is uniform.
+                contentTokens = parseMarkdownOrEmpty(body),
                 kind = 9uL,
                 // One `_media_pending` tag per attachment. retryFailedSend
                 // detects ANY of these as a media-retry trigger and re-runs
@@ -2822,7 +2833,16 @@ class ConversationController(
                     is AgentStreamUpdateFfi.Finished -> {
                         text.clear()
                         text.append(update.text)
-                        updateStreamPreview(streamId, text.toString(), MessageStatus.Sent)
+                        // Parse once on completion only — per-chunk parsing
+                        // would be an FFI round-trip per token batch for a
+                        // document that's still mutating. Chunks render as
+                        // plain text; the finished message gets markdown.
+                        updateStreamPreview(
+                            streamId,
+                            text.toString(),
+                            MessageStatus.Sent,
+                            tokens = parseMarkdownOrEmpty(update.text),
+                        )
                     }
                     is AgentStreamUpdateFfi.Failed -> {
                         updateStreamPreview(streamId, copy.streamFailed(update.message), MessageStatus.Failed)
@@ -2855,6 +2875,7 @@ class ConversationController(
         streamId: String,
         plaintext: String,
         status: MessageStatus,
+        tokens: MarkdownDocumentFfi? = null,
     ) {
         if (streamId in removedStreamIds) return
         val id = "stream:$streamId"
@@ -2874,7 +2895,15 @@ class ConversationController(
                     recordedAt = nowSeconds(),
                     receivedAt = nowSeconds(),
                 )
-            ).copy(plaintext = plaintext)
+            ).copy(
+                plaintext = plaintext,
+                // Tokens must always describe the plaintext beside them.
+                // When the caller didn't parse this revision (streaming
+                // chunks, failure copy), reset to empty — carrying forward a
+                // previous revision's tokens would render stale markdown
+                // against the new text. Empty falls back to plain rendering.
+                contentTokens = tokens ?: MarkdownDocumentFfi(blocks = emptyList()),
+            )
         optimisticMessages[id] =
             TimelineMessage(
                 id,
@@ -2899,6 +2928,23 @@ class ConversationController(
             ?.sender
             .orEmpty()
     }
+
+    /**
+     * Parse [text] into the same Markdown AST the Rust core attaches to
+     * projected records, for the records this controller synthesizes locally
+     * (optimistic sends, finished agent streams). `parseMarkdown` is a
+     * blocking FFI call, so it rides [DarkMatterAppState.marmotIo]'s
+     * `Dispatchers.IO` hop instead of the main thread. Any failure degrades
+     * to an empty document — MessageBubble renders plain text for empty
+     * docs, so a parser error can never lose a message body.
+     */
+    private suspend fun parseMarkdownOrEmpty(text: String): MarkdownDocumentFfi =
+        try {
+            appState.marmotIo { parseMarkdown(text) }
+        } catch (throwable: Throwable) {
+            throwable.rethrowIfCancellation()
+            MarkdownDocumentFfi(blocks = emptyList())
+        }
 
     private fun nowSeconds(): ULong = (System.currentTimeMillis() / 1000L).toULong()
 

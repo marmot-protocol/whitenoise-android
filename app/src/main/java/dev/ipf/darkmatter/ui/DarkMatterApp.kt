@@ -5668,10 +5668,25 @@ private fun MessageBubble(
                                 else -> displayedBody
                             }
                         if (bodyTextToRender != null) {
-                            Text(
-                                bodyTextToRender,
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
+                            // Markdown only when the tokens describe exactly
+                            // the text we're about to show: tombstone copy,
+                            // imeta-filename fallbacks, etc. all diverge from
+                            // record.plaintext and must stay plain. An empty
+                            // document (legacy record, parse failure) falls
+                            // through to the unchanged plain-text path.
+                            val markdownDocument = record.contentTokens
+                            if (!deleted &&
+                                !invalidated &&
+                                markdownDocument.blocks.isNotEmpty() &&
+                                bodyTextToRender == record.plaintext
+                            ) {
+                                MarkdownMessageBody(markdownDocument)
+                            } else {
+                                Text(
+                                    bodyTextToRender,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
                         }
                         Row(
                             modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start),
