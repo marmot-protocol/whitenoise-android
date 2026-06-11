@@ -6,11 +6,10 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-// Apply the google-services plugin only when a `google-services.json` is
-// dropped in. The file is intentionally gitignored — it ties the build to a
-// specific Firebase project and is provisioned per environment. Without it,
-// Firebase is absent at runtime and [PushServerConfig] reports unconfigured;
-// the app still compiles and runs, falling back to local notifications.
+// Apply the Firebase plugin only when its expected config file is present.
+// Without that file, Firebase stays uninitialized at runtime and the push
+// runtime reports unavailable; the app still compiles and runs, falling
+// back to local notifications.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }

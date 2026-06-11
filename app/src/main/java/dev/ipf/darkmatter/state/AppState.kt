@@ -903,16 +903,14 @@ class DarkMatterAppState(
      * Whether real push notifications can run on this device + build. True
      * only if (1) the build is configured with a MIP-05 push server pubkey,
      * (2) Google Play Services is available on the device, AND (3) the
-     * Firebase app has actually been initialized — which only happens when
-     * `app/google-services.json` is present at build time so the
-     * `google-services` Gradle plugin can wire `FirebaseInitProvider`.
-     * Without (3), `FirebaseMessaging.getInstance()` throws
-     * `IllegalStateException` deep in the FCM SDK; the gate keeps that
-     * exception out of the foreground / account-switch / token-rotation
-     * paths that would otherwise crash the process. False on
-     * F-Droid/Zapstore installs lacking GMS, on builds without
+     * Firebase app has actually been initialized at process start. Without
+     * (3), `FirebaseMessaging.getInstance()` throws `IllegalStateException`
+     * deep in the FCM SDK; the gate keeps that exception out of the
+     * foreground / account-switch / token-rotation paths that would
+     * otherwise crash the process. False on F-Droid/Zapstore installs
+     * lacking GMS, on builds without
      * [BuildConfig.DARKMATTER_PUSH_SERVER_PUBKEY_HEX], on emulators without
-     * Play Services, and on builds shipped without a Firebase project file.
+     * Play Services, and on builds where Firebase isn't initialized.
      */
     fun isNativePushAvailable(): Boolean {
         if (PushServerConfig.current() == null) return false
