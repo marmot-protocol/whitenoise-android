@@ -11,6 +11,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
+import com.google.firebase.FirebaseApp
+import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.AvatarImageLoader
@@ -23,6 +27,8 @@ import dev.ipf.darkmatter.notifications.BackgroundConnectionPreferences
 import dev.ipf.darkmatter.notifications.LocalNotificationPolicy
 import dev.ipf.darkmatter.notifications.LocalNotificationPresenter
 import dev.ipf.darkmatter.notifications.NotificationStreamForegroundService
+import dev.ipf.darkmatter.notifications.PushServerConfig
+import dev.ipf.darkmatter.notifications.PushTokenStore
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -33,6 +39,7 @@ import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
 import dev.ipf.marmotkit.AuditLogUploadSourceFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.NotificationSettingsFfi
+import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
@@ -47,6 +54,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -54,6 +62,7 @@ import java.net.IDN
 import java.net.URI
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.resume
 
 sealed interface AppPhase {
     data object Bootstrapping : AppPhase
@@ -228,6 +237,17 @@ class DarkMatterAppState(
     // null-client check and each construct a MarmotClient (TOCTOU). See #33.
     private val bootstrapMutex = Mutex()
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
+    private val pushTokenStore = PushTokenStore.create(appContext)
+
+    // Per-account (platform, token, server-pubkey, relay-hint) fingerprint
+    // of the most recent successful `upsertPushRegistration`. Skip redundant
+    // FFI calls when nothing has changed across foreground/token-rotation/
+    // account-bind events. Keyed per account so multi-account devices keep a
+    // working registration on every enabled account, not just the active
+    // one. An entry is removed when the corresponding account disables
+    // native push, signs out, or hits a sync failure that may indicate the
+    // registration is stale.
+    private val perAccountSyncedFingerprints = mutableMapOf<String, String>()
 
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
         private set
@@ -538,6 +558,7 @@ class DarkMatterAppState(
         notificationScope.launch {
             configurePrivacyRuntime()
             refreshLocalNotificationSettings()
+            syncNativePushRegistrationIfEnabled()
         }
     }
 
@@ -580,6 +601,7 @@ class DarkMatterAppState(
         // (setActiveAccount) is *not* a sign-out — it keeps the L2 disk cache
         // so re-entry into the same account doesn't re-download every image.
         clearAllMediaCaches()
+        val signedOutRef = activeAccountRef
         val outcome = signOutOutcome(accounts.map { it.label }, activeAccountRef)
         val next = outcome.nextActiveRef
         activeAccountRef = next
@@ -595,6 +617,20 @@ class DarkMatterAppState(
             accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
         }
         notificationScope.launch {
+            // Tell the runtime to forget the signed-out account's push
+            // registration before refreshing visible settings. Otherwise the
+            // MIP-05 server keeps wrapping wake messages for an account that
+            // can no longer decrypt them on this device. Best-effort: a
+            // failure here doesn't block sign-out, the next foreground sync
+            // will retry.
+            if (signedOutRef != null) {
+                runCatching { marmotIo { setNativePushEnabled(signedOutRef, false) } }
+                    .onFailure {
+                        rethrowIfCancellation(it)
+                        appStateDebug { "setNativePushEnabled(false) failed on sign-out: ${it.readableMessage()}" }
+                    }
+                clearPushRegistrationForAccount(signedOutRef)
+            }
             refreshLocalNotificationSettings()
         }
     }
@@ -724,9 +760,12 @@ class DarkMatterAppState(
 
     suspend fun setAuditLogsEnabled(enabled: Boolean): Boolean =
         runCatching {
+            // setAuditLogSettings now applies the switch to every live session
+            // in place via a recorder hot-swap (enable → live recorder,
+            // disable → flush + close); no session reopen or runtime restart
+            // required on the host side.
             val updated = marmotIo { setAuditLogSettings(AuditLogSettingsFfi(enabled = enabled)) }
             auditLogSettings = updated
-            restartMarmotRuntime()
             present(R.string.toast_security_privacy_updated)
             true
         }.getOrElse {
@@ -734,6 +773,41 @@ class DarkMatterAppState(
             present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()))
             false
         }
+
+    /**
+     * Delete every local audit log file. Each delete is best-effort; the
+     * runtime hot-swaps any live recorder so logging keeps running on a
+     * fresh file when audit logging is currently on. Returns true if at
+     * least one file was successfully removed (or rotated).
+     */
+    suspend fun deleteAuditLogs(): Boolean {
+        val files =
+            runCatching { marmotIo { auditLogFiles() } }
+                .getOrElse {
+                    if (it is CancellationException) throw it
+                    present(R.string.toast_couldnt_delete_audit_logs, AppText.Plain(it.readableMessage()))
+                    return false
+                }
+        if (files.isEmpty()) {
+            present(R.string.toast_no_audit_logs_to_delete)
+            return false
+        }
+        var anyDeleted = false
+        for (file in files) {
+            val outcome =
+                runCatching { marmotIo { deleteAuditLogFile(file.path) } }
+                    .onFailure {
+                        if (it is CancellationException) throw it
+                        appStateDebug { "deleteAuditLogFile failed: ${it.readableMessage()}" }
+                    }.getOrNull() ?: continue
+            anyDeleted = true
+            appStateDebug { "audit log deleted still_recording=${outcome.stillRecording}" }
+        }
+        present(
+            if (anyDeleted) R.string.toast_audit_logs_deleted else R.string.toast_couldnt_delete_audit_logs,
+        )
+        return anyDeleted
+    }
 
     fun updateThemeMode(mode: AppThemeMode) {
         themeMode = mode
@@ -774,6 +848,7 @@ class DarkMatterAppState(
         appInForeground = foreground
         if (foreground) refreshLocalNotificationPermission()
         if (foreground && backgroundConnectionEnabled) startBackgroundConnectionService()
+        if (foreground) notificationScope.launch { syncNativePushRegistrationIfEnabled() }
     }
 
     fun setActiveConversation(groupIdHex: String?) {
@@ -860,6 +935,218 @@ class DarkMatterAppState(
         }
         present(if (enabled) R.string.toast_background_connection_enabled else R.string.toast_background_connection_disabled)
         return true
+    }
+
+    /**
+     * Whether real push notifications can run on this device + build. True
+     * only if (1) the build is configured with a MIP-05 push server pubkey,
+     * (2) Google Play Services is available on the device, AND (3) the
+     * Firebase app has actually been initialized at process start. Without
+     * (3), `FirebaseMessaging.getInstance()` throws `IllegalStateException`
+     * deep in the FCM SDK; the gate keeps that exception out of the
+     * foreground / account-switch / token-rotation paths that would
+     * otherwise crash the process. False on F-Droid/Zapstore installs
+     * lacking GMS, on builds without
+     * [BuildConfig.DARKMATTER_PUSH_SERVER_PUBKEY_HEX], on emulators without
+     * Play Services, and on builds where Firebase isn't initialized.
+     */
+    fun isNativePushAvailable(): Boolean {
+        if (PushServerConfig.current() == null) return false
+        val status = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(appContext)
+        if (status != ConnectionResult.SUCCESS) return false
+        return FirebaseApp.getApps(appContext).isNotEmpty()
+    }
+
+    /**
+     * Persist the FCM token and trigger a re-sync against the runtime. Called
+     * by [dev.ipf.darkmatter.notifications.MarmotFirebaseMessagingService] on
+     * every Firebase token rotation. The sync coroutine no-ops if any
+     * precondition is missing, so the call is safe at any point in the app
+     * lifecycle.
+     */
+    fun onPushTokenRotated(token: String) {
+        pushTokenStore.setToken(token)
+        notificationScope.launch { syncNativePushRegistrationIfEnabled() }
+    }
+
+    /**
+     * Push the current FCM token to the runtime for every signed-in account
+     * that has `nativePushEnabled = true`. Multi-account devices keep a
+     * working registration on every account, not just the active one — a
+     * push for account A still wakes the device when account B is in
+     * focus. Idempotent per account: a successful sync caches the
+     * (token, server, relay) fingerprint and skips on the next call until
+     * something changes.
+     */
+    suspend fun syncNativePushRegistrationIfEnabled() {
+        if (!isNativePushAvailable()) return
+        drainPendingPushClears()
+        val config = PushServerConfig.current() ?: return
+        val accountRefs = accounts.map { it.label }
+        if (accountRefs.isEmpty()) return
+        val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return
+        for (account in accountRefs) {
+            syncPushForAccount(account, config, token)
+        }
+    }
+
+    /**
+     * Retry every `clearPushRegistration` that previously failed (sign-out
+     * disconnected from the network, runtime transient error, etc.). On
+     * success the entry leaves the persisted set; on failure it stays and
+     * the next sync tick will try again. Without this drain a failed
+     * sign-out-time deregistration would silently leave the push server
+     * holding a stale token — there's no other code path that would notice
+     * because [nativePushEnabled] is already false on the runtime side.
+     */
+    private suspend fun drainPendingPushClears() {
+        for (account in pushTokenStore.pendingClears()) {
+            val cleared =
+                runCatching { marmotIo { clearPushRegistration(account) } }
+                    .onFailure {
+                        rethrowIfCancellation(it)
+                        appStateDebug { "pending clearPushRegistration retry failed: ${it.readableMessage()}" }
+                    }.isSuccess
+            if (cleared) {
+                pushTokenStore.clearPending(account)
+                appStateDebug { "pending clearPushRegistration drained account=${account.take(8)}" }
+            }
+        }
+    }
+
+    private suspend fun syncPushForAccount(
+        account: String,
+        config: PushServerConfig,
+        token: String,
+    ) {
+        val settings = runCatching { marmotIo { notificationSettings(account) } }.getOrNull() ?: return
+        if (account == activeAccountRef) localNotificationSettings = settings
+        if (!settings.nativePushEnabled) return
+        val fingerprint = "FCM|$token|${config.serverPubkeyHex}|${config.relayHint.orEmpty()}"
+        if (perAccountSyncedFingerprints[account] == fingerprint) return
+        runCatching {
+            marmotIo {
+                upsertPushRegistration(
+                    accountRef = account,
+                    platform = PushPlatformFfi.FCM,
+                    rawToken = token,
+                    serverPubkeyHex = config.serverPubkeyHex,
+                    relayHint = config.relayHint,
+                )
+            }
+            // Re-read settings: a concurrent `setNativePushEnabled(false)` or
+            // sign-out could have flipped the flag (and cleared the cache)
+            // while upsertPushRegistration was suspended. If push is no
+            // longer enabled, do NOT write the fingerprint back — otherwise
+            // the cache restores a stale entry and the next enable
+            // short-circuits without re-registering. Roll back instead.
+            val settingsAfter = runCatching { marmotIo { notificationSettings(account) } }.getOrNull()
+            when {
+                // Re-read failed: that's a transient error, not a disable —
+                // the upsert itself succeeded, so keep the registration. Skip
+                // the fingerprint write so the next sync re-verifies instead
+                // of trusting a state we couldn't confirm.
+                settingsAfter == null ->
+                    appStateDebug { "push settings re-read failed; keeping registration account=${account.take(8)}" }
+                settingsAfter.nativePushEnabled -> {
+                    perAccountSyncedFingerprints[account] = fingerprint
+                    appStateDebug { "push registration synced account=${account.take(8)}" }
+                }
+                else -> {
+                    appStateDebug { "push registration raced disable; rolling back account=${account.take(8)}" }
+                    // Shares the pending-clear bookkeeping: a failed rollback
+                    // is queued for retry instead of stranding the account
+                    // registered server-side.
+                    clearPushRegistrationForAccount(account)
+                }
+            }
+        }.onFailure {
+            rethrowIfCancellation(it)
+            // Drop the fingerprint on failure so the next sync retries
+            // rather than assuming the registration is fresh.
+            perAccountSyncedFingerprints.remove(account)
+            appStateDebug { "push registration sync failed: ${it.readableMessage()}" }
+        }
+    }
+
+    /**
+     * Enable or disable real push on the active account. When enabling, also
+     * triggers the registration sync; when disabling, clears the runtime
+     * registration so the MIP-05 server stops trying to deliver to a token
+     * the device no longer wants.
+     */
+    suspend fun setNativePushEnabled(enabled: Boolean): Boolean {
+        val account =
+            activeAccountRef ?: run {
+                present(R.string.toast_no_active_account)
+                return false
+            }
+        if (enabled && !isNativePushAvailable()) return false
+        return runCatching {
+            val settings = marmotIo { setNativePushEnabled(account, enabled) }
+            localNotificationSettings = settings
+            if (enabled) {
+                syncNativePushRegistrationIfEnabled()
+            } else {
+                clearPushRegistrationForAccount(account)
+            }
+            true
+        }.getOrElse {
+            rethrowIfCancellation(it)
+            present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()))
+            false
+        }
+    }
+
+    /**
+     * Runtime-side clear of an account's push registration plus the cached
+     * fingerprint. If the FFI call fails (network hiccup, runtime mid-
+     * teardown, sign-out racing with a transient error), persist the
+     * account into the pending-clears set so [drainPendingPushClears]
+     * retries it on the next sync — otherwise a server-side stale token
+     * would stick indefinitely because `nativePushEnabled` is already
+     * false locally and the sync loop would skip the account.
+     */
+    private suspend fun clearPushRegistrationForAccount(account: String) {
+        perAccountSyncedFingerprints.remove(account)
+        runCatching { marmotIo { clearPushRegistration(account) } }
+            .onSuccess { pushTokenStore.clearPending(account) }
+            .onFailure {
+                rethrowIfCancellation(it)
+                pushTokenStore.recordPendingClear(account)
+                appStateDebug { "clearPushRegistration failed (queued for retry): ${it.readableMessage()}" }
+            }
+    }
+
+    private suspend fun fetchFcmTokenOrNull(): String? {
+        if (!isNativePushAvailable()) return null
+        val token =
+            runCatching {
+                suspendCancellableCoroutine<String?> { continuation ->
+                    // The Firebase Task API has no cancel surface, so the
+                    // completion listener can fire after this coroutine is
+                    // cancelled. Guard the resume on isActive so a stale
+                    // callback doesn't try to push a value onto a closed
+                    // continuation; the task completes in the background and
+                    // its result is dropped. The outer runCatching is a
+                    // belt — `getInstance()` itself can throw
+                    // IllegalStateException if FirebaseApp isn't initialized,
+                    // and we'd rather drop the token fetch than crash.
+                    FirebaseMessaging
+                        .getInstance()
+                        .token
+                        .addOnCompleteListener { task ->
+                            if (continuation.isActive) {
+                                continuation.resume(if (task.isSuccessful) task.result else null)
+                            }
+                        }
+                }
+            }.onFailure {
+                rethrowIfCancellation(it)
+                appStateDebug { "FCM token fetch failed: ${it.readableMessage()}" }
+            }.getOrNull()
+        if (!token.isNullOrBlank()) pushTokenStore.setToken(token)
+        return token?.takeIf { it.isNotBlank() }
     }
 
     fun shouldRequestDefaultNotificationPermission(): Boolean =

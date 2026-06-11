@@ -6,6 +6,14 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
+// Apply the Firebase plugin only when its expected config file is present.
+// Without that file, Firebase stays uninitialized at runtime and the push
+// runtime reports unavailable; the app still compiles and runs, falling
+// back to local notifications.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val localProperties =
     Properties().apply {
         val file = rootProject.file("local.properties")
@@ -82,6 +90,22 @@ android {
             "String",
             "DARKMATTER_TELEMETRY_TENANT",
             runtimeConfigProperty("DARKMATTER_TELEMETRY_TENANT", "darkmatter-android").asBuildConfigString(),
+        )
+        // Push gateway configuration. The pubkey identifies the MIP-05 push
+        // server that takes FCM tokens, encrypts notifications, and hands them
+        // to the relay hint below for delivery. Both values are provisioned
+        // per environment via local.properties (or the environment); leave
+        // them unset and the runtime treats push as unconfigured rather than
+        // attempting to register against a default server.
+        buildConfigField(
+            "String",
+            "DARKMATTER_PUSH_SERVER_PUBKEY_HEX",
+            runtimeConfigProperty("DARKMATTER_PUSH_SERVER_PUBKEY_HEX").asBuildConfigString(),
+        )
+        buildConfigField(
+            "String",
+            "DARKMATTER_PUSH_RELAY_HINT",
+            runtimeConfigProperty("DARKMATTER_PUSH_RELAY_HINT", "wss://relay.eu.whitenoise.chat").asBuildConfigString(),
         )
     }
 
@@ -187,6 +211,9 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.barcode.scanning)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+    implementation(libs.play.services.base)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

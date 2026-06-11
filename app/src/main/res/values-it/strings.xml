@@ -163,6 +163,8 @@
     <string name="telemetry_settings_subtitle">Condividi telemetria della connessione ai relay.</string>
     <string name="audit_logs">Log di audit</string>
     <string name="audit_logs_settings_subtitle">Crea e invia file di log di audit di sicurezza.</string>
+    <string name="delete_audit_logs">Elimina log di audit</string>
+    <string name="delete_audit_logs_subtitle">Rimuove tutti i file di audit locali. Se l’audit è attivo, continua su un nuovo file.</string>
     <string name="developer">Sviluppatore</string>
     <string name="developer_mode">Modalità sviluppatore</string>
     <string name="developer_mode_subtitle">Mostra la diagnostica e gli interni MLS.</string>
@@ -172,6 +174,9 @@
     <string name="local_notifications_subtitle">Mostra messaggi e invita avvisi mentre Dark Matter è in esecuzione.</string>
     <string name="keep_connected">Resta connesso</string>
     <string name="keep_connected_subtitle">Mantieni un servizio in background visibile in esecuzione per gli avvisi di messaggi.</string>
+    <string name="native_push">Notifiche push</string>
+    <string name="native_push_subtitle">Risveglia l’app quando il relay ha nuovi eventi da consegnare.</string>
+    <string name="native_push_unavailable_subtitle">Richiede i servizi Google Play e una build configurata con un server push.</string>
     <string name="switch_account">Cambia profilo</string>
     <string name="my_qr_code">Il mio codice QR</string>
     <string name="read_only">La chiave privata è archiviata in un signer esterno</string>
@@ -335,6 +340,9 @@
     <string name="toast_couldnt_load_mls_state">Impossibile caricare lo stato MLS</string>
     <string name="toast_security_privacy_updated">Sicurezza e privacy aggiornate</string>
     <string name="toast_couldnt_update_security_privacy">Impossibile aggiornare sicurezza e privacy</string>
+    <string name="toast_audit_logs_deleted">Log di audit eliminati</string>
+    <string name="toast_couldnt_delete_audit_logs">Impossibile eliminare i log di audit</string>
+    <string name="toast_no_audit_logs_to_delete">Nessun log di audit da eliminare</string>
     <string name="toast_chat_created">Chat creata</string>
     <string name="toast_notification_permission_denied">Autorizzazione di notifica negata</string>
     <string name="toast_copied_npub">npub copiato</string>

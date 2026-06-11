@@ -163,6 +163,8 @@
     <string name="telemetry_settings_subtitle">Partager la télémétrie de connexion aux relais.</string>
     <string name="audit_logs">Journaux d’audit</string>
     <string name="audit_logs_settings_subtitle">Créer et envoyer des fichiers de journaux d’audit de sécurité.</string>
+    <string name="delete_audit_logs">Supprimer les journaux d’audit</string>
+    <string name="delete_audit_logs_subtitle">Supprime tous les fichiers d’audit locaux. Si la journalisation reste active, elle continue dans un nouveau fichier.</string>
     <string name="developer">Développeur</string>
     <string name="developer_mode">Mode développeur</string>
     <string name="developer_mode_subtitle">Affiche les diagnostics et les éléments internes MLS.</string>
@@ -172,6 +174,9 @@
     <string name="local_notifications_subtitle">Afficher des alertes de message et d’invitation pendant l’exécution de Dark Matter.</string>
     <string name="keep_connected">Rester connecté</string>
     <string name="keep_connected_subtitle">Gardez un service d’arrière-plan visible en cours d’exécution pour les alertes de message.</string>
+    <string name="native_push">Notifications push</string>
+    <string name="native_push_subtitle">Réveille l’application lorsque le relais a de nouveaux événements à livrer.</string>
+    <string name="native_push_unavailable_subtitle">Nécessite les services Google Play et une version configurée avec un serveur push.</string>
     <string name="switch_account">Changer de profil</string>
     <string name="my_qr_code">Mon code QR</string>
     <string name="read_only">La clé privée est stockée dans un signataire externe</string>
@@ -335,6 +340,9 @@
     <string name="toast_couldnt_load_mls_state">Impossible de charger l’état MLS</string>
     <string name="toast_security_privacy_updated">Sécurité et confidentialité mises à jour</string>
     <string name="toast_couldnt_update_security_privacy">Impossible de mettre à jour la sécurité et la confidentialité</string>
+    <string name="toast_audit_logs_deleted">Journaux d’audit supprimés</string>
+    <string name="toast_couldnt_delete_audit_logs">Impossible de supprimer les journaux d’audit</string>
+    <string name="toast_no_audit_logs_to_delete">Aucun journal d’audit à supprimer</string>
     <string name="toast_chat_created">Chat créé</string>
     <string name="toast_notification_permission_denied">Autorisation de notification refusée</string>
     <string name="toast_copied_npub">npub copié</string>

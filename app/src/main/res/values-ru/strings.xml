@@ -165,6 +165,8 @@
     <string name="telemetry_settings_subtitle">Передавать телеметрию соединений с реле.</string>
     <string name="audit_logs">Журналы аудита</string>
     <string name="audit_logs_settings_subtitle">Создавать и отправлять файлы журналов аудита безопасности.</string>
+    <string name="delete_audit_logs">Удалить журналы аудита</string>
+    <string name="delete_audit_logs_subtitle">Удаляет все локальные файлы журнала аудита. Если запись активна, она продолжится в новом файле.</string>
     <string name="developer">Разработчик</string>
     <string name="developer_mode">Режим разработчика</string>
     <string name="developer_mode_subtitle">Показывает диагностику и внутренние компоненты MLS.</string>
@@ -174,6 +176,9 @@
     <string name="local_notifications_subtitle">Показывать уведомления о сообщениях и приглашениях во время работы Dark Matter.</string>
     <string name="keep_connected">Оставаться на связи</string>
     <string name="keep_connected_subtitle">Поддерживайте видимую фоновую службу для оповещений о сообщениях.</string>
+    <string name="native_push">Push-уведомления</string>
+    <string name="native_push_subtitle">Будит приложение, когда у реле есть новые события для доставки.</string>
+    <string name="native_push_unavailable_subtitle">Требуются Google Play и сборка с настроенным push-сервером.</string>
     <string name="switch_account">Сменить профиль</string>
     <string name="my_qr_code">Мой QR код</string>
     <string name="read_only">Закрытый ключ хранится во внешнем приложении</string>
@@ -337,6 +342,9 @@
     <string name="toast_couldnt_load_mls_state">Не удалось загрузить состояние MLS</string>
     <string name="toast_security_privacy_updated">Настройки безопасности и конфиденциальности обновлены</string>
     <string name="toast_couldnt_update_security_privacy">Не удалось обновить настройки безопасности и конфиденциальности</string>
+    <string name="toast_audit_logs_deleted">Журналы аудита удалены</string>
+    <string name="toast_couldnt_delete_audit_logs">Не удалось удалить журналы аудита</string>
+    <string name="toast_no_audit_logs_to_delete">Нет журналов аудита для удаления</string>
     <string name="toast_chat_created">Чат создан</string>
     <string name="toast_notification_permission_denied">Разрешение на уведомление отклонено</string>
     <string name="toast_copied_npub">npub скопирован</string>

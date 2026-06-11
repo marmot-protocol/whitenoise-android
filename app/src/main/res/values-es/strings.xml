@@ -163,6 +163,8 @@
     <string name="telemetry_settings_subtitle">Compartir telemetría de conexión de relés.</string>
     <string name="audit_logs">Registros de auditoría</string>
     <string name="audit_logs_settings_subtitle">Crear y enviar archivos de auditoría de seguridad.</string>
+    <string name="delete_audit_logs">Eliminar registros de auditoría</string>
+    <string name="delete_audit_logs_subtitle">Borra todos los archivos locales de auditoría. Si la auditoría sigue activa, continúa en un archivo nuevo.</string>
     <string name="developer">Desarrollador</string>
     <string name="developer_mode">Modo desarrollador</string>
     <string name="developer_mode_subtitle">Muestra diagnósticos y elementos internos de MLS.</string>
@@ -172,6 +174,9 @@
     <string name="local_notifications_subtitle">Mostrar mensajes e invitar alertas mientras se ejecuta Dark Matter.</string>
     <string name="keep_connected">Mantener conectado</string>
     <string name="keep_connected_subtitle">Mantenga un servicio en segundo plano visible en ejecución para alertas de mensajes.</string>
+    <string name="native_push">Notificaciones push</string>
+    <string name="native_push_subtitle">Despierta la aplicación cuando el relay tiene nuevos eventos para entregar.</string>
+    <string name="native_push_unavailable_subtitle">Requiere los servicios de Google Play y una compilación configurada con un servidor push.</string>
     <string name="switch_account">Cambiar perfil</string>
     <string name="my_qr_code">Mi código QR</string>
     <string name="read_only">La llave privada está almacenada en un firmante externo</string>
@@ -335,6 +340,9 @@
     <string name="toast_couldnt_load_mls_state">No se pudo cargar el estado MLS</string>
     <string name="toast_security_privacy_updated">Seguridad y privacidad actualizadas</string>
     <string name="toast_couldnt_update_security_privacy">No se pudieron actualizar la seguridad y la privacidad</string>
+    <string name="toast_audit_logs_deleted">Registros de auditoría eliminados</string>
+    <string name="toast_couldnt_delete_audit_logs">No se pudieron eliminar los registros de auditoría</string>
+    <string name="toast_no_audit_logs_to_delete">No hay registros de auditoría para eliminar</string>
     <string name="toast_chat_created">Chat creado</string>
     <string name="toast_notification_permission_denied">Permiso de notificación denegado</string>
     <string name="toast_copied_npub">npub copiado</string>
