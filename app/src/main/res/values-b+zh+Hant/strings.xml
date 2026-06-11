@@ -162,6 +162,8 @@
     <string name="telemetry_settings_subtitle">分享中繼連線遙測。</string>
     <string name="audit_logs">稽核日誌</string>
     <string name="audit_logs_settings_subtitle">建立並傳送安全稽核日誌檔案。</string>
+    <string name="delete_audit_logs">刪除稽核日誌</string>
+    <string name="delete_audit_logs_subtitle">移除所有本機稽核檔案。如果稽核仍開啟，會在新檔案中繼續記錄。</string>
     <string name="developer">開發商</string>
     <string name="developer_mode">開發者模式</string>
     <string name="developer_mode_subtitle">顯示診斷和 MLS 內部結構。</string>
@@ -171,6 +173,9 @@
     <string name="local_notifications_subtitle">在 Dark Matter 執行時顯示訊息並邀請警報。</string>
     <string name="keep_connected">保持連線</string>
     <string name="keep_connected_subtitle">保持可見的後台服務運作以接收訊息警報。</string>
+    <string name="native_push">推播通知</string>
+    <string name="native_push_subtitle">中繼有新事件需要送達時喚醒應用程式。</string>
+    <string name="native_push_unavailable_subtitle">需要 Google Play 服務，以及配置了推播伺服器的構建版本。</string>
     <string name="switch_account">切換帳號</string>
     <string name="my_qr_code">我的 QR 代碼</string>
     <string name="read_only">私鑰儲存在外部簽署器中</string>
@@ -334,6 +339,9 @@
     <string name="toast_couldnt_load_mls_state">無法載入 MLS 狀態</string>
     <string name="toast_security_privacy_updated">安全與隱私已更新</string>
     <string name="toast_couldnt_update_security_privacy">無法更新安全與隱私</string>
+    <string name="toast_audit_logs_deleted">稽核日誌已刪除</string>
+    <string name="toast_couldnt_delete_audit_logs">無法刪除稽核日誌</string>
+    <string name="toast_no_audit_logs_to_delete">沒有可刪除的稽核日誌</string>
     <string name="toast_chat_created">聊天已建立</string>
     <string name="toast_notification_permission_denied">通知權限被拒絕</string>
     <string name="toast_copied_npub">已複製 npub</string>

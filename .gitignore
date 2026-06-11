@@ -14,5 +14,9 @@
 .cxx
 local.properties
 
+# Firebase project config. Tied to a specific Firebase project per
+# environment; provisioned out of band rather than checked in.
+app/google-services.json
+
 # Claude Code local runtime state
 .claude/
