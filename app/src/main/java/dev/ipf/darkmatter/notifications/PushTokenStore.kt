@@ -23,9 +23,37 @@ class PushTokenStore(
         preferences.edit().remove(KEY_FCM_TOKEN).apply()
     }
 
+    /**
+     * Account refs whose `clearPushRegistration` FFI call previously failed.
+     * The next [syncNativePushRegistrationIfEnabled]-style drain should retry
+     * them; sign-out / disable that succeeded never enters this set.
+     *
+     * Returns a defensive copy — `SharedPreferences.getStringSet` may share
+     * its backing instance, and mutating that is undefined behavior.
+     */
+    fun pendingClears(): Set<String> = preferences.getStringSet(KEY_PENDING_CLEARS, emptySet())?.toSet() ?: emptySet()
+
+    /**
+     * Mark [account] as needing a deferred `clearPushRegistration` retry.
+     * Idempotent — re-recording an already-pending ref is a no-op.
+     */
+    fun recordPendingClear(account: String) {
+        if (account.isBlank()) return
+        val current = pendingClears()
+        if (account in current) return
+        preferences.edit().putStringSet(KEY_PENDING_CLEARS, current + account).apply()
+    }
+
+    fun clearPending(account: String) {
+        val current = pendingClears()
+        if (account !in current) return
+        preferences.edit().putStringSet(KEY_PENDING_CLEARS, current - account).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "darkmatter.push.tokens"
         private const val KEY_FCM_TOKEN = "fcm_token"
+        private const val KEY_PENDING_CLEARS = "pending_clears"
 
         fun create(context: Context): PushTokenStore =
             PushTokenStore(

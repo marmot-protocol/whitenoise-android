@@ -936,12 +936,37 @@ class DarkMatterAppState(
      */
     suspend fun syncNativePushRegistrationIfEnabled() {
         if (!isNativePushAvailable()) return
+        drainPendingPushClears()
         val config = PushServerConfig.current() ?: return
         val accountRefs = accounts.map { it.label }
         if (accountRefs.isEmpty()) return
         val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return
         for (account in accountRefs) {
             syncPushForAccount(account, config, token)
+        }
+    }
+
+    /**
+     * Retry every `clearPushRegistration` that previously failed (sign-out
+     * disconnected from the network, runtime transient error, etc.). On
+     * success the entry leaves the persisted set; on failure it stays and
+     * the next sync tick will try again. Without this drain a failed
+     * sign-out-time deregistration would silently leave the push server
+     * holding a stale token — there's no other code path that would notice
+     * because [nativePushEnabled] is already false on the runtime side.
+     */
+    private suspend fun drainPendingPushClears() {
+        for (account in pushTokenStore.pendingClears()) {
+            val cleared =
+                runCatching { marmotIo { clearPushRegistration(account) } }
+                    .onFailure {
+                        rethrowIfCancellation(it)
+                        appStateDebug { "pending clearPushRegistration retry failed: ${it.readableMessage()}" }
+                    }.isSuccess
+            if (cleared) {
+                pushTokenStore.clearPending(account)
+                appStateDebug { "pending clearPushRegistration drained account=${account.take(8)}" }
+            }
         }
     }
 
@@ -1019,17 +1044,22 @@ class DarkMatterAppState(
     }
 
     /**
-     * Best-effort runtime-side clear of an account's push registration plus
-     * the cached fingerprint. Safe to call whether or not the account is
-     * currently registered server-side — a no-op on the server side just
-     * returns success.
+     * Runtime-side clear of an account's push registration plus the cached
+     * fingerprint. If the FFI call fails (network hiccup, runtime mid-
+     * teardown, sign-out racing with a transient error), persist the
+     * account into the pending-clears set so [drainPendingPushClears]
+     * retries it on the next sync — otherwise a server-side stale token
+     * would stick indefinitely because `nativePushEnabled` is already
+     * false locally and the sync loop would skip the account.
      */
     private suspend fun clearPushRegistrationForAccount(account: String) {
         perAccountSyncedFingerprints.remove(account)
         runCatching { marmotIo { clearPushRegistration(account) } }
+            .onSuccess { pushTokenStore.clearPending(account) }
             .onFailure {
                 rethrowIfCancellation(it)
-                appStateDebug { "clearPushRegistration failed: ${it.readableMessage()}" }
+                pushTokenStore.recordPendingClear(account)
+                appStateDebug { "clearPushRegistration failed (queued for retry): ${it.readableMessage()}" }
             }
     }
 
