@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
+import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
@@ -900,17 +901,24 @@ class DarkMatterAppState(
 
     /**
      * Whether real push notifications can run on this device + build. True
-     * only if the build is configured with a MIP-05 push server pubkey AND
-     * Google Play Services is available. False on F-Droid/Zapstore installs
-     * lacking GMS, on builds without [BuildConfig.DARKMATTER_PUSH_SERVER_PUBKEY_HEX],
-     * and on emulators without Play Services. The settings UI gates the push
-     * toggle on this; the foreground-service notifications path keeps working
-     * regardless.
+     * only if (1) the build is configured with a MIP-05 push server pubkey,
+     * (2) Google Play Services is available on the device, AND (3) the
+     * Firebase app has actually been initialized — which only happens when
+     * `app/google-services.json` is present at build time so the
+     * `google-services` Gradle plugin can wire `FirebaseInitProvider`.
+     * Without (3), `FirebaseMessaging.getInstance()` throws
+     * `IllegalStateException` deep in the FCM SDK; the gate keeps that
+     * exception out of the foreground / account-switch / token-rotation
+     * paths that would otherwise crash the process. False on
+     * F-Droid/Zapstore installs lacking GMS, on builds without
+     * [BuildConfig.DARKMATTER_PUSH_SERVER_PUBKEY_HEX], on emulators without
+     * Play Services, and on builds shipped without a Firebase project file.
      */
     fun isNativePushAvailable(): Boolean {
         if (PushServerConfig.current() == null) return false
         val status = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(appContext)
-        return status == ConnectionResult.SUCCESS
+        if (status != ConnectionResult.SUCCESS) return false
+        return FirebaseApp.getApps(appContext).isNotEmpty()
     }
 
     /**
@@ -1077,21 +1085,30 @@ class DarkMatterAppState(
     private suspend fun fetchFcmTokenOrNull(): String? {
         if (!isNativePushAvailable()) return null
         val token =
-            suspendCancellableCoroutine<String?> { continuation ->
-                // The Firebase Task API has no cancel surface, so the
-                // completion listener can fire after this coroutine is
-                // cancelled. Guard the resume on isActive so a stale callback
-                // doesn't try to push a value onto a closed continuation; the
-                // task completes in the background and its result is dropped.
-                FirebaseMessaging
-                    .getInstance()
-                    .token
-                    .addOnCompleteListener { task ->
-                        if (continuation.isActive) {
-                            continuation.resume(if (task.isSuccessful) task.result else null)
+            runCatching {
+                suspendCancellableCoroutine<String?> { continuation ->
+                    // The Firebase Task API has no cancel surface, so the
+                    // completion listener can fire after this coroutine is
+                    // cancelled. Guard the resume on isActive so a stale
+                    // callback doesn't try to push a value onto a closed
+                    // continuation; the task completes in the background and
+                    // its result is dropped. The outer runCatching is a
+                    // belt — `getInstance()` itself can throw
+                    // IllegalStateException if FirebaseApp isn't initialized,
+                    // and we'd rather drop the token fetch than crash.
+                    FirebaseMessaging
+                        .getInstance()
+                        .token
+                        .addOnCompleteListener { task ->
+                            if (continuation.isActive) {
+                                continuation.resume(if (task.isSuccessful) task.result else null)
+                            }
                         }
-                    }
-            }
+                }
+            }.onFailure {
+                rethrowIfCancellation(it)
+                appStateDebug { "FCM token fetch failed: ${it.readableMessage()}" }
+            }.getOrNull()
         if (!token.isNullOrBlank()) pushTokenStore.setToken(token)
         return token?.takeIf { it.isNotBlank() }
     }
