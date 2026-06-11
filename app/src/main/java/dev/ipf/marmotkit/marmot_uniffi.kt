@@ -953,6 +953,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1050,6 +1052,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_delete_account_key_package(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`eventIdHex`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,
     ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_delete_audit_log_file(`ptr`: Pointer,`path`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_delete_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_demote_admin(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
@@ -1146,8 +1150,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_set_account_nip65_relays(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_settings(`ptr`: Pointer,`settings`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_tracker_config(`ptr`: Pointer,`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_set_group_archived(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`archived`: Byte,uniffi_out_err: UniffiRustCallStatus, 
@@ -1385,6 +1389,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_decline_group_invite(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_delete_account_key_package(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_delete_audit_log_file(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_delete_message(
     ): Short
@@ -1643,6 +1649,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_delete_account_key_package() != 19816.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_delete_audit_log_file() != 6934.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_delete_message() != 13951.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1787,7 +1796,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_account_nip65_relays() != 61454.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_settings() != 56917.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_settings() != 36141.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_tracker_config() != 30506.toShort()) {
@@ -2628,7 +2637,7 @@ public interface ChatListSubscriptionInterface {
     
     suspend fun `nextUpdate`(): ChatListSubscriptionUpdateFfi?
     
-    fun `snapshot`(): List<ChatListRowFfi>
+    fun `snapshot`(): kotlin.collections.List<ChatListRowFfi>
     
     companion object
 }
@@ -2754,7 +2763,7 @@ open class ChatListSubscription: Disposable, AutoCloseable, ChatListSubscription
     )
     }
 
-    override fun `snapshot`(): List<ChatListRowFfi> {
+    override fun `snapshot`(): kotlin.collections.List<ChatListRowFfi> {
             return FfiConverterSequenceTypeChatListRowFfi.lift(
     callWithPointer {
     uniffiRustCall() { _status ->
@@ -2905,7 +2914,7 @@ public interface ChatsSubscriptionInterface {
     
     suspend fun `next`(): AppGroupRecordFfi?
     
-    fun `snapshot`(): List<AppGroupRecordFfi>
+    fun `snapshot`(): kotlin.collections.List<AppGroupRecordFfi>
     
     companion object
 }
@@ -3011,7 +3020,7 @@ open class ChatsSubscription: Disposable, AutoCloseable, ChatsSubscriptionInterf
     )
     }
 
-    override fun `snapshot`(): List<AppGroupRecordFfi> {
+    override fun `snapshot`(): kotlin.collections.List<AppGroupRecordFfi> {
             return FfiConverterSequenceTypeAppGroupRecordFfi.lift(
     callWithPointer {
     uniffiRustCall() { _status ->
@@ -3681,15 +3690,15 @@ public interface MarmotInterface {
      */
     fun `accountIdHex`(`reference`: kotlin.String): kotlin.String?
     
-    fun `accountInboxRelays`(`accountRef`: kotlin.String): List<kotlin.String>
+    fun `accountInboxRelays`(`accountRef`: kotlin.String): kotlin.collections.List<kotlin.String>
     
     /**
      * List the local and relay-discovered Marmot KeyPackage publications for
      * `account_ref`.
      */
-    suspend fun `accountKeyPackages`(`accountRef`: kotlin.String, `bootstrapRelays`: List<kotlin.String>): List<AccountKeyPackageFfi>
+    suspend fun `accountKeyPackages`(`accountRef`: kotlin.String, `bootstrapRelays`: kotlin.collections.List<kotlin.String>): kotlin.collections.List<AccountKeyPackageFfi>
     
-    fun `accountNip65Relays`(`accountRef`: kotlin.String): List<kotlin.String>
+    fun `accountNip65Relays`(`accountRef`: kotlin.String): kotlin.collections.List<kotlin.String>
     
     /**
      * Per-account relay lists: the NIP-65 and inbox lists the account has
@@ -3700,7 +3709,7 @@ public interface MarmotInterface {
     /**
      * Local JSONL audit logs available for explicit forensic upload.
      */
-    fun `auditLogFiles`(): List<AuditLogFileFfi>
+    fun `auditLogFiles`(): kotlin.collections.List<AuditLogFileFfi>
     
     /**
      * Local forensic audit-log recording settings. Recording is opt-in and only
@@ -3714,7 +3723,7 @@ public interface MarmotInterface {
      * Durable chat-list rows for fast app launch. Rows include the group
      * title/avatar, last kind-9 preview, unread count, and read anchors.
      */
-    fun `chatList`(`accountRef`: kotlin.String, `includeArchived`: kotlin.Boolean): List<ChatListRowFfi>
+    fun `chatList`(`accountRef`: kotlin.String, `includeArchived`: kotlin.Boolean): kotlin.collections.List<ChatListRowFfi>
     
     suspend fun `clearPushRegistration`(`accountRef`: kotlin.String)
     
@@ -3724,20 +3733,32 @@ public interface MarmotInterface {
      * Create a new MLS group with `name` and the given members. Members are
      * referenced by `npub` or hex account id. Returns the group id as hex.
      */
-    suspend fun `createGroup`(`accountRef`: kotlin.String, `name`: kotlin.String, `memberRefs`: List<kotlin.String>, `description`: kotlin.String?): kotlin.String
+    suspend fun `createGroup`(`accountRef`: kotlin.String, `name`: kotlin.String, `memberRefs`: kotlin.collections.List<kotlin.String>, `description`: kotlin.String?): kotlin.String
     
     /**
      * Create a brand-new Nostr identity, store its secret in the platform
      * keychain, and publish initial relay lists + key package.
      */
-    suspend fun `createIdentity`(`defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountSummaryFfi
+    suspend fun `createIdentity`(`defaultRelays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>): AccountSummaryFfi
     
     suspend fun `declineGroupInvite`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupInviteDeclineResultFfi
     
     /**
      * Publish a NIP-09 deletion for a KeyPackage event.
      */
-    suspend fun `deleteAccountKeyPackage`(`accountRef`: kotlin.String, `eventIdHex`: kotlin.String, `relays`: List<kotlin.String>): kotlin.ULong
+    suspend fun `deleteAccountKeyPackage`(`accountRef`: kotlin.String, `eventIdHex`: kotlin.String, `relays`: kotlin.collections.List<kotlin.String>): kotlin.ULong
+    
+    /**
+     * Delete one local JSONL audit log file (e.g. behind a "clear audit log"
+     * button).
+     *
+     * When forensic audit logging is on and a session for the file's account
+     * is live, the recorder rotates to a fresh file and keeps recording, so
+     * the result's `still_recording` is `true`. When audit logging is off, or
+     * no session is recording this file, it is simply removed and
+     * `still_recording` is `false`. Pass a `path` from `audit_log_files()`.
+     */
+    suspend fun `deleteAuditLogFile`(`path`: kotlin.String): AuditLogDeleteResultFfi
     
     /**
      * Mark `target_message_id` deleted for the whole group. This is a
@@ -3780,7 +3801,7 @@ public interface MarmotInterface {
     /**
      * Membership roster for `group_id_hex`.
      */
-    suspend fun `groupMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): List<AppGroupMemberRecordFfi>
+    suspend fun `groupMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): kotlin.collections.List<AppGroupMemberRecordFfi>
     
     /**
      * Current MLS state (epoch, member count, required components) for the
@@ -3797,9 +3818,9 @@ public interface MarmotInterface {
      */
     fun `initializeChatReadState`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): ChatListRowFfi?
     
-    suspend fun `inviteMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): SendSummaryFfi
+    suspend fun `inviteMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: kotlin.collections.List<kotlin.String>): SendSummaryFfi
     
-    suspend fun `inviteMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): GroupMutationResultFfi
+    suspend fun `inviteMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: kotlin.collections.List<kotlin.String>): GroupMutationResultFfi
     
     /**
      * True once shutdown has started. Host apps can use this to avoid
@@ -3815,20 +3836,20 @@ public interface MarmotInterface {
      * `false` for accounts that haven't been brought up by the current
      * process yet.
      */
-    fun `listAccounts`(): List<AccountSummaryFfi>
+    fun `listAccounts`(): kotlin.collections.List<AccountSummaryFfi>
     
     /**
      * Typed media references projected from group message history. Host apps
      * can pass a returned `reference` back to `download_media`.
      */
-    fun `listMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `limit`: kotlin.UInt?): List<MediaRecordFfi>
+    fun `listMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `limit`: kotlin.UInt?): kotlin.collections.List<MediaRecordFfi>
     
     /**
      * Log in with an existing identity. `identity` can be an `nsec` (private
      * key) for a local-signing account, or an `npub` to track a public
      * identity without local signing.
      */
-    suspend fun `login`(`identity`: kotlin.String, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountSummaryFfi
+    suspend fun `login`(`identity`: kotlin.String, `defaultRelays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>): AccountSummaryFfi
     
     /**
      * Mark a kind-9 timeline message visible/read. Own kind-9 messages can
@@ -3841,7 +3862,7 @@ public interface MarmotInterface {
      * the account-wide tail). Used to populate the conversation view before
      * the subscription stream takes over.
      */
-    fun `messages`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String?, `limit`: kotlin.UInt?): List<AppMessageRecordFfi>
+    fun `messages`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String?, `limit`: kotlin.UInt?): kotlin.collections.List<AppMessageRecordFfi>
     
     /**
      * Normalize a member reference for group-management UI. Accepts hex,
@@ -3893,14 +3914,14 @@ public interface MarmotInterface {
      * Publish (or re-publish) the NIP-65 and inbox relay lists for
      * `account_ref`. Idempotent — safe to call on every launch.
      */
-    suspend fun `publishRelayLists`(`accountRef`: kotlin.String, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>)
+    suspend fun `publishRelayLists`(`accountRef`: kotlin.String, `defaultRelays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>)
     
     /**
      * Publish the Nostr kind:0 metadata for `account_ref`. The returned
      * metadata is what marmot-app actually published (any server-applied
      * defaults are reflected here).
      */
-    suspend fun `publishUserProfile`(`accountRef`: kotlin.String, `profile`: UserProfileMetadataFfi, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): UserProfileMetadataFfi
+    suspend fun `publishUserProfile`(`accountRef`: kotlin.String, `profile`: UserProfileMetadataFfi, `defaultRelays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>): UserProfileMetadataFfi
     
     fun `pushRegistration`(`accountRef`: kotlin.String): PushRegistrationFfi?
     
@@ -3914,7 +3935,7 @@ public interface MarmotInterface {
      * After this resolves, `user_profile` / `display_name` return the
      * freshly-fetched metadata (name, picture, etc.) for that account.
      */
-    suspend fun `refreshProfile`(`accountIdHex`: kotlin.String, `relays`: List<kotlin.String>)
+    suspend fun `refreshProfile`(`accountIdHex`: kotlin.String, `relays`: kotlin.collections.List<kotlin.String>)
     
     /**
      * Live relay-plane connection health (connected / connecting /
@@ -3934,16 +3955,16 @@ public interface MarmotInterface {
      */
     suspend fun `removeAccount`(`accountRef`: kotlin.String)
     
-    suspend fun `removeMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): SendSummaryFfi
+    suspend fun `removeMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: kotlin.collections.List<kotlin.String>): SendSummaryFfi
     
-    suspend fun `removeMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>): GroupMutationResultFfi
+    suspend fun `removeMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: kotlin.collections.List<kotlin.String>): GroupMutationResultFfi
     
     /**
      * Replace the group's encrypted-media default blob endpoints as a full
      * `marmot.group.encrypted-media.v1` component update. Requires the caller
      * to be an admin.
      */
-    suspend fun `replaceEncryptedMediaBlobEndpoints`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `endpoints`: List<AppBlobEndpointFfi>): SendSummaryFfi
+    suspend fun `replaceEncryptedMediaBlobEndpoints`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `endpoints`: kotlin.collections.List<AppBlobEndpointFfi>): SendSummaryFfi
     
     /**
      * Send `text` as a reply that quotes `target_message_id`.
@@ -3967,7 +3988,7 @@ public interface MarmotInterface {
      * Send already-uploaded encrypted media attachments as a kind-9 chat
      * carrying ordered NIP-92 `imeta` tags.
      */
-    suspend fun `sendMediaAttachments`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `attachments`: List<MediaAttachmentReferenceFfi>, `caption`: kotlin.String?): SendSummaryFfi
+    suspend fun `sendMediaAttachments`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `attachments`: kotlin.collections.List<MediaAttachmentReferenceFfi>, `caption`: kotlin.String?): SendSummaryFfi
     
     /**
      * Send a plain UTF-8 text message. Structured payloads (reactions,
@@ -3975,15 +3996,19 @@ public interface MarmotInterface {
      */
     suspend fun `sendText`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `text`: kotlin.String): SendSummaryFfi
     
-    suspend fun `setAccountInboxRelays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountRelayListsFfi
+    suspend fun `setAccountInboxRelays`(`accountRef`: kotlin.String, `relays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>): AccountRelayListsFfi
     
-    suspend fun `setAccountNip65Relays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountRelayListsFfi
+    suspend fun `setAccountNip65Relays`(`accountRef`: kotlin.String, `relays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>): AccountRelayListsFfi
     
     /**
      * Persist local forensic audit-log recording settings and return the stored
      * value.
+     *
+     * Async because toggling the switch is applied to any already-running
+     * account sessions in place: enabling starts a live recorder, disabling
+     * stops it and closes the file — no session reopen required.
      */
-    fun `setAuditLogSettings`(`settings`: AuditLogSettingsFfi): AuditLogSettingsFfi
+    suspend fun `setAuditLogSettings`(`settings`: AuditLogSettingsFfi): AuditLogSettingsFfi
     
     /**
      * Supply non-persisted audit tracker upload metadata: optional Goggles
@@ -4035,7 +4060,7 @@ public interface MarmotInterface {
      * `quic://quic-broker.ipf.dev:4450`; omit `stream_id_hex` to let Rust
      * generate a 32-byte stream id.
      */
-    suspend fun `startAgentTextStream`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `streamIdHex`: kotlin.String?, `quicCandidates`: List<kotlin.String>): AgentStreamStartFfi
+    suspend fun `startAgentTextStream`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `streamIdHex`: kotlin.String?, `quicCandidates`: kotlin.collections.List<kotlin.String>): AgentStreamStartFfi
     
     /**
      * Per-account durable chat-list projection. Async for the same
@@ -4175,7 +4200,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * secret store can fail. Call [`Marmot::start`] before subscribing to
      * events.
      */
-    constructor(`rootPath`: kotlin.String, `relayUrls`: List<kotlin.String>) :
+    constructor(`rootPath`: kotlin.String, `relayUrls`: kotlin.collections.List<kotlin.String>) :
         this(
     uniffiRustCallWithError(MarmotKitException) { _status ->
     UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_constructor_marmot_new(
@@ -4285,7 +4310,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
 
     
-    @Throws(MarmotKitException::class)override fun `accountInboxRelays`(`accountRef`: kotlin.String): List<kotlin.String> {
+    @Throws(MarmotKitException::class)override fun `accountInboxRelays`(`accountRef`: kotlin.String): kotlin.collections.List<kotlin.String> {
             return FfiConverterSequenceString.lift(
     callWithPointer {
     uniffiRustCallWithError(MarmotKitException) { _status ->
@@ -4304,7 +4329,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `accountKeyPackages`(`accountRef`: kotlin.String, `bootstrapRelays`: List<kotlin.String>) : List<AccountKeyPackageFfi> {
+    override suspend fun `accountKeyPackages`(`accountRef`: kotlin.String, `bootstrapRelays`: kotlin.collections.List<kotlin.String>) : kotlin.collections.List<AccountKeyPackageFfi> {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_account_key_packages(
@@ -4323,7 +4348,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     }
 
     
-    @Throws(MarmotKitException::class)override fun `accountNip65Relays`(`accountRef`: kotlin.String): List<kotlin.String> {
+    @Throws(MarmotKitException::class)override fun `accountNip65Relays`(`accountRef`: kotlin.String): kotlin.collections.List<kotlin.String> {
             return FfiConverterSequenceString.lift(
     callWithPointer {
     uniffiRustCallWithError(MarmotKitException) { _status ->
@@ -4356,7 +4381,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     /**
      * Local JSONL audit logs available for explicit forensic upload.
      */
-    @Throws(MarmotKitException::class)override fun `auditLogFiles`(): List<AuditLogFileFfi> {
+    @Throws(MarmotKitException::class)override fun `auditLogFiles`(): kotlin.collections.List<AuditLogFileFfi> {
             return FfiConverterSequenceTypeAuditLogFileFfi.lift(
     callWithPointer {
     uniffiRustCallWithError(MarmotKitException) { _status ->
@@ -4412,7 +4437,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * Durable chat-list rows for fast app launch. Rows include the group
      * title/avatar, last kind-9 preview, unread count, and read anchors.
      */
-    @Throws(MarmotKitException::class)override fun `chatList`(`accountRef`: kotlin.String, `includeArchived`: kotlin.Boolean): List<ChatListRowFfi> {
+    @Throws(MarmotKitException::class)override fun `chatList`(`accountRef`: kotlin.String, `includeArchived`: kotlin.Boolean): kotlin.collections.List<ChatListRowFfi> {
             return FfiConverterSequenceTypeChatListRowFfi.lift(
     callWithPointer {
     uniffiRustCallWithError(MarmotKitException) { _status ->
@@ -4474,7 +4499,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `createGroup`(`accountRef`: kotlin.String, `name`: kotlin.String, `memberRefs`: List<kotlin.String>, `description`: kotlin.String?) : kotlin.String {
+    override suspend fun `createGroup`(`accountRef`: kotlin.String, `name`: kotlin.String, `memberRefs`: kotlin.collections.List<kotlin.String>, `description`: kotlin.String?) : kotlin.String {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_create_group(
@@ -4499,7 +4524,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `createIdentity`(`defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>) : AccountSummaryFfi {
+    override suspend fun `createIdentity`(`defaultRelays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>) : AccountSummaryFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_create_identity(
@@ -4544,7 +4569,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `deleteAccountKeyPackage`(`accountRef`: kotlin.String, `eventIdHex`: kotlin.String, `relays`: List<kotlin.String>) : kotlin.ULong {
+    override suspend fun `deleteAccountKeyPackage`(`accountRef`: kotlin.String, `eventIdHex`: kotlin.String, `relays`: kotlin.collections.List<kotlin.String>) : kotlin.ULong {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_delete_account_key_package(
@@ -4557,6 +4582,37 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_u64(future) },
         // lift function
         { FfiConverterULong.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Delete one local JSONL audit log file (e.g. behind a "clear audit log"
+     * button).
+     *
+     * When forensic audit logging is on and a session for the file's account
+     * is live, the recorder rotates to a fresh file and keeps recording, so
+     * the result's `still_recording` is `true`. When audit logging is off, or
+     * no session is recording this file, it is simply removed and
+     * `still_recording` is `false`. Pass a `path` from `audit_log_files()`.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `deleteAuditLogFile`(`path`: kotlin.String) : AuditLogDeleteResultFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_delete_audit_log_file(
+                thisPtr,
+                FfiConverterString.lower(`path`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeAuditLogDeleteResultFfi.lift(it) },
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
@@ -4730,7 +4786,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `groupMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : List<AppGroupMemberRecordFfi> {
+    override suspend fun `groupMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : kotlin.collections.List<AppGroupMemberRecordFfi> {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_group_members(
@@ -4815,7 +4871,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `inviteMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>) : SendSummaryFfi {
+    override suspend fun `inviteMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: kotlin.collections.List<kotlin.String>) : SendSummaryFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_invite_members(
@@ -4836,7 +4892,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `inviteMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>) : GroupMutationResultFfi {
+    override suspend fun `inviteMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: kotlin.collections.List<kotlin.String>) : GroupMutationResultFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_invite_members_detailed(
@@ -4898,7 +4954,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * `false` for accounts that haven't been brought up by the current
      * process yet.
      */
-    @Throws(MarmotKitException::class)override fun `listAccounts`(): List<AccountSummaryFfi> {
+    @Throws(MarmotKitException::class)override fun `listAccounts`(): kotlin.collections.List<AccountSummaryFfi> {
             return FfiConverterSequenceTypeAccountSummaryFfi.lift(
     callWithPointer {
     uniffiRustCallWithError(MarmotKitException) { _status ->
@@ -4915,7 +4971,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * Typed media references projected from group message history. Host apps
      * can pass a returned `reference` back to `download_media`.
      */
-    @Throws(MarmotKitException::class)override fun `listMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `limit`: kotlin.UInt?): List<MediaRecordFfi> {
+    @Throws(MarmotKitException::class)override fun `listMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `limit`: kotlin.UInt?): kotlin.collections.List<MediaRecordFfi> {
             return FfiConverterSequenceTypeMediaRecordFfi.lift(
     callWithPointer {
     uniffiRustCallWithError(MarmotKitException) { _status ->
@@ -4935,7 +4991,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `login`(`identity`: kotlin.String, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>) : AccountSummaryFfi {
+    override suspend fun `login`(`identity`: kotlin.String, `defaultRelays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>) : AccountSummaryFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_login(
@@ -4976,7 +5032,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * the account-wide tail). Used to populate the conversation view before
      * the subscription stream takes over.
      */
-    @Throws(MarmotKitException::class)override fun `messages`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String?, `limit`: kotlin.UInt?): List<AppMessageRecordFfi> {
+    @Throws(MarmotKitException::class)override fun `messages`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String?, `limit`: kotlin.UInt?): kotlin.collections.List<AppMessageRecordFfi> {
             return FfiConverterSequenceTypeAppMessageRecordFfi.lift(
     callWithPointer {
     uniffiRustCallWithError(MarmotKitException) { _status ->
@@ -5178,7 +5234,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `publishRelayLists`(`accountRef`: kotlin.String, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>) {
+    override suspend fun `publishRelayLists`(`accountRef`: kotlin.String, `defaultRelays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>) {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_publish_relay_lists(
@@ -5205,7 +5261,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `publishUserProfile`(`accountRef`: kotlin.String, `profile`: UserProfileMetadataFfi, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>) : UserProfileMetadataFfi {
+    override suspend fun `publishUserProfile`(`accountRef`: kotlin.String, `profile`: UserProfileMetadataFfi, `defaultRelays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>) : UserProfileMetadataFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_publish_user_profile(
@@ -5268,7 +5324,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `refreshProfile`(`accountIdHex`: kotlin.String, `relays`: List<kotlin.String>) {
+    override suspend fun `refreshProfile`(`accountIdHex`: kotlin.String, `relays`: kotlin.collections.List<kotlin.String>) {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_refresh_profile(
@@ -5357,7 +5413,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `removeMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>) : SendSummaryFfi {
+    override suspend fun `removeMembers`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: kotlin.collections.List<kotlin.String>) : SendSummaryFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_remove_members(
@@ -5378,7 +5434,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `removeMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: List<kotlin.String>) : GroupMutationResultFfi {
+    override suspend fun `removeMembersDetailed`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRefs`: kotlin.collections.List<kotlin.String>) : GroupMutationResultFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_remove_members_detailed(
@@ -5404,7 +5460,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `replaceEncryptedMediaBlobEndpoints`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `endpoints`: List<AppBlobEndpointFfi>) : SendSummaryFfi {
+    override suspend fun `replaceEncryptedMediaBlobEndpoints`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `endpoints`: kotlin.collections.List<AppBlobEndpointFfi>) : SendSummaryFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_replace_encrypted_media_blob_endpoints(
@@ -5523,7 +5579,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `sendMediaAttachments`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `attachments`: List<MediaAttachmentReferenceFfi>, `caption`: kotlin.String?) : SendSummaryFfi {
+    override suspend fun `sendMediaAttachments`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `attachments`: kotlin.collections.List<MediaAttachmentReferenceFfi>, `caption`: kotlin.String?) : SendSummaryFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_send_media_attachments(
@@ -5569,7 +5625,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `setAccountInboxRelays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>) : AccountRelayListsFfi {
+    override suspend fun `setAccountInboxRelays`(`accountRef`: kotlin.String, `relays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>) : AccountRelayListsFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_account_inbox_relays(
@@ -5590,7 +5646,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `setAccountNip65Relays`(`accountRef`: kotlin.String, `relays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>) : AccountRelayListsFfi {
+    override suspend fun `setAccountNip65Relays`(`accountRef`: kotlin.String, `relays`: kotlin.collections.List<kotlin.String>, `bootstrapRelays`: kotlin.collections.List<kotlin.String>) : AccountRelayListsFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_account_nip65_relays(
@@ -5612,18 +5668,30 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     /**
      * Persist local forensic audit-log recording settings and return the stored
      * value.
+     *
+     * Async because toggling the switch is applied to any already-running
+     * account sessions in place: enabling starts a live recorder, disabling
+     * stops it and closes the file — no session reopen required.
      */
-    @Throws(MarmotKitException::class)override fun `setAuditLogSettings`(`settings`: AuditLogSettingsFfi): AuditLogSettingsFfi {
-            return FfiConverterTypeAuditLogSettingsFfi.lift(
-    callWithPointer {
-    uniffiRustCallWithError(MarmotKitException) { _status ->
-    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_settings(
-        it, FfiConverterTypeAuditLogSettingsFfi.lower(`settings`),_status)
-}
-    }
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `setAuditLogSettings`(`settings`: AuditLogSettingsFfi) : AuditLogSettingsFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_set_audit_log_settings(
+                thisPtr,
+                FfiConverterTypeAuditLogSettingsFfi.lower(`settings`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeAuditLogSettingsFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
     )
     }
-    
 
     
     /**
@@ -5808,7 +5876,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `startAgentTextStream`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `streamIdHex`: kotlin.String?, `quicCandidates`: List<kotlin.String>) : AgentStreamStartFfi {
+    override suspend fun `startAgentTextStream`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `streamIdHex`: kotlin.String?, `quicCandidates`: kotlin.collections.List<kotlin.String>) : AgentStreamStartFfi {
         return uniffiRustCallAsync(
         callWithPointer { thisPtr ->
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_start_agent_text_stream(
@@ -6345,7 +6413,7 @@ public interface MessagesSubscriptionInterface {
     
     suspend fun `next`(): MessageUpdateFfi?
     
-    fun `snapshot`(): List<AppMessageRecordFfi>
+    fun `snapshot`(): kotlin.collections.List<AppMessageRecordFfi>
     
     companion object
 }
@@ -6451,7 +6519,7 @@ open class MessagesSubscription: Disposable, AutoCloseable, MessagesSubscription
     )
     }
 
-    override fun `snapshot`(): List<AppMessageRecordFfi> {
+    override fun `snapshot`(): kotlin.collections.List<AppMessageRecordFfi> {
             return FfiConverterSequenceTypeAppMessageRecordFfi.lift(
     callWithPointer {
     uniffiRustCall() { _status ->
@@ -7031,7 +7099,7 @@ data class AccountKeyPackageFfi (
     var `eventIdHex`: kotlin.String, 
     var `publishedAt`: kotlin.ULong, 
     var `keyPackageBytes`: kotlin.ULong, 
-    var `sourceRelays`: List<kotlin.String>, 
+    var `sourceRelays`: kotlin.collections.List<kotlin.String>, 
     var `local`: kotlin.Boolean, 
     var `relay`: kotlin.Boolean
 ) {
@@ -7089,9 +7157,9 @@ public object FfiConverterTypeAccountKeyPackageFfi: FfiConverterRustBuffer<Accou
 
 data class AccountRelayListsFfi (
     var `complete`: kotlin.Boolean, 
-    var `missing`: List<kotlin.String>, 
-    var `defaultRelays`: List<kotlin.String>, 
-    var `bootstrapRelays`: List<kotlin.String>, 
+    var `missing`: kotlin.collections.List<kotlin.String>, 
+    var `defaultRelays`: kotlin.collections.List<kotlin.String>, 
+    var `bootstrapRelays`: kotlin.collections.List<kotlin.String>, 
     var `nip65`: RelayListFfi, 
     var `inbox`: RelayListFfi
 ) {
@@ -7178,7 +7246,7 @@ public object FfiConverterTypeAccountSummaryFfi: FfiConverterRustBuffer<AccountS
 data class AgentStreamStartFfi (
     var `streamIdHex`: kotlin.String, 
     var `published`: kotlin.UInt, 
-    var `messageIds`: List<kotlin.String>
+    var `messageIds`: kotlin.collections.List<kotlin.String>
 ) {
     
     companion object
@@ -7248,8 +7316,8 @@ data class AppGroupEncryptedMediaComponentFfi (
     var `component`: kotlin.String, 
     var `required`: kotlin.Boolean, 
     var `mediaFormat`: kotlin.String, 
-    var `allowedLocatorKinds`: List<kotlin.String>, 
-    var `defaultBlobEndpoints`: List<AppBlobEndpointFfi>
+    var `allowedLocatorKinds`: kotlin.collections.List<kotlin.String>, 
+    var `defaultBlobEndpoints`: kotlin.collections.List<AppBlobEndpointFfi>
 ) {
     
     companion object
@@ -7335,7 +7403,7 @@ data class AppGroupMlsStateFfi (
     var `groupIdHex`: kotlin.String, 
     var `epoch`: kotlin.ULong, 
     var `memberCount`: kotlin.UInt, 
-    var `requiredAppComponents`: List<kotlin.UShort>
+    var `requiredAppComponents`: kotlin.collections.List<kotlin.UShort>
 ) {
     
     companion object
@@ -7376,8 +7444,8 @@ data class AppGroupRecordFfi (
     var `endpoint`: kotlin.String, 
     var `name`: kotlin.String, 
     var `description`: kotlin.String, 
-    var `admins`: List<kotlin.String>, 
-    var `relays`: List<kotlin.String>, 
+    var `admins`: kotlin.collections.List<kotlin.String>, 
+    var `relays`: kotlin.collections.List<kotlin.String>, 
     var `nostrGroupIdHex`: kotlin.String, 
     /**
      * URL-based group avatar (`marmot.group.avatar-url.v1`), `None` when absent.
@@ -7473,7 +7541,7 @@ data class AppMessageRecordFfi (
     /**
      * Nostr `tags` of the inner Marmot app event.
      */
-    var `tags`: List<MessageTagFfi>, 
+    var `tags`: kotlin.collections.List<MessageTagFfi>, 
     var `recordedAt`: kotlin.ULong, 
     var `receivedAt`: kotlin.ULong
 ) {
@@ -7524,6 +7592,39 @@ public object FfiConverterTypeAppMessageRecordFfi: FfiConverterRustBuffer<AppMes
             FfiConverterSequenceTypeMessageTagFfi.write(value.`tags`, buf)
             FfiConverterULong.write(value.`recordedAt`, buf)
             FfiConverterULong.write(value.`receivedAt`, buf)
+    }
+}
+
+
+
+data class AuditLogDeleteResultFfi (
+    /**
+     * `true` when a live recorder was rotated and is already recording to a
+     * fresh file; `false` when the file was simply removed (no live recorder,
+     * or audit logging off).
+     */
+    var `stillRecording`: kotlin.Boolean
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAuditLogDeleteResultFfi: FfiConverterRustBuffer<AuditLogDeleteResultFfi> {
+    override fun read(buf: ByteBuffer): AuditLogDeleteResultFfi {
+        return AuditLogDeleteResultFfi(
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AuditLogDeleteResultFfi) = (
+            FfiConverterBoolean.allocationSize(value.`stillRecording`)
+    )
+
+    override fun write(value: AuditLogDeleteResultFfi, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`stillRecording`, buf)
     }
 }
 
@@ -7639,7 +7740,7 @@ public object FfiConverterTypeAuditLogTrackerConfigFfi: FfiConverterRustBuffer<A
 
 data class AuditLogTrackerUpdateResultFfi (
     var `enabled`: kotlin.Boolean, 
-    var `uploaded`: List<AuditLogUploadResultFfi>, 
+    var `uploaded`: kotlin.collections.List<AuditLogUploadResultFfi>, 
     var `skippedReason`: kotlin.String?
 ) {
     
@@ -7751,7 +7852,7 @@ public object FfiConverterTypeAuditLogUploadSourceFfi: FfiConverterRustBuffer<Au
 
 data class BackgroundNotificationCollectionFfi (
     var `status`: NotificationCollectionStatusFfi, 
-    var `notifications`: List<NotificationUpdateFfi>, 
+    var `notifications`: kotlin.collections.List<NotificationUpdateFfi>, 
     var `error`: kotlin.String?
 ) {
     
@@ -7967,7 +8068,7 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
 
 data class GroupDetailsFfi (
     var `group`: AppGroupRecordFfi, 
-    var `members`: List<GroupMemberDetailsFfi>
+    var `members`: kotlin.collections.List<GroupMemberDetailsFfi>
 ) {
     
     companion object
@@ -8036,7 +8137,7 @@ data class GroupManagementStateFfi (
     var `canInvite`: kotlin.Boolean, 
     var `canLeave`: kotlin.Boolean, 
     var `requiresSelfDemoteBeforeLeave`: kotlin.Boolean, 
-    var `memberActions`: List<GroupMemberActionStateFfi>
+    var `memberActions`: kotlin.collections.List<GroupMemberActionStateFfi>
 ) {
     
     companion object
@@ -8224,7 +8325,7 @@ data class GroupPushDebugInfoFfi (
     var `missingRelayHintCount`: kotlin.UInt, 
     var `lastTokenListUpdatedAtMs`: kotlin.Long?, 
     var `localRegistration`: LocalPushRegistrationDebugFfi, 
-    var `tokens`: List<GroupPushTokenDebugEntryFfi>
+    var `tokens`: kotlin.collections.List<GroupPushTokenDebugEntryFfi>
 ) {
     
     companion object
@@ -8382,7 +8483,7 @@ public object FfiConverterTypeLocalPushRegistrationDebugFfi: FfiConverterRustBuf
 
 
 data class MarkdownDocumentFfi (
-    var `blocks`: List<MarkdownBlockFfi>
+    var `blocks`: kotlin.collections.List<MarkdownBlockFfi>
 ) {
     
     companion object
@@ -8410,7 +8511,7 @@ public object FfiConverterTypeMarkdownDocumentFfi: FfiConverterRustBuffer<Markdo
 
 
 data class MarkdownListItemFfi (
-    var `blocks`: List<MarkdownBlockFfi>, 
+    var `blocks`: kotlin.collections.List<MarkdownBlockFfi>, 
     /**
      * `None` for plain bullets/ordered items, `Some(false)` for `[ ]`,
      * `Some(true)` for `[x]`.
@@ -8478,7 +8579,7 @@ public object FfiConverterTypeMarkdownNostrEntityFfi: FfiConverterRustBuffer<Mar
 
 
 data class MarkdownTableCellFfi (
-    var `inlines`: List<MarkdownInlineFfi>
+    var `inlines`: kotlin.collections.List<MarkdownInlineFfi>
 ) {
     
     companion object
@@ -8506,7 +8607,7 @@ public object FfiConverterTypeMarkdownTableCellFfi: FfiConverterRustBuffer<Markd
 
 
 data class MediaAttachmentReferenceFfi (
-    var `locators`: List<MediaLocatorFfi>, 
+    var `locators`: kotlin.collections.List<MediaLocatorFfi>, 
     var `ciphertextSha256`: kotlin.String, 
     var `plaintextSha256`: kotlin.String, 
     var `nonceHex`: kotlin.String, 
@@ -8778,7 +8879,7 @@ public object FfiConverterTypeMediaUploadAttachmentResultFfi: FfiConverterRustBu
 
 
 data class MediaUploadRequestFfi (
-    var `attachments`: List<MediaUploadAttachmentRequestFfi>, 
+    var `attachments`: kotlin.collections.List<MediaUploadAttachmentRequestFfi>, 
     var `caption`: kotlin.String?, 
     var `send`: kotlin.Boolean, 
     var `blossomServer`: kotlin.String?
@@ -8818,7 +8919,7 @@ public object FfiConverterTypeMediaUploadRequestFfi: FfiConverterRustBuffer<Medi
 
 
 data class MediaUploadResultFfi (
-    var `attachments`: List<MediaUploadAttachmentResultFfi>, 
+    var `attachments`: kotlin.collections.List<MediaUploadAttachmentResultFfi>, 
     var `sent`: SendSummaryFfi?
 ) {
     
@@ -8891,7 +8992,7 @@ public object FfiConverterTypeMemberRefFfi: FfiConverterRustBuffer<MemberRefFfi>
  * plus these tags instead of a fixed payload enum.
  */
 data class MessageTagFfi (
-    var `values`: List<kotlin.String>
+    var `values`: kotlin.collections.List<kotlin.String>
 ) {
     
     companion object
@@ -9148,7 +9249,7 @@ data class ReceivedMessageFfi (
     /**
      * Nostr `tags` of the inner Marmot app event.
      */
-    var `tags`: List<MessageTagFfi>, 
+    var `tags`: kotlin.collections.List<MessageTagFfi>, 
     /**
      * Source-event timestamp (seconds since epoch) for the MLS-delivered
      * message. Clients should sort the timeline by this value so chronology
@@ -9283,7 +9384,7 @@ public object FfiConverterTypeRelayHealthFfi: FfiConverterRustBuffer<RelayHealth
 
 data class RelayListFfi (
     var `kind`: kotlin.ULong, 
-    var `relays`: List<kotlin.String>
+    var `relays`: kotlin.collections.List<kotlin.String>
 ) {
     
     companion object
@@ -9507,7 +9608,7 @@ public object FfiConverterTypeRuntimeProjectionUpdateFfi: FfiConverterRustBuffer
 
 data class SendSummaryFfi (
     var `published`: kotlin.UInt, 
-    var `messageIds`: List<kotlin.String>
+    var `messageIds`: kotlin.collections.List<kotlin.String>
 ) {
     
     companion object
@@ -9598,7 +9699,7 @@ data class TimelineMessageRecordFfi (
     var `plaintext`: kotlin.String, 
     var `contentTokens`: MarkdownDocumentFfi, 
     var `kind`: kotlin.ULong, 
-    var `tags`: List<MessageTagFfi>, 
+    var `tags`: kotlin.collections.List<MessageTagFfi>, 
     var `timelineAt`: kotlin.ULong, 
     var `receivedAt`: kotlin.ULong, 
     var `replyToMessageIdHex`: kotlin.String?, 
@@ -9696,7 +9797,7 @@ public object FfiConverterTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<T
 
 
 data class TimelinePageFfi (
-    var `messages`: List<TimelineMessageRecordFfi>, 
+    var `messages`: kotlin.collections.List<TimelineMessageRecordFfi>, 
     var `hasMoreBefore`: kotlin.Boolean, 
     var `hasMoreAfter`: kotlin.Boolean
 ) {
@@ -9733,8 +9834,8 @@ public object FfiConverterTypeTimelinePageFfi: FfiConverterRustBuffer<TimelinePa
 
 data class TimelineProjectionUpdateFfi (
     var `groupIdHex`: kotlin.String, 
-    var `messages`: List<TimelineMessageRecordFfi>, 
-    var `changes`: List<TimelineMessageChangeFfi>, 
+    var `messages`: kotlin.collections.List<TimelineMessageRecordFfi>, 
+    var `changes`: kotlin.collections.List<TimelineMessageChangeFfi>, 
     var `chatListRow`: ChatListRowFfi?, 
     var `chatListTrigger`: ChatListUpdateTriggerFfi
 ) {
@@ -9777,7 +9878,7 @@ public object FfiConverterTypeTimelineProjectionUpdateFfi: FfiConverterRustBuffe
 
 data class TimelineReactionEmojiFfi (
     var `emoji`: kotlin.String, 
-    var `senders`: List<kotlin.String>
+    var `senders`: kotlin.collections.List<kotlin.String>
 ) {
     
     companion object
@@ -9808,8 +9909,8 @@ public object FfiConverterTypeTimelineReactionEmojiFfi: FfiConverterRustBuffer<T
 
 
 data class TimelineReactionSummaryFfi (
-    var `byEmoji`: List<TimelineReactionEmojiFfi>, 
-    var `userReactions`: List<TimelineUserReactionFfi>
+    var `byEmoji`: kotlin.collections.List<TimelineReactionEmojiFfi>, 
+    var `userReactions`: kotlin.collections.List<TimelineUserReactionFfi>
 ) {
     
     companion object
@@ -10358,38 +10459,38 @@ sealed class MarkdownBlockFfi {
         val `inlines`: kotlin.collections.List<MarkdownInlineFfi>) : MarkdownBlockFfi() {
         companion object
     }
-
+    
     data class Heading(
-        val `level`: kotlin.UByte,
+        val `level`: kotlin.UByte, 
         val `inlines`: kotlin.collections.List<MarkdownInlineFfi>) : MarkdownBlockFfi() {
         companion object
     }
-
+    
     object ThematicBreak : MarkdownBlockFfi()
-
-
+    
+    
     data class CodeBlock(
-        val `kind`: MarkdownCodeBlockKindFfi,
-        val `info`: kotlin.String,
+        val `kind`: MarkdownCodeBlockKindFfi, 
+        val `info`: kotlin.String, 
         val `content`: kotlin.String) : MarkdownBlockFfi() {
         companion object
     }
-
+    
     data class BlockQuote(
         val `blocks`: kotlin.collections.List<MarkdownBlockFfi>) : MarkdownBlockFfi() {
         companion object
     }
-
+    
     data class List(
-        val `kind`: MarkdownListKindFfi,
-        val `tight`: kotlin.Boolean,
+        val `kind`: MarkdownListKindFfi, 
+        val `tight`: kotlin.Boolean, 
         val `items`: kotlin.collections.List<MarkdownListItemFfi>) : MarkdownBlockFfi() {
         companion object
     }
-
+    
     data class Table(
-        val `alignments`: kotlin.collections.List<MarkdownAlignmentFfi>,
-        val `header`: kotlin.collections.List<MarkdownTableCellFfi>,
+        val `alignments`: kotlin.collections.List<MarkdownAlignmentFfi>, 
+        val `header`: kotlin.collections.List<MarkdownTableCellFfi>, 
         val `rows`: kotlin.collections.List<kotlin.collections.List<MarkdownTableCellFfi>>) : MarkdownBlockFfi() {
         companion object
     }
@@ -10615,31 +10716,31 @@ sealed class MarkdownInlineFfi {
     }
     
     data class Emph(
-        val `children`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        val `children`: kotlin.collections.List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
         companion object
     }
     
     data class Strong(
-        val `children`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        val `children`: kotlin.collections.List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
         companion object
     }
     
     data class Strikethrough(
-        val `children`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        val `children`: kotlin.collections.List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
         companion object
     }
     
     data class Link(
         val `dest`: kotlin.String, 
         val `title`: kotlin.String?, 
-        val `children`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        val `children`: kotlin.collections.List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
         companion object
     }
     
     data class Image(
         val `dest`: kotlin.String, 
         val `title`: kotlin.String?, 
-        val `alt`: List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
+        val `alt`: kotlin.collections.List<MarkdownInlineFfi>) : MarkdownInlineFfi() {
         companion object
     }
     
@@ -12744,21 +12845,21 @@ public object FfiConverterOptionalTypeTimelineSubscriptionUpdateFfi: FfiConverte
 /**
  * @suppress
  */
-public object FfiConverterSequenceUShort: FfiConverterRustBuffer<List<kotlin.UShort>> {
-    override fun read(buf: ByteBuffer): List<kotlin.UShort> {
+public object FfiConverterSequenceUShort: FfiConverterRustBuffer<kotlin.collections.List<kotlin.UShort>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<kotlin.UShort> {
         val len = buf.getInt()
         return List<kotlin.UShort>(len) {
             FfiConverterUShort.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<kotlin.UShort>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<kotlin.UShort>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterUShort.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<kotlin.UShort>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<kotlin.UShort>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterUShort.write(it, buf)
@@ -12772,21 +12873,21 @@ public object FfiConverterSequenceUShort: FfiConverterRustBuffer<List<kotlin.USh
 /**
  * @suppress
  */
-public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
-    override fun read(buf: ByteBuffer): List<kotlin.String> {
+public object FfiConverterSequenceString: FfiConverterRustBuffer<kotlin.collections.List<kotlin.String>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<kotlin.String> {
         val len = buf.getInt()
         return List<kotlin.String>(len) {
             FfiConverterString.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<kotlin.String>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<kotlin.String>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterString.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<kotlin.String>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<kotlin.String>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterString.write(it, buf)
@@ -12800,21 +12901,21 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeAccountKeyPackageFfi: FfiConverterRustBuffer<List<AccountKeyPackageFfi>> {
-    override fun read(buf: ByteBuffer): List<AccountKeyPackageFfi> {
+public object FfiConverterSequenceTypeAccountKeyPackageFfi: FfiConverterRustBuffer<kotlin.collections.List<AccountKeyPackageFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<AccountKeyPackageFfi> {
         val len = buf.getInt()
         return List<AccountKeyPackageFfi>(len) {
             FfiConverterTypeAccountKeyPackageFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<AccountKeyPackageFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<AccountKeyPackageFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeAccountKeyPackageFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<AccountKeyPackageFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<AccountKeyPackageFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeAccountKeyPackageFfi.write(it, buf)
@@ -12828,21 +12929,21 @@ public object FfiConverterSequenceTypeAccountKeyPackageFfi: FfiConverterRustBuff
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeAccountSummaryFfi: FfiConverterRustBuffer<List<AccountSummaryFfi>> {
-    override fun read(buf: ByteBuffer): List<AccountSummaryFfi> {
+public object FfiConverterSequenceTypeAccountSummaryFfi: FfiConverterRustBuffer<kotlin.collections.List<AccountSummaryFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<AccountSummaryFfi> {
         val len = buf.getInt()
         return List<AccountSummaryFfi>(len) {
             FfiConverterTypeAccountSummaryFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<AccountSummaryFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<AccountSummaryFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeAccountSummaryFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<AccountSummaryFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<AccountSummaryFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeAccountSummaryFfi.write(it, buf)
@@ -12856,21 +12957,21 @@ public object FfiConverterSequenceTypeAccountSummaryFfi: FfiConverterRustBuffer<
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeAppBlobEndpointFfi: FfiConverterRustBuffer<List<AppBlobEndpointFfi>> {
-    override fun read(buf: ByteBuffer): List<AppBlobEndpointFfi> {
+public object FfiConverterSequenceTypeAppBlobEndpointFfi: FfiConverterRustBuffer<kotlin.collections.List<AppBlobEndpointFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<AppBlobEndpointFfi> {
         val len = buf.getInt()
         return List<AppBlobEndpointFfi>(len) {
             FfiConverterTypeAppBlobEndpointFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<AppBlobEndpointFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<AppBlobEndpointFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeAppBlobEndpointFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<AppBlobEndpointFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<AppBlobEndpointFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeAppBlobEndpointFfi.write(it, buf)
@@ -12884,21 +12985,21 @@ public object FfiConverterSequenceTypeAppBlobEndpointFfi: FfiConverterRustBuffer
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeAppGroupMemberRecordFfi: FfiConverterRustBuffer<List<AppGroupMemberRecordFfi>> {
-    override fun read(buf: ByteBuffer): List<AppGroupMemberRecordFfi> {
+public object FfiConverterSequenceTypeAppGroupMemberRecordFfi: FfiConverterRustBuffer<kotlin.collections.List<AppGroupMemberRecordFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<AppGroupMemberRecordFfi> {
         val len = buf.getInt()
         return List<AppGroupMemberRecordFfi>(len) {
             FfiConverterTypeAppGroupMemberRecordFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<AppGroupMemberRecordFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<AppGroupMemberRecordFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeAppGroupMemberRecordFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<AppGroupMemberRecordFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<AppGroupMemberRecordFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeAppGroupMemberRecordFfi.write(it, buf)
@@ -12912,21 +13013,21 @@ public object FfiConverterSequenceTypeAppGroupMemberRecordFfi: FfiConverterRustB
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeAppGroupRecordFfi: FfiConverterRustBuffer<List<AppGroupRecordFfi>> {
-    override fun read(buf: ByteBuffer): List<AppGroupRecordFfi> {
+public object FfiConverterSequenceTypeAppGroupRecordFfi: FfiConverterRustBuffer<kotlin.collections.List<AppGroupRecordFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<AppGroupRecordFfi> {
         val len = buf.getInt()
         return List<AppGroupRecordFfi>(len) {
             FfiConverterTypeAppGroupRecordFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<AppGroupRecordFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<AppGroupRecordFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeAppGroupRecordFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<AppGroupRecordFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<AppGroupRecordFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeAppGroupRecordFfi.write(it, buf)
@@ -12940,21 +13041,21 @@ public object FfiConverterSequenceTypeAppGroupRecordFfi: FfiConverterRustBuffer<
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeAppMessageRecordFfi: FfiConverterRustBuffer<List<AppMessageRecordFfi>> {
-    override fun read(buf: ByteBuffer): List<AppMessageRecordFfi> {
+public object FfiConverterSequenceTypeAppMessageRecordFfi: FfiConverterRustBuffer<kotlin.collections.List<AppMessageRecordFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<AppMessageRecordFfi> {
         val len = buf.getInt()
         return List<AppMessageRecordFfi>(len) {
             FfiConverterTypeAppMessageRecordFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<AppMessageRecordFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<AppMessageRecordFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeAppMessageRecordFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<AppMessageRecordFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<AppMessageRecordFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeAppMessageRecordFfi.write(it, buf)
@@ -12968,21 +13069,21 @@ public object FfiConverterSequenceTypeAppMessageRecordFfi: FfiConverterRustBuffe
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeAuditLogFileFfi: FfiConverterRustBuffer<List<AuditLogFileFfi>> {
-    override fun read(buf: ByteBuffer): List<AuditLogFileFfi> {
+public object FfiConverterSequenceTypeAuditLogFileFfi: FfiConverterRustBuffer<kotlin.collections.List<AuditLogFileFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<AuditLogFileFfi> {
         val len = buf.getInt()
         return List<AuditLogFileFfi>(len) {
             FfiConverterTypeAuditLogFileFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<AuditLogFileFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<AuditLogFileFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeAuditLogFileFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<AuditLogFileFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<AuditLogFileFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeAuditLogFileFfi.write(it, buf)
@@ -12996,21 +13097,21 @@ public object FfiConverterSequenceTypeAuditLogFileFfi: FfiConverterRustBuffer<Li
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeAuditLogUploadResultFfi: FfiConverterRustBuffer<List<AuditLogUploadResultFfi>> {
-    override fun read(buf: ByteBuffer): List<AuditLogUploadResultFfi> {
+public object FfiConverterSequenceTypeAuditLogUploadResultFfi: FfiConverterRustBuffer<kotlin.collections.List<AuditLogUploadResultFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<AuditLogUploadResultFfi> {
         val len = buf.getInt()
         return List<AuditLogUploadResultFfi>(len) {
             FfiConverterTypeAuditLogUploadResultFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<AuditLogUploadResultFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<AuditLogUploadResultFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeAuditLogUploadResultFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<AuditLogUploadResultFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<AuditLogUploadResultFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeAuditLogUploadResultFfi.write(it, buf)
@@ -13024,21 +13125,21 @@ public object FfiConverterSequenceTypeAuditLogUploadResultFfi: FfiConverterRustB
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeChatListRowFfi: FfiConverterRustBuffer<List<ChatListRowFfi>> {
-    override fun read(buf: ByteBuffer): List<ChatListRowFfi> {
+public object FfiConverterSequenceTypeChatListRowFfi: FfiConverterRustBuffer<kotlin.collections.List<ChatListRowFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<ChatListRowFfi> {
         val len = buf.getInt()
         return List<ChatListRowFfi>(len) {
             FfiConverterTypeChatListRowFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<ChatListRowFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<ChatListRowFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeChatListRowFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<ChatListRowFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<ChatListRowFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeChatListRowFfi.write(it, buf)
@@ -13052,21 +13153,21 @@ public object FfiConverterSequenceTypeChatListRowFfi: FfiConverterRustBuffer<Lis
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeGroupMemberActionStateFfi: FfiConverterRustBuffer<List<GroupMemberActionStateFfi>> {
-    override fun read(buf: ByteBuffer): List<GroupMemberActionStateFfi> {
+public object FfiConverterSequenceTypeGroupMemberActionStateFfi: FfiConverterRustBuffer<kotlin.collections.List<GroupMemberActionStateFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<GroupMemberActionStateFfi> {
         val len = buf.getInt()
         return List<GroupMemberActionStateFfi>(len) {
             FfiConverterTypeGroupMemberActionStateFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<GroupMemberActionStateFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<GroupMemberActionStateFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeGroupMemberActionStateFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<GroupMemberActionStateFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<GroupMemberActionStateFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeGroupMemberActionStateFfi.write(it, buf)
@@ -13080,21 +13181,21 @@ public object FfiConverterSequenceTypeGroupMemberActionStateFfi: FfiConverterRus
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeGroupMemberDetailsFfi: FfiConverterRustBuffer<List<GroupMemberDetailsFfi>> {
-    override fun read(buf: ByteBuffer): List<GroupMemberDetailsFfi> {
+public object FfiConverterSequenceTypeGroupMemberDetailsFfi: FfiConverterRustBuffer<kotlin.collections.List<GroupMemberDetailsFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<GroupMemberDetailsFfi> {
         val len = buf.getInt()
         return List<GroupMemberDetailsFfi>(len) {
             FfiConverterTypeGroupMemberDetailsFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<GroupMemberDetailsFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<GroupMemberDetailsFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeGroupMemberDetailsFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<GroupMemberDetailsFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<GroupMemberDetailsFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeGroupMemberDetailsFfi.write(it, buf)
@@ -13108,21 +13209,21 @@ public object FfiConverterSequenceTypeGroupMemberDetailsFfi: FfiConverterRustBuf
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeGroupPushTokenDebugEntryFfi: FfiConverterRustBuffer<List<GroupPushTokenDebugEntryFfi>> {
-    override fun read(buf: ByteBuffer): List<GroupPushTokenDebugEntryFfi> {
+public object FfiConverterSequenceTypeGroupPushTokenDebugEntryFfi: FfiConverterRustBuffer<kotlin.collections.List<GroupPushTokenDebugEntryFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<GroupPushTokenDebugEntryFfi> {
         val len = buf.getInt()
         return List<GroupPushTokenDebugEntryFfi>(len) {
             FfiConverterTypeGroupPushTokenDebugEntryFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<GroupPushTokenDebugEntryFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<GroupPushTokenDebugEntryFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeGroupPushTokenDebugEntryFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<GroupPushTokenDebugEntryFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<GroupPushTokenDebugEntryFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeGroupPushTokenDebugEntryFfi.write(it, buf)
@@ -13136,21 +13237,21 @@ public object FfiConverterSequenceTypeGroupPushTokenDebugEntryFfi: FfiConverterR
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeMarkdownListItemFfi: FfiConverterRustBuffer<List<MarkdownListItemFfi>> {
-    override fun read(buf: ByteBuffer): List<MarkdownListItemFfi> {
+public object FfiConverterSequenceTypeMarkdownListItemFfi: FfiConverterRustBuffer<kotlin.collections.List<MarkdownListItemFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<MarkdownListItemFfi> {
         val len = buf.getInt()
         return List<MarkdownListItemFfi>(len) {
             FfiConverterTypeMarkdownListItemFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<MarkdownListItemFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<MarkdownListItemFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMarkdownListItemFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<MarkdownListItemFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<MarkdownListItemFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMarkdownListItemFfi.write(it, buf)
@@ -13164,21 +13265,21 @@ public object FfiConverterSequenceTypeMarkdownListItemFfi: FfiConverterRustBuffe
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeMarkdownTableCellFfi: FfiConverterRustBuffer<List<MarkdownTableCellFfi>> {
-    override fun read(buf: ByteBuffer): List<MarkdownTableCellFfi> {
+public object FfiConverterSequenceTypeMarkdownTableCellFfi: FfiConverterRustBuffer<kotlin.collections.List<MarkdownTableCellFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<MarkdownTableCellFfi> {
         val len = buf.getInt()
         return List<MarkdownTableCellFfi>(len) {
             FfiConverterTypeMarkdownTableCellFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<MarkdownTableCellFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<MarkdownTableCellFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMarkdownTableCellFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<MarkdownTableCellFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<MarkdownTableCellFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMarkdownTableCellFfi.write(it, buf)
@@ -13192,21 +13293,21 @@ public object FfiConverterSequenceTypeMarkdownTableCellFfi: FfiConverterRustBuff
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeMediaAttachmentReferenceFfi: FfiConverterRustBuffer<List<MediaAttachmentReferenceFfi>> {
-    override fun read(buf: ByteBuffer): List<MediaAttachmentReferenceFfi> {
+public object FfiConverterSequenceTypeMediaAttachmentReferenceFfi: FfiConverterRustBuffer<kotlin.collections.List<MediaAttachmentReferenceFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<MediaAttachmentReferenceFfi> {
         val len = buf.getInt()
         return List<MediaAttachmentReferenceFfi>(len) {
             FfiConverterTypeMediaAttachmentReferenceFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<MediaAttachmentReferenceFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<MediaAttachmentReferenceFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMediaAttachmentReferenceFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<MediaAttachmentReferenceFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<MediaAttachmentReferenceFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMediaAttachmentReferenceFfi.write(it, buf)
@@ -13220,21 +13321,21 @@ public object FfiConverterSequenceTypeMediaAttachmentReferenceFfi: FfiConverterR
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeMediaLocatorFfi: FfiConverterRustBuffer<List<MediaLocatorFfi>> {
-    override fun read(buf: ByteBuffer): List<MediaLocatorFfi> {
+public object FfiConverterSequenceTypeMediaLocatorFfi: FfiConverterRustBuffer<kotlin.collections.List<MediaLocatorFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<MediaLocatorFfi> {
         val len = buf.getInt()
         return List<MediaLocatorFfi>(len) {
             FfiConverterTypeMediaLocatorFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<MediaLocatorFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<MediaLocatorFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMediaLocatorFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<MediaLocatorFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<MediaLocatorFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMediaLocatorFfi.write(it, buf)
@@ -13248,21 +13349,21 @@ public object FfiConverterSequenceTypeMediaLocatorFfi: FfiConverterRustBuffer<Li
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeMediaRecordFfi: FfiConverterRustBuffer<List<MediaRecordFfi>> {
-    override fun read(buf: ByteBuffer): List<MediaRecordFfi> {
+public object FfiConverterSequenceTypeMediaRecordFfi: FfiConverterRustBuffer<kotlin.collections.List<MediaRecordFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<MediaRecordFfi> {
         val len = buf.getInt()
         return List<MediaRecordFfi>(len) {
             FfiConverterTypeMediaRecordFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<MediaRecordFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<MediaRecordFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMediaRecordFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<MediaRecordFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<MediaRecordFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMediaRecordFfi.write(it, buf)
@@ -13276,21 +13377,21 @@ public object FfiConverterSequenceTypeMediaRecordFfi: FfiConverterRustBuffer<Lis
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeMediaUploadAttachmentRequestFfi: FfiConverterRustBuffer<List<MediaUploadAttachmentRequestFfi>> {
-    override fun read(buf: ByteBuffer): List<MediaUploadAttachmentRequestFfi> {
+public object FfiConverterSequenceTypeMediaUploadAttachmentRequestFfi: FfiConverterRustBuffer<kotlin.collections.List<MediaUploadAttachmentRequestFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<MediaUploadAttachmentRequestFfi> {
         val len = buf.getInt()
         return List<MediaUploadAttachmentRequestFfi>(len) {
             FfiConverterTypeMediaUploadAttachmentRequestFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<MediaUploadAttachmentRequestFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<MediaUploadAttachmentRequestFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMediaUploadAttachmentRequestFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<MediaUploadAttachmentRequestFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<MediaUploadAttachmentRequestFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMediaUploadAttachmentRequestFfi.write(it, buf)
@@ -13304,21 +13405,21 @@ public object FfiConverterSequenceTypeMediaUploadAttachmentRequestFfi: FfiConver
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeMediaUploadAttachmentResultFfi: FfiConverterRustBuffer<List<MediaUploadAttachmentResultFfi>> {
-    override fun read(buf: ByteBuffer): List<MediaUploadAttachmentResultFfi> {
+public object FfiConverterSequenceTypeMediaUploadAttachmentResultFfi: FfiConverterRustBuffer<kotlin.collections.List<MediaUploadAttachmentResultFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<MediaUploadAttachmentResultFfi> {
         val len = buf.getInt()
         return List<MediaUploadAttachmentResultFfi>(len) {
             FfiConverterTypeMediaUploadAttachmentResultFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<MediaUploadAttachmentResultFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<MediaUploadAttachmentResultFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMediaUploadAttachmentResultFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<MediaUploadAttachmentResultFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<MediaUploadAttachmentResultFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMediaUploadAttachmentResultFfi.write(it, buf)
@@ -13332,21 +13433,21 @@ public object FfiConverterSequenceTypeMediaUploadAttachmentResultFfi: FfiConvert
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeMessageTagFfi: FfiConverterRustBuffer<List<MessageTagFfi>> {
-    override fun read(buf: ByteBuffer): List<MessageTagFfi> {
+public object FfiConverterSequenceTypeMessageTagFfi: FfiConverterRustBuffer<kotlin.collections.List<MessageTagFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<MessageTagFfi> {
         val len = buf.getInt()
         return List<MessageTagFfi>(len) {
             FfiConverterTypeMessageTagFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<MessageTagFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<MessageTagFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMessageTagFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<MessageTagFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<MessageTagFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMessageTagFfi.write(it, buf)
@@ -13360,21 +13461,21 @@ public object FfiConverterSequenceTypeMessageTagFfi: FfiConverterRustBuffer<List
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeNotificationUpdateFfi: FfiConverterRustBuffer<List<NotificationUpdateFfi>> {
-    override fun read(buf: ByteBuffer): List<NotificationUpdateFfi> {
+public object FfiConverterSequenceTypeNotificationUpdateFfi: FfiConverterRustBuffer<kotlin.collections.List<NotificationUpdateFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<NotificationUpdateFfi> {
         val len = buf.getInt()
         return List<NotificationUpdateFfi>(len) {
             FfiConverterTypeNotificationUpdateFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<NotificationUpdateFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<NotificationUpdateFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeNotificationUpdateFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<NotificationUpdateFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<NotificationUpdateFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeNotificationUpdateFfi.write(it, buf)
@@ -13388,21 +13489,21 @@ public object FfiConverterSequenceTypeNotificationUpdateFfi: FfiConverterRustBuf
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<List<TimelineMessageRecordFfi>> {
-    override fun read(buf: ByteBuffer): List<TimelineMessageRecordFfi> {
+public object FfiConverterSequenceTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<kotlin.collections.List<TimelineMessageRecordFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<TimelineMessageRecordFfi> {
         val len = buf.getInt()
         return List<TimelineMessageRecordFfi>(len) {
             FfiConverterTypeTimelineMessageRecordFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<TimelineMessageRecordFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<TimelineMessageRecordFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeTimelineMessageRecordFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<TimelineMessageRecordFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<TimelineMessageRecordFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeTimelineMessageRecordFfi.write(it, buf)
@@ -13416,21 +13517,21 @@ public object FfiConverterSequenceTypeTimelineMessageRecordFfi: FfiConverterRust
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeTimelineReactionEmojiFfi: FfiConverterRustBuffer<List<TimelineReactionEmojiFfi>> {
-    override fun read(buf: ByteBuffer): List<TimelineReactionEmojiFfi> {
+public object FfiConverterSequenceTypeTimelineReactionEmojiFfi: FfiConverterRustBuffer<kotlin.collections.List<TimelineReactionEmojiFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<TimelineReactionEmojiFfi> {
         val len = buf.getInt()
         return List<TimelineReactionEmojiFfi>(len) {
             FfiConverterTypeTimelineReactionEmojiFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<TimelineReactionEmojiFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<TimelineReactionEmojiFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeTimelineReactionEmojiFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<TimelineReactionEmojiFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<TimelineReactionEmojiFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeTimelineReactionEmojiFfi.write(it, buf)
@@ -13444,21 +13545,21 @@ public object FfiConverterSequenceTypeTimelineReactionEmojiFfi: FfiConverterRust
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeTimelineUserReactionFfi: FfiConverterRustBuffer<List<TimelineUserReactionFfi>> {
-    override fun read(buf: ByteBuffer): List<TimelineUserReactionFfi> {
+public object FfiConverterSequenceTypeTimelineUserReactionFfi: FfiConverterRustBuffer<kotlin.collections.List<TimelineUserReactionFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<TimelineUserReactionFfi> {
         val len = buf.getInt()
         return List<TimelineUserReactionFfi>(len) {
             FfiConverterTypeTimelineUserReactionFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<TimelineUserReactionFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<TimelineUserReactionFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeTimelineUserReactionFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<TimelineUserReactionFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<TimelineUserReactionFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeTimelineUserReactionFfi.write(it, buf)
@@ -13472,21 +13573,21 @@ public object FfiConverterSequenceTypeTimelineUserReactionFfi: FfiConverterRustB
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeMarkdownAlignmentFfi: FfiConverterRustBuffer<List<MarkdownAlignmentFfi>> {
-    override fun read(buf: ByteBuffer): List<MarkdownAlignmentFfi> {
+public object FfiConverterSequenceTypeMarkdownAlignmentFfi: FfiConverterRustBuffer<kotlin.collections.List<MarkdownAlignmentFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<MarkdownAlignmentFfi> {
         val len = buf.getInt()
         return List<MarkdownAlignmentFfi>(len) {
             FfiConverterTypeMarkdownAlignmentFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<MarkdownAlignmentFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<MarkdownAlignmentFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMarkdownAlignmentFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<MarkdownAlignmentFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<MarkdownAlignmentFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMarkdownAlignmentFfi.write(it, buf)
@@ -13500,21 +13601,21 @@ public object FfiConverterSequenceTypeMarkdownAlignmentFfi: FfiConverterRustBuff
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeMarkdownBlockFfi: FfiConverterRustBuffer<List<MarkdownBlockFfi>> {
-    override fun read(buf: ByteBuffer): List<MarkdownBlockFfi> {
+public object FfiConverterSequenceTypeMarkdownBlockFfi: FfiConverterRustBuffer<kotlin.collections.List<MarkdownBlockFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<MarkdownBlockFfi> {
         val len = buf.getInt()
         return List<MarkdownBlockFfi>(len) {
             FfiConverterTypeMarkdownBlockFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<MarkdownBlockFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<MarkdownBlockFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMarkdownBlockFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<MarkdownBlockFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<MarkdownBlockFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMarkdownBlockFfi.write(it, buf)
@@ -13528,21 +13629,21 @@ public object FfiConverterSequenceTypeMarkdownBlockFfi: FfiConverterRustBuffer<L
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeMarkdownInlineFfi: FfiConverterRustBuffer<List<MarkdownInlineFfi>> {
-    override fun read(buf: ByteBuffer): List<MarkdownInlineFfi> {
+public object FfiConverterSequenceTypeMarkdownInlineFfi: FfiConverterRustBuffer<kotlin.collections.List<MarkdownInlineFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<MarkdownInlineFfi> {
         val len = buf.getInt()
         return List<MarkdownInlineFfi>(len) {
             FfiConverterTypeMarkdownInlineFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<MarkdownInlineFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<MarkdownInlineFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeMarkdownInlineFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<MarkdownInlineFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<MarkdownInlineFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMarkdownInlineFfi.write(it, buf)
@@ -13556,21 +13657,21 @@ public object FfiConverterSequenceTypeMarkdownInlineFfi: FfiConverterRustBuffer<
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeTimelineMessageChangeFfi: FfiConverterRustBuffer<List<TimelineMessageChangeFfi>> {
-    override fun read(buf: ByteBuffer): List<TimelineMessageChangeFfi> {
+public object FfiConverterSequenceTypeTimelineMessageChangeFfi: FfiConverterRustBuffer<kotlin.collections.List<TimelineMessageChangeFfi>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<TimelineMessageChangeFfi> {
         val len = buf.getInt()
         return List<TimelineMessageChangeFfi>(len) {
             FfiConverterTypeTimelineMessageChangeFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<TimelineMessageChangeFfi>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<TimelineMessageChangeFfi>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterTypeTimelineMessageChangeFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<TimelineMessageChangeFfi>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<TimelineMessageChangeFfi>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeTimelineMessageChangeFfi.write(it, buf)
@@ -13584,21 +13685,21 @@ public object FfiConverterSequenceTypeTimelineMessageChangeFfi: FfiConverterRust
 /**
  * @suppress
  */
-public object FfiConverterSequenceSequenceTypeMarkdownTableCellFfi: FfiConverterRustBuffer<List<List<MarkdownTableCellFfi>>> {
-    override fun read(buf: ByteBuffer): List<List<MarkdownTableCellFfi>> {
+public object FfiConverterSequenceSequenceTypeMarkdownTableCellFfi: FfiConverterRustBuffer<kotlin.collections.List<List<MarkdownTableCellFfi>>> {
+    override fun read(buf: ByteBuffer): kotlin.collections.List<kotlin.collections.List<MarkdownTableCellFfi>> {
         val len = buf.getInt()
-        return List<List<MarkdownTableCellFfi>>(len) {
+        return List<kotlin.collections.List<MarkdownTableCellFfi>>(len) {
             FfiConverterSequenceTypeMarkdownTableCellFfi.read(buf)
         }
     }
 
-    override fun allocationSize(value: List<List<MarkdownTableCellFfi>>): ULong {
+    override fun allocationSize(value: kotlin.collections.List<kotlin.collections.List<MarkdownTableCellFfi>>): ULong {
         val sizeForLength = 4UL
         val sizeForItems = value.map { FfiConverterSequenceTypeMarkdownTableCellFfi.allocationSize(it) }.sum()
         return sizeForLength + sizeForItems
     }
 
-    override fun write(value: List<List<MarkdownTableCellFfi>>, buf: ByteBuffer) {
+    override fun write(value: kotlin.collections.List<kotlin.collections.List<MarkdownTableCellFfi>>, buf: ByteBuffer) {
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterSequenceTypeMarkdownTableCellFfi.write(it, buf)
