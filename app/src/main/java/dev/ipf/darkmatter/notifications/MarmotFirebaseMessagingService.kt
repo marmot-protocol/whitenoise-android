@@ -29,12 +29,13 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        // MIP-05 wake pushes carry no display notification — if a payload
-        // ever sneaks one in, ignore it. We don't trust server-side text;
-        // the local pipeline owns notification text.
+        // MIP-05 wake pushes carry no display notification. If a payload
+        // ever sneaks one in we still drop the server-supplied text (the
+        // local pipeline owns notification text), but the wake itself
+        // must always happen — an early return here would cause a missed
+        // foreground-stream resync for the rest of the payload.
         if (message.notification != null) {
             Log.d(TAG, "Ignoring notification body on MIP-05 push")
-            return
         }
         Log.d(TAG, "MIP-05 wake push received; starting foreground stream")
         wakeForegroundStream()
