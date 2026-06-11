@@ -61,6 +61,15 @@ data class ChatListItem(
     val memberCount: Int,
     val memberSnapshot: GroupMemberSnapshot?,
     val projection: ChatListRowFfi? = null,
+    /**
+     * Markdown AST for the last-message preview line, parsed off-main by
+     * [ChatsController] from the same plaintext [projectedPreviewText]
+     * returns. Null (or an empty document) while the parse is in flight or
+     * failed — the row then renders the raw plaintext exactly as before.
+     * Only attached when the preview would show the message body itself
+     * (non-deleted, non-blank), so fallback copy is never styled.
+     */
+    val previewTokens: MarkdownDocumentFfi? = null,
 ) {
     val id: String = group.groupIdHex
 
@@ -129,6 +138,7 @@ internal fun chatListItemFromProjection(
     group: AppGroupRecordFfi? = null,
     activeAccountIdHex: String? = null,
     members: List<AppGroupMemberRecordFfi>? = null,
+    previewTokens: MarkdownDocumentFfi? = null,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
     val displayGroup =
@@ -150,6 +160,11 @@ internal fun chatListItemFromProjection(
                     groupIdHex = row.groupIdHex,
                     sender = preview.sender,
                     plaintext = preview.plaintext,
+                    // Deliberately empty: the chat-list preview's markdown
+                    // rides [ChatListItem.previewTokens] (parsed async by
+                    // ChatsController), not this synthesized record. Parsing
+                    // here would force an FFI hop into a pure projection
+                    // helper.
                     contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                     kind = preview.kind,
                     tags = emptyList(),
@@ -161,7 +176,21 @@ internal fun chatListItemFromProjection(
         memberCount = memberCount,
         memberSnapshot = null,
         projection = row,
+        previewTokens = previewTokens,
     )
+}
+
+/**
+ * The last-message text a chat row should run through the markdown parser,
+ * or null when the row's preview line will show fallback copy instead of
+ * the message body (no last message, deleted, or blank plaintext). Keeping
+ * this predicate beside [chatListItemFromProjection] ties the parse gate to
+ * the same plaintext `projectedPreviewText` would surface.
+ */
+internal fun chatRowPreviewMarkdownSource(row: ChatListRowFfi): String? {
+    val preview = row.lastMessage ?: return null
+    if (preview.deleted) return null
+    return preview.plaintext.takeIf { it.isNotBlank() }
 }
 
 private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
@@ -476,6 +505,20 @@ class ChatsController(
     // `bind()` clears the set alongside the cache to reset both at once.
     private val inFlightMemberFetches = mutableSetOf<String>()
 
+    // Parsed markdown for each row's last-message preview, keyed by the exact
+    // plaintext (tokens must always describe the text beside them — keying by
+    // group or message id would go stale on edits). This is derived UI state
+    // over the live rows, not a second store of protocol data: it's pruned to
+    // the texts the current rows actually show (in
+    // [schedulePendingPreviewParses]) and cleared on bind. A parse failure
+    // caches the empty document, which renders as plaintext and stops the
+    // row from re-parsing on every recompute.
+    private var previewTokensByText = mapOf<String, MarkdownDocumentFfi>()
+
+    // Same single-state invariant as [inFlightMemberFetches], keyed by
+    // preview plaintext: pending → in flight (here) → cached.
+    private val inFlightPreviewParses = mutableSetOf<String>()
+
     // Monotonically increments on every `bind()`. Captured by each
     // [schedulePendingMemberFetches] job; once a later bind has happened
     // (account switch, sign-out, or re-bind), the captured epoch no
@@ -491,6 +534,8 @@ class ChatsController(
         groupRecordsById = emptyMap()
         memberCacheByGroup = emptyMap()
         inFlightMemberFetches.clear()
+        previewTokensByText = emptyMap()
+        inFlightPreviewParses.clear()
         bindEpoch += 1L
         recompute()
         error = null
@@ -764,6 +809,8 @@ class ChatsController(
                         group = groupRecordsById[row.groupIdHex],
                         activeAccountIdHex = me,
                         members = memberCacheByGroup[row.groupIdHex],
+                        previewTokens =
+                            chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
                     )
                 }.let(::sortChatListItems)
         items = all.filter { !it.group.archived }
@@ -774,6 +821,9 @@ class ChatsController(
         // the local projector. Only unnamed groups need this — named
         // groups display `group.name` directly without member data.
         schedulePendingMemberFetches()
+        // Likewise, fan out off-main markdown parses for any preview text we
+        // haven't tokenized yet; each completion folds back via recompute().
+        schedulePendingPreviewParses()
     }
 
     /**
@@ -824,7 +874,64 @@ class ChatsController(
             }
         }
     }
+
+    /**
+     * Walk the current chat rows and, for any preview plaintext without
+     * cached tokens or an in-flight parse, kick off the `parseMarkdown` FFI
+     * call off-main. On completion the cache updates and `recompute()` runs
+     * again so the row re-emits with its styled preview. List emission never
+     * waits on a parse: rows surface immediately with plaintext and upgrade
+     * when the tokens land. Failures cache the empty document (renders as
+     * plaintext, no retry storm). The cache is pruned to the texts still on
+     * screen so live-update churn can't grow it without bound.
+     */
+    private fun schedulePendingPreviewParses() {
+        if (accountRef == null) return
+        val epoch = bindEpoch
+        val liveTexts = chatRows.mapNotNullTo(mutableSetOf(), ::chatRowPreviewMarkdownSource)
+        if (previewTokensByText.keys.any { it !in liveTexts }) {
+            previewTokensByText = previewTokensByText.filterKeys { it in liveTexts }
+        }
+        val pending =
+            liveTexts
+                .filterNot { it in previewTokensByText }
+                .filterNot { it in inFlightPreviewParses }
+        if (pending.isEmpty()) return
+        inFlightPreviewParses.addAll(pending)
+        pending.forEach { text ->
+            appState.launchMutation {
+                try {
+                    val tokens = appState.parseMarkdownOrEmpty(text)
+                    if (bindEpoch != epoch) return@launchMutation
+                    previewTokensByText = previewTokensByText + (text to tokens)
+                    recompute()
+                } finally {
+                    // Same epoch discipline as the member fetches: a later
+                    // bind() already cleared the set, so only the owning
+                    // epoch may mutate it.
+                    if (bindEpoch == epoch) inFlightPreviewParses.remove(text)
+                }
+            }
+        }
+    }
 }
+
+/**
+ * Parse [text] into the same Markdown AST the Rust core attaches to projected
+ * records, for the state Android synthesizes locally (optimistic sends,
+ * finished agent streams, chat-list previews). `parseMarkdown` is a blocking
+ * FFI call, so it rides [DarkMatterAppState.marmotIo]'s `Dispatchers.IO` hop
+ * instead of the main thread. Any failure degrades to an empty document —
+ * empty docs render as plain text, so a parser error can never lose a
+ * message body.
+ */
+internal suspend fun DarkMatterAppState.parseMarkdownOrEmpty(text: String): MarkdownDocumentFfi =
+    try {
+        marmotIo { parseMarkdown(text) }
+    } catch (throwable: Throwable) {
+        rethrowIfCancellation(throwable)
+        MarkdownDocumentFfi(blocks = emptyList())
+    }
 
 private fun AppGroupRecordFfi.debugSummary(): String =
     "id=${groupIdHex.take(8)} archived=$archived pending=$pendingConfirmation " +
@@ -1178,7 +1285,10 @@ class ConversationController(
                 groupIdHex = group.groupIdHex,
                 sender = appState.activeAccount?.accountIdHex ?: "",
                 plaintext = trimmed,
-                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                // Parse locally so the optimistic bubble renders the same
+                // markdown the projected record will carry once the send
+                // round-trips — no plain→styled flash on confirm.
+                contentTokens = appState.parseMarkdownOrEmpty(trimmed),
                 kind = 9uL,
                 tags =
                     replyTarget
@@ -1286,7 +1396,11 @@ class ConversationController(
                 groupIdHex = group.groupIdHex,
                 sender = appState.activeAccount?.accountIdHex ?: "",
                 plaintext = body,
-                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                // Markdown in a media caption renders styled from the first
+                // optimistic frame. The 📎 placeholder parses to a plain
+                // paragraph, and the bubble suppresses body text while the
+                // upload is pending anyway, so parsing `body` is uniform.
+                contentTokens = appState.parseMarkdownOrEmpty(body),
                 kind = 9uL,
                 // One `_media_pending` tag per attachment. retryFailedSend
                 // detects ANY of these as a media-retry trigger and re-runs
@@ -2822,7 +2936,16 @@ class ConversationController(
                     is AgentStreamUpdateFfi.Finished -> {
                         text.clear()
                         text.append(update.text)
-                        updateStreamPreview(streamId, text.toString(), MessageStatus.Sent)
+                        // Parse once on completion only — per-chunk parsing
+                        // would be an FFI round-trip per token batch for a
+                        // document that's still mutating. Chunks render as
+                        // plain text; the finished message gets markdown.
+                        updateStreamPreview(
+                            streamId,
+                            text.toString(),
+                            MessageStatus.Sent,
+                            tokens = appState.parseMarkdownOrEmpty(update.text),
+                        )
                     }
                     is AgentStreamUpdateFfi.Failed -> {
                         updateStreamPreview(streamId, copy.streamFailed(update.message), MessageStatus.Failed)
@@ -2855,6 +2978,7 @@ class ConversationController(
         streamId: String,
         plaintext: String,
         status: MessageStatus,
+        tokens: MarkdownDocumentFfi? = null,
     ) {
         if (streamId in removedStreamIds) return
         val id = "stream:$streamId"
@@ -2874,7 +2998,15 @@ class ConversationController(
                     recordedAt = nowSeconds(),
                     receivedAt = nowSeconds(),
                 )
-            ).copy(plaintext = plaintext)
+            ).copy(
+                plaintext = plaintext,
+                // Tokens must always describe the plaintext beside them.
+                // When the caller didn't parse this revision (streaming
+                // chunks, failure copy), reset to empty — carrying forward a
+                // previous revision's tokens would render stale markdown
+                // against the new text. Empty falls back to plain rendering.
+                contentTokens = tokens ?: MarkdownDocumentFfi(blocks = emptyList()),
+            )
         optimisticMessages[id] =
             TimelineMessage(
                 id,

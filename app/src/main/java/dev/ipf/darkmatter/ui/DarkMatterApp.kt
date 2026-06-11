@@ -1707,15 +1707,35 @@ private fun ChatRow(
         },
         supportingContent = {
             val draft = appState.draftFor(item.group.groupIdHex)?.takeIf { it.isNotBlank() }
+            // Tokens only ever describe the last message's body, so they're
+            // ignored whenever the line shows something else (invite copy,
+            // draft). When the controller hasn't parsed yet (or the parse
+            // produced nothing), fall back to today's plaintext line. No
+            // parsing happens here — composition stays parse-free.
+            val markdownPreview =
+                item.previewTokens
+                    ?.takeIf { !item.group.pendingConfirmation && draft == null && it.blocks.isNotEmpty() }
             val preview =
-                when {
-                    item.group.pendingConfirmation -> stringResource(R.string.invitation)
-                    draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
-                    else ->
-                        item.projectedPreviewText(
-                            copy = messageTextCopy,
-                            empty = stringResource(R.string.no_messages_yet),
-                        )
+                if (markdownPreview != null) {
+                    rememberMarkdownPreviewText(
+                        markdownPreview,
+                        mentionDisplayName =
+                            remember(appState) {
+                                { bech32: String -> appState.mentionDisplayName(bech32) }
+                            },
+                    )
+                } else {
+                    AnnotatedString(
+                        when {
+                            item.group.pendingConfirmation -> stringResource(R.string.invitation)
+                            draft != null -> stringResource(R.string.chat_row_draft_prefix) + draft
+                            else ->
+                                item.projectedPreviewText(
+                                    copy = messageTextCopy,
+                                    empty = stringResource(R.string.no_messages_yet),
+                                )
+                        },
+                    )
                 }
             Text(
                 text = preview,
@@ -5668,10 +5688,39 @@ private fun MessageBubble(
                                 else -> displayedBody
                             }
                         if (bodyTextToRender != null) {
-                            Text(
-                                bodyTextToRender,
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
+                            // Markdown only when the tokens describe exactly
+                            // the text we're about to show: tombstone copy,
+                            // imeta-filename fallbacks, etc. all diverge from
+                            // record.plaintext and must stay plain. An empty
+                            // document (legacy record, parse failure) falls
+                            // through to the unchanged plain-text path.
+                            val markdownDocument = record.contentTokens
+                            if (!deleted &&
+                                !invalidated &&
+                                markdownDocument.blocks.isNotEmpty() &&
+                                bodyTextToRender == record.plaintext
+                            ) {
+                                // Mention names resolve through the profile
+                                // cache; npub taps stay in-app via the
+                                // profile sheet (never an external nostr:
+                                // intent).
+                                MarkdownMessageBody(
+                                    markdownDocument,
+                                    mentionDisplayName =
+                                        remember(appState) {
+                                            { bech32: String -> appState.mentionDisplayName(bech32) }
+                                        },
+                                    onNostrProfileTap =
+                                        remember(appState) {
+                                            { bech32: String -> appState.presentNostrProfile(bech32) }
+                                        },
+                                )
+                            } else {
+                                Text(
+                                    bodyTextToRender,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
                         }
                         Row(
                             modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start),
