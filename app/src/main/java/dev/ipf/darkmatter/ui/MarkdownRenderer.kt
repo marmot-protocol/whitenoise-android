@@ -613,12 +613,16 @@ private fun AnnotatedString.Builder.appendPreviewBlock(
     maxLength: Int,
     mentionDisplayName: ((String) -> String?)?,
 ) {
+    // Budget check inside the recursion too: the top-level loop only guards
+    // between siblings, so a deep quote/list subtree would otherwise keep
+    // flattening long after the row's budget is spent.
+    if (length >= maxLength) return
     when (block) {
-        is MarkdownBlockFfi.Paragraph -> appendPreviewInlineSegment(block.inlines, codeStyle, mentionDisplayName)
-        is MarkdownBlockFfi.Heading -> appendPreviewInlineSegment(block.inlines, codeStyle, mentionDisplayName)
+        is MarkdownBlockFfi.Paragraph -> appendPreviewInlineSegment(block.inlines, codeStyle, maxLength, mentionDisplayName)
+        is MarkdownBlockFfi.Heading -> appendPreviewInlineSegment(block.inlines, codeStyle, maxLength, mentionDisplayName)
         MarkdownBlockFfi.ThematicBreak -> Unit
-        is MarkdownBlockFfi.CodeBlock -> appendPreviewCodeContent(block.content, codeStyle)
-        is MarkdownBlockFfi.MathBlock -> appendPreviewCodeContent(block.content, codeStyle)
+        is MarkdownBlockFfi.CodeBlock -> appendPreviewCodeContent(block.content, codeStyle, maxLength)
+        is MarkdownBlockFfi.MathBlock -> appendPreviewCodeContent(block.content, codeStyle, maxLength)
         is MarkdownBlockFfi.BlockQuote ->
             block.blocks.forEach { appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName) }
         is MarkdownBlockFfi.List ->
@@ -626,9 +630,9 @@ private fun AnnotatedString.Builder.appendPreviewBlock(
                 item.blocks.forEach { appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName) }
             }
         is MarkdownBlockFfi.Table -> {
-            block.header.forEach { cell -> appendPreviewInlineSegment(cell.inlines, codeStyle, mentionDisplayName) }
+            block.header.forEach { cell -> appendPreviewInlineSegment(cell.inlines, codeStyle, maxLength, mentionDisplayName) }
             block.rows.forEach { row ->
-                row.forEach { cell -> appendPreviewInlineSegment(cell.inlines, codeStyle, mentionDisplayName) }
+                row.forEach { cell -> appendPreviewInlineSegment(cell.inlines, codeStyle, maxLength, mentionDisplayName) }
             }
         }
     }
@@ -639,56 +643,84 @@ private val previewWhitespaceRun = Regex("\\s+")
 private fun AnnotatedString.Builder.appendPreviewCodeContent(
     content: String,
     codeStyle: SpanStyle,
+    maxLength: Int,
 ) {
+    // Bound the work BEFORE the whitespace collapse: a megabyte code block
+    // must not be regex-processed for a one-line row. The window is generous
+    // because collapsing only shrinks text; a pathological mostly-whitespace
+    // prefix just yields a shorter preview, which the row can afford.
+    val bounded = content.take(maxLength * 8)
     // A code block is a multi-line region; the preview is one line. Collapse
     // every whitespace run (incl. newlines and indentation) to a single space
     // so `fun main() {\n  hi()\n}` reads as `fun main() { hi() }`.
-    val singleLine = content.trim().replace(previewWhitespaceRun, " ")
-    appendPreviewSegment(buildAnnotatedString { withStyle(codeStyle) { append(singleLine) } })
+    val singleLine = bounded.trim().replace(previewWhitespaceRun, " ")
+    appendPreviewSegment(
+        buildAnnotatedString { withStyle(codeStyle) { append(singleLine) } },
+        maxLength,
+    )
 }
 
 private fun AnnotatedString.Builder.appendPreviewInlineSegment(
     inlines: List<MarkdownInlineFfi>,
     codeStyle: SpanStyle,
+    maxLength: Int,
     mentionDisplayName: ((String) -> String?)?,
 ) {
-    appendPreviewSegment(buildAnnotatedString { appendPreviewInlines(inlines, codeStyle, mentionDisplayName) })
+    appendPreviewSegment(
+        buildAnnotatedString { appendPreviewInlines(inlines, codeStyle, maxLength, mentionDisplayName) },
+        maxLength,
+    )
 }
 
 /**
- * Joins a leaf segment to the builder with the single-space block separator.
- * The segment is materialized first so an empty contribution (blank
- * paragraph, empty table cell) commits neither text nor a stray separator.
+ * Joins a leaf segment to the builder with the single-space block separator,
+ * spending at most the remaining [maxLength] budget. The segment is
+ * materialized first so an empty contribution (blank paragraph, empty table
+ * cell) commits neither text nor a stray separator; a segment that overflows
+ * the budget is cut at the boundary instead of being appended whole.
  */
-private fun AnnotatedString.Builder.appendPreviewSegment(segment: AnnotatedString) {
+private fun AnnotatedString.Builder.appendPreviewSegment(
+    segment: AnnotatedString,
+    maxLength: Int,
+) {
     if (segment.isEmpty()) return
-    if (length > 0) append(' ')
-    append(segment)
+    val separator = if (length > 0) 1 else 0
+    val remaining = maxLength - length - separator
+    if (remaining <= 0) return
+    if (separator == 1) append(' ')
+    append(if (segment.length > remaining) segment.subSequence(0, remaining) else segment)
 }
 
 private fun AnnotatedString.Builder.appendPreviewInlines(
     inlines: List<MarkdownInlineFfi>,
     codeStyle: SpanStyle,
+    maxLength: Int,
     mentionDisplayName: ((String) -> String?)?,
 ) {
-    inlines.forEach { inline ->
+    for (inline in inlines) {
+        // This builds a segment (own builder, length starts at 0), so the
+        // whole-document budget bounds each segment: stop walking once spent
+        // and cap the unbounded leaf appends (text/code/math/autolink) so one
+        // giant run can't blow past it either.
+        if (length >= maxLength) return
         when (inline) {
-            is MarkdownInlineFfi.Text -> append(inline.content)
+            is MarkdownInlineFfi.Text -> append(inline.content.take(maxLength - length))
             // One-line preview: the author's line breaks flatten to spaces
             // (unlike the bubble renderer, which preserves them).
             MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append(' ')
-            is MarkdownInlineFfi.Code -> withStyle(codeStyle) { append(inline.content) }
+            is MarkdownInlineFfi.Code ->
+                withStyle(codeStyle) { append(inline.content.take((maxLength - length).coerceAtLeast(0))) }
             is MarkdownInlineFfi.Emph ->
                 withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-                    appendPreviewInlines(inline.children, codeStyle, mentionDisplayName)
+                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName)
                 }
             is MarkdownInlineFfi.Strong ->
                 withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                    appendPreviewInlines(inline.children, codeStyle, mentionDisplayName)
+                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName)
                 }
             is MarkdownInlineFfi.Strikethrough ->
                 withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
-                    appendPreviewInlines(inline.children, codeStyle, mentionDisplayName)
+                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName)
                 }
             // Visible text only — no annotation, no link styling. A label-less
             // link still shows its destination so the preview isn't blank.
@@ -696,16 +728,19 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
                 appendPreviewInlines(
                     inline.children.ifEmpty { listOf(MarkdownInlineFfi.Text(inline.dest.trim())) },
                     codeStyle,
+                    maxLength,
                     mentionDisplayName,
                 )
             is MarkdownInlineFfi.Image ->
                 appendPreviewInlines(
                     inline.alt.ifEmpty { listOf(MarkdownInlineFfi.Text(inline.dest.trim())) },
                     codeStyle,
+                    maxLength,
                     mentionDisplayName,
                 )
-            is MarkdownInlineFfi.Autolink -> append(inline.url)
-            is MarkdownInlineFfi.Math -> withStyle(codeStyle) { append(inline.content) }
+            is MarkdownInlineFfi.Autolink -> append(inline.url.take(maxLength - length))
+            is MarkdownInlineFfi.Math ->
+                withStyle(codeStyle) { append(inline.content.take((maxLength - length).coerceAtLeast(0))) }
             // Same visible text as the bubble (name or shortened bech32) but
             // inert: the row's only tap target is the chat itself.
             is MarkdownInlineFfi.NostrMention -> {
@@ -737,11 +772,11 @@ internal fun markdownListMarker(
     }
 
 /**
- * The only link schemes the markdown renderer will hand to `ACTION_VIEW`,
- * mirroring iOS's MessageLinkPolicy. Explicit allowlist — javascript:, data:,
- * file:, ftp:, intent: and anything unknown stays inert text. nostr: is also
- * absent on purpose: profile entities route in-app via
- * [NOSTR_PROFILE_LINK_TAG_PREFIX], never to an arbitrary external handler.
+ * Explicit scheme allowlist — only these are handed to `ACTION_VIEW`;
+ * everything else (javascript:, data:, file:, ftp:, intent:, anything
+ * unknown) stays inert text. nostr: is also absent on purpose: profile
+ * entities route in-app via [NOSTR_PROFILE_LINK_TAG_PREFIX], never to an
+ * arbitrary external handler.
  */
 private val openableMarkdownLinkSchemes =
     setOf("http", "https", "mailto", "tel", "whitenoise", "whitenoise-staging")

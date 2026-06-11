@@ -157,6 +157,21 @@ class MarkdownInlineTextTest {
     }
 
     @Test
+    fun paddedUriAutolinkPreservesVisibleTextButTrimsAnnotation() {
+        val annotated =
+            build(
+                listOf(
+                    MarkdownInlineFfi.Autolink("  https://example.com  ", MarkdownAutolinkKindFfi.URI),
+                ),
+            )
+        // The author's padding stays visible, but the stored destination is
+        // trimmed so the gate, the annotation, and Uri.parse agree.
+        assertEquals("  https://example.com  ", annotated.text)
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertEquals("https://example.com", (link.item as LinkAnnotation.Url).url)
+    }
+
+    @Test
     fun emailAutolinkOpensThroughMailto() {
         val annotated =
             build(

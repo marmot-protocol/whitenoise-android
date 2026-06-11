@@ -261,6 +261,46 @@ class MarkdownPreviewTextTest {
     }
 
     @Test
+    fun capAppliesWithinASingleOversizedBlock() {
+        val annotated =
+            build(
+                listOf(
+                    MarkdownBlockFfi.Paragraph(
+                        listOf(
+                            MarkdownInlineFfi.Text("a".repeat(150)),
+                            MarkdownInlineFfi.Text("b".repeat(150)),
+                        ),
+                    ),
+                ),
+                maxLength = 200,
+            )
+        assertEquals(200, annotated.length)
+        assertEquals("a".repeat(150) + "b".repeat(50), annotated.text)
+    }
+
+    @Test
+    fun giantCodeBlockCapsAtMaxLength() {
+        val annotated =
+            build(
+                listOf(
+                    MarkdownBlockFfi.CodeBlock(
+                        kind = MarkdownCodeBlockKindFfi.FENCED,
+                        info = "",
+                        content = "x".repeat(100_000),
+                    ),
+                ),
+                maxLength = 200,
+            )
+        assertEquals(200, annotated.length)
+        assertEquals(
+            FontFamily.Monospace,
+            annotated.spanStyles
+                .single()
+                .item.fontFamily,
+        )
+    }
+
+    @Test
     fun capStopsWalkingLaterBlocks() {
         val annotated =
             build(
