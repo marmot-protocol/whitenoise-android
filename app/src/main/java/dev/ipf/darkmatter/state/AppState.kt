@@ -11,6 +11,9 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
+import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.AvatarImageLoader
@@ -23,6 +26,8 @@ import dev.ipf.darkmatter.notifications.BackgroundConnectionPreferences
 import dev.ipf.darkmatter.notifications.LocalNotificationPolicy
 import dev.ipf.darkmatter.notifications.LocalNotificationPresenter
 import dev.ipf.darkmatter.notifications.NotificationStreamForegroundService
+import dev.ipf.darkmatter.notifications.PushServerConfig
+import dev.ipf.darkmatter.notifications.PushTokenStore
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -33,6 +38,7 @@ import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
 import dev.ipf.marmotkit.AuditLogUploadSourceFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.NotificationSettingsFfi
+import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
@@ -47,6 +53,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -54,6 +61,7 @@ import java.net.IDN
 import java.net.URI
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.resume
 
 sealed interface AppPhase {
     data object Bootstrapping : AppPhase
@@ -228,6 +236,13 @@ class DarkMatterAppState(
     // null-client check and each construct a MarmotClient (TOCTOU). See #33.
     private val bootstrapMutex = Mutex()
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
+    private val pushTokenStore = PushTokenStore.create(appContext)
+
+    // Last (account, platform, token, server-pubkey, relay-hint) tuple we
+    // successfully handed to the runtime. Skip redundant FFI calls when
+    // nothing has changed across foreground/token-rotation/account-bind
+    // events. Cleared on sign-out and on disable.
+    private var lastSyncedPushFingerprint: String? = null
 
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
         private set
@@ -535,9 +550,13 @@ class DarkMatterAppState(
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+        // Account switch invalidates the cached push fingerprint — the new
+        // active account may have a different push registration state.
+        lastSyncedPushFingerprint = null
         notificationScope.launch {
             configurePrivacyRuntime()
             refreshLocalNotificationSettings()
+            syncNativePushRegistrationIfEnabled()
         }
     }
 
@@ -774,6 +793,7 @@ class DarkMatterAppState(
         appInForeground = foreground
         if (foreground) refreshLocalNotificationPermission()
         if (foreground && backgroundConnectionEnabled) startBackgroundConnectionService()
+        if (foreground) notificationScope.launch { syncNativePushRegistrationIfEnabled() }
     }
 
     fun setActiveConversation(groupIdHex: String?) {
@@ -860,6 +880,119 @@ class DarkMatterAppState(
         }
         present(if (enabled) R.string.toast_background_connection_enabled else R.string.toast_background_connection_disabled)
         return true
+    }
+
+    /**
+     * Whether real push notifications can run on this device + build. True
+     * only if the build is configured with a MIP-05 push server pubkey AND
+     * Google Play Services is available. False on F-Droid/Zapstore installs
+     * lacking GMS, on builds without [BuildConfig.DARKMATTER_PUSH_SERVER_PUBKEY_HEX],
+     * and on emulators without Play Services. The settings UI gates the push
+     * toggle on this; the foreground-service notifications path keeps working
+     * regardless.
+     */
+    fun isNativePushAvailable(): Boolean {
+        if (PushServerConfig.current() == null) return false
+        val status = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(appContext)
+        return status == ConnectionResult.SUCCESS
+    }
+
+    /**
+     * Persist the FCM token and trigger a re-sync against the runtime. Called
+     * by [dev.ipf.darkmatter.notifications.MarmotFirebaseMessagingService] on
+     * every Firebase token rotation. The sync coroutine no-ops if any
+     * precondition is missing, so the call is safe at any point in the app
+     * lifecycle.
+     */
+    fun onPushTokenRotated(token: String) {
+        pushTokenStore.setToken(token)
+        notificationScope.launch { syncNativePushRegistrationIfEnabled() }
+    }
+
+    /**
+     * If native push is configured AND the active account has it enabled,
+     * push the current FCM token to the runtime so the MIP-05 server can
+     * deliver wake messages. Idempotent — repeated calls within the same
+     * (token, account, server, relay) tuple are no-ops.
+     */
+    suspend fun syncNativePushRegistrationIfEnabled() {
+        if (!isNativePushAvailable()) return
+        val account = activeAccountRef ?: return
+        val config = PushServerConfig.current() ?: return
+        val settings =
+            localNotificationSettings
+                ?: runCatching { marmotIo { notificationSettings(account) } }
+                    .also { result -> result.getOrNull()?.let { localNotificationSettings = it } }
+                    .getOrNull()
+                ?: return
+        if (!settings.nativePushEnabled) return
+        val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return
+        val fingerprint = "$account|FCM|$token|${config.serverPubkeyHex}|${config.relayHint.orEmpty()}"
+        if (fingerprint == lastSyncedPushFingerprint) return
+        runCatching {
+            marmotIo {
+                upsertPushRegistration(
+                    accountRef = account,
+                    platform = PushPlatformFfi.FCM,
+                    rawToken = token,
+                    serverPubkeyHex = config.serverPubkeyHex,
+                    relayHint = config.relayHint,
+                )
+            }
+            lastSyncedPushFingerprint = fingerprint
+            appStateDebug { "push registration synced account=${account.take(8)}" }
+        }.onFailure {
+            rethrowIfCancellation(it)
+            appStateDebug { "push registration sync failed: ${it.readableMessage()}" }
+        }
+    }
+
+    /**
+     * Enable or disable real push on the active account. When enabling, also
+     * triggers the registration sync; when disabling, clears the runtime
+     * registration so the MIP-05 server stops trying to deliver to a token
+     * the device no longer wants.
+     */
+    suspend fun setNativePushEnabled(enabled: Boolean): Boolean {
+        val account =
+            activeAccountRef ?: run {
+                present(R.string.toast_no_active_account)
+                return false
+            }
+        if (enabled && !isNativePushAvailable()) return false
+        return runCatching {
+            val settings = marmotIo { setNativePushEnabled(account, enabled) }
+            localNotificationSettings = settings
+            if (enabled) {
+                syncNativePushRegistrationIfEnabled()
+            } else {
+                lastSyncedPushFingerprint = null
+                runCatching { marmotIo { clearPushRegistration(account) } }
+                    .onFailure {
+                        rethrowIfCancellation(it)
+                        appStateDebug { "clearPushRegistration failed: ${it.readableMessage()}" }
+                    }
+            }
+            true
+        }.getOrElse {
+            rethrowIfCancellation(it)
+            present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()))
+            false
+        }
+    }
+
+    private suspend fun fetchFcmTokenOrNull(): String? {
+        if (!isNativePushAvailable()) return null
+        val token =
+            suspendCancellableCoroutine<String?> { continuation ->
+                FirebaseMessaging
+                    .getInstance()
+                    .token
+                    .addOnSuccessListener { continuation.resume(it) }
+                    .addOnFailureListener { continuation.resume(null) }
+            }
+        if (!token.isNullOrBlank()) pushTokenStore.setToken(token)
+        return token?.takeIf { it.isNotBlank() }
     }
 
     fun shouldRequestDefaultNotificationPermission(): Boolean =
