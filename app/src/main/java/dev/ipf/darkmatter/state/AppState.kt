@@ -965,8 +965,21 @@ class DarkMatterAppState(
                     relayHint = config.relayHint,
                 )
             }
-            perAccountSyncedFingerprints[account] = fingerprint
-            appStateDebug { "push registration synced account=${account.take(8)}" }
+            // Re-read settings: a concurrent `setNativePushEnabled(false)` or
+            // sign-out could have flipped the flag (and cleared the cache)
+            // while upsertPushRegistration was suspended. If push is no
+            // longer enabled, do NOT write the fingerprint back — otherwise
+            // the cache restores a stale entry and the next enable
+            // short-circuits without re-registering. Roll back instead.
+            val settingsAfter = runCatching { marmotIo { notificationSettings(account) } }.getOrNull()
+            if (settingsAfter?.nativePushEnabled == true) {
+                perAccountSyncedFingerprints[account] = fingerprint
+                appStateDebug { "push registration synced account=${account.take(8)}" }
+            } else {
+                appStateDebug { "push registration raced disable; rolling back account=${account.take(8)}" }
+                runCatching { marmotIo { clearPushRegistration(account) } }
+                    .onFailure { rethrowIfCancellation(it) }
+            }
         }.onFailure {
             rethrowIfCancellation(it)
             // Drop the fingerprint on failure so the next sync retries
