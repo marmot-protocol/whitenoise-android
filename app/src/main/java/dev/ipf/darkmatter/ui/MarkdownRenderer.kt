@@ -472,29 +472,39 @@ private fun AnnotatedString.Builder.appendNostrEntity(
     mention: Boolean,
     ctx: MarkdownInlineRenderContext,
 ) {
-    val appendVisible: AnnotatedString.Builder.() -> Unit = {
-        val name = if (mention) ctx.mentionDisplayName?.invoke(entity.bech32) else null
+    val name = if (mention) ctx.mentionDisplayName?.invoke(entity.bech32) else null
+    // The annotated run borrows the link color (LocalContentColor in the
+    // bubble): a Clickable region is painted with ITS OWN TextLinkStyles —
+    // when those are null, Material's Text falls back to the theme's default
+    // link color (primary), which is invisible on the outgoing
+    // primary-container bubble. Same color policy as linkStyle itself.
+    val style =
         if (name != null) {
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("@$name") }
+            SpanStyle(color = ctx.linkStyle.color, fontWeight = FontWeight.Bold)
         } else {
-            withStyle(ctx.codeStyle) {
-                if (mention) append('@')
-                append(shortenedBech32(entity.bech32))
-            }
+            ctx.codeStyle.copy(color = ctx.linkStyle.color)
         }
-    }
+    val visible = if (name != null) "@$name" else (if (mention) "@" else "") + shortenedBech32(entity.bech32)
     val opensProfile =
         entity.hrp == MarkdownNostrHrpFfi.NPUB || entity.hrp == MarkdownNostrHrpFfi.NPROFILE
     if (opensProfile) {
         withLink(
             LinkAnnotation.Clickable(
                 tag = NOSTR_PROFILE_LINK_TAG_PREFIX + entity.bech32,
-                styles = null,
+                styles = TextLinkStyles(style = style),
                 linkInteractionListener = ctx.linkListener,
             ),
-        ) { appendVisible() }
+        ) {
+            // Keep the span on the text too so flattened copies (and the
+            // pure-mapping tests) see the styling without the annotation.
+            withStyle(style) { append(visible) }
+        }
     } else {
-        appendVisible()
+        // Inert entities inherit the surrounding color normally — no
+        // annotation, no color override needed.
+        withStyle(if (name != null) SpanStyle(fontWeight = FontWeight.Bold) else ctx.codeStyle) {
+            append(visible)
+        }
     }
 }
 

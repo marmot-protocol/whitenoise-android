@@ -302,10 +302,12 @@ class MarkdownInlineTextTest {
         assertEquals(0, code.start)
         assertEquals(annotated.length, code.end)
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
-        assertEquals(
-            NOSTR_PROFILE_LINK_TAG_PREFIX + npub,
-            (link.item as LinkAnnotation.Clickable).tag,
-        )
+        val clickable = link.item as LinkAnnotation.Clickable
+        assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + npub, clickable.tag)
+        // The annotation must carry its own styles: a styles-less link is
+        // painted in the theme's default link color, which vanishes on the
+        // outgoing (primary-container) bubble.
+        assertEquals(FontFamily.Monospace, clickable.styles?.style?.fontFamily)
     }
 
     @Test
@@ -329,10 +331,12 @@ class MarkdownInlineTextTest {
         assertEquals(0, bold.start)
         assertEquals(6, bold.end)
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
-        assertEquals(
-            NOSTR_PROFILE_LINK_TAG_PREFIX + npub,
-            (link.item as LinkAnnotation.Clickable).tag,
-        )
+        val clickable = link.item as LinkAnnotation.Clickable
+        assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + npub, clickable.tag)
+        // Explicit annotation styles (see the unresolved-mention test): the
+        // bold run must also ride the link itself so it inherits the visible
+        // color, not the theme's default link color.
+        assertEquals(FontWeight.Bold, clickable.styles?.style?.fontWeight)
     }
 
     @Test
@@ -357,12 +361,12 @@ class MarkdownInlineTextTest {
                 .single()
                 .item.fontFamily,
         )
-        // nprofile still routes to the profile callback.
+        // nprofile still routes to the profile callback, and the annotation
+        // carries the monospace style explicitly (visible on both bubbles).
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
-        assertEquals(
-            NOSTR_PROFILE_LINK_TAG_PREFIX + nprofile,
-            (link.item as LinkAnnotation.Clickable).tag,
-        )
+        val clickable = link.item as LinkAnnotation.Clickable
+        assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + nprofile, clickable.tag)
+        assertEquals(FontFamily.Monospace, clickable.styles?.style?.fontFamily)
     }
 
     @Test
