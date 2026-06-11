@@ -997,13 +997,24 @@ class DarkMatterAppState(
             // the cache restores a stale entry and the next enable
             // short-circuits without re-registering. Roll back instead.
             val settingsAfter = runCatching { marmotIo { notificationSettings(account) } }.getOrNull()
-            if (settingsAfter?.nativePushEnabled == true) {
-                perAccountSyncedFingerprints[account] = fingerprint
-                appStateDebug { "push registration synced account=${account.take(8)}" }
-            } else {
-                appStateDebug { "push registration raced disable; rolling back account=${account.take(8)}" }
-                runCatching { marmotIo { clearPushRegistration(account) } }
-                    .onFailure { rethrowIfCancellation(it) }
+            when {
+                // Re-read failed: that's a transient error, not a disable —
+                // the upsert itself succeeded, so keep the registration. Skip
+                // the fingerprint write so the next sync re-verifies instead
+                // of trusting a state we couldn't confirm.
+                settingsAfter == null ->
+                    appStateDebug { "push settings re-read failed; keeping registration account=${account.take(8)}" }
+                settingsAfter.nativePushEnabled -> {
+                    perAccountSyncedFingerprints[account] = fingerprint
+                    appStateDebug { "push registration synced account=${account.take(8)}" }
+                }
+                else -> {
+                    appStateDebug { "push registration raced disable; rolling back account=${account.take(8)}" }
+                    // Shares the pending-clear bookkeeping: a failed rollback
+                    // is queued for retry instead of stranding the account
+                    // registered server-side.
+                    clearPushRegistrationForAccount(account)
+                }
             }
         }.onFailure {
             rethrowIfCancellation(it)
