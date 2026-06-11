@@ -1024,6 +1024,34 @@ class DarkMatterAppState(
         pendingProfileNpub = npub
     }
 
+    /**
+     * Display name for a markdown mention entity (its bare bech32, npub form).
+     * Null when the reference doesn't normalize to a pubkey or the profile is
+     * unknown, so the renderer keeps its shortened-bech32 fallback. A miss
+     * schedules a relay profile fetch; the profile-revision read inside
+     * [profilePresentation] re-renders observers when the name lands.
+     * (nprofile mentions return null for now: the Rust `accountIdHex`
+     * normalizer accepts npub/hex but not nprofile TLVs.)
+     */
+    fun mentionDisplayName(bech32: String): String? {
+        val accountIdHex = nostrEntityAccountIdHex(bech32) ?: return null
+        profileDisplayName(accountIdHex)?.let { return it }
+        requestProfile(accountIdHex)
+        return null
+    }
+
+    /**
+     * In-app route for a tapped nostr profile entity in a message body. The
+     * tap must never become an ACTION_VIEW nostr: intent — identity taps stay
+     * in the app's own profile sheet. Unresolvable references no-op.
+     */
+    fun presentNostrProfile(bech32: String) {
+        val accountIdHex = nostrEntityAccountIdHex(bech32) ?: return
+        presentProfile(npub(accountIdHex))
+    }
+
+    private fun nostrEntityAccountIdHex(bech32: String): String? = runCatching { marmot().accountIdHex(bech32.trim()) }.getOrNull()
+
     fun clearPresentedProfile() {
         pendingProfileNpub = null
     }
