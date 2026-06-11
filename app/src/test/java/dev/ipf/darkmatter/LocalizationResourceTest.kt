@@ -102,8 +102,11 @@ class LocalizationResourceTest {
                 "online",
                 "ref",
                 "relay_health",
+                "new_chat_optional_section",
                 "relays",
+                "settings_version_label",
                 "status",
+                "theme_amoled",
                 "theme_system",
                 "total",
             )
