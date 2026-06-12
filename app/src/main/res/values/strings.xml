@@ -320,6 +320,14 @@
     <string name="toast_send_failed">Send failed</string>
     <string name="toast_reaction_failed">Reaction failed</string>
     <string name="toast_couldnt_delete_message">Couldn\'t delete message</string>
+    <string name="toast_couldnt_edit_message">Couldn\'t edit message</string>
+    <string name="editing_message">Editing message</string>
+    <string name="cancel_edit">Cancel edit</string>
+    <string name="edited">edited</string>
+    <string name="edited_count">edited · %1$d</string>
+    <string name="edit_history">Edit history</string>
+    <string name="edit_history_original">Original</string>
+    <string name="edit_history_version_label">Version %1$d</string>
     <string name="toast_make_another_admin_before_leaving">Make another admin before leaving</string>
     <string name="toast_group_needs_admin">A group needs at least one admin.</string>
     <string name="toast_left_chat">Left chat</string>

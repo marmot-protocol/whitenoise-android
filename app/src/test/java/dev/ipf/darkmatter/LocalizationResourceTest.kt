@@ -76,6 +76,8 @@ class LocalizationResourceTest {
                 "app_preferences",
                 "actions",
                 "bytes_count",
+                "edit_history_original",
+                "edit_history_version_label",
                 "generic_message",
                 "invitation",
                 "key_packages",

@@ -315,6 +315,14 @@
     <string name="toast_send_failed">Invio non riuscito</string>
     <string name="toast_reaction_failed">La reazione è fallita</string>
     <string name="toast_couldnt_delete_message">Eliminazione del messaggio fallita. Riprova.</string>
+    <string name="toast_couldnt_edit_message">Impossibile modificare il messaggio</string>
+    <string name="editing_message">Modifica del messaggio</string>
+    <string name="cancel_edit">Annulla modifica</string>
+    <string name="edited">modificato</string>
+    <string name="edited_count">modificato · %1$d</string>
+    <string name="edit_history">Cronologia modifiche</string>
+    <string name="edit_history_original">Originale</string>
+    <string name="edit_history_version_label">Versione %1$d</string>
     <string name="toast_make_another_admin_before_leaving">Crea un altro amministratore prima di partire</string>
     <string name="toast_group_needs_admin">Un gruppo necessita di almeno un amministratore.</string>
     <string name="toast_left_chat">Chatta a sinistra</string>
