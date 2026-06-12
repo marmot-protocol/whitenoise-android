@@ -315,6 +315,14 @@
     <string name="toast_send_failed">Senden fehlgeschlagen</string>
     <string name="toast_reaction_failed">Reaktion fehlgeschlagen</string>
     <string name="toast_couldnt_delete_message">Nachricht konnte nicht gelöscht werden. Bitte erneut versuchen.</string>
+    <string name="toast_couldnt_edit_message">Nachricht konnte nicht bearbeitet werden</string>
+    <string name="editing_message">Nachricht wird bearbeitet</string>
+    <string name="cancel_edit">Bearbeiten abbrechen</string>
+    <string name="edited">bearbeitet</string>
+    <string name="edited_count">bearbeitet · %1$d</string>
+    <string name="edit_history">Bearbeitungsverlauf</string>
+    <string name="edit_history_original">Original</string>
+    <string name="edit_history_version_label">Version %1$d</string>
     <string name="toast_make_another_admin_before_leaving">Machen Sie einen weiteren Administrator, bevor Sie gehen</string>
     <string name="toast_group_needs_admin">Eine Gruppe benötigt mindestens einen Administrator.</string>
     <string name="toast_left_chat">Chat verlassen</string>

@@ -315,6 +315,14 @@
     <string name="toast_send_failed">Gönderim başarısız oldu</string>
     <string name="toast_reaction_failed">Tepki başarısız oldu</string>
     <string name="toast_couldnt_delete_message">Mesaj silinemedi. Lütfen tekrar deneyin.</string>
+    <string name="toast_couldnt_edit_message">Mesaj düzenlenemedi</string>
+    <string name="editing_message">Mesaj düzenleniyor</string>
+    <string name="cancel_edit">Düzenlemeyi iptal et</string>
+    <string name="edited">düzenlendi</string>
+    <string name="edited_count">düzenlendi · %1$d</string>
+    <string name="edit_history">Düzenleme geçmişi</string>
+    <string name="edit_history_original">Özgün</string>
+    <string name="edit_history_version_label">Sürüm %1$d</string>
     <string name="toast_make_another_admin_before_leaving">Ayrılmadan önce başka bir yönetici yapın</string>
     <string name="toast_group_needs_admin">Bir grubun en az bir yöneticiye ihtiyacı vardır.</string>
     <string name="toast_left_chat">Sohbetten ayrıldı</string>

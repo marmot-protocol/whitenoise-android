@@ -315,6 +315,14 @@
     <string name="toast_send_failed">Échec de l’envoi</string>
     <string name="toast_reaction_failed">La réaction a échoué</string>
     <string name="toast_couldnt_delete_message">Échec de la suppression du message. Veuillez réessayer.</string>
+    <string name="toast_couldnt_edit_message">Impossible de modifier le message</string>
+    <string name="editing_message">Modification du message</string>
+    <string name="cancel_edit">Annuler la modification</string>
+    <string name="edited">modifié</string>
+    <string name="edited_count">modifié · %1$d</string>
+    <string name="edit_history">Historique des modifications</string>
+    <string name="edit_history_original">Original</string>
+    <string name="edit_history_version_label">Version %1$d</string>
     <string name="toast_make_another_admin_before_leaving">Créez un autre administrateur avant de partir</string>
     <string name="toast_group_needs_admin">Un groupe a besoin d’au moins un administrateur.</string>
     <string name="toast_left_chat">Discussion quittée</string>

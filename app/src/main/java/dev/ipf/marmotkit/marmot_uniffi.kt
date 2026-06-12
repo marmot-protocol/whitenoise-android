@@ -955,6 +955,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1063,6 +1065,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_display_name(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_download_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_edit_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_group_details(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
@@ -1402,6 +1406,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_download_media(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_edit_message(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_group_details(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_group_management_state(
@@ -1665,6 +1671,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_download_media() != 56125.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_edit_message() != 43927.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_details() != 55062.toShort()) {
@@ -3789,6 +3798,20 @@ public interface MarmotInterface {
     suspend fun `downloadMedia`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `reference`: MediaAttachmentReferenceFfi): MediaDownloadResultFfi
     
     /**
+     * Edit `target_message_id` by publishing a kind-1009 event that
+     * references it and carries the replacement plaintext in `content`.
+     * Recipients honour the edit only when its authenticated author matches
+     * the target's author; mismatched edits are ignored client-side.
+     *
+     * The chat-list preview deliberately does not bump on an edit — an edit
+     * to a stale message must not reorder a conversation back to the top of
+     * the list. Host apps that aggregate edit history (e.g. an "(edited · N)"
+     * affordance) read the kind-1009 versions back from the timeline
+     * projection and resolve the latest text per target message id.
+     */
+    suspend fun `editMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String, `content`: kotlin.String): SendSummaryFfi
+    
+    /**
      * Group plus enriched member rows for detail screens.
      */
     suspend fun `groupDetails`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): GroupDetailsFfi
@@ -4727,6 +4750,39 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeMediaDownloadResultFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Edit `target_message_id` by publishing a kind-1009 event that
+     * references it and carries the replacement plaintext in `content`.
+     * Recipients honour the edit only when its authenticated author matches
+     * the target's author; mismatched edits are ignored client-side.
+     *
+     * The chat-list preview deliberately does not bump on an edit — an edit
+     * to a stale message must not reorder a conversation back to the top of
+     * the list. Host apps that aggregate edit history (e.g. an "(edited · N)"
+     * affordance) read the kind-1009 versions back from the timeline
+     * projection and resolve the latest text per target message id.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `editMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String, `content`: kotlin.String) : SendSummaryFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_edit_message(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterString.lower(`targetMessageId`),FfiConverterString.lower(`content`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeSendSummaryFfi.lift(it) },
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
