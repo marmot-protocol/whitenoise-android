@@ -42,7 +42,7 @@ class MessageEditsTest {
         sender = sender,
         plaintext = text,
         contentTokens = empty,
-        kind = 1010uL,
+        kind = 1009uL,
         tags = listOf(MessageTagFfi(values = listOf("e", target))),
         recordedAt = at,
         receivedAt = at,

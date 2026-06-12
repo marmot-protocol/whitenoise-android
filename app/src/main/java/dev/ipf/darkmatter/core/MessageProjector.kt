@@ -40,7 +40,7 @@ object MessageProjector {
     private val KindDelete = 5uL
     private val KindReaction = 7uL
     private val KindChat = 9uL
-    private val KindEdit = 1010uL
+    private val KindEdit = 1009uL
     private val KindAgentStreamStart = 1200uL
 
     private const val EventRefTag = "e"

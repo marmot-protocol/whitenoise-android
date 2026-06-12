@@ -96,12 +96,12 @@ data class ChatListItem(
         return when {
             preview.deleted -> copy.deleted
             preview.kind == 1200uL -> preview.plaintext.ifBlank { copy.agentStreamStarted }
-            // Kind-1010 edits are an in-place mutation of an existing
+            // Kind-1009 edits are an in-place mutation of an existing
             // message body; they must not bump the chat-list preview to
             // "edit content" nor reorder the conversation. The original
             // [latest] message stays projected — drop this row's edit
             // payload from the preview text path.
-            preview.kind == 1010uL -> MessageProjector.previewText(latest, copy, empty)
+            preview.kind == 1009uL -> MessageProjector.previewText(latest, copy, empty)
             preview.plaintext.isNotBlank() -> preview.plaintext
             else -> copy.message
         }
@@ -409,7 +409,7 @@ internal fun countUnreadIncoming(
 // network but represent state changes (edits, group system events), not
 // new chat. They never inflate unread counts and never block read-anchor
 // advancement.
-private fun isDerivedStateKind(kind: ULong): Boolean = kind == 1010uL || kind == 1210uL
+private fun isDerivedStateKind(kind: ULong): Boolean = kind == 1009uL || kind == 1210uL
 
 /**
  * Monotonic read-anchor advance. Returns the candidate row's id (the row at
