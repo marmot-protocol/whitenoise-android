@@ -7,12 +7,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
+import dev.ipf.darkmatter.core.EditState
 import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ReactionTally
 import dev.ipf.darkmatter.core.ReplyNavigation
 import dev.ipf.darkmatter.core.TimelineProjector
+import dev.ipf.darkmatter.core.aggregateEdits
 import dev.ipf.darkmatter.media.ByteSizeLruCache
 import dev.ipf.darkmatter.media.MediaPipeline
 import dev.ipf.darkmatter.media.MediaReferenceParser
@@ -94,6 +96,12 @@ data class ChatListItem(
         return when {
             preview.deleted -> copy.deleted
             preview.kind == 1200uL -> preview.plaintext.ifBlank { copy.agentStreamStarted }
+            // Kind-1010 edits are an in-place mutation of an existing
+            // message body; they must not bump the chat-list preview to
+            // "edit content" nor reorder the conversation. The original
+            // [latest] message stays projected — drop this row's edit
+            // payload from the preview text path.
+            preview.kind == 1010uL -> MessageProjector.previewText(latest, copy, empty)
             preview.plaintext.isNotBlank() -> preview.plaintext
             else -> copy.message
         }
@@ -359,7 +367,13 @@ internal fun firstUnreadReceivedIndex(
     if (unreadCount <= 0 || timeline.isEmpty()) return -1
     var seen = 0
     for (index in timeline.indices.reversed()) {
-        if (timeline[index].record.direction == "received") {
+        val record = timeline[index].record
+        // Derived-state rows (kind 1010 edits, 1210 group system events)
+        // arrive as `received` but never count as new chat — skip them so
+        // an avatar change or in-place edit doesn't inflate the unread
+        // badge or shift the "first unread" anchor away from real
+        // messages.
+        if (record.direction == "received" && !isDerivedStateKind(record.kind)) {
             seen += 1
             if (seen == unreadCount) return index
         }
@@ -386,8 +400,16 @@ internal fun countUnreadIncoming(
         readAnchorMessageId?.let { id ->
             timeline.indexOfFirst { it.record.messageIdHex == id }
         } ?: -1
-    return timeline.drop(anchorIdx + 1).count { it.record.direction == "received" }
+    return timeline.drop(anchorIdx + 1).count {
+        it.record.direction == "received" && !isDerivedStateKind(it.record.kind)
+    }
 }
+
+// Derived-state event kinds: rows that arrive as `received` from the
+// network but represent state changes (edits, group system events), not
+// new chat. They never inflate unread counts and never block read-anchor
+// advancement.
+private fun isDerivedStateKind(kind: ULong): Boolean = kind == 1010uL || kind == 1210uL
 
 /**
  * Monotonic read-anchor advance. Returns the candidate row's id (the row at
@@ -1017,6 +1039,18 @@ class ConversationController(
     var deletedMessageIds by mutableStateOf<Set<String>>(emptySet())
         private set
     var replyingTo by mutableStateOf<AppMessageRecordFfi?>(null)
+
+    /** Per-target edit history for kind-1010 events, recomputed on every
+     * timeline publish. The bubble reads `.latestText` and the "(edited · N)"
+     * affordance reads `.count`. Null entry == message never edited. */
+    var editsByTarget by mutableStateOf<Map<String, EditState>>(emptyMap())
+        private set
+
+    /** Set when the user has tapped Edit on a kind-9 they sent — the composer
+     * banner reflects this and the next [send] routes through [editMessage]
+     * instead of producing a new chat. Cleared on submit, cancel, or
+     * navigation away. */
+    var editingMessageId by mutableStateOf<String?>(null)
     var isLoading by mutableStateOf(false)
         private set
     var isLoadingOlder by mutableStateOf(false)
@@ -1279,6 +1313,17 @@ class ConversationController(
         val account = conversationAccountRef ?: return
         if (trimmed.isEmpty()) return
         if (!canSendMessages) return
+
+        // Edit mode short-circuits the normal send path: publish a kind-1010
+        // edit instead, then clear edit state. The bubble's text rebinds
+        // automatically once the kind-1010 echoes back into the timeline and
+        // [editsByTarget] picks it up.
+        val editTarget = editingMessageId
+        if (editTarget != null) {
+            editingMessageId = null
+            editMessage(editTarget, trimmed)
+            return
+        }
 
         val replyTarget = replyingTo?.messageIdHex?.takeIf { it.isNotBlank() }
         val tempId = UUID.randomUUID().toString()
@@ -1631,6 +1676,38 @@ class ConversationController(
             appState.present(R.string.toast_couldnt_delete_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
     }
+
+    /**
+     * Publish a kind-1010 edit replacing the body of [targetMessageId] with
+     * [content]. The runtime enforces the wire-level constraint that the
+     * edit's signer matches the original; recipients re-enforce
+     * client-side via [aggregateEdits]. Trim is applied before send so a
+     * trailing newline from the composer doesn't change the visible body.
+     */
+    suspend fun editMessage(
+        targetMessageId: String,
+        content: String,
+    ) {
+        val account = appState.activeAccountRef ?: return
+        if (!canSendMessages) return
+        val target = targetMessageId.takeIf { it.isNotBlank() } ?: return
+        val trimmed = content.trim()
+        if (trimmed.isEmpty()) return
+        try {
+            appState.marmotIo { editMessage(account, group.groupIdHex, target, trimmed) }
+        } catch (throwable: Throwable) {
+            throwable.rethrowIfCancellation()
+            appState.present(R.string.toast_couldnt_edit_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
+        }
+    }
+
+    /**
+     * Latest text to display for a kind-9 chat row: the most-recent
+     * kind-1010 edit's content when one exists, otherwise the original
+     * plaintext. Bubble + reply preview both read through this so an edit
+     * shows everywhere the original would have.
+     */
+    fun displayedText(record: AppMessageRecordFfi): String = editsByTarget[record.messageIdHex]?.latestText ?: record.plaintext
 
     // Tracks optimistic ids the user discarded while a retry was in flight.
     // The retry coroutine consults this set before re-inserting a failed
@@ -2641,6 +2718,7 @@ class ConversationController(
             (optimisticMessages.values + projected)
                 .distinctBy { it.id }
                 .sortedWith(::compareTimelineMessages)
+        editsByTarget = aggregateEdits(timeline.map { it.record })
     }
 
     private fun nextOptimisticTimelineOrder(): ULong =
