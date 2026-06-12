@@ -113,6 +113,44 @@ class GroupSystemEventsTest {
     }
 
     @Test
+    fun selfActorRendersTheYouForms() {
+        val event = GroupSystemEvents.parse(avatarChangedJson)!!
+
+        assertEquals(
+            "You changed the group avatar",
+            GroupSystemEvents.summary(event, actorName = "Zesty Jaguar", subjectName = null, actorIsSelf = true),
+        )
+    }
+
+    @Test
+    fun selfSubjectRendersTheYouForms() {
+        val added =
+            GroupSystemEvent(
+                systemType = "member_added",
+                text = "",
+                actor = "ef34",
+                subject = "ab12cd",
+                name = null,
+            )
+
+        assertEquals(
+            "alice added you",
+            GroupSystemEvents.summary(added, actorName = "alice", subjectName = "me", subjectIsSelf = true),
+        )
+        assertEquals(
+            "You were added",
+            GroupSystemEvents.summary(added.copy(actor = null), actorName = null, subjectName = "me", subjectIsSelf = true),
+        )
+    }
+
+    @Test
+    fun selfMatchingIsCaseInsensitive() {
+        assertEquals(true, GroupSystemEvents.isSelf("AB12CD", "ab12cd"))
+        assertEquals(false, GroupSystemEvents.isSelf("AB12CD", null))
+        assertEquals(false, GroupSystemEvents.isSelf(null, "ab12cd"))
+    }
+
+    @Test
     fun previewTextIsNameFreePassiveForm() {
         assertEquals("The group avatar changed", GroupSystemEvents.previewText(avatarChangedJson))
         assertEquals("Group updated", GroupSystemEvents.previewText("not json"))

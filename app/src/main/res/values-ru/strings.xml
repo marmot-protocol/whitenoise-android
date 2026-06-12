@@ -473,4 +473,19 @@
     <string name="group_system_avatar_changed_passive">Аватар группы изменён</string>
     <string name="group_system_someone">Кто-то</string>
     <string name="group_system_fallback">Группа обновлена</string>
+    <string name="group_system_you_member_added">Вы добавили %1$s</string>
+    <string name="group_system_member_added_you">%1$s добавил(а) вас</string>
+    <string name="group_system_member_added_you_passive">Вас добавили</string>
+    <string name="group_system_you_member_removed">Вы удалили %1$s</string>
+    <string name="group_system_member_removed_you">%1$s удалил(а) вас</string>
+    <string name="group_system_member_removed_you_passive">Вас удалили</string>
+    <string name="group_system_you_member_left">Вы покинули группу</string>
+    <string name="group_system_you_admin_added">Вы назначили %1$s администратором</string>
+    <string name="group_system_admin_added_you">%1$s назначил(а) вас администратором</string>
+    <string name="group_system_admin_added_you_passive">Теперь вы администратор</string>
+    <string name="group_system_you_admin_removed">Вы сняли %1$s с роли администратора</string>
+    <string name="group_system_admin_removed_you">%1$s снял(а) вас с роли администратора</string>
+    <string name="group_system_admin_removed_you_passive">Вы больше не администратор</string>
+    <string name="group_system_you_renamed">Вы переименовали группу в «%1$s»</string>
+    <string name="group_system_you_avatar_changed">Вы изменили аватар группы</string>
 </resources>

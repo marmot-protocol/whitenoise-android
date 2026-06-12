@@ -467,4 +467,19 @@
     <string name="group_system_avatar_changed_passive">Grup avatarı değiştirildi</string>
     <string name="group_system_someone">Birisi</string>
     <string name="group_system_fallback">Grup güncellendi</string>
+    <string name="group_system_you_member_added">%1$s kişisini eklediniz</string>
+    <string name="group_system_member_added_you">%1$s sizi ekledi</string>
+    <string name="group_system_member_added_you_passive">Eklendiniz</string>
+    <string name="group_system_you_member_removed">%1$s kişisini çıkardınız</string>
+    <string name="group_system_member_removed_you">%1$s sizi çıkardı</string>
+    <string name="group_system_member_removed_you_passive">Çıkarıldınız</string>
+    <string name="group_system_you_member_left">Gruptan ayrıldınız</string>
+    <string name="group_system_you_admin_added">%1$s kişisini yönetici yaptınız</string>
+    <string name="group_system_admin_added_you">%1$s sizi yönetici yaptı</string>
+    <string name="group_system_admin_added_you_passive">Artık yöneticisiniz</string>
+    <string name="group_system_you_admin_removed">%1$s kişisinin yöneticiliğini kaldırdınız</string>
+    <string name="group_system_admin_removed_you">%1$s yöneticiliğinizi kaldırdı</string>
+    <string name="group_system_admin_removed_you_passive">Artık yönetici değilsiniz</string>
+    <string name="group_system_you_renamed">Grubun adını “%1$s” olarak değiştirdiniz</string>
+    <string name="group_system_you_avatar_changed">Grup avatarını değiştirdiniz</string>
 </resources>

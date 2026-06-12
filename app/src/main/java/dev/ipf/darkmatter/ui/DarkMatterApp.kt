@@ -390,6 +390,21 @@ private fun rememberGroupSystemCopy(): GroupSystemCopy =
         renamedPassiveFormat = stringResource(R.string.group_system_renamed_passive),
         avatarChangedFormat = stringResource(R.string.group_system_avatar_changed),
         avatarChangedPassive = stringResource(R.string.group_system_avatar_changed_passive),
+        youMemberAddedFormat = stringResource(R.string.group_system_you_member_added),
+        memberAddedYouFormat = stringResource(R.string.group_system_member_added_you),
+        memberAddedYouPassive = stringResource(R.string.group_system_member_added_you_passive),
+        youMemberRemovedFormat = stringResource(R.string.group_system_you_member_removed),
+        memberRemovedYouFormat = stringResource(R.string.group_system_member_removed_you),
+        memberRemovedYouPassive = stringResource(R.string.group_system_member_removed_you_passive),
+        youMemberLeft = stringResource(R.string.group_system_you_member_left),
+        youAdminAddedFormat = stringResource(R.string.group_system_you_admin_added),
+        adminAddedYouFormat = stringResource(R.string.group_system_admin_added_you),
+        adminAddedYouPassive = stringResource(R.string.group_system_admin_added_you_passive),
+        youAdminRemovedFormat = stringResource(R.string.group_system_you_admin_removed),
+        adminRemovedYouFormat = stringResource(R.string.group_system_admin_removed_you),
+        adminRemovedYouPassive = stringResource(R.string.group_system_admin_removed_you_passive),
+        youRenamedFormat = stringResource(R.string.group_system_you_renamed),
+        youAvatarChanged = stringResource(R.string.group_system_you_avatar_changed),
         someone = stringResource(R.string.group_system_someone),
         fallback = stringResource(R.string.group_system_fallback),
     )
@@ -3536,12 +3551,18 @@ private fun GroupSystemRow(
     val event = remember(record.plaintext) { GroupSystemEvents.parse(record.plaintext) }
     val summary =
         if (event != null) {
-            GroupSystemEvents.summary(
-                event = event,
-                actorName = GroupSystemEvents.actorHex(event, record.sender)?.let { appState.displayName(it) },
-                subjectName = event.subject?.let { appState.displayName(it) },
-                copy = copy,
-            )
+            run {
+                val selfHex = appState.activeAccount?.accountIdHex
+                val actorHex = GroupSystemEvents.actorHex(event, record.sender)
+                GroupSystemEvents.summary(
+                    event = event,
+                    actorName = actorHex?.let { appState.displayName(it) },
+                    subjectName = event.subject?.let { appState.displayName(it) },
+                    actorIsSelf = GroupSystemEvents.isSelf(selfHex, actorHex),
+                    subjectIsSelf = GroupSystemEvents.isSelf(selfHex, event.subject),
+                    copy = copy,
+                )
+            }
         } else {
             copy.fallback
         }

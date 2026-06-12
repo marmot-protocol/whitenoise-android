@@ -464,4 +464,19 @@
     <string name="group_system_avatar_changed_passive">群组头像已更换</string>
     <string name="group_system_someone">有人</string>
     <string name="group_system_fallback">群组已更新</string>
+    <string name="group_system_you_member_added">你添加了 %1$s</string>
+    <string name="group_system_member_added_you">%1$s 添加了你</string>
+    <string name="group_system_member_added_you_passive">你已被添加</string>
+    <string name="group_system_you_member_removed">你移除了 %1$s</string>
+    <string name="group_system_member_removed_you">%1$s 移除了你</string>
+    <string name="group_system_member_removed_you_passive">你已被移除</string>
+    <string name="group_system_you_member_left">你退出了群组</string>
+    <string name="group_system_you_admin_added">你将 %1$s 设为管理员</string>
+    <string name="group_system_admin_added_you">%1$s 将你设为管理员</string>
+    <string name="group_system_admin_added_you_passive">你已成为管理员</string>
+    <string name="group_system_you_admin_removed">你取消了 %1$s 的管理员身份</string>
+    <string name="group_system_admin_removed_you">%1$s 取消了你的管理员身份</string>
+    <string name="group_system_admin_removed_you_passive">你不再是管理员</string>
+    <string name="group_system_you_renamed">你将群组名称改为“%1$s”</string>
+    <string name="group_system_you_avatar_changed">你更换了群组头像</string>
 </resources>

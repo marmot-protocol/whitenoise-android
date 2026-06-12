@@ -467,4 +467,19 @@
     <string name="group_system_avatar_changed_passive">La imagen del grupo cambió</string>
     <string name="group_system_someone">Alguien</string>
     <string name="group_system_fallback">Grupo actualizado</string>
+    <string name="group_system_you_member_added">Añadiste a %1$s</string>
+    <string name="group_system_member_added_you">%1$s te añadió</string>
+    <string name="group_system_member_added_you_passive">Te añadieron</string>
+    <string name="group_system_you_member_removed">Eliminaste a %1$s</string>
+    <string name="group_system_member_removed_you">%1$s te eliminó</string>
+    <string name="group_system_member_removed_you_passive">Te eliminaron</string>
+    <string name="group_system_you_member_left">Saliste del grupo</string>
+    <string name="group_system_you_admin_added">Hiciste administrador a %1$s</string>
+    <string name="group_system_admin_added_you">%1$s te hizo administrador</string>
+    <string name="group_system_admin_added_you_passive">Ahora eres administrador</string>
+    <string name="group_system_you_admin_removed">Quitaste a %1$s como administrador</string>
+    <string name="group_system_admin_removed_you">%1$s te quitó como administrador</string>
+    <string name="group_system_admin_removed_you_passive">Ya no eres administrador</string>
+    <string name="group_system_you_renamed">Cambiaste el nombre del grupo a “%1$s”</string>
+    <string name="group_system_you_avatar_changed">Cambiaste la imagen del grupo</string>
 </resources>
