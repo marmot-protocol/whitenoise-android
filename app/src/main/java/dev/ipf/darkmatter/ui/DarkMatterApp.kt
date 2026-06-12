@@ -3616,8 +3616,20 @@ private fun ConversationScreen(
     val context = LocalContext.current
     val groupTitleCopy = rememberGroupTitleCopy()
     val messageTextCopy = rememberMessageTextCopy()
+    // Seeded empty and populated off the Main thread: the first access to a
+    // SharedPreferences file blocks on disk, and doing that inside composition
+    // stalls the conversation screen's first frame. See #147.
     var recentReactionEmojis by remember(context) {
-        mutableStateOf(RecentEmojiPreferences.load(context))
+        mutableStateOf(emptyList<String>())
+    }
+    LaunchedEffect(context) {
+        val loaded = withContext(Dispatchers.IO) { RecentEmojiPreferences.load(context) }
+        // A pick made before this load lands has already merged the disk list
+        // (recordPicked re-reads prefs), so a non-empty state is strictly newer
+        // — don't clobber it with the stale read.
+        if (recentReactionEmojis.isEmpty()) {
+            recentReactionEmojis = loaded
+        }
     }
     // Selected-but-not-yet-sent image attachments: when non-empty the preview
     // / caption sheet is shown. Multi-pick goes through
@@ -4145,8 +4157,13 @@ private fun ConversationScreen(
                                     appState = appState,
                                     highlighted = item.record.messageIdHex == highlightedMessageId,
                                     recentReactionEmojis = recentReactionEmojis,
-                                    onReactionEmojiPicked = ::recordReactionEmoji,
-                                    onReplyPreviewClick = ::navigateToReplyTarget,
+                                    // Lambdas, not method references: the Compose
+                                    // compiler memoizes lambdas but allocates a fresh
+                                    // function reference per recomposition, which made
+                                    // every visible bubble recompose on any timeline
+                                    // change. See #110.
+                                    onReactionEmojiPicked = { recordReactionEmoji(it) },
+                                    onReplyPreviewClick = { navigateToReplyTarget(it) },
                                 )
                             }
                             item { Spacer(Modifier.height(8.dp)) }
@@ -5448,23 +5465,30 @@ private fun MessageBubble(
     val replySwipeThresholdPx = with(density) { 64.dp.toPx() }
     val maxSwipeOffsetPx = with(density) { 72.dp.toPx() }
     val messageTextCopy = rememberMessageTextCopy()
+    val deletedBodyText = stringResource(R.string.message_deleted)
+    val invalidatedBodyText = stringResource(R.string.message_invalidated)
+    // Cached like the media references below: displayBody sanitizes/allocates
+    // per call, and recomputing it for every visible bubble on every timeline
+    // recomposition adds up. See #131.
     val displayedBody =
-        if (deleted) {
-            // Check `deleted` first so the optimistic tombstone (from
-            // controller.deletedMessageIds) renders immediately on tap. Otherwise
-            // the projected branch runs against the stale Rust-side `deleted`
-            // flag and the bubble keeps showing the original body until the
-            // delete echo arrives.
-            stringResource(R.string.message_deleted)
-        } else if (invalidated) {
-            stringResource(R.string.message_invalidated)
-        } else if (item.projected != null) {
-            TimelineProjector.displayBody(
-                item.projected,
-                messageTextCopy.copy(deleted = stringResource(R.string.message_deleted)),
-            )
-        } else {
-            MessageProjector.displayBody(record, messageTextCopy)
+        remember(item, deleted, invalidated, messageTextCopy, deletedBodyText, invalidatedBodyText) {
+            if (deleted) {
+                // Check `deleted` first so the optimistic tombstone (from
+                // controller.deletedMessageIds) renders immediately on tap. Otherwise
+                // the projected branch runs against the stale Rust-side `deleted`
+                // flag and the bubble keeps showing the original body until the
+                // delete echo arrives.
+                deletedBodyText
+            } else if (invalidated) {
+                invalidatedBodyText
+            } else if (item.projected != null) {
+                TimelineProjector.displayBody(
+                    item.projected,
+                    messageTextCopy.copy(deleted = deletedBodyText),
+                )
+            } else {
+                MessageProjector.displayBody(record, messageTextCopy)
+            }
         }
     val showSenderAvatar =
         GroupProjector.shouldShowTranscriptSenderAvatar(
@@ -5577,14 +5601,34 @@ private fun MessageBubble(
                                     ),
                             )
                         }
-                        controller.replyPreview(item, messageTextCopy)?.let { (name, body) ->
+                        // Projected items: the preview is a pure function of
+                        // item.projected, so caching keyed on the item is always
+                        // correct (a reprojection replaces the instance). The
+                        // optimistic fallback instead resolves the target from
+                        // controller.messageById, which can gain the target after
+                        // this bubble composes — resolve those live. Display names
+                        // resolve outside the cache either way so a late profile
+                        // load still updates them. See #131.
+                        val replyPreview =
+                            if (item.projected != null) {
+                                remember(item, messageTextCopy) {
+                                    controller.replyPreview(item, messageTextCopy)
+                                }
+                            } else {
+                                controller.replyPreview(item, messageTextCopy)
+                            }
+                        replyPreview?.let { (replySender, body) ->
                             Surface(
                                 modifier = Modifier.clickable { onReplyPreviewClick(item) },
                                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
                                 shape = RoundedCornerShape(10.dp),
                             ) {
                                 Column(Modifier.padding(8.dp)) {
-                                    Text(name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        appState.displayName(replySender),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
                                     Text(body, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 }
                             }

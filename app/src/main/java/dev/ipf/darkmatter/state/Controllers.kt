@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.state
 
 import android.util.Log
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -260,6 +261,10 @@ fun MessageStatus.outgoingIndicator(): OutgoingMessageIndicator? =
         MessageStatus.Streaming -> null
     }
 
+// Immutable so MessageBubble's `item` param is stable and bubbles can skip
+// recomposition; the UniFFI record types are all-val data classes but carry
+// no Compose stability information on their own. See #110.
+@Immutable
 data class TimelineMessage(
     val id: String,
     val record: AppMessageRecordFfi,
@@ -2255,18 +2260,23 @@ class ConversationController(
         return streamIds
     }
 
+    /**
+     * Resolved reply target as (sender pubkey, display body). Returns the raw
+     * sender — not a display name — so the caller can cache this projection in
+     * `remember` while name resolution stays live for late profile loads.
+     */
     fun replyPreview(
         item: TimelineMessage,
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): Pair<String, String>? {
         item.projected?.let { record ->
             TimelineProjector.replyPreview(record, copy)?.let { preview ->
-                return appState.displayName(preview.sender) to preview.body
+                return preview.sender to preview.body
             }
         }
         val targetMessageId = MessageProjector.replyTargetMessageId(item.record) ?: return null
         val target = messageById[targetMessageId] ?: return null
-        return appState.displayName(target.sender) to MessageProjector.displayBody(target, copy)
+        return target.sender to MessageProjector.displayBody(target, copy)
     }
 
     private fun applyTimelinePage(
@@ -2642,7 +2652,10 @@ class ConversationController(
             ?: 1uL
 
     private fun recomputeReactions() {
-        val mine = appState.activeAccount?.accountIdHex
+        // Lowercased to match baseReactionSenders(): hex account-id casing can
+        // drift between the active account and reaction senders, and a mismatch
+        // would render your own reaction as not-mine. See #143.
+        val mine = appState.activeAccount?.accountIdHex?.lowercase()
         val sendersByTarget = baseReactionSenders()
         if (mine != null) {
             optimisticReactionChanges.values.forEach { change ->
@@ -2692,10 +2705,12 @@ class ConversationController(
     }
 
     private fun reactionTalliesFor(targetMessageId: String): List<ReactionTally> {
-        val mine = appState.activeAccount?.accountIdHex
+        // Lowercased sender sets for the same casing-drift reason as
+        // recomputeReactions(). See #143.
+        val mine = appState.activeAccount?.accountIdHex?.lowercase()
         val sendersByEmoji = linkedMapOf<String, MutableSet<String>>()
         timelineRecords[targetMessageId]?.reactions?.byEmoji?.forEach { summary ->
-            sendersByEmoji.getOrPut(summary.emoji) { linkedSetOf() }.addAll(summary.senders)
+            sendersByEmoji.getOrPut(summary.emoji) { linkedSetOf() }.addAll(summary.senders.map { it.lowercase() })
         }
         if (mine != null) {
             optimisticReactionChanges.values
@@ -2772,7 +2787,9 @@ class ConversationController(
         timelineRecords.values.forEach { record ->
             val byEmoji = result.getOrPut(record.messageIdHex) { linkedMapOf() }
             record.reactions.byEmoji.forEach { summary ->
-                byEmoji.getOrPut(summary.emoji) { linkedSetOf() }.addAll(summary.senders)
+                // Lowercased so the optimistic add/remove and the `mine` check in
+                // recomputeReactions() match regardless of casing drift. See #143.
+                byEmoji.getOrPut(summary.emoji) { linkedSetOf() }.addAll(summary.senders.map { it.lowercase() })
             }
         }
         return result
@@ -3007,14 +3024,27 @@ class ConversationController(
                 // against the new text. Empty falls back to plain rendering.
                 contentTokens = tokens ?: MarkdownDocumentFfi(blocks = emptyList()),
             )
-        optimisticMessages[id] =
+        val updated =
             TimelineMessage(
                 id,
                 record,
                 status,
                 timelineOrder = existingItem?.timelineOrder ?: nextOptimisticTimelineOrder(),
             )
-        publishTimelineFromIndexes()
+        optimisticMessages[id] = updated
+        // A streaming chunk only mutates this one item's text, and none of its
+        // sort keys (recordedAt, timelineOrder, id) change across chunks — so
+        // its timeline slot is fixed. Replace the slot in place instead of
+        // rebuilding + re-sorting the whole timeline per chunk on the Main
+        // thread. Finished/Failed (and the first chunk, which has no slot yet)
+        // take the full publish so status-driven reconciliation stays on the
+        // canonical path. See #145.
+        val slot = if (status == MessageStatus.Streaming) timeline.indexOfFirst { it.id == id } else -1
+        if (slot >= 0) {
+            timeline = timeline.toMutableList().apply { set(slot, updated) }
+        } else {
+            publishTimelineFromIndexes()
+        }
     }
 
     // The authoritative sender for a stream comes from the projected timeline

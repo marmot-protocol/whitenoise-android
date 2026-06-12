@@ -99,8 +99,11 @@ object MessageProjector {
                         val target = firstEventRef(record) ?: return@forEach
                         val emoji = record.plaintext
                         if (target != targetMessageId || emoji.isBlank()) return@forEach
-                        reactionById[record.messageIdHex] = ReactionRecord(target, emoji, record.sender)
-                        sendersByEmoji.getOrPut(emoji) { linkedSetOf() }.add(record.sender)
+                        // Senders are stored lowercased: hex account-id casing can
+                        // drift between events, and a case-variant duplicate would
+                        // double-count or break the remove path below.
+                        reactionById[record.messageIdHex] = ReactionRecord(target, emoji, record.sender.lowercase())
+                        sendersByEmoji.getOrPut(emoji) { linkedSetOf() }.add(record.sender.lowercase())
                     }
                     isDelete(record) -> {
                         for (deletedId in deletedTargetMessageIds(record)) {
@@ -109,7 +112,7 @@ object MessageProjector {
                                 sendersByEmoji[deletedReaction.emoji]?.remove(deletedReaction.sender)
                             } else if (deletedId == targetMessageId) {
                                 for (senders in sendersByEmoji.values) {
-                                    senders.remove(record.sender)
+                                    senders.remove(record.sender.lowercase())
                                 }
                             }
                         }
@@ -125,7 +128,8 @@ object MessageProjector {
                     ReactionTally(
                         emoji = emoji,
                         count = senders.size,
-                        mine = myAccountId != null && senders.contains(myAccountId),
+                        // Case-insensitive: see TimelineProjector.reactionTallies.
+                        mine = myAccountId != null && senders.contains(myAccountId.lowercase()),
                     )
                 }
             }.sortedWith(

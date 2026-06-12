@@ -31,6 +31,23 @@ class MessageProjectorTest {
     }
 
     @Test
+    fun reactionTalliesMatchSendersCaseInsensitively() {
+        val records =
+            listOf(
+                reaction("r1", sender = "AB12CD", target = "m1", emoji = "👍", at = 1u),
+                reaction("r2", sender = "ab12cd", target = "m1", emoji = "❤️", at = 2u),
+                delete("d1", sender = "AB12CD", target = "m1", at = 3u),
+                reaction("r4", sender = "AB12CD", target = "m1", emoji = "🔥", at = 4u),
+            )
+
+        val tallies = MessageProjector.reactionTallies(records, targetMessageId = "m1", myAccountId = "Ab12Cd")
+
+        // The target-delete tombstone must clear both case spellings, and the
+        // surviving reaction must read as mine despite the casing drift.
+        assertEquals(listOf(ReactionTally(emoji = "🔥", count = 1, mine = true)), tallies)
+    }
+
+    @Test
     fun displayBodyUsesTextAndMediaTagsFromCurrentBindings() {
         val reply =
             message(
