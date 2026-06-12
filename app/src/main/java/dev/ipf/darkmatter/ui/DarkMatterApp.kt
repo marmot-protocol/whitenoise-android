@@ -235,6 +235,8 @@ import dev.ipf.darkmatter.core.AvatarImageLoader
 import dev.ipf.darkmatter.core.DiagnosticFormatter
 import dev.ipf.darkmatter.core.EditState
 import dev.ipf.darkmatter.core.GroupProjector
+import dev.ipf.darkmatter.core.GroupSystemCopy
+import dev.ipf.darkmatter.core.GroupSystemEvents
 import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MessageProjector
@@ -369,6 +371,27 @@ private fun rememberMessageTextCopy(): MessageTextCopy =
         streamFinished = stringResource(R.string.stream_finished),
         mediaAttachment = stringResource(R.string.media_attachment),
         message = stringResource(R.string.generic_message),
+        groupSystem = rememberGroupSystemCopy(),
+    )
+
+@Composable
+private fun rememberGroupSystemCopy(): GroupSystemCopy =
+    GroupSystemCopy(
+        memberAddedFormat = stringResource(R.string.group_system_member_added),
+        memberAddedPassiveFormat = stringResource(R.string.group_system_member_added_passive),
+        memberRemovedFormat = stringResource(R.string.group_system_member_removed),
+        memberRemovedPassiveFormat = stringResource(R.string.group_system_member_removed_passive),
+        memberLeftFormat = stringResource(R.string.group_system_member_left),
+        adminAddedFormat = stringResource(R.string.group_system_admin_added),
+        adminAddedPassiveFormat = stringResource(R.string.group_system_admin_added_passive),
+        adminRemovedFormat = stringResource(R.string.group_system_admin_removed),
+        adminRemovedPassiveFormat = stringResource(R.string.group_system_admin_removed_passive),
+        renamedFormat = stringResource(R.string.group_system_renamed),
+        renamedPassiveFormat = stringResource(R.string.group_system_renamed_passive),
+        avatarChangedFormat = stringResource(R.string.group_system_avatar_changed),
+        avatarChangedPassive = stringResource(R.string.group_system_avatar_changed_passive),
+        someone = stringResource(R.string.group_system_someone),
+        fallback = stringResource(R.string.group_system_fallback),
     )
 
 @Composable
@@ -3498,6 +3521,53 @@ private fun UnreadMessagesDivider(count: Int) {
 }
 
 /**
+ * Centered one-line row for a kind-1210 group system event ("%s changed the
+ * group avatar", membership changes, renames). Rendered from `system_type` +
+ * `data` with display names resolved live — [DarkMatterAppState.displayName]
+ * reads the profile revision, so the row re-renders when a name loads. An
+ * unparseable payload renders the generic fallback, never the raw content.
+ */
+@Composable
+private fun GroupSystemRow(
+    record: AppMessageRecordFfi,
+    appState: DarkMatterAppState,
+) {
+    val copy = rememberGroupSystemCopy()
+    val event = remember(record.plaintext) { GroupSystemEvents.parse(record.plaintext) }
+    val summary =
+        if (event != null) {
+            GroupSystemEvents.summary(
+                event = event,
+                actorName = event.actor?.let { appState.displayName(it) },
+                subjectName = event.subject?.let { appState.displayName(it) },
+                copy = copy,
+            )
+        } else {
+            copy.fallback
+        }
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = summary,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier =
+                Modifier
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                    ).padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+    }
+}
+
+/**
  * Shared definition of "user is at (or near) the newest message". Used both
  * by the auto-scroll LaunchedEffect (issue #59) and the jump-to-newest FAB
  * so they can't disagree on the threshold.
@@ -4212,6 +4282,13 @@ private fun ConversationScreen(
                             items(renderedTimeline, key = { it.id }) { item ->
                                 if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
                                     UnreadMessagesDivider(count = entryUnreadCount)
+                                }
+                                // Group system rows (kind 1210) are derived state
+                                // facts, not chat: render the centered summary row,
+                                // never a bubble with the raw JSON content.
+                                if (MessageProjector.isGroupSystem(item.record)) {
+                                    GroupSystemRow(record = item.record, appState = appState)
+                                    return@items
                                 }
                                 MessageBubble(
                                     item = item,
