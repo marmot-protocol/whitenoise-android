@@ -2260,18 +2260,23 @@ class ConversationController(
         return streamIds
     }
 
+    /**
+     * Resolved reply target as (sender pubkey, display body). Returns the raw
+     * sender — not a display name — so the caller can cache this projection in
+     * `remember` while name resolution stays live for late profile loads.
+     */
     fun replyPreview(
         item: TimelineMessage,
         copy: MessageTextCopy = MessageTextCopy.Default,
     ): Pair<String, String>? {
         item.projected?.let { record ->
             TimelineProjector.replyPreview(record, copy)?.let { preview ->
-                return appState.displayName(preview.sender) to preview.body
+                return preview.sender to preview.body
             }
         }
         val targetMessageId = MessageProjector.replyTargetMessageId(item.record) ?: return null
         val target = messageById[targetMessageId] ?: return null
-        return appState.displayName(target.sender) to MessageProjector.displayBody(target, copy)
+        return target.sender to MessageProjector.displayBody(target, copy)
     }
 
     private fun applyTimelinePage(

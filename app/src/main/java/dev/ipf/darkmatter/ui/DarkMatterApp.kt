@@ -5459,23 +5459,30 @@ private fun MessageBubble(
     val replySwipeThresholdPx = with(density) { 64.dp.toPx() }
     val maxSwipeOffsetPx = with(density) { 72.dp.toPx() }
     val messageTextCopy = rememberMessageTextCopy()
+    val deletedBodyText = stringResource(R.string.message_deleted)
+    val invalidatedBodyText = stringResource(R.string.message_invalidated)
+    // Cached like the media references below: displayBody sanitizes/allocates
+    // per call, and recomputing it for every visible bubble on every timeline
+    // recomposition adds up. See #131.
     val displayedBody =
-        if (deleted) {
-            // Check `deleted` first so the optimistic tombstone (from
-            // controller.deletedMessageIds) renders immediately on tap. Otherwise
-            // the projected branch runs against the stale Rust-side `deleted`
-            // flag and the bubble keeps showing the original body until the
-            // delete echo arrives.
-            stringResource(R.string.message_deleted)
-        } else if (invalidated) {
-            stringResource(R.string.message_invalidated)
-        } else if (item.projected != null) {
-            TimelineProjector.displayBody(
-                item.projected,
-                messageTextCopy.copy(deleted = stringResource(R.string.message_deleted)),
-            )
-        } else {
-            MessageProjector.displayBody(record, messageTextCopy)
+        remember(item, deleted, invalidated, messageTextCopy, deletedBodyText, invalidatedBodyText) {
+            if (deleted) {
+                // Check `deleted` first so the optimistic tombstone (from
+                // controller.deletedMessageIds) renders immediately on tap. Otherwise
+                // the projected branch runs against the stale Rust-side `deleted`
+                // flag and the bubble keeps showing the original body until the
+                // delete echo arrives.
+                deletedBodyText
+            } else if (invalidated) {
+                invalidatedBodyText
+            } else if (item.projected != null) {
+                TimelineProjector.displayBody(
+                    item.projected,
+                    messageTextCopy.copy(deleted = deletedBodyText),
+                )
+            } else {
+                MessageProjector.displayBody(record, messageTextCopy)
+            }
         }
     val showSenderAvatar =
         GroupProjector.shouldShowTranscriptSenderAvatar(
@@ -5588,14 +5595,26 @@ private fun MessageBubble(
                                     ),
                             )
                         }
-                        controller.replyPreview(item, messageTextCopy)?.let { (name, body) ->
+                        // Projection cached per item (a projection change replaces
+                        // the item instance, invalidating the key); the display
+                        // name resolves outside the cache so a late profile load
+                        // still updates it. See #131.
+                        val replyPreview =
+                            remember(item, messageTextCopy) {
+                                controller.replyPreview(item, messageTextCopy)
+                            }
+                        replyPreview?.let { (replySender, body) ->
                             Surface(
                                 modifier = Modifier.clickable { onReplyPreviewClick(item) },
                                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
                                 shape = RoundedCornerShape(10.dp),
                             ) {
                                 Column(Modifier.padding(8.dp)) {
-                                    Text(name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        appState.displayName(replySender),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
                                     Text(body, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 }
                             }
