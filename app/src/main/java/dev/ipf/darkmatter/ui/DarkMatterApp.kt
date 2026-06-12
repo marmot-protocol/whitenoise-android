@@ -4151,8 +4151,13 @@ private fun ConversationScreen(
                                     appState = appState,
                                     highlighted = item.record.messageIdHex == highlightedMessageId,
                                     recentReactionEmojis = recentReactionEmojis,
-                                    onReactionEmojiPicked = ::recordReactionEmoji,
-                                    onReplyPreviewClick = ::navigateToReplyTarget,
+                                    // Lambdas, not method references: the Compose
+                                    // compiler memoizes lambdas but allocates a fresh
+                                    // function reference per recomposition, which made
+                                    // every visible bubble recompose on any timeline
+                                    // change. See #110.
+                                    onReactionEmojiPicked = { recordReactionEmoji(it) },
+                                    onReplyPreviewClick = { navigateToReplyTarget(it) },
                                 )
                             }
                             item { Spacer(Modifier.height(8.dp)) }

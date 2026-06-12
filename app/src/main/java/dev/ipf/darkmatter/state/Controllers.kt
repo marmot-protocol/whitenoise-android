@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.state
 
 import android.util.Log
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -260,6 +261,10 @@ fun MessageStatus.outgoingIndicator(): OutgoingMessageIndicator? =
         MessageStatus.Streaming -> null
     }
 
+// Immutable so MessageBubble's `item` param is stable and bubbles can skip
+// recomposition; the UniFFI record types are all-val data classes but carry
+// no Compose stability information on their own. See #110.
+@Immutable
 data class TimelineMessage(
     val id: String,
     val record: AppMessageRecordFfi,
