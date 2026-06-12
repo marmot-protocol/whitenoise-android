@@ -230,6 +230,7 @@ import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.AvatarImageLoader
 import dev.ipf.darkmatter.core.DiagnosticFormatter
+import dev.ipf.darkmatter.core.EditState
 import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
@@ -4158,6 +4159,15 @@ private fun ConversationScreen(
                                 if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
                                     UnreadMessagesDivider(count = entryUnreadCount)
                                 }
+                                // Kind-1009 edit events are derived state, not chat.
+                                // They mutate the original message's body via
+                                // [ConversationController.editsByTarget] and must
+                                // not render as a standalone bubble — otherwise
+                                // every edit creates a phantom row carrying the
+                                // replacement text.
+                                if (MessageProjector.isEdit(item.record)) {
+                                    return@items
+                                }
                                 MessageBubble(
                                     item = item,
                                     controller = controller,
@@ -5519,6 +5529,7 @@ private fun MessageBubble(
         }
     var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var infoSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    var editHistoryOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var reactionSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     val quickReactionEmojis = RecentEmojiList.quickChoices(recentReactionEmojis)
 
@@ -5789,6 +5800,23 @@ private fun MessageBubble(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = timestampColor,
                             )
+                            // "(edited · N)" affordance. Renders only on
+                            // unedited rows whose original is still a
+                            // displayable chat kind (kind 9). Tap opens the
+                            // history modal listing each version + timestamp.
+                            if (editState != null && record.kind == 9uL && !deleted && !invalidated) {
+                                Text(
+                                    text =
+                                        if (editState.count > 1) {
+                                            stringResource(R.string.edited_count, editState.count)
+                                        } else {
+                                            stringResource(R.string.edited)
+                                        },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = timestampColor,
+                                    modifier = Modifier.clickable { editHistoryOpen = true },
+                                )
+                            }
                             if (mine) {
                                 OutgoingMessageStatusIcon(item.status, tint = timestampColor)
                             }
@@ -5862,6 +5890,14 @@ private fun MessageBubble(
                             emojiPickerOpen = false
                             reactWithEmoji(emoji)
                         },
+                    )
+                }
+                if (editHistoryOpen && editState != null) {
+                    EditHistorySheet(
+                        original = record.plaintext,
+                        originalTimestamp = record.recordedAt,
+                        editState = editState,
+                        onDismissRequest = { editHistoryOpen = false },
                     )
                 }
                 if (infoSheetOpen) {
@@ -6050,6 +6086,75 @@ private fun ReactionParticipantRow(
             text = participant.emoji,
             style = MaterialTheme.typography.headlineSmall,
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditHistorySheet(
+    original: String,
+    originalTimestamp: ULong,
+    editState: EditState,
+    onDismissRequest: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Newest first matches what the user just tapped on — the most recent
+    // edit is the body they were looking at — and original sits at the
+    // bottom so the chronology reads as "this is what's shown now ←
+    // earlier revisions ← original".
+    val rows =
+        remember(original, originalTimestamp, editState) {
+            buildList {
+                editState.versions
+                    .reversed()
+                    .forEachIndexed { reversedIndex, version ->
+                        val versionNumber = editState.versions.size - reversedIndex
+                        add(Triple(versionNumber, version.text, version.recordedAt))
+                    }
+                add(Triple(0, original, originalTimestamp))
+            }
+        }
+    ModalBottomSheet(onDismissRequest = onDismissRequest, sheetState = sheetState) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.edit_history),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            rows.forEach { (versionNumber, text, recordedAt) ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text =
+                                if (versionNumber == 0) {
+                                    stringResource(R.string.edit_history_original)
+                                } else {
+                                    stringResource(R.string.edit_history_version_label, versionNumber)
+                                },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = IdentityFormatter.relativeTime(recordedAt),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
     }
 }
 
