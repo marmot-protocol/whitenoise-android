@@ -157,7 +157,7 @@ object MessageProjector {
     fun isEdit(message: AppMessageRecordFfi): Boolean = message.kind == KindEdit
 
     /**
-     * For a kind-1010 edit record, the target message id from its single
+     * For a kind-1009 edit record, the target message id from its single
      * `e` tag, or null when malformed/missing. Use this to route an edit
      * back to the message it replaces; never derive an edit target from
      * any other tag — spec wire format pins the reference to `e`.

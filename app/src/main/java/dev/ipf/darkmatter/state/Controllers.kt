@@ -368,7 +368,7 @@ internal fun firstUnreadReceivedIndex(
     var seen = 0
     for (index in timeline.indices.reversed()) {
         val record = timeline[index].record
-        // Derived-state rows (kind 1010 edits, 1210 group system events)
+        // Derived-state rows (kind 1009 edits, 1210 group system events)
         // arrive as `received` but never count as new chat — skip them so
         // an avatar change or in-place edit doesn't inflate the unread
         // badge or shift the "first unread" anchor away from real
@@ -1040,7 +1040,7 @@ class ConversationController(
         private set
     var replyingTo by mutableStateOf<AppMessageRecordFfi?>(null)
 
-    /** Per-target edit history for kind-1010 events, recomputed on every
+    /** Per-target edit history for kind-1009 events, recomputed on every
      * timeline publish. The bubble reads `.latestText` and the "(edited · N)"
      * affordance reads `.count`. Null entry == message never edited. */
     var editsByTarget by mutableStateOf<Map<String, EditState>>(emptyMap())
@@ -1314,9 +1314,9 @@ class ConversationController(
         if (trimmed.isEmpty()) return
         if (!canSendMessages) return
 
-        // Edit mode short-circuits the normal send path: publish a kind-1010
+        // Edit mode short-circuits the normal send path: publish a kind-1009
         // edit instead, then clear edit state. The bubble's text rebinds
-        // automatically once the kind-1010 echoes back into the timeline and
+        // automatically once the kind-1009 echoes back into the timeline and
         // [editsByTarget] picks it up.
         val editTarget = editingMessageId
         if (editTarget != null) {
@@ -1678,7 +1678,7 @@ class ConversationController(
     }
 
     /**
-     * Publish a kind-1010 edit replacing the body of [targetMessageId] with
+     * Publish a kind-1009 edit replacing the body of [targetMessageId] with
      * [content]. The runtime enforces the wire-level constraint that the
      * edit's signer matches the original; recipients re-enforce
      * client-side via [aggregateEdits]. Trim is applied before send so a
@@ -1703,7 +1703,7 @@ class ConversationController(
 
     /**
      * Latest text to display for a kind-9 chat row: the most-recent
-     * kind-1010 edit's content when one exists, otherwise the original
+     * kind-1009 edit's content when one exists, otherwise the original
      * plaintext. Bubble + reply preview both read through this so an edit
      * shows everywhere the original would have.
      */

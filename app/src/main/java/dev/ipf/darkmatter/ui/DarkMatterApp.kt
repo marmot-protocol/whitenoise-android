@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -200,6 +201,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -207,6 +209,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -3896,9 +3899,19 @@ private fun ConversationScreen(
         initialTimelineLoadStarted = true
         controller.start()
     }
-    val latestTimelineItemId = controller.timeline.lastOrNull()?.id
+    // Edits (kind-1009) are derived state, not chat — they mutate the
+    // original message's body via [editsByTarget] and must not occupy a slot
+    // in the lazy list. A naive `return@items` still reserves the slot, which
+    // (combined with `Arrangement.spacedBy`) leaves a visible gap. Filter
+    // them out up front and base every index/scroll calculation on the
+    // filtered list so what we count matches what we render.
+    val renderedTimeline =
+        remember(controller.timeline) {
+            controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        }
+    val latestTimelineItemId = renderedTimeline.lastOrNull()?.id
     val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-    val bottomTimelineIndex = controller.timeline.size + 1 + olderHeaderCount
+    val bottomTimelineIndex = renderedTimeline.size + 1 + olderHeaderCount
     // Capture the unread boundary at chat open. Stays fixed for the lifetime
     // of this composable (per chat.id) so the "N unread messages" divider
     // doesn't keep moving as the user scrolls and marks messages as read.
@@ -3908,6 +3921,9 @@ private fun ConversationScreen(
         if (entryFirstUnreadMessageId == null && entryUnreadCount > 0) {
             val firstUnreadIndex = controller.firstUnreadTimelineIndex(entryUnreadCount)
             if (firstUnreadIndex >= 0) {
+                // Controller-side unread helpers already skip derived-state
+                // kinds, so this is always a kind-9 chat present in the
+                // filtered renderedTimeline.
                 entryFirstUnreadMessageId =
                     controller.timeline[firstUnreadIndex]
                         .record.messageIdHex
@@ -3916,16 +3932,28 @@ private fun ConversationScreen(
         }
     }
     LaunchedEffect(latestTimelineItemId, imeBottom) {
-        if (controller.timeline.isNotEmpty()) {
+        if (renderedTimeline.isNotEmpty()) {
             if (!initialTimelineAnchored) {
                 // First-time anchor on chat open. If there are unread
                 // messages, land at the first unread one so the user can
                 // read forward from there; otherwise drop them at the
-                // newest message.
-                val firstUnreadTimelineIndex = controller.firstUnreadTimelineIndex(chat.unreadCount.toInt())
+                // newest message. Re-resolve the index in renderedTimeline so
+                // scrollToItem refers to the lazy-list slot order, not the
+                // unfiltered controller timeline.
+                val unreadId =
+                    controller
+                        .firstUnreadTimelineIndex(chat.unreadCount.toInt())
+                        .takeIf { it >= 0 }
+                        ?.let {
+                            controller.timeline[it]
+                                .record.messageIdHex
+                                .takeIf { id -> id.isNotBlank() }
+                        }
+                val renderedUnreadIndex =
+                    unreadId?.let { id -> renderedTimeline.indexOfFirst { it.record.messageIdHex == id } } ?: -1
                 val targetIndex =
-                    if (firstUnreadTimelineIndex >= 0) {
-                        1 + olderHeaderCount + firstUnreadTimelineIndex
+                    if (renderedUnreadIndex >= 0) {
+                        1 + olderHeaderCount + renderedUnreadIndex
                     } else {
                         bottomTimelineIndex
                     }
@@ -4155,18 +4183,9 @@ private fun ConversationScreen(
                                     }
                                 }
                             }
-                            items(controller.timeline, key = { it.id }) { item ->
+                            items(renderedTimeline, key = { it.id }) { item ->
                                 if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
                                     UnreadMessagesDivider(count = entryUnreadCount)
-                                }
-                                // Kind-1009 edit events are derived state, not chat.
-                                // They mutate the original message's body via
-                                // [ConversationController.editsByTarget] and must
-                                // not render as a standalone bubble — otherwise
-                                // every edit creates a phantom row carrying the
-                                // replacement text.
-                                if (MessageProjector.isEdit(item.record)) {
-                                    return@items
                                 }
                                 MessageBubble(
                                     item = item,
@@ -5487,7 +5506,7 @@ private fun MessageBubble(
     // Cached like the media references below: displayBody sanitizes/allocates
     // per call, and recomputing it for every visible bubble on every timeline
     // recomposition adds up. See #131.
-    // Kind-1010 edits replace the body of an existing kind-9 chat. When an
+    // Kind-1009 edits replace the body of an existing kind-9 chat. When an
     // edit is present for this message's id, prefer the latest edited text
     // over the original projection. Keyed on editState so a fresh edit
     // recomposes the bubble in place.
@@ -5737,13 +5756,14 @@ private fun MessageBubble(
                         // Body text policy:
                         // - Pending optimistic with an attachment: placeholder
                         //   composable already renders, suppress text.
-                        // - Confirmed media (imeta tag present): render ONLY
-                        //   the user-typed caption (record.plaintext). Never
-                        //   use displayedBody here — MessageProjector falls
-                        //   back to the imeta filename when the caption is
-                        //   blank, which is the right answer for chat-list
-                        //   previews but wrong for a bubble that's already
-                        //   showing the image inline.
+                        // - Confirmed media (imeta tag present): render the
+                        //   user-typed caption, edit-overlay-aware so a
+                        //   subsequent edit on a media bubble updates the
+                        //   caption in place. We deliberately don't use
+                        //   `displayedBody` directly because MessageProjector
+                        //   falls back to the imeta filename for a blank
+                        //   caption — fine for chat-list previews, wrong for
+                        //   a bubble already showing the image inline.
                         // - Non-media: render displayedBody (covers reactions,
                         //   deletions, agent streams, plain text).
                         val bodyTextToRender: String? =
@@ -5752,7 +5772,8 @@ private fun MessageBubble(
                                 // tombstone copy, never an inline image/caption.
                                 deleted || invalidated -> displayedBody
                                 mediaPendingName != null && !anyConfirmedMedia -> null
-                                anyConfirmedMedia -> record.plaintext.takeIf { it.isNotBlank() }
+                                anyConfirmedMedia ->
+                                    (editState?.latestText ?: record.plaintext).takeIf { it.isNotBlank() }
                                 else -> displayedBody
                             }
                         if (bodyTextToRender != null) {
@@ -6089,6 +6110,14 @@ private fun ReactionParticipantRow(
     }
 }
 
+private data class EditHistoryRow(
+    val versionNumber: Int,
+    val text: String,
+    val recordedAt: ULong,
+    val isLatest: Boolean,
+    val isOriginal: Boolean,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditHistorySheet(
@@ -6098,62 +6127,184 @@ private fun EditHistorySheet(
     onDismissRequest: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // Newest first matches what the user just tapped on — the most recent
-    // edit is the body they were looking at — and original sits at the
-    // bottom so the chronology reads as "this is what's shown now ←
-    // earlier revisions ← original".
+    // Newest first reads as "this is what's shown now ← earlier revisions ← original".
     val rows =
         remember(original, originalTimestamp, editState) {
             buildList {
-                editState.versions
-                    .reversed()
-                    .forEachIndexed { reversedIndex, version ->
-                        val versionNumber = editState.versions.size - reversedIndex
-                        add(Triple(versionNumber, version.text, version.recordedAt))
-                    }
-                add(Triple(0, original, originalTimestamp))
+                editState.versions.reversed().forEachIndexed { reversedIndex, version ->
+                    val versionNumber = editState.versions.size - reversedIndex
+                    add(
+                        EditHistoryRow(
+                            versionNumber = versionNumber,
+                            text = version.text,
+                            recordedAt = version.recordedAt,
+                            isLatest = reversedIndex == 0,
+                            isOriginal = false,
+                        ),
+                    )
+                }
+                add(
+                    EditHistoryRow(
+                        versionNumber = 0,
+                        text = original,
+                        recordedAt = originalTimestamp,
+                        isLatest = false,
+                        isOriginal = true,
+                    ),
+                )
             }
         }
     ModalBottomSheet(onDismissRequest = onDismissRequest, sheetState = sheetState) {
+        // The header is anchored above the scroll region so the title and
+        // count chip remain visible while the user pages through a long edit
+        // chain. The rail keeps its visual continuity because every row is
+        // a child of the same Column — a LazyColumn would compose each row
+        // independently and break the dot-to-dot line through the rail.
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 20.dp, vertical = 4.dp)
+                .padding(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                text = stringResource(R.string.edit_history),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            rows.forEach { (versionNumber, text, recordedAt) ->
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            text =
-                                if (versionNumber == 0) {
-                                    stringResource(R.string.edit_history_original)
-                                } else {
-                                    stringResource(R.string.edit_history_version_label, versionNumber)
-                                },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = IdentityFormatter.relativeTime(recordedAt),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.edit_history),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shape = RoundedCornerShape(999.dp),
+                ) {
                     Text(
-                        text = text,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = stringResource(R.string.edited_count, editState.versions.size),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                rows.forEachIndexed { index, row ->
+                    EditHistoryVersionRow(
+                        row = row,
+                        isFirst = index == 0,
+                        isLast = index == rows.lastIndex,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditHistoryVersionRow(
+    row: EditHistoryRow,
+    isFirst: Boolean,
+    isLast: Boolean,
+) {
+    Row(
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Leading rail: dot anchored to the label row + a vertical line
+        // connecting consecutive dots so the column reads as a single
+        // timeline rather than disconnected cards.
+        Column(
+            Modifier.width(16.dp).fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(
+                Modifier
+                    .height(10.dp)
+                    .width(2.dp)
+                    .background(
+                        if (isFirst) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+                    ),
+            )
+            val dotColor =
+                when {
+                    row.isLatest -> MaterialTheme.colorScheme.primary
+                    row.isOriginal -> MaterialTheme.colorScheme.outline
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            Box(Modifier.size(10.dp).background(dotColor, shape = CircleShape))
+            Spacer(
+                Modifier
+                    .weight(1f)
+                    .width(2.dp)
+                    .background(
+                        if (isLast) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+                    ),
+            )
+        }
+        Column(
+            Modifier.fillMaxWidth().padding(bottom = if (isLast) 0.dp else 12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (row.isLatest) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(999.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.edit_history_version_label, row.versionNumber),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                } else {
+                    Text(
+                        text =
+                            if (row.isOriginal) {
+                                stringResource(R.string.edit_history_original)
+                            } else {
+                                stringResource(R.string.edit_history_version_label, row.versionNumber)
+                            },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    text = IdentityFormatter.relativeTime(row.recordedAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Surface(
+                color =
+                    if (row.isOriginal) {
+                        MaterialTheme.colorScheme.surfaceContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Text(
+                    text = row.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color =
+                        if (row.isOriginal) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                )
+            }
         }
     }
 }
@@ -6537,26 +6688,38 @@ private fun ComposerBar(
     onCancelEdit: () -> Unit = {},
 ) {
     var attachMenuOpen by remember { mutableStateOf(false) }
-    // Keyed on draftKey so switching to a different chat re-hydrates the text
-    // field from that chat's saved draft rather than carrying state across.
-    var text by remember(draftKey) { mutableStateOf(initialDraft) }
-    // Snapshot the draft when entering edit mode so cancelling restores
-    // what the user was typing. Keyed on the message id so a tap-Edit on
-    // a different message snapshots a fresh baseline.
-    var preEditDraft by remember(draftKey) { mutableStateOf<String?>(null) }
+    // Field state is a TextFieldValue (not a bare String) so the caret can
+    // be positioned at the end of the prefilled body on edit-entry, and so
+    // a re-tap on a different message rebases the caret too. Keyed on
+    // draftKey so switching to a different chat re-hydrates the text field
+    // from that chat's saved draft rather than carrying state across.
+    var textFieldValue by remember(draftKey) { mutableStateOf(TextFieldValue(initialDraft)) }
+    val text = textFieldValue.text
+    // Snapshot the in-flight composer state (full TextFieldValue — text +
+    // caret) when entering edit mode so cancelling restores both. Keyed on
+    // the message id so a tap-Edit on a different message snapshots a fresh
+    // baseline.
+    var preEditFieldValue by remember(draftKey) { mutableStateOf<TextFieldValue?>(null) }
+    // Claim focus on edit-entry so the IME opens with the caret at the end
+    // of the prefill, without making the user tap the field a second time.
+    val composerFocus = remember { FocusRequester() }
     LaunchedEffect(editingMessageId, editingInitialText) {
         if (editingMessageId != null) {
-            // Save the in-flight draft once per edit session, then push the
-            // message's current text into the input so the user edits from
-            // where it stands today (which is the latest applied edit if
-            // there's already an edit chain).
-            if (preEditDraft == null) preEditDraft = text
-            text = editingInitialText.orEmpty()
-        } else if (preEditDraft != null) {
+            // Save the in-flight composer once per edit session, then push
+            // the message's current text into the input so the user edits
+            // from where it stands today (which is the latest applied edit
+            // if there's already an edit chain). Selection at `length` lands
+            // the caret past the last character — same caret model as a
+            // long-press-to-edit on every other modern chat composer.
+            if (preEditFieldValue == null) preEditFieldValue = textFieldValue
+            val prefill = editingInitialText.orEmpty()
+            textFieldValue = TextFieldValue(text = prefill, selection = TextRange(prefill.length))
+            runCatching { composerFocus.requestFocus() }
+        } else if (preEditFieldValue != null) {
             // Edit cancelled or submitted: restore the draft the user had
-            // been composing before they tapped Edit.
-            text = preEditDraft.orEmpty()
-            preEditDraft = null
+            // been composing before they tapped Edit (text + original caret).
+            textFieldValue = preEditFieldValue ?: TextFieldValue("")
+            preEditFieldValue = null
         }
     }
     Column(
@@ -6661,12 +6824,17 @@ private fun ComposerBar(
                 }
             }
             OutlinedTextField(
-                value = text,
-                onValueChange = {
-                    text = it
-                    onDraftChange(it)
+                value = textFieldValue,
+                onValueChange = { value ->
+                    textFieldValue = value
+                    // While editing, the field holds the edit candidate, not
+                    // a fresh chat draft. Persisting it would clobber whatever
+                    // the user was composing before they tapped Edit — which
+                    // is exactly the snapshot we restore from `preEditFieldValue`
+                    // on cancel/submit.
+                    if (editingMessageId == null) onDraftChange(value.text)
                 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).focusRequester(composerFocus),
                 placeholder = { Text(stringResource(R.string.message)) },
                 maxLines = 5,
                 colors =
@@ -6686,10 +6854,20 @@ private fun ComposerBar(
             FloatingActionButton(
                 onClick = {
                     if (text.isNotBlank()) {
+                        val sendingEdit = editingMessageId != null
                         onSend(text)
-                        text = ""
-                        onDraftChange("")
-                        onAfterSend()
+                        // For an in-place edit: the LaunchedEffect that
+                        // watches `editingMessageId` will restore the pre-edit
+                        // composer (text + caret) once the controller clears
+                        // edit state — so don't blank the field here, don't
+                        // blank the persisted draft, and don't scroll to
+                        // newest (the bubble's row didn't move, the body
+                        // just rebinds).
+                        if (!sendingEdit) {
+                            textFieldValue = TextFieldValue("")
+                            onDraftChange("")
+                            onAfterSend()
+                        }
                     }
                 },
                 modifier = Modifier.size(52.dp),

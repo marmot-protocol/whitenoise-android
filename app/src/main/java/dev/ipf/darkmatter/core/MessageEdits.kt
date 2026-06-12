@@ -3,7 +3,7 @@ package dev.ipf.darkmatter.core
 import dev.ipf.marmotkit.AppMessageRecordFfi
 
 /**
- * One published kind-1010 edit version for a target message: the
+ * One published kind-1009 edit version for a target message: the
  * replacement plaintext plus the wall-clock time the edit was emitted.
  * Versions are ordered oldest-first in [EditState.versions], so the latest
  * is the last element.
@@ -29,7 +29,7 @@ data class EditState(
 )
 
 /**
- * Aggregate kind-1010 edit events across a timeline slice into a
+ * Aggregate kind-1009 edit events across a timeline slice into a
  * `targetMessageId → EditState` map.
  *
  * Authorship is enforced here: an edit is only honoured when its
