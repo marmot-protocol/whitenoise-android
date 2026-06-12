@@ -4049,6 +4049,10 @@ private fun ConversationScreen(
                 controller.membersLoaded && !controller.isSelfMember -> RemovedMemberComposerNotice()
                 else -> {
                     val groupIdHex = controller.group.groupIdHex
+                    val editingRecord =
+                        controller.editingMessageId?.let { id ->
+                            controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
+                        }
                     ComposerBar(
                         replyingTo = controller.replyingTo,
                         messageTextCopy = messageTextCopy,
@@ -4057,6 +4061,9 @@ private fun ConversationScreen(
                         initialDraft = appState.draftFor(groupIdHex).orEmpty(),
                         onDraftChange = { appState.setDraft(groupIdHex, it) },
                         draftKey = groupIdHex,
+                        editingMessageId = controller.editingMessageId,
+                        editingInitialText = editingRecord?.let { controller.displayedText(it) },
+                        onCancelEdit = { controller.editingMessageId = null },
                         onAfterSend = {
                             // Always pull the user down to see their just-sent
                             // bubble, even if they were reading older history.
@@ -5470,24 +5477,30 @@ private fun MessageBubble(
     // Cached like the media references below: displayBody sanitizes/allocates
     // per call, and recomputing it for every visible bubble on every timeline
     // recomposition adds up. See #131.
+    // Kind-1010 edits replace the body of an existing kind-9 chat. When an
+    // edit is present for this message's id, prefer the latest edited text
+    // over the original projection. Keyed on editState so a fresh edit
+    // recomposes the bubble in place.
+    val editState = controller.editsByTarget[record.messageIdHex]
     val displayedBody =
-        remember(item, deleted, invalidated, messageTextCopy, deletedBodyText, invalidatedBodyText) {
-            if (deleted) {
+        remember(item, deleted, invalidated, messageTextCopy, deletedBodyText, invalidatedBodyText, editState) {
+            when {
                 // Check `deleted` first so the optimistic tombstone (from
-                // controller.deletedMessageIds) renders immediately on tap. Otherwise
-                // the projected branch runs against the stale Rust-side `deleted`
-                // flag and the bubble keeps showing the original body until the
-                // delete echo arrives.
-                deletedBodyText
-            } else if (invalidated) {
-                invalidatedBodyText
-            } else if (item.projected != null) {
-                TimelineProjector.displayBody(
-                    item.projected,
-                    messageTextCopy.copy(deleted = deletedBodyText),
-                )
-            } else {
-                MessageProjector.displayBody(record, messageTextCopy)
+                // controller.deletedMessageIds) renders immediately on tap.
+                deleted -> deletedBodyText
+                invalidated -> invalidatedBodyText
+                // Edit overlay wins over both projected and raw plaintext.
+                // We don't go through MessageProjector here — the edit
+                // payload is plain text by spec; markdown re-parse will
+                // happen below if record.contentTokens is populated, but
+                // for kind-9 edits the body is the latest version verbatim.
+                editState != null && record.kind == 9uL -> editState.latestText
+                item.projected != null ->
+                    TimelineProjector.displayBody(
+                        item.projected,
+                        messageTextCopy.copy(deleted = deletedBodyText),
+                    )
+                else -> MessageProjector.displayBody(record, messageTextCopy)
             }
         }
     val showSenderAvatar =
@@ -5806,6 +5819,7 @@ private fun MessageBubble(
                             MessageActionMenu(
                                 expanded = menuOpen,
                                 canDelete = mine && record.messageIdHex.isNotBlank(),
+                                canEdit = mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
                                 quickReactionEmojis = quickReactionEmojis,
                                 onDismissRequest = { menuOpen = false },
                                 onReact = { emoji ->
@@ -5817,6 +5831,14 @@ private fun MessageBubble(
                                     emojiPickerOpen = true
                                 },
                                 onReply = ::beginReply,
+                                onEdit = {
+                                    menuOpen = false
+                                    // Cancel any reply-in-progress: reply and
+                                    // edit modes are mutually exclusive in the
+                                    // composer banner.
+                                    controller.replyingTo = null
+                                    controller.editingMessageId = record.messageIdHex
+                                },
                                 onCopyText = ::copyMessageText,
                                 onInfo = ::openInfoSheet,
                                 onDelete = {
@@ -6035,11 +6057,13 @@ private fun ReactionParticipantRow(
 private fun MessageActionMenu(
     expanded: Boolean,
     canDelete: Boolean,
+    canEdit: Boolean,
     quickReactionEmojis: List<String>,
     onDismissRequest: () -> Unit,
     onReact: (String) -> Unit,
     onOpenEmojiPicker: () -> Unit,
     onReply: () -> Unit,
+    onEdit: () -> Unit,
     onCopyText: () -> Unit,
     onInfo: () -> Unit,
     onDelete: () -> Unit,
@@ -6081,6 +6105,13 @@ private fun MessageActionMenu(
                     icon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(20.dp)) },
                     onClick = onReply,
                 )
+                if (canEdit) {
+                    MessageActionButton(
+                        label = stringResource(R.string.edit),
+                        icon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        onClick = onEdit,
+                    )
+                }
                 MessageActionButton(
                     label = stringResource(R.string.copy_text),
                     icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
@@ -6396,11 +6427,33 @@ private fun ComposerBar(
     onPickFromGallery: (() -> Unit)? = null,
     onCaptureFromCamera: (() -> Unit)? = null,
     onPickDocument: (() -> Unit)? = null,
+    editingMessageId: String? = null,
+    editingInitialText: String? = null,
+    onCancelEdit: () -> Unit = {},
 ) {
     var attachMenuOpen by remember { mutableStateOf(false) }
     // Keyed on draftKey so switching to a different chat re-hydrates the text
     // field from that chat's saved draft rather than carrying state across.
     var text by remember(draftKey) { mutableStateOf(initialDraft) }
+    // Snapshot the draft when entering edit mode so cancelling restores
+    // what the user was typing. Keyed on the message id so a tap-Edit on
+    // a different message snapshots a fresh baseline.
+    var preEditDraft by remember(draftKey) { mutableStateOf<String?>(null) }
+    LaunchedEffect(editingMessageId, editingInitialText) {
+        if (editingMessageId != null) {
+            // Save the in-flight draft once per edit session, then push the
+            // message's current text into the input so the user edits from
+            // where it stands today (which is the latest applied edit if
+            // there's already an edit chain).
+            if (preEditDraft == null) preEditDraft = text
+            text = editingInitialText.orEmpty()
+        } else if (preEditDraft != null) {
+            // Edit cancelled or submitted: restore the draft the user had
+            // been composing before they tapped Edit.
+            text = preEditDraft.orEmpty()
+            preEditDraft = null
+        }
+    }
     Column(
         modifier
             .fillMaxWidth()
@@ -6409,7 +6462,28 @@ private fun ComposerBar(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (replyingTo != null) {
+        if (editingMessageId != null) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.editing_message),
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                IconButton(onClick = onCancelEdit, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel_edit), modifier = Modifier.size(18.dp))
+                }
+            }
+        } else if (replyingTo != null) {
             Row(
                 Modifier
                     .fillMaxWidth()

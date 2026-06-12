@@ -314,6 +314,14 @@
     <string name="toast_send_failed">发送失败</string>
     <string name="toast_reaction_failed">反应失败</string>
     <string name="toast_couldnt_delete_message">删除消息失败。请重试。</string>
+    <string name="toast_couldnt_edit_message">无法编辑消息</string>
+    <string name="editing_message">正在编辑消息</string>
+    <string name="cancel_edit">取消编辑</string>
+    <string name="edited">已编辑</string>
+    <string name="edited_count">已编辑 · %1$d</string>
+    <string name="edit_history">编辑历史</string>
+    <string name="edit_history_original">原始</string>
+    <string name="edit_history_version_label">版本 %1$d</string>
     <string name="toast_make_another_admin_before_leaving">离开前再指定一个管理员</string>
     <string name="toast_group_needs_admin">一个群组至少需要一名管理员。</string>
     <string name="toast_left_chat">左聊天</string>

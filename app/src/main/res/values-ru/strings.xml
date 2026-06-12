@@ -317,6 +317,14 @@
     <string name="toast_send_failed">Отправить не удалось</string>
     <string name="toast_reaction_failed">Реакция не удалась</string>
     <string name="toast_couldnt_delete_message">Не удалось удалить сообщение. Попробуйте снова.</string>
+    <string name="toast_couldnt_edit_message">Не удалось изменить сообщение</string>
+    <string name="editing_message">Редактирование сообщения</string>
+    <string name="cancel_edit">Отменить редактирование</string>
+    <string name="edited">изменено</string>
+    <string name="edited_count">изменено · %1$d</string>
+    <string name="edit_history">История изменений</string>
+    <string name="edit_history_original">Оригинал</string>
+    <string name="edit_history_version_label">Версия %1$d</string>
     <string name="toast_make_another_admin_before_leaving">Прежде чем уйти, назначьте другого администратора.</string>
     <string name="toast_group_needs_admin">В группе нужен хотя бы один администратор.</string>
     <string name="toast_left_chat">Вышел из чата</string>
