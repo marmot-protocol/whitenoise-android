@@ -2547,10 +2547,8 @@ class ConversationController(
         if (!HEX_MESSAGE_ID.matches(trimmed)) return
         if (trimmed == lastReadMessageId) return
         val account = conversationAccountRef ?: return
-        // Capture the previous pointer so a transient FFI failure restores it
-        // rather than nulling out the dedupe state entirely — a single failed
-        // mark-read would otherwise re-issue FFI hops on every subsequent
-        // settle, even on rows that were already marked successfully before.
+        // Restore the prior pointer on failure so a transient FFI error
+        // doesn't drop the dedupe state for already-marked rows.
         val previous = lastReadMessageId
         lastReadMessageId = trimmed
         runCatching {

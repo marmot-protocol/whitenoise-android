@@ -17,6 +17,9 @@ object IdentityFormatter {
     }
 
     fun initials(name: String): String {
+        // Iterate code points so a leading non-BMP grapheme (emoji, CJK
+        // extensions, mathematical alphanumerics) is taken whole and not as
+        // a lone surrogate half.
         val words =
             name
                 .trim()
@@ -24,10 +27,6 @@ object IdentityFormatter {
                 .filter { it.isNotBlank() }
         val letters =
             when {
-                // Iterate code points rather than UTF-16 `Char`s so a leading
-                // non-BMP grapheme (emoji, mathematical alphanumerics, many
-                // CJK extensions) is taken whole rather than as a lone
-                // surrogate half that renders as a replacement glyph.
                 words.size >= 2 -> firstCodePoint(words[0]) + firstCodePoint(words[1])
                 words.size == 1 -> firstTwoCodePoints(words[0])
                 else -> "DM"
@@ -67,9 +66,7 @@ object IdentityFormatter {
             delta < 86_400 -> String.format(locale, copy.hoursFormat, delta / 3_600)
             delta < 604_800 -> String.format(locale, copy.daysFormat, delta / 86_400)
             else ->
-                // FormatStyle.MEDIUM picks the locale's natural month-and-day
-                // ordering (day-then-month for most non-US locales) instead of
-                // forcing "MMM d" English ordering.
+                // Locale-aware month-day ordering rather than forced "MMM d".
                 DateTimeFormatter
                     .ofLocalizedDate(FormatStyle.MEDIUM)
                     .withLocale(locale)
@@ -79,12 +76,6 @@ object IdentityFormatter {
     }
 }
 
-/**
- * Localized tokens consumed by [IdentityFormatter.relativeTime]. Threaded in
- * from composables via [rememberRelativeTimeCopy] so the formatter itself
- * stays pure and testable; the [Default] companion mirrors the prior
- * hard-coded English fallback for non-composable callers and tests.
- */
 data class RelativeTimeCopy(
     val future: String,
     val now: String,

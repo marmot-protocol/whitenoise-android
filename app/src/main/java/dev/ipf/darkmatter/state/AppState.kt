@@ -249,14 +249,7 @@ class DarkMatterAppState(
     // registration is stale.
     private val perAccountSyncedFingerprints = mutableMapOf<String, PushFingerprint>()
 
-    /**
-     * Cache key for [perAccountSyncedFingerprints]: a value type whose
-     * equality is structural across every field that participates in the
-     * push registration. A delimited string was the prior shape; switching
-     * to a data class makes collisions impossible if any field ever gains
-     * a delimiter character downstream, without depending on the choice of
-     * separator.
-     */
+    /** Structural cache key for the push-registration dedupe map. */
     private data class PushFingerprint(
         val platform: PushPlatformFfi,
         val token: String,
@@ -646,11 +639,8 @@ class DarkMatterAppState(
                     }
                 clearPushRegistrationForAccount(signedOutRef)
             }
-            // No accounts left on this device: the cached FCM token has no
-            // consumer until a future sign-in re-fetches one. Drop it so the
-            // local state matches the "fully signed out" semantic. Switching
-            // out of one account while others remain leaves the token in
-            // place — other identities on the device still need it.
+            // Drop the cached FCM token only when no accounts remain on the
+            // device — other identities still need it on multi-account switch.
             if (next == null) pushTokenStore.clear()
             refreshLocalNotificationSettings()
         }
