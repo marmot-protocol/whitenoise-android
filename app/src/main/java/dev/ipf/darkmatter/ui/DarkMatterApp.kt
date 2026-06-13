@@ -396,11 +396,6 @@ private fun rememberRelativeTimeCopy(): dev.ipf.darkmatter.core.RelativeTimeCopy
     }
 }
 
-/**
- * Composable shorthand for `IdentityFormatter.relativeTime` that reads the
- * localized tokens + active locale from the composition. Pass the epoch
- * seconds; the resolved string follows the user's selected language.
- */
 @Composable
 private fun rememberedRelativeTime(epochSeconds: ULong): String =
     IdentityFormatter.relativeTime(
@@ -932,8 +927,8 @@ private fun MainShell(
         MainSection.Diagnostics ->
             DiagnosticsScreen(
                 appState = appState,
-                onBackToChats = {
-                    sectionName = MainSection.Chats.name
+                onBack = {
+                    sectionName = MainSection.Settings.name
                     settingsDetailName = null
                 },
             )
@@ -8769,13 +8764,14 @@ private fun formatPublishedAt(
 @Composable
 private fun DiagnosticsScreen(
     appState: DarkMatterAppState,
-    onBackToChats: () -> Unit,
+    onBack: () -> Unit,
 ) {
+    // Claim back so it returns to Settings rather than falling through
+    // to the Activity and closing the app.
+    BackHandler { onBack() }
     var health by remember { mutableStateOf<RelayHealthFfi?>(null) }
     var entries by remember { mutableStateOf<List<DiagnosticLogEntry>>(emptyList()) }
     var streaming by remember { mutableStateOf(false) }
-    // Gates Send-to-self so rapid taps don't fan out into N concurrent
-    // create-group + publish + archive triples against the relays.
     var sendingPing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val sentPingFormat = stringResource(R.string.diagnostic_sent_ping_to_self)
@@ -8811,7 +8807,7 @@ private fun DiagnosticsScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.diagnostics)) },
                 navigationIcon = {
-                    IconButton(onClick = onBackToChats) {
+                    IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_to_chats))
                     }
                 },
@@ -8849,8 +8845,7 @@ private fun DiagnosticsScreen(
                                                 )
                                             }
                                         appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }
-                                        // Archive the throwaway diagnostic group so it doesn't
-                                        // accumulate as an orphan in the chat list on every click. See #70.
+                                        // Archive the throwaway group so the chat list doesn't accumulate orphans.
                                         appState.marmotIo { setGroupArchived(account, groupId, true) }
                                         appendLog(String.format(sentPingFormat, IdentityFormatter.short(groupId)))
                                     }.onFailure {
