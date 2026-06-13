@@ -2245,6 +2245,109 @@ private fun MediaImageBubble(
  * remaining images are reachable from the viewer (next-tile navigation
  * lands with the pager-viewer follow-up).
  */
+
+/**
+ * Count-specific masonry scaffolding for a 2-6 image album. Lays out the
+ * tiles so a 3-image set is tall-left + two-stacked-right (no empty cell),
+ * 5 is 2-up over 3-down, 6+ is 3×2 with a "+N" tile six. Caller provides
+ * the per-tile composable through [tile]; the helper supplies each tile
+ * its size modifier so the layout shape stays one source of truth across
+ * the confirmed bubble and the optimistic upload-phase placeholder.
+ */
+@Composable
+private fun MasonryImageLayout(
+    visibleCount: Int,
+    tile: @Composable (index: Int, tileModifier: Modifier) -> Unit,
+) {
+    when (visibleCount) {
+        2 ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth().padding(2.dp),
+            ) {
+                tile(0, Modifier.weight(1f).aspectRatio(1f))
+                tile(1, Modifier.weight(1f).aspectRatio(1f))
+            }
+        3 ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth().padding(2.dp).aspectRatio(1f),
+            ) {
+                tile(0, Modifier.weight(1f).fillMaxHeight())
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                ) {
+                    tile(1, Modifier.weight(1f).fillMaxWidth())
+                    tile(2, Modifier.weight(1f).fillMaxWidth())
+                }
+            }
+        4 ->
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth().padding(2.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(0, Modifier.weight(1f).aspectRatio(1f))
+                    tile(1, Modifier.weight(1f).aspectRatio(1f))
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(2, Modifier.weight(1f).aspectRatio(1f))
+                    tile(3, Modifier.weight(1f).aspectRatio(1f))
+                }
+            }
+        5 ->
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth().padding(2.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(0, Modifier.weight(1f).aspectRatio(1f))
+                    tile(1, Modifier.weight(1f).aspectRatio(1f))
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(2, Modifier.weight(1f).aspectRatio(1f))
+                    tile(3, Modifier.weight(1f).aspectRatio(1f))
+                    tile(4, Modifier.weight(1f).aspectRatio(1f))
+                }
+            }
+        else ->
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth().padding(2.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(0, Modifier.weight(1f).aspectRatio(1f))
+                    tile(1, Modifier.weight(1f).aspectRatio(1f))
+                    tile(2, Modifier.weight(1f).aspectRatio(1f))
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(3, Modifier.weight(1f).aspectRatio(1f))
+                    tile(4, Modifier.weight(1f).aspectRatio(1f))
+                    tile(5, Modifier.weight(1f).aspectRatio(1f))
+                }
+            }
+    }
+}
+
 @Composable
 private fun MediaImageGridBubble(
     item: TimelineMessage,
@@ -2282,100 +2385,7 @@ private fun MediaImageGridBubble(
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        // Tile counts use contextual layouts rather than a uniform 2-wide
-        // grid, so a 3-image album never leaves an empty cell. Sizes are
-        // count-specific: 1 = full-width single, 2 = side-by-side, 3 =
-        // tall-left + two stacked, 4 = 2×2, 5 = 2-up over 3-down, 6+ = 3×2
-        // with +N on tile 6.
-        when (visible.size) {
-            2 ->
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.fillMaxWidth().padding(2.dp),
-                ) {
-                    tileAt(0, Modifier.weight(1f).aspectRatio(1f))
-                    tileAt(1, Modifier.weight(1f).aspectRatio(1f))
-                }
-            3 ->
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.fillMaxWidth().padding(2.dp).aspectRatio(1f),
-                ) {
-                    // Left = portrait half (1:2 within the square bubble);
-                    // right = two square halves stacked.
-                    tileAt(0, Modifier.weight(1f).fillMaxHeight())
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    ) {
-                        tileAt(1, Modifier.weight(1f).fillMaxWidth())
-                        tileAt(2, Modifier.weight(1f).fillMaxWidth())
-                    }
-                }
-            4 ->
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.fillMaxWidth().padding(2.dp),
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        tileAt(0, Modifier.weight(1f).aspectRatio(1f))
-                        tileAt(1, Modifier.weight(1f).aspectRatio(1f))
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        tileAt(2, Modifier.weight(1f).aspectRatio(1f))
-                        tileAt(3, Modifier.weight(1f).aspectRatio(1f))
-                    }
-                }
-            5 ->
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.fillMaxWidth().padding(2.dp),
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        tileAt(0, Modifier.weight(1f).aspectRatio(1f))
-                        tileAt(1, Modifier.weight(1f).aspectRatio(1f))
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        tileAt(2, Modifier.weight(1f).aspectRatio(1f))
-                        tileAt(3, Modifier.weight(1f).aspectRatio(1f))
-                        tileAt(4, Modifier.weight(1f).aspectRatio(1f))
-                    }
-                }
-            else ->
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.fillMaxWidth().padding(2.dp),
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        tileAt(0, Modifier.weight(1f).aspectRatio(1f))
-                        tileAt(1, Modifier.weight(1f).aspectRatio(1f))
-                        tileAt(2, Modifier.weight(1f).aspectRatio(1f))
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        tileAt(3, Modifier.weight(1f).aspectRatio(1f))
-                        tileAt(4, Modifier.weight(1f).aspectRatio(1f))
-                        tileAt(5, Modifier.weight(1f).aspectRatio(1f))
-                    }
-                }
-        }
+        MasonryImageLayout(visibleCount = visible.size, tile = tileAt)
     }
 
     viewerOpenAt?.let { index ->
@@ -2797,34 +2807,23 @@ private fun MediaPendingPlaceholder(
                     )
                 }
             } else {
-                // Album: render the same 2-col grid the post-upload bubble
-                // uses, so the optimistic → confirmed transition is a visual
-                // no-op. Each tile decodes from local bytes (no network), and
-                // a single status overlay sits across the whole bubble.
-                val visible = pendingAttachments.take(4)
+                // Album: route through the same count-specific masonry
+                // layout the confirmed bubble uses so the optimistic →
+                // confirmed transition is a visual no-op even on the
+                // 3-image case. Each tile decodes from local bytes (no
+                // network), and a single status overlay sits across the
+                // whole bubble.
+                val visible = pendingAttachments.take(6)
                 val overflow = (pendingAttachments.size - visible.size).coerceAtLeast(0)
                 Box(Modifier.fillMaxWidth()) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier.padding(2.dp),
-                    ) {
-                        visible.chunked(2).forEachIndexed { rowIndex, row ->
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                row.forEachIndexed { colIndex, attachment ->
-                                    val tileIndex = rowIndex * 2 + colIndex
-                                    val showOverflow = tileIndex == visible.lastIndex && overflow > 0
-                                    PendingGridTile(
-                                        bytes = attachment.plaintextBytes,
-                                        overflowCount = if (showOverflow) overflow else 0,
-                                        modifier = Modifier.weight(1f).aspectRatio(1f),
-                                    )
-                                }
-                                if (row.size == 1) Spacer(Modifier.weight(1f))
-                            }
-                        }
+                    MasonryImageLayout(visibleCount = visible.size) { index, tileModifier ->
+                        val attachment = visible[index]
+                        val showOverflow = index == visible.lastIndex && overflow > 0
+                        PendingGridTile(
+                            bytes = attachment.plaintextBytes,
+                            overflowCount = if (showOverflow) overflow else 0,
+                            modifier = tileModifier,
+                        )
                     }
                     Box(
                         Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)),
