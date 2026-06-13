@@ -631,6 +631,12 @@ class DarkMatterAppState(
                     }
                 clearPushRegistrationForAccount(signedOutRef)
             }
+            // No accounts left on this device: the cached FCM token has no
+            // consumer until a future sign-in re-fetches one. Drop it so the
+            // local state matches the "fully signed out" semantic. Switching
+            // out of one account while others remain leaves the token in
+            // place — other identities on the device still need it.
+            if (next == null) pushTokenStore.clear()
             refreshLocalNotificationSettings()
         }
     }
