@@ -3416,13 +3416,83 @@ private fun LocalImagePreview(
     }
 }
 
+@Composable
+private fun StagingTile(
+    onRemove: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxHeight()
+                .aspectRatio(1f),
+    ) {
+        content()
+        FilledIconButton(
+            onClick = onRemove,
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(24.dp),
+            colors =
+                IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f),
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+        ) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = stringResource(R.string.media_attachment_remove),
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StagingDocumentTile(uri: android.net.Uri) {
+    val context = LocalContext.current
+    val displayName =
+        remember(uri) { queryDisplayName(context.contentResolver, uri) ?: "file" }
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                Icons.Default.Description,
+                contentDescription = null,
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MediaPreviewSheet(
     uris: List<android.net.Uri>,
+    documentUris: List<android.net.Uri>,
     onDismiss: () -> Unit,
     onSend: (caption: String) -> Unit,
     onRemoveAt: (Int) -> Unit,
+    onRemoveDocumentAt: (Int) -> Unit,
     onAddMore: () -> Unit,
 ) {
     var caption by remember { mutableStateOf("") }
@@ -3451,12 +3521,9 @@ private fun MediaPreviewSheet(
                         .heightIn(min = 96.dp, max = 220.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                itemsIndexed(uris, key = { _, uri -> uri.toString() }) { index, uri ->
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxHeight()
-                                .aspectRatio(1f),
+                itemsIndexed(uris, key = { _, uri -> "image:$uri" }) { index, uri ->
+                    StagingTile(
+                        onRemove = { if (!sending) onRemoveAt(index) },
                     ) {
                         LocalImagePreview(
                             uri = uri,
@@ -3465,25 +3532,13 @@ private fun MediaPreviewSheet(
                                     .fillMaxSize()
                                     .clip(RoundedCornerShape(12.dp)),
                         )
-                        FilledIconButton(
-                            onClick = { if (!sending) onRemoveAt(index) },
-                            modifier =
-                                Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(4.dp)
-                                    .size(24.dp),
-                            colors =
-                                IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f),
-                                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                                ),
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.media_attachment_remove),
-                                modifier = Modifier.size(14.dp),
-                            )
-                        }
+                    }
+                }
+                itemsIndexed(documentUris, key = { _, uri -> "doc:$uri" }) { index, uri ->
+                    StagingTile(
+                        onRemove = { if (!sending) onRemoveDocumentAt(index) },
+                    ) {
+                        StagingDocumentTile(uri = uri)
                     }
                 }
                 item(key = "media_preview_add_more_tile") {
@@ -3803,6 +3858,14 @@ private fun ConversationScreen(
     var pendingMediaUris by rememberSaveable(stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
     }
+    // Document picks go through the same preview sheet as images, so the user
+    // can mix image + file attachments in one kind-9 album. The two lists
+    // stay separate because the sheet renders them differently (image
+    // thumbnail vs file-pill tile) and because the send-time decoders
+    // diverge (downscale-to-JPEG vs raw-bytes-with-cap).
+    var pendingDocumentUris by rememberSaveable(stateSaver = UriListSaver) {
+        mutableStateOf<List<android.net.Uri>>(emptyList())
+    }
     // Survives process death while the camera app is foreground (the result
     // callback fires into a recreated activity, otherwise the capture is lost).
     var cameraOutputUri by rememberSaveable(stateSaver = NullableUriSaver) {
@@ -3918,6 +3981,134 @@ private fun ConversationScreen(
     //
     // Any reject surfaces a single user-visible toast; the rest of the album
     // continues. If NOTHING survives the gates we bail without an empty send.
+    // Decoded outcome of the document read pass, surfaced so the unified
+    // sendStagedAttachments path can blend its results with the image decode.
+    data class DocumentReadOutcome(
+        val attachments: List<PendingAttachment>,
+        val rejected: Boolean,
+        val albumOverflowed: Boolean,
+        val totalBytes: Long,
+    )
+
+    suspend fun readPickedDocuments(
+        uris: List<android.net.Uri>,
+        bytesBudget: Long = MEDIA_ALBUM_MAX_TOTAL_BYTES,
+    ): DocumentReadOutcome =
+        withContext(Dispatchers.IO) {
+            val accepted = mutableListOf<PendingAttachment>()
+            var albumBytes = 0L
+            var rejected = false
+            var albumOverflowed = false
+            for (uri in uris) {
+                val declaredSize = queryContentSize(context.contentResolver, uri)
+                if (declaredSize > 0L && declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
+                    rejected = true
+                    continue
+                }
+                val remainingAlbumBudget = (bytesBudget - albumBytes).coerceAtLeast(0L)
+                if (remainingAlbumBudget <= 0L) {
+                    albumOverflowed = true
+                    break
+                }
+                val perFileCap =
+                    minOf(MEDIA_ATTACHMENT_MAX_BYTES, remainingAlbumBudget)
+                        .coerceAtMost(Int.MAX_VALUE.toLong())
+                        .toInt()
+                val bytes =
+                    runCatching {
+                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                            MediaPipeline.readBoundedBytes(stream, perFileCap)
+                        }
+                    }.getOrNull()
+                if (bytes == null) {
+                    rejected = true
+                    continue
+                }
+                if (bytes.isEmpty()) continue
+                if (albumBytes + bytes.size > bytesBudget) {
+                    albumOverflowed = true
+                    continue
+                }
+                albumBytes += bytes.size
+                val resolvedMime =
+                    context.contentResolver
+                        .getType(uri)
+                        .orEmpty()
+                        .takeIf { it.isNotBlank() }
+                        ?: "application/octet-stream"
+                val name = queryDisplayName(context.contentResolver, uri) ?: "file"
+                val dim =
+                    if (resolvedMime.startsWith("image/", ignoreCase = true)) {
+                        MediaPipeline.imageDimOrNull(bytes)
+                    } else {
+                        null
+                    }
+                accepted +=
+                    PendingAttachment(
+                        plaintextBytes = bytes,
+                        mediaType = resolvedMime,
+                        fileName = name,
+                        dim = dim,
+                    )
+            }
+            DocumentReadOutcome(accepted, rejected, albumOverflowed, albumBytes)
+        }
+
+    suspend fun readPickedImages(uris: List<android.net.Uri>): List<PendingAttachment> =
+        withContext(Dispatchers.Default) {
+            uris.mapNotNull { uri ->
+                val jpeg =
+                    MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
+                        ?: return@mapNotNull null
+                val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
+                val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
+                PendingAttachment(
+                    plaintextBytes = jpeg.bytes,
+                    mediaType = MediaPipeline.RECOMPRESSED_MIME,
+                    fileName = fileName,
+                    dim = "${jpeg.width}x${jpeg.height}",
+                    thumbhash = jpeg.thumbhash,
+                )
+            }
+        }
+
+    // Single-path send used by the unified staging shelf: decodes images
+    // (downscale + JPEG) and documents (raw bytes with cap) in parallel,
+    // concatenates the attachments, and ships them as one kind-9 album.
+    fun sendStagedAttachments(
+        imageUris: List<android.net.Uri>,
+        documentUris: List<android.net.Uri>,
+        caption: String,
+    ) {
+        if (imageUris.isEmpty() && documentUris.isEmpty()) return
+        val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
+        appState.launchMutation {
+            val imageAttachments = readPickedImages(imageUris)
+            val imageBytes = imageAttachments.sumOf { it.plaintextBytes.size.toLong() }
+            val docBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - imageBytes).coerceAtLeast(0L)
+            val docOutcome =
+                if (documentUris.isEmpty()) {
+                    DocumentReadOutcome(emptyList(), rejected = false, albumOverflowed = false, totalBytes = 0L)
+                } else {
+                    readPickedDocuments(documentUris, docBudget)
+                }
+            val merged = imageAttachments + docOutcome.attachments
+            if (merged.isEmpty()) {
+                appState.present(R.string.toast_couldnt_decode_image)
+                return@launchMutation
+            }
+            if (imageAttachments.size < imageUris.size) {
+                appState.present(R.string.toast_couldnt_decode_image)
+            }
+            if (docOutcome.albumOverflowed) {
+                appState.present(R.string.media_album_too_large)
+            } else if (docOutcome.rejected) {
+                appState.present(R.string.media_file_too_large)
+            }
+            controller.sendAttachments(merged, trimmedCaption)
+        }
+    }
+
     fun sendPickedDocuments(uris: List<android.net.Uri>) {
         if (uris.isEmpty()) return
         appState.launchMutation {
@@ -4022,9 +4213,12 @@ private fun ConversationScreen(
         rememberLauncherForActivityResult(
             ActivityResultContracts.OpenMultipleDocuments(),
         ) { uris ->
-            if (uris.isNotEmpty()) {
-                sendPickedDocuments(uris.take(MEDIA_PICKER_MAX_ITEMS))
-            }
+            if (uris.isEmpty()) return@rememberLauncherForActivityResult
+            // Append into the document side of the staging shelf rather than
+            // sending immediately. The preview sheet renders both lists and
+            // a single Send dispatches both decoders into one kind-9 album.
+            val merged = (pendingDocumentUris + uris).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+            pendingDocumentUris = merged
         }
 
     // Wipe camera-capture temp files and retained outgoing attachment bytes
@@ -4447,18 +4641,30 @@ private fun ConversationScreen(
         )
     }
 
-    if (pendingMediaUris.isNotEmpty()) {
-        val uris = pendingMediaUris
+    if (pendingMediaUris.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
+        val imageUris = pendingMediaUris
+        val documentUris = pendingDocumentUris
         MediaPreviewSheet(
-            uris = uris,
-            onDismiss = { pendingMediaUris = emptyList() },
+            uris = imageUris,
+            documentUris = documentUris,
+            onDismiss = {
+                pendingMediaUris = emptyList()
+                pendingDocumentUris = emptyList()
+            },
             onSend = { caption ->
                 pendingMediaUris = emptyList()
-                sendPickedMedia(uris, caption)
+                pendingDocumentUris = emptyList()
+                sendStagedAttachments(imageUris, documentUris, caption)
             },
             onRemoveAt = { index ->
                 pendingMediaUris =
                     pendingMediaUris.toMutableList().apply {
+                        if (index in indices) removeAt(index)
+                    }
+            },
+            onRemoveDocumentAt = { index ->
+                pendingDocumentUris =
+                    pendingDocumentUris.toMutableList().apply {
                         if (index in indices) removeAt(index)
                     }
             },
