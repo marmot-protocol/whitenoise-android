@@ -3923,13 +3923,9 @@ private fun ConversationScreen(
             recentReactionEmojis = loaded
         }
     }
-    // Selected-but-not-yet-sent image attachments: when non-empty the preview
-    // / caption sheet is shown. Multi-pick goes through
-    // `PickMultipleVisualMedia` with `MEDIA_PICKER_MAX_ITEMS` as the cap. The
-    // whole selection ships as a single kind:9 album (one event carrying N
-    // imeta tags) via `controller.sendAttachments(list, caption)`. Document
-    // picks bypass this sheet and route directly through
-    // `sendPickedDocuments`.
+    // Selected-but-not-yet-sent image attachments. The preview sheet opens
+    // when this or `pendingDocumentUris` is non-empty; the whole queue
+    // ships as one kind:9 album via `controller.sendAttachments(list, caption)`.
     var pendingMediaUris by rememberSaveable(stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
     }
@@ -4184,104 +4180,11 @@ private fun ConversationScreen(
         }
     }
 
-    fun sendPickedDocuments(uris: List<android.net.Uri>) {
-        if (uris.isEmpty()) return
-        appState.launchMutation {
-            data class ReadOutcome(
-                val attachments: List<PendingAttachment>,
-                val rejected: Boolean,
-                val albumOverflowed: Boolean,
-            )
-            val outcome =
-                withContext(Dispatchers.IO) {
-                    val accepted = mutableListOf<PendingAttachment>()
-                    var albumBytes = 0L
-                    var rejected = false
-                    var albumOverflowed = false
-                    for (uri in uris) {
-                        val declaredSize = queryContentSize(context.contentResolver, uri)
-                        if (declaredSize > 0L && declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
-                            rejected = true
-                            continue
-                        }
-                        val remainingAlbumBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - albumBytes).coerceAtLeast(0L)
-                        if (remainingAlbumBudget <= 0L) {
-                            albumOverflowed = true
-                            break
-                        }
-                        // Cap the bounded read at whichever is smaller: the
-                        // single-file ceiling, or the remaining album budget.
-                        val perFileCap =
-                            minOf(MEDIA_ATTACHMENT_MAX_BYTES, remainingAlbumBudget)
-                                .coerceAtMost(Int.MAX_VALUE.toLong())
-                                .toInt()
-                        val bytes =
-                            runCatching {
-                                context.contentResolver.openInputStream(uri)?.use { stream ->
-                                    MediaPipeline.readBoundedBytes(stream, perFileCap)
-                                }
-                            }.getOrNull()
-                        if (bytes == null) {
-                            // null from runCatching = open failed; null from
-                            // readBoundedBytes = exceeded cap. Both surface as
-                            // "rejected" — the user sees one toast either way.
-                            rejected = true
-                            continue
-                        }
-                        if (bytes.isEmpty()) continue
-                        if (albumBytes + bytes.size > MEDIA_ALBUM_MAX_TOTAL_BYTES) {
-                            // Defensive: per-file cap already accounts for
-                            // remainingAlbumBudget, so this branch shouldn't
-                            // fire — keep it as a belt-and-braces guard.
-                            albumOverflowed = true
-                            continue
-                        }
-                        albumBytes += bytes.size
-                        val resolvedMime =
-                            context.contentResolver
-                                .getType(uri)
-                                .orEmpty()
-                                .takeIf { it.isNotBlank() }
-                                ?: "application/octet-stream"
-                        val name = queryDisplayName(context.contentResolver, uri) ?: "file"
-                        val dim =
-                            if (resolvedMime.startsWith("image/", ignoreCase = true)) {
-                                MediaPipeline.imageDimOrNull(bytes)
-                            } else {
-                                null
-                            }
-                        accepted +=
-                            PendingAttachment(
-                                plaintextBytes = bytes,
-                                mediaType = resolvedMime,
-                                fileName = name,
-                                dim = dim,
-                            )
-                    }
-                    ReadOutcome(accepted, rejected, albumOverflowed)
-                }
-            if (outcome.attachments.isEmpty()) {
-                appState.present(
-                    if (outcome.rejected || outcome.albumOverflowed) {
-                        R.string.media_file_too_large
-                    } else {
-                        R.string.toast_couldnt_decode_image
-                    },
-                )
-                return@launchMutation
-            }
-            if (outcome.albumOverflowed) {
-                appState.present(R.string.media_album_too_large)
-            } else if (outcome.rejected) {
-                appState.present(R.string.media_file_too_large)
-            }
-            controller.sendAttachments(outcome.attachments, caption = null)
-        }
-    }
-
     // Documents take a separate launcher because `OpenMultipleDocuments`
     // accepts any MIME — the image picker can't surface PDFs, archives, etc.
-    // Picked URIs go straight to `sendPickedDocuments` without recompression;
+    // Picked URIs accumulate in `pendingDocumentUris` so they can ride the
+    // same staging shelf as image picks; one Send dispatches both sides
+    // through one kind:9 album. Bytes pass through without recompression —
     // the bytes ride the same `sendAttachments(list, caption)` path since
     // the FFI is MIME-agnostic.
     val documentPickerLauncher =
