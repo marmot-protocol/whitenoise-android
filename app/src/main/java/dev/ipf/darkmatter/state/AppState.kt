@@ -991,8 +991,12 @@ class DarkMatterAppState(
      */
     suspend fun syncNativePushRegistrationIfEnabled() {
         val config = PushServerConfig.current() ?: return
-        if (!isNativePushAvailable(config)) return
+        // Drain before the GMS gate so a token clear that failed earlier
+        // still retries when Play Services becomes unavailable later — the
+        // push server otherwise keeps wrapping wake events for a device
+        // that can no longer receive them.
         drainPendingPushClears()
+        if (!isNativePushAvailable(config)) return
         val accountRefs = accounts.map { it.label }
         if (accountRefs.isEmpty()) return
         val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return
