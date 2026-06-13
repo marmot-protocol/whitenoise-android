@@ -2087,6 +2087,25 @@ private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RET
  *  so async decode never reflows the list (would break the open-time anchor). */
 private val MediaBubbleHeight = 240.dp
 
+/**
+ * Parse the imeta `dim` field ("WxH") into a width/height aspect ratio.
+ * Returns null when [dim] is null, blank, malformed, or non-positive on
+ * either axis. Caller falls back to [MediaBubbleHeight] in that case.
+ */
+private fun aspectRatioFromDim(dim: String?): Float? {
+    if (dim.isNullOrBlank()) return null
+    val parts = dim.split('x', 'X', ignoreCase = true)
+    if (parts.size != 2) return null
+    val w = parts[0].trim().toIntOrNull() ?: return null
+    val h = parts[1].trim().toIntOrNull() ?: return null
+    if (w <= 0 || h <= 0) return null
+    // Clamp so a very tall portrait (e.g. 100×3000) doesn't take the full
+    // viewport, and a very wide panorama (3000×100) doesn't squeeze the
+    // bubble down to a sliver. 0.5..2.5 keeps the bubble between a
+    // wide-landscape strip and a tall-portrait card.
+    return (w.toFloat() / h.toFloat()).coerceIn(0.5f, 2.5f)
+}
+
 /** Saves a nullable Uri across process death (camera capture round-trip). */
 private val NullableUriSaver: Saver<android.net.Uri?, String> =
     Saver(
@@ -2176,15 +2195,20 @@ private fun MediaImageBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
-        // FIXED height across every state (loading / image / failed / gated) so
-        // the bubble never changes size when the image finishes decoding. A
-        // variable height would reflow the timeline after the open-time
-        // scroll-to-bottom and strand the user mid-list (and cause visible
-        // flips). Full aspect-ratio sizing needs `dim` in the imeta tag (Rust).
+        // Reserve aspect-ratio space from the imeta `dim` when present, so
+        // the bubble has its final shape *before* the bytes decode and the
+        // timeline doesn't reflow after the open-time scroll-to-bottom.
+        // Older messages (and any sender that doesn't ship `dim`) fall back
+        // to the fixed bubble height.
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(MediaBubbleHeight),
+            run {
+                val ratio = aspectRatioFromDim(reference.dim)
+                if (ratio != null) {
+                    Modifier.fillMaxWidth().aspectRatio(ratio)
+                } else {
+                    Modifier.fillMaxWidth().height(MediaBubbleHeight)
+                }
+            },
     ) {
         Box(contentAlignment = Alignment.Center) {
             val current = bitmap
