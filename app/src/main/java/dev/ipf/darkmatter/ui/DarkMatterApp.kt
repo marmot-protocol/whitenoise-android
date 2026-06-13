@@ -2237,16 +2237,6 @@ private fun MediaImageBubble(
 }
 
 /**
- * Multi-image album bubble: a 2-column grid of square thumbnails. Used for
- * any message carrying ≥2 image attachments. Each tile maintains its own
- * download/cache state (keyed by `(messageId, attachmentIndex)`); tap any
- * tile to open the full-screen viewer at that attachment. When the album
- * holds more than four images, the fourth tile gets a "+N" overlay and the
- * remaining images are reachable from the viewer (next-tile navigation
- * lands with the pager-viewer follow-up).
- */
-
-/**
  * Count-specific masonry scaffolding for a 2-6 image album. Lays out the
  * tiles so a 3-image set is tall-left + two-stacked-right (no empty cell),
  * 5 is 2-up over 3-down, 6+ is 3×2 with a "+N" tile six. Caller provides
@@ -3925,17 +3915,14 @@ private fun ConversationScreen(
     // Selected-but-not-yet-sent image attachments. The preview sheet opens
     // when this or `pendingDocumentUris` is non-empty; the whole queue
     // ships as one kind:9 album via `controller.sendAttachments(list, caption)`.
-    var pendingMediaUris by rememberSaveable(stateSaver = UriListSaver) {
-        mutableStateOf<List<android.net.Uri>>(emptyList())
-    }
-    // Document picks go through the same preview sheet as images, so the user
-    // can mix image + file attachments in one kind-9 album. The two lists
-    // stay separate because the sheet renders them differently (image
-    // thumbnail vs file-pill tile) and because the send-time decoders
-    // diverge (downscale-to-JPEG vs raw-bytes-with-cap).
-    var pendingDocumentUris by rememberSaveable(stateSaver = UriListSaver) {
-        mutableStateOf<List<android.net.Uri>>(emptyList())
-    }
+    //
+    // Intentionally `remember`, not `rememberSaveable`: Photo Picker and
+    // document URIs carry session-scoped read grants that don't survive
+    // process death, so restoring them from a saved bundle gives us URIs
+    // that fail to open on first read. Lose the staging buffer on
+    // process death rather than keep ghost URIs around.
+    var pendingMediaUris by remember { mutableStateOf<List<android.net.Uri>>(emptyList()) }
+    var pendingDocumentUris by remember { mutableStateOf<List<android.net.Uri>>(emptyList()) }
     // Survives process death while the camera app is foreground (the result
     // callback fires into a recreated activity, otherwise the capture is lost).
     var cameraOutputUri by rememberSaveable(stateSaver = NullableUriSaver) {
@@ -4153,8 +4140,24 @@ private fun ConversationScreen(
         if (imageUris.isEmpty() && documentUris.isEmpty()) return
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
         appState.launchMutation {
-            val imageAttachments = readPickedImages(imageUris)
-            val imageBytes = imageAttachments.sumOf { it.plaintextBytes.size.toLong() }
+            // Enforce the album byte cap on images first so a multi-large-photo
+            // pick can't push the cumulative payload past
+            // MEDIA_ALBUM_MAX_TOTAL_BYTES and evict the retained-uploads LRU
+            // mid-flight (which would break retry). Drop the tail and surface
+            // a single oversize toast.
+            val rawImages = readPickedImages(imageUris)
+            var imageBytes = 0L
+            val acceptedImages = mutableListOf<PendingAttachment>()
+            var imageAlbumOverflowed = false
+            for (attachment in rawImages) {
+                val next = imageBytes + attachment.plaintextBytes.size
+                if (next > MEDIA_ALBUM_MAX_TOTAL_BYTES) {
+                    imageAlbumOverflowed = true
+                    continue
+                }
+                imageBytes = next
+                acceptedImages += attachment
+            }
             val docBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - imageBytes).coerceAtLeast(0L)
             val docOutcome =
                 if (documentUris.isEmpty()) {
@@ -4162,19 +4165,26 @@ private fun ConversationScreen(
                 } else {
                     readPickedDocuments(documentUris, docBudget)
                 }
-            val merged = imageAttachments + docOutcome.attachments
+            val merged = acceptedImages + docOutcome.attachments
             if (merged.isEmpty()) {
-                appState.present(R.string.toast_couldnt_decode_image)
-                return@launchMutation
+                // Only surface the image-decode toast when there were image
+                // picks to begin with — a document-only send that failed every
+                // file should fall through to the document toasts below
+                // rather than misreporting as an image decode error.
+                if (imageUris.isNotEmpty()) {
+                    appState.present(R.string.toast_couldnt_decode_image)
+                    return@launchMutation
+                }
             }
-            if (imageAttachments.size < imageUris.size) {
+            if (acceptedImages.size < imageUris.size && !imageAlbumOverflowed) {
                 appState.present(R.string.toast_couldnt_decode_image)
             }
-            if (docOutcome.albumOverflowed) {
+            if (imageAlbumOverflowed || docOutcome.albumOverflowed) {
                 appState.present(R.string.media_album_too_large)
             } else if (docOutcome.rejected) {
                 appState.present(R.string.media_file_too_large)
             }
+            if (merged.isEmpty()) return@launchMutation
             controller.sendAttachments(merged, trimmedCaption)
         }
     }

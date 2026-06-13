@@ -257,7 +257,7 @@ object MediaPipeline {
         val w = bounds.outWidth
         val h = bounds.outHeight
         if (w <= 0 || h <= 0) return null
-        return "${w}x${h}"
+        return "${w}x$h"
     }
 
     /**
