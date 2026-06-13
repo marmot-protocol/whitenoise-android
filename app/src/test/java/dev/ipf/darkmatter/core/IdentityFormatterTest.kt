@@ -11,4 +11,38 @@ class IdentityFormatterTest {
 
         assertEquals("future", IdentityFormatter.relativeTime(tomorrow))
     }
+
+    @Test
+    fun initialsTakeLeadingCodePointFromEachWord() {
+        // Latin smoke test: the existing two-word path still works.
+        assertEquals("AB", IdentityFormatter.initials("alice bobson"))
+    }
+
+    @Test
+    fun initialsTakeNonBmpEmojiWhole() {
+        // Two-word name whose first word leads with a non-BMP emoji: the
+        // emoji must arrive whole rather than as a lone surrogate half.
+        val grinningFace = String(Character.toChars(0x1F600))
+        val expected = "${grinningFace.uppercase()}B"
+
+        assertEquals(expected, IdentityFormatter.initials("$grinningFace bob"))
+    }
+
+    @Test
+    fun initialsTakeTwoNonBmpCodePointsFromOneWord() {
+        // Single-word name made entirely of non-BMP code points: both initials
+        // must arrive whole. Pre-fix this would split a surrogate pair.
+        val mathBoldX = String(Character.toChars(0x1D54F))
+        val mathBoldA = String(Character.toChars(0x1D400))
+        val word = mathBoldX + mathBoldA + "vier"
+        val expected = (mathBoldX + mathBoldA).uppercase()
+
+        assertEquals(expected, IdentityFormatter.initials(word))
+    }
+
+    @Test
+    fun initialsFallBackForBlankInput() {
+        assertEquals("DM", IdentityFormatter.initials(""))
+        assertEquals("DM", IdentityFormatter.initials("   "))
+    }
 }

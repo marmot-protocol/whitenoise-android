@@ -22,11 +22,30 @@ object IdentityFormatter {
                 .filter { it.isNotBlank() }
         val letters =
             when {
-                words.size >= 2 -> "${words[0].first()}${words[1].first()}"
-                words.size == 1 -> words[0].take(2)
+                // Iterate code points rather than UTF-16 `Char`s so a leading
+                // non-BMP grapheme (emoji, mathematical alphanumerics, many
+                // CJK extensions) is taken whole rather than as a lone
+                // surrogate half that renders as a replacement glyph.
+                words.size >= 2 -> firstCodePoint(words[0]) + firstCodePoint(words[1])
+                words.size == 1 -> firstTwoCodePoints(words[0])
                 else -> "DM"
             }
         return letters.uppercase()
+    }
+
+    private fun firstCodePoint(value: String): String {
+        if (value.isEmpty()) return ""
+        val codePoint = value.codePointAt(0)
+        return String(Character.toChars(codePoint))
+    }
+
+    private fun firstTwoCodePoints(value: String): String {
+        if (value.isEmpty()) return ""
+        val first = value.codePointAt(0)
+        val firstWidth = Character.charCount(first)
+        if (firstWidth >= value.length) return String(Character.toChars(first))
+        val second = value.codePointAt(firstWidth)
+        return String(Character.toChars(first)) + String(Character.toChars(second))
     }
 
     fun relativeTime(epochSeconds: ULong): String {
