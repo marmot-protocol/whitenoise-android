@@ -571,28 +571,27 @@ class DarkMatterAppState(
     }
 
     /**
-     * Wipe in-memory media caches only — L1 plaintext, decoded thumbnails,
-     * and the URL-keyed avatar LRU. Used on account switch, where the L2
-     * disk cache (per-account-keyed) is deliberately preserved so the user
-     * doesn't re-download every image when bouncing between accounts.
+     * Wipe per-account in-memory media caches on account switch. The
+     * URL-keyed avatar LRU stays put — it is already byte-budgeted, holds
+     * no per-account secret material, and the same URL points at the same
+     * bytes regardless of the active account, so re-fetching every group
+     * and profile picture on every switch is gratuitous network + battery
+     * cost. The L2 disk cache is also deliberately preserved.
      */
     private fun clearInMemoryMediaCaches() {
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
-        // Avatars are URL-keyed and shared across accounts; wiping on switch
-        // keeps the LRU bounded without per-switch growth, at the cost of a
-        // re-fetch when the user returns. Cheap relative to media bytes.
-        AvatarImageLoader.clear()
     }
 
     /**
-     * Wipe in-memory caches AND the L2 disk cache. Used at sign-out, when
-     * we treat the device-side decrypted-media footprint as ending with
-     * the session. Re-opening a chat after the next sign-in re-downloads
-     * from Blossom.
+     * Wipe in-memory caches, the avatar LRU, and the L2 disk cache. Used
+     * at sign-out, when we treat the device-side decrypted-media footprint
+     * as ending with the session. Re-opening a chat after the next sign-in
+     * re-downloads from Blossom.
      */
     private fun clearAllMediaCaches() {
         clearInMemoryMediaCaches()
+        AvatarImageLoader.clear()
         notificationScope.launch(Dispatchers.IO) { diskMediaCache.clear() }
     }
 
