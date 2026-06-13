@@ -163,7 +163,11 @@ class DiskByteCache(
         // Sweep stranded `.tmp` files from a prior crash so the byte cap
         // matches what's actually on disk.
         for (file in allFiles) {
-            if (file.name.endsWith(TMP_SUFFIX)) runCatching { file.delete() }
+            if (file.name.endsWith(TMP_SUFFIX)) {
+                runCatching { file.delete() }.onFailure {
+                    android.util.Log.w("DiskByteCache", "failed to delete orphan ${file.name}", it)
+                }
+            }
         }
         val files =
             allFiles
