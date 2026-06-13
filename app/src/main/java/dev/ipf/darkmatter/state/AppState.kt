@@ -247,7 +247,22 @@ class DarkMatterAppState(
     // one. An entry is removed when the corresponding account disables
     // native push, signs out, or hits a sync failure that may indicate the
     // registration is stale.
-    private val perAccountSyncedFingerprints = mutableMapOf<String, String>()
+    private val perAccountSyncedFingerprints = mutableMapOf<String, PushFingerprint>()
+
+    /**
+     * Cache key for [perAccountSyncedFingerprints]: a value type whose
+     * equality is structural across every field that participates in the
+     * push registration. A delimited string was the prior shape; switching
+     * to a data class makes collisions impossible if any field ever gains
+     * a delimiter character downstream, without depending on the choice of
+     * separator.
+     */
+    private data class PushFingerprint(
+        val platform: PushPlatformFfi,
+        val token: String,
+        val serverPubkeyHex: String,
+        val relayHint: String?,
+    )
 
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
         private set
@@ -1028,7 +1043,13 @@ class DarkMatterAppState(
         val settings = runCatching { marmotIo { notificationSettings(account) } }.getOrNull() ?: return
         if (account == activeAccountRef) localNotificationSettings = settings
         if (!settings.nativePushEnabled) return
-        val fingerprint = "FCM|$token|${config.serverPubkeyHex}|${config.relayHint.orEmpty()}"
+        val fingerprint =
+            PushFingerprint(
+                platform = PushPlatformFfi.FCM,
+                token = token,
+                serverPubkeyHex = config.serverPubkeyHex,
+                relayHint = config.relayHint,
+            )
         if (perAccountSyncedFingerprints[account] == fingerprint) return
         runCatching {
             marmotIo {
