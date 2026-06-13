@@ -134,6 +134,7 @@ import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -3421,6 +3422,8 @@ private fun MediaPreviewSheet(
     uris: List<android.net.Uri>,
     onDismiss: () -> Unit,
     onSend: (caption: String) -> Unit,
+    onRemoveAt: (Int) -> Unit,
+    onAddMore: () -> Unit,
 ) {
     var caption by remember { mutableStateOf("") }
     // Local guard against a rapid double-tap firing onSend twice before the
@@ -3438,36 +3441,74 @@ private fun MediaPreviewSheet(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (uris.size == 1) {
-                LocalImagePreview(
-                    uri = uris.first(),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 320.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                )
-            } else {
-                // Album preview: a horizontally-scrollable strip of square
-                // thumbnails. The strip-shape on the compose surface lets the
-                // user scan + reorder mentally before sending; the grid shape
-                // is reserved for the received-message bubble.
-                LazyRow(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 220.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(uris, key = { uri -> uri.toString() }) { uri ->
+            // Horizontally-scrollable shelf of square tiles, one per staged
+            // attachment plus a trailing "Add more" tile. Each tile carries a
+            // small `✕` overlay that removes only that item from the queue.
+            LazyRow(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 96.dp, max = 220.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                itemsIndexed(uris, key = { _, uri -> uri.toString() }) { index, uri ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxHeight()
+                                .aspectRatio(1f),
+                    ) {
                         LocalImagePreview(
                             uri = uri,
                             modifier =
                                 Modifier
-                                    .fillMaxHeight()
-                                    .aspectRatio(1f)
+                                    .fillMaxSize()
                                     .clip(RoundedCornerShape(12.dp)),
                         )
+                        FilledIconButton(
+                            onClick = { if (!sending) onRemoveAt(index) },
+                            modifier =
+                                Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .size(24.dp),
+                            colors =
+                                IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f),
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                ),
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.media_attachment_remove),
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
+                }
+                item(key = "media_preview_add_more_tile") {
+                    OutlinedButton(
+                        onClick = { if (!sending) onAddMore() },
+                        modifier =
+                            Modifier
+                                .fillMaxHeight()
+                                .aspectRatio(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        enabled = !sending,
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                stringResource(R.string.media_attachment_add_more),
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
@@ -3778,7 +3819,14 @@ private fun ConversationScreen(
         rememberLauncherForActivityResult(
             ActivityResultContracts.PickMultipleVisualMedia(maxItems = MEDIA_PICKER_MAX_ITEMS),
         ) { uris ->
-            if (uris.isNotEmpty()) pendingMediaUris = uris
+            if (uris.isEmpty()) return@rememberLauncherForActivityResult
+            // Append rather than replace so a follow-up "Add more" tile-pick
+            // grows the staging shelf instead of clobbering whatever the user
+            // already queued. Dedupe on Uri identity to keep a double-pick
+            // from doubling the row, and cap on MEDIA_PICKER_MAX_ITEMS so the
+            // shelf can't exceed what a fresh pick would have been allowed.
+            val merged = (pendingMediaUris + uris).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+            pendingMediaUris = merged
         }
     val cameraLauncher =
         rememberLauncherForActivityResult(
@@ -3786,7 +3834,10 @@ private fun ConversationScreen(
         ) { success ->
             val captured = cameraOutputUri
             if (success && captured != null) {
-                pendingMediaUris = listOf(captured)
+                // Append to whatever's already queued so an in-progress staging
+                // shelf survives a camera capture.
+                val merged = (pendingMediaUris + captured).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+                pendingMediaUris = merged
             } else {
                 cameraOutputFile?.delete() // cancelled — don't leak the empty temp
             }
@@ -4404,6 +4455,17 @@ private fun ConversationScreen(
             onSend = { caption ->
                 pendingMediaUris = emptyList()
                 sendPickedMedia(uris, caption)
+            },
+            onRemoveAt = { index ->
+                pendingMediaUris =
+                    pendingMediaUris.toMutableList().apply {
+                        if (index in indices) removeAt(index)
+                    }
+            },
+            onAddMore = {
+                imagePickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
             },
         )
     }

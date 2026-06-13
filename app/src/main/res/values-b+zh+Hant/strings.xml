@@ -479,4 +479,6 @@
     <string name="group_system_admin_removed_you_passive">你不再是管理員</string>
     <string name="group_system_you_renamed">你將群組名稱改為「%1$s」</string>
     <string name="group_system_you_avatar_changed">你更換了群組頭像</string>
+    <string name="media_attachment_add_more">新增更多</string>
+    <string name="media_attachment_remove">移除附件</string>
 </resources>

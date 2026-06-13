@@ -488,4 +488,6 @@
     <string name="group_system_admin_removed_you_passive">Вы больше не администратор</string>
     <string name="group_system_you_renamed">Вы переименовали группу в «%1$s»</string>
     <string name="group_system_you_avatar_changed">Вы изменили аватар группы</string>
+    <string name="media_attachment_add_more">Добавить ещё</string>
+    <string name="media_attachment_remove">Удалить вложение</string>
 </resources>
