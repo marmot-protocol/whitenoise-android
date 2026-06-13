@@ -8808,7 +8808,7 @@ private fun DiagnosticsScreen(
                 title = { Text(stringResource(R.string.diagnostics)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_to_chats))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
@@ -8826,6 +8826,7 @@ private fun DiagnosticsScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(
                         onClick = {
+                            if (sendingPing) return@OutlinedButton
                             sendingPing = true
                             scope.launch {
                                 val account = appState.activeAccountRef
