@@ -990,12 +990,13 @@ class DarkMatterAppState(
      * something changes.
      */
     suspend fun syncNativePushRegistrationIfEnabled() {
-        val config = PushServerConfig.current() ?: return
-        // Drain before the GMS gate so a token clear that failed earlier
-        // still retries when Play Services becomes unavailable later — the
-        // push server otherwise keeps wrapping wake events for a device
-        // that can no longer receive them.
+        // Drain before resolving the push-server config so a clear that
+        // failed earlier still retries even if the config is later blanked
+        // or GMS is uninstalled — otherwise a stale server-side registration
+        // would keep wrapping wake events for a device that can no longer
+        // receive them. Only the upsert path is gated on config + GMS.
         drainPendingPushClears()
+        val config = PushServerConfig.current() ?: return
         if (!isNativePushAvailable(config)) return
         val accountRefs = accounts.map { it.label }
         if (accountRefs.isEmpty()) return
