@@ -18,6 +18,7 @@ data class MessageTextCopy(
     val streamFinished: String,
     val mediaAttachment: String,
     val message: String,
+    val groupSystem: GroupSystemCopy = GroupSystemCopy.Default,
 ) {
     fun reacted(value: String): String = String.format(reactedFormat, value)
 
@@ -42,6 +43,7 @@ object MessageProjector {
     private val KindChat = 9uL
     private val KindEdit = 1009uL
     private val KindAgentStreamStart = 1200uL
+    private val KindGroupSystem = 1210uL
 
     private const val EventRefTag = "e"
     private const val QuoteRefTag = "q"
@@ -58,6 +60,10 @@ object MessageProjector {
             isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
             isDelete(message) -> copy.deleted
             isStreamStart(message) -> message.plaintext.ifBlank { copy.agentStreamStarted }
+            // Never the raw JSON: kind-1210 content must not render as a chat
+            // body. The conversation row builds the name-resolved summary;
+            // this name-free form covers reply previews and copy-text.
+            isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
             isMedia(message) ->
                 message.plaintext.takeIf { it.isNotBlank() }
                     ?: imetaField(message, "filename")
@@ -75,6 +81,7 @@ object MessageProjector {
             isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
             isDelete(message) -> copy.deleted
             isStreamStart(message) -> copy.agentStreamStarted
+            isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
             isStreamFinal(message) -> message.plaintext.ifBlank { copy.streamFinished }
             isMedia(message) ->
                 message.plaintext.takeIf { it.isNotBlank() }
@@ -149,6 +156,10 @@ object MessageProjector {
         messageIdHex: String,
         deletedMessageIds: Set<String>,
     ): Boolean = messageIdHex.isNotEmpty() && deletedMessageIds.contains(messageIdHex)
+
+    fun isGroupSystem(message: AppMessageRecordFfi): Boolean = isGroupSystemKind(message.kind)
+
+    fun isGroupSystemKind(kind: ULong): Boolean = kind == KindGroupSystem
 
     fun isReaction(message: AppMessageRecordFfi): Boolean = message.kind == KindReaction
 

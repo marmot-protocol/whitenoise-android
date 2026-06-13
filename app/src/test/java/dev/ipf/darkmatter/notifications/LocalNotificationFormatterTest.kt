@@ -23,7 +23,7 @@ class LocalNotificationFormatterTest {
 
         assertEquals("Alice in Launch", content?.title)
         assertEquals("We are go", content?.body)
-        assertNull(content?.groupKey)
+        assertEquals("account|group", content?.groupKey)
     }
 
     @Test

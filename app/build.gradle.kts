@@ -215,6 +215,8 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.play.services.base)
     testImplementation(libs.junit)
+    // Real org.json for JVM unit tests — the android.jar stubs throw on use.
+    testImplementation(libs.org.json)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

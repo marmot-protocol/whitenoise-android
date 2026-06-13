@@ -9,6 +9,7 @@ import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.EditState
 import dev.ipf.darkmatter.core.GroupProjector
+import dev.ipf.darkmatter.core.GroupSystemEvents
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ReactionTally
@@ -102,6 +103,10 @@ data class ChatListItem(
             // [latest] message stays projected — drop this row's edit
             // payload from the preview text path.
             preview.kind == 1009uL -> MessageProjector.previewText(latest, copy, empty)
+            // Before the generic plaintext arm: a kind-1210 last message would
+            // otherwise leak its raw JSON content into the chat list.
+            MessageProjector.isGroupSystemKind(preview.kind) ->
+                GroupSystemEvents.previewText(preview.plaintext, copy.groupSystem)
             preview.plaintext.isNotBlank() -> preview.plaintext
             else -> copy.message
         }

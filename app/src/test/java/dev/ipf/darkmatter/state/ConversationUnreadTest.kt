@@ -81,6 +81,15 @@ class ConversationUnreadTest {
     }
 
     @Test
+    fun unreadCount_skipsGroupSystemRows() {
+        // Kind-1210 rows arrive direction=received but are derived state
+        // facts, not messages — they must not inflate the FAB badge.
+        val timeline = listOf(received("r1"), groupSystem("g1"), received("r2"), groupSystem("g2"))
+        assertEquals(1, countUnreadIncoming(timeline, readAnchorMessageId = "r1"))
+        assertEquals(2, countUnreadIncoming(timeline, readAnchorMessageId = null))
+    }
+
+    @Test
     fun unreadCount_emptyTimeline_isZero() {
         assertEquals(0, countUnreadIncoming(emptyList(), readAnchorMessageId = "anything"))
     }
@@ -247,11 +256,17 @@ class ConversationUnreadTest {
         recordedAt: ULong = 1uL,
     ): TimelineMessage = message(id, direction = "sent", recordedAt = recordedAt)
 
+    private fun groupSystem(
+        id: String,
+        recordedAt: ULong = 1uL,
+    ): TimelineMessage = message(id, direction = "received", recordedAt = recordedAt, kind = 1210uL)
+
     private fun message(
         id: String,
         direction: String,
         recordedAt: ULong = 1uL,
         status: MessageStatus = if (direction == "received") MessageStatus.Received else MessageStatus.Sent,
+        kind: ULong = 9uL,
     ): TimelineMessage =
         TimelineMessage(
             id = "msg:$id",
@@ -263,7 +278,7 @@ class ConversationUnreadTest {
                     sender = if (direction == "received") "bob" else "alice",
                     plaintext = "text-$id",
                     contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
-                    kind = 9uL,
+                    kind = kind,
                     tags = emptyList(),
                     recordedAt = recordedAt,
                     receivedAt = recordedAt,
