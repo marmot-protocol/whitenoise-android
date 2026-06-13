@@ -453,4 +453,9 @@
     <string name="message_invalidated">Это сообщение не дошло до группы</string>
     <string name="message_invalidated_preview">Не дошло до группы</string>
     <string name="group_avatar_url">URL аватара</string>
+    <string name="relative_time_future">будущее</string>
+    <string name="relative_time_now">сейчас</string>
+    <string name="relative_time_minutes">%1$d мин</string>
+    <string name="relative_time_hours">%1$d ч</string>
+    <string name="relative_time_days">%1$d дн</string>
 </resources>

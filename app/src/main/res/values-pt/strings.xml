@@ -447,4 +447,9 @@
     <string name="message_invalidated">Esta mensagem não chegou ao grupo</string>
     <string name="message_invalidated_preview">Não chegou ao grupo</string>
     <string name="group_avatar_url">URL do avatar</string>
+    <string name="relative_time_future">futuro</string>
+    <string name="relative_time_now">agora</string>
+    <string name="relative_time_minutes">%1$d min</string>
+    <string name="relative_time_hours">%1$d h</string>
+    <string name="relative_time_days">%1$d d</string>
 </resources>

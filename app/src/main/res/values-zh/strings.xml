@@ -444,4 +444,9 @@
     <string name="message_invalidated">此消息未送达群组</string>
     <string name="message_invalidated_preview">未送达群组</string>
     <string name="group_avatar_url">头像 URL</string>
+    <string name="relative_time_future">未来</string>
+    <string name="relative_time_now">现在</string>
+    <string name="relative_time_minutes">%1$d分钟</string>
+    <string name="relative_time_hours">%1$d小时</string>
+    <string name="relative_time_days">%1$d天</string>
 </resources>

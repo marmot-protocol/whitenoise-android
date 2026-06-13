@@ -447,4 +447,9 @@
         <item quantity="one">%1$d image selected</item>
         <item quantity="other">%1$d images selected</item>
     </plurals>
+    <string name="relative_time_future">future</string>
+    <string name="relative_time_now">now</string>
+    <string name="relative_time_minutes">%1$dm</string>
+    <string name="relative_time_hours">%1$dh</string>
+    <string name="relative_time_days">%1$dd</string>
 </resources>

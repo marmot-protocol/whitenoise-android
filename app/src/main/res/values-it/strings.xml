@@ -447,4 +447,9 @@
     <string name="message_invalidated">Questo messaggio non ha raggiunto il gruppo</string>
     <string name="message_invalidated_preview">Non ha raggiunto il gruppo</string>
     <string name="group_avatar_url">URL dell\'avatar</string>
+    <string name="relative_time_future">futuro</string>
+    <string name="relative_time_now">adesso</string>
+    <string name="relative_time_minutes">%1$d min</string>
+    <string name="relative_time_hours">%1$d h</string>
+    <string name="relative_time_days">%1$d g</string>
 </resources>

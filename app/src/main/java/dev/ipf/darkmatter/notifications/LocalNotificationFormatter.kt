@@ -35,7 +35,9 @@ object LocalNotificationFormatter {
         return LocalNotificationContent(
             notificationTag = update.notificationKey,
             notificationId = 0,
-            groupKey = null,
+            // Per-conversation per-account so the shade collapses into one
+            // stack instead of N independent alerts.
+            groupKey = "${update.accountRef}|${update.groupIdHex}",
             title = title,
             body = body,
         )

@@ -247,7 +247,15 @@ class DarkMatterAppState(
     // one. An entry is removed when the corresponding account disables
     // native push, signs out, or hits a sync failure that may indicate the
     // registration is stale.
-    private val perAccountSyncedFingerprints = mutableMapOf<String, String>()
+    private val perAccountSyncedFingerprints = mutableMapOf<String, PushFingerprint>()
+
+    /** Structural cache key for the push-registration dedupe map. */
+    private data class PushFingerprint(
+        val platform: PushPlatformFfi,
+        val token: String,
+        val serverPubkeyHex: String,
+        val relayHint: String?,
+    )
 
     var phase by mutableStateOf<AppPhase>(AppPhase.Bootstrapping)
         private set
@@ -631,6 +639,9 @@ class DarkMatterAppState(
                     }
                 clearPushRegistrationForAccount(signedOutRef)
             }
+            // Drop the cached FCM token only when no accounts remain on the
+            // device — other identities still need it on multi-account switch.
+            if (next == null) pushTokenStore.clear()
             refreshLocalNotificationSettings()
         }
     }
@@ -950,8 +961,8 @@ class DarkMatterAppState(
      * [BuildConfig.DARKMATTER_PUSH_SERVER_PUBKEY_HEX], on emulators without
      * Play Services, and on builds where Firebase isn't initialized.
      */
-    fun isNativePushAvailable(): Boolean {
-        if (PushServerConfig.current() == null) return false
+    fun isNativePushAvailable(config: PushServerConfig? = PushServerConfig.current()): Boolean {
+        if (config == null) return false
         val status = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(appContext)
         if (status != ConnectionResult.SUCCESS) return false
         return FirebaseApp.getApps(appContext).isNotEmpty()
@@ -979,9 +990,14 @@ class DarkMatterAppState(
      * something changes.
      */
     suspend fun syncNativePushRegistrationIfEnabled() {
-        if (!isNativePushAvailable()) return
+        // Drain before resolving the push-server config so a clear that
+        // failed earlier still retries even if the config is later blanked
+        // or GMS is uninstalled — otherwise a stale server-side registration
+        // would keep wrapping wake events for a device that can no longer
+        // receive them. Only the upsert path is gated on config + GMS.
         drainPendingPushClears()
         val config = PushServerConfig.current() ?: return
+        if (!isNativePushAvailable(config)) return
         val accountRefs = accounts.map { it.label }
         if (accountRefs.isEmpty()) return
         val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return
@@ -1022,7 +1038,13 @@ class DarkMatterAppState(
         val settings = runCatching { marmotIo { notificationSettings(account) } }.getOrNull() ?: return
         if (account == activeAccountRef) localNotificationSettings = settings
         if (!settings.nativePushEnabled) return
-        val fingerprint = "FCM|$token|${config.serverPubkeyHex}|${config.relayHint.orEmpty()}"
+        val fingerprint =
+            PushFingerprint(
+                platform = PushPlatformFfi.FCM,
+                token = token,
+                serverPubkeyHex = config.serverPubkeyHex,
+                relayHint = config.relayHint,
+            )
         if (perAccountSyncedFingerprints[account] == fingerprint) return
         runCatching {
             marmotIo {

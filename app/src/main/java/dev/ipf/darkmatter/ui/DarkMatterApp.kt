@@ -378,6 +378,32 @@ private fun rememberConversationControllerCopy(): ConversationControllerCopy =
         streamFailedFormat = stringResource(R.string.stream_failed_format),
     )
 
+@Composable
+private fun rememberRelativeTimeCopy(): dev.ipf.darkmatter.core.RelativeTimeCopy {
+    val future = stringResource(R.string.relative_time_future)
+    val now = stringResource(R.string.relative_time_now)
+    val minutesFormat = stringResource(R.string.relative_time_minutes)
+    val hoursFormat = stringResource(R.string.relative_time_hours)
+    val daysFormat = stringResource(R.string.relative_time_days)
+    return remember(future, now, minutesFormat, hoursFormat, daysFormat) {
+        dev.ipf.darkmatter.core.RelativeTimeCopy(
+            future = future,
+            now = now,
+            minutesFormat = minutesFormat,
+            hoursFormat = hoursFormat,
+            daysFormat = daysFormat,
+        )
+    }
+}
+
+@Composable
+private fun rememberedRelativeTime(epochSeconds: ULong): String =
+    IdentityFormatter.relativeTime(
+        epochSeconds,
+        rememberRelativeTimeCopy(),
+        LocalConfiguration.current.locales[0],
+    )
+
 private val AppThemeMode.labelRes: Int
     @StringRes
     get() =
@@ -901,8 +927,8 @@ private fun MainShell(
         MainSection.Diagnostics ->
             DiagnosticsScreen(
                 appState = appState,
-                onBackToChats = {
-                    sectionName = MainSection.Chats.name
+                onBack = {
+                    sectionName = MainSection.Settings.name
                     settingsDetailName = null
                 },
             )
@@ -1751,7 +1777,7 @@ private fun ChatRow(
         trailingContent = {
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    IdentityFormatter.relativeTime(item.latestAt ?: 0uL),
+                    rememberedRelativeTime(item.latestAt ?: 0uL),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -5817,7 +5843,7 @@ private fun MessageBubble(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                IdentityFormatter.relativeTime(record.recordedAt),
+                                rememberedRelativeTime(record.recordedAt),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = timestampColor,
                             )
@@ -6279,7 +6305,7 @@ private fun EditHistoryVersionRow(
                     )
                 }
                 Text(
-                    text = IdentityFormatter.relativeTime(row.recordedAt),
+                    text = rememberedRelativeTime(row.recordedAt),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -8738,11 +8764,15 @@ private fun formatPublishedAt(
 @Composable
 private fun DiagnosticsScreen(
     appState: DarkMatterAppState,
-    onBackToChats: () -> Unit,
+    onBack: () -> Unit,
 ) {
+    // Claim back so it returns to Settings rather than falling through
+    // to the Activity and closing the app.
+    BackHandler { onBack() }
     var health by remember { mutableStateOf<RelayHealthFfi?>(null) }
     var entries by remember { mutableStateOf<List<DiagnosticLogEntry>>(emptyList()) }
     var streaming by remember { mutableStateOf(false) }
+    var sendingPing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val sentPingFormat = stringResource(R.string.diagnostic_sent_ping_to_self)
     val sendToSelfFailedFormat = stringResource(R.string.diagnostic_send_to_self_failed)
@@ -8777,8 +8807,8 @@ private fun DiagnosticsScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.diagnostics)) },
                 navigationIcon = {
-                    IconButton(onClick = onBackToChats) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_to_chats))
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
@@ -8796,29 +8826,38 @@ private fun DiagnosticsScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(
                         onClick = {
+                            if (sendingPing) return@OutlinedButton
+                            sendingPing = true
                             scope.launch {
-                                val account = appState.activeAccountRef ?: return@launch
-                                runCatching {
-                                    val groupId =
-                                        appState.marmotIo {
-                                            createGroup(
-                                                account,
-                                                "diagnostic-${System.currentTimeMillis() / 1000L}",
-                                                emptyList(),
-                                                null,
-                                            )
-                                        }
-                                    appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }
-                                    // Archive the throwaway diagnostic group so it doesn't
-                                    // accumulate as an orphan in the chat list on every click. See #70.
-                                    appState.marmotIo { setGroupArchived(account, groupId, true) }
-                                    appendLog(String.format(sentPingFormat, IdentityFormatter.short(groupId)))
-                                }.onFailure {
-                                    appendLog(String.format(sendToSelfFailedFormat, it.message ?: it.javaClass.simpleName))
+                                val account = appState.activeAccountRef
+                                if (account == null) {
+                                    sendingPing = false
+                                    return@launch
+                                }
+                                try {
+                                    runCatching {
+                                        val groupId =
+                                            appState.marmotIo {
+                                                createGroup(
+                                                    account,
+                                                    "diagnostic-${System.currentTimeMillis() / 1000L}",
+                                                    emptyList(),
+                                                    null,
+                                                )
+                                            }
+                                        appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }
+                                        // Archive the throwaway group so the chat list doesn't accumulate orphans.
+                                        appState.marmotIo { setGroupArchived(account, groupId, true) }
+                                        appendLog(String.format(sentPingFormat, IdentityFormatter.short(groupId)))
+                                    }.onFailure {
+                                        appendLog(String.format(sendToSelfFailedFormat, it.message ?: it.javaClass.simpleName))
+                                    }
+                                } finally {
+                                    sendingPing = false
                                 }
                             }
                         },
-                        enabled = appState.activeAccountRef != null,
+                        enabled = !sendingPing && appState.activeAccountRef != null,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
@@ -8880,7 +8919,7 @@ private fun DiagnosticsScreen(
                 items(entries, key = { it.id }) { entry ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            IdentityFormatter.relativeTime(entry.timestamp),
+                            rememberedRelativeTime(entry.timestamp),
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

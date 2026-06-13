@@ -159,12 +159,20 @@ class DiskByteCache(
     }
 
     private fun rehydrateIndex() {
+        val allFiles = cacheDir.listFiles()?.filter { it.isFile } ?: return
+        // Sweep stranded `.tmp` files from a prior crash so the byte cap
+        // matches what's actually on disk.
+        for (file in allFiles) {
+            if (file.name.endsWith(TMP_SUFFIX)) {
+                runCatching { file.delete() }.onFailure {
+                    android.util.Log.w("DiskByteCache", "failed to delete orphan ${file.name}", it)
+                }
+            }
+        }
         val files =
-            cacheDir
-                .listFiles()
-                ?.filter { it.isFile && it.name.endsWith(SUFFIX) }
-                ?.sortedBy { it.lastModified() }
-                ?: return
+            allFiles
+                .filter { it.name.endsWith(SUFFIX) }
+                .sortedBy { it.lastModified() }
         for (file in files) {
             val size = file.length()
             if (size <= 0 || size > Int.MAX_VALUE) {

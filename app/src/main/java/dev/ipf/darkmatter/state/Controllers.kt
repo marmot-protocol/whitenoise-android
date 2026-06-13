@@ -2547,11 +2547,15 @@ class ConversationController(
         if (!HEX_MESSAGE_ID.matches(trimmed)) return
         if (trimmed == lastReadMessageId) return
         val account = conversationAccountRef ?: return
+        // Restore the prior pointer on failure so a transient FFI error
+        // doesn't drop the dedupe state for already-marked rows.
+        val previous = lastReadMessageId
         lastReadMessageId = trimmed
         runCatching {
             appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, trimmed) }
         }.onFailure {
-            lastReadMessageId = null
+            lastReadMessageId = previous
+            if (it is CancellationException) throw it
             Log.w("DMConversation", "mark read failed for ${group.groupIdHex.take(8)} message=${trimmed.take(8)}", it)
         }
     }
