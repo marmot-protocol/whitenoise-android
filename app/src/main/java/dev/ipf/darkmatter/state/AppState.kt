@@ -956,8 +956,8 @@ class DarkMatterAppState(
      * [BuildConfig.DARKMATTER_PUSH_SERVER_PUBKEY_HEX], on emulators without
      * Play Services, and on builds where Firebase isn't initialized.
      */
-    fun isNativePushAvailable(): Boolean {
-        if (PushServerConfig.current() == null) return false
+    fun isNativePushAvailable(config: PushServerConfig? = PushServerConfig.current()): Boolean {
+        if (config == null) return false
         val status = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(appContext)
         if (status != ConnectionResult.SUCCESS) return false
         return FirebaseApp.getApps(appContext).isNotEmpty()
@@ -985,9 +985,9 @@ class DarkMatterAppState(
      * something changes.
      */
     suspend fun syncNativePushRegistrationIfEnabled() {
-        if (!isNativePushAvailable()) return
-        drainPendingPushClears()
         val config = PushServerConfig.current() ?: return
+        if (!isNativePushAvailable(config)) return
+        drainPendingPushClears()
         val accountRefs = accounts.map { it.label }
         if (accountRefs.isEmpty()) return
         val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return
