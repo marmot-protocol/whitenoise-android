@@ -11,9 +11,14 @@ import dev.ipf.marmotkit.NotificationUserFfi
 data class LocalNotificationContent(
     val notificationTag: String,
     val notificationId: Int,
-    val groupKey: String?,
     val title: String,
     val body: String,
+    val senderName: String,
+    val senderKey: String,
+    val selfName: String,
+    val selfKey: String,
+    val isGroupConversation: Boolean,
+    val conversationTitle: String?,
 )
 
 object LocalNotificationFormatter {
@@ -33,13 +38,23 @@ object LocalNotificationFormatter {
                 NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context)
             }
         return LocalNotificationContent(
-            notificationTag = update.notificationKey,
+            // Messages from one conversation share a per-account, per-group tag
+            // so they accumulate into a single MessagingStyle card instead of N
+            // independent alerts. Invites stay individual (per notification key).
+            notificationTag =
+                when (update.trigger) {
+                    NotificationTriggerFfi.NEW_MESSAGE -> "${update.accountRef}|${update.groupIdHex}"
+                    NotificationTriggerFfi.GROUP_INVITE -> update.notificationKey
+                },
             notificationId = 0,
-            // Per-conversation per-account so the shade collapses into one
-            // stack instead of N independent alerts.
-            groupKey = "${update.accountRef}|${update.groupIdHex}",
             title = title,
             body = body,
+            senderName = displayName(update.sender),
+            senderKey = update.sender.accountIdHex,
+            selfName = displayName(update.receiver),
+            selfKey = update.receiver.accountIdHex,
+            isGroupConversation = !update.isDm,
+            conversationTitle = if (!update.isDm) clean(update.groupName) else null,
         )
     }
 

@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.NotificationUserFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalNotificationFormatterTest {
@@ -23,7 +24,23 @@ class LocalNotificationFormatterTest {
 
         assertEquals("Alice in Launch", content?.title)
         assertEquals("We are go", content?.body)
-        assertEquals("account|group", content?.groupKey)
+        // Per-conversation tag (account|group) is what makes a chat's messages
+        // accumulate into a single card.
+        assertEquals("account|group", content?.notificationTag)
+        assertEquals("Alice", content?.senderName)
+        assertTrue(content?.isGroupConversation == true)
+        assertEquals("Launch", content?.conversationTitle)
+    }
+
+    @Test
+    fun directMessageIsNotMarkedAsGroupConversation() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, isDm = true, groupName = null),
+            )
+
+        assertTrue(content?.isGroupConversation == false)
+        assertNull(content?.conversationTitle)
     }
 
     @Test
@@ -55,39 +72,50 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
-    fun collidingNotificationKeysReceiveDistinctTags() {
-        val first = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, notificationKey = "Aa"))
-        val second = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, notificationKey = "BB"))
-
-        assertEquals("Aa".hashCode(), "BB".hashCode())
-        assertNotEquals(first?.notificationTag, second?.notificationTag)
-    }
-
-    @Test
-    fun repeatedNotificationKeyKeepsStableIdentity() {
-        val first = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, notificationKey = "stable-key"))
-        val second = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, notificationKey = "stable-key"))
+    fun messagesInTheSameConversationShareATag() {
+        // Different per-message keys, same account + group: they must collapse
+        // onto one tag so the card accumulates instead of stacking.
+        val first = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, notificationKey = "msg-1"))
+        val second = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, notificationKey = "msg-2"))
 
         assertEquals(first?.notificationTag, second?.notificationTag)
         assertEquals(first?.notificationId, second?.notificationId)
+    }
+
+    @Test
+    fun differentConversationsGetDistinctTags() {
+        val launch = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"))
+        val ops = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-b"))
+
+        assertNotEquals(launch?.notificationTag, ops?.notificationTag)
+    }
+
+    @Test
+    fun invitesStayIndividualPerNotificationKey() {
+        val first = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.GROUP_INVITE, notificationKey = "invite-1"))
+        val second = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.GROUP_INVITE, notificationKey = "invite-2"))
+
+        assertNotEquals(first?.notificationTag, second?.notificationTag)
     }
 
     private fun update(
         trigger: NotificationTriggerFfi,
         notificationKey: String = "message:account:message",
         groupName: String? = "General",
+        groupIdHex: String = "group",
         previewText: String? = "Hello",
         sender: NotificationUserFfi = user(),
+        isDm: Boolean = false,
         isFromSelf: Boolean = false,
     ) = NotificationUpdateFfi(
         notificationKey = notificationKey,
-        conversationKey = "conversation:account:group",
+        conversationKey = "conversation:account:$groupIdHex",
         trigger = trigger,
         accountRef = "account",
         accountIdHex = "account",
-        groupIdHex = "group",
+        groupIdHex = groupIdHex,
         groupName = groupName,
-        isDm = false,
+        isDm = isDm,
         messageIdHex = "message",
         sender = sender,
         receiver = user(accountIdHex = "account", displayName = "Me"),

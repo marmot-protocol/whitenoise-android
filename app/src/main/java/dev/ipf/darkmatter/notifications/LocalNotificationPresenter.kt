@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.Person
 import androidx.core.content.ContextCompat
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.MainActivity
@@ -60,38 +61,16 @@ class LocalNotificationPresenter(
         // every show() to avoid the per-notification Binder IPC into
         // NotificationManagerService.
 
-        val tapIntent =
-            Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                // Stamp the navigation target. The unique data URI (from the
-                // notification key) gives each notification a distinct PendingIntent
-                // identity — Android ignores extras when comparing PendingIntents,
-                // so without it a later notification would overwrite an earlier
-                // one's click target.
-                NotificationNavigation.fromUpdate(update)?.let { target ->
-                    NotificationNavigation.applyToIntent(this, target, update.notificationKey)
-                }
-            }
-        val pendingIntent =
-            PendingIntent.getActivity(
-                context,
-                NotificationNavigation.requestCode(update.notificationKey),
-                tapIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
         val category =
             when (update.trigger) {
                 NotificationTriggerFfi.NEW_MESSAGE -> NotificationCompat.CATEGORY_MESSAGE
                 NotificationTriggerFfi.GROUP_INVITE -> NotificationCompat.CATEGORY_EVENT
             }
-        val notification =
+        val builder =
             NotificationCompat
                 .Builder(context, CHANNEL_MESSAGES)
                 .setSmallIcon(R.drawable.ic_stat_darkmatter)
-                .setContentTitle(content.title)
-                .setContentText(content.body)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
-                .setContentIntent(pendingIntent)
+                .setContentIntent(conversationPendingIntent(update, content.notificationTag))
                 .setCategory(category)
                 .setWhen(update.timestampMs)
                 .setShowWhen(true)
@@ -100,23 +79,91 @@ class LocalNotificationPresenter(
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                 .setSilent(false)
-                .apply {
-                    content.groupKey?.let { group ->
-                        setGroup(group)
-                        setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_ALL)
-                    }
-                }.build()
 
-        NotificationManagerCompat.from(context).notify(content.notificationTag, content.notificationId, notification)
+        when (update.trigger) {
+            // Messages stack into one per-conversation card; invites are
+            // one-off events, so keep them as a plain expandable notification.
+            NotificationTriggerFfi.NEW_MESSAGE -> builder.setStyle(messagingStyle(update, content))
+            NotificationTriggerFfi.GROUP_INVITE ->
+                builder
+                    .setContentTitle(content.title)
+                    .setContentText(content.body)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
+        }
+
+        NotificationManagerCompat.from(context).notify(content.notificationTag, content.notificationId, builder.build())
         notificationDebug {
-            // Never log the title — it carries sender / group names (PII).
-            "posted id=${content.notificationId} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
+            // Never log the title/body — they carry sender / group names (PII).
+            "posted tag=${content.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
         }
         return true
     }
 
+    // Accumulate every message from a conversation into one card. Android keys a
+    // notification by (tag, id); reusing the per-conversation tag updates the
+    // existing card, and MessagingStyle appends the new line to the previous
+    // ones it carried — so five messages read as one entry, not five alerts.
+    private fun messagingStyle(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+    ): NotificationCompat.MessagingStyle {
+        val self =
+            Person
+                .Builder()
+                .setName(content.selfName)
+                .setKey(content.selfKey)
+                .build()
+        val style = existingMessagingStyle(content.notificationTag) ?: NotificationCompat.MessagingStyle(self)
+        style.isGroupConversation = content.isGroupConversation
+        content.conversationTitle?.let { style.conversationTitle = it }
+        val sender =
+            Person
+                .Builder()
+                .setName(content.senderName)
+                .setKey(content.senderKey)
+                .build()
+        style.addMessage(content.body, update.timestampMs, sender)
+        return style
+    }
+
+    private fun existingMessagingStyle(tag: String): NotificationCompat.MessagingStyle? {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return null
+        val existing =
+            runCatching { manager.activeNotifications }
+                .getOrNull()
+                ?.firstOrNull { it.tag == tag && it.id == MESSAGE_NOTIFICATION_ID }
+                ?: return null
+        return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing.notification)
+    }
+
+    private fun conversationPendingIntent(
+        update: NotificationUpdateFfi,
+        tag: String,
+    ): PendingIntent {
+        val tapIntent =
+            Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                // Key the tap target on the notification tag (per-conversation
+                // for messages) so the accumulating card always reopens the
+                // same conversation. PendingIntents compare by URI, not extras.
+                NotificationNavigation.fromUpdate(update)?.let { target ->
+                    NotificationNavigation.applyToIntent(this, target, tag)
+                }
+            }
+        return PendingIntent.getActivity(
+            context,
+            NotificationNavigation.requestCode(tag),
+            tapIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
     companion object {
         const val CHANNEL_MESSAGES = "darkmatter.messages.v2"
+
+        // Per-conversation cards share id 0; the per-conversation tag keeps them
+        // distinct, so reusing (tag, 0) updates the right conversation's card.
+        private const val MESSAGE_NOTIFICATION_ID = 0
     }
 }
 
