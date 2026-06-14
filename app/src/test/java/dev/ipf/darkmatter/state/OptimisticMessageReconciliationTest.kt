@@ -118,6 +118,32 @@ class OptimisticMessageReconciliationTest {
     }
 
     @Test
+    fun multiMediaSendReconcilesByBridgeIdNotBySiblingHeuristic() {
+        // Reproduction for a multi-document send where 3 docs are queued in
+        // rapid succession (same direction/sender/kind/recordedAt) and each
+        // optimistic carries a `_media_pending` shape. After the FIRST upload
+        // confirms, performMediaUpload inserts a "bridge" optimistic keyed at
+        // the confirmed event id. The relay then echoes back the kind-9
+        // projection. The reconciler MUST return that bridge — not a sibling
+        // pending — otherwise the wrong sibling gets removed and the user
+        // sees pending bubbles vanish until each upload confirms in turn.
+        val pendingB = mediaPending("temp-b", filename = "b.pdf")
+        val pendingC = mediaPending("temp-c", filename = "c.pdf")
+        val bridgeA = mediaSent("confirmed-a", filename = "a.pdf")
+        val projection = mediaProjection("confirmed-a")
+
+        // Bridge is inserted LAST (after the siblings were already pending),
+        // so insertion-order iteration would otherwise hit pendingB first.
+        assertEquals(
+            "confirmed-a",
+            optimisticMessageIdForProjection(
+                listOf(pendingB, pendingC, bridgeA),
+                projection,
+            ),
+        )
+    }
+
+    @Test
     fun queuedMessagesKeepTheirOrderWhenIdsChangeDuringConfirmation() {
         val first = timelineMessage("first-temp", MessageStatus.Pending, plaintext = "A", timelineOrder = 1uL)
         val second = timelineMessage("second-temp", MessageStatus.Pending, plaintext = "B", timelineOrder = 2uL)
@@ -131,6 +157,81 @@ class OptimisticMessageReconciliationTest {
                 .map { it.record.plaintext },
         )
     }
+
+    private fun mediaPending(
+        id: String,
+        filename: String,
+    ): TimelineMessage =
+        TimelineMessage(
+            id = "msg:$id",
+            record =
+                AppMessageRecordFfi(
+                    messageIdHex = id,
+                    direction = "sent",
+                    groupIdHex = "group",
+                    sender = "alice",
+                    plaintext = "📎 $filename",
+                    contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                    kind = 9uL,
+                    tags =
+                        listOf(
+                            dev.ipf.marmotkit.MessageTagFfi(
+                                listOf("_media_pending", filename, "application/pdf"),
+                            ),
+                        ),
+                    recordedAt = 1uL,
+                    receivedAt = 1uL,
+                ),
+            status = MessageStatus.Pending,
+            timelineOrder = 1uL,
+        )
+
+    private fun mediaSent(
+        id: String,
+        filename: String,
+    ): TimelineMessage =
+        TimelineMessage(
+            id = "msg:$id",
+            record =
+                AppMessageRecordFfi(
+                    messageIdHex = id,
+                    direction = "sent",
+                    groupIdHex = "group",
+                    sender = "alice",
+                    plaintext = "",
+                    contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                    kind = 9uL,
+                    tags =
+                        listOf(
+                            dev.ipf.marmotkit.MessageTagFfi(
+                                listOf("imeta", "url https://example/$filename", "m application/pdf"),
+                            ),
+                        ),
+                    recordedAt = 1uL,
+                    receivedAt = 1uL,
+                ),
+            status = MessageStatus.Sent,
+            timelineOrder = 1uL,
+        )
+
+    private fun mediaProjection(id: String): AppMessageRecordFfi =
+        AppMessageRecordFfi(
+            messageIdHex = id,
+            direction = "sent",
+            groupIdHex = "group",
+            sender = "alice",
+            plaintext = "",
+            contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+            kind = 9uL,
+            tags =
+                listOf(
+                    dev.ipf.marmotkit.MessageTagFfi(
+                        listOf("imeta", "url https://example/a.pdf", "m application/pdf"),
+                    ),
+                ),
+            recordedAt = 1uL,
+            receivedAt = 1uL,
+        )
 
     private fun timelineMessage(
         id: String,

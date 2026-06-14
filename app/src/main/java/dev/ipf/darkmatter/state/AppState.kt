@@ -46,9 +46,11 @@ import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
@@ -56,7 +58,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.net.IDN
 import java.net.URI
@@ -331,6 +335,30 @@ class DarkMatterAppState(
     private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
     private val timelineOrderOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
     private val timelineTimestampOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
+
+    // Retained-upload bytes survive screen disposal so a user who navigates
+    // out of a chat mid-send and returns sees the pending bubble still carry
+    // its preview/filename instead of an empty placeholder. Cap (and sizeOf
+    // policy) match the controller-local version they replace.
+    private val retainedMediaUploadsByConversation = mutableMapOf<String, dev.ipf.darkmatter.media.ByteSizeLruCache<String, RetainedMediaUpload>>()
+    private val activeUploadKeysByConversation = mutableMapOf<String, MutableSet<String>>()
+    private val pendingProjectionsAwaitingBridgeByConversation =
+        mutableMapOf<String, MutableMap<String, dev.ipf.marmotkit.TimelineMessageRecordFfi>>()
+
+    // In-flight attachment downloads, keyed by the mediaCacheKey. Routed
+    // through `mutationsScope` so the FFI download continues even when the
+    // calling screen disposes (e.g., user tapped a file then swiped away).
+    // Memoized so a re-entry / sibling tile / retry tap shares the same
+    // Deferred instead of spawning a second Blossom fetch.
+    private val inFlightDownloads = mutableMapOf<String, Deferred<ByteArray>>()
+    private val inFlightDownloadsLock = Any()
+
+    // Strictly serialize attachment fetches. A 6-tile album otherwise fires
+    // N parallel Blossom calls on `mutationsScope` and the underlying FFI
+    // surfaces errors on the queued-behind tiles, leaving them stuck in
+    // `failed`. Throughput stays adequate because the Rust core does its
+    // own pipelining inside a single fetch.
+    private val attachmentDownloadSemaphore = Semaphore(1)
     private val recentConversationStateKeys = LinkedHashMap<String, Unit>(16, 0.75f, true)
 
     val draftStore: DraftStore = DraftStore.forContext(appContext)
@@ -423,6 +451,38 @@ class DarkMatterAppState(
             timelineTimestampOverridesByConversation.getOrPut(key) { mutableMapOf() }
         }
 
+    internal fun retainedMediaUploads(
+        accountRef: String?,
+        groupIdHex: String,
+    ): dev.ipf.darkmatter.media.ByteSizeLruCache<String, RetainedMediaUpload> =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            retainedMediaUploadsByConversation.getOrPut(key) {
+                dev.ipf.darkmatter.media.ByteSizeLruCache(
+                    maxBytes = ConversationController.MEDIA_RETAINED_MAX_BYTES,
+                    sizeOf = { upload -> upload.attachments.sumOf { it.plaintextBytes.size } },
+                )
+            }
+        }
+
+    internal fun activeUploadKeys(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableSet<String> =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            activeUploadKeysByConversation.getOrPut(key) { mutableSetOf() }
+        }
+
+    internal fun pendingProjectionsAwaitingBridge(
+        accountRef: String?,
+        groupIdHex: String,
+    ): MutableMap<String, dev.ipf.marmotkit.TimelineMessageRecordFfi> =
+        synchronized(conversationStateLock) {
+            val key = retainConversationState(accountRef, groupIdHex)
+            pendingProjectionsAwaitingBridgeByConversation.getOrPut(key) { linkedMapOf() }
+        }
+
     private fun retainConversationState(
         accountRef: String?,
         groupIdHex: String,
@@ -436,6 +496,9 @@ class DarkMatterAppState(
             projectedMessageIdsByConversation.remove(staleKey)
             timelineOrderOverridesByConversation.remove(staleKey)
             timelineTimestampOverridesByConversation.remove(staleKey)
+            retainedMediaUploadsByConversation.remove(staleKey)
+            activeUploadKeysByConversation.remove(staleKey)
+            pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
         }
         return key
     }
@@ -461,6 +524,48 @@ class DarkMatterAppState(
         withContext(Dispatchers.IO) {
             marmot().block()
         }
+
+    /**
+     * Memoize an in-flight attachment download keyed on [cacheKey] and route
+     * the work through [mutationsScope] so it survives caller cancellation
+     * (e.g. the user tapped a file and swiped away). Concurrent callers for
+     * the same key share the same Deferred; the entry is dropped when the
+     * Deferred completes so a later retry can re-attempt.
+     */
+    internal fun memoizedDownload(
+        cacheKey: String,
+        block: suspend CoroutineScope.() -> ByteArray,
+    ): Deferred<ByteArray> {
+        synchronized(inFlightDownloadsLock) {
+            inFlightDownloads[cacheKey]?.takeIf { it.isActive }?.let { return it }
+            val deferred =
+                mutationsScope.async {
+                    // Cap concurrent attachment fetches so an N-tile album
+                    // doesn't saturate the underlying network or Blossom
+                    // stack into per-tile failures. Permits are acquired
+                    // inside the Deferred so the semaphore never blocks
+                    // the caller's `await()`.
+                    attachmentDownloadSemaphore.withPermit { block() }
+                }
+            inFlightDownloads[cacheKey] = deferred
+            // Drop the map entry via `invokeOnCompletion` (fires AFTER the
+            // Deferred has transitioned to completed/cancelled — a `finally`
+            // inside `async`'s body races against that transition and can
+            // observe `isCompleted == false`, leaking the entry. A completed
+            // Deferred<ByteArray> retains the plaintext result, so a leaked
+            // entry keeps the bytes alive forever). Identity check ensures
+            // a concurrent retry that registered a fresh Deferred under the
+            // same key survives.
+            deferred.invokeOnCompletion {
+                synchronized(inFlightDownloadsLock) {
+                    if (inFlightDownloads[cacheKey] === deferred) {
+                        inFlightDownloads.remove(cacheKey)
+                    }
+                }
+            }
+            return deferred
+        }
+    }
 
     suspend fun bootstrap() = bootstrapMutex.withLock { bootstrapLocked() }
 
@@ -592,6 +697,26 @@ class DarkMatterAppState(
     private fun clearInMemoryMediaCaches() {
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
+        // The four per-conversation maps below hold (or potentially hold)
+        // decrypted plaintext keyed by account/group. Wiping them at the
+        // same call site keeps account-switch and sign-out symmetric with
+        // the L1 plaintext clear above; an unwiped retained-upload cache
+        // would otherwise let the next signed-in account see the previous
+        // account's outgoing bytes.
+        synchronized(conversationStateLock) {
+            retainedMediaUploadsByConversation.values.forEach { it.clear() }
+            retainedMediaUploadsByConversation.clear()
+            activeUploadKeysByConversation.values.forEach { it.clear() }
+            activeUploadKeysByConversation.clear()
+            pendingProjectionsAwaitingBridgeByConversation.values.forEach { it.clear() }
+            pendingProjectionsAwaitingBridgeByConversation.clear()
+        }
+        // Cancel any in-flight downloads (their Deferred holds the plaintext
+        // result) and drop the index so the next session starts cold.
+        synchronized(inFlightDownloadsLock) {
+            inFlightDownloads.values.forEach { it.cancel() }
+            inFlightDownloads.clear()
+        }
     }
 
     /**

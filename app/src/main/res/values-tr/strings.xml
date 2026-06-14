@@ -482,4 +482,6 @@
     <string name="group_system_admin_removed_you_passive">Artık yönetici değilsiniz</string>
     <string name="group_system_you_renamed">Grubun adını “%1$s” olarak değiştirdiniz</string>
     <string name="group_system_you_avatar_changed">Grup avatarını değiştirdiniz</string>
+    <string name="media_attachment_add_more">Daha fazla ekle</string>
+    <string name="media_attachment_remove">Eki kaldır</string>
 </resources>

@@ -3,6 +3,8 @@ package dev.ipf.darkmatter.media
 import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
 import android.net.Uri
 import java.io.ByteArrayOutputStream
 
@@ -153,6 +155,20 @@ object MediaPipeline {
     }
 
     /**
+     * The bytes + decoded dimensions of a downscaled JPEG. Width/height are
+     * the *encoded* dimensions, not the source — receivers use them to
+     * reserve aspect-ratio space before the decode completes. `thumbhash`
+     * is the base64-encoded perceptual hash a receiver can render as a
+     * blurred placeholder while the full bytes decrypt + decode.
+     */
+    data class DownscaledJpeg(
+        val bytes: ByteArray,
+        val width: Int,
+        val height: Int,
+        val thumbhash: String?,
+    )
+
+    /**
      * Decode the image at [uri], downscale so the longer edge ≤ [maxEdgePx],
      * and re-encode as JPEG at [quality]. Returns null when the source can't
      * be decoded (corrupt file, unsupported format, unreadable Uri).
@@ -162,7 +178,7 @@ object MediaPipeline {
         uri: Uri,
         maxEdgePx: Int = DEFAULT_MAX_EDGE_PX,
         quality: Int = DEFAULT_JPEG_QUALITY,
-    ): ByteArray? {
+    ): DownscaledJpeg? {
         // Two-pass decode: first read just the bounds so we can decide an
         // inSampleSize, then decode at that sampled size. Avoids a 50MB
         // bitmap in heap for a 12MP source. Any I/O or decode failure below
@@ -202,16 +218,40 @@ object MediaPipeline {
                     decoded
                 }
 
+            // Flatten alpha onto opaque white before hashing AND compressing
+            // so the thumbhash describes the exact pixels we ship. JPEG drops
+            // alpha by white-compositing inside compress(); without this step,
+            // a transparent PNG source hashes its alpha-blended pixels while
+            // the JPEG bytes carry the white-composite version — receivers
+            // would render a placeholder that doesn't match the final image.
+            val opaque =
+                if (scaled.hasAlpha()) {
+                    Bitmap.createBitmap(scaled.width, scaled.height, Bitmap.Config.ARGB_8888).also {
+                        Canvas(it).apply {
+                            drawColor(Color.WHITE)
+                            drawBitmap(scaled, 0f, 0f, null)
+                        }
+                    }
+                } else {
+                    scaled
+                }
             try {
+                val width = opaque.width
+                val height = opaque.height
+                // Failures degrade silently — a missing hash just means
+                // receivers don't get a placeholder; it's not a reason to
+                // drop the upload.
+                val thumbhash = runCatching { Thumbhash.encodeFromBitmap(opaque) }.getOrNull()
                 ByteArrayOutputStream().use { out ->
                     // compress() returns false on failure — don't ship partial bytes.
-                    if (scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)) {
-                        out.toByteArray()
+                    if (opaque.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)) {
+                        DownscaledJpeg(out.toByteArray(), width, height, thumbhash)
                     } else {
                         null
                     }
                 }
             } finally {
+                if (opaque !== scaled) opaque.recycle()
                 scaled.recycle()
             }
         } catch (_: java.io.IOException) {
@@ -219,6 +259,24 @@ object MediaPipeline {
         } catch (_: SecurityException) {
             null
         }
+    }
+
+    /**
+     * Decode an existing image-byte payload's bounds (no allocation) and
+     * return them as a `WxH` string suitable for the NIP-92 `imeta dim`
+     * field, or null when the bytes don't decode. Used by the document-picker
+     * path which doesn't recompress — it still wants to advertise dimensions
+     * to the receiver so the bubble lays out before the bytes finish
+     * decoding.
+     */
+    fun imageDimOrNull(bytes: ByteArray): String? {
+        if (bytes.isEmpty()) return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val w = bounds.outWidth
+        val h = bounds.outHeight
+        if (w <= 0 || h <= 0) return null
+        return "${w}x$h"
     }
 
     /**
