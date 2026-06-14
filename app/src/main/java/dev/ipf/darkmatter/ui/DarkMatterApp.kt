@@ -257,6 +257,7 @@ import dev.ipf.darkmatter.media.ImageSearchException
 import dev.ipf.darkmatter.media.ImageSearchResult
 import dev.ipf.darkmatter.media.MediaPipeline
 import dev.ipf.darkmatter.media.MediaReferenceParser
+import dev.ipf.darkmatter.media.Thumbhash
 import dev.ipf.darkmatter.media.sanitizeHttpsAvatarUrl
 import dev.ipf.darkmatter.notifications.NotificationNavStep
 import dev.ipf.darkmatter.notifications.NotificationTarget
@@ -2116,6 +2117,21 @@ private fun imageBubbleSizing(ratio: Float?): Modifier =
     }
 
 /**
+ * Decode an imeta `thumbhash` field into a tiny ARGB ImageBitmap, cached
+ * for the lifetime of the composition. Returns null when the field is
+ * absent or doesn't decode. Callers render the bitmap with
+ * [ContentScale.Crop] under the loading state so the bubble shows a
+ * blurred preview before the real bytes arrive.
+ */
+@Composable
+private fun rememberThumbhashImage(thumbhash: String?): ImageBitmap? {
+    if (thumbhash.isNullOrBlank()) return null
+    return remember(thumbhash) {
+        Thumbhash.decodeToBitmap(thumbhash)?.asImageBitmap()
+    }
+}
+
+/**
  * Parse the imeta `dim` field ("WxH") into a width/height aspect ratio.
  * Returns null when [dim] is null, blank, malformed, or non-positive on
  * either axis. Caller falls back to [MediaBubbleHeight] in that case.
@@ -2232,6 +2248,18 @@ private fun MediaImageBubble(
     ) {
         Box(contentAlignment = Alignment.Center) {
             val current = bitmap
+            val placeholder = rememberThumbhashImage(reference.thumbhash)
+            // Paint the blurred placeholder behind whatever loading-state is
+            // shown so the bubble has a perceptual preview before the real
+            // bytes arrive. The real image (when `current != null`) covers it.
+            if (current == null && placeholder != null) {
+                Image(
+                    bitmap = placeholder,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             when {
                 current != null ->
                     Image(
@@ -2515,6 +2543,15 @@ private fun MediaImageGridTile(
         contentAlignment = Alignment.Center,
     ) {
         val current = bitmap
+        val placeholder = rememberThumbhashImage(reference.thumbhash)
+        if (current == null && placeholder != null) {
+            Image(
+                bitmap = placeholder,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         when {
             current != null ->
                 Image(
