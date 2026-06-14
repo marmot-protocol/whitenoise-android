@@ -3701,12 +3701,14 @@ private fun MediaPreviewSheet(
     onSend: (caption: String) -> Unit,
     onRemoveAt: (Int) -> Unit,
     onRemoveDocumentAt: (Int) -> Unit,
-    onAddMore: () -> Unit,
+    onAddPhotos: () -> Unit,
+    onAddDocuments: () -> Unit,
 ) {
     var caption by remember { mutableStateOf("") }
     // Local guard against a rapid double-tap firing onSend twice before the
     // parent clears pendingMediaUris and the sheet leaves composition.
     var sending by remember { mutableStateOf(false) }
+    var addMoreMenuOpen by remember { mutableStateOf(false) }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -3750,26 +3752,50 @@ private fun MediaPreviewSheet(
                     }
                 }
                 item(key = "media_preview_add_more_tile") {
-                    OutlinedButton(
-                        onClick = { if (!sending) onAddMore() },
-                        modifier =
-                            Modifier
-                                .fillMaxHeight()
-                                .aspectRatio(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(0.dp),
-                        enabled = !sending,
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
+                    // Anchor a DropdownMenu to the tile so the user can add
+                    // either kind to a mixed shelf — the tile alone can't
+                    // know which (images vs files) the user wants to append.
+                    Box {
+                        OutlinedButton(
+                            onClick = { if (!sending) addMoreMenuOpen = true },
+                            modifier =
+                                Modifier
+                                    .fillMaxHeight()
+                                    .aspectRatio(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            enabled = !sending,
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                stringResource(R.string.media_attachment_add_more),
-                                style = MaterialTheme.typography.labelSmall,
-                                maxLines = 1,
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    stringResource(R.string.media_attachment_add_more),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = addMoreMenuOpen,
+                            onDismissRequest = { addMoreMenuOpen = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.attach_photo_library)) },
+                                onClick = {
+                                    addMoreMenuOpen = false
+                                    onAddPhotos()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.attach_document)) },
+                                onClick = {
+                                    addMoreMenuOpen = false
+                                    onAddDocuments()
+                                },
                             )
                         }
                     }
@@ -4828,11 +4854,12 @@ private fun ConversationScreen(
                         if (index in indices) removeAt(index)
                     }
             },
-            onAddMore = {
+            onAddPhotos = {
                 imagePickerLauncher.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                 )
             },
+            onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
         )
     }
 }
