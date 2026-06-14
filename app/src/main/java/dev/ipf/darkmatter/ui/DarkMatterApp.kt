@@ -878,7 +878,16 @@ private fun MainShell(
             selectedChat = null
         }
         when (step) {
-            is NotificationNavStep.SwitchAccount -> appState.setActiveAccount(step.accountRef)
+            is NotificationNavStep.SwitchAccount -> {
+                // Close any conversation open under the previous account before
+                // switching. Otherwise the destination conversation is built
+                // mid-switch against a not-yet-settled chat-list projection and
+                // anchors to a stale unread count / old messages. Clearing it
+                // here makes tapping from inside a chat take the same clean path
+                // as tapping after returning to the chat list.
+                selectedChat = null
+                appState.setActiveAccount(step.accountRef)
+            }
             NotificationNavStep.AwaitChatList -> Unit // re-fires when list state settles
             is NotificationNavStep.OpenConversation -> {
                 // Ensure we're on the Chats section so back-from-conversation
@@ -4076,7 +4085,12 @@ private fun ConversationScreen(
     }
     val controllerCopy = rememberConversationControllerCopy()
     val controller =
-        remember(chat.id, appState.runtimeGeneration) {
+        // Key on the active account too: chat.id is the groupIdHex, which is
+        // shared across local accounts that belong to the same group. Without
+        // the account in the key, switching accounts into the same conversation
+        // (e.g. tapping another account's notification) reuses a controller
+        // still bound to the previous account's timeline and read state.
+        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
             ConversationController(
                 appState = appState,
                 initialGroup = chat.group,

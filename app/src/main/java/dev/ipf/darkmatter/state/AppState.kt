@@ -377,6 +377,11 @@ class DarkMatterAppState(
     private var notificationJob: Job? = null
     private var appInForeground = false
     private var activeConversationGroupIdHex: String? = null
+
+    // The account that has the active conversation on screen, captured when the
+    // chat opens. Notification suppression is scoped to this account so viewing
+    // a shared group under one account doesn't mute the other account's alerts.
+    private var activeConversationAccountRef: String? = null
     private val profileRefreshGate = ProfileRefreshGate(PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS)
     private var chatsController: ChatsController? = null
 
@@ -1016,7 +1021,12 @@ class DarkMatterAppState(
 
     fun setActiveConversation(groupIdHex: String?) {
         activeConversationGroupIdHex = groupIdHex
-        appStateDebug { "active conversation=${groupIdHex?.take(8) ?: "<none>"}" }
+        // The chat screen always runs under the active account, so capture it
+        // now; clear it when the conversation closes.
+        activeConversationAccountRef = if (groupIdHex != null) activeAccountRef else null
+        appStateDebug {
+            "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
+        }
     }
 
     fun refreshLocalNotificationPermission() {
@@ -1755,10 +1765,13 @@ class DarkMatterAppState(
                                         update = update,
                                         appInForeground = appInForeground,
                                         activeConversationGroupIdHex = activeConversation,
+                                        activeConversationAccountRef = activeConversationAccountRef,
                                     )
                                 appStateDebug {
                                     "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
-                                        "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} post=$shouldPost"
+                                        "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} " +
+                                        "activeAccount=${activeConversationAccountRef?.take(8) ?: "<none>"} " +
+                                        "updateAccount=${update.accountRef.take(8)} post=$shouldPost"
                                 }
                                 if (shouldPost) {
                                     localNotificationPresenter.show(update)
