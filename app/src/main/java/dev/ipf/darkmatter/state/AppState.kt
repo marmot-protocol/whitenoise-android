@@ -338,6 +338,14 @@ class DarkMatterAppState(
     private val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mutationsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    // Bumped whenever cross-account caches are cleared (switch / sign-out). An
+    // in-flight profile refresh captures it at start and discards its result if
+    // the epoch moved, so a job that resolves after a switch can't write the
+    // old account's data back into the just-cleared caches.
+    private val profileCacheEpoch =
+        java.util.concurrent.atomic
+            .AtomicInteger(0)
     private var notificationJob: Job? = null
     private var appInForeground = false
     private var activeConversationGroupIdHex: String? = null
@@ -559,7 +567,10 @@ class DarkMatterAppState(
         // wipes disk; switching is just a UI context flip.
         // Skip the wipe when the label is unchanged (no-op tap on the
         // already-active account).
-        if (label != activeAccountRef) clearInMemoryMediaCaches()
+        if (label != activeAccountRef) {
+            clearInMemoryMediaCaches()
+            clearCrossAccountCaches()
+        }
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
@@ -595,6 +606,22 @@ class DarkMatterAppState(
         notificationScope.launch(Dispatchers.IO) { diskMediaCache.clear() }
     }
 
+    /**
+     * Drop per-account identity/metadata caches so account A's data isn't
+     * reachable after switching to B, and so they don't grow unbounded across
+     * many account switches: the npub cache, resolved profile presentations,
+     * and group-member snapshots. Bumps [profileRevision] so any visible
+     * profile re-resolves for the now-active account. Called on account switch
+     * and sign-out.
+     */
+    private fun clearCrossAccountCaches() {
+        profileCacheEpoch.incrementAndGet()
+        npubs.clear()
+        synchronized(profilePresentationLock) { profilePresentations.clear() }
+        synchronized(groupMemberSnapshotLock) { groupMemberSnapshots.clear() }
+        profileRevision += 1
+    }
+
     fun signOutActiveAccount() {
         // Sign-out is a non-destructive session switch: the identity stays in
         // the device keychain and the user can switch back to it. Per-account
@@ -608,6 +635,7 @@ class DarkMatterAppState(
         // (setActiveAccount) is *not* a sign-out — it keeps the L2 disk cache
         // so re-entry into the same account doesn't re-download every image.
         clearAllMediaCaches()
+        clearCrossAccountCaches()
         val signedOutRef = activeAccountRef
         val outcome = signOutOutcome(accounts.map { it.label }, activeAccountRef)
         val next = outcome.nextActiveRef
@@ -1279,8 +1307,13 @@ class DarkMatterAppState(
         // This is called from render/timeline projection paths, so do not synchronously
         // probe the Rust profile cache here. The refresh job owns the binding work.
         if (!profileRefreshGate.tryStart(id, System.currentTimeMillis())) return
+        // Snapshot the cache epoch now, before the job is queued. A switch or
+        // sign-out can clear the caches in the gap before this coroutine starts,
+        // so the staleness check must compare against the epoch at request time,
+        // not whatever it has become by the time the body runs.
+        val requestEpoch = profileCacheEpoch.get()
         profileScope.launch {
-            refreshProfile(id)
+            refreshProfile(id, requestEpoch)
         }
     }
 
@@ -1311,7 +1344,10 @@ class DarkMatterAppState(
         return snapshot
     }
 
-    suspend fun refreshProfile(accountIdHex: String) {
+    suspend fun refreshProfile(
+        accountIdHex: String,
+        epoch: Int = profileCacheEpoch.get(),
+    ) {
         val profile =
             try {
                 val result =
@@ -1335,7 +1371,16 @@ class DarkMatterAppState(
                 profileRefreshGate.finish(accountIdHex, System.currentTimeMillis())
             }
         if (profile != null) {
-            notifyProfileChanged(accountIdHex)
+            // Resolve the presentation off the main thread: readProfilePresentation
+            // does blocking FFI and this completion runs on profileScope
+            // (Main.immediate). Then apply the in-memory state on the main thread.
+            val presentation = marmotIo { readProfilePresentation(accountIdHex) }
+            // Drop the result if an account switch / sign-out cleared the caches
+            // while this refresh was in flight, so we don't repopulate them with
+            // the previous account's data.
+            if (profileCacheEpoch.get() == epoch) {
+                applyProfilePresentation(accountIdHex, presentation)
+            }
         }
     }
 
@@ -1656,8 +1701,16 @@ class DarkMatterAppState(
         return ProfilePresentation(displayName = displayName, avatarUrl = avatarUrl)
     }
 
-    private fun notifyProfileChanged(accountIdHex: String) {
-        val presentation = readProfilePresentation(accountIdHex)
+    /**
+     * Store a freshly-resolved [presentation] and bump [profileRevision] if it
+     * changed. Pure in-memory state work, no FFI — safe on the main thread.
+     * The blocking [readProfilePresentation] read is the caller's job to run
+     * off-main (see [refreshProfile]).
+     */
+    private fun applyProfilePresentation(
+        accountIdHex: String,
+        presentation: ProfilePresentation,
+    ) {
         val changed =
             synchronized(profilePresentationLock) {
                 profilePresentations.put(accountIdHex, presentation) != presentation
