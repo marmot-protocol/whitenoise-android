@@ -51,6 +51,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -1274,12 +1275,23 @@ class ConversationController(
                         launch { watchAgentTextStream(account, streamId) }
                     }
                 }
+                val timelineUpdates = Channel<TimelineSubscriptionUpdateFfi>(capacity = Channel.BUFFERED)
+                launch {
+                    try {
+                        while (isActive) {
+                            val update =
+                                withContext(Dispatchers.IO) {
+                                    timelineStream.nextUpdate()
+                                } ?: break
+                            timelineUpdates.send(update)
+                        }
+                    } finally {
+                        timelineUpdates.close()
+                    }
+                }
                 launch {
                     while (isActive) {
-                        val first =
-                            withContext(Dispatchers.IO) {
-                                timelineStream.nextUpdate()
-                            } ?: break
+                        val first = timelineUpdates.receiveCatching().getOrNull() ?: break
                         // Drain any updates that arrived within roughly one
                         // 120Hz frame budget into a single batch. The runtime
                         // can emit several updates back-to-back during a
@@ -1287,15 +1299,18 @@ class ConversationController(
                         // followed by a flurry of Projections); applying
                         // them one at a time triggers N expensive recompose
                         // passes (sort + dedup + edits aggregate). Batching
-                        // collapses them into one publish at the end.
+                        // collapses them into one publish at the end. The
+                        // timeout only wraps the local channel receive; the
+                        // UniFFI nextUpdate() call above is always awaited to
+                        // completion so a timed-out drain can't consume and
+                        // drop a Rust subscription update.
                         val batch = mutableListOf(first)
                         while (batch.size < TIMELINE_BATCH_CAP) {
                             val more =
-                                withContext(Dispatchers.IO) {
-                                    withTimeoutOrNull(TIMELINE_BATCH_DRAIN_MS) {
-                                        timelineStream.nextUpdate()
-                                    }
-                                } ?: break
+                                timelineUpdates.tryReceive().getOrNull()
+                                    ?: withTimeoutOrNull(TIMELINE_BATCH_DRAIN_MS) {
+                                        timelineUpdates.receiveCatching().getOrNull()
+                                    } ?: break
                             batch += more
                         }
                         val streamIdsLaunched = mutableListOf<String>()
@@ -2939,12 +2954,14 @@ class ConversationController(
         timelineOrder.add(itemId)
     }
 
-    // Re-entrant counter — when non-zero, `publishTimelineFromIndexes` defers
-    // its work and the outermost `coalesceTimelinePublishes` flushes once.
-    // Batching a burst of subscription emits into one publish is the largest
-    // single saving for the 7.21ms-on-janky-frames "Input+Anim+Layout" cost
-    // in `dumpsys gfxinfo`: each publish re-sorts + de-dupes the full
-    // timeline and re-aggregates the edits index.
+    // Main-thread only, like the rest of ConversationController's Compose
+    // state. Re-entrant counter — when non-zero,
+    // `publishTimelineFromIndexes` defers its work and the outermost
+    // `coalesceTimelinePublishes` flushes once. Batching a burst of
+    // subscription emits into one publish is the largest single saving for the
+    // 7.21ms-on-janky-frames "Input+Anim+Layout" cost in `dumpsys gfxinfo`:
+    // each publish re-sorts + de-dupes the full timeline and re-aggregates the
+    // edits index.
     private var publishSuppressionDepth = 0
     private var publishPending = false
 
