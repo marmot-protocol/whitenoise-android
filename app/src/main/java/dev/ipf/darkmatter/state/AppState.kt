@@ -948,6 +948,23 @@ class DarkMatterAppState(
     }
 
     /**
+     * Reconcile the background-connection preference when the foreground
+     * service fails to come up. `start()` returns true the moment the start
+     * intent is *queued*, before `onStartCommand` runs — so an Android 14+
+     * foreground-start rejection inside the service can't be seen by the
+     * enable path and would otherwise leave the toggle stuck "on" while no
+     * service runs. The service calls this from its failure branch so the
+     * UI reflects reality and surfaces the same toast as the synchronous
+     * rejection path, for every entry point (toggle, app-foreground, resume).
+     * Main-thread only (invoked from `onStartCommand`). See #164.
+     */
+    fun onBackgroundConnectionStartRejected() {
+        if (!backgroundConnectionEnabled) return
+        updateBackgroundConnectionPreference(false)
+        present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service)
+    }
+
+    /**
      * Whether real push notifications can run on this device + build. True
      * only if (1) the build is configured with a MIP-05 push server pubkey,
      * (2) Google Play Services is available on the device, AND (3) the

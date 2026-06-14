@@ -125,10 +125,14 @@ object MediaReferenceParser {
 
     /**
      * Whether [raw] is a media URL we're willing to download: a non-blank
-     * http(s) URL whose host is not loopback / the local network. Defense in
+     * `https` URL whose host is not loopback / the local network. Defense in
      * depth against SSRF via a malicious imeta tag — a hostile group member
      * could otherwise point auto-download at `http://127.0.0.1:8080/...` or an
      * RFC-1918 service. See issue #98.
+     *
+     * `http` is rejected outright (#157): this is an E2EE client, and a
+     * cleartext fetch would leak the attachment URL and the downloader's IP to
+     * any on-path observer, defeating the point of the encrypted transport.
      */
     private fun isDownloadableLocator(
         kind: String,
@@ -137,8 +141,7 @@ object MediaReferenceParser {
         if (kind != BLOSSOM_LOCATOR_KIND) return false
         if (raw.isBlank()) return false
         val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return false
-        val scheme = uri.scheme?.lowercase()
-        if (scheme != "http" && scheme != "https") return false
+        if (uri.scheme?.lowercase() != "https") return false
         val host = uri.host ?: return false
         if (host.isBlank()) return false
         return !HostSafety.isPrivateOrLoopbackHost(host)

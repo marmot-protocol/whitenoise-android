@@ -168,10 +168,17 @@ class MediaReferenceParserTest {
     }
 
     @Test
-    fun acceptsPublicHttpAndHttpsMediaLocators() {
-        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "http://blossom.example/x.bin"))))
+    fun acceptsPublicHttpsMediaLocators() {
         assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "https://blossom.example/x.bin"))))
-        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "http://172.32.0.1/x.bin"))))
+        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "https://172.32.0.1/x.bin"))))
+    }
+
+    @Test
+    fun returnsNull_whenLocatorSchemeIsCleartextHttp() {
+        // #157: cleartext http leaks the attachment URL + downloader IP to any
+        // on-path observer in an E2EE client; even public-host http is rejected.
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "http://blossom.example/x.bin"))))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "http://172.32.0.1/x.bin"))))
     }
 
     @Test

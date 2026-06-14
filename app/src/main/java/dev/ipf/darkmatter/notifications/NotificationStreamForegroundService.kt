@@ -31,11 +31,31 @@ class NotificationStreamForegroundService : Service() {
         flags: Int,
         startId: Int,
     ): Int {
-        startForeground(
-            NOTIFICATION_ID,
-            BackgroundConnectionNotification.build(this),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
-        )
+        // Android 14+ rejects a foreground-service start from a disallowed
+        // context with ForegroundServiceStartNotAllowedException (an
+        // IllegalStateException); a missing FGS grant throws SecurityException.
+        // Either one is fatal if it propagates out of onStartCommand. Bail
+        // cleanly instead — the next foregroundable trigger (app open, FCM
+        // high-priority wake) will retry. See #164.
+        val startedForeground =
+            runCatching {
+                startForeground(
+                    NOTIFICATION_ID,
+                    BackgroundConnectionNotification.build(this),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
+                )
+            }.onFailure {
+                foregroundServiceDebug(it) { "startForeground rejected" }
+            }.isSuccess
+        if (!startedForeground) {
+            // The enable path already optimistically persisted "background
+            // connection on" and got a `true` from start() (the intent was
+            // merely queued). Tell AppState the start actually failed so the
+            // toggle doesn't lie and the user sees why. See #164.
+            (application as? DarkMatterApplication)?.appState?.onBackgroundConnectionStartRejected()
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         if (bootstrapJob?.isActive != true) {
             bootstrapJob =
                 serviceScope.launch {

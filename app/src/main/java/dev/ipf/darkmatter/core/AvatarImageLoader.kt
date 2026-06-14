@@ -133,6 +133,12 @@ object AvatarImageLoader {
         while (true) {
             val parsed = runCatching { URL(current) }.getOrNull() ?: return null
             if (parsed.protocol != "https") return null
+            // SSRF: validate the host on EVERY hop, not just the first. A
+            // public https URL can 30x-redirect to https://127.0.0.1/ (or any
+            // private/loopback literal, including the non-dotted encodings
+            // HostSafety now decodes); without a per-hop host check the manual
+            // follow below would happily connect to it. See #129.
+            if (HostSafety.isPrivateOrLoopbackHost(parsed.host)) return null
             val connection = parsed.openConnection() as? HttpURLConnection ?: return null
             try {
                 connection.instanceFollowRedirects = false

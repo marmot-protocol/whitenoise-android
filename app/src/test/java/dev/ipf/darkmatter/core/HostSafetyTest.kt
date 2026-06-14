@@ -79,6 +79,48 @@ class HostSafetyTest {
     }
 
     @Test
+    fun hexGroupedEmbeddedIpv4LoopbackIsFlagged() {
+        // #153 sibling: the hex-grouped embedded IPv4 forms reach 127.0.0.1
+        // just like the dotted form and must be blocked.
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("::ffff:7f00:1")) // IPv4-mapped 127.0.0.1
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("::7f00:1")) // IPv4-compatible 127.0.0.1
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("::ffff:c0a8:1")) // 192.168.0.1
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("[::ffff:7f00:1]")) // bracketed
+        // Public IPv4-mapped stays allowed (8.8.8.8 == 0808:0808).
+        assertFalse(HostSafety.isPrivateOrLoopbackHost("::ffff:808:808"))
+    }
+
+    @Test
+    fun nonDottedIpv4LoopbackEncodingsAreFlagged() {
+        // SSRF bypass (#153): every form below resolves to 127.0.0.1 in the
+        // platform resolver and must be blocked, not waved through as a name.
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("2130706433")) // decimal
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("0x7f000001")) // hex
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("0177.0.0.1")) // octal first octet
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("127.1")) // short form
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("0x7f.0.0.1")) // hex octet
+        // Decimal encoding of an RFC-1918 address (10.0.0.1).
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("167772161"))
+    }
+
+    @Test
+    fun trailingRootDotStillResolvesToLoopbackAndIsFlagged() {
+        // #153: a rooting trailing dot would otherwise split into a 5th empty
+        // label (IPv4 decode misses) or dodge the exact "localhost" match.
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("127.0.0.1."))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("localhost."))
+        // A public host with a trailing dot stays allowed.
+        assertFalse(HostSafety.isPrivateOrLoopbackHost("relay.example."))
+    }
+
+    @Test
+    fun nonDottedPublicIpv4IsStillDecodedAndAllowed() {
+        // Proves the decoder classifies rather than blanket-blocking numerics:
+        // 134744072 == 8.8.8.8 (public) must remain allowed.
+        assertFalse(HostSafety.isPrivateOrLoopbackHost("134744072"))
+    }
+
+    @Test
     fun blankHostIsTreatedAsUnsafe() {
         assertTrue(HostSafety.isPrivateOrLoopbackHost(""))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("   "))

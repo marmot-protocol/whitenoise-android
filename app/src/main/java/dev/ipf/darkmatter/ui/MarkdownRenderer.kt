@@ -105,10 +105,33 @@ internal fun MarkdownMessageBody(
         }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         document.blocks.forEach { block ->
-            MarkdownBlockView(block, bodyContext)
+            MarkdownBlockView(block, bodyContext, depth = 0)
         }
     }
 }
+
+/**
+ * Maximum block-nesting depth the renderer will descend before it stops
+ * recursing. Block quotes and lists render their children via
+ * [MarkdownBlockView] again, so a peer-crafted message with thousands of
+ * nested quotes/lists would otherwise overflow the stack and crash the app on
+ * open (a DoS — the body renders as soon as the conversation is shown). No
+ * legitimate chat message nests anywhere near this deep. See #156.
+ */
+internal const val MARKDOWN_MAX_BLOCK_DEPTH = 24
+
+internal fun markdownDepthExceeded(depth: Int): Boolean = depth >= MARKDOWN_MAX_BLOCK_DEPTH
+
+/**
+ * Maximum inline-nesting depth. Inline nodes (emphasis, strong, strikethrough,
+ * link, image alt) carry child inlines, so the inline walkers recurse too — a
+ * peer-crafted tree of repeated nested emphasis/links would overflow the stack
+ * or burn CPU just like deep block nesting. Real formatting nests a handful of
+ * levels (bold-italic-link); 64 is generous headroom. See #156.
+ */
+internal const val MARKDOWN_MAX_INLINE_DEPTH = 64
+
+internal fun markdownInlineDepthExceeded(depth: Int): Boolean = depth >= MARKDOWN_MAX_INLINE_DEPTH
 
 /** Per-document inputs threaded through every block view. */
 private data class MarkdownBodyContext(
@@ -120,7 +143,15 @@ private data class MarkdownBodyContext(
 private fun MarkdownBlockView(
     block: MarkdownBlockFfi,
     ctx: MarkdownBodyContext,
+    depth: Int,
 ) {
+    // Past the nesting cap, stop descending: render a plain ellipsis marker
+    // instead of recursing into another quote/list level. Bounds the render
+    // stack against a maliciously deep document. See #156.
+    if (markdownDepthExceeded(depth)) {
+        Text("…", style = MaterialTheme.typography.bodyLarge)
+        return
+    }
     when (block) {
         is MarkdownBlockFfi.Paragraph ->
             Text(
@@ -135,8 +166,8 @@ private fun MarkdownBlockView(
         MarkdownBlockFfi.ThematicBreak ->
             HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.25f))
         is MarkdownBlockFfi.CodeBlock -> MarkdownCodeBlockView(block.content)
-        is MarkdownBlockFfi.BlockQuote -> MarkdownBlockQuoteView(block.blocks, ctx)
-        is MarkdownBlockFfi.List -> MarkdownListView(block, ctx)
+        is MarkdownBlockFfi.BlockQuote -> MarkdownBlockQuoteView(block.blocks, ctx, depth)
+        is MarkdownBlockFfi.List -> MarkdownListView(block, ctx, depth)
         is MarkdownBlockFfi.Table -> MarkdownTableView(block, ctx)
         // No math typesetting in v1 — show the raw TeX in the code treatment
         // so it at least reads as "source", not as broken prose.
@@ -186,6 +217,7 @@ private fun MarkdownCodeBlockView(content: String) {
 private fun MarkdownBlockQuoteView(
     blocks: List<MarkdownBlockFfi>,
     ctx: MarkdownBodyContext,
+    depth: Int,
 ) {
     Row(Modifier.height(IntrinsicSize.Min)) {
         Box(
@@ -199,7 +231,7 @@ private fun MarkdownBlockQuoteView(
         // children (nested code blocks) don't measure under unbounded
         // constraints inside the IntrinsicSize.Min row.
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            blocks.forEach { MarkdownBlockView(it, ctx) }
+            blocks.forEach { MarkdownBlockView(it, ctx, depth + 1) }
         }
     }
 }
@@ -208,6 +240,7 @@ private fun MarkdownBlockQuoteView(
 private fun MarkdownListView(
     block: MarkdownBlockFfi.List,
     ctx: MarkdownBodyContext,
+    depth: Int,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(if (block.tight) 2.dp else 6.dp)) {
         block.items.forEachIndexed { index, item ->
@@ -224,7 +257,7 @@ private fun MarkdownListView(
                     modifier = Modifier.padding(end = 6.dp),
                 )
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    item.blocks.forEach { MarkdownBlockView(it, ctx) }
+                    item.blocks.forEach { MarkdownBlockView(it, ctx, depth + 1) }
                 }
             }
         }
@@ -318,22 +351,24 @@ private fun resolveMentionNames(
 ): Map<String, String?> {
     if (resolve == null) return emptyMap()
     val bech32s = mutableSetOf<String>()
-    collectMentionBech32s(inlines, bech32s)
+    collectMentionBech32s(inlines, bech32s, depth = 0)
     return bech32s.associateWith(resolve)
 }
 
 private fun collectMentionBech32s(
     inlines: List<MarkdownInlineFfi>,
     out: MutableSet<String>,
+    depth: Int,
 ) {
+    if (markdownInlineDepthExceeded(depth)) return
     inlines.forEach { inline ->
         when (inline) {
             is MarkdownInlineFfi.NostrMention -> out += inline.entity.bech32
-            is MarkdownInlineFfi.Emph -> collectMentionBech32s(inline.children, out)
-            is MarkdownInlineFfi.Strong -> collectMentionBech32s(inline.children, out)
-            is MarkdownInlineFfi.Strikethrough -> collectMentionBech32s(inline.children, out)
-            is MarkdownInlineFfi.Link -> collectMentionBech32s(inline.children, out)
-            is MarkdownInlineFfi.Image -> collectMentionBech32s(inline.alt, out)
+            is MarkdownInlineFfi.Emph -> collectMentionBech32s(inline.children, out, depth + 1)
+            is MarkdownInlineFfi.Strong -> collectMentionBech32s(inline.children, out, depth + 1)
+            is MarkdownInlineFfi.Strikethrough -> collectMentionBech32s(inline.children, out, depth + 1)
+            is MarkdownInlineFfi.Link -> collectMentionBech32s(inline.children, out, depth + 1)
+            is MarkdownInlineFfi.Image -> collectMentionBech32s(inline.alt, out, depth + 1)
             else -> Unit
         }
     }
@@ -342,17 +377,19 @@ private fun collectMentionBech32s(
 private fun collectBlockMentionBech32s(
     blocks: List<MarkdownBlockFfi>,
     out: MutableSet<String>,
+    depth: Int,
 ) {
+    if (markdownDepthExceeded(depth)) return
     blocks.forEach { block ->
         when (block) {
-            is MarkdownBlockFfi.Paragraph -> collectMentionBech32s(block.inlines, out)
-            is MarkdownBlockFfi.Heading -> collectMentionBech32s(block.inlines, out)
-            is MarkdownBlockFfi.BlockQuote -> collectBlockMentionBech32s(block.blocks, out)
+            is MarkdownBlockFfi.Paragraph -> collectMentionBech32s(block.inlines, out, depth = 0)
+            is MarkdownBlockFfi.Heading -> collectMentionBech32s(block.inlines, out, depth = 0)
+            is MarkdownBlockFfi.BlockQuote -> collectBlockMentionBech32s(block.blocks, out, depth + 1)
             is MarkdownBlockFfi.List ->
-                block.items.forEach { collectBlockMentionBech32s(it.blocks, out) }
+                block.items.forEach { collectBlockMentionBech32s(it.blocks, out, depth + 1) }
             is MarkdownBlockFfi.Table -> {
-                block.header.forEach { collectMentionBech32s(it.inlines, out) }
-                block.rows.forEach { row -> row.forEach { collectMentionBech32s(it.inlines, out) } }
+                block.header.forEach { collectMentionBech32s(it.inlines, out, depth = 0) }
+                block.rows.forEach { row -> row.forEach { collectMentionBech32s(it.inlines, out, depth = 0) } }
             }
             else -> Unit
         }
@@ -387,6 +424,7 @@ internal fun markdownInlinesToAnnotatedString(
         appendMarkdownInlines(
             inlines,
             MarkdownInlineRenderContext(codeStyle, linkStyle, linkListener, mentionDisplayName),
+            depth = 0,
         )
     }
 
@@ -401,7 +439,11 @@ private class MarkdownInlineRenderContext(
 private fun AnnotatedString.Builder.appendMarkdownInlines(
     inlines: List<MarkdownInlineFfi>,
     ctx: MarkdownInlineRenderContext,
+    depth: Int,
 ) {
+    // Bound inline recursion (nested emphasis/strong/link/image) against a
+    // peer-crafted deep tree, mirroring the block-depth cap. See #156.
+    if (markdownInlineDepthExceeded(depth)) return
     inlines.forEach { inline ->
         when (inline) {
             is MarkdownInlineFfi.Text -> append(inline.content)
@@ -412,23 +454,23 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
             is MarkdownInlineFfi.Code -> withStyle(ctx.codeStyle) { append(inline.content) }
             is MarkdownInlineFfi.Emph ->
                 withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-                    appendMarkdownInlines(inline.children, ctx)
+                    appendMarkdownInlines(inline.children, ctx, depth + 1)
                 }
             is MarkdownInlineFfi.Strong ->
                 withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                    appendMarkdownInlines(inline.children, ctx)
+                    appendMarkdownInlines(inline.children, ctx, depth + 1)
                 }
             is MarkdownInlineFfi.Strikethrough ->
                 withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
-                    appendMarkdownInlines(inline.children, ctx)
+                    appendMarkdownInlines(inline.children, ctx, depth + 1)
                 }
             is MarkdownInlineFfi.Link ->
-                appendMarkdownLink(inline.dest, inline.children, ctx)
+                appendMarkdownLink(inline.dest, inline.children, ctx, depth + 1)
             // No inline image fetches (they'd bypass the encrypted-media
             // pipeline): the alt text stands in, tappable through to the
             // image URL when its scheme is allowlisted.
             is MarkdownInlineFfi.Image ->
-                appendMarkdownLink(inline.dest, inline.alt, ctx)
+                appendMarkdownLink(inline.dest, inline.alt, ctx, depth + 1)
             is MarkdownInlineFfi.Autolink -> {
                 // Normalize at the boundary: the gate, the annotation, and the
                 // eventual ACTION_VIEW all see the same trimmed destination.
@@ -523,6 +565,7 @@ private fun AnnotatedString.Builder.appendMarkdownLink(
     dest: String,
     children: List<MarkdownInlineFfi>,
     ctx: MarkdownInlineRenderContext,
+    depth: Int,
 ) {
     // Normalize once at the boundary so the openability gate, the stored
     // annotation, and the eventual ACTION_VIEW all agree on the same string.
@@ -534,10 +577,10 @@ private fun AnnotatedString.Builder.appendMarkdownLink(
     val visible = children.ifEmpty { listOf(MarkdownInlineFfi.Text(normalizedDest)) }
     if (isOpenableMarkdownLink(normalizedDest)) {
         withLink(LinkAnnotation.Url(normalizedDest, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)) {
-            appendMarkdownInlines(visible, ctx)
+            appendMarkdownInlines(visible, ctx, depth)
         }
     } else {
-        appendMarkdownInlines(visible, ctx)
+        appendMarkdownInlines(visible, ctx, depth)
     }
 }
 
@@ -563,7 +606,7 @@ internal fun rememberMarkdownPreviewText(
             emptyMap()
         } else {
             val bech32s = mutableSetOf<String>()
-            collectBlockMentionBech32s(document.blocks, bech32s)
+            collectBlockMentionBech32s(document.blocks, bech32s, depth = 0)
             bech32s.associateWith(mentionDisplayName)
         }
     return remember(document, contentColor, mentionNames) {
@@ -611,7 +654,7 @@ internal fun markdownDocumentToPreviewAnnotatedString(
         buildAnnotatedString {
             for (block in document.blocks) {
                 if (length >= maxLength) break
-                appendPreviewBlock(block, codeStyle, maxLength, mentionDisplayName)
+                appendPreviewBlock(block, codeStyle, maxLength, mentionDisplayName, depth = 0)
             }
         }
     return if (flattened.length > maxLength) flattened.subSequence(0, maxLength) else flattened
@@ -622,11 +665,16 @@ private fun AnnotatedString.Builder.appendPreviewBlock(
     codeStyle: SpanStyle,
     maxLength: Int,
     mentionDisplayName: ((String) -> String?)?,
+    depth: Int,
 ) {
     // Budget check inside the recursion too: the top-level loop only guards
     // between siblings, so a deep quote/list subtree would otherwise keep
     // flattening long after the row's budget is spent.
     if (length >= maxLength) return
+    // Structural depth cap: a deeply-nested subtree with NO text content never
+    // spends the length budget, so the budget alone can't bound the recursion
+    // — a peer could overflow the stack while building a one-line preview. See #156.
+    if (markdownDepthExceeded(depth)) return
     when (block) {
         is MarkdownBlockFfi.Paragraph -> appendPreviewInlineSegment(block.inlines, codeStyle, maxLength, mentionDisplayName)
         is MarkdownBlockFfi.Heading -> appendPreviewInlineSegment(block.inlines, codeStyle, maxLength, mentionDisplayName)
@@ -634,10 +682,10 @@ private fun AnnotatedString.Builder.appendPreviewBlock(
         is MarkdownBlockFfi.CodeBlock -> appendPreviewCodeContent(block.content, codeStyle, maxLength)
         is MarkdownBlockFfi.MathBlock -> appendPreviewCodeContent(block.content, codeStyle, maxLength)
         is MarkdownBlockFfi.BlockQuote ->
-            block.blocks.forEach { appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName) }
+            block.blocks.forEach { appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1) }
         is MarkdownBlockFfi.List ->
             block.items.forEach { item ->
-                item.blocks.forEach { appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName) }
+                item.blocks.forEach { appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1) }
             }
         is MarkdownBlockFfi.Table -> {
             block.header.forEach { cell -> appendPreviewInlineSegment(cell.inlines, codeStyle, maxLength, mentionDisplayName) }
@@ -677,7 +725,7 @@ private fun AnnotatedString.Builder.appendPreviewInlineSegment(
     mentionDisplayName: ((String) -> String?)?,
 ) {
     appendPreviewSegment(
-        buildAnnotatedString { appendPreviewInlines(inlines, codeStyle, maxLength, mentionDisplayName) },
+        buildAnnotatedString { appendPreviewInlines(inlines, codeStyle, maxLength, mentionDisplayName, depth = 0) },
         maxLength,
     )
 }
@@ -706,7 +754,12 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
     codeStyle: SpanStyle,
     maxLength: Int,
     mentionDisplayName: ((String) -> String?)?,
+    depth: Int,
 ) {
+    // Structural depth cap as well as the budget: a deeply-nested EMPTY inline
+    // tree (e.g. emphasis nested thousands deep with no text) never spends the
+    // length budget, so the budget alone can't bound this recursion. See #156.
+    if (markdownInlineDepthExceeded(depth)) return
     for (inline in inlines) {
         // This builds a segment (own builder, length starts at 0), so the
         // whole-document budget bounds each segment: stop walking once spent
@@ -722,15 +775,15 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
                 withStyle(codeStyle) { append(inline.content.take((maxLength - length).coerceAtLeast(0))) }
             is MarkdownInlineFfi.Emph ->
                 withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName)
+                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName, depth + 1)
                 }
             is MarkdownInlineFfi.Strong ->
                 withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName)
+                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName, depth + 1)
                 }
             is MarkdownInlineFfi.Strikethrough ->
                 withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
-                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName)
+                    appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName, depth + 1)
                 }
             // Visible text only — no annotation, no link styling. A label-less
             // link still shows its destination so the preview isn't blank.
@@ -740,6 +793,7 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
                     codeStyle,
                     maxLength,
                     mentionDisplayName,
+                    depth + 1,
                 )
             is MarkdownInlineFfi.Image ->
                 appendPreviewInlines(
@@ -747,6 +801,7 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
                     codeStyle,
                     maxLength,
                     mentionDisplayName,
+                    depth + 1,
                 )
             is MarkdownInlineFfi.Autolink -> append(inline.url.take(maxLength - length))
             is MarkdownInlineFfi.Math ->

@@ -10,14 +10,13 @@ import android.content.SharedPreferences
  * survives an app restart even before Firebase delivers a fresh
  * `onNewToken` callback.
  *
- * **Thread confinement.** The non-suspending mutators (`setToken`,
- * `recordPendingClear`, `clearPending`) do a read-modify-write on
- * SharedPreferences without an internal lock. They are safe today because
- * every caller is on `Dispatchers.Main.immediate` — either via
- * [dev.ipf.darkmatter.state.DarkMatterAppState]'s `notificationScope` or
- * the Firebase service callback that resolves on the same dispatcher. A
- * new off-main caller must serialize through one of those scopes (or add
- * an internal lock here) to avoid lost-update on the pending-clears set.
+ * **Thread safety.** `FirebaseMessagingService.onNewToken` runs on a Firebase
+ * background thread, not Main — so the old "every caller is on
+ * `Dispatchers.Main.immediate`" confinement was false, and the
+ * read-modify-write mutators below could lose updates or resurrect a
+ * just-cleared token under concurrent sign-out. Every mutator (and the
+ * read-modify-write read it depends on) now serializes through [lock], so the
+ * store is safe to call from any thread. See #167.
  */
 class PushTokenStore(
     private val preferences: SharedPreferences,
@@ -25,11 +24,15 @@ class PushTokenStore(
     fun lastToken(): String? = preferences.getString(KEY_FCM_TOKEN, null)?.takeIf { it.isNotBlank() }
 
     fun setToken(token: String) {
-        preferences.edit().putString(KEY_FCM_TOKEN, token).apply()
+        synchronized(LOCK) {
+            preferences.edit().putString(KEY_FCM_TOKEN, token).apply()
+        }
     }
 
     fun clear() {
-        preferences.edit().remove(KEY_FCM_TOKEN).apply()
+        synchronized(LOCK) {
+            preferences.edit().remove(KEY_FCM_TOKEN).apply()
+        }
     }
 
     /**
@@ -48,19 +51,28 @@ class PushTokenStore(
      */
     fun recordPendingClear(account: String) {
         if (account.isBlank()) return
-        val current = pendingClears()
-        if (account in current) return
-        preferences.edit().putStringSet(KEY_PENDING_CLEARS, current + account).apply()
+        synchronized(LOCK) {
+            val current = pendingClears()
+            if (account in current) return
+            preferences.edit().putStringSet(KEY_PENDING_CLEARS, current + account).apply()
+        }
     }
 
     fun clearPending(account: String) {
         if (account.isBlank()) return
-        val current = pendingClears()
-        if (account !in current) return
-        preferences.edit().putStringSet(KEY_PENDING_CLEARS, current - account).apply()
+        synchronized(LOCK) {
+            val current = pendingClears()
+            if (account !in current) return
+            preferences.edit().putStringSet(KEY_PENDING_CLEARS, current - account).apply()
+        }
     }
 
     companion object {
+        // Process-wide, NOT per-instance: callers construct fresh stores over
+        // the same prefs file (onNewToken does PushTokenStore.create(...) on a
+        // Firebase background thread while sign-out uses another instance), so
+        // an instance lock would serialize nothing across them. See #167.
+        private val LOCK = Any()
         private const val PREFS_NAME = "darkmatter.push.tokens"
         private const val KEY_FCM_TOKEN = "fcm_token"
         private const val KEY_PENDING_CLEARS = "pending_clears"

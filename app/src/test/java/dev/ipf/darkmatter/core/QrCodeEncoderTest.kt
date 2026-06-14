@@ -1,10 +1,23 @@
 package dev.ipf.darkmatter.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QrCodeEncoderTest {
+    @Test
+    fun rejectsOversizeDimensionBeforeAllocating() {
+        // #169: a size whose square overflows Int (50_000² ≈ 2.5e9 > Int.MAX)
+        // must be rejected up front, not turned into a negative IntArray length.
+        assertThrows(IllegalArgumentException::class.java) {
+            QrCodeEncoder.pixels(content = "npub1abc", size = 50_000, onColor = 1, offColor = 0)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            QrCodeEncoder.matrix("npub1abc", size = QrCodeEncoder.MAX_QR_DIMENSION + 1)
+        }
+    }
+
     @Test
     fun createsSquareQrMatricesForProfileLinks() {
         val matrix = QrCodeEncoder.matrix(ProfileLink("npub1abc").uri, size = 128)
