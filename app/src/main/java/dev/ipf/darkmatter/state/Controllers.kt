@@ -1908,30 +1908,37 @@ class ConversationController(
             appState.mediaPlaintextCache.put(cacheKey, onDisk)
             return onDisk
         }
-        val result =
-            runCatching {
-                appState.marmotIo { downloadMedia(account, group.groupIdHex, reference) }
-            }.onFailure {
-                if (it is CancellationException) throw it
-                Log.w(
-                    "DMConversation",
-                    "downloadAttachment failed for ${group.groupIdHex.take(8)} message=${messageIdHex.take(8)}",
-                    it,
-                )
-            }.getOrThrow()
-        // Never cache empty plaintext — a zero-byte result would render as a
-        // permanent broken image and short-circuit tap-to-retry.
-        if (result.plaintext.isNotEmpty()) {
-            appState.mediaPlaintextCache.put(cacheKey, result.plaintext)
-            // Persist to L2 in the background. The L1 write above means the
-            // bubble already renders; the disk write only needs to finish
-            // before the user kills the app, which is many seconds away.
-            val plaintext = result.plaintext
-            appState.launchMutation {
-                withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, plaintext) }
+        // The actual Blossom fetch runs on `mutationsScope` so it continues
+        // after the caller is cancelled (e.g. the user tapped a file and
+        // swiped the app away). Memoized so a re-tap or sibling tile that
+        // hits the same key shares the same Deferred — no double-fetch.
+        val groupIdHex = group.groupIdHex
+        val deferred =
+            appState.memoizedDownload(cacheKey) {
+                val result =
+                    runCatching {
+                        appState.marmotIo { downloadMedia(account, groupIdHex, reference) }
+                    }.onFailure {
+                        if (it is CancellationException) throw it
+                        Log.w(
+                            "DMConversation",
+                            "downloadAttachment failed for ${groupIdHex.take(8)} message=${messageIdHex.take(8)}",
+                            it,
+                        )
+                    }.getOrThrow()
+                // Never cache empty plaintext — a zero-byte result would
+                // render as a permanent broken image and short-circuit
+                // tap-to-retry.
+                if (result.plaintext.isNotEmpty()) {
+                    appState.mediaPlaintextCache.put(cacheKey, result.plaintext)
+                    val plaintext = result.plaintext
+                    // Persist to L2 still on this background scope (same
+                    // lifetime as the FFI fetch).
+                    withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, plaintext) }
+                }
+                result.plaintext
             }
-        }
-        return result.plaintext
+        return deferred.await()
     }
 
     /** Decoded thumbnail for [messageIdHex] if one is cached (renders with no
