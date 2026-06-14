@@ -2441,7 +2441,7 @@ class ConversationController(
     private suspend fun loadOlderPage(): Boolean {
         if (!hasMoreBefore || isLoadingOlder) return false
         val subscription = timelineSubscription ?: return false
-        val priorCount = timelineRecords.size
+        val priorMessageIds = timelineRecords.keys.toSet()
         // A previous loadOlderPage failure leaves `error` set; clear it now
         // that we're actually retrying, otherwise the stale banner sits over
         // a successful retry and a developer can't distinguish "still broken"
@@ -2467,9 +2467,11 @@ class ConversationController(
             // on whether the page actually contains a media-bearing row so
             // a text-only history pull doesn't trigger the unbounded scan.
             if (pageContainsMedia(page)) refreshMediaReferences()
-            // "Made progress" = the window grew. The page is the full new
-            // window, not a delta, so we can't use `page.messages.isNotEmpty`.
-            timelineRecords.size > priorCount
+            // "Made progress" = the window grew OR shifted to include older
+            // ids. paginateBackwards() returns a bounded/capped full window,
+            // so size can stay constant while content still advances backward.
+            timelineRecords.size > priorMessageIds.size ||
+                timelineRecords.keys.any { it !in priorMessageIds }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
