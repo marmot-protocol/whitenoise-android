@@ -37,6 +37,14 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
         if (message.notification != null) {
             Log.d(TAG, "Ignoring notification body on MIP-05 push")
         }
+        // Respect the user's choice: if they turned the background connection
+        // off, a wake push must not resurrect the foreground stream service.
+        // (On Android 14+ starting an FGS from this background context is also
+        // a disallowed start, so gating here avoids that rejection too.) #158
+        if (!BackgroundConnectionPreferences.isEnabled(applicationContext)) {
+            Log.d(TAG, "Background connection disabled; ignoring wake push")
+            return
+        }
         Log.d(TAG, "MIP-05 wake push received; starting foreground stream")
         wakeForegroundStream()
     }
