@@ -53,6 +53,168 @@ object Thumbhash {
 
     internal const val MAX_EDGE_PX: Int = 100
 
+    /**
+     * Decode a base64 thumbhash string into a small ARGB_8888 bitmap
+     * suitable for a blurred placeholder. Inverse of [encodeBase64]. Caller
+     * is expected to scale the result to fit the destination box (e.g.
+     * via `Image(... contentScale = ContentScale.Crop)`). Returns null
+     * when the input can't be base64-decoded, is too short, or doesn't
+     * produce a sensible decoded bitmap.
+     */
+    fun decodeToBitmap(base64Hash: String): Bitmap? {
+        val bytes =
+            runCatching {
+                Base64.decode(base64Hash, Base64.NO_PADDING or Base64.NO_WRAP)
+            }.getOrNull() ?: return null
+        val decoded = runCatching { decodeRgba(bytes) }.getOrNull() ?: return null
+        return Bitmap.createBitmap(decoded.pixels, decoded.width, decoded.height, Bitmap.Config.ARGB_8888)
+    }
+
+    /**
+     * Decoded thumbhash as an ARGB pixel grid. Width/height are the
+     * algorithm's natural output (≤32 on each axis); callers scale to fit.
+     */
+    internal data class DecodedRgba(
+        val width: Int,
+        val height: Int,
+        val pixels: IntArray,
+    )
+
+    internal fun decodeRgba(hash: ByteArray): DecodedRgba? {
+        if (hash.size < 5) return null
+        val h0 = hash[0].toInt() and 0xFF
+        val h1 = hash[1].toInt() and 0xFF
+        val h2 = hash[2].toInt() and 0xFF
+        val h3 = hash[3].toInt() and 0xFF
+        val h4 = hash[4].toInt() and 0xFF
+        val header24 = h0 or (h1 shl 8) or (h2 shl 16)
+        val header16 = h3 or (h4 shl 8)
+        val lDc = (header24 and 63) / 63.0
+        val pDc = ((header24 shr 6) and 63) / 31.5 - 1.0
+        val qDc = ((header24 shr 12) and 63) / 31.5 - 1.0
+        val lScale = ((header24 shr 18) and 31) / 31.0
+        val hasAlpha = (header24 shr 23) and 1 == 1
+        val pScale = ((header16 shr 3) and 63) / 63.0
+        val qScale = ((header16 shr 9) and 63) / 63.0
+        val isLandscape = (header16 shr 15) and 1 == 1
+        val lMaxBits = header16 and 7
+        val lx = max(3, if (isLandscape) (if (hasAlpha) 5 else 7) else lMaxBits)
+        val ly = max(3, if (isLandscape) lMaxBits else (if (hasAlpha) 5 else 7))
+
+        val aDc: Double
+        val aScale: Double
+        val acStart: Int
+        if (hasAlpha) {
+            if (hash.size < 6) return null
+            val h5 = hash[5].toInt() and 0xFF
+            aDc = (h5 and 15) / 15.0
+            aScale = ((h5 shr 4) and 15) / 15.0
+            acStart = 6
+        } else {
+            aDc = 1.0
+            aScale = 0.0
+            acStart = 5
+        }
+
+        var acIndex = 0
+
+        fun decodeChannel(
+            nx: Int,
+            ny: Int,
+            scale: Double,
+        ): DoubleArray {
+            val ac = ArrayList<Double>(nx * ny)
+            for (cy in 0 until ny) {
+                var cx = if (cy == 0) 1 else 0
+                while (cx * ny < nx * (ny - cy)) {
+                    val slot = acStart + (acIndex shr 1)
+                    val nibble =
+                        if (slot < hash.size) {
+                            (hash[slot].toInt() shr ((acIndex and 1) shl 2)) and 15
+                        } else {
+                            // Truncated hash — pad with neutral nibble so the
+                            // decoder degrades gracefully rather than throwing.
+                            7
+                        }
+                    ac.add((nibble / 7.5 - 1.0) * scale)
+                    acIndex += 1
+                    cx += 1
+                }
+            }
+            return ac.toDoubleArray()
+        }
+
+        val lAc = decodeChannel(lx, ly, lScale)
+        val pAc = decodeChannel(3, 3, pScale * 1.25)
+        val qAc = decodeChannel(3, 3, qScale * 1.25)
+        val aAc = if (hasAlpha) decodeChannel(5, 5, aScale) else DoubleArray(0)
+
+        val ratio = lx.toDouble() / ly.toDouble()
+        val w = if (ratio > 1.0) 32 else (32 * ratio).roundToInt().coerceAtLeast(1)
+        val h = if (ratio > 1.0) (32 / ratio).roundToInt().coerceAtLeast(1) else 32
+        val pixels = IntArray(w * h)
+        val cxStop = max(lx, if (hasAlpha) 5 else 3)
+        val cyStop = max(ly, if (hasAlpha) 5 else 3)
+        val fxBuf = DoubleArray(cxStop)
+        val fyBuf = DoubleArray(cyStop)
+
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                var l = lDc
+                var p = pDc
+                var q = qDc
+                var a = aDc
+                for (cx in 0 until cxStop) fxBuf[cx] = cos(PI / w * (x + 0.5) * cx)
+                for (cy in 0 until cyStop) fyBuf[cy] = cos(PI / h * (y + 0.5) * cy)
+
+                var j = 0
+                for (cy in 0 until ly) {
+                    var cx = if (cy == 0) 1 else 0
+                    val fy2 = fyBuf[cy] * 2.0
+                    while (cx * ly < lx * (ly - cy)) {
+                        l += lAc[j] * fxBuf[cx] * fy2
+                        j += 1
+                        cx += 1
+                    }
+                }
+                j = 0
+                for (cy in 0 until 3) {
+                    var cx = if (cy == 0) 1 else 0
+                    val fy2 = fyBuf[cy] * 2.0
+                    while (cx < 3 - cy) {
+                        val f = fxBuf[cx] * fy2
+                        if (j < pAc.size) p += pAc[j] * f
+                        if (j < qAc.size) q += qAc[j] * f
+                        j += 1
+                        cx += 1
+                    }
+                }
+                if (hasAlpha) {
+                    j = 0
+                    for (cy in 0 until 5) {
+                        var cx = if (cy == 0) 1 else 0
+                        val fy2 = fyBuf[cy] * 2.0
+                        while (cx < 5 - cy) {
+                            if (j < aAc.size) a += aAc[j] * fxBuf[cx] * fy2
+                            j += 1
+                            cx += 1
+                        }
+                    }
+                }
+
+                val b = l - 2.0 / 3.0 * p
+                val r = (3.0 * l - b + q) / 2.0
+                val g = r - q
+                val red = (255.0 * r.coerceIn(0.0, 1.0)).toInt()
+                val green = (255.0 * g.coerceIn(0.0, 1.0)).toInt()
+                val blue = (255.0 * b.coerceIn(0.0, 1.0)).toInt()
+                val alpha = (255.0 * a.coerceIn(0.0, 1.0)).toInt()
+                pixels[x + y * w] = (alpha shl 24) or (red shl 16) or (green shl 8) or blue
+            }
+        }
+        return DecodedRgba(w, h, pixels)
+    }
+
     internal fun scaledDimensions(
         srcW: Int,
         srcH: Int,
@@ -71,6 +233,22 @@ object Thumbhash {
         if (w <= 0 || h <= 0 || w > MAX_EDGE_PX || h > MAX_EDGE_PX) return null
         val pixels = IntArray(w * h)
         bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+        return encodeFromRgba(w, h, pixels)
+    }
+
+    /**
+     * Pure-pixel-input encoder core. Used both by the Bitmap-coupled
+     * [encode] path and by unit tests running on plain JVM (where
+     * `Bitmap.getPixels` is a stub). Pixels are ARGB_8888 packed ints
+     * (alpha << 24 | red << 16 | green << 8 | blue).
+     */
+    internal fun encodeFromRgba(
+        w: Int,
+        h: Int,
+        pixels: IntArray,
+    ): ByteArray? {
+        if (w <= 0 || h <= 0 || w > MAX_EDGE_PX || h > MAX_EDGE_PX) return null
+        if (pixels.size != w * h) return null
 
         var avgR = 0.0
         var avgG = 0.0
@@ -180,7 +358,11 @@ object Thumbhash {
                 }
                 f /= (w * h).toDouble()
                 if (cx > 0 || cy > 0) {
-                    ac.add(f * 2.0)
+                    // Store raw f. The decoder applies the DCT-II
+                    // reconstruction factor of 2 during synthesis, so
+                    // doubling here would clamp high-amplitude chroma
+                    // to the wrong sign after nibble quantization.
+                    ac.add(f)
                     if (kotlin.math.abs(f) > scale) scale = kotlin.math.abs(f)
                 } else {
                     dc = f
