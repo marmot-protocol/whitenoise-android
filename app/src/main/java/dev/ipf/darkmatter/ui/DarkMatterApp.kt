@@ -134,6 +134,7 @@ import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -256,6 +257,7 @@ import dev.ipf.darkmatter.media.ImageSearchException
 import dev.ipf.darkmatter.media.ImageSearchResult
 import dev.ipf.darkmatter.media.MediaPipeline
 import dev.ipf.darkmatter.media.MediaReferenceParser
+import dev.ipf.darkmatter.media.Thumbhash
 import dev.ipf.darkmatter.media.sanitizeHttpsAvatarUrl
 import dev.ipf.darkmatter.notifications.NotificationNavStep
 import dev.ipf.darkmatter.notifications.NotificationTarget
@@ -2086,6 +2088,68 @@ private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RET
  *  so async decode never reflows the list (would break the open-time anchor). */
 private val MediaBubbleHeight = 240.dp
 
+/** Hard cap on the height a `dim`-shaped image bubble can claim, so a tall
+ *  portrait can't dominate the chat viewport. Width fills the bubble; this
+ *  bounds the height so the aspect-ratio sizing degrades to a cropped
+ *  preview at the extremes. */
+private val MediaBubbleMaxHeight = 340.dp
+
+/** Fixed card width used for portrait image bubbles, so every portrait
+ *  reads as a consistently-sized card rather than a width-varying strip.
+ *  Landscape bubbles still fill the parent. */
+private val MediaBubbleCardWidth = 280.dp
+
+/** Sizing modifier for both the optimistic and the confirmed single-image
+ *  bubble. Portrait images become uniform-width cards with a height cap;
+ *  landscape images fill the bubble width and derive their natural height
+ *  (which can't exceed the width for ratio ≥ 1). Falls back to the legacy
+ *  fixed-height slab when the aspect ratio is unknown. */
+@Composable
+private fun imageBubbleSizing(ratio: Float?): Modifier =
+    when {
+        ratio == null -> Modifier.fillMaxWidth().height(MediaBubbleHeight)
+        ratio >= 1f -> Modifier.fillMaxWidth().aspectRatio(ratio)
+        else -> {
+            val natural = (MediaBubbleCardWidth.value / ratio).dp
+            val height = if (natural > MediaBubbleMaxHeight) MediaBubbleMaxHeight else natural
+            Modifier.width(MediaBubbleCardWidth).height(height)
+        }
+    }
+
+/**
+ * Decode an imeta `thumbhash` field into a tiny ARGB ImageBitmap, cached
+ * for the lifetime of the composition. Returns null when the field is
+ * absent or doesn't decode. Callers render the bitmap with
+ * [ContentScale.Crop] under the loading state so the bubble shows a
+ * blurred preview before the real bytes arrive.
+ */
+@Composable
+private fun rememberThumbhashImage(thumbhash: String?): ImageBitmap? {
+    if (thumbhash.isNullOrBlank()) return null
+    return remember(thumbhash) {
+        Thumbhash.decodeToBitmap(thumbhash)?.asImageBitmap()
+    }
+}
+
+/**
+ * Parse the imeta `dim` field ("WxH") into a width/height aspect ratio.
+ * Returns null when [dim] is null, blank, malformed, or non-positive on
+ * either axis. Caller falls back to [MediaBubbleHeight] in that case.
+ */
+private fun aspectRatioFromDim(dim: String?): Float? {
+    if (dim.isNullOrBlank()) return null
+    val parts = dim.split('x', 'X', ignoreCase = true)
+    if (parts.size != 2) return null
+    val w = parts[0].trim().toIntOrNull() ?: return null
+    val h = parts[1].trim().toIntOrNull() ?: return null
+    if (w <= 0 || h <= 0) return null
+    // Clamp wide panoramas so the bubble doesn't squeeze to a sliver.
+    // Tall portraits are bounded by [MediaBubbleMaxHeight] at the layout
+    // site instead — keeping the aspect ratio uncramped lets the placeholder
+    // still convey "this is a tall image" before the bytes arrive.
+    return (w.toFloat() / h.toFloat()).coerceIn(0.4f, 2.5f)
+}
+
 /** Saves a nullable Uri across process death (camera capture round-trip). */
 private val NullableUriSaver: Saver<android.net.Uri?, String> =
     Saver(
@@ -2148,6 +2212,13 @@ private fun MediaImageBubble(
     LaunchedEffect(key, attachmentIndex, epoch, startDownload, reloadToken) {
         if (bitmap != null) return@LaunchedEffect // already have a decoded thumbnail
         if (!startDownload) return@LaunchedEffect
+        // The imeta-tag parser falls back to sourceEpoch=0 (the wire format
+        // doesn't carry it). Calling downloadMedia with epoch=0 errors with
+        // "missing encrypted media secret for epoch 0". Wait for the typed
+        // reference upgrade via `refreshMediaReferences` — once it lands,
+        // `epoch` re-keys this effect with the real value. The spinner stays
+        // visible during the wait (bitmap=null, failed=false, startDownload).
+        if (epoch == 0uL) return@LaunchedEffect
         failed = false
         try {
             val data = controller.downloadAttachment(key, attachmentIndex, reference)
@@ -2167,7 +2238,12 @@ private fun MediaImageBubble(
             // Composable left composition or key changed — propagate. A
             // cancelled effect isn't a download failure; the bubble is gone.
             throw cancel
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
+            android.util.Log.w(
+                "MediaImageBubble",
+                "auto-download failed for msg=${key.take(8)} idx=$attachmentIndex",
+                t,
+            )
             failed = true
         }
     }
@@ -2175,18 +2251,27 @@ private fun MediaImageBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
-        // FIXED height across every state (loading / image / failed / gated) so
-        // the bubble never changes size when the image finishes decoding. A
-        // variable height would reflow the timeline after the open-time
-        // scroll-to-bottom and strand the user mid-list (and cause visible
-        // flips). Full aspect-ratio sizing needs `dim` in the imeta tag (Rust).
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(MediaBubbleHeight),
+        // Single source of truth for image-bubble shape: portraits become
+        // uniform-width cards (capped height), landscapes fill the bubble
+        // width. Used by both the confirmed bubble and the optimistic
+        // upload-phase bubble so the optimistic → confirmed swap is a
+        // visual no-op.
+        modifier = imageBubbleSizing(aspectRatioFromDim(reference.dim)),
     ) {
         Box(contentAlignment = Alignment.Center) {
             val current = bitmap
+            val placeholder = rememberThumbhashImage(reference.thumbhash)
+            // Paint the blurred placeholder behind whatever loading-state is
+            // shown so the bubble has a perceptual preview before the real
+            // bytes arrive. The real image (when `current != null`) covers it.
+            if (current == null && placeholder != null) {
+                Image(
+                    bitmap = placeholder,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             when {
                 current != null ->
                     Image(
@@ -2199,18 +2284,18 @@ private fun MediaImageBubble(
                                 .clickable { viewerOpen = true },
                     )
                 failed ->
-                    MediaBubbleAction(
-                        icon = Icons.Default.BrokenImage,
-                        label = stringResource(R.string.media_tap_to_retry),
+                    MediaCircleAction(
+                        icon = Icons.Default.Refresh,
+                        contentDescription = stringResource(R.string.media_tap_to_retry),
                         onClick = {
                             failed = false
                             reloadToken++
                         },
                     )
                 !startDownload ->
-                    MediaBubbleAction(
-                        icon = Icons.Default.Download,
-                        label = stringResource(R.string.media_tap_to_download),
+                    MediaCircleAction(
+                        icon = Icons.Default.ArrowDownward,
+                        contentDescription = stringResource(R.string.media_tap_to_download),
                         onClick = { startDownload = true },
                     )
                 else ->
@@ -2236,14 +2321,107 @@ private fun MediaImageBubble(
 }
 
 /**
- * Multi-image album bubble: a 2-column grid of square thumbnails. Used for
- * any message carrying ≥2 image attachments. Each tile maintains its own
- * download/cache state (keyed by `(messageId, attachmentIndex)`); tap any
- * tile to open the full-screen viewer at that attachment. When the album
- * holds more than four images, the fourth tile gets a "+N" overlay and the
- * remaining images are reachable from the viewer (next-tile navigation
- * lands with the pager-viewer follow-up).
+ * Count-specific masonry scaffolding for a 2-6 image album. Lays out the
+ * tiles so a 3-image set is tall-left + two-stacked-right (no empty cell),
+ * 5 is 2-up over 3-down, 6+ is 3×2 with a "+N" tile six. Caller provides
+ * the per-tile composable through [tile]; the helper supplies each tile
+ * its size modifier so the layout shape stays one source of truth across
+ * the confirmed bubble and the optimistic upload-phase placeholder.
  */
+@Composable
+private fun MasonryImageLayout(
+    visibleCount: Int,
+    tile: @Composable (index: Int, tileModifier: Modifier) -> Unit,
+) {
+    when (visibleCount) {
+        2 ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth().padding(2.dp),
+            ) {
+                tile(0, Modifier.weight(1f).aspectRatio(1f))
+                tile(1, Modifier.weight(1f).aspectRatio(1f))
+            }
+        3 ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth().padding(2.dp).aspectRatio(1f),
+            ) {
+                tile(0, Modifier.weight(1f).fillMaxHeight())
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                ) {
+                    tile(1, Modifier.weight(1f).fillMaxWidth())
+                    tile(2, Modifier.weight(1f).fillMaxWidth())
+                }
+            }
+        4 ->
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth().padding(2.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(0, Modifier.weight(1f).aspectRatio(1f))
+                    tile(1, Modifier.weight(1f).aspectRatio(1f))
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(2, Modifier.weight(1f).aspectRatio(1f))
+                    tile(3, Modifier.weight(1f).aspectRatio(1f))
+                }
+            }
+        5 ->
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth().padding(2.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(0, Modifier.weight(1f).aspectRatio(1f))
+                    tile(1, Modifier.weight(1f).aspectRatio(1f))
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(2, Modifier.weight(1f).aspectRatio(1f))
+                    tile(3, Modifier.weight(1f).aspectRatio(1f))
+                    tile(4, Modifier.weight(1f).aspectRatio(1f))
+                }
+            }
+        else ->
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth().padding(2.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(0, Modifier.weight(1f).aspectRatio(1f))
+                    tile(1, Modifier.weight(1f).aspectRatio(1f))
+                    tile(2, Modifier.weight(1f).aspectRatio(1f))
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    tile(3, Modifier.weight(1f).aspectRatio(1f))
+                    tile(4, Modifier.weight(1f).aspectRatio(1f))
+                    tile(5, Modifier.weight(1f).aspectRatio(1f))
+                }
+            }
+    }
+}
+
 @Composable
 private fun MediaImageGridBubble(
     item: TimelineMessage,
@@ -2253,53 +2431,35 @@ private fun MediaImageGridBubble(
     mine: Boolean,
 ) {
     val record = item.record
-    val visible = attachments.take(4)
+    // Show up to six tiles before collapsing the remainder into a "+N"
+    // overlay on tile six. Higher counts trip the overflow chip in the
+    // 3×2 layout below.
+    val visible = attachments.take(6)
     val overflow = (attachments.size - visible.size).coerceAtLeast(0)
-    // Pager position within the viewer (a position within `attachments`),
-    // not the protocol-level attachmentIndex. The viewer resolves the real
-    // attachmentIndex per page from the indexed-value entry.
     var viewerOpenAt by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
+
+    val tileAt: @Composable (Int, Modifier) -> Unit = { tileIndex, tileModifier ->
+        val entry = visible[tileIndex]
+        val showOverflow = tileIndex == visible.lastIndex && overflow > 0
+        MediaImageGridTile(
+            messageIdHex = record.messageIdHex,
+            attachmentIndex = entry.index,
+            reference = entry.value,
+            controller = controller,
+            appState = appState,
+            mine = mine,
+            onTap = { viewerOpenAt = tileIndex },
+            overflowCount = if (showOverflow) overflow else 0,
+            modifier = tileModifier,
+        )
+    }
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-            modifier = Modifier.padding(2.dp),
-        ) {
-            visible.chunked(2).forEachIndexed { rowIndex, row ->
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    row.forEachIndexed { colIndex, entry ->
-                        val tileIndex = rowIndex * 2 + colIndex
-                        val showOverflow = tileIndex == visible.lastIndex && overflow > 0
-                        MediaImageGridTile(
-                            messageIdHex = record.messageIdHex,
-                            attachmentIndex = entry.index,
-                            reference = entry.value,
-                            controller = controller,
-                            appState = appState,
-                            mine = mine,
-                            onTap = { viewerOpenAt = tileIndex },
-                            overflowCount = if (showOverflow) overflow else 0,
-                            modifier =
-                                Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f),
-                        )
-                    }
-                    // Pad odd-count rows so a single-tile last row stays
-                    // half-width instead of stretching across the bubble.
-                    if (row.size == 1) {
-                        Spacer(Modifier.weight(1f))
-                    }
-                }
-            }
-        }
+        MasonryImageLayout(visibleCount = visible.size, tile = tileAt)
     }
 
     viewerOpenAt?.let { index ->
@@ -2356,6 +2516,8 @@ private fun MediaImageGridTile(
     LaunchedEffect(decodeKey, startDownload, reloadToken) {
         if (bitmap != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
+        // Same epoch=0 guard as the single-image bubble — see comment there.
+        if (reference.sourceEpoch == 0uL) return@LaunchedEffect
         failed = false
         try {
             val data = controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
@@ -2371,7 +2533,12 @@ private fun MediaImageGridTile(
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
+            android.util.Log.w(
+                "MediaImageGridTile",
+                "tile auto-download failed for msg=${messageIdHex.take(8)} idx=$attachmentIndex",
+                t,
+            )
             failed = true
         }
     }
@@ -2395,6 +2562,15 @@ private fun MediaImageGridTile(
         contentAlignment = Alignment.Center,
     ) {
         val current = bitmap
+        val placeholder = rememberThumbhashImage(reference.thumbhash)
+        if (current == null && placeholder != null) {
+            Image(
+                bitmap = placeholder,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         when {
             current != null ->
                 Image(
@@ -2404,21 +2580,19 @@ private fun MediaImageGridTile(
                     modifier = Modifier.fillMaxSize(),
                 )
             failed ->
-                IconButton(onClick = {
-                    failed = false
-                    reloadToken++
-                }) {
-                    Icon(
-                        Icons.Default.BrokenImage,
-                        contentDescription = stringResource(R.string.media_tap_to_retry),
-                    )
-                }
+                MediaCircleAction(
+                    icon = Icons.Default.Refresh,
+                    contentDescription = stringResource(R.string.media_tap_to_retry),
+                    onClick = {
+                        failed = false
+                        reloadToken++
+                    },
+                )
             !startDownload ->
-                Icon(
-                    Icons.Default.Download,
+                MediaCircleAction(
+                    icon = Icons.Default.ArrowDownward,
                     contentDescription = stringResource(R.string.media_tap_to_download),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(28.dp),
+                    onClick = { startDownload = true },
                 )
             else ->
                 CircularProgressIndicator(
@@ -2459,6 +2633,7 @@ private fun MediaFileBubble(
     reference: MediaAttachmentReferenceFfi,
     controller: ConversationController,
     appState: DarkMatterAppState,
+    mine: Boolean,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -2467,6 +2642,13 @@ private fun MediaFileBubble(
     var failed by remember(pillKey) { mutableStateOf(false) }
     val noOpenAppMessage = stringResource(R.string.media_no_app_to_open)
     val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
+    // Cached bytes (own send, or downloaded earlier) mean the chevron is
+    // misleading — there's nothing to fetch. Probe on first composition,
+    // then flip after a successful in-bubble download. Outgoing sends are
+    // implicitly cached, so `mine` short-circuits to true.
+    var cached by remember(pillKey) {
+        mutableStateOf(mine || controller.hasCachedAttachment(messageIdHex, attachmentIndex))
+    }
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -2480,8 +2662,35 @@ private fun MediaFileBubble(
                     scope.launch {
                         val outcome =
                             runCatching {
-                                val data = controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+                                // For own sends, the retained-uploads LRU still
+                                // holds the source plaintext during the upload
+                                // window. Prefer those bytes — the FFI download
+                                // path is mid-flight (the blob may not have
+                                // fully propagated through the Blossom server
+                                // yet) and would otherwise return invalid bytes
+                                // that the system reader rejects.
+                                val retained =
+                                    if (mine) {
+                                        controller
+                                            .pendingAttachmentsList(messageIdHex)
+                                            .getOrNull(attachmentIndex)
+                                            ?.plaintextBytes
+                                    } else {
+                                        null
+                                    }
+                                val data =
+                                    retained
+                                        ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+                                cached = true
                                 openAttachmentExternally(context, data, reference.fileName, reference.mediaType)
+                            }.onFailure {
+                                // Swipe-up / screen-dispose cancels this
+                                // coroutine. The download itself continues on
+                                // `mutationsScope` and lands in the cache —
+                                // rethrow so the launch dies quietly instead
+                                // of misreporting cancellation as a generic
+                                // "couldn't open file" toast.
+                                if (it is kotlinx.coroutines.CancellationException) throw it
                             }.getOrDefault(OpenAttachmentResult.Error)
                         when (outcome) {
                             OpenAttachmentResult.Opened -> Unit
@@ -2517,7 +2726,7 @@ private fun MediaFileBubble(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    reference.mediaType,
+                    shortMediaTypeLabel(reference.mediaType),
                     style = MaterialTheme.typography.labelSmall,
                     color =
                         if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -2531,16 +2740,48 @@ private fun MediaFileBubble(
                     strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            } else {
+            } else if (failed) {
                 Icon(
-                    imageVector =
-                        if (failed) Icons.Default.Refresh else Icons.Default.Download,
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = stringResource(R.string.media_open),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            } else if (!cached) {
+                // Bytes aren't local yet — show the chevron so the user
+                // knows the tap will fetch. Once cached (own send, or after
+                // first tap-and-download) the chevron disappears: nothing
+                // to fetch, and the row is just "tap to open".
+                Icon(
+                    imageVector = Icons.Default.Download,
                     contentDescription = stringResource(R.string.media_open),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp),
                 )
             }
         }
+    }
+}
+
+/**
+ * Compact uppercase label for the file-bubble's MIME line: `application/pdf`
+ * becomes "PDF", `image/jpeg` becomes "JPG", `application/vnd.…` falls back
+ * to the lowercase MIME so the bubble never goes blank.
+ */
+private fun shortMediaTypeLabel(mediaType: String): String {
+    val trimmed = mediaType.trim()
+    if (trimmed.isEmpty()) return ""
+    val tail = trimmed.substringAfterLast('/', missingDelimiterValue = trimmed)
+    return when (val canonical = tail.substringBefore('+').substringBefore(';').lowercase()) {
+        "jpeg" -> "JPG"
+        "vnd.openxmlformats-officedocument.wordprocessingml.document" -> "DOCX"
+        "vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "XLSX"
+        "vnd.openxmlformats-officedocument.presentationml.presentation" -> "PPTX"
+        "msword" -> "DOC"
+        "vnd.ms-excel" -> "XLS"
+        "vnd.ms-powerpoint" -> "PPT"
+        "" -> trimmed
+        else -> canonical.uppercase()
     }
 }
 
@@ -2631,7 +2872,40 @@ private suspend fun openAttachmentExternally(
     }
 }
 
-/** Centered icon+label tap target used for the retry/download bubble states. */
+/**
+ * Circular tap target overlaid on a media bubble. Used for both the
+ * "tap to download" affordance (download arrow) and the "tap to retry"
+ * affordance (refresh arrow) so the receiver-side bubble feels like a
+ * polished media-message card instead of a flat icon-label stack.
+ *
+ * Renders as a ~52dp opaque scrim circle with a centered icon — works
+ * over a blurred thumbhash placeholder or a plain surface tint without
+ * fighting the background.
+ */
+@Composable
+private fun MediaCircleAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = Color.Black.copy(alpha = 0.55f),
+        contentColor = Color.White,
+        modifier = modifier.size(52.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(26.dp),
+            )
+        }
+    }
+}
+
 @Composable
 private fun MediaBubbleAction(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -2666,6 +2940,7 @@ private fun MediaBubbleAction(
 private fun MediaPendingPlaceholder(
     pendingAttachments: List<PendingAttachment>,
     failed: Boolean,
+    onRetry: (() -> Unit)? = null,
 ) {
     val statusLabel = stringResource(if (failed) R.string.media_upload_failed else R.string.media_uploading)
     val statusColor = if (failed) MaterialTheme.colorScheme.error else Color.White
@@ -2684,6 +2959,7 @@ private fun MediaPendingPlaceholder(
                     sizeBytes = attachment.plaintextBytes.size.toLong(),
                     failed = failed,
                     statusLabel = statusLabel,
+                    onRetry = onRetry,
                 )
             }
         }
@@ -2697,11 +2973,15 @@ private fun MediaPendingPlaceholder(
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (pendingAttachments.size <= 1) {
-                // Single-image: keep the existing fixed-height bubble so the
-                // optimistic→projected swap doesn't reflow the timeline.
-                val preview = rememberSampledBitmap(pendingAttachments.firstOrNull()?.plaintextBytes)
+                // Single-image optimistic: same sizing as the confirmed
+                // bubble so the optimistic→confirmed swap doesn't reflow
+                // the timeline. Source aspect ratio comes from the
+                // attachment's own `dim` (set at pick time).
+                val attachment = pendingAttachments.firstOrNull()
+                val preview = rememberSampledBitmap(attachment?.plaintextBytes)
+                val ratio = aspectRatioFromDim(attachment?.dim)
                 Box(
-                    Modifier.fillMaxWidth().height(MediaBubbleHeight),
+                    imageBubbleSizing(ratio),
                     contentAlignment = Alignment.Center,
                 ) {
                     preview?.let {
@@ -2718,37 +2998,27 @@ private fun MediaPendingPlaceholder(
                         hasPreview = preview != null,
                         statusLabel = statusLabel,
                         statusColor = statusColor,
+                        onRetry = onRetry,
                     )
                 }
             } else {
-                // Album: render the same 2-col grid the post-upload bubble
-                // uses, so the optimistic → confirmed transition is a visual
-                // no-op. Each tile decodes from local bytes (no network), and
-                // a single status overlay sits across the whole bubble.
-                val visible = pendingAttachments.take(4)
+                // Album: route through the same count-specific masonry
+                // layout the confirmed bubble uses so the optimistic →
+                // confirmed transition is a visual no-op even on the
+                // 3-image case. Each tile decodes from local bytes (no
+                // network), and a single status overlay sits across the
+                // whole bubble.
+                val visible = pendingAttachments.take(6)
                 val overflow = (pendingAttachments.size - visible.size).coerceAtLeast(0)
                 Box(Modifier.fillMaxWidth()) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier.padding(2.dp),
-                    ) {
-                        visible.chunked(2).forEachIndexed { rowIndex, row ->
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                row.forEachIndexed { colIndex, attachment ->
-                                    val tileIndex = rowIndex * 2 + colIndex
-                                    val showOverflow = tileIndex == visible.lastIndex && overflow > 0
-                                    PendingGridTile(
-                                        bytes = attachment.plaintextBytes,
-                                        overflowCount = if (showOverflow) overflow else 0,
-                                        modifier = Modifier.weight(1f).aspectRatio(1f),
-                                    )
-                                }
-                                if (row.size == 1) Spacer(Modifier.weight(1f))
-                            }
-                        }
+                    MasonryImageLayout(visibleCount = visible.size) { index, tileModifier ->
+                        val attachment = visible[index]
+                        val showOverflow = index == visible.lastIndex && overflow > 0
+                        PendingGridTile(
+                            bytes = attachment.plaintextBytes,
+                            overflowCount = if (showOverflow) overflow else 0,
+                            modifier = tileModifier,
+                        )
                     }
                     Box(
                         Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)),
@@ -2758,6 +3028,7 @@ private fun MediaPendingPlaceholder(
                         hasPreview = true,
                         statusLabel = statusLabel,
                         statusColor = statusColor,
+                        onRetry = onRetry,
                         modifier = Modifier.align(Alignment.Center),
                     )
                 }
@@ -2775,11 +3046,21 @@ private fun PendingFilePill(
     sizeBytes: Long,
     failed: Boolean,
     statusLabel: String,
+    onRetry: (() -> Unit)? = null,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .then(
+                    if (failed && onRetry != null) {
+                        Modifier.clickable(onClick = onRetry)
+                    } else {
+                        Modifier
+                    },
+                ),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -2808,8 +3089,8 @@ private fun PendingFilePill(
             }
             if (failed) {
                 Icon(
-                    Icons.Default.BrokenImage,
-                    contentDescription = null,
+                    Icons.Default.Refresh,
+                    contentDescription = stringResource(R.string.retry),
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp),
                 )
@@ -2831,18 +3112,30 @@ private fun PendingStatusOverlay(
     statusLabel: String,
     statusColor: Color,
     modifier: Modifier = Modifier,
+    onRetry: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (failed) {
-            Icon(
-                Icons.Default.BrokenImage,
-                contentDescription = null,
-                tint = statusColor,
-                modifier = Modifier.size(28.dp),
-            )
+            // Tap target for retry. Without this the user only has the
+            // small refresh icon down in the status row, which is easy to
+            // miss on a media bubble dominated by a blurred preview.
+            if (onRetry != null) {
+                MediaCircleAction(
+                    icon = Icons.Default.Refresh,
+                    contentDescription = stringResource(R.string.retry),
+                    onClick = onRetry,
+                )
+            } else {
+                Icon(
+                    Icons.Default.BrokenImage,
+                    contentDescription = null,
+                    tint = statusColor,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
         } else {
             CircularProgressIndicator(
                 modifier = Modifier.size(28.dp),
@@ -3378,10 +3671,10 @@ private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
         bitmap =
             withContext(Dispatchers.Default) {
                 runCatching {
-                    val bytes = MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
-                    bytes?.let {
+                    val jpeg = MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
+                    jpeg?.bytes?.let { bytes ->
                         android.graphics.BitmapFactory
-                            .decodeByteArray(it, 0, it.size)
+                            .decodeByteArray(bytes, 0, bytes.size)
                             ?.asImageBitmap()
                     }
                 }.getOrNull()
@@ -3415,17 +3708,91 @@ private fun LocalImagePreview(
     }
 }
 
+@Composable
+private fun StagingTile(
+    onRemove: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxHeight()
+                .aspectRatio(1f),
+    ) {
+        content()
+        FilledIconButton(
+            onClick = onRemove,
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(24.dp),
+            colors =
+                IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f),
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+        ) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = stringResource(R.string.media_attachment_remove),
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StagingDocumentTile(uri: android.net.Uri) {
+    val context = LocalContext.current
+    val displayName =
+        remember(uri) { queryDisplayName(context.contentResolver, uri) ?: "file" }
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                Icons.Default.Description,
+                contentDescription = null,
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MediaPreviewSheet(
     uris: List<android.net.Uri>,
+    documentUris: List<android.net.Uri>,
     onDismiss: () -> Unit,
     onSend: (caption: String) -> Unit,
+    onRemoveAt: (Int) -> Unit,
+    onRemoveDocumentAt: (Int) -> Unit,
+    onAddPhotos: () -> Unit,
+    onAddDocuments: () -> Unit,
 ) {
     var caption by remember { mutableStateOf("") }
     // Local guard against a rapid double-tap firing onSend twice before the
     // parent clears pendingMediaUris and the sheet leaves composition.
     var sending by remember { mutableStateOf(false) }
+    var addMoreMenuOpen by remember { mutableStateOf(false) }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -3438,36 +3805,83 @@ private fun MediaPreviewSheet(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (uris.size == 1) {
-                LocalImagePreview(
-                    uri = uris.first(),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 320.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                )
-            } else {
-                // Album preview: a horizontally-scrollable strip of square
-                // thumbnails. The strip-shape on the compose surface lets the
-                // user scan + reorder mentally before sending; the grid shape
-                // is reserved for the received-message bubble.
-                LazyRow(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 220.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(uris, key = { uri -> uri.toString() }) { uri ->
+            // Horizontally-scrollable shelf of square tiles, one per staged
+            // attachment plus a trailing "Add more" tile. Each tile carries a
+            // small `✕` overlay that removes only that item from the queue.
+            LazyRow(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 96.dp, max = 220.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                itemsIndexed(uris, key = { _, uri -> "image:$uri" }) { index, uri ->
+                    StagingTile(
+                        onRemove = { if (!sending) onRemoveAt(index) },
+                    ) {
                         LocalImagePreview(
                             uri = uri,
                             modifier =
                                 Modifier
-                                    .fillMaxHeight()
-                                    .aspectRatio(1f)
+                                    .fillMaxSize()
                                     .clip(RoundedCornerShape(12.dp)),
                         )
+                    }
+                }
+                itemsIndexed(documentUris, key = { _, uri -> "doc:$uri" }) { index, uri ->
+                    StagingTile(
+                        onRemove = { if (!sending) onRemoveDocumentAt(index) },
+                    ) {
+                        StagingDocumentTile(uri = uri)
+                    }
+                }
+                item(key = "media_preview_add_more_tile") {
+                    // Anchor a DropdownMenu to the tile so the user can add
+                    // either kind to a mixed shelf — the tile alone can't
+                    // know which (images vs files) the user wants to append.
+                    Box {
+                        OutlinedButton(
+                            onClick = { if (!sending) addMoreMenuOpen = true },
+                            modifier =
+                                Modifier
+                                    .fillMaxHeight()
+                                    .aspectRatio(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            enabled = !sending,
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    stringResource(R.string.media_attachment_add_more),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = addMoreMenuOpen,
+                            onDismissRequest = { addMoreMenuOpen = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.attach_photo_library)) },
+                                onClick = {
+                                    addMoreMenuOpen = false
+                                    onAddPhotos()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.attach_document)) },
+                                onClick = {
+                                    addMoreMenuOpen = false
+                                    onAddDocuments()
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -3752,16 +4166,21 @@ private fun ConversationScreen(
             recentReactionEmojis = loaded
         }
     }
-    // Selected-but-not-yet-sent image attachments: when non-empty the preview
-    // / caption sheet is shown. Multi-pick goes through
-    // `PickMultipleVisualMedia` with `MEDIA_PICKER_MAX_ITEMS` as the cap. The
-    // whole selection ships as a single kind:9 album (one event carrying N
-    // imeta tags) via `controller.sendAttachments(list, caption)`. Document
-    // picks bypass this sheet and route directly through
-    // `sendPickedDocuments`.
-    var pendingMediaUris by rememberSaveable(stateSaver = UriListSaver) {
-        mutableStateOf<List<android.net.Uri>>(emptyList())
-    }
+    // Selected-but-not-yet-sent image attachments. The preview sheet opens
+    // when this or `pendingDocumentUris` is non-empty; the whole queue
+    // ships as one kind:9 album via `controller.sendAttachments(list, caption)`.
+    //
+    // Intentionally `remember`, not `rememberSaveable`: Photo Picker and
+    // document URIs carry session-scoped read grants that don't survive
+    // process death, so restoring them from a saved bundle gives us URIs
+    // that fail to open on first read. Lose the staging buffer on
+    // process death rather than keep ghost URIs around.
+    // Keyed on chat.id so a conversation switch flushes the staging shelf —
+    // ConversationScreen is reused when `selectedChat` changes in place, and
+    // an unkeyed remember would otherwise carry URIs from chat A into chat B
+    // (where a Send would attach them to the wrong recipient).
+    var pendingMediaUris by remember(chat.id) { mutableStateOf<List<android.net.Uri>>(emptyList()) }
+    var pendingDocumentUris by remember(chat.id) { mutableStateOf<List<android.net.Uri>>(emptyList()) }
     // Survives process death while the camera app is foreground (the result
     // callback fires into a recreated activity, otherwise the capture is lost).
     var cameraOutputUri by rememberSaveable(stateSaver = NullableUriSaver) {
@@ -3778,7 +4197,14 @@ private fun ConversationScreen(
         rememberLauncherForActivityResult(
             ActivityResultContracts.PickMultipleVisualMedia(maxItems = MEDIA_PICKER_MAX_ITEMS),
         ) { uris ->
-            if (uris.isNotEmpty()) pendingMediaUris = uris
+            if (uris.isEmpty()) return@rememberLauncherForActivityResult
+            // Append rather than replace so a follow-up "Add more" tile-pick
+            // grows the staging shelf instead of clobbering whatever the user
+            // already queued. Dedupe on Uri identity to keep a double-pick
+            // from doubling the row, and cap on MEDIA_PICKER_MAX_ITEMS so the
+            // shelf can't exceed what a fresh pick would have been allowed.
+            val merged = (pendingMediaUris + uris).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+            pendingMediaUris = merged
         }
     val cameraLauncher =
         rememberLauncherForActivityResult(
@@ -3786,7 +4212,10 @@ private fun ConversationScreen(
         ) { success ->
             val captured = cameraOutputUri
             if (success && captured != null) {
-                pendingMediaUris = listOf(captured)
+                // Append to whatever's already queued so an in-progress staging
+                // shelf survives a camera capture.
+                val merged = (pendingMediaUris + captured).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+                pendingMediaUris = merged
             } else {
                 cameraOutputFile?.delete() // cancelled — don't leak the empty temp
             }
@@ -3835,9 +4264,11 @@ private fun ConversationScreen(
                         val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
                         val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
                         PendingAttachment(
-                            plaintextBytes = jpeg,
+                            plaintextBytes = jpeg.bytes,
                             mediaType = MediaPipeline.RECOMPRESSED_MIME,
                             fileName = fileName,
+                            dim = "${jpeg.width}x${jpeg.height}",
+                            thumbhash = jpeg.thumbhash,
                         )
                     }
                 }
@@ -3865,106 +4296,243 @@ private fun ConversationScreen(
     //
     // Any reject surfaces a single user-visible toast; the rest of the album
     // continues. If NOTHING survives the gates we bail without an empty send.
-    fun sendPickedDocuments(uris: List<android.net.Uri>) {
-        if (uris.isEmpty()) return
-        appState.launchMutation {
-            data class ReadOutcome(
-                val attachments: List<PendingAttachment>,
-                val rejected: Boolean,
-                val albumOverflowed: Boolean,
-            )
-            val outcome =
-                withContext(Dispatchers.IO) {
-                    val accepted = mutableListOf<PendingAttachment>()
-                    var albumBytes = 0L
-                    var rejected = false
-                    var albumOverflowed = false
-                    for (uri in uris) {
-                        val declaredSize = queryContentSize(context.contentResolver, uri)
-                        if (declaredSize > 0L && declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
-                            rejected = true
-                            continue
-                        }
-                        val remainingAlbumBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - albumBytes).coerceAtLeast(0L)
-                        if (remainingAlbumBudget <= 0L) {
-                            albumOverflowed = true
-                            break
-                        }
-                        // Cap the bounded read at whichever is smaller: the
-                        // single-file ceiling, or the remaining album budget.
-                        val perFileCap =
-                            minOf(MEDIA_ATTACHMENT_MAX_BYTES, remainingAlbumBudget)
-                                .coerceAtMost(Int.MAX_VALUE.toLong())
-                                .toInt()
-                        val bytes =
-                            runCatching {
-                                context.contentResolver.openInputStream(uri)?.use { stream ->
-                                    MediaPipeline.readBoundedBytes(stream, perFileCap)
-                                }
-                            }.getOrNull()
-                        if (bytes == null) {
-                            // null from runCatching = open failed; null from
-                            // readBoundedBytes = exceeded cap. Both surface as
-                            // "rejected" — the user sees one toast either way.
-                            rejected = true
-                            continue
-                        }
-                        if (bytes.isEmpty()) continue
-                        if (albumBytes + bytes.size > MEDIA_ALBUM_MAX_TOTAL_BYTES) {
-                            // Defensive: per-file cap already accounts for
-                            // remainingAlbumBudget, so this branch shouldn't
-                            // fire — keep it as a belt-and-braces guard.
-                            albumOverflowed = true
-                            continue
-                        }
-                        albumBytes += bytes.size
-                        val resolvedMime =
-                            context.contentResolver
-                                .getType(uri)
-                                .orEmpty()
-                                .takeIf { it.isNotBlank() }
-                                ?: "application/octet-stream"
-                        val name = queryDisplayName(context.contentResolver, uri) ?: "file"
-                        accepted +=
-                            PendingAttachment(
-                                plaintextBytes = bytes,
-                                mediaType = resolvedMime,
-                                fileName = name,
-                            )
-                    }
-                    ReadOutcome(accepted, rejected, albumOverflowed)
+    // Decoded outcome of the document read pass, surfaced so the unified
+    // sendStagedAttachments path can blend its results with the image decode.
+    data class DocumentReadOutcome(
+        val attachments: List<PendingAttachment>,
+        val rejected: Boolean,
+        val albumOverflowed: Boolean,
+        val totalBytes: Long,
+    )
+
+    suspend fun readPickedDocuments(
+        uris: List<android.net.Uri>,
+        bytesBudget: Long = MEDIA_ALBUM_MAX_TOTAL_BYTES,
+    ): DocumentReadOutcome =
+        withContext(Dispatchers.IO) {
+            val accepted = mutableListOf<PendingAttachment>()
+            var albumBytes = 0L
+            var rejected = false
+            var albumOverflowed = false
+            for (uri in uris) {
+                val declaredSize = queryContentSize(context.contentResolver, uri)
+                if (declaredSize > 0L && declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
+                    rejected = true
+                    continue
                 }
-            if (outcome.attachments.isEmpty()) {
-                appState.present(
-                    if (outcome.rejected || outcome.albumOverflowed) {
-                        R.string.media_file_too_large
+                val remainingAlbumBudget = (bytesBudget - albumBytes).coerceAtLeast(0L)
+                if (remainingAlbumBudget <= 0L) {
+                    albumOverflowed = true
+                    break
+                }
+                val perFileCap =
+                    minOf(MEDIA_ATTACHMENT_MAX_BYTES, remainingAlbumBudget)
+                        .coerceAtMost(Int.MAX_VALUE.toLong())
+                        .toInt()
+                val bytes =
+                    runCatching {
+                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                            MediaPipeline.readBoundedBytes(stream, perFileCap)
+                        }
+                    }.getOrNull()
+                if (bytes == null) {
+                    rejected = true
+                    continue
+                }
+                if (bytes.isEmpty()) continue
+                if (albumBytes + bytes.size > bytesBudget) {
+                    albumOverflowed = true
+                    continue
+                }
+                albumBytes += bytes.size
+                val resolvedMime =
+                    context.contentResolver
+                        .getType(uri)
+                        .orEmpty()
+                        .takeIf { it.isNotBlank() }
+                        ?: "application/octet-stream"
+                val name = queryDisplayName(context.contentResolver, uri) ?: "file"
+                val dim =
+                    if (resolvedMime.startsWith("image/", ignoreCase = true)) {
+                        MediaPipeline.imageDimOrNull(bytes)
                     } else {
-                        R.string.toast_couldnt_decode_image
-                    },
-                )
-                return@launchMutation
+                        null
+                    }
+                accepted +=
+                    PendingAttachment(
+                        plaintextBytes = bytes,
+                        mediaType = resolvedMime,
+                        fileName = name,
+                        dim = dim,
+                    )
             }
-            if (outcome.albumOverflowed) {
+            DocumentReadOutcome(accepted, rejected, albumOverflowed, albumBytes)
+        }
+
+    suspend fun readPickedImages(uris: List<android.net.Uri>): List<PendingAttachment> =
+        withContext(Dispatchers.Default) {
+            uris.mapNotNull { uri ->
+                val jpeg =
+                    MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
+                        ?: return@mapNotNull null
+                val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
+                val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
+                PendingAttachment(
+                    plaintextBytes = jpeg.bytes,
+                    mediaType = MediaPipeline.RECOMPRESSED_MIME,
+                    fileName = fileName,
+                    dim = "${jpeg.width}x${jpeg.height}",
+                    thumbhash = jpeg.thumbhash,
+                )
+            }
+        }
+
+    // Single-path send used by the unified staging shelf: decodes images
+    // (downscale + JPEG) and documents (raw bytes with cap) in parallel,
+    // concatenates the attachments, and ships them as one kind-9 album.
+    fun sendStagedAttachments(
+        imageUris: List<android.net.Uri>,
+        documentUris: List<android.net.Uri>,
+        caption: String,
+        onAfterSend: () -> Unit = {},
+    ) {
+        if (imageUris.isEmpty() && documentUris.isEmpty()) return
+        val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
+        appState.launchMutation {
+            // Enforce the album byte cap on images first so a multi-large-photo
+            // pick can't push the cumulative payload past
+            // MEDIA_ALBUM_MAX_TOTAL_BYTES and evict the retained-uploads LRU
+            // mid-flight (which would break retry). Drop the tail and surface
+            // a single oversize toast.
+            val rawImages = readPickedImages(imageUris)
+            var imageBytes = 0L
+            val acceptedImages = mutableListOf<PendingAttachment>()
+            var imageAlbumOverflowed = false
+            for (attachment in rawImages) {
+                val next = imageBytes + attachment.plaintextBytes.size
+                if (next > MEDIA_ALBUM_MAX_TOTAL_BYTES) {
+                    imageAlbumOverflowed = true
+                    continue
+                }
+                imageBytes = next
+                acceptedImages += attachment
+            }
+            val docBudget = (MEDIA_ALBUM_MAX_TOTAL_BYTES - imageBytes).coerceAtLeast(0L)
+            val docOutcome =
+                if (documentUris.isEmpty()) {
+                    DocumentReadOutcome(emptyList(), rejected = false, albumOverflowed = false, totalBytes = 0L)
+                } else {
+                    readPickedDocuments(documentUris, docBudget)
+                }
+            val merged = acceptedImages + docOutcome.attachments
+            if (merged.isEmpty()) {
+                // Only surface the image-decode toast when there were image
+                // picks to begin with — a document-only send that failed every
+                // file should fall through to the document toasts below
+                // rather than misreporting as an image decode error.
+                if (imageUris.isNotEmpty()) {
+                    appState.present(R.string.toast_couldnt_decode_image)
+                    return@launchMutation
+                }
+            }
+            if (acceptedImages.size < imageUris.size && !imageAlbumOverflowed) {
+                appState.present(R.string.toast_couldnt_decode_image)
+            }
+            if (imageAlbumOverflowed || docOutcome.albumOverflowed) {
                 appState.present(R.string.media_album_too_large)
-            } else if (outcome.rejected) {
+            } else if (docOutcome.rejected) {
                 appState.present(R.string.media_file_too_large)
             }
-            controller.sendAttachments(outcome.attachments, caption = null)
+            if (merged.isEmpty()) return@launchMutation
+            // Two-phase ship: SEED every send synchronously (so all the
+            // optimistic bubbles appear in the same recomposition pass and
+            // the user sees the queue light up at once), THEN run the
+            // FFI upload+publish for each in pick order (so the post-
+            // confirm timeline keeps the order the user picked).
+            //
+            // Image attachments ride one kind-9 album (the masonry layout
+            // wants multiple tiles in one message). Non-image attachments
+            // ship as their own kind-9 each, because each carries distinct
+            // filename/MIME metadata that doesn't benefit from grid
+            // composition. Caption sticks with images when present;
+            // otherwise it attaches to the first file send.
+            // Pre-compute thumbhash for any image-typed doc-picker attachments
+            // so receivers get the same blurred placeholder as the
+            // image-picker path. Bytes and MIME stay as-picked — only the
+            // hash field is filled in. Runs off-main so the staging-shelf
+            // dismiss animation doesn't stutter on a multi-image pick.
+            val readyDocAttachments =
+                if (docOutcome.attachments.isEmpty()) {
+                    emptyList()
+                } else {
+                    withContext(Dispatchers.Default) {
+                        docOutcome.attachments.map { attachment ->
+                            if (!attachment.mediaType.startsWith("image/", ignoreCase = true) ||
+                                attachment.thumbhash != null
+                            ) {
+                                attachment
+                            } else {
+                                val bitmap =
+                                    MediaPipeline.decodeSampledBitmap(
+                                        attachment.plaintextBytes,
+                                        MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                                    )
+                                val hash = bitmap?.let { Thumbhash.encodeFromBitmap(it) }
+                                bitmap?.recycle()
+                                attachment.copy(thumbhash = hash)
+                            }
+                        }
+                    }
+                }
+            // The image picker's multi-select UI groups its picks as one
+            // batch, so they ride one kind-9 album — preserves the masonry
+            // grouping the user opted into. Doc-picker items, by contrast,
+            // are picked one-by-one in order, so each ships as its own
+            // kind-9 in pick position regardless of MIME. Image MIMEs from
+            // the doc picker still render as image bubbles (single-image
+            // variant of the album shape) — same surface, different framing.
+            val seeded = mutableListOf<ConversationController.QueuedAttachmentSend>()
+            if (acceptedImages.isNotEmpty()) {
+                controller.queueAttachments(acceptedImages, trimmedCaption)?.let(seeded::add)
+            }
+            val captionConsumedByAlbum = acceptedImages.isNotEmpty()
+            readyDocAttachments.forEachIndexed { index, attachment ->
+                val perItemCaption =
+                    if (!captionConsumedByAlbum && index == 0) trimmedCaption else null
+                controller.queueAttachments(listOf(attachment), perItemCaption)?.let(seeded::add)
+            }
+            // Pull the user down to the just-seeded bubbles before the
+            // upload loop suspends — same UX as text-send. Firing after
+            // queueAttachments (the optimistic seed) and before
+            // uploadQueued (the FFI publish) means the scroll lands in the
+            // same frame the bubble appears, instead of waiting on the
+            // relay round-trip.
+            if (seeded.isNotEmpty()) onAfterSend()
+            // Run uploads sequentially so the kind-9 publishes go out in
+            // pick order. The optimistic bubbles are already on screen.
+            for (slot in seeded) {
+                controller.uploadQueued(slot)
+            }
         }
     }
 
     // Documents take a separate launcher because `OpenMultipleDocuments`
     // accepts any MIME — the image picker can't surface PDFs, archives, etc.
-    // Picked URIs go straight to `sendPickedDocuments` without recompression;
+    // Picked URIs accumulate in `pendingDocumentUris` so they can ride the
+    // same staging shelf as image picks; one Send dispatches both sides
+    // through one kind:9 album. Bytes pass through without recompression —
     // the bytes ride the same `sendAttachments(list, caption)` path since
     // the FFI is MIME-agnostic.
     val documentPickerLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.OpenMultipleDocuments(),
         ) { uris ->
-            if (uris.isNotEmpty()) {
-                sendPickedDocuments(uris.take(MEDIA_PICKER_MAX_ITEMS))
-            }
+            if (uris.isEmpty()) return@rememberLauncherForActivityResult
+            // Append into the document side of the staging shelf rather than
+            // sending immediately. The preview sheet renders both lists and
+            // a single Send dispatches both decoders into one kind-9 album.
+            val merged = (pendingDocumentUris + uris).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+            pendingDocumentUris = merged
         }
 
     // Wipe camera-capture temp files and retained outgoing attachment bytes
@@ -4387,15 +4955,54 @@ private fun ConversationScreen(
         )
     }
 
-    if (pendingMediaUris.isNotEmpty()) {
-        val uris = pendingMediaUris
+    if (pendingMediaUris.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
+        val imageUris = pendingMediaUris
+        val documentUris = pendingDocumentUris
         MediaPreviewSheet(
-            uris = uris,
-            onDismiss = { pendingMediaUris = emptyList() },
+            uris = imageUris,
+            documentUris = documentUris,
+            onDismiss = {
+                pendingMediaUris = emptyList()
+                pendingDocumentUris = emptyList()
+            },
             onSend = { caption ->
                 pendingMediaUris = emptyList()
-                sendPickedMedia(uris, caption)
+                pendingDocumentUris = emptyList()
+                sendStagedAttachments(
+                    imageUris,
+                    documentUris,
+                    caption,
+                    onAfterSend = {
+                        // Pull the user down to the just-seeded bubble.
+                        // `bottomTimelineIndex` reads from
+                        // [renderedTimeline.size] (the snapshot-backed
+                        // controller list) instead of
+                        // [LazyListState.layoutInfo.totalItemsCount], which
+                        // is stale until the next recompose — for a
+                        // multi-file send that staleness leaves the user
+                        // one-or-more rows above the new bubble.
+                        scope.launch { listState.animateScrollToItem(bottomTimelineIndex) }
+                    },
+                )
             },
+            onRemoveAt = { index ->
+                pendingMediaUris =
+                    pendingMediaUris.toMutableList().apply {
+                        if (index in indices) removeAt(index)
+                    }
+            },
+            onRemoveDocumentAt = { index ->
+                pendingDocumentUris =
+                    pendingDocumentUris.toMutableList().apply {
+                        if (index in indices) removeAt(index)
+                    }
+            },
+            onAddPhotos = {
+                imagePickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
+            onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
         )
     }
 }
@@ -5865,6 +6472,7 @@ private fun MessageBubble(
                                     messageIdHex = record.messageIdHex,
                                     attachmentIndex = entry.index,
                                     reference = entry.value,
+                                    mine = mine,
                                     controller = controller,
                                     appState = appState,
                                 )
@@ -5875,6 +6483,12 @@ private fun MessageBubble(
                             MediaPendingPlaceholder(
                                 pendingAttachments = controller.pendingAttachmentsList(record.messageIdHex),
                                 failed = item.status == MessageStatus.Failed,
+                                onRetry =
+                                    if (mine && item.status == MessageStatus.Failed) {
+                                        { appState.launchMutation { controller.retryFailedSend(item) } }
+                                    } else {
+                                        null
+                                    },
                             )
                         }
                         // Body text policy:

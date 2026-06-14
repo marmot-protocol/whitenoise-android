@@ -47,6 +47,20 @@ class DiskByteCache(
         hydrated = true
     }
 
+    /**
+     * Yes/no probe — true iff bytes for [key] are currently indexed on
+     * disk. Doesn't read the file, doesn't promote LRU, doesn't fall
+     * through to anywhere. Lets a caller decide UI affordances (e.g. show
+     * a download chevron only on miss) without paying the read cost.
+     */
+    fun contains(key: String): Boolean {
+        val hashed = fileNameFor(key)
+        return synchronized(this) {
+            ensureHydrated()
+            index.containsKey(hashed)
+        }
+    }
+
     fun get(key: String): ByteArray? {
         val hashed = fileNameFor(key)
         // Look up (and LRU-promote) the entry under the lock, then read the

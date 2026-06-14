@@ -482,4 +482,6 @@
     <string name="group_system_admin_removed_you_passive">Ya no eres administrador</string>
     <string name="group_system_you_renamed">Cambiaste el nombre del grupo a “%1$s”</string>
     <string name="group_system_you_avatar_changed">Cambiaste la imagen del grupo</string>
+    <string name="media_attachment_add_more">Añadir más</string>
+    <string name="media_attachment_remove">Quitar archivo</string>
 </resources>

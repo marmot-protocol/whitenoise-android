@@ -482,4 +482,6 @@
     <string name="relative_time_minutes">%1$dm</string>
     <string name="relative_time_hours">%1$dh</string>
     <string name="relative_time_days">%1$dd</string>
+    <string name="media_attachment_add_more">Add more</string>
+    <string name="media_attachment_remove">Remove attachment</string>
 </resources>
