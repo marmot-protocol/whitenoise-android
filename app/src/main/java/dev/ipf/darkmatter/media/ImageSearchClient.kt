@@ -15,6 +15,11 @@ import java.nio.charset.StandardCharsets
  *  bailing. Matches `AvatarImageLoader`'s cap. */
 private const val MAX_IMAGE_SEARCH_REDIRECT_HOPS = 5
 
+// Upper bound on a search response body. The vqd-token HTML page and the JSON
+// results are tens of KB; 4 MiB is generous headroom. A hostile or MITM'd
+// endpoint could otherwise stream an unbounded body and exhaust memory. See #144.
+private const val MAX_IMAGE_SEARCH_BODY_BYTES = 4 * 1024 * 1024
+
 /**
  * Single source of truth for "is this raw string an avatar-safe HTTPS URL".
  *
@@ -145,10 +150,10 @@ class DuckDuckGoImageSearchClient(
                         // the initial request.
                     }
                     code !in 200..299 -> return null
-                    else ->
-                        return connection.inputStream.use {
-                            it.readBytes().toString(StandardCharsets.UTF_8)
-                        }
+                    else -> {
+                        if (connection.contentLengthLong > MAX_IMAGE_SEARCH_BODY_BYTES) return null
+                        return connection.inputStream.use { readBounded(it, MAX_IMAGE_SEARCH_BODY_BYTES) }
+                    }
                 }
             } catch (_: IOException) {
                 return null
@@ -156,6 +161,28 @@ class DuckDuckGoImageSearchClient(
                 connection.disconnect()
             }
         }
+    }
+
+    /**
+     * Read at most [limit] bytes from [input] and decode as UTF-8, or null if
+     * the stream exceeds the cap (declared Content-Length can lie, so the read
+     * loop enforces the bound regardless). See #144.
+     */
+    private fun readBounded(
+        input: java.io.InputStream,
+        limit: Int,
+    ): String? {
+        val output = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var total = 0
+        while (true) {
+            val read = input.read(buffer)
+            if (read == -1) break
+            total += read
+            if (total > limit) return null
+            output.write(buffer, 0, read)
+        }
+        return output.toByteArray().toString(StandardCharsets.UTF_8)
     }
 
     private fun decodeResults(body: String): List<ImageSearchResult> {
