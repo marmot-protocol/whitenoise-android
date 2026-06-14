@@ -55,6 +55,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 
 data class ChatListItem(
@@ -1040,6 +1041,17 @@ private inline fun chatsDebug(
 
 private val ConversationTimelinePageLimit = 50u
 
+// Cap on how many subscription updates one coalesced batch can absorb. A
+// runaway producer shouldn't be able to wedge the UI behind an unbounded
+// drain loop; this keeps latency-to-first-paint bounded.
+private const val TIMELINE_BATCH_CAP = 32
+
+// Window to wait for additional subscription updates to coalesce into the
+// current batch. 6ms is roughly the slack on a 120Hz frame budget (8.33ms)
+// minus the apply+publish work, so we soak up updates that arrive within
+// one frame without delaying the next paint.
+private const val TIMELINE_BATCH_DRAIN_MS = 6L
+
 class ConversationController(
     private val appState: DarkMatterAppState,
     initialGroup: AppGroupRecordFfi,
@@ -1264,60 +1276,77 @@ class ConversationController(
                 }
                 launch {
                     while (isActive) {
-                        val update =
+                        val first =
                             withContext(Dispatchers.IO) {
                                 timelineStream.nextUpdate()
                             } ?: break
-                        val streamIds =
-                            when (update) {
-                                is TimelineSubscriptionUpdateFfi.Page -> {
-                                    val replaceWindow = !hasLoadedOlderPages
-                                    applyTimelinePage(
-                                        update.page,
-                                        replaceWindow = replaceWindow,
-                                        updatePagination = replaceWindow,
-                                    )
-                                }
-                                is TimelineSubscriptionUpdateFfi.Projection -> {
-                                    val projection = update.update.update
-                                    if (projection.groupIdHex == group.groupIdHex) {
-                                        applyChatListProjection(
-                                            projection.chatListTrigger,
-                                            projection.chatListRow,
-                                        )
-                                        applyTimelineChanges(projection.changes)
-                                    } else {
-                                        emptyList()
+                        // Drain any updates that arrived within roughly one
+                        // 120Hz frame budget into a single batch. The runtime
+                        // can emit several updates back-to-back during a
+                        // sync burst (e.g. on conversation open, a Page
+                        // followed by a flurry of Projections); applying
+                        // them one at a time triggers N expensive recompose
+                        // passes (sort + dedup + edits aggregate). Batching
+                        // collapses them into one publish at the end.
+                        val batch = mutableListOf(first)
+                        while (batch.size < TIMELINE_BATCH_CAP) {
+                            val more =
+                                withContext(Dispatchers.IO) {
+                                    withTimeoutOrNull(TIMELINE_BATCH_DRAIN_MS) {
+                                        timelineStream.nextUpdate()
                                     }
-                                }
+                                } ?: break
+                            batch += more
+                        }
+                        val streamIdsLaunched = mutableListOf<String>()
+                        coalesceTimelinePublishes {
+                            for (update in batch) {
+                                val streamIds =
+                                    when (update) {
+                                        is TimelineSubscriptionUpdateFfi.Page -> {
+                                            val replaceWindow = !hasLoadedOlderPages
+                                            applyTimelinePage(
+                                                update.page,
+                                                replaceWindow = replaceWindow,
+                                                updatePagination = replaceWindow,
+                                            )
+                                        }
+                                        is TimelineSubscriptionUpdateFfi.Projection -> {
+                                            val projection = update.update.update
+                                            if (projection.groupIdHex == group.groupIdHex) {
+                                                applyChatListProjection(
+                                                    projection.chatListTrigger,
+                                                    projection.chatListRow,
+                                                )
+                                                applyTimelineChanges(projection.changes)
+                                            } else {
+                                                emptyList()
+                                            }
+                                        }
+                                    }
+                                streamIdsLaunched += streamIds
                             }
-                        // New messages may include media; refresh the cached
-                        // references so the bubble's download path finds the
-                        // correct `sourceEpoch`. The `listMedia(group, null)`
-                        // FFI scan is unbounded — gate it on "this update
-                        // actually touches media" so text-only / reaction-only
-                        // updates don't trigger a full-table scan every time
-                        // (a real cost in media-heavy groups). The Page
-                        // initial snapshot always refreshes (the cache is
-                        // empty on first load anyway).
+                        }
+                        // Refresh media references at most once per batch.
+                        // `listMedia` is an unbounded scan — gate on whether
+                        // any update in the batch actually touched media so
+                        // text-only / reaction-only bursts don't pay for it.
                         val touchedMedia =
-                            when (update) {
-                                is TimelineSubscriptionUpdateFfi.Page -> pageContainsMedia(update.page)
-                                is TimelineSubscriptionUpdateFfi.Projection ->
-                                    if (update.update.update.groupIdHex == group.groupIdHex) {
-                                        changesContainMedia(update.update.update.changes)
-                                    } else {
-                                        false
-                                    }
+                            batch.any { update ->
+                                when (update) {
+                                    is TimelineSubscriptionUpdateFfi.Page -> pageContainsMedia(update.page)
+                                    is TimelineSubscriptionUpdateFfi.Projection ->
+                                        if (update.update.update.groupIdHex == group.groupIdHex) {
+                                            changesContainMedia(update.update.update.changes)
+                                        } else {
+                                            false
+                                        }
+                                }
                             }
                         if (touchedMedia) refreshMediaReferences()
-                        // Scroll-driven mark-read in the UI layer handles the
-                        // user-visible read pointer. The projection-update
-                        // path no longer force-marks the absolute newest as
-                        // read; if the user is scrolled up reading older
-                        // history, an incoming message must remain unread
-                        // until they actually scroll to it.
-                        streamIds.forEach { streamId ->
+                        // Scroll-driven mark-read in the UI layer handles
+                        // the user-visible read pointer.
+                        streamIdsLaunched.forEach { streamId ->
                             if (activeStreamIds.add(streamId)) {
                                 launch { watchAgentTextStream(account, streamId) }
                             }
@@ -2910,7 +2939,37 @@ class ConversationController(
         timelineOrder.add(itemId)
     }
 
+    // Re-entrant counter — when non-zero, `publishTimelineFromIndexes` defers
+    // its work and the outermost `coalesceTimelinePublishes` flushes once.
+    // Batching a burst of subscription emits into one publish is the largest
+    // single saving for the 7.21ms-on-janky-frames "Input+Anim+Layout" cost
+    // in `dumpsys gfxinfo`: each publish re-sorts + de-dupes the full
+    // timeline and re-aggregates the edits index.
+    private var publishSuppressionDepth = 0
+    private var publishPending = false
+
+    private inline fun coalesceTimelinePublishes(block: () -> Unit) {
+        publishSuppressionDepth += 1
+        try {
+            block()
+        } finally {
+            publishSuppressionDepth -= 1
+            if (publishSuppressionDepth == 0 && publishPending) {
+                publishPending = false
+                publishTimelineFromIndexesInternal()
+            }
+        }
+    }
+
     private fun publishTimelineFromIndexes() {
+        if (publishSuppressionDepth > 0) {
+            publishPending = true
+            return
+        }
+        publishTimelineFromIndexesInternal()
+    }
+
+    private fun publishTimelineFromIndexesInternal() {
         val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
         timeline =
             (optimisticMessages.values + projected)
