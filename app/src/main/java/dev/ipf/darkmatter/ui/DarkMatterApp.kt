@@ -4372,26 +4372,20 @@ private fun ConversationScreen(
             // filename/MIME metadata that doesn't benefit from grid
             // composition. Caption sticks with images when present;
             // otherwise it attaches to the first file send.
-            // Document picker accepts every MIME, including image/*. Anything
-            // image/* picked via that route joins the image-album path so the
-            // rendered bubble matches the user's intent ("I picked an image")
-            // regardless of which sheet they opened. Non-image picks stay
-            // standalone — each carries distinct filename/MIME metadata that
-            // doesn't benefit from masonry composition.
-            val (rawDocImages, docPickedFiles) =
-                docOutcome.attachments.partition {
-                    it.mediaType.startsWith("image/", ignoreCase = true)
-                }
-            // Raw bytes from the doc picker have no thumbhash yet. Compute
-            // it now so receivers get the same blurred placeholder as the
-            // image-picker path. Bytes and MIME are preserved as-picked.
-            val docPickedImages =
-                if (rawDocImages.isEmpty()) {
+            // Pre-compute thumbhash for any image-typed doc-picker attachments
+            // so receivers get the same blurred placeholder as the
+            // image-picker path. Bytes and MIME stay as-picked — only the
+            // hash field is filled in. Runs off-main so the staging-shelf
+            // dismiss animation doesn't stutter on a multi-image pick.
+            val readyDocAttachments =
+                if (docOutcome.attachments.isEmpty()) {
                     emptyList()
                 } else {
                     withContext(Dispatchers.Default) {
-                        rawDocImages.map { attachment ->
-                            if (attachment.thumbhash != null) {
+                        docOutcome.attachments.map { attachment ->
+                            if (!attachment.mediaType.startsWith("image/", ignoreCase = true) ||
+                                attachment.thumbhash != null
+                            ) {
                                 attachment
                             } else {
                                 val bitmap =
@@ -4399,26 +4393,29 @@ private fun ConversationScreen(
                                         attachment.plaintextBytes,
                                         MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
                                     )
-                                val hash =
-                                    bitmap?.let { Thumbhash.encodeFromBitmap(it) }
+                                val hash = bitmap?.let { Thumbhash.encodeFromBitmap(it) }
                                 bitmap?.recycle()
                                 attachment.copy(thumbhash = hash)
                             }
                         }
                     }
                 }
-            val albumImages = acceptedImages + docPickedImages
+            // The image picker's multi-select UI groups its picks as one
+            // batch, so they ride one kind-9 album — preserves the masonry
+            // grouping the user opted into. Doc-picker items, by contrast,
+            // are picked one-by-one in order, so each ships as its own
+            // kind-9 in pick position regardless of MIME. Image MIMEs from
+            // the doc picker still render as image bubbles (single-image
+            // variant of the album shape) — same surface, different framing.
             val seeded = mutableListOf<ConversationController.QueuedAttachmentSend>()
-            if (albumImages.isNotEmpty()) {
-                controller.queueAttachments(albumImages, trimmedCaption)?.let(seeded::add)
-                for (doc in docPickedFiles) {
-                    controller.queueAttachments(listOf(doc), null)?.let(seeded::add)
-                }
-            } else {
-                docPickedFiles.forEachIndexed { index, doc ->
-                    val perFileCaption = if (index == 0) trimmedCaption else null
-                    controller.queueAttachments(listOf(doc), perFileCaption)?.let(seeded::add)
-                }
+            if (acceptedImages.isNotEmpty()) {
+                controller.queueAttachments(acceptedImages, trimmedCaption)?.let(seeded::add)
+            }
+            val captionConsumedByAlbum = acceptedImages.isNotEmpty()
+            readyDocAttachments.forEachIndexed { index, attachment ->
+                val perItemCaption =
+                    if (!captionConsumedByAlbum && index == 0) trimmedCaption else null
+                controller.queueAttachments(listOf(attachment), perItemCaption)?.let(seeded::add)
             }
             // Pull the user down to the just-seeded bubbles before the
             // upload loop suspends — same UX as text-send. Firing after
