@@ -559,7 +559,10 @@ class DarkMatterAppState(
         // wipes disk; switching is just a UI context flip.
         // Skip the wipe when the label is unchanged (no-op tap on the
         // already-active account).
-        if (label != activeAccountRef) clearInMemoryMediaCaches()
+        if (label != activeAccountRef) {
+            clearInMemoryMediaCaches()
+            clearCrossAccountCaches()
+        }
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
@@ -595,6 +598,21 @@ class DarkMatterAppState(
         notificationScope.launch(Dispatchers.IO) { diskMediaCache.clear() }
     }
 
+    /**
+     * Drop per-account identity/metadata caches so account A's data isn't
+     * reachable after switching to B, and so they don't grow unbounded across
+     * many account switches: the npub cache, resolved profile presentations,
+     * and group-member snapshots. Bumps [profileRevision] so any visible
+     * profile re-resolves for the now-active account. Called on account switch
+     * and sign-out. See #107.
+     */
+    private fun clearCrossAccountCaches() {
+        npubs.clear()
+        synchronized(profilePresentationLock) { profilePresentations.clear() }
+        synchronized(groupMemberSnapshotLock) { groupMemberSnapshots.clear() }
+        profileRevision += 1
+    }
+
     fun signOutActiveAccount() {
         // Sign-out is a non-destructive session switch: the identity stays in
         // the device keychain and the user can switch back to it. Per-account
@@ -608,6 +626,7 @@ class DarkMatterAppState(
         // (setActiveAccount) is *not* a sign-out — it keeps the L2 disk cache
         // so re-entry into the same account doesn't re-download every image.
         clearAllMediaCaches()
+        clearCrossAccountCaches()
         val signedOutRef = activeAccountRef
         val outcome = signOutOutcome(accounts.map { it.label }, activeAccountRef)
         val next = outcome.nextActiveRef
