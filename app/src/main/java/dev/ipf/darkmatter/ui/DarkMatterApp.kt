@@ -2093,6 +2093,28 @@ private val MediaBubbleHeight = 240.dp
  *  preview at the extremes. */
 private val MediaBubbleMaxHeight = 340.dp
 
+/** Fixed card width used for portrait image bubbles, so every portrait
+ *  reads as a consistently-sized card rather than a width-varying strip.
+ *  Landscape bubbles still fill the parent. */
+private val MediaBubbleCardWidth = 280.dp
+
+/** Sizing modifier for both the optimistic and the confirmed single-image
+ *  bubble. Portrait images become uniform-width cards with a height cap;
+ *  landscape images fill the bubble width and derive their natural height
+ *  (which can't exceed the width for ratio ≥ 1). Falls back to the legacy
+ *  fixed-height slab when the aspect ratio is unknown. */
+@Composable
+private fun imageBubbleSizing(ratio: Float?): Modifier =
+    when {
+        ratio == null -> Modifier.fillMaxWidth().height(MediaBubbleHeight)
+        ratio >= 1f -> Modifier.fillMaxWidth().aspectRatio(ratio)
+        else -> {
+            val natural = (MediaBubbleCardWidth.value / ratio).dp
+            val height = if (natural > MediaBubbleMaxHeight) MediaBubbleMaxHeight else natural
+            Modifier.width(MediaBubbleCardWidth).height(height)
+        }
+    }
+
 /**
  * Parse the imeta `dim` field ("WxH") into a width/height aspect ratio.
  * Returns null when [dim] is null, blank, malformed, or non-positive on
@@ -2201,23 +2223,12 @@ private fun MediaImageBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
-        // Reserve aspect-ratio space from the imeta `dim` when present, so
-        // the bubble has its final shape before the bytes decode and the
-        // timeline doesn't reflow after the open-time scroll-to-bottom.
-        // Tall portraits are bounded by [MediaBubbleMaxHeight] so a 9:16
-        // photo doesn't dominate the viewport — height capped, width given
-        // up so the bubble centers as a portrait card rather than a slab.
-        // Older messages (and any sender that doesn't ship `dim`) fall back
-        // to the fixed bubble height.
-        modifier =
-            run {
-                val ratio = aspectRatioFromDim(reference.dim)
-                if (ratio != null) {
-                    Modifier.fillMaxWidth().aspectRatio(ratio).heightIn(max = MediaBubbleMaxHeight)
-                } else {
-                    Modifier.fillMaxWidth().height(MediaBubbleHeight)
-                }
-            },
+        // Single source of truth for image-bubble shape: portraits become
+        // uniform-width cards (capped height), landscapes fill the bubble
+        // width. Used by both the confirmed bubble and the optimistic
+        // upload-phase bubble so the optimistic → confirmed swap is a
+        // visual no-op.
+        modifier = imageBubbleSizing(aspectRatioFromDim(reference.dim)),
     ) {
         Box(contentAlignment = Alignment.Center) {
             val current = bitmap
@@ -2865,11 +2876,15 @@ private fun MediaPendingPlaceholder(
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (pendingAttachments.size <= 1) {
-                // Single-image: keep the existing fixed-height bubble so the
-                // optimistic→projected swap doesn't reflow the timeline.
-                val preview = rememberSampledBitmap(pendingAttachments.firstOrNull()?.plaintextBytes)
+                // Single-image optimistic: same sizing as the confirmed
+                // bubble so the optimistic→confirmed swap doesn't reflow
+                // the timeline. Source aspect ratio comes from the
+                // attachment's own `dim` (set at pick time).
+                val attachment = pendingAttachments.firstOrNull()
+                val preview = rememberSampledBitmap(attachment?.plaintextBytes)
+                val ratio = aspectRatioFromDim(attachment?.dim)
                 Box(
-                    Modifier.fillMaxWidth().height(MediaBubbleHeight),
+                    imageBubbleSizing(ratio),
                     contentAlignment = Alignment.Center,
                 ) {
                     preview?.let {
