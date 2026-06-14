@@ -2126,9 +2126,23 @@ private fun imageBubbleSizing(ratio: Float?): Modifier =
 @Composable
 private fun rememberThumbhashImage(thumbhash: String?): ImageBitmap? {
     if (thumbhash.isNullOrBlank()) return null
-    return remember(thumbhash) {
-        Thumbhash.decodeToBitmap(thumbhash)?.asImageBitmap()
-    }
+    // The decode is a few hundred μs to a couple ms (cosine-basis sum
+    // across a 32×32 grid). Doing it inside `remember { ... }` runs it on
+    // the Compose / Main thread during the initial composition pass, which
+    // multiplied across the bubbles entering composition during scroll adds
+    // up to a measurable Input+Anim+Layout cost. `produceState` defers the
+    // decode to Dispatchers.Default and emits the result when ready —
+    // initial composition returns instantly with `null` and the bubble
+    // shows the underlying surface tint until the blurred placeholder
+    // arrives.
+    val state =
+        produceState<ImageBitmap?>(initialValue = null, key1 = thumbhash) {
+            value =
+                withContext(Dispatchers.Default) {
+                    Thumbhash.decodeToBitmap(thumbhash)?.asImageBitmap()
+                }
+        }
+    return state.value
 }
 
 /**
@@ -4868,7 +4882,17 @@ private fun ConversationScreen(
                                     }
                                 }
                             }
-                            items(renderedTimeline, key = { it.id }) { item ->
+                            items(
+                                renderedTimeline,
+                                key = { it.id },
+                                // Pool layouts by category so Compose can reuse
+                                // the heavier MessageBubble slot across scroll
+                                // without recreating layout nodes for the
+                                // simpler centered group-system rows.
+                                contentType = { item ->
+                                    if (MessageProjector.isGroupSystem(item.record)) "groupSystem" else "message"
+                                },
+                            ) { item ->
                                 if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
                                     UnreadMessagesDivider(count = entryUnreadCount)
                                 }
