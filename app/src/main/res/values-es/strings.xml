@@ -484,4 +484,9 @@
     <string name="group_system_you_avatar_changed">Cambiaste la imagen del grupo</string>
     <string name="media_attachment_add_more">Añadir más</string>
     <string name="media_attachment_remove">Quitar archivo</string>
+    <string name="voice_message_record">Hold to record voice message</string>
+    <string name="voice_message_recording">Recording…</string>
+    <string name="voice_message_release_to_send">Release to send · slide off to cancel</string>
+    <string name="voice_message_too_short">Hold longer to record</string>
+    <string name="voice_message_permission_denied">Microphone permission needed to record</string>
 </resources>

@@ -481,4 +481,9 @@
     <string name="group_system_you_avatar_changed">你更换了群组头像</string>
     <string name="media_attachment_add_more">添加更多</string>
     <string name="media_attachment_remove">移除附件</string>
+    <string name="voice_message_record">Hold to record voice message</string>
+    <string name="voice_message_recording">Recording…</string>
+    <string name="voice_message_release_to_send">Release to send · slide off to cancel</string>
+    <string name="voice_message_too_short">Hold longer to record</string>
+    <string name="voice_message_permission_denied">Microphone permission needed to record</string>
 </resources>

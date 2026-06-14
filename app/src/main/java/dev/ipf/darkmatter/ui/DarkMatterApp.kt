@@ -27,6 +27,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -189,12 +190,14 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -4243,6 +4246,76 @@ private fun ConversationScreen(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> if (granted) launchCameraCapture() }
 
+    // Voice-message recording surface — owned per ConversationScreen so a
+    // backgrounded recording is dropped on dispose. The recorder writes
+    // into a per-session temp dir; the file is consumed by `sendVoiceMessage`
+    // below and then removed.
+    val voiceOutputDir =
+        remember(context) {
+            java.io.File(context.cacheDir, "voice-recordings").apply { mkdirs() }
+        }
+    val micPermissionDeniedMsg = stringResource(R.string.voice_message_permission_denied)
+    val voiceTooShortMsg = stringResource(R.string.voice_message_too_short)
+    var voiceMicPermissionRequested by remember { mutableStateOf(false) }
+    val voiceMicPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted -> if (!granted) appState.present(micPermissionDeniedMsg) }
+
+    fun sendVoiceAttachment(
+        file: java.io.File,
+        durationMs: Long,
+    ) {
+        appState.launchMutation {
+            val bytes =
+                withContext(Dispatchers.IO) {
+                    runCatching { file.readBytes() }.getOrNull()
+                }
+            withContext(Dispatchers.IO) { runCatching { file.delete() } }
+            if (bytes == null || bytes.isEmpty()) return@launchMutation
+            val attachment =
+                PendingAttachment(
+                    plaintextBytes = bytes,
+                    mediaType = dev.ipf.darkmatter.audio.VoiceRecorder.MIME_TYPE,
+                    fileName = "voice-${durationMs}ms.${dev.ipf.darkmatter.audio.VoiceRecorder.FILE_EXTENSION}",
+                )
+            val seeded = controller.queueAttachments(listOf(attachment), null) ?: return@launchMutation
+            scope.launch {
+                val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                listState.animateScrollToItem(target)
+            }
+            controller.uploadQueued(seeded)
+        }
+    }
+
+    val voiceRecordingController =
+        remember(chat.id) {
+            dev.ipf.darkmatter.audio.VoiceRecordingController(
+                context = context,
+                outputDirectory = voiceOutputDir,
+                scope = scope,
+                onPermissionRequest = {
+                    val granted =
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                            PackageManager.PERMISSION_GRANTED
+                    if (!granted && !voiceMicPermissionRequested) {
+                        voiceMicPermissionRequested = true
+                        voiceMicPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                    granted
+                },
+                onRecordingComplete = { file, durationMs -> sendVoiceAttachment(file, durationMs) },
+                onError = { throwable ->
+                    if (throwable is IllegalStateException && throwable.message == "voice recording too short") {
+                        appState.present(voiceTooShortMsg)
+                    }
+                },
+            )
+        }
+    DisposableEffect(voiceRecordingController) {
+        onDispose { voiceRecordingController.release() }
+    }
+
     // Decode/compress each URI off the main thread, then hand the album to
     // the controller as a single `sendAttachments(list, caption)` call. One
     // kind:9 carries N imeta tags; the caption is shared across the whole
@@ -4810,6 +4883,7 @@ private fun ConversationScreen(
                             // without restricting by MIME. Bytes upload as-is.
                             documentPickerLauncher.launch(arrayOf("*/*"))
                         },
+                        voiceRecordingController = voiceRecordingController,
                     )
                 }
             }
@@ -7421,6 +7495,7 @@ private fun ComposerBar(
     onPickFromGallery: (() -> Unit)? = null,
     onCaptureFromCamera: (() -> Unit)? = null,
     onPickDocument: (() -> Unit)? = null,
+    voiceRecordingController: dev.ipf.darkmatter.audio.VoiceRecordingController? = null,
     editingMessageId: String? = null,
     editingInitialText: String? = null,
     onCancelEdit: () -> Unit = {},
@@ -7589,33 +7664,145 @@ private fun ComposerBar(
                         imeAction = ImeAction.Default,
                     ),
             )
-            FloatingActionButton(
-                onClick = {
-                    if (text.isNotBlank()) {
-                        val sendingEdit = editingMessageId != null
-                        onSend(text)
-                        // For an in-place edit: the LaunchedEffect that
-                        // watches `editingMessageId` will restore the pre-edit
-                        // composer (text + caret) once the controller clears
-                        // edit state — so don't blank the field here, don't
-                        // blank the persisted draft, and don't scroll to
-                        // newest (the bubble's row didn't move, the body
-                        // just rebinds).
-                        if (!sendingEdit) {
-                            textFieldValue = TextFieldValue("")
-                            onDraftChange("")
-                            onAfterSend()
+            val showMicButton =
+                text.isBlank() &&
+                    editingMessageId == null &&
+                    voiceRecordingController != null
+            if (showMicButton) {
+                MicHoldButton(controller = voiceRecordingController)
+            } else {
+                FloatingActionButton(
+                    onClick = {
+                        if (text.isNotBlank()) {
+                            val sendingEdit = editingMessageId != null
+                            onSend(text)
+                            // For an in-place edit: the LaunchedEffect that
+                            // watches `editingMessageId` will restore the pre-edit
+                            // composer (text + caret) once the controller clears
+                            // edit state — so don't blank the field here, don't
+                            // blank the persisted draft, and don't scroll to
+                            // newest (the bubble's row didn't move, the body
+                            // just rebinds).
+                            if (!sendingEdit) {
+                                textFieldValue = TextFieldValue("")
+                                onDraftChange("")
+                                onAfterSend()
+                            }
+                        }
+                    },
+                    modifier = Modifier.size(52.dp),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
+                }
+            }
+        }
+        if (voiceRecordingController?.isRecording == true) {
+            RecordingIndicator(elapsedMs = voiceRecordingController.elapsedMs)
+        }
+    }
+}
+
+/**
+ * Hold-to-record voice button. Press → start; release inside the button
+ * bounds → stop and send. Drag the finger outside the button before
+ * releasing → cancel. The cancel threshold is `cancelThresholdPx` away
+ * from the down position; the gesture stays as a pointerInput input so
+ * Compose doesn't fight us for the up event.
+ */
+@Composable
+private fun MicHoldButton(controller: dev.ipf.darkmatter.audio.VoiceRecordingController) {
+    val haptics = LocalHapticFeedback.current
+    val cancelThresholdDp = 80.dp
+    val cancelThresholdPx = with(LocalDensity.current) { cancelThresholdDp.toPx() }
+    val recording = controller.isRecording
+    FloatingActionButton(
+        onClick = {},
+        modifier =
+            Modifier
+                .size(52.dp)
+                .pointerInput(controller) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val started = controller.start()
+                        if (!started) return@awaitEachGesture
+                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        var canceled = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            val dragPx = (change.position - down.position).getDistance()
+                            if (!canceled && dragPx > cancelThresholdPx) {
+                                canceled = true
+                            }
+                            if (change.changedToUp() || !change.pressed) {
+                                if (canceled) controller.cancel() else controller.stop()
+                                break
+                            }
                         }
                     }
                 },
-                modifier = Modifier.size(52.dp),
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
-            }
-        }
+        containerColor =
+            if (recording) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+    ) {
+        Icon(
+            Icons.Default.Mic,
+            contentDescription = stringResource(R.string.voice_message_record),
+        )
     }
+}
+
+/**
+ * Slim recording-status row above the composer that surfaces a recording
+ * pulse, the elapsed time, and the release-or-slide-to-cancel hint while a
+ * voice message is being captured.
+ */
+@Composable
+private fun RecordingIndicator(elapsedMs: Long) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.errorContainer)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.error),
+        )
+        Text(
+            text = formatRecordingDuration(elapsedMs),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+        )
+        Text(
+            text = stringResource(R.string.voice_message_release_to_send),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+private fun formatRecordingDuration(elapsedMs: Long): String {
+    val totalSeconds = (elapsedMs / 1000L).coerceAtLeast(0L)
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%d:%02d".format(minutes, seconds)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
