@@ -37,6 +37,11 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
         if (message.notification != null) {
             Log.d(TAG, "Ignoring notification body on MIP-05 push")
         }
+        // A wake only reaches us because native push is registered, and native
+        // push is independent of the "Keep connected" toggle — gating the wake
+        // on the background-connection preference would silently drop every
+        // fetch for a user who runs native push without a persistent
+        // connection (the whole point of native push).
         Log.d(TAG, "MIP-05 wake push received; starting foreground stream")
         wakeForegroundStream()
     }
