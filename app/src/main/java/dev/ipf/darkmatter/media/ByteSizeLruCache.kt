@@ -61,6 +61,14 @@ class ByteSizeLruCache<K : Any, V : Any>(
 
     fun size(): Int = entries.size
 
+    /**
+     * Snapshot of the current keys. Used by callers that need to filter
+     * eviction by external criteria (e.g. skip entries whose work is still
+     * in flight). Iterating `entries` directly would expose the LRU
+     * mutation hazard; this snapshot is safe to traverse while mutating.
+     */
+    fun keysSnapshot(): List<K> = entries.keys.toList()
+
     fun residentBytes(): Long = residentBytes
 
     private fun evictUntilUnderCap() {
