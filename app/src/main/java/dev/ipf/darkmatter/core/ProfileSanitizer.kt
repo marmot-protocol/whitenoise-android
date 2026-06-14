@@ -34,7 +34,7 @@ object ProfileSanitizer {
         maxLength: Int,
     ): String? {
         val collapsed =
-            stripUnsafe(normalizeConfusables(raw ?: ""))
+            stripUnsafe(normalizeCompatibilityForms(raw ?: ""))
                 .split(Regex("\\s+"))
                 .filter { it.isNotBlank() }
                 .joinToString(" ")
@@ -45,11 +45,12 @@ object ProfileSanitizer {
      * NFKC folds compatibility/fullwidth look-alikes to their canonical forms
      * (`ＡＢＣ` → `ABC`, `ﬁ` → `fi`), removing a large class of display-name
      * homoglyphs. Applied to the display-name surface only, not message
-     * bodies, which must keep the author's exact text. It does not fold
-     * cross-script confusables (Cyrillic `а` vs Latin `a`) — that needs the
-     * Unicode confusables table and a mixed-script policy.
+     * bodies, which must keep the author's exact text. This is compatibility
+     * normalization, not full confusables mapping: it does not fold
+     * cross-script look-alikes (Cyrillic `а` vs Latin `a`) — that needs the
+     * Unicode confusables skeleton table and a mixed-script policy.
      */
-    private fun normalizeConfusables(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFKC)
+    private fun normalizeCompatibilityForms(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFKC)
 
     private fun multiline(
         raw: String?,
@@ -88,7 +89,7 @@ object ProfileSanitizer {
                     // carry meaning in Indic/Arabic shaping and emoji sequences.
                     char.code == 0x00AD -> Unit // soft hyphen
                     char.code == 0x034F -> Unit // combining grapheme joiner
-                    char.code == 0x180E -> Unit // Mongolian vowel separator
+                    char.code == 0x180E -> Unit // Mongolian vowel separator: default-ignorable since Unicode 6.3
                     char.code == 0x2060 -> Unit // word joiner
                     char.code in 0x2061..0x2064 -> Unit // invisible math operators
                     else -> append(char)

@@ -14,7 +14,7 @@ class ProfileSanitizerTest {
 
     @Test
     fun displayNamesFoldFullwidthAndCompatibilityHomoglyphs() {
-        // #60: NFKC folds fullwidth/compatibility look-alikes so a spoofed
+        // NFKC folds fullwidth/compatibility look-alikes so a spoofed
         // "Ａdmin" / "ﬁnance" can't masquerade as the canonical form.
         assertEquals("Admin", ProfileSanitizer.displayName("Ａｄｍｉｎ")) // fullwidth "Admin"
         assertEquals("finance", ProfileSanitizer.displayName("ﬁnance")) // ﬁ ligature
@@ -27,6 +27,14 @@ class ProfileSanitizerTest {
         // ZWJ emoji sequence (man + ZWJ + laptop) must survive intact.
         val zwjEmoji = "👨‍💻"
         assertEquals(zwjEmoji, ProfileSanitizer.displayName(zwjEmoji))
+    }
+
+    @Test
+    fun displayNamesStripCombiningJoinerAndInvisibleMathChars() {
+        // Combining grapheme joiner (U+034F), Mongolian vowel separator
+        // (U+180E), and the invisible math operators (U+2061..U+2064) are all
+        // default-ignorable padding the sanitizer must remove.
+        assertEquals("Alice", ProfileSanitizer.displayName("A͏l᠎i⁡c⁤e"))
     }
 
     @Test

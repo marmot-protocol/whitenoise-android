@@ -50,6 +50,11 @@ val hasReleaseSigning =
         !releaseKeyPassword.isNullOrBlank() &&
         file(releaseKeystorePath!!).exists()
 
+// Escape hatch for the unsigned-release guard below. Off by default: a release
+// build without signing must fail rather than emit an uninstallable artifact.
+val allowUnsignedRelease =
+    runtimeConfigProperty("DARKMATTER_ALLOW_UNSIGNED_RELEASE", "false").equals("true", ignoreCase = true)
+
 android {
     namespace = "dev.ipf.darkmatter"
     compileSdk {
@@ -137,15 +142,10 @@ android {
             )
             // Never fall back to the debug keystore: the Android debug key is
             // public, so a release APK signed with it is trivially forgeable.
-            // Leave the build unsigned when release signing isn't configured.
+            // When signing is absent, the release packaging tasks fail (see the
+            // guard below) instead of producing an unsigned artifact.
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
-            } else {
-                logger.warn(
-                    "Release signing is not configured (set DARKMATTER_KEYSTORE_PATH/PASSWORD/" +
-                        "KEY_ALIAS/KEY_PASSWORD). The release build will be UNSIGNED — it will not " +
-                        "fall back to the public debug key.",
-                )
             }
         }
     }
@@ -173,6 +173,22 @@ android {
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
             isUniversalApk = true
+        }
+    }
+}
+
+// Fail any release packaging task when signing isn't configured. Checked at
+// execution time so debug builds are never affected; an unsigned release APK
+// is uninstallable, so a build that "succeeds" while emitting one hides a
+// release-blocking failure. Override with DARKMATTER_ALLOW_UNSIGNED_RELEASE=true.
+tasks.matching { it.name.startsWith("package") && it.name.contains("Release") }.configureEach {
+    doFirst {
+        if (!hasReleaseSigning && !allowUnsignedRelease) {
+            throw GradleException(
+                "Release signing is not configured (set DARKMATTER_KEYSTORE_PATH/PASSWORD/" +
+                    "KEY_ALIAS/KEY_PASSWORD). Refusing to produce an unsigned release artifact; " +
+                    "set DARKMATTER_ALLOW_UNSIGNED_RELEASE=true to override.",
+            )
         }
     }
 }
