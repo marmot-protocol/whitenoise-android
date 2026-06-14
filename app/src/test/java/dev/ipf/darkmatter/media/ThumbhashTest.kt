@@ -23,6 +23,14 @@ class ThumbhashTest {
     }
 
     @Test
+    fun decodeRgba_returnsNullOnOversizedInput() {
+        // Defends against an attacker-supplied imeta `thumbhash` tag that's
+        // megabytes long. Real hashes top out around 25 bytes.
+        assertNull(Thumbhash.decodeRgba(ByteArray(65)))
+        assertNull(Thumbhash.decodeRgba(ByteArray(4096)))
+    }
+
+    @Test
     fun decodeRgba_neutralGrayPortraitHashProducesGrayPixels() {
         // Hand-constructed hash: portrait, no alpha, mid-gray DC, zero AC scale.
         // - lDc=32/63≈0.508, pDc≈0, qDc≈0  (mid gray)

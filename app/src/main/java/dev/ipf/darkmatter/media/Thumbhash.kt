@@ -53,6 +53,13 @@ object Thumbhash {
 
     internal const val MAX_EDGE_PX: Int = 100
 
+    // Wire-format ceiling. A real thumbhash maxes around 25 bytes (≈34
+    // base64-no-padding chars); the cap here is generous so a future spec
+    // bump fits, but tight enough that an attacker can't push a kilobyte
+    // of base64 through Base64.decode() during placeholder rendering.
+    private const val MAX_THUMBHASH_B64_CHARS = 64
+    private const val MAX_THUMBHASH_BYTES = 64
+
     /**
      * Decode a base64 thumbhash string into a small ARGB_8888 bitmap
      * suitable for a blurred placeholder. Inverse of [encodeBase64]. Caller
@@ -62,10 +69,16 @@ object Thumbhash {
      * produce a sensible decoded bitmap.
      */
     fun decodeToBitmap(base64Hash: String): Bitmap? {
+        // Reject anything longer than the spec ceiling before decoding —
+        // base64Hash is read straight off an untrusted imeta tag, so a
+        // malicious peer could otherwise force a multi-megabyte
+        // Base64.decode() allocation during placeholder rendering.
+        if (base64Hash.length > MAX_THUMBHASH_B64_CHARS) return null
         val bytes =
             runCatching {
                 Base64.decode(base64Hash, Base64.NO_PADDING or Base64.NO_WRAP)
             }.getOrNull() ?: return null
+        if (bytes.size > MAX_THUMBHASH_BYTES) return null
         val decoded = runCatching { decodeRgba(bytes) }.getOrNull() ?: return null
         return Bitmap.createBitmap(decoded.pixels, decoded.width, decoded.height, Bitmap.Config.ARGB_8888)
     }
@@ -81,7 +94,7 @@ object Thumbhash {
     )
 
     internal fun decodeRgba(hash: ByteArray): DecodedRgba? {
-        if (hash.size < 5) return null
+        if (hash.size < 5 || hash.size > MAX_THUMBHASH_BYTES) return null
         val h0 = hash[0].toInt() and 0xFF
         val h1 = hash[1].toInt() and 0xFF
         val h2 = hash[2].toInt() and 0xFF
