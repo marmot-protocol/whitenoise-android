@@ -4310,6 +4310,7 @@ private fun ConversationScreen(
         imageUris: List<android.net.Uri>,
         documentUris: List<android.net.Uri>,
         caption: String,
+        onAfterSend: () -> Unit = {},
     ) {
         if (imageUris.isEmpty() && documentUris.isEmpty()) return
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
@@ -4371,19 +4372,61 @@ private fun ConversationScreen(
             // filename/MIME metadata that doesn't benefit from grid
             // composition. Caption sticks with images when present;
             // otherwise it attaches to the first file send.
-            val docs = docOutcome.attachments
+            // Document picker accepts every MIME, including image/*. Anything
+            // image/* picked via that route joins the image-album path so the
+            // rendered bubble matches the user's intent ("I picked an image")
+            // regardless of which sheet they opened. Non-image picks stay
+            // standalone — each carries distinct filename/MIME metadata that
+            // doesn't benefit from masonry composition.
+            val (rawDocImages, docPickedFiles) =
+                docOutcome.attachments.partition {
+                    it.mediaType.startsWith("image/", ignoreCase = true)
+                }
+            // Raw bytes from the doc picker have no thumbhash yet. Compute
+            // it now so receivers get the same blurred placeholder as the
+            // image-picker path. Bytes and MIME are preserved as-picked.
+            val docPickedImages =
+                if (rawDocImages.isEmpty()) {
+                    emptyList()
+                } else {
+                    withContext(Dispatchers.Default) {
+                        rawDocImages.map { attachment ->
+                            if (attachment.thumbhash != null) {
+                                attachment
+                            } else {
+                                val bitmap =
+                                    MediaPipeline.decodeSampledBitmap(
+                                        attachment.plaintextBytes,
+                                        MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                                    )
+                                val hash =
+                                    bitmap?.let { Thumbhash.encodeFromBitmap(it) }
+                                bitmap?.recycle()
+                                attachment.copy(thumbhash = hash)
+                            }
+                        }
+                    }
+                }
+            val albumImages = acceptedImages + docPickedImages
             val seeded = mutableListOf<ConversationController.QueuedAttachmentSend>()
-            if (acceptedImages.isNotEmpty()) {
-                controller.queueAttachments(acceptedImages, trimmedCaption)?.let(seeded::add)
-                for (doc in docs) {
+            if (albumImages.isNotEmpty()) {
+                controller.queueAttachments(albumImages, trimmedCaption)?.let(seeded::add)
+                for (doc in docPickedFiles) {
                     controller.queueAttachments(listOf(doc), null)?.let(seeded::add)
                 }
             } else {
-                docs.forEachIndexed { index, doc ->
+                docPickedFiles.forEachIndexed { index, doc ->
                     val perFileCaption = if (index == 0) trimmedCaption else null
                     controller.queueAttachments(listOf(doc), perFileCaption)?.let(seeded::add)
                 }
             }
+            // Pull the user down to the just-seeded bubbles before the
+            // upload loop suspends — same UX as text-send. Firing after
+            // queueAttachments (the optimistic seed) and before
+            // uploadQueued (the FFI publish) means the scroll lands in the
+            // same frame the bubble appears, instead of waiting on the
+            // relay round-trip.
+            if (seeded.isNotEmpty()) onAfterSend()
             // Run uploads sequentially so the kind-9 publishes go out in
             // pick order. The optimistic bubbles are already on screen.
             for (slot in seeded) {
@@ -4844,7 +4887,22 @@ private fun ConversationScreen(
             onSend = { caption ->
                 pendingMediaUris = emptyList()
                 pendingDocumentUris = emptyList()
-                sendStagedAttachments(imageUris, documentUris, caption)
+                sendStagedAttachments(
+                    imageUris,
+                    documentUris,
+                    caption,
+                    onAfterSend = {
+                        // Pull the user down to the just-seeded bubble.
+                        // `bottomTimelineIndex` reads from
+                        // [renderedTimeline.size] (the snapshot-backed
+                        // controller list) instead of
+                        // [LazyListState.layoutInfo.totalItemsCount], which
+                        // is stale until the next recompose — for a
+                        // multi-file send that staleness leaves the user
+                        // one-or-more rows above the new bubble.
+                        scope.launch { listState.animateScrollToItem(bottomTimelineIndex) }
+                    },
+                )
             },
             onRemoveAt = { index ->
                 pendingMediaUris =
