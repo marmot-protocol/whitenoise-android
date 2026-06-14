@@ -1159,6 +1159,15 @@ class ConversationController(
         appState.pendingProjectionsAwaitingBridge(conversationAccountRef, initialGroup.groupIdHex)
     private val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
     private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    // Cached at start() so `loadOlderPage` / `loadNewerPage` can drive
+    // `paginate_backwards` / `paginate_forwards` on the subscription. Per
+    // the PR-#400 contract, the subscription owns the materialized window
+    // (ordering, dedup, head-anchoring, cap, has_more_*); clients render
+    // the returned page directly instead of merging against a hand-rolled
+    // cursor.
+    @Volatile
+    private var timelineSubscription: TimelineMessagesSubscription? = null
     private val activeStreamIds = mutableSetOf<String>()
     private val removedStreamIds = mutableSetOf<String>()
     private var hasLoadedOlderPages = false
@@ -1222,7 +1231,6 @@ class ConversationController(
         val account = conversationAccountRef ?: return
         isLoading = true
         error = null
-        var timelineSubscription: TimelineMessagesSubscription? = null
         var groupSubscription: GroupStateSubscription? = null
         try {
             val timelineStream =
@@ -1343,9 +1351,11 @@ class ConversationController(
             error = throwable.message ?: throwable.javaClass.simpleName
         } finally {
             inviteStreamScope.cancel()
+            val closingSubscription = timelineSubscription
+            timelineSubscription = null
             withContext(Dispatchers.IO) {
                 runCatching { groupSubscription?.close() }
-                runCatching { timelineSubscription?.close() }
+                runCatching { closingSubscription?.close() }
             }
         }
     }
@@ -2429,12 +2439,9 @@ class ConversationController(
     fun timelineIndexOf(messageIdHex: String): Int = timeline.indexOfFirst { it.record.messageIdHex == messageIdHex }
 
     private suspend fun loadOlderPage(): Boolean {
-        val account = appState.activeAccountRef ?: return false
         if (!hasMoreBefore || isLoadingOlder) return false
-        val oldest =
-            timelineRecords.values.minWithOrNull(
-                compareBy<TimelineMessageRecordFfi> { it.timelineAt }.thenBy { it.messageIdHex },
-            ) ?: return false
+        val subscription = timelineSubscription ?: return false
+        val priorMessageIds = timelineRecords.keys.toSet()
         // A previous loadOlderPage failure leaves `error` set; clear it now
         // that we're actually retrying, otherwise the stale banner sits over
         // a successful retry and a developer can't distinguish "still broken"
@@ -2442,23 +2449,16 @@ class ConversationController(
         error = null
         isLoadingOlder = true
         return try {
+            // The subscription's paginate_backwards extends the runtime's
+            // materialized window backwards by `count` and returns the new
+            // authoritative window — already deduped, sorted, head-anchored,
+            // and cap-trimmed. We render it directly via replaceWindow=true.
             val page =
-                appState.marmotIo {
-                    timelineMessages(
-                        account,
-                        TimelineMessageQueryFfi(
-                            groupIdHex = group.groupIdHex,
-                            search = null,
-                            before = oldest.timelineAt,
-                            beforeMessageId = oldest.messageIdHex,
-                            after = null,
-                            afterMessageId = null,
-                            limit = ConversationTimelinePageLimit,
-                        ),
-                    )
+                withContext(Dispatchers.IO) {
+                    subscription.paginateBackwards(ConversationTimelinePageLimit)
                 }
             hasLoadedOlderPages = true
-            applyTimelinePage(page, replaceWindow = false, updatePagination = true)
+            applyTimelinePage(page, replaceWindow = true, updatePagination = true)
             // The cached `mediaReferences` map only carries entries for
             // messages that have been listMedia-projected at some prior
             // point. Older-page rows landing fresh here would otherwise
@@ -2467,7 +2467,11 @@ class ConversationController(
             // on whether the page actually contains a media-bearing row so
             // a text-only history pull doesn't trigger the unbounded scan.
             if (pageContainsMedia(page)) refreshMediaReferences()
-            page.messages.isNotEmpty()
+            // "Made progress" = the window grew OR shifted to include older
+            // ids. paginateBackwards() returns a bounded/capped full window,
+            // so size can stay constant while content still advances backward.
+            timelineRecords.size > priorMessageIds.size ||
+                timelineRecords.keys.any { it !in priorMessageIds }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
