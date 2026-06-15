@@ -4381,6 +4381,30 @@ private fun rememberSampledBitmap(bytes: ByteArray?): ImageBitmap? {
     return bitmap
 }
 
+/**
+ * Resolve the decrypted bytes for an attachment, preferring the retained
+ * plaintext in `pendingAttachmentsList` for own optimistic sends so the
+ * viewer / save / share paths don't spin while waiting for the projection
+ * to reconcile. Falls back to the standard FFI download for everything else.
+ */
+private suspend fun attachmentBytes(
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+): ByteArray {
+    if (mine) {
+        controller
+            .pendingAttachmentsList(messageIdHex)
+            .getOrNull(attachmentIndex)
+            ?.plaintextBytes
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+    }
+    return controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+}
+
 @Composable
 private fun FullScreenImageViewer(
     controller: ConversationController,
@@ -4459,6 +4483,7 @@ private fun FullScreenImageViewer(
                         offset = if (page == pagerState.currentPage) offset else Offset.Zero,
                         onScaleChange = { if (page == pagerState.currentPage) scale = it },
                         onOffsetChange = { if (page == pagerState.currentPage) offset = it },
+                        mine = mine,
                     )
                 }
             }
@@ -4490,7 +4515,7 @@ private fun FullScreenImageViewer(
                             scope.launch {
                                 val data =
                                     runCatching {
-                                        controller.downloadAttachment(messageIdHex, attachmentIndex, ref)
+                                        attachmentBytes(controller, messageIdHex, attachmentIndex, ref, mine)
                                     }.getOrNull()
                                 val ok =
                                     data != null &&
@@ -4513,7 +4538,7 @@ private fun FullScreenImageViewer(
                             val attachmentIndex = currentAttachmentIndex
                             scope.launch {
                                 runCatching {
-                                    controller.downloadAttachment(messageIdHex, attachmentIndex, ref)
+                                    attachmentBytes(controller, messageIdHex, attachmentIndex, ref, mine)
                                 }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType) }
                             }
                         },
@@ -4622,6 +4647,7 @@ private fun ViewerPage(
     offset: Offset,
     onScaleChange: (Float) -> Unit,
     onOffsetChange: (Offset) -> Unit,
+    mine: Boolean,
 ) {
     // `pointerInput(pageKey)` only restarts when the key changes — its
     // coroutine outlives any single gesture. Function parameters
@@ -4646,7 +4672,7 @@ private fun ViewerPage(
     LaunchedEffect(pageKey, viewerReloadToken) {
         viewerFailed = false
         try {
-            val data = controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+            val data = attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
             // Bounded sampled decode. A 5000px remote image decoded full-size
             // is ~100 MB ARGB_8888 and OOMs mid-class devices; the viewer
             // ceiling caps that while keeping quality high enough on phones.
