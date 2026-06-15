@@ -231,6 +231,8 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
     implementation(libs.mlkit.barcode.scanning)
     implementation(libs.kotlinx.coroutines.android)
     implementation(platform(libs.firebase.bom))

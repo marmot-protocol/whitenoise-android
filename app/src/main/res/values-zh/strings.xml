@@ -401,7 +401,7 @@
     <string name="toast_notification_conversation_unavailable">该对话已不可用</string>
     <string name="attach_image">附加图片</string>
     <string name="toast_couldnt_decode_image">无法解码该图片</string>
-    <string name="toast_reattach_to_retry_media">重新附加图片以重试</string>
+    <string name="toast_reattach_to_retry_media">重新附加以重试</string>
     <string name="media_uploading">上传中…</string>
     <string name="media_upload_failed">上传失败</string>
     <string name="media_tap_to_retry">点按重试</string>
@@ -498,4 +498,5 @@
     <string name="voice_message_cancel">取消语音消息</string>
     <string name="notification_reacted_to_message">用 %1$s 回应了：\"%2$s\"</string>
     <string name="notification_reacted">用 %1$s 回应</string>
+    <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
 </resources>

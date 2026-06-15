@@ -407,7 +407,7 @@
     <string name="toast_notification_conversation_unavailable">Этот разговор больше недоступен</string>
     <string name="attach_image">Прикрепить изображение</string>
     <string name="toast_couldnt_decode_image">Не удалось декодировать изображение</string>
-    <string name="toast_reattach_to_retry_media">Прикрепите изображение ещё раз, чтобы повторить</string>
+    <string name="toast_reattach_to_retry_media">Прикрепите ещё раз для повтора</string>
     <string name="media_uploading">Отправка…</string>
     <string name="media_upload_failed">Не удалось загрузить</string>
     <string name="media_tap_to_retry">Нажмите, чтобы повторить</string>
@@ -507,4 +507,5 @@
     <string name="voice_message_cancel">Отменить голосовое</string>
     <string name="notification_reacted_to_message">отреагировал(а) %1$s на: \"%2$s\"</string>
     <string name="notification_reacted">отреагировал(а) %1$s</string>
+    <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
 </resources>

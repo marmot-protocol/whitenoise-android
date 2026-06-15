@@ -171,4 +171,6 @@ object MediaReferenceParser {
      * predicate is intentionally broader so other senders' clips also play.
      */
     fun isAudioMedia(reference: MediaAttachmentReferenceFfi): Boolean = reference.mediaType.startsWith("audio/", ignoreCase = true)
+
+    fun isVideoMedia(reference: MediaAttachmentReferenceFfi): Boolean = reference.mediaType.startsWith("video/", ignoreCase = true)
 }

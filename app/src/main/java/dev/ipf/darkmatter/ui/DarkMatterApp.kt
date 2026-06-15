@@ -2338,6 +2338,7 @@ private fun MediaImageBubble(
     controller: ConversationController,
     appState: DarkMatterAppState,
     mine: Boolean,
+    uploading: Boolean = false,
 ) {
     val record = item.record
     val key = record.messageIdHex
@@ -2377,7 +2378,17 @@ private fun MediaImageBubble(
         if (epoch == 0uL) return@LaunchedEffect
         failed = false
         try {
-            val data = controller.downloadAttachment(key, attachmentIndex, reference)
+            // Own optimistic sends still have their bytes only in the
+            // pending list (the projection hasn't reconciled them into the
+            // L1 cache yet). Use those directly so the bubble paints during
+            // the upload window instead of hanging on a missing-epoch FFI.
+            val pendingBytes =
+                if (mine) {
+                    controller.pendingAttachmentsList(key).getOrNull(attachmentIndex)?.plaintextBytes
+                } else {
+                    null
+                }
+            val data = pendingBytes ?: controller.downloadAttachment(key, attachmentIndex, reference)
             // Decode a sampled bitmap sized to the bubble — a full 1920px
             // image would be a ~14 MB ARGB_8888 bitmap per visible row.
             val decoded =
@@ -2461,6 +2472,21 @@ private fun MediaImageBubble(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
             }
+            if (uploading) {
+                Surface(
+                    color = Color.Black.copy(alpha = 0.55f),
+                    shape = CircleShape,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.5.dp,
+                            color = Color.White,
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -2472,6 +2498,7 @@ private fun MediaImageBubble(
             attachments = listOf(IndexedValue(attachmentIndex, reference)),
             startIndex = 0,
             onDismiss = { viewerOpen = false },
+            mine = mine,
         )
     }
 }
@@ -2626,7 +2653,257 @@ private fun MediaImageGridBubble(
             attachments = attachments,
             startIndex = index,
             onDismiss = { viewerOpenAt = null },
+            mine = mine,
         )
+    }
+}
+
+/**
+ * Mixed image + video album bubble. Each tile picks its renderer based on
+ * MIME — image tiles open the image viewer, video tiles tap-to-play in the
+ * fullscreen ExoPlayer. Layout is the same masonry as MediaImageGridBubble.
+ */
+@Composable
+private fun MediaVisualGridBubble(
+    item: TimelineMessage,
+    attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    mine: Boolean,
+    uploading: Boolean = false,
+) {
+    val record = item.record
+    val visible = attachments.take(6)
+    val overflow = (attachments.size - visible.size).coerceAtLeast(0)
+    var viewerOpenAt by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
+
+    val tileAt: @Composable (Int, Modifier) -> Unit = { tileIndex, tileModifier ->
+        val entry = visible[tileIndex]
+        val showOverflow = tileIndex == visible.lastIndex && overflow > 0
+        if (MediaReferenceParser.isVideoMedia(entry.value)) {
+            MediaVideoGridTile(
+                messageIdHex = record.messageIdHex,
+                attachmentIndex = entry.index,
+                reference = entry.value,
+                controller = controller,
+                appState = appState,
+                mine = mine,
+                onTap = { _ -> viewerOpenAt = tileIndex },
+                overflowCount = if (showOverflow) overflow else 0,
+                modifier = tileModifier,
+                uploading = uploading,
+            )
+        } else {
+            MediaImageGridTile(
+                messageIdHex = record.messageIdHex,
+                attachmentIndex = entry.index,
+                reference = entry.value,
+                controller = controller,
+                appState = appState,
+                mine = mine,
+                onTap = { viewerOpenAt = tileIndex },
+                overflowCount = if (showOverflow) overflow else 0,
+                modifier = tileModifier,
+                uploading = uploading,
+            )
+        }
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        MasonryImageLayout(visibleCount = visible.size, tile = tileAt)
+    }
+
+    viewerOpenAt?.let { tileIndex ->
+        // Unified viewer walks the full attachments list — each page picks
+        // its renderer (image vs video) by MIME, swipes between siblings
+        // regardless of type. mine threads through so an own optimistic
+        // overflow video (>6 tiles) materialises from retained bytes
+        // instead of trying an FFI download at epoch=0.
+        FullScreenImageViewer(
+            controller = controller,
+            appState = appState,
+            messageIdHex = record.messageIdHex,
+            attachments = attachments,
+            startIndex = tileIndex,
+            onDismiss = { viewerOpenAt = null },
+            mine = mine,
+        )
+    }
+}
+
+/**
+ * Single video tile in an album grid. Auto-materialises on first
+ * composition (mine + cached short-circuit; otherwise FFI download honoring
+ * the auto-download policy), decodes a scaled poster, overlays a centered
+ * play affordance. Tap delivers the materialised file to the parent so
+ * the bubble can open the fullscreen player.
+ */
+@Composable
+private fun MediaVideoGridTile(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    mine: Boolean,
+    onTap: (java.io.File) -> Unit,
+    overflowCount: Int,
+    modifier: Modifier = Modifier,
+    uploading: Boolean = false,
+) {
+    val context = LocalContext.current
+    val epoch = reference.sourceEpoch
+    var localFile by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf<java.io.File?>(null) }
+    var posterBitmap by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
+    val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
+    var startDownload by remember(messageIdHex, attachmentIndex, appState.mediaAutoDownloadPolicy) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia())
+    }
+
+    LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload) {
+        if (localFile != null) return@LaunchedEffect
+        if (!startDownload) return@LaunchedEffect
+        if (!mine && epoch == 0uL) return@LaunchedEffect
+        runCatching {
+            materializeVideoAttachment(
+                context = context,
+                controller = controller,
+                messageIdHex = messageIdHex,
+                attachmentIndex = attachmentIndex,
+                reference = reference,
+                mine = mine,
+            )
+        }.onSuccess { f ->
+            localFile = f
+            failed = false
+        }.onFailure {
+            if (it is kotlinx.coroutines.CancellationException) throw it
+            failed = true
+        }
+    }
+
+    LaunchedEffect(localFile) {
+        val f = localFile ?: return@LaunchedEffect
+        if (posterBitmap != null) return@LaunchedEffect
+        posterBitmap =
+            withContext(Dispatchers.IO) {
+                val mmr = android.media.MediaMetadataRetriever()
+                try {
+                    mmr.setDataSource(f.absolutePath)
+                    val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
+                    mmr
+                        .getScaledFrameAtTime(
+                            0L,
+                            android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                            edge,
+                            edge,
+                        )?.asImageBitmap()
+                } catch (t: Throwable) {
+                    null
+                } finally {
+                    runCatching { mmr.release() }
+                }
+            }
+    }
+
+    Box(
+        modifier =
+            modifier.clickable {
+                val f = localFile
+                if (f != null) onTap(f) else startDownload = true
+            },
+    ) {
+        val poster = posterBitmap
+        when {
+            poster != null ->
+                Image(
+                    bitmap = poster,
+                    contentDescription = stringResource(R.string.reply_media_video),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            thumbhashImage != null ->
+                Image(
+                    bitmap = thumbhashImage,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            else ->
+                Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
+        }
+        Surface(
+            color = Color.Black.copy(alpha = 0.55f),
+            shape = CircleShape,
+            modifier =
+                Modifier
+                    .align(Alignment.Center)
+                    .size(40.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                when {
+                    failed ->
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.voice_message_failed),
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    !startDownload && localFile == null ->
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = stringResource(R.string.media_open),
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    localFile == null ->
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White,
+                        )
+                    else ->
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = stringResource(R.string.reply_media_video),
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp),
+                        )
+                }
+            }
+        }
+        if (overflowCount > 0) {
+            Box(
+                modifier =
+                    Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = 0.45f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "+$overflowCount",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                )
+            }
+        }
+        if (uploading) {
+            Box(
+                modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    strokeWidth = 2.5.dp,
+                    color = Color.White,
+                )
+            }
+        }
     }
 }
 
@@ -2647,6 +2924,7 @@ private fun MediaImageGridTile(
     onTap: () -> Unit,
     overflowCount: Int,
     modifier: Modifier = Modifier,
+    uploading: Boolean = false,
 ) {
     // Two-bucket key model (mirrors `MediaImageBubble`):
     //   - `decodeKey` includes `sourceEpoch`, scoped to bytes-level state
@@ -2672,11 +2950,19 @@ private fun MediaImageGridTile(
     LaunchedEffect(decodeKey, startDownload, reloadToken) {
         if (bitmap != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
-        // Same epoch=0 guard as the single-image bubble — see comment there.
-        if (reference.sourceEpoch == 0uL) return@LaunchedEffect
+        val pendingBytes =
+            if (mine) {
+                controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.plaintextBytes
+            } else {
+                null
+            }
+        // Pre-confirm own albums: bytes live in pendingAttachmentsList and the
+        // FFI imeta isn't ready yet, so skip the sourceEpoch guard for that
+        // path. After reconcile, downloadAttachment hits the cache instead.
+        if (pendingBytes == null && reference.sourceEpoch == 0uL) return@LaunchedEffect
         failed = false
         try {
-            val data = controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+            val data = pendingBytes ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
             val decoded =
                 withContext(Dispatchers.Default) {
                     MediaPipeline.decodeSampledBitmap(data, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
@@ -2769,6 +3055,18 @@ private fun MediaImageGridTile(
                     color = Color.White,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+        if (uploading) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    strokeWidth = 2.5.dp,
+                    color = Color.White,
                 )
             }
         }
@@ -2913,6 +3211,347 @@ private fun MediaFileBubble(
                     contentDescription = stringResource(R.string.media_open),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaVideoBubble(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    mine: Boolean,
+    uploading: Boolean = false,
+    uploadFailed: Boolean = false,
+    onRetryUpload: (() -> Unit)? = null,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val pillKey = "$messageIdHex#$attachmentIndex"
+    val epoch = reference.sourceEpoch
+    var localFile by remember(pillKey, epoch) { mutableStateOf<java.io.File?>(null) }
+    var loading by remember(pillKey, epoch) { mutableStateOf(false) }
+    var failed by remember(pillKey, epoch) { mutableStateOf(false) }
+    var posterBitmap by remember(pillKey, epoch) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var durationMs by remember(pillKey, epoch) { mutableStateOf(0L) }
+    var playerOpen by remember(pillKey) { mutableStateOf(false) }
+    val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
+    // Mirrors the image bubble's auto-download gate. When the policy says
+    // no (e.g. Wi-Fi-only on cellular), a tap flips startDownload=true so
+    // the user always has a path to fetch — never "looks present but can't
+    // be opened". See PR #191 reviewer feedback.
+    var startDownload by remember(pillKey, appState.mediaAutoDownloadPolicy) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia())
+    }
+
+    LaunchedEffect(pillKey, epoch, startDownload) {
+        if (localFile != null) return@LaunchedEffect
+        if (!startDownload) return@LaunchedEffect
+        if (!mine && epoch == 0uL) return@LaunchedEffect
+        loading = true
+        runCatching {
+            materializeVideoAttachment(
+                context = context,
+                controller = controller,
+                messageIdHex = messageIdHex,
+                attachmentIndex = attachmentIndex,
+                reference = reference,
+                mine = mine,
+            )
+        }.onSuccess { f ->
+            localFile = f
+            failed = false
+        }.onFailure {
+            if (it is kotlinx.coroutines.CancellationException) throw it
+            Log.w("MediaVideoBubble", "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
+            failed = true
+        }
+        loading = false
+    }
+
+    LaunchedEffect(localFile) {
+        val f = localFile ?: return@LaunchedEffect
+        if (posterBitmap != null) return@LaunchedEffect
+        val (bm, dur) =
+            withContext(Dispatchers.IO) {
+                val mmr = android.media.MediaMetadataRetriever()
+                try {
+                    mmr.setDataSource(f.absolutePath)
+                    // Scale down to bubble preview size so a 4K source doesn't
+                    // hold a ~33 MB ARGB bitmap per visible video bubble.
+                    val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
+                    val frame =
+                        mmr.getScaledFrameAtTime(
+                            0L,
+                            android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                            edge,
+                            edge,
+                        )
+                    val d =
+                        mmr
+                            .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                            ?.toLongOrNull() ?: 0L
+                    frame to d
+                } catch (t: Throwable) {
+                    Log.w("MediaVideoBubble", "poster extract failed", t)
+                    null to 0L
+                } finally {
+                    runCatching { mmr.release() }
+                }
+            }
+        durationMs = dur
+        posterBitmap = bm?.asImageBitmap()
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+        modifier = imageBubbleSizing(aspectRatioFromDim(reference.dim)),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            val poster = posterBitmap
+            when {
+                poster != null ->
+                    Image(
+                        bitmap = poster,
+                        contentDescription = stringResource(R.string.reply_media_video),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                thumbhashImage != null ->
+                    Image(
+                        bitmap = thumbhashImage,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                else ->
+                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
+            }
+
+            // Centered play overlay — semi-transparent dark circle with white
+            // triangle. While uploading we replace the triangle with a spinner
+            // so the user sees the send is in flight (matches the image bubble).
+            // When startDownload is gated off (policy says no auto-fetch), the
+            // triangle becomes a download icon and tap consents to the fetch.
+            Surface(
+                color = Color.Black.copy(alpha = 0.55f),
+                shape = CircleShape,
+                modifier =
+                    Modifier
+                        .size(56.dp)
+                        .clickable {
+                            when {
+                                uploadFailed -> onRetryUpload?.invoke()
+                                else -> {
+                                    val f = localFile
+                                    if (f != null) {
+                                        playerOpen = true
+                                    } else {
+                                        startDownload = true
+                                    }
+                                }
+                            }
+                        },
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    when {
+                        uploadFailed ->
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = stringResource(R.string.voice_message_failed),
+                                tint = Color.White,
+                                modifier =
+                                    Modifier
+                                        .size(28.dp)
+                                        .clickable { onRetryUpload?.invoke() },
+                            )
+                        uploading ->
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                strokeWidth = 2.5.dp,
+                                color = Color.White,
+                            )
+                        !startDownload && localFile == null ->
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = stringResource(R.string.media_open),
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        loading && posterBitmap == null ->
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White,
+                            )
+                        failed ->
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = stringResource(R.string.voice_message_failed),
+                                tint = Color.White,
+                                modifier =
+                                    Modifier
+                                        .size(28.dp)
+                                        .clickable {
+                                            failed = false
+                                            scope.launch {
+                                                runCatching {
+                                                    materializeVideoAttachment(
+                                                        context = context,
+                                                        controller = controller,
+                                                        messageIdHex = messageIdHex,
+                                                        attachmentIndex = attachmentIndex,
+                                                        reference = reference,
+                                                        mine = mine,
+                                                    )
+                                                }.onSuccess { localFile = it }
+                                                    .onFailure { failed = true }
+                                            }
+                                        },
+                            )
+                        else ->
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = stringResource(R.string.reply_media_video),
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp),
+                            )
+                    }
+                }
+            }
+
+            // Duration pill bottom-start. Only shown once duration is known.
+            if (durationMs > 0L) {
+                Surface(
+                    color = Color.Black.copy(alpha = 0.55f),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(8.dp),
+                ) {
+                    Text(
+                        formatVoiceTime(durationMs.toInt()),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+    if (playerOpen) {
+        val file = localFile
+        if (file != null) {
+            FullscreenVideoPlayer(file = file, onDismiss = { playerOpen = false })
+        }
+    }
+}
+
+/** Decrypted video on disk under cacheDir/video_attachments; reuses the
+ *  age-based janitor that already sweeps shared_media / voice_attachments. */
+private suspend fun materializeVideoAttachment(
+    context: android.content.Context,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+): java.io.File {
+    val dir = java.io.File(context.cacheDir, "video_attachments").apply { mkdirs() }
+    val ext =
+        when {
+            reference.mediaType.contains("quicktime", ignoreCase = true) -> "mov"
+            reference.mediaType.contains("webm", ignoreCase = true) -> "webm"
+            else -> "mp4"
+        }
+    val file = java.io.File(dir, "$messageIdHex-$attachmentIndex.$ext")
+    if (file.exists() && file.length() > 0) return file
+    val retained =
+        if (mine) {
+            controller
+                .pendingAttachmentsList(messageIdHex)
+                .getOrNull(attachmentIndex)
+                ?.plaintextBytes
+        } else {
+            null
+        }
+    val bytes = retained ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+    withContext(Dispatchers.IO) { file.writeBytes(bytes) }
+    return file
+}
+
+/**
+ * Fullscreen player backed by Media3 ExoPlayer + PlayerView — the same
+ * controller the platform media apps ship. Tap toggles the transport bar;
+ * play/pause/seek work reliably without VideoView's MediaController quirks.
+ */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+private fun FullscreenVideoPlayer(
+    file: java.io.File,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val exo =
+        remember(file) {
+            androidx.media3.exoplayer.ExoPlayer
+                .Builder(context)
+                .build()
+                .apply {
+                    setMediaItem(
+                        androidx.media3.common.MediaItem
+                            .fromUri(android.net.Uri.fromFile(file)),
+                    )
+                    prepare()
+                    playWhenReady = true
+                }
+        }
+    DisposableEffect(exo) { onDispose { exo.release() } }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties =
+            androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnBackPress = true,
+                dismissOnClickOutside = false,
+            ),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.ui.viewinterop.AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    androidx.media3.ui.PlayerView(ctx).apply {
+                        player = exo
+                        useController = true
+                        setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                        controllerShowTimeoutMs = 2500
+                    }
+                },
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .statusBarsPadding()
+                        .padding(8.dp),
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = stringResource(R.string.cancel),
+                    tint = Color.White,
                 )
             }
         }
@@ -3742,6 +4381,30 @@ private fun rememberSampledBitmap(bytes: ByteArray?): ImageBitmap? {
     return bitmap
 }
 
+/**
+ * Resolve the decrypted bytes for an attachment, preferring the retained
+ * plaintext in `pendingAttachmentsList` for own optimistic sends so the
+ * viewer / save / share paths don't spin while waiting for the projection
+ * to reconcile. Falls back to the standard FFI download for everything else.
+ */
+private suspend fun attachmentBytes(
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+): ByteArray {
+    if (mine) {
+        controller
+            .pendingAttachmentsList(messageIdHex)
+            .getOrNull(attachmentIndex)
+            ?.plaintextBytes
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+    }
+    return controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+}
+
 @Composable
 private fun FullScreenImageViewer(
     controller: ConversationController,
@@ -3750,6 +4413,7 @@ private fun FullScreenImageViewer(
     attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
     startIndex: Int,
     onDismiss: () -> Unit,
+    mine: Boolean = false,
 ) {
     if (attachments.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
@@ -3800,16 +4464,28 @@ private fun FullScreenImageViewer(
                 userScrollEnabled = scale <= 1f,
             ) { page ->
                 val pageEntry = attachments[page]
-                ViewerPage(
-                    controller = controller,
-                    messageIdHex = messageIdHex,
-                    attachmentIndex = pageEntry.index,
-                    reference = pageEntry.value,
-                    scale = if (page == pagerState.currentPage) scale else 1f,
-                    offset = if (page == pagerState.currentPage) offset else Offset.Zero,
-                    onScaleChange = { if (page == pagerState.currentPage) scale = it },
-                    onOffsetChange = { if (page == pagerState.currentPage) offset = it },
-                )
+                if (MediaReferenceParser.isVideoMedia(pageEntry.value)) {
+                    VideoViewerPage(
+                        controller = controller,
+                        messageIdHex = messageIdHex,
+                        attachmentIndex = pageEntry.index,
+                        reference = pageEntry.value,
+                        isCurrent = page == pagerState.currentPage,
+                        mine = mine,
+                    )
+                } else {
+                    ViewerPage(
+                        controller = controller,
+                        messageIdHex = messageIdHex,
+                        attachmentIndex = pageEntry.index,
+                        reference = pageEntry.value,
+                        scale = if (page == pagerState.currentPage) scale else 1f,
+                        offset = if (page == pagerState.currentPage) offset else Offset.Zero,
+                        onScaleChange = { if (page == pagerState.currentPage) scale = it },
+                        onOffsetChange = { if (page == pagerState.currentPage) offset = it },
+                        mine = mine,
+                    )
+                }
             }
             Row(
                 modifier =
@@ -3839,12 +4515,16 @@ private fun FullScreenImageViewer(
                             scope.launch {
                                 val data =
                                     runCatching {
-                                        controller.downloadAttachment(messageIdHex, attachmentIndex, ref)
+                                        attachmentBytes(controller, messageIdHex, attachmentIndex, ref, mine)
                                     }.getOrNull()
                                 val ok =
                                     data != null &&
                                         withContext(Dispatchers.IO) {
-                                            saveImageToGallery(context, data, ref.fileName, ref.mediaType)
+                                            if (MediaReferenceParser.isVideoMedia(ref)) {
+                                                saveVideoToGallery(context, data, ref.fileName, ref.mediaType)
+                                            } else {
+                                                saveImageToGallery(context, data, ref.fileName, ref.mediaType)
+                                            }
                                         }
                                 snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
                             }
@@ -3858,7 +4538,7 @@ private fun FullScreenImageViewer(
                             val attachmentIndex = currentAttachmentIndex
                             scope.launch {
                                 runCatching {
-                                    controller.downloadAttachment(messageIdHex, attachmentIndex, ref)
+                                    attachmentBytes(controller, messageIdHex, attachmentIndex, ref, mine)
                                 }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType) }
                             }
                         },
@@ -3886,6 +4566,77 @@ private fun FullScreenImageViewer(
  * `LaunchedEffect` doesn't need to wait for "page becomes visible" — it
  * downloads as soon as the page composes.
  */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+private fun VideoViewerPage(
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    isCurrent: Boolean,
+    mine: Boolean,
+) {
+    val context = LocalContext.current
+    var localFile by remember(messageIdHex, attachmentIndex, reference.sourceEpoch) {
+        mutableStateOf<java.io.File?>(null)
+    }
+    LaunchedEffect(messageIdHex, attachmentIndex, reference.sourceEpoch) {
+        if (localFile != null) return@LaunchedEffect
+        // Receive-side: skip epoch=0 (FFI download would error). Own
+        // optimistic sends still have their bytes in pendingAttachmentsList
+        // even at epoch=0, so we let materializeVideoAttachment short-
+        // circuit through the retained-bytes path with mine=true.
+        if (!mine && reference.sourceEpoch == 0uL) return@LaunchedEffect
+        runCatching {
+            materializeVideoAttachment(
+                context = context,
+                controller = controller,
+                messageIdHex = messageIdHex,
+                attachmentIndex = attachmentIndex,
+                reference = reference,
+                mine = mine,
+            )
+        }.onSuccess { localFile = it }
+    }
+    val file = localFile
+    if (file == null) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
+        }
+        return
+    }
+    val exo =
+        remember(file) {
+            androidx.media3.exoplayer.ExoPlayer
+                .Builder(context)
+                .build()
+                .apply {
+                    setMediaItem(
+                        androidx.media3.common.MediaItem
+                            .fromUri(android.net.Uri.fromFile(file)),
+                    )
+                    prepare()
+                }
+        }
+    DisposableEffect(exo) { onDispose { exo.release() } }
+    // Pre-composed neighbour pages must NOT play audio — only the visible
+    // one autoplays. Pause when the page scrolls off-screen.
+    LaunchedEffect(isCurrent, exo) {
+        if (isCurrent) exo.playWhenReady = true else exo.pause()
+    }
+    androidx.compose.ui.viewinterop.AndroidView(
+        modifier = Modifier.fillMaxSize().background(Color.Black),
+        factory = { ctx ->
+            androidx.media3.ui.PlayerView(ctx).apply {
+                player = exo
+                useController = true
+                setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                controllerShowTimeoutMs = 2500
+            }
+        },
+    )
+}
+
 @Composable
 private fun ViewerPage(
     controller: ConversationController,
@@ -3896,6 +4647,7 @@ private fun ViewerPage(
     offset: Offset,
     onScaleChange: (Float) -> Unit,
     onOffsetChange: (Offset) -> Unit,
+    mine: Boolean,
 ) {
     // `pointerInput(pageKey)` only restarts when the key changes — its
     // coroutine outlives any single gesture. Function parameters
@@ -3920,7 +4672,7 @@ private fun ViewerPage(
     LaunchedEffect(pageKey, viewerReloadToken) {
         viewerFailed = false
         try {
-            val data = controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+            val data = attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
             // Bounded sampled decode. A 5000px remote image decoded full-size
             // is ~100 MB ARGB_8888 and OOMs mid-class devices; the viewer
             // ceiling caps that while keeping quality high enough on phones.
@@ -4095,6 +4847,41 @@ private fun saveImageToGallery(
     }
 }
 
+/** Persist a decrypted video to the public Movies/DarkMatter folder via the
+ *  Video MediaStore so it shows up in the system gallery. Mirrors the image
+ *  save flow's IS_PENDING dance. */
+private fun saveVideoToGallery(
+    context: android.content.Context,
+    bytes: ByteArray,
+    fileName: String,
+    mediaType: String,
+): Boolean {
+    val resolver = context.contentResolver
+    val values =
+        android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, MediaPipeline.safeDisplayName(fileName))
+            put(android.provider.MediaStore.Video.Media.MIME_TYPE, mediaType.ifBlank { "video/mp4" })
+            put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/DarkMatter")
+            put(android.provider.MediaStore.Video.Media.IS_PENDING, 1)
+        }
+    val uri =
+        resolver.insert(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+            ?: return false
+    return try {
+        resolver.openOutputStream(uri).use { out ->
+            if (out == null) throw java.io.IOException("null output stream")
+            out.write(bytes)
+        }
+        values.clear()
+        values.put(android.provider.MediaStore.Video.Media.IS_PENDING, 0)
+        resolver.update(uri, values, null, null)
+        true
+    } catch (_: Throwable) {
+        resolver.delete(uri, null, null)
+        false
+    }
+}
+
 /**
  * Share [bytes] via a FileProvider Uri using the system share sheet.
  *
@@ -4186,7 +4973,7 @@ private fun sweepStaleSharedMedia(
         // Same age-based reaper covers the decrypted voice cache too —
         // those bytes are plaintext E2EE-decrypted audio and shouldn't
         // linger past the last MediaPlayer that opened them.
-        listOf("shared_media", "voice_attachments").forEach { name ->
+        listOf("shared_media", "voice_attachments", "video_attachments").forEach { name ->
             val dir = java.io.File(context.cacheDir, name)
             if (!dir.isDirectory) return@forEach
             dir.listFiles()?.forEach { entry ->
@@ -4210,14 +4997,39 @@ private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
     LaunchedEffect(uri) {
         bitmap =
             withContext(Dispatchers.Default) {
-                runCatching {
-                    val jpeg = MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
-                    jpeg?.bytes?.let { bytes ->
-                        android.graphics.BitmapFactory
-                            .decodeByteArray(bytes, 0, bytes.size)
-                            ?.asImageBitmap()
-                    }
-                }.getOrNull()
+                val mime = context.contentResolver.getType(uri).orEmpty()
+                if (mime.startsWith("video/", ignoreCase = true)) {
+                    // Video URI: extract the first frame as the staging thumbnail
+                    // instead of trying to decode the bytes as JPEG (which spins
+                    // forever on a video and leaves the sheet stuck). Scaled to
+                    // the staging tile size — full-res posters from a 4K clip
+                    // would be a ~33 MB ARGB bitmap per tile.
+                    runCatching {
+                        val mmr = android.media.MediaMetadataRetriever()
+                        try {
+                            mmr.setDataSource(context, uri)
+                            val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
+                            mmr
+                                .getScaledFrameAtTime(
+                                    0L,
+                                    android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                                    edge,
+                                    edge,
+                                )?.asImageBitmap()
+                        } finally {
+                            runCatching { mmr.release() }
+                        }
+                    }.getOrNull()
+                } else {
+                    runCatching {
+                        val jpeg = MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
+                        jpeg?.bytes?.let { bytes ->
+                            android.graphics.BitmapFactory
+                                .decodeByteArray(bytes, 0, bytes.size)
+                                ?.asImageBitmap()
+                        }
+                    }.getOrNull()
+                }
             }
     }
     return bitmap
@@ -4941,25 +5753,70 @@ private fun ConversationScreen(
         if (uris.isEmpty()) return
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
         appState.launchMutation {
-            val attachments =
+            val result =
                 withContext(Dispatchers.Default) {
-                    uris.mapNotNull { uri ->
-                        val jpeg =
-                            MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
-                                ?: return@mapNotNull null
-                        val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
-                        val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
-                        PendingAttachment(
-                            plaintextBytes = jpeg.bytes,
-                            mediaType = MediaPipeline.RECOMPRESSED_MIME,
-                            fileName = fileName,
-                            dim = "${jpeg.width}x${jpeg.height}",
-                            thumbhash = jpeg.thumbhash,
-                        )
+                    val out = mutableListOf<PendingAttachment>()
+                    var consumed = 0L
+                    var overflowed = false
+                    for (uri in uris) {
+                        val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - consumed).coerceAtLeast(0L)
+                        if (remaining <= 0L) {
+                            overflowed = true
+                            break
+                        }
+                        val mime = context.contentResolver.getType(uri).orEmpty()
+                        val attachment =
+                            if (mime.startsWith("video/", ignoreCase = true)) {
+                                when (val r = MediaPipeline.readVideoForUpload(context, uri, remaining)) {
+                                    is MediaPipeline.VideoReadResult.Success ->
+                                        PendingAttachment(
+                                            plaintextBytes = r.video.bytes,
+                                            mediaType = r.video.mediaType,
+                                            fileName = r.video.fileName,
+                                            dim = "${r.video.width}x${r.video.height}",
+                                            thumbhash = r.video.thumbhash,
+                                        )
+                                    MediaPipeline.VideoReadResult.TooLarge -> {
+                                        overflowed = true
+                                        continue
+                                    }
+                                    MediaPipeline.VideoReadResult.Failed -> continue
+                                }
+                            } else {
+                                val jpeg =
+                                    MediaPipeline.readDownscaledJpeg(context.contentResolver, uri) ?: continue
+                                val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
+                                val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
+                                PendingAttachment(
+                                    plaintextBytes = jpeg.bytes,
+                                    mediaType = MediaPipeline.RECOMPRESSED_MIME,
+                                    fileName = fileName,
+                                    dim = "${jpeg.width}x${jpeg.height}",
+                                    thumbhash = jpeg.thumbhash,
+                                )
+                            }
+                        consumed += attachment.plaintextBytes.size.toLong()
+                        out += attachment
                     }
+                    out to overflowed
                 }
+            val attachments = result.first
+            val albumOverflowed = result.second
             if (attachments.size < uris.size) {
-                appState.present(R.string.toast_couldnt_decode_image)
+                val anyVideoPicked =
+                    uris.any {
+                        context.contentResolver
+                            .getType(it)
+                            .orEmpty()
+                            .startsWith("video/", ignoreCase = true)
+                    }
+                appState.present(
+                    when {
+                        albumOverflowed -> R.string.media_album_too_large
+                        anyVideoPicked -> R.string.toast_couldnt_process_video
+                        else -> R.string.toast_couldnt_decode_image
+                    },
+                )
                 if (attachments.isEmpty()) return@launchMutation
             }
             controller.sendAttachments(attachments, trimmedCaption)
@@ -5055,22 +5912,59 @@ private fun ConversationScreen(
             DocumentReadOutcome(accepted, rejected, albumOverflowed, albumBytes)
         }
 
-    suspend fun readPickedImages(uris: List<android.net.Uri>): List<PendingAttachment> =
+    data class VisualReadOutcome(
+        val attachments: List<PendingAttachment>,
+        val albumOverflowed: Boolean,
+    )
+
+    suspend fun readPickedImages(uris: List<android.net.Uri>): VisualReadOutcome =
         withContext(Dispatchers.Default) {
-            uris.mapNotNull { uri ->
-                val jpeg =
-                    MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
-                        ?: return@mapNotNull null
-                val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
-                val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
-                PendingAttachment(
-                    plaintextBytes = jpeg.bytes,
-                    mediaType = MediaPipeline.RECOMPRESSED_MIME,
-                    fileName = fileName,
-                    dim = "${jpeg.width}x${jpeg.height}",
-                    thumbhash = jpeg.thumbhash,
-                )
+            val out = mutableListOf<PendingAttachment>()
+            var consumed = 0L
+            var overflowed = false
+            for (uri in uris) {
+                val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - consumed).coerceAtLeast(0L)
+                if (remaining <= 0L) {
+                    overflowed = true
+                    break
+                }
+                val mime = context.contentResolver.getType(uri).orEmpty()
+                val attachment =
+                    if (mime.startsWith("video/", ignoreCase = true)) {
+                        // Thread the remaining album budget into the video read so a
+                        // multi-video pick can't accumulate hundreds of MB in heap
+                        // before the cap downstream would reject the tail.
+                        when (val r = MediaPipeline.readVideoForUpload(context, uri, remaining)) {
+                            is MediaPipeline.VideoReadResult.Success ->
+                                PendingAttachment(
+                                    plaintextBytes = r.video.bytes,
+                                    mediaType = r.video.mediaType,
+                                    fileName = r.video.fileName,
+                                    dim = "${r.video.width}x${r.video.height}",
+                                    thumbhash = r.video.thumbhash,
+                                )
+                            MediaPipeline.VideoReadResult.TooLarge -> {
+                                overflowed = true
+                                continue
+                            }
+                            MediaPipeline.VideoReadResult.Failed -> continue
+                        }
+                    } else {
+                        val jpeg = MediaPipeline.readDownscaledJpeg(context.contentResolver, uri) ?: continue
+                        val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
+                        val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
+                        PendingAttachment(
+                            plaintextBytes = jpeg.bytes,
+                            mediaType = MediaPipeline.RECOMPRESSED_MIME,
+                            fileName = fileName,
+                            dim = "${jpeg.width}x${jpeg.height}",
+                            thumbhash = jpeg.thumbhash,
+                        )
+                    }
+                consumed += attachment.plaintextBytes.size.toLong()
+                out += attachment
             }
+            VisualReadOutcome(out, overflowed)
         }
 
     // Single-path send used by the unified staging shelf: decodes images
@@ -5093,8 +5987,8 @@ private fun ConversationScreen(
             val rawImages = readPickedImages(imageUris)
             var imageBytes = 0L
             val acceptedImages = mutableListOf<PendingAttachment>()
-            var imageAlbumOverflowed = false
-            for (attachment in rawImages) {
+            var imageAlbumOverflowed = rawImages.albumOverflowed
+            for (attachment in rawImages.attachments) {
                 val next = imageBytes + attachment.plaintextBytes.size
                 if (next > MEDIA_ALBUM_MAX_TOTAL_BYTES) {
                     imageAlbumOverflowed = true
@@ -5111,18 +6005,31 @@ private fun ConversationScreen(
                     readPickedDocuments(documentUris, docBudget)
                 }
             val merged = acceptedImages + docOutcome.attachments
+            val pickHasVideo =
+                imageUris.any {
+                    context.contentResolver
+                        .getType(it)
+                        .orEmpty()
+                        .startsWith("video/", ignoreCase = true)
+                }
+            val visualFailureToast =
+                if (pickHasVideo) R.string.toast_couldnt_process_video else R.string.toast_couldnt_decode_image
             if (merged.isEmpty()) {
-                // Only surface the image-decode toast when there were image
+                // Only surface the visual-decode toast when there were visual
                 // picks to begin with — a document-only send that failed every
                 // file should fall through to the document toasts below
-                // rather than misreporting as an image decode error.
+                // rather than misreporting as an image decode error. And if
+                // the album overflowed the byte budget, surface that
+                // explicitly instead of "couldn't process".
                 if (imageUris.isNotEmpty()) {
-                    appState.present(R.string.toast_couldnt_decode_image)
+                    val toast =
+                        if (imageAlbumOverflowed) R.string.media_album_too_large else visualFailureToast
+                    appState.present(toast)
                     return@launchMutation
                 }
             }
             if (acceptedImages.size < imageUris.size && !imageAlbumOverflowed) {
-                appState.present(R.string.toast_couldnt_decode_image)
+                appState.present(visualFailureToast)
             }
             if (imageAlbumOverflowed || docOutcome.albumOverflowed) {
                 appState.present(R.string.media_album_too_large)
@@ -5490,7 +6397,7 @@ private fun ConversationScreen(
                         },
                         onPickFromGallery = {
                             imagePickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                             )
                         },
                         onCaptureFromCamera = {
@@ -5715,7 +6622,7 @@ private fun ConversationScreen(
             },
             onAddPhotos = {
                 imagePickerLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                 )
             },
             onAddDocuments = { documentPickerLauncher.launch(arrayOf("*/*")) },
@@ -7170,13 +8077,21 @@ private fun MessageBubble(
                                     .filter { (_, ref) -> MediaReferenceParser.isAudioMedia(ref) }
                                     .toList()
                             }
+                        val videoAttachments =
+                            remember(mediaReferences) {
+                                mediaReferences
+                                    .withIndex()
+                                    .filter { (_, ref) -> MediaReferenceParser.isVideoMedia(ref) }
+                                    .toList()
+                            }
                         val fileAttachments =
                             remember(mediaReferences) {
                                 mediaReferences
                                     .withIndex()
                                     .filter { (_, ref) ->
                                         !MediaReferenceParser.isImageMedia(ref) &&
-                                            !MediaReferenceParser.isAudioMedia(ref)
+                                            !MediaReferenceParser.isAudioMedia(ref) &&
+                                            !MediaReferenceParser.isVideoMedia(ref)
                                     }.toList()
                             }
                         val mediaPendingName =
@@ -7186,21 +8101,40 @@ private fun MessageBubble(
                                     ?.values
                                     ?.getOrNull(1)
                             }
-                        if (!deleted && !invalidated && imageAttachments.isNotEmpty()) {
-                            if (imageAttachments.size == 1) {
-                                val entry = imageAttachments.first()
-                                MediaImageBubble(
-                                    item = item,
-                                    reference = entry.value,
-                                    attachmentIndex = entry.index,
-                                    controller = controller,
-                                    appState = appState,
-                                    mine = mine,
-                                )
+                        // Visual attachments (image + video) ride one bubble:
+                        // a singleton routes to its dedicated bubble, a multi
+                        // goes to MediaVisualGridBubble which mixes image
+                        // and video tiles in pick order.
+                        val visualAttachments =
+                            remember(imageAttachments, videoAttachments) {
+                                (imageAttachments + videoAttachments).sortedBy { it.index }
+                            }
+                        if (!deleted && !invalidated && visualAttachments.isNotEmpty()) {
+                            if (visualAttachments.size == 1) {
+                                val entry = visualAttachments.first()
+                                if (MediaReferenceParser.isVideoMedia(entry.value)) {
+                                    MediaVideoBubble(
+                                        messageIdHex = record.messageIdHex,
+                                        attachmentIndex = entry.index,
+                                        reference = entry.value,
+                                        mine = mine,
+                                        controller = controller,
+                                        appState = appState,
+                                    )
+                                } else {
+                                    MediaImageBubble(
+                                        item = item,
+                                        reference = entry.value,
+                                        attachmentIndex = entry.index,
+                                        controller = controller,
+                                        appState = appState,
+                                        mine = mine,
+                                    )
+                                }
                             } else {
-                                MediaImageGridBubble(
+                                MediaVisualGridBubble(
                                     item = item,
-                                    attachments = imageAttachments,
+                                    attachments = visualAttachments,
                                     controller = controller,
                                     appState = appState,
                                     mine = mine,
@@ -7234,6 +8168,7 @@ private fun MessageBubble(
                         val anyConfirmedMedia =
                             imageAttachments.isNotEmpty() ||
                                 audioAttachments.isNotEmpty() ||
+                                videoAttachments.isNotEmpty() ||
                                 fileAttachments.isNotEmpty()
                         val pendingAttachmentsForRecord =
                             remember(record.messageIdHex, controller.pendingAttachmentsList(record.messageIdHex)) {
@@ -7245,6 +8180,24 @@ private fun MessageBubble(
                                     .withIndex()
                                     .filter { (_, p) -> p.mediaType.startsWith("audio/", ignoreCase = true) }
                                     .toList()
+                            }
+                        val pendingVideo =
+                            remember(pendingAttachmentsForRecord) {
+                                pendingAttachmentsForRecord
+                                    .withIndex()
+                                    .filter { (_, p) -> p.mediaType.startsWith("video/", ignoreCase = true) }
+                                    .toList()
+                            }
+                        val pendingImage =
+                            remember(pendingAttachmentsForRecord) {
+                                pendingAttachmentsForRecord
+                                    .withIndex()
+                                    .filter { (_, p) -> p.mediaType.startsWith("image/", ignoreCase = true) }
+                                    .toList()
+                            }
+                        val pendingVisuals =
+                            remember(pendingImage, pendingVideo) {
+                                (pendingImage + pendingVideo).sortedBy { it.index }
                             }
                         if (!deleted && !invalidated && !anyConfirmedMedia && pendingAudio.isNotEmpty()) {
                             pendingAudio.forEach { (index, pending) ->
@@ -7272,11 +8225,78 @@ private fun MessageBubble(
                                 )
                             }
                         }
+                        // Synthesize references for each pending visual so
+                        // the existing single-bubble + grid bubble can render
+                        // them. mine=true threads the bytes through the
+                        // pendingAttachmentsList fallback in the auto-download
+                        // path.
+                        val pendingVisualRefs =
+                            remember(record.messageIdHex, pendingVisuals) {
+                                pendingVisuals.map { (index, pending) ->
+                                    IndexedValue(
+                                        index,
+                                        MediaAttachmentReferenceFfi(
+                                            locators = emptyList(),
+                                            ciphertextSha256 = "",
+                                            plaintextSha256 = "",
+                                            nonceHex = "",
+                                            fileName = pending.fileName,
+                                            mediaType = pending.mediaType,
+                                            version = "encrypted-media-v1",
+                                            sourceEpoch = 0u,
+                                            dim = pending.dim,
+                                            thumbhash = pending.thumbhash,
+                                        ),
+                                    )
+                                }
+                            }
+                        if (!deleted && !invalidated && !anyConfirmedMedia && pendingVisualRefs.isNotEmpty()) {
+                            val uploadFailed = item.status == MessageStatus.Failed
+                            val retryUpload: () -> Unit = {
+                                appState.launchMutation { controller.retryFailedSend(item) }
+                            }
+                            if (pendingVisualRefs.size == 1) {
+                                val entry = pendingVisualRefs.first()
+                                if (MediaReferenceParser.isVideoMedia(entry.value)) {
+                                    MediaVideoBubble(
+                                        messageIdHex = record.messageIdHex,
+                                        attachmentIndex = entry.index,
+                                        reference = entry.value,
+                                        mine = true,
+                                        controller = controller,
+                                        appState = appState,
+                                        uploading = !uploadFailed,
+                                        uploadFailed = uploadFailed,
+                                        onRetryUpload = if (uploadFailed) retryUpload else null,
+                                    )
+                                } else {
+                                    MediaImageBubble(
+                                        item = item,
+                                        reference = entry.value,
+                                        attachmentIndex = entry.index,
+                                        controller = controller,
+                                        appState = appState,
+                                        mine = true,
+                                        uploading = !uploadFailed,
+                                    )
+                                }
+                            } else {
+                                MediaVisualGridBubble(
+                                    item = item,
+                                    attachments = pendingVisualRefs,
+                                    controller = controller,
+                                    appState = appState,
+                                    mine = true,
+                                    uploading = !uploadFailed,
+                                )
+                            }
+                        }
                         val showPendingPlaceholder =
                             !deleted &&
                                 !invalidated &&
                                 !anyConfirmedMedia &&
                                 pendingAudio.isEmpty() &&
+                                pendingVisualRefs.isEmpty() &&
                                 mediaPendingName != null
                         if (showPendingPlaceholder) {
                             MediaPendingPlaceholder(

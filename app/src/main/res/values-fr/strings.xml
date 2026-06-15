@@ -403,7 +403,7 @@
     <string name="toast_notification_conversation_unavailable">Cette conversation n\'est plus disponible</string>
     <string name="attach_image">Joindre une image</string>
     <string name="toast_couldnt_decode_image">Impossible de décoder l\'image</string>
-    <string name="toast_reattach_to_retry_media">Joignez à nouveau l\'image pour réessayer</string>
+    <string name="toast_reattach_to_retry_media">Joindre à nouveau pour réessayer</string>
     <string name="media_uploading">Envoi…</string>
     <string name="media_upload_failed">Échec de l\'envoi</string>
     <string name="media_tap_to_retry">Appuyez pour réessayer</string>
@@ -501,4 +501,5 @@
     <string name="voice_message_cancel">Annuler le message vocal</string>
     <string name="notification_reacted_to_message">a réagi avec %1$s à : \"%2$s\"</string>
     <string name="notification_reacted">a réagi avec %1$s</string>
+    <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
 </resources>
