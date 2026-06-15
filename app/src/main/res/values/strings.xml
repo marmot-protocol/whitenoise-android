@@ -438,6 +438,7 @@
     <string name="message_status_streaming">Streaming</string>
     <string name="attach_image">Attach image</string>
     <string name="toast_couldnt_decode_image">Couldn\'t decode that image</string>
+    <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="toast_reattach_to_retry_media">Re-attach the image to retry</string>
     <string name="media_uploading">Uploading…</string>
     <string name="media_upload_failed">Upload failed</string>

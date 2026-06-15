@@ -507,4 +507,5 @@
     <string name="voice_message_cancel">Отменить голосовое</string>
     <string name="notification_reacted_to_message">отреагировал(а) %1$s на: \"%2$s\"</string>
     <string name="notification_reacted">отреагировал(а) %1$s</string>
+    <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
 </resources>

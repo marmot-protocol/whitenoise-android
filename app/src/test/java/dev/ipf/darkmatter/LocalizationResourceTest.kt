@@ -120,6 +120,7 @@ class LocalizationResourceTest {
                 "reply_media_video",
                 "reply_media_voice",
                 "reply_media_document",
+                "toast_couldnt_process_video",
             )
     }
 }

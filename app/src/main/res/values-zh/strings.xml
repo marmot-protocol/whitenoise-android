@@ -498,4 +498,5 @@
     <string name="voice_message_cancel">取消语音消息</string>
     <string name="notification_reacted_to_message">用 %1$s 回应了：\"%2$s\"</string>
     <string name="notification_reacted">用 %1$s 回应</string>
+    <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
 </resources>

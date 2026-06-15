@@ -2978,7 +2978,16 @@ private fun MediaVideoBubble(
                 val mmr = android.media.MediaMetadataRetriever()
                 try {
                     mmr.setDataSource(f.absolutePath)
-                    val frame = mmr.getFrameAtTime(0L)
+                    // Scale down to bubble preview size so a 4K source doesn't
+                    // hold a ~33 MB ARGB bitmap per visible video bubble.
+                    val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
+                    val frame =
+                        mmr.getScaledFrameAtTime(
+                            0L,
+                            android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                            edge,
+                            edge,
+                        )
                     val d =
                         mmr
                             .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
@@ -4512,12 +4521,21 @@ private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
                 if (mime.startsWith("video/", ignoreCase = true)) {
                     // Video URI: extract the first frame as the staging thumbnail
                     // instead of trying to decode the bytes as JPEG (which spins
-                    // forever on a video and leaves the sheet stuck).
+                    // forever on a video and leaves the sheet stuck). Scaled to
+                    // the staging tile size — full-res posters from a 4K clip
+                    // would be a ~33 MB ARGB bitmap per tile.
                     runCatching {
                         val mmr = android.media.MediaMetadataRetriever()
                         try {
                             mmr.setDataSource(context, uri)
-                            mmr.getFrameAtTime(0L)?.asImageBitmap()
+                            val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
+                            mmr
+                                .getScaledFrameAtTime(
+                                    0L,
+                                    android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                                    edge,
+                                    edge,
+                                )?.asImageBitmap()
                         } finally {
                             runCatching { mmr.release() }
                         }
@@ -5257,36 +5275,52 @@ private fun ConversationScreen(
         appState.launchMutation {
             val attachments =
                 withContext(Dispatchers.Default) {
-                    uris.mapNotNull { uri ->
+                    val out = mutableListOf<PendingAttachment>()
+                    var consumed = 0L
+                    for (uri in uris) {
+                        val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - consumed).coerceAtLeast(0L)
+                        if (remaining <= 0L) break
                         val mime = context.contentResolver.getType(uri).orEmpty()
-                        if (mime.startsWith("video/", ignoreCase = true)) {
-                            val video =
-                                MediaPipeline.readVideoForUpload(context, uri) ?: return@mapNotNull null
-                            PendingAttachment(
-                                plaintextBytes = video.bytes,
-                                mediaType = video.mediaType,
-                                fileName = video.fileName,
-                                dim = "${video.width}x${video.height}",
-                                thumbhash = video.thumbhash,
-                            )
-                        } else {
-                            val jpeg =
-                                MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
-                                    ?: return@mapNotNull null
-                            val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
-                            val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
-                            PendingAttachment(
-                                plaintextBytes = jpeg.bytes,
-                                mediaType = MediaPipeline.RECOMPRESSED_MIME,
-                                fileName = fileName,
-                                dim = "${jpeg.width}x${jpeg.height}",
-                                thumbhash = jpeg.thumbhash,
-                            )
-                        }
+                        val attachment =
+                            if (mime.startsWith("video/", ignoreCase = true)) {
+                                val video =
+                                    MediaPipeline.readVideoForUpload(context, uri, remaining) ?: continue
+                                PendingAttachment(
+                                    plaintextBytes = video.bytes,
+                                    mediaType = video.mediaType,
+                                    fileName = video.fileName,
+                                    dim = "${video.width}x${video.height}",
+                                    thumbhash = video.thumbhash,
+                                )
+                            } else {
+                                val jpeg =
+                                    MediaPipeline.readDownscaledJpeg(context.contentResolver, uri) ?: continue
+                                val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
+                                val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
+                                PendingAttachment(
+                                    plaintextBytes = jpeg.bytes,
+                                    mediaType = MediaPipeline.RECOMPRESSED_MIME,
+                                    fileName = fileName,
+                                    dim = "${jpeg.width}x${jpeg.height}",
+                                    thumbhash = jpeg.thumbhash,
+                                )
+                            }
+                        consumed += attachment.plaintextBytes.size.toLong()
+                        out += attachment
                     }
+                    out
                 }
             if (attachments.size < uris.size) {
-                appState.present(R.string.toast_couldnt_decode_image)
+                val anyVideoPicked =
+                    uris.any {
+                        context.contentResolver
+                            .getType(it)
+                            .orEmpty()
+                            .startsWith("video/", ignoreCase = true)
+                    }
+                appState.present(
+                    if (anyVideoPicked) R.string.toast_couldnt_process_video else R.string.toast_couldnt_decode_image,
+                )
                 if (attachments.isEmpty()) return@launchMutation
             }
             controller.sendAttachments(attachments, trimmedCaption)
@@ -5384,33 +5418,41 @@ private fun ConversationScreen(
 
     suspend fun readPickedImages(uris: List<android.net.Uri>): List<PendingAttachment> =
         withContext(Dispatchers.Default) {
-            uris.mapNotNull { uri ->
+            val out = mutableListOf<PendingAttachment>()
+            var consumed = 0L
+            for (uri in uris) {
+                val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - consumed).coerceAtLeast(0L)
+                if (remaining <= 0L) break
                 val mime = context.contentResolver.getType(uri).orEmpty()
-                if (mime.startsWith("video/", ignoreCase = true)) {
-                    val video =
-                        MediaPipeline.readVideoForUpload(context, uri) ?: return@mapNotNull null
-                    PendingAttachment(
-                        plaintextBytes = video.bytes,
-                        mediaType = video.mediaType,
-                        fileName = video.fileName,
-                        dim = "${video.width}x${video.height}",
-                        thumbhash = video.thumbhash,
-                    )
-                } else {
-                    val jpeg =
-                        MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
-                            ?: return@mapNotNull null
-                    val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
-                    val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
-                    PendingAttachment(
-                        plaintextBytes = jpeg.bytes,
-                        mediaType = MediaPipeline.RECOMPRESSED_MIME,
-                        fileName = fileName,
-                        dim = "${jpeg.width}x${jpeg.height}",
-                        thumbhash = jpeg.thumbhash,
-                    )
-                }
+                val attachment =
+                    if (mime.startsWith("video/", ignoreCase = true)) {
+                        // Thread the remaining album budget into the video read so a
+                        // multi-video pick can't accumulate hundreds of MB in heap
+                        // before the cap downstream would reject the tail.
+                        val video = MediaPipeline.readVideoForUpload(context, uri, remaining) ?: continue
+                        PendingAttachment(
+                            plaintextBytes = video.bytes,
+                            mediaType = video.mediaType,
+                            fileName = video.fileName,
+                            dim = "${video.width}x${video.height}",
+                            thumbhash = video.thumbhash,
+                        )
+                    } else {
+                        val jpeg = MediaPipeline.readDownscaledJpeg(context.contentResolver, uri) ?: continue
+                        val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
+                        val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
+                        PendingAttachment(
+                            plaintextBytes = jpeg.bytes,
+                            mediaType = MediaPipeline.RECOMPRESSED_MIME,
+                            fileName = fileName,
+                            dim = "${jpeg.width}x${jpeg.height}",
+                            thumbhash = jpeg.thumbhash,
+                        )
+                    }
+                consumed += attachment.plaintextBytes.size.toLong()
+                out += attachment
             }
+            out
         }
 
     // Single-path send used by the unified staging shelf: decodes images
@@ -5451,18 +5493,27 @@ private fun ConversationScreen(
                     readPickedDocuments(documentUris, docBudget)
                 }
             val merged = acceptedImages + docOutcome.attachments
+            val pickHasVideo =
+                imageUris.any {
+                    context.contentResolver
+                        .getType(it)
+                        .orEmpty()
+                        .startsWith("video/", ignoreCase = true)
+                }
+            val visualFailureToast =
+                if (pickHasVideo) R.string.toast_couldnt_process_video else R.string.toast_couldnt_decode_image
             if (merged.isEmpty()) {
-                // Only surface the image-decode toast when there were image
+                // Only surface the visual-decode toast when there were visual
                 // picks to begin with — a document-only send that failed every
                 // file should fall through to the document toasts below
                 // rather than misreporting as an image decode error.
                 if (imageUris.isNotEmpty()) {
-                    appState.present(R.string.toast_couldnt_decode_image)
+                    appState.present(visualFailureToast)
                     return@launchMutation
                 }
             }
             if (acceptedImages.size < imageUris.size && !imageAlbumOverflowed) {
-                appState.present(R.string.toast_couldnt_decode_image)
+                appState.present(visualFailureToast)
             }
             if (imageAlbumOverflowed || docOutcome.albumOverflowed) {
                 appState.present(R.string.media_album_too_large)

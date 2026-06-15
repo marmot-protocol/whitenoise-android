@@ -316,16 +316,22 @@ object MediaPipeline {
      * darkmatter-ios and darkmatter-desktop behavior. Extracts dimensions
      * and a thumbhash from the poster frame so receivers paint a blurred
      * preview before the full payload downloads. Returns null on read
-     * failure or when the source exceeds [VIDEO_MAX_BYTES].
+     * failure, when the source exceeds [VIDEO_MAX_BYTES], or when reading
+     * would overflow [remainingBytes] — caller threads its album budget
+     * through this parameter so a multi-video pick can't accumulate
+     * hundreds of MB in heap before the cap rejects the tail.
      */
     fun readVideoForUpload(
         context: android.content.Context,
         uri: Uri,
+        remainingBytes: Long = VIDEO_MAX_BYTES,
     ): VideoForUpload? {
         val resolver = context.contentResolver
         val mime = resolver.getType(uri)?.takeIf { it.startsWith("video/", ignoreCase = true) } ?: return null
         val displayName = queryDisplayNameFromResolver(resolver, uri) ?: "video.mp4"
 
+        val perFileCap = minOf(VIDEO_MAX_BYTES, remainingBytes.coerceAtLeast(0L))
+        if (perFileCap <= 0L) return null
         val bytes =
             runCatching {
                 resolver.openInputStream(uri)?.use { stream ->
@@ -336,7 +342,7 @@ object MediaPipeline {
                         val n = stream.read(buf)
                         if (n < 0) break
                         total += n.toLong()
-                        if (total > VIDEO_MAX_BYTES) return null
+                        if (total > perFileCap) return null
                         out.write(buf, 0, n)
                     }
                     out.toByteArray()
@@ -360,7 +366,16 @@ object MediaPipeline {
                     mmr
                         .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
                         ?.toIntOrNull() ?: 0
-                val poster = mmr.getFrameAtTime(0L)
+                // Thumbhash output is tiny (~25 bytes), so we just need a
+                // representative downscaled frame — don't pull a 4K bitmap
+                // through to encode it.
+                val poster =
+                    mmr.getScaledFrameAtTime(
+                        0L,
+                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                        THUMBNAIL_MAX_EDGE_PX,
+                        THUMBNAIL_MAX_EDGE_PX,
+                    )
                 val thumbhash =
                     poster?.let { bm ->
                         // ThumbHash needs an opaque RGB bitmap; matches the
