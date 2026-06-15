@@ -505,4 +505,6 @@
     <string name="reply_media_voice">Голосовое сообщение</string>
     <string name="reply_media_document">Документ</string>
     <string name="voice_message_cancel">Отменить голосовое</string>
+    <string name="notification_reacted_to_message">отреагировал(а) %1$s на: \"%2$s\"</string>
+    <string name="notification_reacted">отреагировал(а) %1$s</string>
 </resources>

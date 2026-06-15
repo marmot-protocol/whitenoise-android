@@ -60,6 +60,47 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun reactionWithPreviewReadsAsAReactionLine() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    reactionEmoji = "👍",
+                    reactedToPreview = "Lunch at 1?",
+                ),
+            )
+
+        assertEquals("reacted 👍 to: \"Lunch at 1?\"", content?.body)
+    }
+
+    @Test
+    fun reactionWithoutPreviewOmitsTheReactedToClause() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    reactionEmoji = "👍",
+                    reactedToPreview = null,
+                ),
+            )
+
+        assertEquals("reacted 👍", content?.body)
+    }
+
+    @Test
+    fun nonReactionMessageStillUsesPreviewText() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    previewText = "We are go",
+                ),
+            )
+
+        assertEquals("We are go", content?.body)
+    }
+
+    @Test
     fun selfAuthoredNotificationsAreSuppressed() {
         assertNull(
             LocalNotificationFormatter.content(
@@ -107,6 +148,8 @@ class LocalNotificationFormatterTest {
         sender: NotificationUserFfi = user(),
         isDm: Boolean = false,
         isFromSelf: Boolean = false,
+        reactionEmoji: String? = null,
+        reactedToPreview: String? = null,
     ) = NotificationUpdateFfi(
         notificationKey = notificationKey,
         conversationKey = "conversation:account:$groupIdHex",
@@ -122,6 +165,8 @@ class LocalNotificationFormatterTest {
         previewText = previewText,
         timestampMs = 1234,
         isFromSelf = isFromSelf,
+        reactionEmoji = reactionEmoji,
+        reactedToPreview = reactedToPreview,
     )
 
     private fun user(

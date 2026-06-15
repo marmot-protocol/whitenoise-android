@@ -499,4 +499,6 @@
     <string name="reply_media_voice">Sesli mesaj</string>
     <string name="reply_media_document">Belge</string>
     <string name="voice_message_cancel">Sesli mesajı iptal et</string>
+    <string name="notification_reacted_to_message">\"%2$s\" iletisine %1$s ile tepki verdi</string>
+    <string name="notification_reacted">%1$s ile tepki verdi</string>
 </resources>

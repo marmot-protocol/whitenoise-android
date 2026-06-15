@@ -312,6 +312,8 @@
     <string name="notification_sender_in_group">%1$s in %2$s</string>
     <string name="notification_invite_from_sender">Invite from %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s invited you to %2$s</string>
+    <string name="notification_reacted_to_message">reacted %1$s to: \"%2$s\"</string>
+    <string name="notification_reacted">reacted %1$s</string>
     <string name="background_connection_notification_title">Dark Matter is connected</string>
     <string name="background_connection_notification_text">Listening for messages and invites</string>
     <string name="notification_channel_background_connection">Background connection</string>

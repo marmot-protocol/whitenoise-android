@@ -496,4 +496,6 @@
     <string name="reply_media_voice">語音訊息</string>
     <string name="reply_media_document">文件</string>
     <string name="voice_message_cancel">取消語音訊息</string>
+    <string name="notification_reacted_to_message">用 %1$s 回應了：\"%2$s\"</string>
+    <string name="notification_reacted">用 %1$s 回應</string>
 </resources>

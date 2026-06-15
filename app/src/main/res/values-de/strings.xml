@@ -499,4 +499,6 @@
     <string name="reply_media_voice">Sprachnachricht</string>
     <string name="reply_media_document">Dokument</string>
     <string name="voice_message_cancel">Sprachnachricht abbrechen</string>
+    <string name="notification_reacted_to_message">hat mit %1$s reagiert auf: \"%2$s\"</string>
+    <string name="notification_reacted">hat mit %1$s reagiert</string>
 </resources>
