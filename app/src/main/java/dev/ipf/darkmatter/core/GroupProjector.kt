@@ -27,19 +27,43 @@ object GroupProjector {
         memberCount: Int,
         memberTitle: (String) -> String,
         copy: GroupTitleCopy = GroupTitleCopy.Default,
+    ): String =
+        displayTitle(
+            name = group.name,
+            pendingInviteAccount = if (group.pendingConfirmation) inviteAccount(group, otherMemberAccount) else null,
+            groupIdHex = group.groupIdHex,
+            otherMemberAccount = otherMemberAccount,
+            memberCount = memberCount,
+            memberTitle = memberTitle,
+            copy = copy,
+        )
+
+    /**
+     * Title resolution from primitive parts, so callers without a full
+     * [AppGroupRecordFfi] (e.g. the notification pipeline, which only has the
+     * group id + members) resolve exactly the same title the chat list shows:
+     * the group name when set, an invite line when pending, "Group of N people"
+     * for larger unnamed groups, the other member for a pair, else a short id.
+     */
+    fun displayTitle(
+        name: String,
+        pendingInviteAccount: String?,
+        groupIdHex: String,
+        otherMemberAccount: String?,
+        memberCount: Int,
+        memberTitle: (String) -> String,
+        copy: GroupTitleCopy = GroupTitleCopy.Default,
     ): String {
-        group.name
+        name
             .trim()
             .takeIf { it.isNotBlank() }
             ?.let { return it }
-        if (group.pendingConfirmation) {
-            inviteAccount(group, otherMemberAccount)?.let { return copy.inviteFrom(memberTitle(it)) }
-        }
+        pendingInviteAccount?.takeIf { it.isNotBlank() }?.let { return copy.inviteFrom(memberTitle(it)) }
         if (memberCount > 2) return copy.groupOfPeople(memberCount)
         if (memberCount == 2) {
             otherMemberAccount?.takeIf { it.isNotBlank() }?.let { return memberTitle(it) }
         }
-        return IdentityFormatter.short(group.groupIdHex)
+        return IdentityFormatter.short(groupIdHex)
     }
 
     fun inviteAccount(
