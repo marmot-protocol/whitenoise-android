@@ -6998,6 +6998,15 @@ private fun MessageBubble(
     var editHistoryOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var reactionSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     val quickReactionEmojis = RecentEmojiList.quickChoices(recentReactionEmojis)
+    // A deleted message is inert: tear down any open action/reaction surface if
+    // the message is deleted out from under it (optimistic or remote delete).
+    LaunchedEffect(deleted) {
+        if (deleted) {
+            menuOpen = false
+            emojiPickerOpen = false
+            reactionSheetOpen = false
+        }
+    }
 
     fun beginReply() {
         controller.replyingTo = record
@@ -7010,6 +7019,10 @@ private fun MessageBubble(
     }
 
     fun reactWithEmoji(emoji: String) {
+        // Chokepoint guard: never react to a deleted message, whatever path
+        // (menu, emoji picker) called in — even if that surface was open when
+        // the delete landed.
+        if (deleted) return
         onReactionEmojiPicked(emoji)
         // Route via launchMutation: same survives-navigation rationale as delete/send.
         appState.launchMutation { controller.toggleReaction(emoji, record) }
@@ -7054,24 +7067,33 @@ private fun MessageBubble(
                     modifier =
                         Modifier
                             .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) }
-                            .pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
-                                detectHorizontalDragGestures(
-                                    onHorizontalDrag = { change, dragAmount ->
-                                        val next = ReplySwipe.visualOffset(swipeDrag + dragAmount, maxSwipeOffsetPx)
-                                        if (next != swipeDrag || dragAmount > 0f) change.consume()
-                                        swipeDrag = next
-                                    },
-                                    onDragEnd = {
-                                        if (ReplySwipe.shouldTriggerReply(swipeDrag, totalY = 0f, threshold = replySwipeThresholdPx)) {
-                                            beginReply()
-                                        }
-                                        swipeDrag = 0f
-                                    },
-                                    onDragCancel = { swipeDrag = 0f },
-                                )
-                            }.combinedClickable(
+                            .then(
+                                // A deleted message has no actionable content, so
+                                // disable swipe-to-reply entirely: no drag, no trigger.
+                                if (deleted) {
+                                    Modifier
+                                } else {
+                                    Modifier.pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
+                                        detectHorizontalDragGestures(
+                                            onHorizontalDrag = { change, dragAmount ->
+                                                val next = ReplySwipe.visualOffset(swipeDrag + dragAmount, maxSwipeOffsetPx)
+                                                if (next != swipeDrag || dragAmount > 0f) change.consume()
+                                                swipeDrag = next
+                                            },
+                                            onDragEnd = {
+                                                if (ReplySwipe.shouldTriggerReply(swipeDrag, totalY = 0f, threshold = replySwipeThresholdPx)) {
+                                                    beginReply()
+                                                }
+                                                swipeDrag = 0f
+                                            },
+                                            onDragCancel = { swipeDrag = 0f },
+                                        )
+                                    }
+                                },
+                            ).combinedClickable(
                                 onClick = {},
-                                onLongClick = { menuOpen = true },
+                                // No action menu (react/reply/copy/info) on a deleted message.
+                                onLongClick = { if (!deleted) menuOpen = true },
                             ),
                     color = bubbleColor,
                     shape = RoundedCornerShape(18.dp),
@@ -7087,7 +7109,7 @@ private fun MessageBubble(
                                 modifier =
                                     Modifier.combinedClickable(
                                         onClick = { appState.presentProfile(appState.npub(record.sender)) },
-                                        onLongClick = { menuOpen = true },
+                                        onLongClick = { if (!deleted) menuOpen = true },
                                     ),
                             )
                         }
@@ -7381,8 +7403,10 @@ private fun MessageBubble(
                                 }
                             }
                             MessageActionMenu(
-                                expanded = menuOpen,
-                                canDelete = mine && record.messageIdHex.isNotBlank(),
+                                // Never render the menu for a deleted message, even
+                                // if it was open when the delete landed.
+                                expanded = menuOpen && !deleted,
+                                canDelete = mine && record.messageIdHex.isNotBlank() && !deleted,
                                 canEdit = mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
                                 quickReactionEmojis = quickReactionEmojis,
                                 onDismissRequest = { menuOpen = false },
@@ -7450,7 +7474,9 @@ private fun MessageBubble(
                     )
                 }
                 val tallies = controller.reactions[record.messageIdHex].orEmpty()
-                if (tallies.isNotEmpty()) {
+                // Hide reaction tallies on a deleted message — nothing to show,
+                // and nothing to long-press-toggle.
+                if (tallies.isNotEmpty() && !deleted) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
                         tallies.forEach { tally ->
                             ReactionTallyChip(

@@ -499,4 +499,6 @@
     <string name="reply_media_voice">Mensagem de voz</string>
     <string name="reply_media_document">Documento</string>
     <string name="voice_message_cancel">Cancelar mensagem de voz</string>
+    <string name="notification_reacted_to_message">reagiu com %1$s a: \"%2$s\"</string>
+    <string name="notification_reacted">reagiu com %1$s</string>
 </resources>

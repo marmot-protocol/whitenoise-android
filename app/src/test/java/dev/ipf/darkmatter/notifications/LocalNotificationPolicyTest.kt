@@ -74,6 +74,8 @@ class LocalNotificationPolicyTest {
         sender = user(),
         receiver = user(accountIdHex = accountRef, displayName = "Me"),
         previewText = "Hello",
+        reactionEmoji = null,
+        reactedToPreview = null,
         timestampMs = 1234,
         isFromSelf = false,
     )

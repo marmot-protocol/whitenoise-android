@@ -34,7 +34,7 @@ object LocalNotificationFormatter {
             }
         val body =
             when (update.trigger) {
-                NotificationTriggerFfi.NEW_MESSAGE -> clean(update.previewText) ?: text(context, R.string.notification_new_message, "New message")
+                NotificationTriggerFfi.NEW_MESSAGE -> messageBody(update, context)
                 NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context)
             }
         return LocalNotificationContent(
@@ -68,6 +68,22 @@ object LocalNotificationFormatter {
             group != null && !update.isDm -> text(context, R.string.notification_sender_in_group, "%1\$s in %2\$s", sender, group)
             else -> sender
         }
+    }
+
+    private fun messageBody(
+        update: NotificationUpdateFfi,
+        context: Context?,
+    ): String {
+        val emoji = clean(update.reactionEmoji)
+        if (emoji != null) {
+            val reactedTo = clean(update.reactedToPreview)
+            return if (reactedTo != null) {
+                text(context, R.string.notification_reacted_to_message, "reacted %1\$s to: \"%2\$s\"", emoji, reactedTo)
+            } else {
+                text(context, R.string.notification_reacted, "reacted %1\$s", emoji)
+            }
+        }
+        return clean(update.previewText) ?: text(context, R.string.notification_new_message, "New message")
     }
 
     private fun inviteBody(
