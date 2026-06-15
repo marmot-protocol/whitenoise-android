@@ -2377,7 +2377,17 @@ private fun MediaImageBubble(
         if (epoch == 0uL) return@LaunchedEffect
         failed = false
         try {
-            val data = controller.downloadAttachment(key, attachmentIndex, reference)
+            // Own optimistic sends still have their bytes only in the
+            // pending list (the projection hasn't reconciled them into the
+            // L1 cache yet). Use those directly so the bubble paints during
+            // the upload window instead of hanging on a missing-epoch FFI.
+            val pendingBytes =
+                if (mine) {
+                    controller.pendingAttachmentsList(key).getOrNull(attachmentIndex)?.plaintextBytes
+                } else {
+                    null
+                }
+            val data = pendingBytes ?: controller.downloadAttachment(key, attachmentIndex, reference)
             // Decode a sampled bitmap sized to the bubble — a full 1920px
             // image would be a ~14 MB ARGB_8888 bitmap per visible row.
             val decoded =
@@ -2902,11 +2912,19 @@ private fun MediaImageGridTile(
     LaunchedEffect(decodeKey, startDownload, reloadToken) {
         if (bitmap != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
-        // Same epoch=0 guard as the single-image bubble — see comment there.
-        if (reference.sourceEpoch == 0uL) return@LaunchedEffect
+        val pendingBytes =
+            if (mine) {
+                controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.plaintextBytes
+            } else {
+                null
+            }
+        // Pre-confirm own albums: bytes live in pendingAttachmentsList and the
+        // FFI imeta isn't ready yet, so skip the sourceEpoch guard for that
+        // path. After reconcile, downloadAttachment hits the cache instead.
+        if (pendingBytes == null && reference.sourceEpoch == 0uL) return@LaunchedEffect
         failed = false
         try {
-            val data = controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+            val data = pendingBytes ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
             val decoded =
                 withContext(Dispatchers.Default) {
                     MediaPipeline.decodeSampledBitmap(data, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
@@ -8071,6 +8089,17 @@ private fun MessageBubble(
                                     .filter { (_, p) -> p.mediaType.startsWith("video/", ignoreCase = true) }
                                     .toList()
                             }
+                        val pendingImage =
+                            remember(pendingAttachmentsForRecord) {
+                                pendingAttachmentsForRecord
+                                    .withIndex()
+                                    .filter { (_, p) -> p.mediaType.startsWith("image/", ignoreCase = true) }
+                                    .toList()
+                            }
+                        val pendingVisuals =
+                            remember(pendingImage, pendingVideo) {
+                                (pendingImage + pendingVideo).sortedBy { it.index }
+                            }
                         if (!deleted && !invalidated && !anyConfirmedMedia && pendingAudio.isNotEmpty()) {
                             pendingAudio.forEach { (index, pending) ->
                                 MediaVoiceBubble(
@@ -8097,30 +8126,61 @@ private fun MessageBubble(
                                 )
                             }
                         }
-                        if (!deleted && !invalidated && !anyConfirmedMedia && pendingVideo.isNotEmpty()) {
-                            pendingVideo.forEach { (index, pending) ->
-                                MediaVideoBubble(
-                                    messageIdHex = record.messageIdHex,
-                                    attachmentIndex = index,
-                                    reference =
-                                        remember(record.messageIdHex, index, pending) {
-                                            MediaAttachmentReferenceFfi(
-                                                locators = emptyList(),
-                                                ciphertextSha256 = "",
-                                                plaintextSha256 = "",
-                                                nonceHex = "",
-                                                fileName = pending.fileName,
-                                                mediaType = pending.mediaType,
-                                                version = "encrypted-media-v1",
-                                                sourceEpoch = 0u,
-                                                dim = pending.dim,
-                                                thumbhash = pending.thumbhash,
-                                            )
-                                        },
-                                    mine = true,
+                        // Synthesize references for each pending visual so
+                        // the existing single-bubble + grid bubble can render
+                        // them. mine=true threads the bytes through the
+                        // pendingAttachmentsList fallback in the auto-download
+                        // path.
+                        val pendingVisualRefs =
+                            remember(record.messageIdHex, pendingVisuals) {
+                                pendingVisuals.map { (index, pending) ->
+                                    IndexedValue(
+                                        index,
+                                        MediaAttachmentReferenceFfi(
+                                            locators = emptyList(),
+                                            ciphertextSha256 = "",
+                                            plaintextSha256 = "",
+                                            nonceHex = "",
+                                            fileName = pending.fileName,
+                                            mediaType = pending.mediaType,
+                                            version = "encrypted-media-v1",
+                                            sourceEpoch = 0u,
+                                            dim = pending.dim,
+                                            thumbhash = pending.thumbhash,
+                                        ),
+                                    )
+                                }
+                            }
+                        if (!deleted && !invalidated && !anyConfirmedMedia && pendingVisualRefs.isNotEmpty()) {
+                            if (pendingVisualRefs.size == 1) {
+                                val entry = pendingVisualRefs.first()
+                                if (MediaReferenceParser.isVideoMedia(entry.value)) {
+                                    MediaVideoBubble(
+                                        messageIdHex = record.messageIdHex,
+                                        attachmentIndex = entry.index,
+                                        reference = entry.value,
+                                        mine = true,
+                                        controller = controller,
+                                        appState = appState,
+                                        uploading = true,
+                                    )
+                                } else {
+                                    MediaImageBubble(
+                                        item = item,
+                                        reference = entry.value,
+                                        attachmentIndex = entry.index,
+                                        controller = controller,
+                                        appState = appState,
+                                        mine = true,
+                                    )
+                                }
+                            } else {
+                                MediaVisualGridBubble(
+                                    item = item,
+                                    attachments = pendingVisualRefs,
                                     controller = controller,
                                     appState = appState,
-                                    uploading = true,
+                                    mine = true,
                                 )
                             }
                         }
@@ -8129,7 +8189,7 @@ private fun MessageBubble(
                                 !invalidated &&
                                 !anyConfirmedMedia &&
                                 pendingAudio.isEmpty() &&
-                                pendingVideo.isEmpty() &&
+                                pendingVisualRefs.isEmpty() &&
                                 mediaPendingName != null
                         if (showPendingPlaceholder) {
                             MediaPendingPlaceholder(
