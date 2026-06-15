@@ -2835,7 +2835,7 @@ class ConversationController(
     }
 
     private fun pruneConfirmedOptimisticReactions() {
-        val mine = appState.activeAccount?.accountIdHex ?: return
+        val mine = appState.activeAccount?.accountIdHex?.lowercase() ?: return
         val base = baseReactionSenders()
         optimisticReactionChanges.entries
             .filter { (_, change) ->
