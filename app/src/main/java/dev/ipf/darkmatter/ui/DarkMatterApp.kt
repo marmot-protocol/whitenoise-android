@@ -324,6 +324,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
@@ -5536,6 +5538,9 @@ private fun ConversationScreen(
             recentReactionEmojis = loaded
         }
     }
+    // Serialize the recents read-modify-write so rapid taps don't lose updates
+    // (concurrent recordPicked() is last-writer-wins on the disk list). See #172.
+    val recentEmojiWriteMutex = remember { Mutex() }
     // Selected-but-not-yet-sent image attachments. The preview sheet opens
     // when this or `pendingDocumentUris` is non-empty; the whole queue
     // ships as one kind:9 album via `controller.sendAttachments(list, caption)`.
@@ -6144,8 +6149,12 @@ private fun ConversationScreen(
     fun recordReactionEmoji(emoji: String) {
         // The read-modify-write touches SharedPreferences (disk); keep it off
         // the Main thread, matching the off-Main load above. See #147.
+        // Held under a mutex so rapid taps serialize instead of losing updates.
         scope.launch {
-            recentReactionEmojis = withContext(Dispatchers.IO) { RecentEmojiPreferences.recordPicked(context, emoji) }
+            recentReactionEmojis =
+                recentEmojiWriteMutex.withLock {
+                    withContext(Dispatchers.IO) { RecentEmojiPreferences.recordPicked(context, emoji) }
+                }
         }
     }
 
