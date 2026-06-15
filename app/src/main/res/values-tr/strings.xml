@@ -498,4 +498,5 @@
     <string name="reply_media_video">Video</string>
     <string name="reply_media_voice">Voice message</string>
     <string name="reply_media_document">Document</string>
+    <string name="voice_message_cancel">Cancel voice message</string>
 </resources>

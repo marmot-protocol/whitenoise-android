@@ -123,6 +123,7 @@ class LocalizationResourceTest {
                 "voice_message_pause",
                 "voice_message_failed",
                 "voice_message_locked",
+                "voice_message_cancel",
                 "reply_you",
                 "reply_media_photo",
                 "reply_media_video",

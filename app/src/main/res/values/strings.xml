@@ -493,6 +493,7 @@
     <string name="voice_message_pause">Pause voice message</string>
     <string name="voice_message_failed">Voice message couldn\'t load</string>
     <string name="voice_message_locked">Locked</string>
+    <string name="voice_message_cancel">Cancel voice message</string>
     <string name="reply_you">You</string>
     <string name="reply_media_photo">Photo</string>
     <string name="reply_media_video">Video</string>

@@ -2929,24 +2929,35 @@ private fun MediaVoiceBubble(
             0f
         }
 
-    // Stable per-message pseudo-waveform: SHA-256 the key, take 32 bytes,
-    // map each to a 0.3..1.0 amplitude. Real peak-decoding can replace
-    // this in a follow-up; today it gives a recognizable waveform shape
-    // that's stable across recompositions and is essentially free.
-    val waveform: FloatArray =
+    val pseudoWaveform: FloatArray =
         remember(pillKey) {
             val bytes =
                 java.security.MessageDigest
                     .getInstance("SHA-256")
                     .digest(pillKey.toByteArray())
-            FloatArray(32) { i ->
+            FloatArray(dev.ipf.darkmatter.audio.AudioWaveformExtractor.BARS) { i ->
                 val byte = bytes[i % bytes.size].toInt() and 0xFF
                 0.3f + (byte / 255f) * 0.7f
             }
         }
+    var realWaveform by remember(pillKey) { mutableStateOf<FloatArray?>(null) }
+    LaunchedEffect(localFile, pillKey) {
+        val file = localFile ?: return@LaunchedEffect
+        if (realWaveform != null) return@LaunchedEffect
+        realWaveform =
+            dev.ipf.darkmatter.audio.AudioWaveformExtractor
+                .decode(file)
+    }
+    val waveform: FloatArray = realWaveform ?: pseudoWaveform
 
-    LaunchedEffect(pillKey) {
+    LaunchedEffect(pillKey, reference.sourceEpoch) {
         if (localFile != null) return@LaunchedEffect
+        // Receive-side imeta-parsed refs start with sourceEpoch=0 until the
+        // controller's listMedia FFI lands the real epoch; the FFI download
+        // path errors with "missing encrypted media secret for epoch 0".
+        // Skip + retry once the projection rebinds the bubble with a real
+        // epoch. Own sends keep epoch 0 valid (retained bytes short-circuit).
+        if (!mine && reference.sourceEpoch == 0uL) return@LaunchedEffect
         val instant = mine || controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         if (!instant) loading = true
         runCatching {
@@ -2963,7 +2974,7 @@ private fun MediaVoiceBubble(
             failed = false
         }.onFailure {
             if (it is kotlinx.coroutines.CancellationException) throw it
-            Log.w("MediaVoiceBubble", "auto-materialize failed for $pillKey", it)
+            Log.w("MediaVoiceBubble", "auto-materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
             failed = true
         }
         loading = false
@@ -4148,12 +4159,17 @@ private fun sweepStaleSharedMedia(
     maxAgeMillis: Long,
 ) {
     runCatching {
-        val dir = java.io.File(context.cacheDir, "shared_media")
-        if (!dir.isDirectory) return@runCatching
         val cutoff = System.currentTimeMillis() - maxAgeMillis
-        dir.listFiles()?.forEach { entry ->
-            if (entry.isFile && entry.lastModified() < cutoff) {
-                runCatching { entry.delete() }
+        // Same age-based reaper covers the decrypted voice cache too —
+        // those bytes are plaintext E2EE-decrypted audio and shouldn't
+        // linger past the last MediaPlayer that opened them.
+        listOf("shared_media", "voice_attachments").forEach { name ->
+            val dir = java.io.File(context.cacheDir, name)
+            if (!dir.isDirectory) return@forEach
+            dir.listFiles()?.forEach { entry ->
+                if (entry.isFile && entry.lastModified() < cutoff) {
+                    runCatching { entry.delete() }
+                }
             }
         }
     }
@@ -4618,7 +4634,12 @@ private fun ConversationScreen(
     //   the visible row, not the last delivered row.
     val nearBottom by remember {
         derivedStateOf {
-            isNearBottom(listState, controller.timeline.size, controller.hasMoreBefore || controller.isLoadingOlder)
+            // Must match the rendered list size (LazyColumn shows
+            // renderedTimeline which filters out edits), otherwise
+            // bottomTimelineIndex overshoots and nearBottom stays false
+            // even when the user is physically at the bottom.
+            val renderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+            isNearBottom(listState, renderedSize, controller.hasMoreBefore || controller.isLoadingOlder)
         }
     }
     // Read anchor stored as the message id of the deepest row the user has
@@ -4795,7 +4816,11 @@ private fun ConversationScreen(
     }
 
     val voiceRecordingController =
-        remember(chat.id) {
+        // Re-key on the controller too: when appState.runtimeGeneration
+        // changes, a fresh ConversationController replaces this one and
+        // the recorder's closure would otherwise keep dispatching sends
+        // through the stale controller.
+        remember(chat.id, controller) {
             dev.ipf.darkmatter.audio.VoiceRecordingController(
                 context = context,
                 outputDirectory = voiceOutputDir,
@@ -4822,46 +4847,50 @@ private fun ConversationScreen(
         onDispose { voiceRecordingController.release() }
     }
 
-    // Auto-chain voice playback: when one clip ends, look up the next
-    // voice attachment in the timeline order and start it. Stops at any
-    // non-voice neighbor or end-of-timeline.
+    // Auto-chain voice playback: when one clip ends, play the IMMEDIATE
+    // next message iff it's also a voice attachment. Stops on any
+    // non-voice neighbor (text, image, system) or end-of-timeline. We do
+    // not skip past unrelated messages to find a later voice note — that
+    // would jump the user past content they hadn't consumed.
     DisposableEffect(controller, chat.id) {
         dev.ipf.darkmatter.audio.VoicePlaybackController.onCompletion = { completedKey ->
-            val (completedMsgId, _) =
-                completedKey.split("#").let { parts ->
-                    parts.getOrNull(0).orEmpty() to (parts.getOrNull(1)?.toIntOrNull() ?: 0)
-                }
+            val completedMsgId = completedKey.substringBefore('#')
             val completedIdx = controller.timeline.indexOfFirst { it.record.messageIdHex == completedMsgId }
             if (completedIdx >= 0) {
-                val nextVoice =
-                    (completedIdx + 1 until controller.timeline.size)
-                        .asSequence()
-                        .mapNotNull { i ->
-                            val msg = controller.timeline[i]
-                            val refs = controller.mediaReferences[msg.record.messageIdHex] ?: return@mapNotNull null
-                            val audioEntry =
-                                refs.withIndex().firstOrNull { (_, r) ->
-                                    r.mediaType.startsWith("audio/", ignoreCase = true)
-                                } ?: return@mapNotNull null
-                            Triple(msg, audioEntry.index, audioEntry.value)
-                        }.firstOrNull()
-                if (nextVoice != null) {
-                    val (msg, idx, ref) = nextVoice
+                // Walk forward only as long as the next item is a derived-
+                // state row (edit / group system) — those are invisible to
+                // the user, so skipping them doesn't violate "immediate
+                // neighbor" semantics.
+                var nextIdx = completedIdx + 1
+                while (nextIdx < controller.timeline.size &&
+                    MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)
+                ) {
+                    nextIdx++
+                }
+                val nextMsg = controller.timeline.getOrNull(nextIdx)
+                val refs = nextMsg?.let { controller.mediaReferences[it.record.messageIdHex] }
+                val audioEntry =
+                    refs?.withIndex()?.firstOrNull { (_, r) ->
+                        r.mediaType.startsWith("audio/", ignoreCase = true)
+                    }
+                if (nextMsg != null && audioEntry != null) {
+                    val idx = audioEntry.index
+                    val ref = audioEntry.value
                     scope.launch {
-                        val mine = msg.record.direction != "received"
+                        val mine = nextMsg.record.direction != "received"
                         val file =
                             runCatching {
                                 materializeVoiceAttachment(
                                     context = context,
                                     controller = controller,
-                                    messageIdHex = msg.record.messageIdHex,
+                                    messageIdHex = nextMsg.record.messageIdHex,
                                     attachmentIndex = idx,
                                     reference = ref,
                                     mine = mine,
                                 )
                             }.getOrNull() ?: return@launch
                         dev.ipf.darkmatter.audio.VoicePlaybackController
-                            .play("${msg.record.messageIdHex}#$idx", file)
+                            .play("${nextMsg.record.messageIdHex}#$idx", file)
                     }
                 }
             }
@@ -8262,7 +8291,7 @@ private fun ComposerBar(
                     ) {
                         Icon(
                             Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.voice_message_release_to_send),
+                            contentDescription = stringResource(R.string.voice_message_cancel),
                             tint = MaterialTheme.colorScheme.error,
                         )
                     }
@@ -8336,7 +8365,16 @@ private fun MicHoldButton(controller: dev.ipf.darkmatter.audio.VoiceRecordingCon
     val lockThresholdPx = with(density) { lockThresholdDp.toPx() }
     val recording = controller.isRecording
     FloatingActionButton(
-        onClick = {},
+        // Accessibility fallback: a tap (TalkBack double-tap, keyboard
+        // Enter, switch access) toggles record-and-lock so users who can't
+        // perform the press-and-hold gesture can still send voice notes.
+        onClick = {
+            if (controller.isRecording) {
+                controller.stop()
+            } else if (controller.start()) {
+                controller.lock()
+            }
+        },
         modifier =
             Modifier
                 .size(44.dp)
@@ -8348,31 +8386,49 @@ private fun MicHoldButton(controller: dev.ipf.darkmatter.audio.VoiceRecordingCon
                         haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                         var canceled = false
                         var locked = false
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            val deltaX = change.position.x - down.position.x
-                            val deltaY = change.position.y - down.position.y
-                            controller.updateDrag(deltaX, deltaY, cancelThresholdPx, lockThresholdPx)
-                            if (!locked && -deltaY > lockThresholdPx && -deltaX <= cancelThresholdPx) {
-                                locked = true
-                                haptics.performHapticFeedback(
-                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
-                                )
-                                controller.lock()
-                                return@awaitEachGesture
+                        var terminated = false
+                        try {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id }
+                                if (change == null) {
+                                    // Parent stole the pointer — cancel rather than orphan the recorder.
+                                    controller.cancel()
+                                    terminated = true
+                                    break
+                                }
+                                val deltaX = change.position.x - down.position.x
+                                val deltaY = change.position.y - down.position.y
+                                controller.updateDrag(deltaX, deltaY, cancelThresholdPx, lockThresholdPx)
+                                if (!locked && -deltaY > lockThresholdPx && -deltaX <= cancelThresholdPx) {
+                                    locked = true
+                                    haptics.performHapticFeedback(
+                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
+                                    )
+                                    controller.lock()
+                                    terminated = true
+                                    return@awaitEachGesture
+                                }
+                                if (!canceled && -deltaX > cancelThresholdPx) {
+                                    canceled = true
+                                    haptics.performHapticFeedback(
+                                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
+                                    )
+                                } else if (canceled && -deltaX <= cancelThresholdPx) {
+                                    canceled = false
+                                }
+                                if (change.changedToUp() || !change.pressed) {
+                                    if (canceled) controller.cancel() else controller.stop()
+                                    terminated = true
+                                    break
+                                }
                             }
-                            if (!canceled && -deltaX > cancelThresholdPx) {
-                                canceled = true
-                                haptics.performHapticFeedback(
-                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
-                                )
-                            } else if (canceled && -deltaX <= cancelThresholdPx) {
-                                canceled = false
-                            }
-                            if (change.changedToUp() || !change.pressed) {
-                                if (canceled) controller.cancel() else controller.stop()
-                                break
+                        } finally {
+                            // Composable removal / coroutine cancellation while still
+                            // recording-unlocked → cancel cleanly instead of letting
+                            // the recorder tick to the 60 s auto-stop.
+                            if (!terminated && controller.isRecording && !controller.locked) {
+                                controller.cancel()
                             }
                         }
                     }

@@ -52,6 +52,9 @@ class VoiceRecordingController(
     fun start(): Boolean {
         if (isRecording) return true
         if (!onPermissionRequest()) return false
+        // Pause AFTER permission is confirmed — a denied prompt shouldn't
+        // also silence whatever the user was listening to.
+        VoicePlaybackController.pause()
         val file =
             File(
                 outputDirectory,

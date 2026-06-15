@@ -1,6 +1,9 @@
 package dev.ipf.darkmatter.audio
 
+import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
 import android.util.Log
@@ -52,6 +55,23 @@ object VoicePlaybackController {
     private var currentKey: String? = null
     private var tickerJob: Job? = null
     private var currentSpeed: Float = 1f
+
+    private var audioManager: AudioManager? = null
+    private var focusRequest: AudioFocusRequest? = null
+    private val focusListener =
+        AudioManager.OnAudioFocusChangeListener { change ->
+            when (change) {
+                AudioManager.AUDIOFOCUS_LOSS,
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
+                -> pause()
+            }
+        }
+
+    /** Call once from Application.onCreate so playback can request audio focus. */
+    fun attach(context: Context) {
+        audioManager = context.applicationContext.getSystemService(AudioManager::class.java)
+    }
 
     /**
      * Fires once when MediaPlayer reports completion, with the key of the
@@ -152,17 +172,30 @@ object VoicePlaybackController {
                 _state.value = PlaybackState()
                 return
             }
+        // MediaPlayer instantiated on Dispatchers.IO has no Looper → its
+        // callbacks fire on an internal MediaPlayer thread. State that we
+        // also touch from Main (player, currentKey, _state) must only be
+        // mutated on Main; hop through scope.launch.
         mp.setOnCompletionListener {
-            val completed = currentKey
-            releasePlayerInternal()
-            _state.value = PlaybackState()
-            if (completed != null) onCompletion?.invoke(completed)
+            scope.launch {
+                val completed = currentKey
+                releasePlayerInternal()
+                _state.value = PlaybackState()
+                if (completed != null) onCompletion?.invoke(completed)
+            }
         }
         mp.setOnErrorListener { _, what, extra ->
-            Log.w(TAG, "MediaPlayer error what=$what extra=$extra")
-            releasePlayerInternal()
-            _state.value = PlaybackState()
+            scope.launch {
+                Log.w(TAG, "MediaPlayer error what=$what extra=$extra")
+                releasePlayerInternal()
+                _state.value = PlaybackState()
+            }
             true
+        }
+        if (!requestFocus()) {
+            mp.runCatching { release() }
+            _state.value = PlaybackState()
+            return
         }
         mp.start()
         player = mp
@@ -178,6 +211,30 @@ object VoicePlaybackController {
                 speed = currentSpeed,
             )
         startTicker()
+    }
+
+    private fun requestFocus(): Boolean {
+        val am = audioManager ?: return true
+        val attrs =
+            AudioAttributes
+                .Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .build()
+        val req =
+            AudioFocusRequest
+                .Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                .setAudioAttributes(attrs)
+                .setOnAudioFocusChangeListener(focusListener)
+                .build()
+        focusRequest = req
+        return am.requestAudioFocus(req) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+
+    private fun abandonFocus() {
+        val am = audioManager ?: return
+        focusRequest?.let { am.abandonAudioFocusRequest(it) }
+        focusRequest = null
     }
 
     /** Pause the active player (no-op if nothing is active). */
@@ -224,6 +281,7 @@ object VoicePlaybackController {
         }
         player = null
         currentKey = null
+        abandonFocus()
     }
 
     private fun startTicker() {

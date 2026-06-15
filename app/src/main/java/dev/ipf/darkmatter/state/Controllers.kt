@@ -1948,7 +1948,9 @@ class ConversationController(
                             } ?: throw initial
                         Log.w(
                             "DMConversation",
-                            "blossom redirect resolved (workaround darkmatter#413): $original -> $resolved",
+                            "blossom redirect resolved (workaround darkmatter#413) " +
+                                "from=${original.substringBefore("/", "?").take(64)} " +
+                                "to=${resolved.substringBefore("?").take(64)}",
                         )
                         val resolvedReference =
                             reference.copy(
@@ -1964,14 +1966,17 @@ class ConversationController(
                         appState.marmotIo { downloadMedia(account, groupIdHex, resolvedReference) }
                     }.onFailure {
                         if (it is CancellationException) throw it
-                        val locator =
+                        // Strip query/path tail so any signed tokens or
+                        // capabilities in the locator don't end up in logs.
+                        val host =
                             reference.locators
                                 .firstOrNull()
                                 ?.value
+                                ?.let { url -> url.substringAfter("://", "").substringBefore('/') }
                                 .orEmpty()
                         Log.w(
                             "DMConversation",
-                            "downloadAttachment failed for ${groupIdHex.take(8)} message=${messageIdHex.take(8)} url=$locator",
+                            "downloadAttachment failed for ${groupIdHex.take(8)} message=${messageIdHex.take(8)} host=$host",
                             it,
                         )
                     }.getOrThrow()
@@ -2757,38 +2762,13 @@ class ConversationController(
         // ("xxxxxxxx-xxxx-..."). The FFI rejects anything that isn't a 64-char
         // hex blob (InvalidHex at the first '-'). Skip — the projection will
         // call markReadUpTo again with the confirmed hex id once it echoes.
-        if (!HEX_MESSAGE_ID.matches(trimmed)) {
-            Log.d("UnreadDebug", "markReadUpTo skipped non-hex id=${trimmed.take(8)} group=${group.groupIdHex.take(8)}")
-            return
-        }
-        if (trimmed == lastReadMessageId) {
-            Log.d("UnreadDebug", "markReadUpTo dedup id=${trimmed.take(8)} group=${group.groupIdHex.take(8)}")
-            return
-        }
-        val account =
-            conversationAccountRef ?: run {
-                Log.d("UnreadDebug", "markReadUpTo no account group=${group.groupIdHex.take(8)}")
-                return
-            }
-        // Surface the row's kind + direction so we can spot whether group
-        // system / edit kinds are dragging the unread count along even
-        // after the read pointer advances past them.
-        val row = timeline.firstOrNull { it.record.messageIdHex == trimmed }
-        Log.d(
-            "UnreadDebug",
-            "markReadUpTo FIRE group=${group.groupIdHex.take(8)} id=${trimmed.take(8)} " +
-                "kind=${row?.record?.kind} dir=${row?.record?.direction} " +
-                "timelineSize=${timeline.size}",
-        )
+        if (!HEX_MESSAGE_ID.matches(trimmed)) return
+        if (trimmed == lastReadMessageId) return
+        val account = conversationAccountRef ?: return
         val previous = lastReadMessageId
         lastReadMessageId = trimmed
         runCatching {
             appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, trimmed) }
-        }.onSuccess {
-            Log.d(
-                "UnreadDebug",
-                "markReadUpTo OK group=${group.groupIdHex.take(8)} id=${trimmed.take(8)}",
-            )
         }.onFailure {
             lastReadMessageId = previous
             if (it is CancellationException) throw it

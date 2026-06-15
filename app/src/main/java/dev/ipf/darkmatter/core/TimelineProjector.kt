@@ -26,10 +26,11 @@ fun replyMediaKindFromMime(mime: String?): ReplyMediaKind {
 // for the MIME tree prefix). Cheap and good enough for "what icon to show".
 fun replyMediaKindFromJson(mediaJson: String?): ReplyMediaKind {
     if (mediaJson.isNullOrBlank()) return ReplyMediaKind.None
+    val lower = mediaJson.lowercase()
     return when {
-        "audio/" in mediaJson -> ReplyMediaKind.Voice
-        "image/" in mediaJson -> ReplyMediaKind.Photo
-        "video/" in mediaJson -> ReplyMediaKind.Video
+        "audio/" in lower -> ReplyMediaKind.Voice
+        "image/" in lower -> ReplyMediaKind.Photo
+        "video/" in lower -> ReplyMediaKind.Video
         else -> ReplyMediaKind.Document
     }
 }
