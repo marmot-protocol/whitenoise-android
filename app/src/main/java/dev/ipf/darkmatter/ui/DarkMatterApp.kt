@@ -6142,7 +6142,11 @@ private fun ConversationScreen(
     }
 
     fun recordReactionEmoji(emoji: String) {
-        recentReactionEmojis = RecentEmojiPreferences.recordPicked(context, emoji)
+        // The read-modify-write touches SharedPreferences (disk); keep it off
+        // the Main thread, matching the off-Main load above. See #147.
+        scope.launch {
+            recentReactionEmojis = withContext(Dispatchers.IO) { RecentEmojiPreferences.recordPicked(context, emoji) }
+        }
     }
 
     fun navigateToReplyTarget(item: TimelineMessage) {
