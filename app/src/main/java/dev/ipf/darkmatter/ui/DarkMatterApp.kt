@@ -5167,7 +5167,7 @@ private fun MediaPreviewSheet(
                         .heightIn(min = 96.dp, max = 220.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                itemsIndexed(uris, key = { _, uri -> "image:$uri" }) { index, uri ->
+                itemsIndexed(uris, key = { index, uri -> "image:$index:$uri" }) { index, uri ->
                     StagingTile(
                         onRemove = { if (!sending) onRemoveAt(index) },
                     ) {
@@ -5180,7 +5180,7 @@ private fun MediaPreviewSheet(
                         )
                     }
                 }
-                itemsIndexed(documentUris, key = { _, uri -> "doc:$uri" }) { index, uri ->
+                itemsIndexed(documentUris, key = { index, uri -> "doc:$index:$uri" }) { index, uri ->
                     StagingTile(
                         onRemove = { if (!sending) onRemoveDocumentAt(index) },
                     ) {
@@ -11899,6 +11899,15 @@ private fun ErrorContent(
     }
 }
 
+private val AvatarPalette =
+    listOf(
+        Color(0xFF006A6A),
+        Color(0xFF8C4A00),
+        Color(0xFF5B5FC7),
+        Color(0xFF006D3B),
+        Color(0xFF9A4055),
+    )
+
 @Composable
 private fun Avatar(
     title: String,
@@ -11906,15 +11915,7 @@ private fun Avatar(
     size: androidx.compose.ui.unit.Dp,
     pictureUrl: String? = null,
 ) {
-    val palette =
-        listOf(
-            Color(0xFF006A6A),
-            Color(0xFF8C4A00),
-            Color(0xFF5B5FC7),
-            Color(0xFF006D3B),
-            Color(0xFF9A4055),
-        )
-    val color = palette[avatarPaletteIndex(seed.hashCode(), palette.size)]
+    val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
     // already-loaded avatar immediately, with no placeholder flash and no
     // re-fetch. See #31.

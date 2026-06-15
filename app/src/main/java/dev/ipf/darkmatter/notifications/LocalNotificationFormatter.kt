@@ -22,6 +22,8 @@ data class LocalNotificationContent(
 )
 
 object LocalNotificationFormatter {
+    private val whitespaceRun = Regex("\\s+")
+
     fun content(
         update: NotificationUpdateFfi,
         context: Context? = null,
@@ -105,7 +107,7 @@ object LocalNotificationFormatter {
         if (value == null) return null
         return ProfileSanitizer
             .stripUnsafe(value)
-            .replace(Regex("\\s+"), " ")
+            .replace(whitespaceRun, " ")
             .trim()
             .takeIf { it.isNotEmpty() }
     }

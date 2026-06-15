@@ -38,6 +38,14 @@ class ProfileSanitizerTest {
     }
 
     @Test
+    fun stripUnsafeRemovesSupplementaryPlaneFormatCharacters() {
+        val tagSmallA = String(Character.toChars(0xE0061))
+        val variationSelector = String(Character.toChars(0xE0101))
+
+        assertEquals("Alice", ProfileSanitizer.displayName("A${tagSmallA}li${variationSelector}ce"))
+    }
+
+    @Test
     fun imageUrlsOnlyAllowHttpsUrlsWithHosts() {
         assertEquals("https://example.com/avatar.png", ProfileSanitizer.imageUrl(" https://example.com/avatar.png "))
         assertNull(ProfileSanitizer.imageUrl("http://example.com/avatar.png"))

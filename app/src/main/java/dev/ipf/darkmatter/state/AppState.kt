@@ -1409,10 +1409,12 @@ class DarkMatterAppState(
         return IdentityFormatter.short(npub, prefix = 10, suffix = 8)
     }
 
-    fun npub(accountIdHex: String): String =
-        npubs.computeIfAbsent(accountIdHex) { key ->
-            runCatching { marmot().npub(key) }.getOrNull() ?: key
-        }
+    fun npub(accountIdHex: String): String {
+        npubs[accountIdHex]?.let { return it }
+        val resolved = runCatching { marmot().npub(accountIdHex) }.getOrNull() ?: return accountIdHex
+        npubs[accountIdHex] = resolved
+        return resolved
+    }
 
     suspend fun accountIdHex(reference: String): String? = runCatching { marmotIo { accountIdHex(reference) } }.getOrNull()
 

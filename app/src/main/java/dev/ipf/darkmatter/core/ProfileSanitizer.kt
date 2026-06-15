@@ -7,13 +7,15 @@ object ProfileSanitizer {
     private const val MAX_NAME_LENGTH = 80
     private const val MAX_ABOUT_LENGTH = 1000
     private const val MAX_MESSAGE_LENGTH = 8000
+    private val blankLineRun = Regex("\n{3,}")
+    private val whitespaceRun = Regex("\\s+")
 
     fun displayName(raw: String?): String? = singleLine(raw, MAX_NAME_LENGTH)
 
     fun about(raw: String?): String? = multiline(raw, MAX_ABOUT_LENGTH)
 
     fun messageBody(raw: String): String {
-        val clamped = stripUnsafe(raw).replace(Regex("\n{3,}"), "\n\n").trim()
+        val clamped = stripUnsafe(raw).replace(blankLineRun, "\n\n").trim()
         return safeTake(clamped, MAX_MESSAGE_LENGTH)
     }
 
@@ -35,7 +37,7 @@ object ProfileSanitizer {
     ): String? {
         val collapsed =
             stripUnsafe(normalizeCompatibilityForms(raw ?: ""))
-                .split(Regex("\\s+"))
+                .split(whitespaceRun)
                 .filter { it.isNotBlank() }
                 .joinToString(" ")
         return collapsed.takeIf { it.isNotEmpty() }?.let { safeTake(it, maxLength) }
@@ -75,24 +77,28 @@ object ProfileSanitizer {
 
     fun stripUnsafe(value: String): String =
         buildString(value.length) {
-            value.forEach { char ->
+            value.codePoints().forEach { cp ->
+                val type = Character.getType(cp)
                 when {
-                    char == '\n' || char == '\t' || char == '\r' -> append(char)
-                    Character.getType(char) == Character.CONTROL.toInt() -> Unit
-                    char.code == 0x200E || char.code == 0x200F -> Unit
-                    char.code in 0x202A..0x202E -> Unit
-                    char.code in 0x2066..0x2069 -> Unit
-                    char.code == 0x061C -> Unit
-                    char.code == 0x200B || char.code == 0xFEFF -> Unit
+                    cp == '\n'.code || cp == '\t'.code || cp == '\r'.code -> appendCodePoint(cp)
+                    type == Character.CONTROL.toInt() -> Unit
+                    type == Character.FORMAT.toInt() && cp != 0x200C && cp != 0x200D -> Unit
+                    cp in 0xE0000..0xE007F -> Unit // supplementary TAG characters
+                    cp in 0xE0100..0xE01EF -> Unit // supplementary variation selectors
+                    cp == 0x200E || cp == 0x200F -> Unit
+                    cp in 0x202A..0x202E -> Unit
+                    cp in 0x2066..0x2069 -> Unit
+                    cp == 0x061C -> Unit
+                    cp == 0x200B || cp == 0xFEFF -> Unit
                     // More invisible/default-ignorable format chars abused for
                     // spoofing. ZWNJ (0x200C) and ZWJ (0x200D) are kept — they
                     // carry meaning in Indic/Arabic shaping and emoji sequences.
-                    char.code == 0x00AD -> Unit // soft hyphen
-                    char.code == 0x034F -> Unit // combining grapheme joiner
-                    char.code == 0x180E -> Unit // Mongolian vowel separator: default-ignorable since Unicode 6.3
-                    char.code == 0x2060 -> Unit // word joiner
-                    char.code in 0x2061..0x2064 -> Unit // invisible math operators
-                    else -> append(char)
+                    cp == 0x00AD -> Unit // soft hyphen
+                    cp == 0x034F -> Unit // combining grapheme joiner
+                    cp == 0x180E -> Unit // Mongolian vowel separator: default-ignorable since Unicode 6.3
+                    cp == 0x2060 -> Unit // word joiner
+                    cp in 0x2061..0x2064 -> Unit // invisible math operators
+                    else -> appendCodePoint(cp)
                 }
             }
         }
