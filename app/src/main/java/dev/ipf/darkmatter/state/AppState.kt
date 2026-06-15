@@ -1750,10 +1750,9 @@ class DarkMatterAppState(
     // groups. Returns null for DMs (MessagingStyle shows the sender instead).
     private suspend fun notificationConversationTitle(update: NotificationUpdateFfi): String? {
         if (update.isDm) return null
-        update.groupName
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?.let { return it }
+        // Sanitize the payload name like the display surfaces do (strip
+        // bidi/control chars) before trusting it as a notification title.
+        update.groupName?.let { ProfileSanitizer.displayName(it) }?.let { return it }
         val members =
             runCatching { marmotIo { groupMembers(update.accountRef, update.groupIdHex) } }
                 .getOrNull()
@@ -1761,6 +1760,9 @@ class DarkMatterAppState(
         if (members.isEmpty()) return null
         return GroupProjector.displayTitle(
             name = "",
+            // A NEW_MESSAGE only fires for an already-joined group; pending
+            // invites surface as GROUP_INVITE, so the chat list's "Invite from
+            // X" title can't apply and there's no invite account to pass.
             pendingInviteAccount = null,
             groupIdHex = update.groupIdHex,
             otherMemberAccount = GroupProjector.otherMemberAccount(members, update.accountIdHex),
