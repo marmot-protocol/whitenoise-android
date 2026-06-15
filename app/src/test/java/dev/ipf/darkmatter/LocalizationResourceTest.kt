@@ -111,20 +111,11 @@ class LocalizationResourceTest {
                 "theme_amoled",
                 "theme_system",
                 "total",
-                // Voice-message strings ship in English placeholders pending
-                // human translation review. Allow exact-copies in locale files
-                // so the feature can land; treat translation as follow-up work.
-                "voice_message_record",
-                "voice_message_recording",
-                "voice_message_release_to_send",
-                "voice_message_too_short",
-                "voice_message_permission_denied",
-                "voice_message_play",
-                "voice_message_pause",
-                "voice_message_failed",
-                "voice_message_locked",
-                "voice_message_cancel",
-                "reply_you",
+                // Some translations may legitimately match English for
+                // some keys/locales (e.g. "Video" in many languages, "Foto"
+                // in DE/ES/IT/PT). Keep just the brand-shared tokens here
+                // — everything else gets a real translation enforced by
+                // localizedStringFilesDoNotCopyEnglishUserVisibleText.
                 "reply_media_photo",
                 "reply_media_video",
                 "reply_media_voice",
