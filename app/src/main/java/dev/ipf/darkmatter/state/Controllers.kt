@@ -2312,6 +2312,7 @@ class ConversationController(
             appState.present(R.string.toast_invite_accepted)
             true
         }.getOrElse {
+            it.rethrowIfCancellation()
             appState.present(R.string.toast_couldnt_accept_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
             false
         }
@@ -2322,9 +2323,11 @@ class ConversationController(
         return runCatching {
             appState.marmotIo { declineGroupInvite(account, group.groupIdHex) }
             group = group.copy(pendingConfirmation = false, archived = true)
+            appState.applyLocalGroupUpdate(group)
             appState.present(R.string.toast_invite_declined)
             true
         }.getOrElse {
+            it.rethrowIfCancellation()
             appState.present(R.string.toast_couldnt_decline_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
             false
         }
@@ -2835,7 +2838,7 @@ class ConversationController(
     }
 
     private fun pruneConfirmedOptimisticReactions() {
-        val mine = appState.activeAccount?.accountIdHex ?: return
+        val mine = appState.activeAccount?.accountIdHex?.lowercase() ?: return
         val base = baseReactionSenders()
         optimisticReactionChanges.entries
             .filter { (_, change) ->
