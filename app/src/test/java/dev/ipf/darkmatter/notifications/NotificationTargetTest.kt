@@ -243,6 +243,8 @@ class NotificationTargetTest {
             sender = NotificationUserFfi("sender-hex", "Sender", null),
             receiver = NotificationUserFfi("receiver-hex", "Me", null),
             previewText = "hi",
+            reactionEmoji = null,
+            reactedToPreview = null,
             timestampMs = 0L,
             isFromSelf = false,
         )

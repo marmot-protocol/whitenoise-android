@@ -9280,6 +9280,8 @@ data class NotificationUpdateFfi (
     var `sender`: NotificationUserFfi, 
     var `receiver`: NotificationUserFfi, 
     var `previewText`: kotlin.String?, 
+    var `reactionEmoji`: kotlin.String?, 
+    var `reactedToPreview`: kotlin.String?, 
     var `timestampMs`: kotlin.Long, 
     var `isFromSelf`: kotlin.Boolean
 ) {
@@ -9305,6 +9307,8 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterTypeNotificationUserFfi.read(buf),
             FfiConverterTypeNotificationUserFfi.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterLong.read(buf),
             FfiConverterBoolean.read(buf),
         )
@@ -9323,6 +9327,8 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterTypeNotificationUserFfi.allocationSize(value.`sender`) +
             FfiConverterTypeNotificationUserFfi.allocationSize(value.`receiver`) +
             FfiConverterOptionalString.allocationSize(value.`previewText`) +
+            FfiConverterOptionalString.allocationSize(value.`reactionEmoji`) +
+            FfiConverterOptionalString.allocationSize(value.`reactedToPreview`) +
             FfiConverterLong.allocationSize(value.`timestampMs`) +
             FfiConverterBoolean.allocationSize(value.`isFromSelf`)
     )
@@ -9340,6 +9346,8 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterTypeNotificationUserFfi.write(value.`sender`, buf)
             FfiConverterTypeNotificationUserFfi.write(value.`receiver`, buf)
             FfiConverterOptionalString.write(value.`previewText`, buf)
+            FfiConverterOptionalString.write(value.`reactionEmoji`, buf)
+            FfiConverterOptionalString.write(value.`reactedToPreview`, buf)
             FfiConverterLong.write(value.`timestampMs`, buf)
             FfiConverterBoolean.write(value.`isFromSelf`, buf)
     }
