@@ -4430,7 +4430,6 @@ private fun FullScreenImageViewer(
  * `LaunchedEffect` doesn't need to wait for "page becomes visible" — it
  * downloads as soon as the page composes.
  */
-@Composable
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun VideoViewerPage(
