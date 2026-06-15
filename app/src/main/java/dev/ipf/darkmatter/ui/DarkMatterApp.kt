@@ -2482,6 +2482,7 @@ private fun MediaImageBubble(
             attachments = listOf(IndexedValue(attachmentIndex, reference)),
             startIndex = 0,
             onDismiss = { viewerOpen = false },
+            mine = mine,
         )
     }
 }
@@ -2636,6 +2637,7 @@ private fun MediaImageGridBubble(
             attachments = attachments,
             startIndex = index,
             onDismiss = { viewerOpenAt = null },
+            mine = mine,
         )
     }
 }
@@ -2699,7 +2701,9 @@ private fun MediaVisualGridBubble(
     viewerOpenAt?.let { tileIndex ->
         // Unified viewer walks the full attachments list — each page picks
         // its renderer (image vs video) by MIME, swipes between siblings
-        // regardless of type.
+        // regardless of type. mine threads through so an own optimistic
+        // overflow video (>6 tiles) materialises from retained bytes
+        // instead of trying an FFI download at epoch=0.
         FullScreenImageViewer(
             controller = controller,
             appState = appState,
@@ -2707,6 +2711,7 @@ private fun MediaVisualGridBubble(
             attachments = attachments,
             startIndex = tileIndex,
             onDismiss = { viewerOpenAt = null },
+            mine = mine,
         )
     }
 }
@@ -3176,6 +3181,8 @@ private fun MediaVideoBubble(
     appState: DarkMatterAppState,
     mine: Boolean,
     uploading: Boolean = false,
+    uploadFailed: Boolean = false,
+    onRetryUpload: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -3292,18 +3299,32 @@ private fun MediaVideoBubble(
                 modifier =
                     Modifier
                         .size(56.dp)
-                        .clickable(enabled = !uploading) {
-                            if (uploading) return@clickable
-                            val f = localFile
-                            if (f != null) {
-                                playerOpen = true
-                            } else {
-                                startDownload = true
+                        .clickable {
+                            when {
+                                uploadFailed -> onRetryUpload?.invoke()
+                                else -> {
+                                    val f = localFile
+                                    if (f != null) {
+                                        playerOpen = true
+                                    } else {
+                                        startDownload = true
+                                    }
+                                }
                             }
                         },
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     when {
+                        uploadFailed ->
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = stringResource(R.string.voice_message_failed),
+                                tint = Color.White,
+                                modifier =
+                                    Modifier
+                                        .size(28.dp)
+                                        .clickable { onRetryUpload?.invoke() },
+                            )
                         uploading ->
                             CircularProgressIndicator(
                                 modifier = Modifier.size(28.dp),
@@ -4323,6 +4344,7 @@ private fun FullScreenImageViewer(
     attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
     startIndex: Int,
     onDismiss: () -> Unit,
+    mine: Boolean = false,
 ) {
     if (attachments.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
@@ -4380,6 +4402,7 @@ private fun FullScreenImageViewer(
                         attachmentIndex = pageEntry.index,
                         reference = pageEntry.value,
                         isCurrent = page == pagerState.currentPage,
+                        mine = mine,
                     )
                 } else {
                     ViewerPage(
@@ -4481,6 +4504,7 @@ private fun VideoViewerPage(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     isCurrent: Boolean,
+    mine: Boolean,
 ) {
     val context = LocalContext.current
     var localFile by remember(messageIdHex, attachmentIndex, reference.sourceEpoch) {
@@ -4488,7 +4512,11 @@ private fun VideoViewerPage(
     }
     LaunchedEffect(messageIdHex, attachmentIndex, reference.sourceEpoch) {
         if (localFile != null) return@LaunchedEffect
-        if (reference.sourceEpoch == 0uL) return@LaunchedEffect
+        // Receive-side: skip epoch=0 (FFI download would error). Own
+        // optimistic sends still have their bytes in pendingAttachmentsList
+        // even at epoch=0, so we let materializeVideoAttachment short-
+        // circuit through the retained-bytes path with mine=true.
+        if (!mine && reference.sourceEpoch == 0uL) return@LaunchedEffect
         runCatching {
             materializeVideoAttachment(
                 context = context,
@@ -4496,7 +4524,7 @@ private fun VideoViewerPage(
                 messageIdHex = messageIdHex,
                 attachmentIndex = attachmentIndex,
                 reference = reference,
-                mine = false,
+                mine = mine,
             )
         }.onSuccess { localFile = it }
     }
@@ -8152,6 +8180,10 @@ private fun MessageBubble(
                                 }
                             }
                         if (!deleted && !invalidated && !anyConfirmedMedia && pendingVisualRefs.isNotEmpty()) {
+                            val uploadFailed = item.status == MessageStatus.Failed
+                            val retryUpload: () -> Unit = {
+                                appState.launchMutation { controller.retryFailedSend(item) }
+                            }
                             if (pendingVisualRefs.size == 1) {
                                 val entry = pendingVisualRefs.first()
                                 if (MediaReferenceParser.isVideoMedia(entry.value)) {
@@ -8162,7 +8194,9 @@ private fun MessageBubble(
                                         mine = true,
                                         controller = controller,
                                         appState = appState,
-                                        uploading = true,
+                                        uploading = !uploadFailed,
+                                        uploadFailed = uploadFailed,
+                                        onRetryUpload = if (uploadFailed) retryUpload else null,
                                     )
                                 } else {
                                     MediaImageBubble(
