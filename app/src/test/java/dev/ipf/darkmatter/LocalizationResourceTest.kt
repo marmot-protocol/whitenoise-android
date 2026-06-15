@@ -119,6 +119,10 @@ class LocalizationResourceTest {
                 "voice_message_release_to_send",
                 "voice_message_too_short",
                 "voice_message_permission_denied",
+                "voice_message_play",
+                "voice_message_pause",
+                "voice_message_failed",
+                "voice_message_locked",
             )
     }
 }

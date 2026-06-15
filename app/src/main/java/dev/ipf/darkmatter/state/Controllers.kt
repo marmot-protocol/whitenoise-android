@@ -1931,16 +1931,8 @@ class ConversationController(
                     runCatching {
                         appState.marmotIo { downloadMedia(account, groupIdHex, reference) }
                     }.recoverCatching { initial ->
-                        // TODO(darkmatter#413): remove this redirect-retry once
-                        // the runtime grows a built-in per-hop-validated follow
-                        // path. Today the Rust client refuses 30x for SSRF
-                        // defense, so a Blossom host that 302s to a CDN
-                        // backend (e.g. `blossom.primal.net` →
-                        // `r2a.primal.net`) bricks every receive-side
-                        // download. Resolve the chain in Kotlin (same SSRF
-                        // shape, bounded hops) and retry once with the
-                        // resolved URL — the runtime still owns the actual
-                        // fetch + decrypt.
+                        // TODO(darkmatter#413): drop with the resolver once
+                        // the runtime follows per-hop validated redirects.
                         if (initial is CancellationException) throw initial
                         if (!isBlossomRedirectError(initial)) throw initial
                         val original =
@@ -2759,15 +2751,38 @@ class ConversationController(
         // ("xxxxxxxx-xxxx-..."). The FFI rejects anything that isn't a 64-char
         // hex blob (InvalidHex at the first '-'). Skip — the projection will
         // call markReadUpTo again with the confirmed hex id once it echoes.
-        if (!HEX_MESSAGE_ID.matches(trimmed)) return
-        if (trimmed == lastReadMessageId) return
-        val account = conversationAccountRef ?: return
-        // Restore the prior pointer on failure so a transient FFI error
-        // doesn't drop the dedupe state for already-marked rows.
+        if (!HEX_MESSAGE_ID.matches(trimmed)) {
+            Log.d("UnreadDebug", "markReadUpTo skipped non-hex id=${trimmed.take(8)} group=${group.groupIdHex.take(8)}")
+            return
+        }
+        if (trimmed == lastReadMessageId) {
+            Log.d("UnreadDebug", "markReadUpTo dedup id=${trimmed.take(8)} group=${group.groupIdHex.take(8)}")
+            return
+        }
+        val account =
+            conversationAccountRef ?: run {
+                Log.d("UnreadDebug", "markReadUpTo no account group=${group.groupIdHex.take(8)}")
+                return
+            }
+        // Surface the row's kind + direction so we can spot whether group
+        // system / edit kinds are dragging the unread count along even
+        // after the read pointer advances past them.
+        val row = timeline.firstOrNull { it.record.messageIdHex == trimmed }
+        Log.d(
+            "UnreadDebug",
+            "markReadUpTo FIRE group=${group.groupIdHex.take(8)} id=${trimmed.take(8)} " +
+                "kind=${row?.record?.kind} dir=${row?.record?.direction} " +
+                "timelineSize=${timeline.size}",
+        )
         val previous = lastReadMessageId
         lastReadMessageId = trimmed
         runCatching {
             appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, trimmed) }
+        }.onSuccess {
+            Log.d(
+                "UnreadDebug",
+                "markReadUpTo OK group=${group.groupIdHex.take(8)} id=${trimmed.take(8)}",
+            )
         }.onFailure {
             lastReadMessageId = previous
             if (it is CancellationException) throw it

@@ -7,6 +7,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.util.Log
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -19,8 +20,15 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -73,6 +81,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -105,8 +114,10 @@ import androidx.compose.material.icons.filled.MarkChatRead
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
@@ -137,6 +148,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
@@ -144,7 +156,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarHost
@@ -166,6 +177,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -178,6 +191,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -187,12 +201,14 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -220,6 +236,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -2766,6 +2783,374 @@ private fun MediaFileBubble(
     }
 }
 
+@Composable
+private fun MediaVoiceBubble(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    mine: Boolean,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val pillKey = "$messageIdHex#$attachmentIndex"
+
+    var localFile by remember(pillKey) { mutableStateOf<java.io.File?>(null) }
+    var totalDurationMs by remember(pillKey) { mutableStateOf(0) }
+    var loading by remember(pillKey) { mutableStateOf(false) }
+    var failed by remember(pillKey) { mutableStateOf(false) }
+
+    val playback by dev.ipf.darkmatter.audio.VoicePlaybackController.state
+        .collectAsState()
+    val isThis = playback.key == pillKey
+    val isPlayingThis = isThis && playback.isPlaying
+    val isPausedThis = isThis && !playback.isPlaying && playback.positionMs > 0
+    val activeDurationMs =
+        if (isThis && playback.durationMs > 0) playback.durationMs else totalDurationMs
+    val activePositionMs = if (isThis) playback.positionMs else 0
+    val progressFraction =
+        if (activeDurationMs > 0) {
+            (activePositionMs.toFloat() / activeDurationMs.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+
+    // Stable per-message pseudo-waveform: SHA-256 the key, take 32 bytes,
+    // map each to a 0.3..1.0 amplitude. Real peak-decoding can replace
+    // this in a follow-up; today it gives a recognizable waveform shape
+    // that's stable across recompositions and is essentially free.
+    val waveform: FloatArray =
+        remember(pillKey) {
+            val bytes =
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest(pillKey.toByteArray())
+            FloatArray(32) { i ->
+                val byte = bytes[i % bytes.size].toInt() and 0xFF
+                0.3f + (byte / 255f) * 0.7f
+            }
+        }
+
+    LaunchedEffect(pillKey) {
+        if (localFile != null) return@LaunchedEffect
+        val instant = mine || controller.hasCachedAttachment(messageIdHex, attachmentIndex)
+        if (!instant) loading = true
+        runCatching {
+            materializeVoiceAttachment(
+                context = context,
+                controller = controller,
+                messageIdHex = messageIdHex,
+                attachmentIndex = attachmentIndex,
+                reference = reference,
+                mine = mine,
+            )
+        }.onSuccess { file ->
+            localFile = file
+            failed = false
+        }.onFailure {
+            if (it is kotlinx.coroutines.CancellationException) throw it
+            Log.w("MediaVoiceBubble", "auto-materialize failed for $pillKey", it)
+            failed = true
+        }
+        loading = false
+    }
+
+    // Surface a cached duration as soon as the file is materialized so the
+    // bubble shows "0:12" instead of "0:00" before the user taps Play.
+    LaunchedEffect(pillKey, localFile) {
+        val file = localFile ?: return@LaunchedEffect
+        if (totalDurationMs == 0) {
+            val probed =
+                dev.ipf.darkmatter.audio.VoicePlaybackController
+                    .probeDuration(file)
+            if (probed > 0) totalDurationMs = probed
+        }
+    }
+
+    val onSurfaceMuted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+    val accent = MaterialTheme.colorScheme.primary
+    val onAccent = MaterialTheme.colorScheme.onPrimary
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+        ) {
+            // Circular play/pause button. Anchors the bubble and is the
+            // primary tap target — sized generously (48dp) so it reads as
+            // the focal control.
+            Surface(
+                color = accent,
+                shape = androidx.compose.foundation.shape.CircleShape,
+                modifier =
+                    Modifier
+                        .size(48.dp)
+                        .clickable(enabled = !loading) {
+                            failed = false
+                            if (isPlayingThis) {
+                                dev.ipf.darkmatter.audio.VoicePlaybackController
+                                    .pause()
+                                return@clickable
+                            }
+                            scope.launch {
+                                val file =
+                                    localFile ?: runCatching {
+                                        loading = true
+                                        materializeVoiceAttachment(
+                                            context = context,
+                                            controller = controller,
+                                            messageIdHex = messageIdHex,
+                                            attachmentIndex = attachmentIndex,
+                                            reference = reference,
+                                            mine = mine,
+                                        )
+                                    }.onFailure {
+                                        if (it is kotlinx.coroutines.CancellationException) throw it
+                                        Log.w("MediaVoiceBubble", "materialize failed for $pillKey", it)
+                                        failed = true
+                                    }.also { loading = false }
+                                        .getOrNull()
+
+                                if (file == null) return@launch
+                                localFile = file
+                                dev.ipf.darkmatter.audio.VoicePlaybackController
+                                    .play(pillKey, file)
+                            }
+                        },
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    when {
+                        loading ->
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.dp,
+                                color = onAccent,
+                            )
+                        failed ->
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = stringResource(R.string.voice_message_failed),
+                                tint = onAccent,
+                                modifier = Modifier.size(26.dp),
+                            )
+                        isPlayingThis ->
+                            Icon(
+                                imageVector = Icons.Default.Pause,
+                                contentDescription = stringResource(R.string.voice_message_pause),
+                                tint = onAccent,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        else ->
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = stringResource(R.string.voice_message_play),
+                                tint = onAccent,
+                                modifier = Modifier.size(28.dp),
+                            )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                VoiceWaveform(
+                    bars = waveform,
+                    progress = progressFraction,
+                    playedColor = accent,
+                    remainingColor = onSurfaceMuted,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(28.dp),
+                    onSeek =
+                        if (isThis && activeDurationMs > 0) {
+                            { fraction ->
+                                dev.ipf.darkmatter.audio.VoicePlaybackController
+                                    .seekTo(pillKey, (fraction * activeDurationMs).toInt())
+                            }
+                        } else {
+                            null
+                        },
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val timeText =
+                        when {
+                            isPlayingThis || isPausedThis ->
+                                "${formatVoiceTime(activePositionMs)} / ${formatVoiceTime(activeDurationMs)}"
+                            totalDurationMs > 0 -> formatVoiceTime(totalDurationMs)
+                            else -> "0:00"
+                        }
+                    Text(
+                        timeText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // Speed pill: only shown once playback has been engaged
+                    // for this clip, so an unplayed bubble stays uncluttered.
+                    if (isThis) {
+                        VoiceSpeedPill(currentSpeed = playback.speed)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceSpeedPill(currentSpeed: Float) {
+    val label =
+        when {
+            currentSpeed >= 1.95f -> "2×"
+            currentSpeed >= 1.45f -> "1.5×"
+            else -> "1×"
+        }
+    Surface(
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+        shape = RoundedCornerShape(10.dp),
+        modifier =
+            Modifier.clickable {
+                dev.ipf.darkmatter.audio.VoicePlaybackController
+                    .cycleSpeed()
+            },
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+        )
+    }
+}
+
+/**
+ * Voice attachments need a file on disk for MediaPlayer; reuse the
+ * downloaded plaintext to populate a stable per-message cache file so
+ * subsequent plays are instant. Own outgoing sends short-circuit through
+ * the still-retained source bytes from the pending-attachments list while
+ * the Blossom upload is in flight.
+ */
+private suspend fun materializeVoiceAttachment(
+    context: android.content.Context,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+): java.io.File {
+    val cacheDir = java.io.File(context.cacheDir, "voice_attachments").apply { mkdirs() }
+    val extension =
+        when {
+            reference.mediaType.contains("mp4", ignoreCase = true) -> "m4a"
+            reference.mediaType.contains("aac", ignoreCase = true) -> "aac"
+            reference.mediaType.contains("ogg", ignoreCase = true) -> "ogg"
+            reference.mediaType.contains("wav", ignoreCase = true) -> "wav"
+            else -> "bin"
+        }
+    val cacheFile = java.io.File(cacheDir, "$messageIdHex-$attachmentIndex.$extension")
+    if (cacheFile.exists() && cacheFile.length() > 0) return cacheFile
+
+    val retained =
+        if (mine) {
+            controller
+                .pendingAttachmentsList(messageIdHex)
+                .getOrNull(attachmentIndex)
+                ?.plaintextBytes
+        } else {
+            null
+        }
+    val bytes =
+        retained
+            ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+    withContext(Dispatchers.IO) { cacheFile.writeBytes(bytes) }
+    return cacheFile
+}
+
+/** mm:ss formatter; durations cap below an hour for voice notes. */
+private fun formatVoiceTime(ms: Int): String {
+    val totalSeconds = (ms / 1000).coerceAtLeast(0)
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format(java.util.Locale.US, "%d:%02d", minutes, seconds)
+}
+
+@Composable
+private fun VoiceWaveform(
+    bars: FloatArray,
+    progress: Float,
+    playedColor: Color,
+    remainingColor: Color,
+    modifier: Modifier = Modifier,
+    onSeek: ((fraction: Float) -> Unit)? = null,
+) {
+    var widthPx by remember { mutableStateOf(0f) }
+    val seekModifier =
+        if (onSeek != null) {
+            Modifier.pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    // Consume so the bubble's parent swipe-to-reply gesture
+                    // doesn't snatch a rightward drag mid-scrub.
+                    down.consume()
+                    onSeek((down.position.x / widthPx).coerceIn(0f, 1f))
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        change.consume()
+                        onSeek((change.position.x / widthPx).coerceIn(0f, 1f))
+                        if (change.changedToUp() || !change.pressed) break
+                    }
+                }
+            }
+        } else {
+            Modifier
+        }
+    Canvas(
+        modifier =
+            modifier
+                .then(seekModifier)
+                .onSizeChanged { widthPx = it.width.toFloat() },
+    ) {
+        val barCount = bars.size
+        if (barCount == 0) return@Canvas
+        val totalWidth = size.width
+        val totalHeight = size.height
+        val barSlot = totalWidth / barCount
+        val barWidth = barSlot * 0.55f
+        val cornerRadius =
+            androidx.compose.ui.geometry
+                .CornerRadius(barWidth / 2f, barWidth / 2f)
+        val playedBars = (progress * barCount).toInt()
+        for (i in 0 until barCount) {
+            val barHeight = totalHeight * bars[i]
+            val x = i * barSlot + (barSlot - barWidth) / 2f
+            val y = (totalHeight - barHeight) / 2f
+            val color = if (i < playedBars) playedColor else remainingColor
+            drawRoundRect(
+                color = color,
+                topLeft =
+                    androidx.compose.ui.geometry
+                        .Offset(x, y),
+                size =
+                    androidx.compose.ui.geometry
+                        .Size(barWidth, barHeight),
+                cornerRadius = cornerRadius,
+            )
+        }
+    }
+}
+
 /**
  * Compact uppercase label for the file-bubble's MIME line: `application/pdf`
  * becomes "PDF", `image/jpeg` becomes "JPG", `application/vnd.…` falls back
@@ -4018,7 +4403,15 @@ private fun isNearBottom(
     if (!listState.canScrollForward) return true
     val olderHeaderCount = if (hasOlderHeader) 1 else 0
     val bottomTimelineIndex = timelineSize + 1 + olderHeaderCount
-    return listState.firstVisibleItemIndex >= bottomTimelineIndex - ConversationNearBottomItemSlack
+    // Check the LAST visible item, not the first — keeps "near bottom"
+    // truthful when the viewport shrinks (e.g. keyboard open) and fewer
+    // items fit, which pushes firstVisibleItemIndex earlier even though
+    // the bottom is still on-screen.
+    val lastVisible =
+        listState.layoutInfo.visibleItemsInfo
+            .lastOrNull()
+            ?.index ?: return false
+    return lastVisible >= bottomTimelineIndex - 1
 }
 
 /** Read the user-visible filename a content Uri exposes via OpenableColumns,
@@ -4314,6 +4707,55 @@ private fun ConversationScreen(
         }
     DisposableEffect(voiceRecordingController) {
         onDispose { voiceRecordingController.release() }
+    }
+
+    // Auto-chain voice playback: when one clip ends, look up the next
+    // voice attachment in the timeline order and start it. Stops at any
+    // non-voice neighbor or end-of-timeline.
+    DisposableEffect(controller, chat.id) {
+        dev.ipf.darkmatter.audio.VoicePlaybackController.onCompletion = { completedKey ->
+            val (completedMsgId, _) =
+                completedKey.split("#").let { parts ->
+                    parts.getOrNull(0).orEmpty() to (parts.getOrNull(1)?.toIntOrNull() ?: 0)
+                }
+            val completedIdx = controller.timeline.indexOfFirst { it.record.messageIdHex == completedMsgId }
+            if (completedIdx >= 0) {
+                val nextVoice =
+                    (completedIdx + 1 until controller.timeline.size)
+                        .asSequence()
+                        .mapNotNull { i ->
+                            val msg = controller.timeline[i]
+                            val refs = controller.mediaReferences[msg.record.messageIdHex] ?: return@mapNotNull null
+                            val audioEntry =
+                                refs.withIndex().firstOrNull { (_, r) ->
+                                    r.mediaType.startsWith("audio/", ignoreCase = true)
+                                } ?: return@mapNotNull null
+                            Triple(msg, audioEntry.index, audioEntry.value)
+                        }.firstOrNull()
+                if (nextVoice != null) {
+                    val (msg, idx, ref) = nextVoice
+                    scope.launch {
+                        val mine = msg.record.direction != "received"
+                        val file =
+                            runCatching {
+                                materializeVoiceAttachment(
+                                    context = context,
+                                    controller = controller,
+                                    messageIdHex = msg.record.messageIdHex,
+                                    attachmentIndex = idx,
+                                    reference = ref,
+                                    mine = mine,
+                                )
+                            }.getOrNull() ?: return@launch
+                        dev.ipf.darkmatter.audio.VoicePlaybackController
+                            .play("${msg.record.messageIdHex}#$idx", file)
+                    }
+                }
+            }
+        }
+        onDispose {
+            dev.ipf.darkmatter.audio.VoicePlaybackController.onCompletion = null
+        }
     }
 
     // Decode/compress each URI off the main thread, then hand the album to
@@ -4689,7 +5131,24 @@ private fun ConversationScreen(
             }
         }
     }
-    LaunchedEffect(latestTimelineItemId, imeBottom) {
+    // Boolean-edge key avoids per-frame coroutine cancellation. The IME open
+    // animation takes ~200ms; the LazyColumn measures a smaller viewport on
+    // each tick, so a single snap at frame 0 leaves the bubble below the
+    // final viewport. The repeat loop re-snaps every frame for ~24 frames,
+    // chasing the shrinking viewport to its settled bottom. Gated on
+    // nearBottom so reading history isn't interrupted.
+    val imeIsOpen = imeBottom > 0
+    LaunchedEffect(imeIsOpen, chat.id) {
+        if (!imeIsOpen || !initialTimelineAnchored || !nearBottom) return@LaunchedEffect
+        Log.d("ImeScroll", "open nearBottom=true totalItems=${listState.layoutInfo.totalItemsCount}")
+        repeat(24) {
+            withFrameNanos { }
+            val last = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+            runCatching { listState.scrollToItem(last) }
+        }
+        Log.d("ImeScroll", "settled firstVisible=${listState.firstVisibleItemIndex}")
+    }
+    LaunchedEffect(latestTimelineItemId) {
         if (renderedTimeline.isNotEmpty()) {
             if (!initialTimelineAnchored) {
                 // First-time anchor on chat open. If there are unread
@@ -4974,25 +5433,28 @@ private fun ConversationScreen(
                             LoadingScreen()
                         }
                         if (initialTimelineAnchored && !nearBottom) {
-                            SmallFloatingActionButton(
-                                onClick = {
-                                    scope.launch {
-                                        val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                                        listState.animateScrollToItem(lastIndex)
-                                    }
-                                },
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                shadowElevation = 2.dp,
                                 modifier =
                                     Modifier
                                         .align(Alignment.BottomEnd)
-                                        .padding(12.dp),
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        .padding(12.dp)
+                                        .size(34.dp)
+                                        .clickable {
+                                            scope.launch {
+                                                val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                                                listState.animateScrollToItem(lastIndex)
+                                            }
+                                        },
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         Icons.Default.ArrowDownward,
                                         contentDescription = stringResource(R.string.jump_to_newest),
-                                        modifier = Modifier.size(20.dp),
+                                        modifier = Modifier.size(16.dp),
                                     )
                                     if (unreadIncomingCount > 0) {
                                         Badge(
@@ -6505,12 +6967,21 @@ private fun MessageBubble(
                                     .filter { (_, ref) -> MediaReferenceParser.isImageMedia(ref) }
                                     .toList()
                             }
+                        val audioAttachments =
+                            remember(mediaReferences) {
+                                mediaReferences
+                                    .withIndex()
+                                    .filter { (_, ref) -> MediaReferenceParser.isAudioMedia(ref) }
+                                    .toList()
+                            }
                         val fileAttachments =
                             remember(mediaReferences) {
                                 mediaReferences
                                     .withIndex()
-                                    .filter { (_, ref) -> !MediaReferenceParser.isImageMedia(ref) }
-                                    .toList()
+                                    .filter { (_, ref) ->
+                                        !MediaReferenceParser.isImageMedia(ref) &&
+                                            !MediaReferenceParser.isAudioMedia(ref)
+                                    }.toList()
                             }
                         val mediaPendingName =
                             remember(record.tags) {
@@ -6540,6 +7011,18 @@ private fun MessageBubble(
                                 )
                             }
                         }
+                        if (!deleted && !invalidated && audioAttachments.isNotEmpty()) {
+                            audioAttachments.forEach { entry ->
+                                MediaVoiceBubble(
+                                    messageIdHex = record.messageIdHex,
+                                    attachmentIndex = entry.index,
+                                    reference = entry.value,
+                                    mine = mine,
+                                    controller = controller,
+                                    appState = appState,
+                                )
+                            }
+                        }
                         if (!deleted && !invalidated && fileAttachments.isNotEmpty()) {
                             fileAttachments.forEach { entry ->
                                 MediaFileBubble(
@@ -6552,8 +7035,54 @@ private fun MessageBubble(
                                 )
                             }
                         }
-                        val anyConfirmedMedia = imageAttachments.isNotEmpty() || fileAttachments.isNotEmpty()
-                        if (!deleted && !invalidated && !anyConfirmedMedia && mediaPendingName != null) {
+                        val anyConfirmedMedia =
+                            imageAttachments.isNotEmpty() ||
+                                audioAttachments.isNotEmpty() ||
+                                fileAttachments.isNotEmpty()
+                        val pendingAttachmentsForRecord =
+                            remember(record.messageIdHex, controller.pendingAttachmentsList(record.messageIdHex)) {
+                                controller.pendingAttachmentsList(record.messageIdHex)
+                            }
+                        val pendingAudio =
+                            remember(pendingAttachmentsForRecord) {
+                                pendingAttachmentsForRecord
+                                    .withIndex()
+                                    .filter { (_, p) -> p.mediaType.startsWith("audio/", ignoreCase = true) }
+                                    .toList()
+                            }
+                        if (!deleted && !invalidated && !anyConfirmedMedia && pendingAudio.isNotEmpty()) {
+                            pendingAudio.forEach { (index, pending) ->
+                                MediaVoiceBubble(
+                                    messageIdHex = record.messageIdHex,
+                                    attachmentIndex = index,
+                                    reference =
+                                        remember(record.messageIdHex, index, pending) {
+                                            MediaAttachmentReferenceFfi(
+                                                locators = emptyList(),
+                                                ciphertextSha256 = "",
+                                                plaintextSha256 = "",
+                                                nonceHex = "",
+                                                fileName = pending.fileName,
+                                                mediaType = pending.mediaType,
+                                                version = "encrypted-media-v1",
+                                                sourceEpoch = 0u,
+                                                dim = null,
+                                                thumbhash = null,
+                                            )
+                                        },
+                                    mine = true,
+                                    controller = controller,
+                                    appState = appState,
+                                )
+                            }
+                        }
+                        val showPendingPlaceholder =
+                            !deleted &&
+                                !invalidated &&
+                                !anyConfirmedMedia &&
+                                pendingAudio.isEmpty() &&
+                                mediaPendingName != null
+                        if (showPendingPlaceholder) {
                             MediaPendingPlaceholder(
                                 pendingAttachments = controller.pendingAttachmentsList(record.messageIdHex),
                                 failed = item.status == MessageStatus.Failed,
@@ -7586,90 +8115,71 @@ private fun ComposerBar(
                 }
             }
         }
+        val isRecordingVoice = voiceRecordingController?.isRecording == true
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (onPickFromGallery != null || onCaptureFromCamera != null || onPickDocument != null) {
-                Box {
-                    IconButton(
-                        onClick = { attachMenuOpen = true },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.AttachFile,
-                            contentDescription = stringResource(R.string.attach_image),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = attachMenuOpen,
-                        onDismissRequest = { attachMenuOpen = false },
-                    ) {
-                        if (onCaptureFromCamera != null) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.attach_take_photo)) },
-                                leadingIcon = { Icon(Icons.Default.PhotoCamera, contentDescription = null) },
-                                onClick = {
-                                    attachMenuOpen = false
-                                    onCaptureFromCamera()
-                                },
-                            )
-                        }
-                        if (onPickFromGallery != null) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.attach_photo_library)) },
-                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
-                                onClick = {
-                                    attachMenuOpen = false
-                                    onPickFromGallery()
-                                },
-                            )
-                        }
-                        if (onPickDocument != null) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.attach_document)) },
-                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
-                                onClick = {
-                                    attachMenuOpen = false
-                                    onPickDocument()
-                                },
-                            )
-                        }
-                    }
-                }
+            // Trailing MicHoldButton call site below must be shared by both
+            // branches — different call sites break the pointer-gesture identity.
+            if (isRecordingVoice && voiceRecordingController != null) {
+                RecordingStripLeading(controller = voiceRecordingController, modifier = Modifier.weight(1f))
+            } else {
+                ComposerPill(
+                    textFieldValue = textFieldValue,
+                    composerFocus = composerFocus,
+                    onValueChange = { value ->
+                        textFieldValue = value
+                        // While editing, the field holds the edit candidate,
+                        // not a fresh chat draft. Persisting it would clobber
+                        // whatever the user was composing before they tapped
+                        // Edit — that's the snapshot we restore from
+                        // preEditFieldValue on cancel/submit.
+                        if (editingMessageId == null) onDraftChange(value.text)
+                    },
+                    onAttachMenuToggle = { attachMenuOpen = !attachMenuOpen },
+                    attachMenuOpen = attachMenuOpen,
+                    onAttachMenuDismiss = { attachMenuOpen = false },
+                    onCaptureFromCamera = onCaptureFromCamera,
+                    onPickFromGallery = onPickFromGallery,
+                    onPickDocument = onPickDocument,
+                    modifier = Modifier.weight(1f),
+                )
             }
-            OutlinedTextField(
-                value = textFieldValue,
-                onValueChange = { value ->
-                    textFieldValue = value
-                    // While editing, the field holds the edit candidate, not
-                    // a fresh chat draft. Persisting it would clobber whatever
-                    // the user was composing before they tapped Edit — which
-                    // is exactly the snapshot we restore from `preEditFieldValue`
-                    // on cancel/submit.
-                    if (editingMessageId == null) onDraftChange(value.text)
-                },
-                modifier = Modifier.weight(1f).focusRequester(composerFocus),
-                placeholder = { Text(stringResource(R.string.message)) },
-                maxLines = 5,
-                colors =
-                    OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        errorContainerColor = Color.Transparent,
-                    ),
-                keyboardOptions =
-                    KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                        keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Default,
-                    ),
-            )
             val showMicButton =
                 text.isBlank() &&
                     editingMessageId == null &&
                     voiceRecordingController != null
-            if (showMicButton) {
-                MicHoldButton(controller = voiceRecordingController)
+            if (showMicButton && voiceRecordingController?.locked == true) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    IconButton(
+                        onClick = { voiceRecordingController.cancel() },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.voice_message_release_to_send),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    FloatingActionButton(
+                        onClick = { voiceRecordingController.stop() },
+                        modifier = Modifier.size(44.dp),
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = stringResource(R.string.send),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            } else if (showMicButton) {
+                Box(contentAlignment = Alignment.BottomCenter) {
+                    LockHintAbove(controller = voiceRecordingController!!)
+                    MicHoldButton(controller = voiceRecordingController)
+                }
             } else {
                 FloatingActionButton(
                     onClick = {
@@ -7690,16 +8200,17 @@ private fun ComposerBar(
                             }
                         }
                     },
-                    modifier = Modifier.size(52.dp),
+                    modifier = Modifier.size(44.dp),
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        contentDescription = stringResource(R.string.send),
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
-        }
-        if (voiceRecordingController?.isRecording == true) {
-            RecordingIndicator(elapsedMs = voiceRecordingController.elapsedMs)
         }
     }
 }
@@ -7714,14 +8225,17 @@ private fun ComposerBar(
 @Composable
 private fun MicHoldButton(controller: dev.ipf.darkmatter.audio.VoiceRecordingController) {
     val haptics = LocalHapticFeedback.current
-    val cancelThresholdDp = 80.dp
-    val cancelThresholdPx = with(LocalDensity.current) { cancelThresholdDp.toPx() }
+    val cancelThresholdDp = 120.dp
+    val lockThresholdDp = 80.dp
+    val density = LocalDensity.current
+    val cancelThresholdPx = with(density) { cancelThresholdDp.toPx() }
+    val lockThresholdPx = with(density) { lockThresholdDp.toPx() }
     val recording = controller.isRecording
     FloatingActionButton(
         onClick = {},
         modifier =
             Modifier
-                .size(52.dp)
+                .size(44.dp)
                 .pointerInput(controller) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
@@ -7729,12 +8243,28 @@ private fun MicHoldButton(controller: dev.ipf.darkmatter.audio.VoiceRecordingCon
                         if (!started) return@awaitEachGesture
                         haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                         var canceled = false
+                        var locked = false
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            val dragPx = (change.position - down.position).getDistance()
-                            if (!canceled && dragPx > cancelThresholdPx) {
+                            val deltaX = change.position.x - down.position.x
+                            val deltaY = change.position.y - down.position.y
+                            controller.updateDrag(deltaX, deltaY, cancelThresholdPx, lockThresholdPx)
+                            if (!locked && -deltaY > lockThresholdPx && -deltaX <= cancelThresholdPx) {
+                                locked = true
+                                haptics.performHapticFeedback(
+                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
+                                )
+                                controller.lock()
+                                return@awaitEachGesture
+                            }
+                            if (!canceled && -deltaX > cancelThresholdPx) {
                                 canceled = true
+                                haptics.performHapticFeedback(
+                                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
+                                )
+                            } else if (canceled && -deltaX <= cancelThresholdPx) {
+                                canceled = false
                             }
                             if (change.changedToUp() || !change.pressed) {
                                 if (canceled) controller.cancel() else controller.stop()
@@ -7758,44 +8288,250 @@ private fun MicHoldButton(controller: dev.ipf.darkmatter.audio.VoiceRecordingCon
     }
 }
 
-/**
- * Slim recording-status row above the composer that surfaces a recording
- * pulse, the elapsed time, and the release-or-slide-to-cancel hint while a
- * voice message is being captured.
- */
 @Composable
-private fun RecordingIndicator(elapsedMs: Long) {
+private fun RecordingStripLeading(
+    controller: dev.ipf.darkmatter.audio.VoiceRecordingController,
+    modifier: Modifier = Modifier,
+) {
+    val pulseScale by rememberInfiniteRecordingPulse()
+    val canceling = controller.willCancel
+    val locked = controller.locked
+    val cancelTint = MaterialTheme.colorScheme.error
+
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.errorContainer)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        Icon(
+            Icons.Default.Delete,
+            contentDescription = null,
+            tint = if (canceling) cancelTint else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
         Box(
             modifier =
                 Modifier
-                    .size(10.dp)
+                    .size((10 * pulseScale).dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.error),
         )
         Text(
-            text = formatRecordingDuration(elapsedMs),
+            formatRecordingDuration(controller.elapsedMs),
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onErrorContainer,
+            color = if (canceling) cancelTint else MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
-            text = stringResource(R.string.voice_message_release_to_send),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
+        Spacer(Modifier.weight(1f))
+        if (locked) {
+            // Locked: the user has handed off control. The hint copy
+            // collapses to a compact "Locked" indicator so the row stays
+            // visually quiet while the trailing Stop+Trash do the work.
+            Icon(
+                Icons.Default.Lock,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                stringResource(R.string.voice_message_locked),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.size(14.dp),
+            )
+            Text(
+                stringResource(R.string.voice_message_release_to_send),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LockHintAbove(
+    controller: dev.ipf.darkmatter.audio.VoiceRecordingController,
+    modifier: Modifier = Modifier,
+) {
+    if (controller.locked || !controller.isRecording) return
+    val density = LocalDensity.current
+    val rawDp = with(density) { (-controller.verticalOffsetPx).toDp() }
+    val rise = rawDp.value.coerceIn(0f, 80f).dp
+    val armed = controller.willLock
+    Box(
+        modifier =
+            modifier
+                .offset(y = -rise - 56.dp)
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(
+                    if (armed) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Default.Lock,
+            contentDescription = null,
+            tint =
+                if (armed) {
+                    MaterialTheme.colorScheme.onPrimary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            modifier = Modifier.size(18.dp),
         )
     }
+}
+
+// BasicTextField (not Material3 TextField) so the pill height isn't pinned
+// to the 56dp filled-textfield minimum.
+@Composable
+private fun ComposerPill(
+    textFieldValue: TextFieldValue,
+    composerFocus: FocusRequester,
+    onValueChange: (TextFieldValue) -> Unit,
+    onAttachMenuToggle: () -> Unit,
+    attachMenuOpen: Boolean,
+    onAttachMenuDismiss: () -> Unit,
+    onCaptureFromCamera: (() -> Unit)?,
+    onPickFromGallery: (() -> Unit)?,
+    onPickDocument: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(22.dp),
+        modifier = modifier,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier =
+                Modifier
+                    .heightIn(min = 44.dp)
+                    .padding(start = 16.dp, end = 4.dp),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .padding(vertical = 10.dp),
+            ) {
+                BasicTextField(
+                    value = textFieldValue,
+                    onValueChange = onValueChange,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .focusRequester(composerFocus),
+                    textStyle =
+                        LocalTextStyle.current.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 16.sp,
+                        ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences,
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Default,
+                        ),
+                    maxLines = 5,
+                )
+                if (textFieldValue.text.isEmpty()) {
+                    Text(
+                        stringResource(R.string.message),
+                        style = LocalTextStyle.current.copy(fontSize = 16.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    )
+                }
+            }
+            if (onPickFromGallery != null || onPickDocument != null) {
+                Box {
+                    IconButton(
+                        onClick = onAttachMenuToggle,
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.AttachFile,
+                            contentDescription = stringResource(R.string.attach_image),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = attachMenuOpen,
+                        onDismissRequest = onAttachMenuDismiss,
+                    ) {
+                        if (onPickFromGallery != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.attach_photo_library)) },
+                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                onClick = {
+                                    onAttachMenuDismiss()
+                                    onPickFromGallery()
+                                },
+                            )
+                        }
+                        if (onPickDocument != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.attach_document)) },
+                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                                onClick = {
+                                    onAttachMenuDismiss()
+                                    onPickDocument()
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            if (onCaptureFromCamera != null) {
+                IconButton(
+                    onClick = onCaptureFromCamera,
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(
+                        Icons.Default.PhotoCamera,
+                        contentDescription = stringResource(R.string.attach_take_photo),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun rememberInfiniteRecordingPulse(): State<Float> {
+    val transition = rememberInfiniteTransition(label = "rec-pulse")
+    return transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.6f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 700, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+        label = "rec-pulse-scale",
+    )
 }
 
 private fun formatRecordingDuration(elapsedMs: Long): String {

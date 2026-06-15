@@ -14,15 +14,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 
-/**
- * Bridges the [VoiceRecorder] state machine to Compose. The composer reads
- * [isRecording] and [elapsedMs] to drive its UI; the conversation screen
- * owns this instance and wires the permission grant + final-send callback.
- *
- * Lifecycle: instantiate once per conversation screen; pass the same
- * instance to [ComposerBar]. Call [release] from a `DisposableEffect`
- * `onDispose` so a backgrounded recording doesn't leak a `MediaRecorder`.
- */
+/** Hold-to-record controller. Slide left to cancel, slide up to lock,
+ *  release to send. Auto-stops at [MAX_RECORDING_MS]. */
 @Stable
 class VoiceRecordingController(
     private val context: Context,
@@ -32,22 +25,30 @@ class VoiceRecordingController(
     private val onRecordingComplete: (file: File, durationMs: Long) -> Unit,
     private val onError: (Throwable) -> Unit,
 ) {
+    companion object {
+        const val MAX_RECORDING_MS: Long = 60_000L
+    }
+
     var isRecording: Boolean by mutableStateOf(false)
+        private set
+    var locked: Boolean by mutableStateOf(false)
         private set
 
     private val _elapsedMs = mutableLongStateOf(0L)
     val elapsedMs: Long get() = _elapsedMs.longValue
 
+    var dragOffsetPx: Float by mutableStateOf(0f)
+        private set
+    var verticalOffsetPx: Float by mutableStateOf(0f)
+        private set
+    var willCancel: Boolean by mutableStateOf(false)
+        private set
+    var willLock: Boolean by mutableStateOf(false)
+        private set
+
     private var recorder: VoiceRecorder? = null
     private var tickJob: Job? = null
 
-    /**
-     * Attempt to begin recording. Returns true if the recorder started.
-     * False means the caller blocked us — typically a missing
-     * `RECORD_AUDIO` permission, in which case [onPermissionRequest] has
-     * already fired a system prompt and the user can press-and-hold again
-     * after granting.
-     */
     fun start(): Boolean {
         if (isRecording) return true
         if (!onPermissionRequest()) return false
@@ -61,12 +62,22 @@ class VoiceRecordingController(
             r.start()
             recorder = r
             isRecording = true
+            locked = false
             _elapsedMs.longValue = 0L
+            dragOffsetPx = 0f
+            verticalOffsetPx = 0f
+            willCancel = false
+            willLock = false
             tickJob =
                 scope.launch(Dispatchers.Main) {
                     val started = System.nanoTime()
                     while (isActive) {
-                        _elapsedMs.longValue = (System.nanoTime() - started) / 1_000_000L
+                        val elapsed = (System.nanoTime() - started) / 1_000_000L
+                        _elapsedMs.longValue = elapsed
+                        if (elapsed >= MAX_RECORDING_MS) {
+                            stop()
+                            break
+                        }
                         delay(50L)
                     }
                 }
@@ -79,16 +90,17 @@ class VoiceRecordingController(
         }
     }
 
-    /**
-     * Stop the recording. On success, fires [onRecordingComplete]; on a
-     * too-short record or encoder error, fires [onError] (no completion).
-     */
     fun stop() {
         val r = recorder ?: return
         recorder = null
         tickJob?.cancel()
         tickJob = null
         isRecording = false
+        locked = false
+        dragOffsetPx = 0f
+        verticalOffsetPx = 0f
+        willCancel = false
+        willLock = false
         val result = r.stop()
         if (result == null) {
             onError(IllegalStateException("voice recording too short"))
@@ -97,20 +109,42 @@ class VoiceRecordingController(
         }
     }
 
-    /** Discard the in-flight recording. Safe to call when not recording. */
     fun cancel() {
         val r = recorder ?: return
         recorder = null
         tickJob?.cancel()
         tickJob = null
         isRecording = false
+        locked = false
+        dragOffsetPx = 0f
+        verticalOffsetPx = 0f
+        willCancel = false
+        willLock = false
         r.cancel()
     }
 
-    /**
-     * Release any in-flight recording. Call on screen dispose so a held mic
-     * + sudden navigate-away doesn't leak the underlying `MediaRecorder`.
-     */
+    fun lock() {
+        if (!isRecording || locked) return
+        locked = true
+        dragOffsetPx = 0f
+        verticalOffsetPx = 0f
+        willCancel = false
+        willLock = false
+    }
+
+    fun updateDrag(
+        deltaX: Float,
+        deltaY: Float,
+        cancelThresholdPx: Float,
+        lockThresholdPx: Float,
+    ) {
+        if (!isRecording || locked) return
+        dragOffsetPx = deltaX.coerceAtMost(0f)
+        verticalOffsetPx = deltaY.coerceAtMost(0f)
+        willCancel = (-deltaX) > cancelThresholdPx
+        willLock = (-deltaY) > lockThresholdPx
+    }
+
     fun release() {
         cancel()
     }

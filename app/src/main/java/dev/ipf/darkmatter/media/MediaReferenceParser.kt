@@ -163,4 +163,12 @@ object MediaReferenceParser {
      * route through a different surface.
      */
     fun isImageMedia(reference: MediaAttachmentReferenceFfi): Boolean = reference.mediaType.startsWith("image/", ignoreCase = true)
+
+    /**
+     * Whether this record is a voice / audio attachment that should render
+     * as an inline playable bubble. Today this matches everything under the
+     * `audio/` MIME tree; the recorder ships `audio/mp4` AAC-LC m4a but the
+     * predicate is intentionally broader so other senders' clips also play.
+     */
+    fun isAudioMedia(reference: MediaAttachmentReferenceFfi): Boolean = reference.mediaType.startsWith("audio/", ignoreCase = true)
 }

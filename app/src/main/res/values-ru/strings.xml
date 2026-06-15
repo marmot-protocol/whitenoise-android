@@ -495,4 +495,8 @@
     <string name="voice_message_release_to_send">Release to send · slide off to cancel</string>
     <string name="voice_message_too_short">Hold longer to record</string>
     <string name="voice_message_permission_denied">Microphone permission needed to record</string>
+    <string name="voice_message_play">Play voice message</string>
+    <string name="voice_message_pause">Pause voice message</string>
+    <string name="voice_message_failed">Voice message couldn\'t load</string>
+    <string name="voice_message_locked">Locked</string>
 </resources>
