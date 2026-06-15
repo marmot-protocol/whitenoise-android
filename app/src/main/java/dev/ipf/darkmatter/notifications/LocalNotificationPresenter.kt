@@ -45,7 +45,10 @@ class LocalNotificationPresenter(
         ) == PackageManager.PERMISSION_GRANTED
 
     @SuppressLint("MissingPermission")
-    fun show(update: NotificationUpdateFfi): Boolean {
+    fun show(
+        update: NotificationUpdateFfi,
+        conversationTitleOverride: String? = null,
+    ): Boolean {
         val content =
             LocalNotificationFormatter.content(update, context) ?: run {
                 notificationDebug { "skip key=${update.notificationKey.take(16)} reason=formatter" }
@@ -83,7 +86,7 @@ class LocalNotificationPresenter(
         when (update.trigger) {
             // Messages stack into one per-conversation card; invites are
             // one-off events, so keep them as a plain expandable notification.
-            NotificationTriggerFfi.NEW_MESSAGE -> builder.setStyle(messagingStyle(update, content))
+            NotificationTriggerFfi.NEW_MESSAGE -> builder.setStyle(messagingStyle(update, content, conversationTitleOverride))
             NotificationTriggerFfi.GROUP_INVITE ->
                 builder
                     .setContentTitle(content.title)
@@ -106,6 +109,7 @@ class LocalNotificationPresenter(
     private fun messagingStyle(
         update: NotificationUpdateFfi,
         content: LocalNotificationContent,
+        conversationTitleOverride: String?,
     ): NotificationCompat.MessagingStyle {
         val self =
             Person
@@ -115,7 +119,9 @@ class LocalNotificationPresenter(
                 .build()
         val style = existingMessagingStyle(content.notificationTag) ?: NotificationCompat.MessagingStyle(self)
         style.isGroupConversation = content.isGroupConversation
-        content.conversationTitle?.let { style.conversationTitle = it }
+        // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
+        // people" for unnamed groups) over the often-empty payload group name.
+        (conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle)?.let { style.conversationTitle = it }
         val sender =
             Person
                 .Builder()

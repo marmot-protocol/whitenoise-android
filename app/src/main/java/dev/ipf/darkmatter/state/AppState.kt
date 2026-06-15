@@ -18,6 +18,8 @@ import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.AvatarImageLoader
+import dev.ipf.darkmatter.core.GroupProjector
+import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.HostSafety
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MarmotClient
@@ -39,6 +41,7 @@ import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
 import dev.ipf.marmotkit.AuditLogUploadSourceFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.NotificationSettingsFfi
+import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
@@ -1742,6 +1745,37 @@ class DarkMatterAppState(
         requestProfile(accountIdHex)
     }
 
+    // Resolve the conversation title for a notification the same way the chat
+    // list does, since the runtime payload's group name is empty for unnamed
+    // groups. Returns null for DMs (MessagingStyle shows the sender instead).
+    private suspend fun notificationConversationTitle(update: NotificationUpdateFfi): String? {
+        if (update.isDm) return null
+        update.groupName
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return it }
+        val members =
+            runCatching { marmotIo { groupMembers(update.accountRef, update.groupIdHex) } }
+                .getOrNull()
+                .orEmpty()
+        if (members.isEmpty()) return null
+        return GroupProjector.displayTitle(
+            name = "",
+            pendingInviteAccount = null,
+            groupIdHex = update.groupIdHex,
+            otherMemberAccount = GroupProjector.otherMemberAccount(members, update.accountIdHex),
+            memberCount = members.size,
+            memberTitle = { chatMemberTitle(it) },
+            copy = notificationGroupTitleCopy(),
+        )
+    }
+
+    private fun notificationGroupTitleCopy(): GroupTitleCopy =
+        GroupTitleCopy(
+            inviteFromFormat = appContext.getString(R.string.group_title_invite_from),
+            groupOfPeopleFormat = appContext.getString(R.string.group_title_people_count),
+        )
+
     private fun startNotificationListener() {
         if (notificationJob?.isActive == true) return
         notificationJob =
@@ -1774,7 +1808,7 @@ class DarkMatterAppState(
                                         "updateAccount=${update.accountRef.take(8)} post=$shouldPost"
                                 }
                                 if (shouldPost) {
-                                    localNotificationPresenter.show(update)
+                                    localNotificationPresenter.show(update, notificationConversationTitle(update))
                                 }
                             }
                         } finally {
