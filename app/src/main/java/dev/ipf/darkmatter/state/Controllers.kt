@@ -2312,6 +2312,7 @@ class ConversationController(
             appState.present(R.string.toast_invite_accepted)
             true
         }.getOrElse {
+            it.rethrowIfCancellation()
             appState.present(R.string.toast_couldnt_accept_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
             false
         }
@@ -2325,6 +2326,7 @@ class ConversationController(
             appState.present(R.string.toast_invite_declined)
             true
         }.getOrElse {
+            it.rethrowIfCancellation()
             appState.present(R.string.toast_couldnt_decline_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
             false
         }
