@@ -3036,7 +3036,7 @@ private fun MediaVoiceBubble(
                                         )
                                     }.onFailure {
                                         if (it is kotlinx.coroutines.CancellationException) throw it
-                                        Log.w("MediaVoiceBubble", "materialize failed for $pillKey", it)
+                                        Log.w("MediaVoiceBubble", "materialize failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
                                         failed = true
                                     }.also { loading = false }
                                         .getOrNull()
