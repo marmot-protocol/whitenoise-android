@@ -7,7 +7,33 @@ import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 data class TimelineReplyDisplay(
     val sender: String,
     val body: String,
+    val mediaKind: ReplyMediaKind = ReplyMediaKind.None,
 )
+
+enum class ReplyMediaKind { None, Photo, Video, Voice, Document }
+
+fun replyMediaKindFromMime(mime: String?): ReplyMediaKind {
+    if (mime.isNullOrBlank()) return ReplyMediaKind.None
+    return when {
+        mime.startsWith("audio/", ignoreCase = true) -> ReplyMediaKind.Voice
+        mime.startsWith("image/", ignoreCase = true) -> ReplyMediaKind.Photo
+        mime.startsWith("video/", ignoreCase = true) -> ReplyMediaKind.Video
+        else -> ReplyMediaKind.Document
+    }
+}
+
+// Heuristic on the FFI's reply preview mediaJson (opaque JSON; just looks
+// for the MIME tree prefix). Cheap and good enough for "what icon to show".
+fun replyMediaKindFromJson(mediaJson: String?): ReplyMediaKind {
+    if (mediaJson.isNullOrBlank()) return ReplyMediaKind.None
+    val lower = mediaJson.lowercase()
+    return when {
+        "audio/" in lower -> ReplyMediaKind.Voice
+        "image/" in lower -> ReplyMediaKind.Photo
+        "video/" in lower -> ReplyMediaKind.Video
+        else -> ReplyMediaKind.Document
+    }
+}
 
 object TimelineProjector {
     fun toAppMessageRecord(record: TimelineMessageRecordFfi): AppMessageRecordFfi =
@@ -52,6 +78,7 @@ object TimelineProjector {
         return TimelineReplyDisplay(
             sender = preview.sender,
             body = preview.displayBody(copy),
+            mediaKind = replyMediaKindFromJson(preview.mediaJson),
         )
     }
 

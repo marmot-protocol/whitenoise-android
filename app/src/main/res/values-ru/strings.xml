@@ -490,4 +490,19 @@
     <string name="group_system_you_avatar_changed">Вы изменили аватар группы</string>
     <string name="media_attachment_add_more">Добавить ещё</string>
     <string name="media_attachment_remove">Удалить вложение</string>
+    <string name="voice_message_record">Удерживайте для записи</string>
+    <string name="voice_message_recording">Запись…</string>
+    <string name="voice_message_release_to_send">Отпустите для отправки · потяните для отмены</string>
+    <string name="voice_message_too_short">Удерживайте дольше</string>
+    <string name="voice_message_permission_denied">Требуется доступ к микрофону</string>
+    <string name="voice_message_play">Воспроизвести голосовое</string>
+    <string name="voice_message_pause">Пауза</string>
+    <string name="voice_message_failed">Не удалось загрузить голосовое сообщение</string>
+    <string name="voice_message_locked">Закреплено</string>
+    <string name="reply_you">Вы</string>
+    <string name="reply_media_photo">Фото</string>
+    <string name="reply_media_video">Видео</string>
+    <string name="reply_media_voice">Голосовое сообщение</string>
+    <string name="reply_media_document">Документ</string>
+    <string name="voice_message_cancel">Отменить голосовое</string>
 </resources>

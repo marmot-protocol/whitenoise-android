@@ -484,4 +484,19 @@
     <string name="relative_time_days">%1$dd</string>
     <string name="media_attachment_add_more">Add more</string>
     <string name="media_attachment_remove">Remove attachment</string>
+    <string name="voice_message_record">Hold to record voice message</string>
+    <string name="voice_message_recording">Recording…</string>
+    <string name="voice_message_release_to_send">Release to send · slide off to cancel</string>
+    <string name="voice_message_too_short">Hold longer to record</string>
+    <string name="voice_message_permission_denied">Microphone permission needed to record</string>
+    <string name="voice_message_play">Play voice message</string>
+    <string name="voice_message_pause">Pause voice message</string>
+    <string name="voice_message_failed">Voice message couldn\'t load</string>
+    <string name="voice_message_locked">Locked</string>
+    <string name="voice_message_cancel">Cancel voice message</string>
+    <string name="reply_you">You</string>
+    <string name="reply_media_photo">Photo</string>
+    <string name="reply_media_video">Video</string>
+    <string name="reply_media_voice">Voice message</string>
+    <string name="reply_media_document">Document</string>
 </resources>

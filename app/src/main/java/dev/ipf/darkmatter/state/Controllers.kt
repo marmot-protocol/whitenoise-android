@@ -15,7 +15,10 @@ import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ReactionTally
 import dev.ipf.darkmatter.core.ReplyNavigation
 import dev.ipf.darkmatter.core.TimelineProjector
+import dev.ipf.darkmatter.core.TimelineReplyDisplay
 import dev.ipf.darkmatter.core.aggregateEdits
+import dev.ipf.darkmatter.core.replyMediaKindFromMime
+import dev.ipf.darkmatter.media.BlossomRedirectResolver
 import dev.ipf.darkmatter.media.MediaPipeline
 import dev.ipf.darkmatter.media.MediaReferenceParser
 import dev.ipf.marmotkit.AgentStreamSubscription
@@ -1803,6 +1806,7 @@ class ConversationController(
             // The key drains when the user retries (terminal performMediaUpload
             // path runs) or explicitly discards.
             publishTimelineFromIndexes()
+            Log.w("DMConversation", "media upload failed for ${group.groupIdHex.take(8)}", throwable)
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
     }
@@ -1972,11 +1976,51 @@ class ConversationController(
                 val result =
                     runCatching {
                         appState.marmotIo { downloadMedia(account, groupIdHex, reference) }
-                    }.onFailure {
-                        if (it is CancellationException) throw it
+                    }.recoverCatching { initial ->
+                        // TODO(darkmatter#413): drop with the resolver once
+                        // the runtime follows per-hop validated redirects.
+                        if (initial is CancellationException) throw initial
+                        if (!isBlossomRedirectError(initial)) throw initial
+                        val original =
+                            reference.locators
+                                .firstOrNull {
+                                    it.kind == "blossom-v1"
+                                }?.value ?: throw initial
+                        val resolved =
+                            withContext(Dispatchers.IO) {
+                                BlossomRedirectResolver.resolve(original)
+                            } ?: throw initial
                         Log.w(
                             "DMConversation",
-                            "downloadAttachment failed for ${groupIdHex.take(8)} message=${messageIdHex.take(8)}",
+                            "blossom redirect resolved (workaround darkmatter#413) " +
+                                "from=${original.substringBefore("/", "?").take(64)} " +
+                                "to=${resolved.substringBefore("?").take(64)}",
+                        )
+                        val resolvedReference =
+                            reference.copy(
+                                locators =
+                                    reference.locators.map { locator ->
+                                        if (locator.kind == "blossom-v1" && locator.value == original) {
+                                            locator.copy(value = resolved)
+                                        } else {
+                                            locator
+                                        }
+                                    },
+                            )
+                        appState.marmotIo { downloadMedia(account, groupIdHex, resolvedReference) }
+                    }.onFailure {
+                        if (it is CancellationException) throw it
+                        // Strip query/path tail so any signed tokens or
+                        // capabilities in the locator don't end up in logs.
+                        val host =
+                            reference.locators
+                                .firstOrNull()
+                                ?.value
+                                ?.let { url -> url.substringAfter("://", "").substringBefore('/') }
+                                .orEmpty()
+                        Log.w(
+                            "DMConversation",
+                            "downloadAttachment failed for ${groupIdHex.take(8)} message=${messageIdHex.take(8)} host=$host",
                             it,
                         )
                     }.getOrThrow()
@@ -2559,15 +2603,19 @@ class ConversationController(
     fun replyPreview(
         item: TimelineMessage,
         copy: MessageTextCopy = MessageTextCopy.Default,
-    ): Pair<String, String>? {
+    ): TimelineReplyDisplay? {
         item.projected?.let { record ->
-            TimelineProjector.replyPreview(record, copy)?.let { preview ->
-                return preview.sender to preview.body
-            }
+            TimelineProjector.replyPreview(record, copy)?.let { preview -> return preview }
         }
         val targetMessageId = MessageProjector.replyTargetMessageId(item.record) ?: return null
         val target = messageById[targetMessageId] ?: return null
-        return target.sender to MessageProjector.displayBody(target, copy)
+        val refs = MediaReferenceParser.parseAllImetaTags(target.tags)
+        val mediaKind = replyMediaKindFromMime(refs.firstOrNull()?.mediaType)
+        return TimelineReplyDisplay(
+            sender = target.sender,
+            body = MessageProjector.displayBody(target, copy),
+            mediaKind = mediaKind,
+        )
     }
 
     private fun applyTimelinePage(
@@ -2761,8 +2809,6 @@ class ConversationController(
         if (!HEX_MESSAGE_ID.matches(trimmed)) return
         if (trimmed == lastReadMessageId) return
         val account = conversationAccountRef ?: return
-        // Restore the prior pointer on failure so a transient FFI error
-        // doesn't drop the dedupe state for already-marked rows.
         val previous = lastReadMessageId
         lastReadMessageId = trimmed
         runCatching {
@@ -3182,6 +3228,19 @@ class ConversationController(
     /** Cheap structural check: a kind:9 record whose tag list includes an
      *  `imeta` entry is a media-bearing message under encrypted-media-v1. */
     private fun recordCarriesMedia(record: TimelineMessageRecordFfi): Boolean = record.kind == 9uL && record.tags.any { it.values.firstOrNull() == "imeta" }
+
+    /**
+     * True iff [throwable] looks like the runtime's "Blossom server returned a
+     * redirect we refused to follow" error. The runtime stringly-types these
+     * via `BlobStore("download returned HTTP <code>")` so we match on the
+     * message rather than a structured field. See the resolver and
+     * darkmatter#413 for context.
+     */
+    private fun isBlossomRedirectError(throwable: Throwable): Boolean {
+        val msg = throwable.message ?: return false
+        if (!msg.contains("download returned HTTP")) return false
+        return listOf("HTTP 301", "HTTP 302", "HTTP 303", "HTTP 307", "HTTP 308").any { msg.contains(it) }
+    }
 
     /**
      * Pull typed media references from Rust and cache them by `messageIdHex`.

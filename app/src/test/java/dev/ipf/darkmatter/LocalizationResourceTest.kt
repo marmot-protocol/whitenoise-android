@@ -111,6 +111,15 @@ class LocalizationResourceTest {
                 "theme_amoled",
                 "theme_system",
                 "total",
+                // Some translations may legitimately match English for
+                // some keys/locales (e.g. "Video" in many languages, "Foto"
+                // in DE/ES/IT/PT). Keep just the brand-shared tokens here
+                // — everything else gets a real translation enforced by
+                // localizedStringFilesDoNotCopyEnglishUserVisibleText.
+                "reply_media_photo",
+                "reply_media_video",
+                "reply_media_voice",
+                "reply_media_document",
             )
     }
 }
