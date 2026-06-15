@@ -2726,14 +2726,13 @@ private fun MediaVideoGridTile(
     var posterBitmap by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
-    val autoDownload =
-        remember(messageIdHex, attachmentIndex, appState.mediaAutoDownloadPolicy) {
-            mine || appState.shouldAutoDownloadMedia()
-        }
+    var startDownload by remember(messageIdHex, attachmentIndex, appState.mediaAutoDownloadPolicy) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia())
+    }
 
-    LaunchedEffect(messageIdHex, attachmentIndex, epoch, autoDownload) {
+    LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload) {
         if (localFile != null) return@LaunchedEffect
-        if (!autoDownload) return@LaunchedEffect
+        if (!startDownload) return@LaunchedEffect
         if (!mine && epoch == 0uL) return@LaunchedEffect
         runCatching {
             materializeVideoAttachment(
@@ -2779,8 +2778,9 @@ private fun MediaVideoGridTile(
 
     Box(
         modifier =
-            modifier.clickable(enabled = localFile != null) {
-                localFile?.let(onTap)
+            modifier.clickable {
+                val f = localFile
+                if (f != null) onTap(f) else startDownload = true
             },
     ) {
         val poster = posterBitmap
@@ -2816,6 +2816,13 @@ private fun MediaVideoGridTile(
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = stringResource(R.string.voice_message_failed),
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    !startDownload && localFile == null ->
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = stringResource(R.string.media_open),
                             tint = Color.White,
                             modifier = Modifier.size(20.dp),
                         )
@@ -3163,14 +3170,17 @@ private fun MediaVideoBubble(
     var durationMs by remember(pillKey, epoch) { mutableStateOf(0L) }
     var playerOpen by remember(pillKey) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
-    val autoDownload =
-        remember(pillKey, appState.mediaAutoDownloadPolicy) {
-            mine || appState.shouldAutoDownloadMedia()
-        }
+    // Mirrors the image bubble's auto-download gate. When the policy says
+    // no (e.g. Wi-Fi-only on cellular), a tap flips startDownload=true so
+    // the user always has a path to fetch — never "looks present but can't
+    // be opened". See PR #191 reviewer feedback.
+    var startDownload by remember(pillKey, appState.mediaAutoDownloadPolicy) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia())
+    }
 
-    LaunchedEffect(pillKey, epoch, autoDownload) {
+    LaunchedEffect(pillKey, epoch, startDownload) {
         if (localFile != null) return@LaunchedEffect
-        if (!autoDownload) return@LaunchedEffect
+        if (!startDownload) return@LaunchedEffect
         if (!mine && epoch == 0uL) return@LaunchedEffect
         loading = true
         runCatching {
@@ -3256,14 +3266,22 @@ private fun MediaVideoBubble(
             // Centered play overlay — semi-transparent dark circle with white
             // triangle. While uploading we replace the triangle with a spinner
             // so the user sees the send is in flight (matches the image bubble).
+            // When startDownload is gated off (policy says no auto-fetch), the
+            // triangle becomes a download icon and tap consents to the fetch.
             Surface(
                 color = Color.Black.copy(alpha = 0.55f),
                 shape = CircleShape,
                 modifier =
                     Modifier
                         .size(56.dp)
-                        .clickable(enabled = !uploading && localFile != null) {
-                            if (!uploading && localFile != null) playerOpen = true
+                        .clickable(enabled = !uploading) {
+                            if (uploading) return@clickable
+                            val f = localFile
+                            if (f != null) {
+                                playerOpen = true
+                            } else {
+                                startDownload = true
+                            }
                         },
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -3273,6 +3291,13 @@ private fun MediaVideoBubble(
                                 modifier = Modifier.size(28.dp),
                                 strokeWidth = 2.5.dp,
                                 color = Color.White,
+                            )
+                        !startDownload && localFile == null ->
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = stringResource(R.string.media_open),
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp),
                             )
                         loading && posterBitmap == null ->
                             CircularProgressIndicator(
@@ -5611,13 +5636,17 @@ private fun ConversationScreen(
         if (uris.isEmpty()) return
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
         appState.launchMutation {
-            val attachments =
+            val result =
                 withContext(Dispatchers.Default) {
                     val out = mutableListOf<PendingAttachment>()
                     var consumed = 0L
+                    var overflowed = false
                     for (uri in uris) {
                         val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - consumed).coerceAtLeast(0L)
-                        if (remaining <= 0L) break
+                        if (remaining <= 0L) {
+                            overflowed = true
+                            break
+                        }
                         val mime = context.contentResolver.getType(uri).orEmpty()
                         val attachment =
                             if (mime.startsWith("video/", ignoreCase = true)) {
@@ -5646,8 +5675,10 @@ private fun ConversationScreen(
                         consumed += attachment.plaintextBytes.size.toLong()
                         out += attachment
                     }
-                    out
+                    out to overflowed
                 }
+            val attachments = result.first
+            val albumOverflowed = result.second
             if (attachments.size < uris.size) {
                 val anyVideoPicked =
                     uris.any {
@@ -5657,7 +5688,11 @@ private fun ConversationScreen(
                             .startsWith("video/", ignoreCase = true)
                     }
                 appState.present(
-                    if (anyVideoPicked) R.string.toast_couldnt_process_video else R.string.toast_couldnt_decode_image,
+                    when {
+                        albumOverflowed -> R.string.media_album_too_large
+                        anyVideoPicked -> R.string.toast_couldnt_process_video
+                        else -> R.string.toast_couldnt_decode_image
+                    },
                 )
                 if (attachments.isEmpty()) return@launchMutation
             }
@@ -5754,13 +5789,22 @@ private fun ConversationScreen(
             DocumentReadOutcome(accepted, rejected, albumOverflowed, albumBytes)
         }
 
-    suspend fun readPickedImages(uris: List<android.net.Uri>): List<PendingAttachment> =
+    data class VisualReadOutcome(
+        val attachments: List<PendingAttachment>,
+        val albumOverflowed: Boolean,
+    )
+
+    suspend fun readPickedImages(uris: List<android.net.Uri>): VisualReadOutcome =
         withContext(Dispatchers.Default) {
             val out = mutableListOf<PendingAttachment>()
             var consumed = 0L
+            var overflowed = false
             for (uri in uris) {
                 val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - consumed).coerceAtLeast(0L)
-                if (remaining <= 0L) break
+                if (remaining <= 0L) {
+                    overflowed = true
+                    break
+                }
                 val mime = context.contentResolver.getType(uri).orEmpty()
                 val attachment =
                     if (mime.startsWith("video/", ignoreCase = true)) {
@@ -5790,7 +5834,7 @@ private fun ConversationScreen(
                 consumed += attachment.plaintextBytes.size.toLong()
                 out += attachment
             }
-            out
+            VisualReadOutcome(out, overflowed)
         }
 
     // Single-path send used by the unified staging shelf: decodes images
@@ -5813,8 +5857,8 @@ private fun ConversationScreen(
             val rawImages = readPickedImages(imageUris)
             var imageBytes = 0L
             val acceptedImages = mutableListOf<PendingAttachment>()
-            var imageAlbumOverflowed = false
-            for (attachment in rawImages) {
+            var imageAlbumOverflowed = rawImages.albumOverflowed
+            for (attachment in rawImages.attachments) {
                 val next = imageBytes + attachment.plaintextBytes.size
                 if (next > MEDIA_ALBUM_MAX_TOTAL_BYTES) {
                     imageAlbumOverflowed = true
@@ -5844,9 +5888,13 @@ private fun ConversationScreen(
                 // Only surface the visual-decode toast when there were visual
                 // picks to begin with — a document-only send that failed every
                 // file should fall through to the document toasts below
-                // rather than misreporting as an image decode error.
+                // rather than misreporting as an image decode error. And if
+                // the album overflowed the byte budget, surface that
+                // explicitly instead of "couldn't process".
                 if (imageUris.isNotEmpty()) {
-                    appState.present(visualFailureToast)
+                    val toast =
+                        if (imageAlbumOverflowed) R.string.media_album_too_large else visualFailureToast
+                    appState.present(toast)
                     return@launchMutation
                 }
             }
