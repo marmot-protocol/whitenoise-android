@@ -41,6 +41,9 @@ fun sanitizeHttpsAvatarUrl(raw: String?): String? {
     if (scheme != "https") return null
     val host = parsed.host ?: return null
     if (host.isBlank()) return null
+    // Reject embedded credentials: `user@` can mask the real authority and the
+    // userinfo can leak to the host.
+    if (!parsed.rawUserInfo.isNullOrEmpty()) return null
     if (HostSafety.isPrivateOrLoopbackHost(host)) return null
     return candidate
 }
@@ -127,6 +130,11 @@ class DuckDuckGoImageSearchClient(
         while (true) {
             val safeSpec = sanitizeHttpsAvatarUrl(currentSpec) ?: return null
             val parsed = runCatching { URL(safeSpec) }.getOrNull() ?: return null
+            // Re-validate the authority on the URL we actually open: URI (used by
+            // the sanitizer) and URL can parse the authority differently, so guard
+            // the host we connect to rather than trusting the URI's view.
+            if (!parsed.userInfo.isNullOrEmpty()) return null
+            if (parsed.host.isNullOrBlank() || HostSafety.isPrivateOrLoopbackHost(parsed.host)) return null
             val connection = (parsed.openConnection() as? HttpURLConnection) ?: return null
             try {
                 connection.connectTimeout = timeoutMillis
