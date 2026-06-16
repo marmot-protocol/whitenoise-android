@@ -11678,7 +11678,7 @@ private fun DiagnosticsScreen(
         entries = (entries + DiagnosticLogEntry(text = text)).takeLast(500)
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
         streaming = true
         val subscription = appState.marmotIo { subscribeEvents() }
         try {
