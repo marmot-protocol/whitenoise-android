@@ -222,6 +222,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -9454,13 +9455,15 @@ private fun ComposerBar(
                     textFieldValue = textFieldValue,
                     composerFocus = composerFocus,
                     onValueChange = { value ->
-                        textFieldValue = value
-                        // While editing, the field holds the edit candidate,
-                        // not a fresh chat draft. Persisting it would clobber
-                        // whatever the user was composing before they tapped
-                        // Edit — that's the snapshot we restore from
-                        // preEditFieldValue on cancel/submit.
-                        if (editingMessageId == null) onDraftChange(value.text)
+                        if (!isRecordingVoice) {
+                            textFieldValue = value
+                            // While editing, the field holds the edit candidate,
+                            // not a fresh chat draft. Persisting it would clobber
+                            // whatever the user was composing before they tapped
+                            // Edit — that's the snapshot we restore from
+                            // preEditFieldValue on cancel/submit.
+                            if (editingMessageId == null) onDraftChange(value.text)
+                        }
                     },
                     onAttachMenuToggle = { attachMenuOpen = !attachMenuOpen },
                     attachMenuOpen = attachMenuOpen,
@@ -9468,17 +9471,34 @@ private fun ComposerBar(
                     onCaptureFromCamera = onCaptureFromCamera,
                     onPickFromGallery = onPickFromGallery,
                     onPickDocument = onPickDocument,
-                    modifier = Modifier.fillMaxWidth().alpha(if (isRecordingVoice) 0f else 1f),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .alpha(if (isRecordingVoice) 0f else 1f)
+                            .then(if (isRecordingVoice) Modifier.clearAndSetSemantics {} else Modifier),
                 )
                 if (activeRecordingController != null) {
-                    RecordingStripLeading(controller = activeRecordingController, modifier = Modifier.matchParentSize())
+                    RecordingStripLeading(
+                        controller = activeRecordingController,
+                        modifier =
+                            Modifier
+                                .matchParentSize()
+                                .pointerInput(activeRecordingController) {
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            event.changes.forEach { it.consume() }
+                                        }
+                                    }
+                                },
+                    )
                 }
             }
             // Trailing MicHoldButton call site below must stay shared by both
             // recording and non-recording states; separate call sites break the
             // pointer-gesture identity for the active hold gesture.
             val showMicButton =
-                text.isBlank() &&
+                (text.isBlank() || isRecordingVoice) &&
                     editingMessageId == null &&
                     voiceRecordingController != null
             if (showMicButton && voiceRecordingController?.locked == true) {
