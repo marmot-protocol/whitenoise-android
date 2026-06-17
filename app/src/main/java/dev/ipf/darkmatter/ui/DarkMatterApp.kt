@@ -9441,13 +9441,15 @@ private fun ComposerBar(
                 onDismiss = onCancelReply,
             )
         }
-        val isRecordingVoice = voiceRecordingController?.isRecording == true
+        val activeRecordingController = voiceRecordingController?.takeIf { it.isRecording }
+        val isRecordingVoice = activeRecordingController != null
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Trailing MicHoldButton call site below must be shared by both
-            // branches — different call sites break the pointer-gesture identity.
-            if (isRecordingVoice && voiceRecordingController != null) {
-                RecordingStripLeading(controller = voiceRecordingController, modifier = Modifier.weight(1f))
-            } else {
+            // Keep the text field composed while recording. Removing the focused
+            // BasicTextField makes Android dismiss the IME, which then removes
+            // imePadding and drops this whole bottom bar under the user's finger.
+            // The recording strip is only a visual overlay; focus stays with the
+            // hidden composer so an already-open keyboard remains open.
+            Box(modifier = Modifier.weight(1f)) {
                 ComposerPill(
                     textFieldValue = textFieldValue,
                     composerFocus = composerFocus,
@@ -9466,9 +9468,15 @@ private fun ComposerBar(
                     onCaptureFromCamera = onCaptureFromCamera,
                     onPickFromGallery = onPickFromGallery,
                     onPickDocument = onPickDocument,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth().alpha(if (isRecordingVoice) 0f else 1f),
                 )
+                if (activeRecordingController != null) {
+                    RecordingStripLeading(controller = activeRecordingController, modifier = Modifier.matchParentSize())
+                }
             }
+            // Trailing MicHoldButton call site below must stay shared by both
+            // recording and non-recording states; separate call sites break the
+            // pointer-gesture identity for the active hold gesture.
             val showMicButton =
                 text.isBlank() &&
                     editingMessageId == null &&
