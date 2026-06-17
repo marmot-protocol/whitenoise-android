@@ -42,7 +42,6 @@
     </plurals>
     <string name="close_quick_actions">Hızlı işlemleri kapat</string>
     <string name="open_quick_actions">Hızlı işlemleri aç</string>
-    <string name="my_profile">Profilini paylaş</string>
     <string name="scan_qr_code">QR kodu tara</string>
     <string name="create_group">Grup oluştur</string>
     <string name="invitation">Davet</string>
@@ -50,7 +49,6 @@
     <string name="no_chats_yet">Henüz sohbet yok</string>
     <string name="empty_chats_invite_npub">Birisini npub ile davet ederek bir sohbet başlatın.</string>
     <string name="new_chat">Yeni sohbet</string>
-    <string name="new_chat_optional_section">İsteğe bağlı</string>
     <string name="error_not_dark_matter_profile_qr">Bu QR kodu bir Dark Matter profili değil.</string>
     <string name="error_valid_recipient_reference">Geçerli bir npub, profil bağlantısı veya hex genel anahtarı girin.</string>
     <string name="error_missing_key_package">Bu hesabın henüz yayınlanmış bir anahtar paketi yok. Onlardan Dark Matter açmalarını isteyin ve tekrar deneyin.</string>
