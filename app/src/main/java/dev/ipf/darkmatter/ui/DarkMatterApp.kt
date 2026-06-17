@@ -2247,6 +2247,11 @@ private fun ReplyPreviewCard(
     mediaKind: dev.ipf.darkmatter.core.ReplyMediaKind,
     onClick: (() -> Unit)?,
     onDismiss: (() -> Unit)?,
+    // The composer banner spans the input row, so it fills its width. The
+    // in-bubble quote (#208) must instead hug its content: forcing
+    // fillMaxWidth there expands the enclosing bubble Column to its max
+    // width even when the quote and reply text are both short.
+    fillWidth: Boolean = true,
 ) {
     val title = if (isOwn) stringResource(R.string.reply_you) else senderTitle
     val mediaLabel =
@@ -2278,7 +2283,7 @@ private fun ReplyPreviewCard(
         shape = RoundedCornerShape(10.dp),
         modifier =
             Modifier
-                .fillMaxWidth()
+                .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
                 .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
     ) {
         Row(modifier = Modifier.height(IntrinsicSize.Min)) {
@@ -2290,11 +2295,17 @@ private fun ReplyPreviewCard(
                         .background(accent),
             )
             Row(
-                modifier = Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 6.dp),
+                // weight(1f) forces this Row to fill the parent's width, which
+                // re-expands the bubble (#208). Only claim it when the card is
+                // meant to span its container (composer banner). When hugging,
+                // wrap to content so a short quote keeps the bubble narrow.
+                modifier =
+                    (if (fillWidth) Modifier.weight(1f) else Modifier)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = if (fillWidth) Modifier.weight(1f) else Modifier) {
                     Text(
                         title,
                         style = MaterialTheme.typography.labelMedium,
@@ -8079,6 +8090,10 @@ private fun MessageBubble(
                                 mediaKind = preview.mediaKind,
                                 onClick = { onReplyPreviewClick(item) },
                                 onDismiss = null,
+                                // In-bubble quote hugs its content so a short
+                                // quote + short reply don't stretch the bubble
+                                // to full chat width (#208).
+                                fillWidth = false,
                             )
                         }
                         // Prefer the controller's listMedia cache — it carries
