@@ -64,14 +64,17 @@ class NotificationActionReceiver : BroadcastReceiver() {
                                 groupIdHex = action.target.groupIdHex,
                                 text = reply,
                             )
-                        if (sent) {
-                            appState.markNotificationMessageRead(
-                                accountRef = action.target.accountRef,
-                                groupIdHex = action.target.groupIdHex,
-                                messageIdHex = action.target.messageIdHex.orEmpty(),
-                            )
-                        }
-                        sent
+                        val markedRead =
+                            if (sent) {
+                                appState.markNotificationMessageRead(
+                                    accountRef = action.target.accountRef,
+                                    groupIdHex = action.target.groupIdHex,
+                                    messageIdHex = action.target.messageIdHex.orEmpty(),
+                                )
+                            } else {
+                                false
+                            }
+                        notificationReplyActionHandled(sent = sent, markedRead = markedRead)
                     }
                 }
 
@@ -88,3 +91,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
         }
     }
 }
+
+internal fun notificationReplyActionHandled(
+    sent: Boolean,
+    markedRead: Boolean,
+): Boolean = sent && markedRead

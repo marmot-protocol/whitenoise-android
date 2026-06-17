@@ -4,8 +4,10 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NotificationTargetTest {
@@ -290,6 +292,14 @@ class NotificationTargetTest {
             NotificationActions.actionUriString(NotificationActionKind.REPLY, "acct-a|group-1"),
             NotificationActions.actionUriString(NotificationActionKind.MARK_READ, "acct-a|group-1"),
         )
+    }
+
+    @Test
+    fun replyActionHandled_requiresSentAndMarkedRead() {
+        assertTrue(notificationReplyActionHandled(sent = true, markedRead = true))
+        assertFalse(notificationReplyActionHandled(sent = true, markedRead = false))
+        assertFalse(notificationReplyActionHandled(sent = false, markedRead = true))
+        assertFalse(notificationReplyActionHandled(sent = false, markedRead = false))
     }
 
     // ---- resolveNotificationNav (routing FSM) -------------------------------
