@@ -6765,6 +6765,8 @@ private fun GroupDetailsScreen(
     var pendingInvites by remember(controller.group.groupIdHex) { mutableStateOf<List<String>>(emptyList()) }
     var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
     val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
+    val inviteLabelText = stringResource(R.string.invite)
     val groupTitleCopy = rememberGroupTitleCopy()
     val oneValidMemberReferenceError = stringResource(R.string.error_one_valid_member_reference)
     val qrNotValidNpubOrPublicKeyError = stringResource(R.string.error_qr_not_valid_npub_or_public_key)
@@ -7007,9 +7009,15 @@ private fun GroupDetailsScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         pendingInvites.forEach { invite ->
+                            // Pending invites stay non-actionable, but a tap
+                            // copies the full invite key to the clipboard.
                             AssistChip(
-                                onClick = {},
-                                enabled = false,
+                                onClick = {
+                                    clipboard.setText(AnnotatedString(invite))
+                                    appState.presentText(
+                                        AppText.Resource(R.string.toast_copied_value, listOf(inviteLabelText)),
+                                    )
+                                },
                                 label = { Text(stringResource(R.string.invite_pending, IdentityFormatter.short(invite))) },
                                 leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
                             )
@@ -7019,8 +7027,18 @@ private fun GroupDetailsScreen(
             }
 
             SectionCard(title = stringResource(R.string.info)) {
-                DiagnosticRow(stringResource(R.string.group_id), IdentityFormatter.short(controller.group.groupIdHex))
-                DiagnosticRow(stringResource(R.string.nostr_group), IdentityFormatter.short(controller.group.nostrGroupIdHex))
+                DiagnosticRow(
+                    stringResource(R.string.group_id),
+                    IdentityFormatter.short(controller.group.groupIdHex),
+                    copyValue = controller.group.groupIdHex,
+                    appState = appState,
+                )
+                DiagnosticRow(
+                    stringResource(R.string.nostr_group),
+                    IdentityFormatter.short(controller.group.nostrGroupIdHex),
+                    copyValue = controller.group.nostrGroupIdHex,
+                    appState = appState,
+                )
                 DiagnosticRow(
                     stringResource(R.string.relays),
                     controller.group.relays.size
@@ -7038,7 +7056,12 @@ private fun GroupDetailsScreen(
                         mlsState == null -> Text(stringResource(R.string.mls_state_unavailable), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         else -> {
                             val state = requireNotNull(mlsState)
-                            DiagnosticRow(stringResource(R.string.group_id), IdentityFormatter.short(state.groupIdHex))
+                            DiagnosticRow(
+                                stringResource(R.string.group_id),
+                                IdentityFormatter.short(state.groupIdHex),
+                                copyValue = state.groupIdHex,
+                                appState = appState,
+                            )
                             DiagnosticRow(stringResource(R.string.epoch), state.epoch.toString())
                             DiagnosticRow(stringResource(R.string.mls_members), state.memberCount.toString())
                             DiagnosticRow(stringResource(R.string.required_components), state.requiredAppComponents.joinToString(", "))
@@ -7775,6 +7798,8 @@ private fun GroupMemberRow(
     onRemove: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    val copyNpubLabel = stringResource(R.string.copy)
     val isAdmin = controller.isAdmin(member)
     val isSelfRow =
         GroupProjector.isActiveAccountMember(
@@ -7800,11 +7825,20 @@ private fun GroupMemberRow(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(controller.memberDisplayName(member), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Tap the shortened npub to copy the full untruncated value.
             Text(
                 controller.memberSubtitle(member),
                 fontFamily = FontFamily.Monospace,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier =
+                    Modifier.clickable(
+                        onClickLabel = copyNpubLabel,
+                        role = Role.Button,
+                    ) {
+                        clipboard.setText(AnnotatedString(appState.npub(member.memberIdHex)))
+                        appState.present(R.string.toast_copied_npub)
+                    },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (isSelfRow) {
@@ -11672,6 +11706,7 @@ private fun KeyPackagesScreen(
                 KeyPackageCard(
                     kp = kp,
                     busy = working,
+                    appState = appState,
                     onDelete = { pendingDelete = kp },
                 )
             }
@@ -11720,11 +11755,15 @@ private fun KeyPackagesScreen(
 private fun KeyPackageCard(
     kp: AccountKeyPackageFfi,
     busy: Boolean,
+    appState: DarkMatterAppState,
     onDelete: () -> Unit,
 ) {
     val localLabel = stringResource(R.string.local)
     val relayLabel = stringResource(R.string.relay)
     val unknownLabel = stringResource(R.string.unknown)
+    val clipboard = LocalClipboardManager.current
+    val copyKeyPackageLabel = stringResource(R.string.copy)
+    val keyPackageLabelText = stringResource(R.string.key_package)
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
@@ -11732,10 +11771,21 @@ private fun KeyPackageCard(
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
+                    // Tap the shortened key-package id header to copy the full value.
                     Text(
                         IdentityFormatter.short(kp.keyPackageId),
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.SemiBold,
+                        modifier =
+                            Modifier.clickable(
+                                onClickLabel = copyKeyPackageLabel,
+                                role = Role.Button,
+                            ) {
+                                clipboard.setText(AnnotatedString(kp.keyPackageId))
+                                appState.presentText(
+                                    AppText.Resource(R.string.toast_copied_value, listOf(keyPackageLabelText)),
+                                )
+                            },
                     )
                     Text(
                         formatPublishedAt(kp.publishedAt, stringResource(R.string.unknown_publish_time), stringResource(R.string.published_at)),
@@ -11752,8 +11802,18 @@ private fun KeyPackageCard(
                     AssistChip(onClick = {}, label = { Text(label, style = MaterialTheme.typography.labelSmall) })
                 }
             }
-            DiagnosticRow(stringResource(R.string.event), IdentityFormatter.short(kp.eventIdHex))
-            DiagnosticRow(stringResource(R.string.ref), IdentityFormatter.short(kp.keyPackageRefHex))
+            DiagnosticRow(
+                stringResource(R.string.event),
+                IdentityFormatter.short(kp.eventIdHex),
+                copyValue = kp.eventIdHex,
+                appState = appState,
+            )
+            DiagnosticRow(
+                stringResource(R.string.ref),
+                IdentityFormatter.short(kp.keyPackageRefHex),
+                copyValue = kp.keyPackageRefHex,
+                appState = appState,
+            )
             DiagnosticRow(stringResource(R.string.size), stringResource(R.string.bytes_count, kp.keyPackageBytes.toLong()))
             if (kp.sourceRelays.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -11976,9 +12036,31 @@ private fun DiagnosticsScreen(
 private fun DiagnosticRow(
     label: String,
     value: String,
+    copyValue: String? = null,
+    appState: DarkMatterAppState? = null,
 ) {
+    val clipboard = LocalClipboardManager.current
+    // Opt-in tap-to-copy: a row becomes copyable only when both the full
+    // value and an appState (for the confirmation toast) are supplied. Plain
+    // numeric/status rows leave these null and stay non-interactive.
+    val copyable = !copyValue.isNullOrEmpty() && appState != null
+    val copyLabel = stringResource(R.string.copy)
+    val rowModifier =
+        if (copyable) {
+            Modifier
+                .fillMaxWidth()
+                .clickable(
+                    onClickLabel = copyLabel,
+                    role = Role.Button,
+                ) {
+                    clipboard.setText(AnnotatedString(copyValue!!))
+                    appState!!.presentText(AppText.Resource(R.string.toast_copied_value, listOf(label)))
+                }
+        } else {
+            Modifier.fillMaxWidth()
+        }
     Row(
-        Modifier.fillMaxWidth(),
+        rowModifier,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -11987,12 +12069,33 @@ private fun DiagnosticRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        Text(
-            value,
-            fontFamily = FontFamily.Monospace,
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f),
-        )
+        if (copyable) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Text(
+                    value,
+                    fontFamily = FontFamily.Monospace,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Icons.Default.ContentCopy,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            Text(
+                value,
+                fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
