@@ -45,7 +45,7 @@
     <string name="close_quick_actions">Закрыть быстрые действия</string>
     <string name="open_quick_actions">Открыть быстрые действия</string>
     <string name="scan_qr_code">Сканировать QR-код</string>
-    <string name="create_group">Создать группу</string>
+    <string name="new_group">Новая группа</string>
     <string name="invitation">Приглашение</string>
     <string name="invite">Пригласить</string>
     <string name="no_chats_yet">Пока нет чатов</string>

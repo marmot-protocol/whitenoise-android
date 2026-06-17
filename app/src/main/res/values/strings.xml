@@ -43,7 +43,7 @@
     <string name="close_quick_actions">Close quick actions</string>
     <string name="open_quick_actions">Open quick actions</string>
     <string name="scan_qr_code">Scan QR Code</string>
-    <string name="create_group">Create Group</string>
+    <string name="new_group">New Group</string>
     <string name="invitation">Invitation</string>
     <string name="invite">Invite</string>
     <string name="no_chats_yet">No chats yet</string>

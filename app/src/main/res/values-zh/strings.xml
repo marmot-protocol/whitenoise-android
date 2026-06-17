@@ -42,7 +42,7 @@
     <string name="close_quick_actions">关闭快速操作</string>
     <string name="open_quick_actions">打开快速操作</string>
     <string name="scan_qr_code">扫码</string>
-    <string name="create_group">创建群组</string>
+    <string name="new_group">新建群组</string>
     <string name="invitation">邀请函</string>
     <string name="invite">邀请</string>
     <string name="no_chats_yet">暂无聊天</string>

@@ -43,7 +43,7 @@
     <string name="close_quick_actions">Fermer les actions rapides</string>
     <string name="open_quick_actions">Ouvrir des actions rapides</string>
     <string name="scan_qr_code">Scanner le code QR</string>
-    <string name="create_group">Créer un groupe</string>
+    <string name="new_group">Nouveau groupe</string>
     <string name="invitation">Invitation</string>
     <string name="invite">Inviter</string>
     <string name="no_chats_yet">Pas encore de discussions</string>

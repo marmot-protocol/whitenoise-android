@@ -43,7 +43,7 @@
     <string name="close_quick_actions">Hızlı işlemleri kapat</string>
     <string name="open_quick_actions">Hızlı işlemleri aç</string>
     <string name="scan_qr_code">QR kodu tara</string>
-    <string name="create_group">Grup oluştur</string>
+    <string name="new_group">Yeni grup</string>
     <string name="invitation">Davet</string>
     <string name="invite">Davet etmek</string>
     <string name="no_chats_yet">Henüz sohbet yok</string>

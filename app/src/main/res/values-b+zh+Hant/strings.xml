@@ -42,7 +42,7 @@
     <string name="close_quick_actions">關閉快速操作</string>
     <string name="open_quick_actions">開啟快速操作</string>
     <string name="scan_qr_code">掃描 QR 碼</string>
-    <string name="create_group">建立群組</string>
+    <string name="new_group">新增群組</string>
     <string name="invitation">邀請函</string>
     <string name="invite">邀請</string>
     <string name="no_chats_yet">尚無聊天</string>

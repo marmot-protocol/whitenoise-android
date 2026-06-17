@@ -1147,7 +1147,7 @@ private fun ChatsScreen(
                         showNewChat = true
                     },
                     onCreateGroup = {
-                        newChatTitle = R.string.create_group
+                        newChatTitle = R.string.new_group
                         newChatDirect = false
                         showNewChat = true
                     },
@@ -1763,7 +1763,7 @@ fun QuickActionFabMenu(
         FloatingActionButtonMenuItem(
             onClick = { runAction(onCreateGroup) },
             icon = { Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(20.dp)) },
-            text = { Text(stringResource(R.string.create_group), style = MaterialTheme.typography.labelLarge) },
+            text = { Text(stringResource(R.string.new_group), style = MaterialTheme.typography.labelLarge) },
         )
         FloatingActionButtonMenuItem(
             onClick = { runAction(onScanQr) },
