@@ -6,10 +6,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.view.WindowCompat
 import dev.ipf.darkmatter.notifications.InboundIntentRouting
 import dev.ipf.darkmatter.notifications.NotificationNavigation
 import dev.ipf.darkmatter.notifications.NotificationTarget
@@ -31,8 +33,18 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state = remember { appState }
             val systemDarkTheme = isSystemInDarkTheme()
+            val darkTheme = state.themeMode.resolveDarkTheme(systemDarkTheme)
+            // The in-app theme can override the system theme (e.g. AMOLED while
+            // the system is light), so the status- and navigation-bar icons must
+            // follow the resolved app theme. Left on the edge-to-edge default,
+            // dark icons land on a black background and disappear.
+            SideEffect {
+                val controller = WindowCompat.getInsetsController(window, window.decorView)
+                controller.isAppearanceLightStatusBars = !darkTheme
+                controller.isAppearanceLightNavigationBars = !darkTheme
+            }
             DarkMatterTheme(
-                darkTheme = state.themeMode.resolveDarkTheme(systemDarkTheme),
+                darkTheme = darkTheme,
                 amoled = state.themeMode.isAmoled,
             ) {
                 DarkMatterApp(

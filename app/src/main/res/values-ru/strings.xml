@@ -508,4 +508,10 @@
     <string name="notification_reacted_to_message">отреагировал(а) %1$s на: \"%2$s\"</string>
     <string name="notification_reacted">отреагировал(а) %1$s</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="profile_picture_hint">Публичный HTTPS-URL изображения</string>
+    <string name="profile_picture_invalid">Разрешены только публичные HTTPS-URL изображений.</string>
+    <string name="profile_nip05_hint">имя@домен</string>
+    <string name="profile_nip05_invalid">Введите адрес вида name@example.com.</string>
+    <string name="profile_lightning_hint">Lightning-адрес, например you@walletprovider.com</string>
+    <string name="profile_lightning_invalid">Введите Lightning-адрес вида name@example.com.</string>
 </resources>
