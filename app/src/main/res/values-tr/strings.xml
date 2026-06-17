@@ -506,6 +506,6 @@
     <string name="profile_picture_invalid">Yalnızca herkese açık HTTPS resim URL\'lerine izin verilir.</string>
     <string name="profile_nip05_hint">ad@alan</string>
     <string name="profile_nip05_invalid">name@example.com gibi bir adres girin.</string>
-    <string name="profile_lightning_hint">Lightning adresi, örn. name@wallet</string>
+    <string name="profile_lightning_hint">Lightning adresi, örn. you@walletprovider.com</string>
     <string name="profile_lightning_invalid">name@example.com gibi bir Lightning adresi girin.</string>
 </resources>

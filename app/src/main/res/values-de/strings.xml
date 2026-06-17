@@ -506,6 +506,6 @@
     <string name="profile_picture_invalid">Nur öffentliche HTTPS-Bild-URLs sind erlaubt.</string>
     <string name="profile_nip05_hint">name@domäne</string>
     <string name="profile_nip05_invalid">Gib eine Adresse wie name@example.com ein.</string>
-    <string name="profile_lightning_hint">Lightning-Adresse, z. B. name@wallet</string>
+    <string name="profile_lightning_hint">Lightning-Adresse, z. B. you@walletprovider.com</string>
     <string name="profile_lightning_invalid">Gib eine Lightning-Adresse wie name@example.com ein.</string>
 </resources>

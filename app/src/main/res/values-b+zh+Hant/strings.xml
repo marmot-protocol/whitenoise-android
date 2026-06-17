@@ -503,6 +503,6 @@
     <string name="profile_picture_invalid">僅允許公開的 HTTPS 圖片網址。</string>
     <string name="profile_nip05_hint">名稱@網域</string>
     <string name="profile_nip05_invalid">請輸入類似 name@example.com 的位址。</string>
-    <string name="profile_lightning_hint">Lightning 位址，例如 name@wallet</string>
+    <string name="profile_lightning_hint">Lightning 位址，例如 you@walletprovider.com</string>
     <string name="profile_lightning_invalid">請輸入類似 name@example.com 的 Lightning 位址。</string>
 </resources>
