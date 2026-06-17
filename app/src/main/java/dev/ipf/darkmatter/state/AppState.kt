@@ -1795,6 +1795,19 @@ class DarkMatterAppState(
         requestProfile(accountIdHex)
     }
 
+    // Resolve the incoming sender's name the same way chat surfaces do:
+    // cached profile / contact display name first, then an npub. The FFI
+    // notification payload's own displayName is frequently null even when
+    // the app already has a name cached for that pubkey, which is what made
+    // notifications fall back to a raw hex key (#206). chatMemberTitle never
+    // returns raw hex — it ends at shortNpub — so a hex key can no longer
+    // leak into a notification when any name or npub is resolvable.
+    private fun notificationSenderName(update: NotificationUpdateFfi): String? {
+        val senderIdHex = update.sender.accountIdHex
+        if (senderIdHex.isBlank()) return null
+        return runCatching { chatMemberTitle(senderIdHex) }.getOrNull()
+    }
+
     // Resolve the conversation title for a notification the same way the chat
     // list does, since the runtime payload's group name is empty for unnamed
     // groups. Returns null for DMs (MessagingStyle shows the sender instead).
@@ -1860,7 +1873,11 @@ class DarkMatterAppState(
                                         "updateAccount=${update.accountRef.take(8)} post=$shouldPost"
                                 }
                                 if (shouldPost) {
-                                    localNotificationPresenter.show(update, notificationConversationTitle(update))
+                                    localNotificationPresenter.show(
+                                        update,
+                                        notificationConversationTitle(update),
+                                        notificationSenderName(update),
+                                    )
                                 }
                             }
                         } finally {

@@ -139,6 +139,100 @@ class LocalNotificationFormatterTest {
         assertNotEquals(first?.notificationTag, second?.notificationTag)
     }
 
+    @Test
+    fun senderNameOverrideTakesPrecedenceOverPayloadDisplayName() {
+        // The caller resolves the sender name (cached profile / contact name,
+        // else npub). When present it must win over the FFI payload name and the
+        // hex-key fallback. See #206.
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    groupName = "Launch",
+                    sender = user(displayName = "stale-payload-name"),
+                ),
+                senderNameOverride = "Alice",
+            )
+
+        assertEquals("Alice", content?.senderName)
+        assertEquals("Alice in Launch", content?.title)
+    }
+
+    @Test
+    fun senderNameOverrideIsUsedWhenPayloadDisplayNameIsNull() {
+        // The crux of #206: payload displayName is null even though the app has
+        // a name (npub) for the sender. The override must be used instead of the
+        // raw hex key.
+        val npub = "npub1qy88wumn8ghj7"
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    isDm = true,
+                    groupName = null,
+                    sender = user(displayName = null),
+                ),
+                senderNameOverride = npub,
+            )
+
+        assertEquals(npub, content?.senderName)
+        assertEquals(npub, content?.title)
+    }
+
+    @Test
+    fun blankSenderNameOverrideFallsBackToPayloadName() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    isDm = true,
+                    groupName = null,
+                    sender = user(displayName = "Bob"),
+                ),
+                senderNameOverride = "   ",
+            )
+
+        assertEquals("Bob", content?.senderName)
+    }
+
+    @Test
+    fun missingNameEverywhereStillShortensTheKeyAsALastResort() {
+        // With no override and no payload name, fall back to a shortened key.
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    isDm = true,
+                    groupName = null,
+                    sender = user(displayName = null),
+                ),
+                senderNameOverride = null,
+            )
+
+        // Never the full raw hex key.
+        assertNotEquals(
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            content?.senderName,
+        )
+        assertTrue(content?.senderName?.contains("...") == true)
+    }
+
+    @Test
+    fun inviteBodyUsesSenderNameOverride() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.GROUP_INVITE,
+                    groupName = null,
+                    previewText = null,
+                    sender = user(displayName = null),
+                ),
+                senderNameOverride = "Carol",
+            )
+
+        assertEquals("Invite from Carol", content?.body)
+    }
+
     private fun update(
         trigger: NotificationTriggerFfi,
         notificationKey: String = "message:account:message",

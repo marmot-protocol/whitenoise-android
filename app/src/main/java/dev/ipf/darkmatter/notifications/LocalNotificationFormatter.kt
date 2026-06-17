@@ -27,17 +27,24 @@ object LocalNotificationFormatter {
     fun content(
         update: NotificationUpdateFfi,
         context: Context? = null,
+        // Caller-resolved sender name (AppState consults the cached profile /
+        // contact name and, failing that, formats an npub). The FFI payload's
+        // displayName is often null for incoming messages even when the app
+        // already has a name for that pubkey, so the override is what keeps the
+        // notification from falling back to a raw hex key. See #206.
+        senderNameOverride: String? = null,
     ): LocalNotificationContent? {
         if (update.isFromSelf) return null
+        val senderName = senderName(update.sender, senderNameOverride)
         val title =
             when (update.trigger) {
-                NotificationTriggerFfi.NEW_MESSAGE -> messageTitle(update, context)
+                NotificationTriggerFfi.NEW_MESSAGE -> messageTitle(update, context, senderName)
                 NotificationTriggerFfi.GROUP_INVITE -> text(context, R.string.notification_group_invite, "Group invite")
             }
         val body =
             when (update.trigger) {
                 NotificationTriggerFfi.NEW_MESSAGE -> messageBody(update, context)
-                NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context)
+                NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context, senderName)
             }
         return LocalNotificationContent(
             // Messages from one conversation share a per-account, per-group tag
@@ -51,7 +58,7 @@ object LocalNotificationFormatter {
             notificationId = 0,
             title = title,
             body = body,
-            senderName = displayName(update.sender),
+            senderName = senderName,
             senderKey = update.sender.accountIdHex,
             selfName = displayName(update.receiver),
             selfKey = update.receiver.accountIdHex,
@@ -63,8 +70,8 @@ object LocalNotificationFormatter {
     private fun messageTitle(
         update: NotificationUpdateFfi,
         context: Context?,
+        sender: String,
     ): String {
-        val sender = displayName(update.sender)
         val group = clean(update.groupName)
         return when {
             group != null && !update.isDm -> text(context, R.string.notification_sender_in_group, "%1\$s in %2\$s", sender, group)
@@ -91,8 +98,8 @@ object LocalNotificationFormatter {
     private fun inviteBody(
         update: NotificationUpdateFfi,
         context: Context?,
+        sender: String,
     ): String {
-        val sender = displayName(update.sender)
         val group = clean(update.groupName)
         return if (group == null) {
             text(context, R.string.notification_invite_from_sender, "Invite from %1\$s", sender)
@@ -100,6 +107,17 @@ object LocalNotificationFormatter {
             text(context, R.string.notification_sender_invited_you_to_group, "%1\$s invited you to %2\$s", sender, group)
         }
     }
+
+    // Sender-name priority for an incoming notification:
+    //   1. caller-resolved override (profile / contact name, else npub),
+    //   2. the FFI payload's own displayName (when present),
+    //   3. a shortened key as the last resort.
+    // The override is npub-formatted by the caller, so a raw hex pubkey only
+    // ever surfaces when nothing — no name and no npub — could be resolved.
+    private fun senderName(
+        user: NotificationUserFfi,
+        override: String?,
+    ): String = clean(override) ?: displayName(user)
 
     private fun displayName(user: NotificationUserFfi): String = clean(user.displayName) ?: IdentityFormatter.short(user.accountIdHex)
 
