@@ -67,15 +67,9 @@ class PushTokenStore(
         }
     }
 
-    /**
-     * Account refs whose `setNativePushEnabled(false)` FFI call failed during
-     * sign-out. The runtime flag is still enabled for them, so the sync loop
-     * would otherwise re-register push; it must skip these and retry the
-     * disable instead. Returns a defensive copy.
-     */
+    // Accounts whose sign-out `setNativePushEnabled(false)` failed: the sync skips them and retries the disable.
     fun pendingDisables(): Set<String> = preferences.getStringSet(KEY_PENDING_DISABLES, emptySet())?.toSet() ?: emptySet()
 
-    /** Mark [account] as needing a deferred `setNativePushEnabled(false)` retry. Idempotent. */
     fun recordPendingDisable(account: String) {
         if (account.isBlank()) return
         synchronized(LOCK) {
