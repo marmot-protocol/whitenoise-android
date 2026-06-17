@@ -6977,8 +6977,18 @@ private fun GroupDetailsScreen(
             }
 
             SectionCard(title = stringResource(R.string.info)) {
-                DiagnosticRow(stringResource(R.string.group_id), IdentityFormatter.short(controller.group.groupIdHex))
-                DiagnosticRow(stringResource(R.string.nostr_group), IdentityFormatter.short(controller.group.nostrGroupIdHex))
+                DiagnosticRow(
+                    stringResource(R.string.group_id),
+                    IdentityFormatter.short(controller.group.groupIdHex),
+                    copyValue = controller.group.groupIdHex,
+                    appState = appState,
+                )
+                DiagnosticRow(
+                    stringResource(R.string.nostr_group),
+                    IdentityFormatter.short(controller.group.nostrGroupIdHex),
+                    copyValue = controller.group.nostrGroupIdHex,
+                    appState = appState,
+                )
                 DiagnosticRow(
                     stringResource(R.string.relays),
                     controller.group.relays.size
@@ -6996,7 +7006,12 @@ private fun GroupDetailsScreen(
                         mlsState == null -> Text(stringResource(R.string.mls_state_unavailable), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         else -> {
                             val state = requireNotNull(mlsState)
-                            DiagnosticRow(stringResource(R.string.group_id), IdentityFormatter.short(state.groupIdHex))
+                            DiagnosticRow(
+                                stringResource(R.string.group_id),
+                                IdentityFormatter.short(state.groupIdHex),
+                                copyValue = state.groupIdHex,
+                                appState = appState,
+                            )
                             DiagnosticRow(stringResource(R.string.epoch), state.epoch.toString())
                             DiagnosticRow(stringResource(R.string.mls_members), state.memberCount.toString())
                             DiagnosticRow(stringResource(R.string.required_components), state.requiredAppComponents.joinToString(", "))
@@ -11545,6 +11560,7 @@ private fun KeyPackagesScreen(
                 KeyPackageCard(
                     kp = kp,
                     busy = working,
+                    appState = appState,
                     onDelete = { pendingDelete = kp },
                 )
             }
@@ -11593,6 +11609,7 @@ private fun KeyPackagesScreen(
 private fun KeyPackageCard(
     kp: AccountKeyPackageFfi,
     busy: Boolean,
+    appState: DarkMatterAppState,
     onDelete: () -> Unit,
 ) {
     val localLabel = stringResource(R.string.local)
@@ -11625,8 +11642,18 @@ private fun KeyPackageCard(
                     AssistChip(onClick = {}, label = { Text(label, style = MaterialTheme.typography.labelSmall) })
                 }
             }
-            DiagnosticRow(stringResource(R.string.event), IdentityFormatter.short(kp.eventIdHex))
-            DiagnosticRow(stringResource(R.string.ref), IdentityFormatter.short(kp.keyPackageRefHex))
+            DiagnosticRow(
+                stringResource(R.string.event),
+                IdentityFormatter.short(kp.eventIdHex),
+                copyValue = kp.eventIdHex,
+                appState = appState,
+            )
+            DiagnosticRow(
+                stringResource(R.string.ref),
+                IdentityFormatter.short(kp.keyPackageRefHex),
+                copyValue = kp.keyPackageRefHex,
+                appState = appState,
+            )
             DiagnosticRow(stringResource(R.string.size), stringResource(R.string.bytes_count, kp.keyPackageBytes.toLong()))
             if (kp.sourceRelays.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -11849,9 +11876,31 @@ private fun DiagnosticsScreen(
 private fun DiagnosticRow(
     label: String,
     value: String,
+    copyValue: String? = null,
+    appState: DarkMatterAppState? = null,
 ) {
+    val clipboard = LocalClipboardManager.current
+    // Opt-in tap-to-copy: a row becomes copyable only when both the full
+    // value and an appState (for the confirmation toast) are supplied. Plain
+    // numeric/status rows leave these null and stay non-interactive.
+    val copyable = !copyValue.isNullOrEmpty() && appState != null
+    val copyLabel = stringResource(R.string.copy)
+    val rowModifier =
+        if (copyable) {
+            Modifier
+                .fillMaxWidth()
+                .clickable(
+                    onClickLabel = copyLabel,
+                    role = Role.Button,
+                ) {
+                    clipboard.setText(AnnotatedString(copyValue!!))
+                    appState!!.presentText(AppText.Resource(R.string.toast_copied_value, listOf(label)))
+                }
+        } else {
+            Modifier.fillMaxWidth()
+        }
     Row(
-        Modifier.fillMaxWidth(),
+        rowModifier,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -11860,12 +11909,33 @@ private fun DiagnosticRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        Text(
-            value,
-            fontFamily = FontFamily.Monospace,
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f),
-        )
+        if (copyable) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Text(
+                    value,
+                    fontFamily = FontFamily.Monospace,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Icons.Default.ContentCopy,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            Text(
+                value,
+                fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
