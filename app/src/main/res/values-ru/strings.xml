@@ -44,15 +44,13 @@
     </plurals>
     <string name="close_quick_actions">Закрыть быстрые действия</string>
     <string name="open_quick_actions">Открыть быстрые действия</string>
-    <string name="my_profile">Поделиться профилем</string>
     <string name="scan_qr_code">Сканировать QR-код</string>
-    <string name="create_group">Создать группу</string>
+    <string name="new_group">Новая группа</string>
     <string name="invitation">Приглашение</string>
     <string name="invite">Пригласить</string>
     <string name="no_chats_yet">Пока нет чатов</string>
     <string name="empty_chats_invite_npub">Начните разговор, пригласив кого-нибудь с помощью npub.</string>
     <string name="new_chat">Новый чат</string>
-    <string name="new_chat_optional_section">Необязательно</string>
     <string name="error_not_dark_matter_profile_qr">Этот код QR не является профилем Dark Matter.</string>
     <string name="error_valid_recipient_reference">Введите действительный npub, ссылку на профиль или открытый ключ hex.</string>
     <string name="error_missing_key_package">Для этой учетной записи еще нет опубликованного пакета ключей. Попросите их открыть Dark Matter и повторите попытку.</string>

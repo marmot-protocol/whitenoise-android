@@ -88,6 +88,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
@@ -855,7 +856,6 @@ private fun MainShell(
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedChat by remember { mutableStateOf<ChatListItem?>(null) }
-    var profileQrAccountId by remember { mutableStateOf<String?>(null) }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
@@ -955,13 +955,6 @@ private fun MainShell(
             onDismiss = { appState.clearPresentedProfile() },
         )
     }
-    profileQrAccountId?.let { accountId ->
-        ProfileQrSheet(
-            appState = appState,
-            accountIdHex = accountId,
-            onDismiss = { profileQrAccountId = null },
-        )
-    }
 
     if (selectedChat != null) {
         ConversationScreen(
@@ -982,11 +975,6 @@ private fun MainShell(
                     settingsDetailName = null
                 },
                 onOpenGroup = { selectedChat = it },
-                onOpenProfile = {
-                    appState.activeAccount?.accountIdHex?.let { accountId ->
-                        profileQrAccountId = accountId
-                    } ?: appState.present(R.string.toast_no_active_account)
-                },
             )
         MainSection.Settings ->
             SettingsScreen(
@@ -1046,11 +1034,11 @@ private fun ChatsScreen(
     controller: ChatsController,
     onOpenSettings: () -> Unit,
     onOpenGroup: (ChatListItem) -> Unit,
-    onOpenProfile: () -> Unit,
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChat by remember { mutableStateOf(false) }
     var newChatTitle by remember { mutableStateOf(R.string.new_chat) }
+    var newChatDirect by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
     var showArchived by remember { mutableStateOf(false) }
     var quickActionsExpanded by remember { mutableStateOf(false) }
@@ -1157,10 +1145,15 @@ private fun ChatsScreen(
                 QuickActionFabMenu(
                     expanded = quickActionsExpanded,
                     onExpandedChange = { quickActionsExpanded = it },
-                    onMyProfile = onOpenProfile,
                     onScanQr = { showScanner = true },
+                    onNewChat = {
+                        newChatTitle = R.string.new_chat
+                        newChatDirect = true
+                        showNewChat = true
+                    },
                     onCreateGroup = {
-                        newChatTitle = R.string.create_group
+                        newChatTitle = R.string.new_group
+                        newChatDirect = false
                         showNewChat = true
                     },
                 )
@@ -1221,6 +1214,7 @@ private fun ChatsScreen(
                     sourceList.isEmpty() ->
                         EmptyChats(onCreate = {
                             newChatTitle = R.string.new_chat
+                            newChatDirect = true
                             showNewChat = true
                         })
                     visibleItems.isEmpty() ->
@@ -1252,7 +1246,26 @@ private fun ChatsScreen(
     }
 
     if (showNewChat) {
-        NewChatSheet(appState = appState, titleRes = newChatTitle, onDismiss = { showNewChat = false })
+        NewChatSheet(
+            appState = appState,
+            titleRes = newChatTitle,
+            directMessage = newChatDirect,
+            existingDirectChat = { pubkey ->
+                // A 1:1 is a confirmed two-member group whose counterparty is
+                // the target. The recipient may be an npub or hex while
+                // otherMemberAccount is hex, so compare in both forms.
+                (controller.items + controller.archivedItems).firstOrNull { chat ->
+                    chat.memberCount == 2 &&
+                        !chat.group.pendingConfirmation &&
+                        chat.otherMemberAccount?.let { other ->
+                            other.equals(pubkey, ignoreCase = true) ||
+                                appState.npub(other).equals(pubkey, ignoreCase = true)
+                        } == true
+                }
+            },
+            onOpenConversation = onOpenGroup,
+            onDismiss = { showNewChat = false },
+        )
     }
 
     if (showScanner) {
@@ -1716,8 +1729,8 @@ private fun SwipeableChatRow(
 fun QuickActionFabMenu(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    onMyProfile: () -> Unit,
     onScanQr: () -> Unit,
+    onNewChat: () -> Unit,
     onCreateGroup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1755,19 +1768,19 @@ fun QuickActionFabMenu(
         },
     ) {
         FloatingActionButtonMenuItem(
-            onClick = { runAction(onMyProfile) },
-            icon = { Icon(Icons.Default.Person, contentDescription = null) },
-            text = { Text(stringResource(R.string.my_profile)) },
-        )
-        FloatingActionButtonMenuItem(
-            onClick = { runAction(onScanQr) },
-            icon = { Icon(Icons.Default.QrCodeScanner, contentDescription = null) },
-            text = { Text(stringResource(R.string.scan_qr_code)) },
+            onClick = { runAction(onNewChat) },
+            icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(20.dp)) },
+            text = { Text(stringResource(R.string.new_chat), style = MaterialTheme.typography.labelLarge) },
         )
         FloatingActionButtonMenuItem(
             onClick = { runAction(onCreateGroup) },
-            icon = { Icon(Icons.Default.Group, contentDescription = null) },
-            text = { Text(stringResource(R.string.create_group)) },
+            icon = { Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(20.dp)) },
+            text = { Text(stringResource(R.string.new_group), style = MaterialTheme.typography.labelLarge) },
+        )
+        FloatingActionButtonMenuItem(
+            onClick = { runAction(onScanQr) },
+            icon = { Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp)) },
+            text = { Text(stringResource(R.string.scan_qr_code), style = MaterialTheme.typography.labelLarge) },
         )
     }
 }
@@ -1897,6 +1910,9 @@ private fun EmptyChats(onCreate: () -> Unit) {
 private fun NewChatSheet(
     appState: DarkMatterAppState,
     @StringRes titleRes: Int = R.string.new_chat,
+    directMessage: Boolean = false,
+    existingDirectChat: (String) -> ChatListItem? = { null },
+    onOpenConversation: (ChatListItem) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     var members by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -1949,7 +1965,7 @@ private fun NewChatSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
-            if (members.isNotEmpty()) {
+            if (!directMessage && members.isNotEmpty()) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -1977,40 +1993,37 @@ private fun NewChatSheet(
                             autoCorrectEnabled = false,
                             imeAction = ImeAction.Done,
                         ),
-                    keyboardActions = KeyboardActions(onDone = { addPending() }),
+                    keyboardActions = KeyboardActions(onDone = { if (!directMessage) addPending() }),
                 )
                 FloatingActionButton(onClick = { showScanner = true }, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_recipient_qr_code))
                 }
-                FloatingActionButton(onClick = { addPending() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_recipient))
+                // A new chat has a single recipient typed or scanned into the
+                // field, so the multi-recipient "+" is only for groups.
+                if (!directMessage) {
+                    FloatingActionButton(onClick = { addPending() }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_recipient))
+                    }
                 }
             }
-            // Both name and description are optional. With no name, the
-            // chat-list row resolves to the other member's display name
-            // for a two-person group or the "Group of N" copy for
-            // larger ones, so requiring a name for every new chat is
-            // ceremony the dominant single-recipient case doesn't need.
-            Text(
-                stringResource(R.string.new_chat_optional_section),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-            )
-            OutlinedTextField(
-                value = groupName,
-                onValueChange = { groupName = it },
-                label = { Text(stringResource(R.string.group_name)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text(stringResource(R.string.description)) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-            )
+            // A DM is a 1:1, so the group name/description fields are hidden.
+            // A group requires a name; the description stays optional.
+            if (!directMessage) {
+                OutlinedTextField(
+                    value = groupName,
+                    onValueChange = { groupName = it },
+                    label = { Text(stringResource(R.string.group_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text(stringResource(R.string.description)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                )
+            }
             if (error != null) {
                 Text(
                     error.orEmpty(),
@@ -2029,10 +2042,22 @@ private fun NewChatSheet(
                                 return@Button
                             }
                         }
-                    val recipients = (members + normalizedPending).distinct()
+                    val recipients =
+                        (members + normalizedPending)
+                            .distinct()
+                            .let { if (directMessage) it.take(1) else it }
                     members = recipients
                     pending = ""
                     val account = appState.activeAccountRef ?: return@Button
+                    // Reuse an existing 1:1 instead of creating a duplicate.
+                    if (directMessage) {
+                        val target = recipients.firstOrNull() ?: return@Button
+                        existingDirectChat(target)?.let { existing ->
+                            onOpenConversation(existing)
+                            onDismiss()
+                            return@Button
+                        }
+                    }
                     busy = true
                     error = null
                     // Process-lifetime scope so MLS commit + Nostr publish complete
@@ -2058,15 +2083,14 @@ private fun NewChatSheet(
                 },
                 enabled =
                     !busy &&
-                        (members.isNotEmpty() || pending.isNotBlank()),
+                        (members.isNotEmpty() || pending.isNotBlank()) &&
+                        (directMessage || groupName.isNotBlank()),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (busy) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
                 }
-                Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.create))
             }
         }
@@ -2082,7 +2106,9 @@ private fun NewChatSheet(
                     error = notDarkMatterProfileQrError
                 } else {
                     error = null
-                    addRecipient(scanned.npub)
+                    // A new chat keeps the single recipient in the field;
+                    // a group accumulates recipients as chips.
+                    if (directMessage) pending = scanned.npub else addRecipient(scanned.npub)
                 }
             },
         )
