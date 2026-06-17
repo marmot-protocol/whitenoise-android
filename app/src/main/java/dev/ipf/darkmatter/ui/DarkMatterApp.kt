@@ -40,6 +40,7 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -7965,7 +7966,48 @@ private fun MessageBubble(
         val bubbleColumnMaxWidth = (messageGroupMaxWidth - senderAvatarWidth).coerceAtLeast(120.dp)
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            // Both reply-swipe and long-press hitboxes cover the ENTIRE row,
+            // not just the bubble: a swipe-right or long-press starting on the
+            // surrounding whitespace (avatar gutter, empty space next to the
+            // bubble) triggers the same action as one starting on the bubble.
+            // See #204. The visual slide stays on the Surface below via
+            // `.offset`; only gesture detection lives on the row. Nested
+            // handlers (avatar, sender name, media, reaction chips) are
+            // children and still win for their own areas. The long-press uses
+            // `indication = null` so no ripple flashes across the full row.
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        // A deleted message has no actionable content, so
+                        // disable swipe-to-reply entirely: no drag, no trigger.
+                        if (deleted) {
+                            Modifier
+                        } else {
+                            Modifier.pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
+                                detectHorizontalDragGestures(
+                                    onHorizontalDrag = { change, dragAmount ->
+                                        val next = ReplySwipe.visualOffset(swipeDrag + dragAmount, maxSwipeOffsetPx)
+                                        if (next != swipeDrag || dragAmount > 0f) change.consume()
+                                        swipeDrag = next
+                                    },
+                                    onDragEnd = {
+                                        if (ReplySwipe.shouldTriggerReply(swipeDrag, totalY = 0f, threshold = replySwipeThresholdPx)) {
+                                            beginReply()
+                                        }
+                                        swipeDrag = 0f
+                                    },
+                                    onDragCancel = { swipeDrag = 0f },
+                                )
+                            }
+                        },
+                    ).combinedClickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                        // No action menu (react/reply/copy/info) on a deleted message.
+                        onLongClick = { if (!deleted) menuOpen = true },
+                    ),
             horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
         ) {
             if (showSenderAvatar) {
@@ -7989,37 +8031,12 @@ private fun MessageBubble(
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
                 Surface(
+                    // Swipe-to-reply and long-press now live on the parent Row
+                    // (see #204) so the whole message row is the hitbox. The
+                    // Surface keeps only the visual slide driven by swipeDrag.
                     modifier =
                         Modifier
-                            .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) }
-                            .then(
-                                // A deleted message has no actionable content, so
-                                // disable swipe-to-reply entirely: no drag, no trigger.
-                                if (deleted) {
-                                    Modifier
-                                } else {
-                                    Modifier.pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
-                                        detectHorizontalDragGestures(
-                                            onHorizontalDrag = { change, dragAmount ->
-                                                val next = ReplySwipe.visualOffset(swipeDrag + dragAmount, maxSwipeOffsetPx)
-                                                if (next != swipeDrag || dragAmount > 0f) change.consume()
-                                                swipeDrag = next
-                                            },
-                                            onDragEnd = {
-                                                if (ReplySwipe.shouldTriggerReply(swipeDrag, totalY = 0f, threshold = replySwipeThresholdPx)) {
-                                                    beginReply()
-                                                }
-                                                swipeDrag = 0f
-                                            },
-                                            onDragCancel = { swipeDrag = 0f },
-                                        )
-                                    }
-                                },
-                            ).combinedClickable(
-                                onClick = {},
-                                // No action menu (react/reply/copy/info) on a deleted message.
-                                onLongClick = { if (!deleted) menuOpen = true },
-                            ),
+                            .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
                     color = bubbleColor,
                     shape = RoundedCornerShape(18.dp),
                     border = if (highlighted) BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary) else null,
