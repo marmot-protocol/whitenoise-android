@@ -25,6 +25,9 @@ object ProfileSanitizer {
         val uri = runCatching { URI(trimmed) }.getOrNull() ?: return null
         if (uri.scheme?.lowercase() != "https") return null
         if (uri.host.isNullOrBlank()) return null
+        // Reject embedded credentials (`https://user:pass@host`): they can leak
+        // to the host and let `user@` mask the real authority.
+        if (!uri.rawUserInfo.isNullOrEmpty()) return null
         // SSRF guard: never let an avatar URL point the app at loopback or the
         // local network. See issue #89.
         if (HostSafety.isPrivateOrLoopbackHost(uri.host)) return null

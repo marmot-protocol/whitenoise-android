@@ -11009,18 +11009,24 @@ private fun ProfileEditScreen(
                     Button(
                         onClick = {
                             busy = true
-                            scope.launch {
-                                appState.publishProfile(
-                                    UserProfileMetadataFfi(
-                                        name = displayName.trim().ifBlank { null },
-                                        displayName = displayName.trim().ifBlank { null },
-                                        about = about.trim().ifBlank { null },
-                                        picture = picture.trim().ifBlank { null },
-                                        nip05 = nip05.trim().ifBlank { null },
-                                        lud16 = lud16.trim().ifBlank { null },
-                                    ),
+                            // Snapshot the field values now: the mutation outlives
+                            // this composition, so reading them inside the lambda
+                            // would publish whatever is on screen when it runs.
+                            val metadata =
+                                UserProfileMetadataFfi(
+                                    name = displayName.trim().ifBlank { null },
+                                    displayName = displayName.trim().ifBlank { null },
+                                    about = about.trim().ifBlank { null },
+                                    picture = picture.trim().ifBlank { null },
+                                    nip05 = nip05.trim().ifBlank { null },
+                                    lud16 = lud16.trim().ifBlank { null },
                                 )
-                                busy = false
+                            appState.launchMutation {
+                                try {
+                                    appState.publishProfile(metadata)
+                                } finally {
+                                    busy = false
+                                }
                             }
                         },
                         enabled = !busy && active != null && pictureValid && nip05Valid,
@@ -11297,9 +11303,12 @@ private fun RelaysScreen(
                             IconButton(
                                 onClick = {
                                     saving = true
-                                    scope.launch {
-                                        lists = appState.setAccountRelays(selectedKind, currentRelays - relay) ?: appState.accountRelayLists()
-                                        saving = false
+                                    appState.launchMutation {
+                                        try {
+                                            lists = appState.setAccountRelays(selectedKind, currentRelays - relay) ?: appState.accountRelayLists()
+                                        } finally {
+                                            saving = false
+                                        }
                                     }
                                 },
                                 enabled = !saving && currentRelays.size > 1,
@@ -11327,10 +11336,13 @@ private fun RelaysScreen(
                             onClick = {
                                 val trimmed = pendingUrl.trim()
                                 saving = true
-                                scope.launch {
-                                    lists = appState.setAccountRelays(selectedKind, currentRelays + trimmed) ?: appState.accountRelayLists()
-                                    pendingUrl = ""
-                                    saving = false
+                                appState.launchMutation {
+                                    try {
+                                        lists = appState.setAccountRelays(selectedKind, currentRelays + trimmed) ?: appState.accountRelayLists()
+                                        pendingUrl = ""
+                                    } finally {
+                                        saving = false
+                                    }
                                 }
                             },
                             modifier = Modifier.size(48.dp),
@@ -11472,7 +11484,7 @@ private fun KeyPackagesScreen(
                         OutlinedButton(
                             onClick = {
                                 working = true
-                                scope.launch {
+                                appState.launchMutation {
                                     try {
                                         appState.republishKeyPackage()
                                         reload(refreshFromNetwork = true)
@@ -11491,7 +11503,7 @@ private fun KeyPackagesScreen(
                         Button(
                             onClick = {
                                 working = true
-                                scope.launch {
+                                appState.launchMutation {
                                     try {
                                         appState.publishNewKeyPackage()
                                         reload(refreshFromNetwork = true)
@@ -11678,7 +11690,7 @@ private fun DiagnosticsScreen(
         entries = (entries + DiagnosticLogEntry(text = text)).takeLast(500)
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
         streaming = true
         val subscription = appState.marmotIo { subscribeEvents() }
         try {
@@ -11690,6 +11702,9 @@ private fun DiagnosticsScreen(
                 entries = (entries + DiagnosticLogEntry(text = DiagnosticFormatter.describe(event))).takeLast(500)
             }
         } catch (throwable: Throwable) {
+            // A re-key (account/runtime change) cancels this effect; let that
+            // propagate instead of logging it as a stream failure.
+            if (throwable is CancellationException) throw throwable
             entries = (entries + DiagnosticLogEntry(text = "event stream failed: ${throwable.message ?: throwable.javaClass.simpleName}")).takeLast(500)
         } finally {
             streaming = false

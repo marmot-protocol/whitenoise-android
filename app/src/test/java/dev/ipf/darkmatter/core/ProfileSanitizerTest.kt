@@ -69,6 +69,14 @@ class ProfileSanitizerTest {
     }
 
     @Test
+    fun imageUrlsRejectEmbeddedCredentials() {
+        assertNull(ProfileSanitizer.imageUrl("https://user:pass@example.com/avatar.png"))
+        assertNull(ProfileSanitizer.imageUrl("https://user@example.com/avatar.png"))
+        // The same host without userinfo still passes.
+        assertEquals("https://example.com/avatar.png", ProfileSanitizer.imageUrl("https://example.com/avatar.png"))
+    }
+
+    @Test
     fun messageBodyPreservesNormalNewlinesButClampsBlankRuns() {
         assertEquals("one\n\ntwo", ProfileSanitizer.messageBody(" one\n\n\n\ntwo "))
     }
