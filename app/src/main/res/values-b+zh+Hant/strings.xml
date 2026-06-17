@@ -499,4 +499,10 @@
     <string name="notification_reacted_to_message">用 %1$s 回應了：\"%2$s\"</string>
     <string name="notification_reacted">用 %1$s 回應</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="profile_picture_hint">公開的 HTTPS 圖片網址</string>
+    <string name="profile_picture_invalid">僅允許公開的 HTTPS 圖片網址。</string>
+    <string name="profile_nip05_hint">名稱@網域</string>
+    <string name="profile_nip05_invalid">請輸入類似 name@example.com 的位址。</string>
+    <string name="profile_lightning_hint">Lightning 位址，例如 you@walletprovider.com</string>
+    <string name="profile_lightning_invalid">請輸入類似 name@example.com 的 Lightning 位址。</string>
 </resources>

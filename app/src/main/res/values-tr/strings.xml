@@ -502,4 +502,10 @@
     <string name="notification_reacted_to_message">\"%2$s\" iletisine %1$s ile tepki verdi</string>
     <string name="notification_reacted">%1$s ile tepki verdi</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="profile_picture_hint">Herkese açık HTTPS resim URL\'si</string>
+    <string name="profile_picture_invalid">Yalnızca herkese açık HTTPS resim URL\'lerine izin verilir.</string>
+    <string name="profile_nip05_hint">ad@alan</string>
+    <string name="profile_nip05_invalid">name@example.com gibi bir adres girin.</string>
+    <string name="profile_lightning_hint">Lightning adresi, örn. you@walletprovider.com</string>
+    <string name="profile_lightning_invalid">name@example.com gibi bir Lightning adresi girin.</string>
 </resources>

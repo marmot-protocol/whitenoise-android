@@ -502,4 +502,10 @@
     <string name="notification_reacted_to_message">ha reagito con %1$s a: \"%2$s\"</string>
     <string name="notification_reacted">ha reagito con %1$s</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="profile_picture_hint">URL immagine HTTPS pubblico</string>
+    <string name="profile_picture_invalid">Sono consentiti solo URL immagine HTTPS pubblici.</string>
+    <string name="profile_nip05_hint">nome@dominio</string>
+    <string name="profile_nip05_invalid">Inserisci un indirizzo come name@example.com.</string>
+    <string name="profile_lightning_hint">Indirizzo Lightning, es. you@walletprovider.com</string>
+    <string name="profile_lightning_invalid">Inserisci un indirizzo Lightning come name@example.com.</string>
 </resources>

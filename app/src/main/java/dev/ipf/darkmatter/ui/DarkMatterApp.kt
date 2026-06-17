@@ -132,7 +132,6 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -148,6 +147,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -166,6 +166,8 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TopAppBar
@@ -204,6 +206,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -308,6 +311,7 @@ import dev.ipf.darkmatter.state.nextReadAnchor
 import dev.ipf.darkmatter.state.outgoingIndicator
 import dev.ipf.darkmatter.state.shortHex
 import dev.ipf.darkmatter.state.shouldShowOriginalTimestamp
+import dev.ipf.darkmatter.ui.theme.Dimens
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
@@ -9851,7 +9855,7 @@ private fun SettingsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsTopBar(onBackToChats: () -> Unit) {
-    CenterAlignedTopAppBar(
+    TopAppBar(
         title = { Text(stringResource(R.string.settings)) },
         navigationIcon = {
             IconButton(onClick = onBackToChats) {
@@ -9881,7 +9885,7 @@ private fun SettingsHomeScreen(
             SettingsTopBar(onBackToChats = onBackToChats)
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = Dimens.spaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.spaceLg)) {
             item {
                 SectionCard(title = stringResource(R.string.account)) {
                     appState.activeAccount?.let { account ->
@@ -10031,10 +10035,15 @@ private fun SelectableSettingsRow(
 ) {
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
         trailingContent = {
             if (selected) {
-                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.selected))
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = stringResource(R.string.selected),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
             }
         },
     )
@@ -10344,6 +10353,7 @@ fun SettingsAccountHeader(
             Modifier
                 .clickable(onClick = onOpenAccountSelector)
                 .semantics { contentDescription = switchAccountDescription },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         leadingContent = {
             Avatar(
                 title = title,
@@ -10383,6 +10393,7 @@ private fun AccountSelectorSheet(
                                 appState.setActiveAccount(account.label)
                                 onDismiss()
                             },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         leadingContent = {
                             Avatar(
                                 title = appState.displayName(account.accountIdHex),
@@ -10407,7 +10418,11 @@ private fun AccountSelectorSheet(
                                     Spacer(Modifier.width(8.dp))
                                 }
                                 if (account.label == appState.activeAccountRef) {
-                                    Icon(Icons.Default.Check, contentDescription = stringResource(R.string.active))
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = stringResource(R.string.active),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
                                 }
                             }
                         },
@@ -10435,6 +10450,7 @@ private fun SettingsRow(
 ) {
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
         supportingContent = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
     )
@@ -10934,41 +10950,70 @@ private fun ProfileEditScreen(
             )
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .imePadding()
+                .padding(Dimens.spaceLg),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+        ) {
             item {
-                SectionCard(title = stringResource(R.string.preview)) {
+                // Live profile header — the avatar, name, and npub update as the
+                // fields below are edited, so the user previews their card inline.
+                Column(
+                    Modifier.fillMaxWidth().padding(top = Dimens.spaceSm),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+                ) {
                     if (active == null) {
                         Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
-                        ListItem(
-                            leadingContent = {
-                                Avatar(
-                                    title = displayName.ifBlank { appState.shortNpub(active.accountIdHex) },
-                                    seed = active.accountIdHex,
-                                    size = 56.dp,
-                                    pictureUrl = ProfileSanitizer.imageUrl(picture),
-                                )
-                            },
-                            headlineContent = { Text(displayName.ifBlank { stringResource(R.string.anonymous) }) },
-                            supportingContent = { Text(appState.shortNpub(active.accountIdHex), fontFamily = FontFamily.Monospace) },
+                        Avatar(
+                            title = displayName.ifBlank { appState.shortNpub(active.accountIdHex) },
+                            seed = active.accountIdHex,
+                            size = 96.dp,
+                            pictureUrl = ProfileSanitizer.imageUrl(picture),
+                        )
+                        Text(
+                            displayName.ifBlank { stringResource(R.string.anonymous) },
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Text(
+                            appState.shortNpub(active.accountIdHex),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             }
             item {
                 SectionCard(title = stringResource(R.string.profile)) {
-                    OutlinedTextField(
+                    // Borderless fields: drop the filled container so each input
+                    // reads as a label + underline row on the white panel, leaving
+                    // the indicator line to carry focus/error state.
+                    val profileFieldColors =
+                        TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            errorContainerColor = Color.Transparent,
+                        )
+                    TextField(
+                        colors = profileFieldColors,
                         value = displayName,
                         onValueChange = { displayName = it },
                         label = { Text(stringResource(R.string.display_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    OutlinedTextField(
+                    TextField(
+                        colors = profileFieldColors,
                         value = about,
                         onValueChange = { about = it },
                         label = { Text(stringResource(R.string.about)) },
-                        minLines = 2,
+                        minLines = 3,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     // Client-side validation: flag a malformed picture URL or
@@ -10976,12 +11021,21 @@ private fun ProfileEditScreen(
                     // — or an SSRF-prone avatar URL — to relays. See #69.
                     val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
                     val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
-                    OutlinedTextField(
+                    val lud16Valid = ProfileFieldValidation.isAcceptableLud16(lud16)
+                    TextField(
+                        colors = profileFieldColors,
                         value = picture,
                         onValueChange = { picture = it },
                         label = { Text(stringResource(R.string.picture_url)) },
                         singleLine = true,
                         isError = !pictureValid,
+                        supportingText = {
+                            Text(
+                                stringResource(
+                                    if (pictureValid) R.string.profile_picture_hint else R.string.profile_picture_invalid,
+                                ),
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions =
                             KeyboardOptions(
@@ -10990,20 +11044,37 @@ private fun ProfileEditScreen(
                                 keyboardType = KeyboardType.Uri,
                             ),
                     )
-                    OutlinedTextField(
+                    TextField(
+                        colors = profileFieldColors,
                         value = nip05,
                         onValueChange = { nip05 = it },
                         label = { Text(stringResource(R.string.nip_05)) },
                         singleLine = true,
                         isError = !nip05Valid,
+                        supportingText = {
+                            Text(
+                                stringResource(
+                                    if (nip05Valid) R.string.profile_nip05_hint else R.string.profile_nip05_invalid,
+                                ),
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                     )
-                    OutlinedTextField(
+                    TextField(
+                        colors = profileFieldColors,
                         value = lud16,
                         onValueChange = { lud16 = it },
                         label = { Text(stringResource(R.string.lightning)) },
                         singleLine = true,
+                        isError = !lud16Valid,
+                        supportingText = {
+                            Text(
+                                stringResource(
+                                    if (lud16Valid) R.string.profile_lightning_hint else R.string.profile_lightning_invalid,
+                                ),
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                     )
@@ -11030,15 +11101,13 @@ private fun ProfileEditScreen(
                                 }
                             }
                         },
-                        enabled = !busy && active != null && pictureValid && nip05Valid,
+                        enabled = !busy && active != null && pictureValid && nip05Valid && lud16Valid,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         if (busy) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Check, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
                         }
-                        Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.publish_to_relays))
                     }
                 }
@@ -11600,7 +11669,7 @@ private fun KeyPackageCard(
     val unknownLabel = stringResource(R.string.unknown)
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -11869,6 +11938,18 @@ private fun DiagnosticRow(
     }
 }
 
+// Section panels read as white cards on a recessed page in light, and as a
+// raised neutral card over the darker page in dark/AMOLED — the same "panel
+// one step above the page" relationship, resolved per theme by luminance since
+// "lighter == elevated" can't be expressed the same way in both.
+@Composable
+private fun sectionPanelColor(): Color =
+    if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+        MaterialTheme.colorScheme.surfaceContainerLowest
+    } else {
+        MaterialTheme.colorScheme.surfaceContainer
+    }
+
 @Composable
 private fun SectionCard(
     title: String,
@@ -11876,9 +11957,9 @@ private fun SectionCard(
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(Dimens.spaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             content()
         }
@@ -11893,9 +11974,9 @@ private fun SectionCardWithAction(
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(Dimens.spaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

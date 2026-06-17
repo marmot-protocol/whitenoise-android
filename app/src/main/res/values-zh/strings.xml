@@ -499,4 +499,10 @@
     <string name="notification_reacted_to_message">用 %1$s 回应了：\"%2$s\"</string>
     <string name="notification_reacted">用 %1$s 回应</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="profile_picture_hint">公开的 HTTPS 图片网址</string>
+    <string name="profile_picture_invalid">仅允许公开的 HTTPS 图片网址。</string>
+    <string name="profile_nip05_hint">名称@域名</string>
+    <string name="profile_nip05_invalid">请输入类似 name@example.com 的地址。</string>
+    <string name="profile_lightning_hint">Lightning 地址，例如 you@walletprovider.com</string>
+    <string name="profile_lightning_invalid">请输入类似 name@example.com 的 Lightning 地址。</string>
 </resources>
