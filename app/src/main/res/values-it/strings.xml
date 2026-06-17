@@ -42,15 +42,13 @@
     </plurals>
     <string name="close_quick_actions">Chiudi le azioni rapide</string>
     <string name="open_quick_actions">Apri azioni rapide</string>
-    <string name="my_profile">Condividi il tuo profilo</string>
     <string name="scan_qr_code">Scansiona codice QR</string>
-    <string name="create_group">Crea gruppo</string>
+    <string name="new_group">Nuovo gruppo</string>
     <string name="invitation">Invito</string>
     <string name="invite">Invita</string>
     <string name="no_chats_yet">Ancora nessuna chat</string>
     <string name="empty_chats_invite_npub">Inizia una conversazione invitando qualcuno con il suo npub.</string>
     <string name="new_chat">Nuova chat</string>
-    <string name="new_chat_optional_section">Facoltativo</string>
     <string name="error_not_dark_matter_profile_qr">Quel codice QR non è un profilo Dark Matter.</string>
     <string name="error_valid_recipient_reference">Inserisci un npub valido, un collegamento al profilo o una chiave pubblica hex.</string>
     <string name="error_missing_key_package">Per quell’account non è ancora stato pubblicato un pacchetto di chiavi. Chiedi loro di aprire Dark Matter, quindi riprova.</string>

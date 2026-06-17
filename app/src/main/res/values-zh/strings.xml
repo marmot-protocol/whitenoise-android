@@ -41,15 +41,13 @@
     </plurals>
     <string name="close_quick_actions">关闭快速操作</string>
     <string name="open_quick_actions">打开快速操作</string>
-    <string name="my_profile">分享您的个人资料</string>
     <string name="scan_qr_code">扫码</string>
-    <string name="create_group">创建群组</string>
+    <string name="new_group">新建群组</string>
     <string name="invitation">邀请函</string>
     <string name="invite">邀请</string>
     <string name="no_chats_yet">暂无聊天</string>
     <string name="empty_chats_invite_npub">通过邀请某人及其 npub 来开始对话。</string>
     <string name="new_chat">新聊天</string>
-    <string name="new_chat_optional_section">可选</string>
     <string name="error_not_dark_matter_profile_qr">该 QR 代码不是 Dark Matter 配置文件。</string>
     <string name="error_valid_recipient_reference">输入有效的 npub、配置文件链接或 hex 公钥。</string>
     <string name="error_missing_key_package">该帐户尚未发布密钥包。请他们打开 Dark Matter，然后重试。</string>
