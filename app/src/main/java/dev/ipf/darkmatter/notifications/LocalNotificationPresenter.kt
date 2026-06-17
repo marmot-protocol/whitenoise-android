@@ -48,9 +48,10 @@ class LocalNotificationPresenter(
     fun show(
         update: NotificationUpdateFfi,
         conversationTitleOverride: String? = null,
+        senderNameOverride: String? = null,
     ): Boolean {
         val content =
-            LocalNotificationFormatter.content(update, context) ?: run {
+            LocalNotificationFormatter.content(update, context, senderNameOverride) ?: run {
                 notificationDebug { "skip key=${update.notificationKey.take(16)} reason=formatter" }
                 return false
             }
