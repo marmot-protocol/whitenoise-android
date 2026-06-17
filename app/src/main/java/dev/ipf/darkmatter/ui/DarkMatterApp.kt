@@ -1209,6 +1209,7 @@ private fun ChatsScreen(
                     sourceList.isEmpty() ->
                         EmptyChats(onCreate = {
                             newChatTitle = R.string.new_chat
+                            newChatDirect = true
                             showNewChat = true
                         })
                     visibleItems.isEmpty() ->
@@ -1245,10 +1246,16 @@ private fun ChatsScreen(
             titleRes = newChatTitle,
             directMessage = newChatDirect,
             existingDirectChat = { pubkey ->
+                // A 1:1 is a confirmed two-member group whose counterparty is
+                // the target. The recipient may be an npub or hex while
+                // otherMemberAccount is hex, so compare in both forms.
                 (controller.items + controller.archivedItems).firstOrNull { chat ->
                     chat.memberCount == 2 &&
-                        chat.group.name.isBlank() &&
-                        chat.otherMemberAccount?.equals(pubkey, ignoreCase = true) == true
+                        !chat.group.pendingConfirmation &&
+                        chat.otherMemberAccount?.let { other ->
+                            other.equals(pubkey, ignoreCase = true) ||
+                                appState.npub(other).equals(pubkey, ignoreCase = true)
+                        } == true
                 }
             },
             onOpenConversation = onOpenGroup,
@@ -1953,7 +1960,7 @@ private fun NewChatSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
-            if (members.isNotEmpty()) {
+            if (!directMessage && members.isNotEmpty()) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
