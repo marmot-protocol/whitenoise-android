@@ -11009,18 +11009,21 @@ private fun ProfileEditScreen(
                     Button(
                         onClick = {
                             busy = true
+                            // Snapshot the field values now: the mutation outlives
+                            // this composition, so reading them inside the lambda
+                            // would publish whatever is on screen when it runs.
+                            val metadata =
+                                UserProfileMetadataFfi(
+                                    name = displayName.trim().ifBlank { null },
+                                    displayName = displayName.trim().ifBlank { null },
+                                    about = about.trim().ifBlank { null },
+                                    picture = picture.trim().ifBlank { null },
+                                    nip05 = nip05.trim().ifBlank { null },
+                                    lud16 = lud16.trim().ifBlank { null },
+                                )
                             appState.launchMutation {
                                 try {
-                                    appState.publishProfile(
-                                        UserProfileMetadataFfi(
-                                            name = displayName.trim().ifBlank { null },
-                                            displayName = displayName.trim().ifBlank { null },
-                                            about = about.trim().ifBlank { null },
-                                            picture = picture.trim().ifBlank { null },
-                                            nip05 = nip05.trim().ifBlank { null },
-                                            lud16 = lud16.trim().ifBlank { null },
-                                        ),
-                                    )
+                                    appState.publishProfile(metadata)
                                 } finally {
                                     busy = false
                                 }
