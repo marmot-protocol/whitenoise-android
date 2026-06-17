@@ -6723,6 +6723,8 @@ private fun GroupDetailsScreen(
     var pendingInvites by remember(controller.group.groupIdHex) { mutableStateOf<List<String>>(emptyList()) }
     var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
     val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
+    val inviteLabelText = stringResource(R.string.invite)
     val groupTitleCopy = rememberGroupTitleCopy()
     val oneValidMemberReferenceError = stringResource(R.string.error_one_valid_member_reference)
     val qrNotValidNpubOrPublicKeyError = stringResource(R.string.error_qr_not_valid_npub_or_public_key)
@@ -6965,9 +6967,15 @@ private fun GroupDetailsScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         pendingInvites.forEach { invite ->
+                            // Pending invites stay non-actionable, but a tap
+                            // copies the full invite key to the clipboard.
                             AssistChip(
-                                onClick = {},
-                                enabled = false,
+                                onClick = {
+                                    clipboard.setText(AnnotatedString(invite))
+                                    appState.presentText(
+                                        AppText.Resource(R.string.toast_copied_value, listOf(inviteLabelText)),
+                                    )
+                                },
                                 label = { Text(stringResource(R.string.invite_pending, IdentityFormatter.short(invite))) },
                                 leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
                             )
@@ -7748,6 +7756,8 @@ private fun GroupMemberRow(
     onRemove: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    val copyNpubLabel = stringResource(R.string.copy)
     val isAdmin = controller.isAdmin(member)
     val isSelfRow =
         GroupProjector.isActiveAccountMember(
@@ -7773,11 +7783,20 @@ private fun GroupMemberRow(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(controller.memberDisplayName(member), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Tap the shortened npub to copy the full untruncated value.
             Text(
                 controller.memberSubtitle(member),
                 fontFamily = FontFamily.Monospace,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier =
+                    Modifier.clickable(
+                        onClickLabel = copyNpubLabel,
+                        role = Role.Button,
+                    ) {
+                        clipboard.setText(AnnotatedString(appState.npub(member.memberIdHex)))
+                        appState.present(R.string.toast_copied_npub)
+                    },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (isSelfRow) {
@@ -11615,6 +11634,9 @@ private fun KeyPackageCard(
     val localLabel = stringResource(R.string.local)
     val relayLabel = stringResource(R.string.relay)
     val unknownLabel = stringResource(R.string.unknown)
+    val clipboard = LocalClipboardManager.current
+    val copyKeyPackageLabel = stringResource(R.string.copy)
+    val keyPackageLabelText = stringResource(R.string.key_package)
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -11622,10 +11644,21 @@ private fun KeyPackageCard(
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
+                    // Tap the shortened key-package id header to copy the full value.
                     Text(
                         IdentityFormatter.short(kp.keyPackageId),
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.SemiBold,
+                        modifier =
+                            Modifier.clickable(
+                                onClickLabel = copyKeyPackageLabel,
+                                role = Role.Button,
+                            ) {
+                                clipboard.setText(AnnotatedString(kp.keyPackageId))
+                                appState.presentText(
+                                    AppText.Resource(R.string.toast_copied_value, listOf(keyPackageLabelText)),
+                                )
+                            },
                     )
                     Text(
                         formatPublishedAt(kp.publishedAt, stringResource(R.string.unknown_publish_time), stringResource(R.string.published_at)),
