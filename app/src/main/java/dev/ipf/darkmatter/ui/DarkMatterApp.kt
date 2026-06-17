@@ -276,6 +276,7 @@ import dev.ipf.darkmatter.media.DuckDuckGoImageSearchClient
 import dev.ipf.darkmatter.media.ImageSearchClient
 import dev.ipf.darkmatter.media.ImageSearchException
 import dev.ipf.darkmatter.media.ImageSearchResult
+import dev.ipf.darkmatter.media.MediaCacheDirs
 import dev.ipf.darkmatter.media.MediaPipeline
 import dev.ipf.darkmatter.media.MediaReferenceParser
 import dev.ipf.darkmatter.media.Thumbhash
@@ -3465,7 +3466,7 @@ private suspend fun materializeVideoAttachment(
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
 ): java.io.File {
-    val dir = java.io.File(context.cacheDir, "video_attachments").apply { mkdirs() }
+    val dir = java.io.File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }
     val ext =
         when {
             reference.mediaType.contains("quicktime", ignoreCase = true) -> "mov"
@@ -3837,7 +3838,7 @@ private suspend fun materializeVoiceAttachment(
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
 ): java.io.File {
-    val cacheDir = java.io.File(context.cacheDir, "voice_attachments").apply { mkdirs() }
+    val cacheDir = java.io.File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }
     val extension =
         when {
             reference.mediaType.contains("mp4", ignoreCase = true) -> "m4a"
@@ -4021,7 +4022,7 @@ private suspend fun openAttachmentExternally(
     val uri =
         withContext(Dispatchers.IO) {
             runCatching {
-                val dir = java.io.File(context.cacheDir, "shared_media").apply { mkdirs() }
+                val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
                 val name = MediaPipeline.safeDisplayName(fileName)
                 val file = java.io.File.createTempFile("open_", "_$name", dir)
                 file.writeBytes(bytes)
@@ -4901,7 +4902,7 @@ private suspend fun shareImage(
     val uri =
         withContext(Dispatchers.IO) {
             runCatching {
-                val dir = java.io.File(context.cacheDir, "shared_media").apply { mkdirs() }
+                val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
                 // Unique temp keyed off a sanitized basename — avoids
                 // collisions and path traversal from a remote-supplied
                 // filename.
@@ -4975,7 +4976,7 @@ private fun sweepStaleSharedMedia(
         // Same age-based reaper covers the decrypted voice cache too —
         // those bytes are plaintext E2EE-decrypted audio and shouldn't
         // linger past the last MediaPlayer that opened them.
-        listOf("shared_media", "voice_attachments", "video_attachments").forEach { name ->
+        listOf(MediaCacheDirs.SHARED, MediaCacheDirs.VOICE, MediaCacheDirs.VIDEO).forEach { name ->
             val dir = java.io.File(context.cacheDir, name)
             if (!dir.isDirectory) return@forEach
             dir.listFiles()?.forEach { entry ->
