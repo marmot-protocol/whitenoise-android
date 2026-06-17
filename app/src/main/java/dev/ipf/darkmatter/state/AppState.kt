@@ -841,9 +841,15 @@ class DarkMatterAppState(
             // will retry.
             if (signedOutRef != null) {
                 runCatching { marmotIo { setNativePushEnabled(signedOutRef, false) } }
+                    .onSuccess { pushTokenStore.clearPendingDisable(signedOutRef) }
                     .onFailure {
                         rethrowIfCancellation(it)
-                        appStateDebug { "setNativePushEnabled(false) failed on sign-out: ${it.readableMessage()}" }
+                        // The runtime flag is still enabled, so the next sync
+                        // would re-upsert this signed-out account's push
+                        // registration. Persist the intent so the sync
+                        // skips it and retries the disable on a later tick.
+                        pushTokenStore.recordPendingDisable(signedOutRef)
+                        appStateDebug { "setNativePushEnabled(false) failed on sign-out; queued disable retry: ${it.readableMessage()}" }
                     }
                 clearPushRegistrationForAccount(signedOutRef)
             }
@@ -1226,6 +1232,7 @@ class DarkMatterAppState(
         // would keep wrapping wake events for a device that can no longer
         // receive them. Only the upsert path is gated on config + GMS.
         drainPendingPushClears()
+        drainPendingPushDisables()
         val config = PushServerConfig.current() ?: return
         if (!isNativePushAvailable(config)) return
         val accountRefs = accounts.map { it.label }
@@ -1260,6 +1267,28 @@ class DarkMatterAppState(
         }
     }
 
+    /**
+     * Retry every `setNativePushEnabled(false)` that failed during sign-out
+     *. Until it succeeds the runtime still reports the account as
+     * push-enabled, so [syncPushForAccount] skips these accounts to avoid
+     * re-registering an identity the user signed out of. On success the entry
+     * leaves the persisted set.
+     */
+    private suspend fun drainPendingPushDisables() {
+        for (account in pushTokenStore.pendingDisables()) {
+            val disabled =
+                runCatching { marmotIo { setNativePushEnabled(account, false) } }
+                    .onFailure {
+                        rethrowIfCancellation(it)
+                        appStateDebug { "pending setNativePushEnabled(false) retry failed: ${it.readableMessage()}" }
+                    }.isSuccess
+            if (disabled) {
+                pushTokenStore.clearPendingDisable(account)
+                appStateDebug { "pending native-push disable drained account=${account.take(8)}" }
+            }
+        }
+    }
+
     private suspend fun syncPushForAccount(
         account: String,
         config: PushServerConfig,
@@ -1267,6 +1296,10 @@ class DarkMatterAppState(
     ) {
         val settings = runCatching { marmotIo { notificationSettings(account) } }.getOrNull() ?: return
         if (account == activeAccountRef) localNotificationSettings = settings
+        // A signed-out account whose disable FFI call failed still reports
+        // nativePushEnabled == true; skip re-registering it.
+        // drainPendingPushDisables retries the disable until it sticks.
+        if (account in pushTokenStore.pendingDisables()) return
         if (!settings.nativePushEnabled) return
         val fingerprint =
             PushFingerprint(

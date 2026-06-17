@@ -67,6 +67,33 @@ class PushTokenStore(
         }
     }
 
+    /**
+     * Account refs whose `setNativePushEnabled(false)` FFI call failed during
+     * sign-out. The runtime flag is still enabled for them, so the sync loop
+     * would otherwise re-register push; it must skip these and retry the
+     * disable instead. Returns a defensive copy.
+     */
+    fun pendingDisables(): Set<String> = preferences.getStringSet(KEY_PENDING_DISABLES, emptySet())?.toSet() ?: emptySet()
+
+    /** Mark [account] as needing a deferred `setNativePushEnabled(false)` retry. Idempotent. */
+    fun recordPendingDisable(account: String) {
+        if (account.isBlank()) return
+        synchronized(LOCK) {
+            val current = pendingDisables()
+            if (account in current) return
+            preferences.edit().putStringSet(KEY_PENDING_DISABLES, current + account).apply()
+        }
+    }
+
+    fun clearPendingDisable(account: String) {
+        if (account.isBlank()) return
+        synchronized(LOCK) {
+            val current = pendingDisables()
+            if (account !in current) return
+            preferences.edit().putStringSet(KEY_PENDING_DISABLES, current - account).apply()
+        }
+    }
+
     companion object {
         // Process-wide, NOT per-instance: callers construct fresh stores over
         // the same prefs file (onNewToken does PushTokenStore.create(...) on a
@@ -76,6 +103,7 @@ class PushTokenStore(
         private const val PREFS_NAME = "darkmatter.push.tokens"
         private const val KEY_FCM_TOKEN = "fcm_token"
         private const val KEY_PENDING_CLEARS = "pending_clears"
+        private const val KEY_PENDING_DISABLES = "pending_native_push_disables"
 
         fun create(context: Context): PushTokenStore =
             PushTokenStore(
