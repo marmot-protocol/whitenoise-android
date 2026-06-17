@@ -763,12 +763,12 @@ class DarkMatterAppState(
                     rethrowIfCancellation(it)
                     appStateDebug { "disk media cache wipe failed: ${it.readableMessage()}" }
                 }
-            runCatching { java.io.File(appContext.cacheDir, "voice_attachments").deleteRecursively() }
+            runCatching { java.io.File(appContext.cacheDir, dev.ipf.darkmatter.media.MediaCacheDirs.VOICE).deleteRecursively() }
                 .onFailure {
                     rethrowIfCancellation(it)
                     appStateDebug { "voice attachment wipe failed: ${it.readableMessage()}" }
                 }
-            runCatching { java.io.File(appContext.cacheDir, "video_attachments").deleteRecursively() }
+            runCatching { java.io.File(appContext.cacheDir, dev.ipf.darkmatter.media.MediaCacheDirs.VIDEO).deleteRecursively() }
                 .onFailure {
                     rethrowIfCancellation(it)
                     appStateDebug { "video attachment wipe failed: ${it.readableMessage()}" }
