@@ -118,7 +118,12 @@ class LocalNotificationPresenter(
                 .setName(content.selfName)
                 .setKey(content.selfKey)
                 .build()
-        val style = existingMessagingStyle(content.notificationTag) ?: NotificationCompat.MessagingStyle(self)
+        // Cap carried-forward history; the extracted style is otherwise re-serialized unbounded across Binder on every post.
+        val style = NotificationCompat.MessagingStyle(self)
+        existingMessagingStyle(content.notificationTag)
+            ?.messages
+            ?.takeLast(MAX_MESSAGE_HISTORY - 1)
+            ?.forEach { style.addMessage(it) }
         style.isGroupConversation = content.isGroupConversation
         // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
         // people" for unnamed groups) over the often-empty payload group name.
@@ -171,6 +176,7 @@ class LocalNotificationPresenter(
         // Per-conversation cards share id 0; the per-conversation tag keeps them
         // distinct, so reusing (tag, 0) updates the right conversation's card.
         private const val MESSAGE_NOTIFICATION_ID = 0
+        private const val MAX_MESSAGE_HISTORY = 25
     }
 }
 
