@@ -10,10 +10,18 @@ import java.util.Locale
 
 class IdentityFormatterTest {
     @Test
-    fun futureTimestampUsesExplicitLabel() {
+    fun farFutureTimestampUsesExplicitLabel() {
         val tomorrow = (Instant.now().epochSecond + 86_400L).toULong()
 
         assertEquals("future", IdentityFormatter.relativeTime(tomorrow))
+    }
+
+    @Test
+    fun slightlyAheadTimestampReadsAsNowNotFuture() {
+        // Clock skew shouldn't render the literal "future".
+        val skewedAhead = (Instant.now().epochSecond + 5L).toULong()
+
+        assertEquals("now", IdentityFormatter.relativeTime(skewedAhead))
     }
 
     @Test
