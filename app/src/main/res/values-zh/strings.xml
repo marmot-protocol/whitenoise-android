@@ -127,6 +127,7 @@
     <string name="toast_original_message_unavailable">原始消息不可用。</string>
     <string name="message_reacted">已回应 %1$s</string>
     <string name="message_reaction_fallback">一条消息</string>
+    <string name="message_actions">消息操作</string>
     <string name="message_deleted_preview">消息已删除</string>
     <string name="agent_stream_started">代理流已开始</string>
     <string name="stream_finished">流已结束</string>
