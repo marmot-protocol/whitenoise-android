@@ -1109,6 +1109,44 @@ class DarkMatterAppState(
             }
     }
 
+    suspend fun sendNotificationReply(
+        accountRef: String,
+        groupIdHex: String,
+        text: String,
+    ): Boolean {
+        val account = accountRef.takeIf { it.isNotBlank() } ?: return false
+        val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
+        val body = text.trim().takeIf { it.isNotEmpty() } ?: return false
+        return runCatching {
+            marmotIo { sendText(account, group, body) }
+            true
+        }.onFailure {
+            rethrowIfCancellation(it)
+            Log.w("DMAppState", "notification reply failed for group=${group.take(8)}", it)
+        }.getOrDefault(false)
+    }
+
+    suspend fun markNotificationMessageRead(
+        accountRef: String,
+        groupIdHex: String,
+        messageIdHex: String,
+    ): Boolean {
+        val account = accountRef.takeIf { it.isNotBlank() } ?: return false
+        val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
+        val message = messageIdHex.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) } ?: return false
+        return runCatching {
+            marmotIo { markTimelineMessageRead(account, group, message) }
+            true
+        }.onFailure {
+            rethrowIfCancellation(it)
+            Log.w(
+                "DMAppState",
+                "notification mark read failed for group=${group.take(8)} message=${message.take(8)}",
+                it,
+            )
+        }.getOrDefault(false)
+    }
+
     suspend fun setLocalNotificationsEnabled(enabled: Boolean): Boolean {
         val account = activeAccountRef ?: return false
         refreshLocalNotificationPermission()
