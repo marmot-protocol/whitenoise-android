@@ -142,6 +142,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
@@ -1195,7 +1196,6 @@ private fun ChatsScreen(
                 controller.archivedItems.isNotEmpty()
             ) {
                 ArchivedFolderRow(
-                    totalCount = controller.archivedItems.size,
                     unreadCount = archivedUnreadCount,
                     onClick = { showArchived = true },
                 )
@@ -1472,23 +1472,43 @@ private fun ChatListFilterChips(
                 .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FilterChip(
-            selected = filter == ChatListFilter.All,
-            onClick = { onChange(ChatListFilter.All) },
-            label = { Text(stringResource(R.string.chat_list_filter_all)) },
-        )
-        FilterChip(
-            selected = filter == ChatListFilter.Unread,
-            onClick = { onChange(ChatListFilter.Unread) },
-            label = { Text(stringResource(R.string.chat_list_filter_unread)) },
+        ChatListFilterChip(filter, ChatListFilter.All, R.string.chat_list_filter_all, onChange)
+        ChatListFilterChip(
+            filter,
+            ChatListFilter.Unread,
+            R.string.chat_list_filter_unread,
+            onChange,
             enabled = activeHasUnread || filter == ChatListFilter.Unread,
         )
-        FilterChip(
-            selected = filter == ChatListFilter.Groups,
-            onClick = { onChange(ChatListFilter.Groups) },
-            label = { Text(stringResource(R.string.chat_list_filter_groups)) },
-        )
+        ChatListFilterChip(filter, ChatListFilter.Groups, R.string.chat_list_filter_groups, onChange)
     }
+}
+
+/** A single chat-list filter pill: borderless and filled, brand-tinted when selected (WhatsApp-style). */
+@Composable
+private fun ChatListFilterChip(
+    current: ChatListFilter,
+    value: ChatListFilter,
+    @StringRes labelRes: Int,
+    onChange: (ChatListFilter) -> Unit,
+    enabled: Boolean = true,
+) {
+    val selected = current == value
+    FilterChip(
+        selected = selected,
+        onClick = { onChange(value) },
+        enabled = enabled,
+        label = { Text(stringResource(labelRes)) },
+        shape = RoundedCornerShape(percent = 50),
+        border = null,
+        colors =
+            FilterChipDefaults.filterChipColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+    )
 }
 
 @Composable
@@ -1524,44 +1544,40 @@ private fun ChatListNoResults(
 
 @Composable
 private fun ArchivedFolderRow(
-    totalCount: Int,
     unreadCount: Int,
     onClick: () -> Unit,
 ) {
-    // Folder-style tile at the top of the active list: same row shape as a
-    // ChatRow (44.dp leading slot + headline + supporting + trailing badge)
-    // so the rhythm doesn't break. Trailing badge shows unread-within-
-    // archived (folder-of-mail style); supporting text shows the total.
-    ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
-        leadingContent = {
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Default.Archive,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        headlineContent = { Text(stringResource(R.string.archived)) },
-        supportingContent = {
-            Text(pluralStringResource(R.plurals.archived_chats_count, totalCount, totalCount))
-        },
-        trailingContent = {
-            if (unreadCount > 0) {
-                Badge {
-                    Text(if (unreadCount > 99) "99+" else unreadCount.toString())
-                }
-            }
-        },
-    )
+    // Slim entry at the top of the active list (WhatsApp-style): a small
+    // archive glyph + "Archived" label, noticeably shorter than a chat row,
+    // with the unread-within-archived count trailing in the brand accent.
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Default.Archive,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(24.dp))
+        Text(
+            stringResource(R.string.archived),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Spacer(Modifier.weight(1f))
+        if (unreadCount > 0) {
+            Text(
+                if (unreadCount > 99) "99+" else unreadCount.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
 }
 
 /**
@@ -1877,20 +1893,30 @@ private fun ChatRow(
             )
         },
         trailingContent = {
-            Column(horizontalAlignment = Alignment.End) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     rememberedRelativeTime(item.latestAt ?: 0uL),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // Accent the timestamp when there's something unread, the
+                    // way WhatsApp does, so the eye lands on active threads.
+                    color =
+                        if (item.hasUnread) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 )
                 if (item.group.pendingConfirmation) {
                     Badge { Text(stringResource(R.string.invite)) }
                 } else if (item.hasUnread) {
-                    Badge {
+                    // Brand-coloured unread pill — Material's default Badge is
+                    // error-red, which reads as an alert rather than a count.
+                    Badge(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
                         Text(if (item.unreadCount > 99uL) "99+" else item.unreadCount.toString())
                     }
-                } else if (item.memberCount > 2) {
-                    Badge { Text(item.memberCount.toString()) }
                 }
             }
         },
