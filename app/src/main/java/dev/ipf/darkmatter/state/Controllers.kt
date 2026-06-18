@@ -2573,8 +2573,6 @@ class ConversationController(
 
     fun replyTargetMessageId(item: TimelineMessage): String? = ReplyNavigation.targetMessageId(item.record, item.projected)
 
-    fun timelineIndexOf(messageIdHex: String): Int = timeline.indexOfFirst { it.record.messageIdHex == messageIdHex }
-
     private suspend fun loadOlderPage(): Boolean {
         if (!hasMoreBefore || isLoadingOlder) return false
         val subscription = timelineSubscription ?: return false

@@ -5578,13 +5578,17 @@ private fun ConversationScreen(
     //   immediately advances HWM to the last timeline index, so the badge
     //   shows 0 — matching the convention that an "open chat" is read up to
     //   the visible row, not the last delivered row.
+    // Size of the rendered (edit-filtered) list. Derived once per timeline
+    // change and shared by every position calculation, so the filter never
+    // re-runs on the scroll path. Read as a State, so the derived blocks below
+    // stay reactive to it.
+    val renderedSize by remember {
+        derivedStateOf { controller.timeline.count { !MessageProjector.isEdit(it.record) } }
+    }
     val nearBottom by remember {
         derivedStateOf {
-            // Must match the rendered list size (LazyColumn shows
-            // renderedTimeline which filters out edits), otherwise
-            // bottomTimelineIndex overshoots and nearBottom stays false
-            // even when the user is physically at the bottom.
-            val renderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+            // Match the rendered list size, otherwise bottomTimelineIndex
+            // overshoots and nearBottom stays false at the physical bottom.
             isNearBottom(listState, renderedSize, controller.hasMoreBefore || controller.isLoadingOlder)
         }
     }
@@ -5602,16 +5606,21 @@ private fun ConversationScreen(
             val olderHeader = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
             // LazyColumn layout: [Spacer][maybe older-loading][timeline items][Spacer]
             val firstTimelineListIndex = 1 + olderHeader
+            // Visible rows index into the rendered (edit-filtered) list, so clamp
+            // to its last index, not the longer unfiltered timeline's.
             (visible.last().index - firstTimelineListIndex)
-                .coerceAtMost(controller.timeline.lastIndex)
+                .coerceAtMost(renderedSize - 1)
         }
     }
     LaunchedEffect(currentHighestVisibleTimelineIndex) {
         val idx = currentHighestVisibleTimelineIndex
         if (idx < 0) return@LaunchedEffect
         // Monotonic advance only — scroll-up keeps the existing anchor so the
-        // read pointer never moves backwards. See [nextReadAnchor].
-        readAnchorMessageId = nextReadAnchor(controller.timeline, readAnchorMessageId, idx)
+        // read pointer never moves backwards. See [nextReadAnchor]. Resolve the
+        // visible row against the filtered (rendered) list it indexes into, not
+        // the unfiltered timeline.
+        val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        readAnchorMessageId = nextReadAnchor(rendered, readAnchorMessageId, idx)
     }
     val unreadIncomingCount by remember {
         derivedStateOf {
@@ -6271,7 +6280,12 @@ private fun ConversationScreen(
                     appState.present(R.string.toast_original_message_unavailable)
                     return@launch
                 }
-                val timelineIndex = controller.timelineIndexOf(targetMessageId)
+                // Resolve the target in the rendered (edit-filtered) list the
+                // LazyColumn shows — an unfiltered index is off by the edits above it.
+                val timelineIndex =
+                    controller.timeline
+                        .filterNot { MessageProjector.isEdit(it.record) }
+                        .indexOfFirst { it.record.messageIdHex == targetMessageId }
                 if (timelineIndex < 0) {
                     appState.present(R.string.toast_original_message_unavailable)
                     return@launch
