@@ -287,6 +287,22 @@ class MarkdownPreviewTextTest {
     }
 
     @Test
+    fun capBacksOffInsteadOfSplittingSupplementaryPlaneCharacter() {
+        val annotated = build(listOf(paragraph("x".repeat(199) + "😀tail")), maxLength = 200)
+
+        assertEquals(199, annotated.length)
+        assertEquals("x".repeat(199), annotated.text)
+    }
+
+    @Test
+    fun capDoesNotLeaveSeparatorWhenNextBlockStartsWithUnsplittableCharacter() {
+        val annotated = build(listOf(paragraph("x".repeat(198)), paragraph("😀tail")), maxLength = 200)
+
+        assertEquals(198, annotated.length)
+        assertEquals("x".repeat(198), annotated.text)
+    }
+
+    @Test
     fun capAppliesWithinASingleOversizedBlock() {
         val annotated =
             build(

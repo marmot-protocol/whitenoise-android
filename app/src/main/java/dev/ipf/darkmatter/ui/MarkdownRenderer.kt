@@ -670,12 +670,8 @@ internal fun markdownDocumentToPreviewAnnotatedString(
                 appendPreviewBlock(block, codeStyle, maxLength, mentionDisplayName, depth = 0)
             }
         }
-    return if (flattened.length > maxLength) flattened.subSequence(0, flattened.safeCutEnd(maxLength)) else flattened
+    return if (flattened.length > maxLength) flattened.previewSubSequence(maxLength) else flattened
 }
-
-// Pull a cut back off a high surrogate so a preview never ends on half a
-// supplementary-plane char (which renders as the � replacement glyph).
-private fun CharSequence.safeCutEnd(end: Int): Int = if (end in 1..length && this[end - 1].isHighSurrogate()) end - 1 else end
 
 private fun AnnotatedString.Builder.appendPreviewBlock(
     block: MarkdownBlockFfi,
@@ -715,6 +711,25 @@ private fun AnnotatedString.Builder.appendPreviewBlock(
 
 private val previewWhitespaceRun = Regex("\\s+")
 
+private fun String.previewTake(maxLength: Int): String {
+    val end = previewSafeEnd(maxLength)
+    return if (end == length) this else substring(0, end)
+}
+
+private fun AnnotatedString.previewSubSequence(maxLength: Int): AnnotatedString {
+    val end = text.previewSafeEnd(maxLength)
+    return subSequence(0, end)
+}
+
+private fun String.previewSafeEnd(maxLength: Int): Int {
+    val end = maxLength.coerceIn(0, length)
+    return if (end > 0 && end < length && Character.isHighSurrogate(this[end - 1])) {
+        end - 1
+    } else {
+        end
+    }
+}
+
 private fun AnnotatedString.Builder.appendPreviewCodeContent(
     content: String,
     codeStyle: SpanStyle,
@@ -724,7 +739,7 @@ private fun AnnotatedString.Builder.appendPreviewCodeContent(
     // must not be regex-processed for a one-line row. The window is generous
     // because collapsing only shrinks text; a pathological mostly-whitespace
     // prefix just yields a shorter preview, which the row can afford.
-    val bounded = content.take(maxLength * 8)
+    val bounded = content.previewTake(maxLength * 8)
     // A code block is a multi-line region; the preview is one line. Collapse
     // every whitespace run (incl. newlines and indentation) to a single space
     // so `fun main() {\n  hi()\n}` reads as `fun main() { hi() }`.
@@ -762,8 +777,10 @@ private fun AnnotatedString.Builder.appendPreviewSegment(
     val separator = if (length > 0) 1 else 0
     val remaining = maxLength - length - separator
     if (remaining <= 0) return
+    val chunk = if (segment.length > remaining) segment.previewSubSequence(remaining) else segment
+    if (chunk.isEmpty()) return
     if (separator == 1) append(' ')
-    append(if (segment.length > remaining) segment.subSequence(0, segment.safeCutEnd(remaining)) else segment)
+    append(chunk)
 }
 
 private fun AnnotatedString.Builder.appendPreviewInlines(
@@ -784,12 +801,12 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
         // giant run can't blow past it either.
         if (length >= maxLength) return
         when (inline) {
-            is MarkdownInlineFfi.Text -> append(inline.content.take(maxLength - length))
+            is MarkdownInlineFfi.Text -> append(inline.content.previewTake(maxLength - length))
             // One-line preview: the author's line breaks flatten to spaces
             // (unlike the bubble renderer, which preserves them).
             MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append(' ')
             is MarkdownInlineFfi.Code ->
-                withStyle(codeStyle) { append(inline.content.take((maxLength - length).coerceAtLeast(0))) }
+                withStyle(codeStyle) { append(inline.content.previewTake((maxLength - length).coerceAtLeast(0))) }
             is MarkdownInlineFfi.Emph ->
                 withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
                     appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName, depth + 1)
@@ -820,9 +837,9 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
                     mentionDisplayName,
                     depth + 1,
                 )
-            is MarkdownInlineFfi.Autolink -> append(inline.url.take(maxLength - length))
+            is MarkdownInlineFfi.Autolink -> append(inline.url.previewTake(maxLength - length))
             is MarkdownInlineFfi.Math ->
-                withStyle(codeStyle) { append(inline.content.take((maxLength - length).coerceAtLeast(0))) }
+                withStyle(codeStyle) { append(inline.content.previewTake((maxLength - length).coerceAtLeast(0))) }
             // Same visible text as the bubble (name or shortened bech32) but
             // inert: the row's only tap target is the chat itself.
             is MarkdownInlineFfi.NostrMention -> {
