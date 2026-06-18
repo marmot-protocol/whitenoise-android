@@ -11,10 +11,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
-import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.common.GoogleApiAvailability
-import com.google.firebase.FirebaseApp
-import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.AvatarImageLoader
@@ -28,6 +24,7 @@ import dev.ipf.darkmatter.core.ProfileSanitizer
 import dev.ipf.darkmatter.notifications.BackgroundConnectionPreferences
 import dev.ipf.darkmatter.notifications.LocalNotificationPolicy
 import dev.ipf.darkmatter.notifications.LocalNotificationPresenter
+import dev.ipf.darkmatter.notifications.NativePush
 import dev.ipf.darkmatter.notifications.NotificationStreamForegroundService
 import dev.ipf.darkmatter.notifications.PushServerConfig
 import dev.ipf.darkmatter.notifications.PushTokenStore
@@ -59,7 +56,6 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -67,7 +63,6 @@ import java.net.IDN
 import java.net.URI
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.coroutines.resume
 
 sealed interface AppPhase {
     data object Bootstrapping : AppPhase
@@ -1260,22 +1255,20 @@ class DarkMatterAppState(
 
     /**
      * Whether real push notifications can run on this device + build. True
-     * only if (1) the build is configured with a MIP-05 push server pubkey,
-     * (2) Google Play Services is available on the device, AND (3) the
-     * Firebase app has actually been initialized at process start. Without
-     * (3), `FirebaseMessaging.getInstance()` throws `IllegalStateException`
-     * deep in the FCM SDK; the gate keeps that exception out of the
-     * foreground / account-switch / token-rotation paths that would
-     * otherwise crash the process. False on F-Droid/Zapstore installs
-     * lacking GMS, on builds without
-     * [BuildConfig.DARKMATTER_PUSH_SERVER_PUBKEY_HEX], on emulators without
-     * Play Services, and on builds where Firebase isn't initialized.
+     * only if (1) the build is configured with a MIP-05 push server pubkey AND
+     * (2) the active product flavor's [NativePush] transport is available
+     * (Google Play Services present and the Firebase app initialized at process
+     * start). The platform check is delegated to the flavor-provided
+     * [NativePush] so this shared code never references Firebase symbols
+     * directly — the `zapstore` (no-FCM) flavor always reports the transport
+     * unavailable. False on F-Droid/Zapstore installs lacking GMS, on builds
+     * without [BuildConfig.DARKMATTER_PUSH_SERVER_PUBKEY_HEX], on emulators
+     * without Play Services, on no-FCM builds, and on builds where Firebase
+     * isn't initialized.
      */
     fun isNativePushAvailable(config: PushServerConfig? = PushServerConfig.current()): Boolean {
         if (config == null) return false
-        val status = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(appContext)
-        if (status != ConnectionResult.SUCCESS) return false
-        return FirebaseApp.getApps(appContext).isNotEmpty()
+        return NativePush.isPlatformAvailable(appContext)
     }
 
     /**
@@ -1473,31 +1466,11 @@ class DarkMatterAppState(
 
     private suspend fun fetchFcmTokenOrNull(): String? {
         if (!isNativePushAvailable()) return null
-        val token =
-            runCatching {
-                suspendCancellableCoroutine<String?> { continuation ->
-                    // The Firebase Task API has no cancel surface, so the
-                    // completion listener can fire after this coroutine is
-                    // cancelled. Guard the resume on isActive so a stale
-                    // callback doesn't try to push a value onto a closed
-                    // continuation; the task completes in the background and
-                    // its result is dropped. The outer runCatching is a
-                    // belt — `getInstance()` itself can throw
-                    // IllegalStateException if FirebaseApp isn't initialized,
-                    // and we'd rather drop the token fetch than crash.
-                    FirebaseMessaging
-                        .getInstance()
-                        .token
-                        .addOnCompleteListener { task ->
-                            if (continuation.isActive) {
-                                continuation.resume(if (task.isSuccessful) task.result else null)
-                            }
-                        }
-                }
-            }.onFailure {
-                rethrowIfCancellation(it)
-                appStateDebug { "FCM token fetch failed: ${it.readableMessage()}" }
-            }.getOrNull()
+        // The flavor-provided transport owns the SDK-specific token fetch
+        // (the Firebase Task API, its threading, and exception handling) and
+        // returns null on any failure; the `zapstore` flavor never gets here
+        // because the gate above reports the transport unavailable.
+        val token = NativePush.fetchToken(appContext)
         if (!token.isNullOrBlank()) pushTokenStore.setToken(token)
         return token?.takeIf { it.isNotBlank() }
     }

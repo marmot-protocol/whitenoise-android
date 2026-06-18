@@ -6,11 +6,15 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-// Apply the Firebase plugin only when its expected config file is present.
-// Without that file, Firebase stays uninitialized at runtime and the push
-// runtime reports unavailable; the app still compiles and runs, falling
-// back to local notifications.
-if (file("google-services.json").exists()) {
+// Apply the Firebase google-services plugin only when its config file is
+// present. The plugin is meaningful only for the `play` flavor (the
+// `zapstore` build ships without Firebase), so the config is looked up in the
+// play source set as well as the app-module root. Without the file, Firebase
+// stays uninitialized at runtime and the push runtime reports unavailable; the
+// app still compiles and runs, falling back to local notifications. The plugin
+// only generates tasks for variants whose flavor provides the JSON, so a
+// `zapstore` build is unaffected even when a play config is present.
+if (file("google-services.json").exists() || file("src/play/google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
 
@@ -157,6 +161,28 @@ android {
         compose = true
         buildConfig = true
     }
+    // Product flavors split the FCM/Firebase packaging by distribution channel.
+    //   play     — Google Play build: bundles Firebase Messaging + Play
+    //              Services Base and (when google-services.json is present)
+    //              applies the google-services plugin, so MIP-05 native push
+    //              works.
+    //   zapstore — Zapstore / no-Firebase build: ships none of the Firebase
+    //              SDKs. The runtime push gate (AppState.isNativePushAvailable)
+    //              reports native push unavailable via the flavor-provided
+    //              NativePushProvider, so the app falls back to local
+    //              notifications over the existing foreground-stream transport.
+    // Firebase symbols live only in the `play` source set (see
+    // app/src/play/...); the shared code references them solely through
+    // dev.ipf.darkmatter.notifications.NativePush.
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+        }
+        create("zapstore") {
+            dimension = "distribution"
+        }
+    }
     packaging {
         jniLibs {
             excludes +=
@@ -235,9 +261,13 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.mlkit.barcode.scanning)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.messaging)
-    implementation(libs.play.services.base)
+    // Firebase / Play Services ship only in the `play` flavor. The `zapstore`
+    // (no-FCM) build excludes them entirely; its push gate reports native push
+    // unavailable through the flavor-provided NativePushProvider. See issue
+    // #140.
+    "playImplementation"(platform(libs.firebase.bom))
+    "playImplementation"(libs.firebase.messaging)
+    "playImplementation"(libs.play.services.base)
     implementation(libs.androidx.security.crypto)
     testImplementation(libs.junit)
     // Real org.json for JVM unit tests — the android.jar stubs throw on use.

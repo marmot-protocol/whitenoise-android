@@ -21,10 +21,30 @@ just release-fast
 Direct Gradle equivalents:
 
 ```bash
-./gradlew :app:testDebugUnitTest
-./gradlew :app:assembleDebug
-./gradlew :app:installDebug
+./gradlew :app:testPlayDebugUnitTest
+./gradlew :app:assemblePlayDebug
+./gradlew :app:installPlayDebug
 ```
+
+## Product Flavors
+
+The app builds in two product flavors on the `distribution` dimension, so the
+Firebase / FCM dependencies ship only where they're used (issue #140):
+
+- **`play`** — Google Play build. Bundles Firebase Messaging + Play Services
+  Base and (when `google-services.json` is present) applies the
+  google-services plugin, so MIP-05 native push works.
+- **`zapstore`** — Zapstore / no-Firebase build. Ships none of the Firebase
+  SDKs; the runtime push gate reports native push unavailable and the app
+  falls back to local notifications over the existing foreground-stream
+  transport.
+
+The dev/release recipes (`just debug`, `just test`, `just apk`, …) default to
+the `play` flavor to preserve the previous Firebase-included behavior. Use the
+`*-zapstore` recipes (e.g. `just debug-zapstore`, `just test-zapstore`) for the
+no-FCM build. Firebase symbols are confined to `app/src/play/`; shared code
+reaches the transport only through
+`dev.ipf.darkmatter.notifications.NativePush`.
 
 ## Release Builds
 

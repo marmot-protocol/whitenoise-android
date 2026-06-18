@@ -154,18 +154,22 @@ fi
 # --- Gradle release build ---
 cd "$REPO_DIR"
 
-APK_DIR="$REPO_DIR/app/build/outputs/apk/release"
-INTERMEDIATE_APK_DIR="$REPO_DIR/app/build/intermediates/apk/release"
+# The Play Store channel ships the `play` product flavor (Firebase/FCM
+# included). The `zapstore` flavor is the no-Firebase build and is produced
+# separately; this script targets `play` to preserve the existing release
+# pipeline. See issue #140.
+APK_DIR="$REPO_DIR/app/build/outputs/apk/play/release"
+INTERMEDIATE_APK_DIR="$REPO_DIR/app/build/intermediates/apk/play/release"
 mkdir -p "$APK_DIR"
 
 if [[ -n "$TARGET_ABI" && "$TARGET_ABI" != "universal" ]]; then
   echo "==> Assembling release APK for $TARGET_ABI"
   rm -f "$APK_DIR"/*.apk
-  ./gradlew :app:assembleRelease \
+  ./gradlew :app:assemblePlayRelease \
     -Pandroid.injected.build.abi="$TARGET_ABI" \
     -Pandroid.injected.testOnly=false
 
-  gradle_apk_name="app-${TARGET_ABI}-release.apk"
+  gradle_apk_name="app-play-${TARGET_ABI}-release.apk"
   selected_apk="$APK_DIR/$gradle_apk_name"
   intermediate_apk="$INTERMEDIATE_APK_DIR/$gradle_apk_name"
   if [[ ! -f "$selected_apk" && -f "$intermediate_apk" ]]; then
@@ -184,7 +188,7 @@ if [[ -n "$TARGET_ABI" && "$TARGET_ABI" != "universal" ]]; then
   assert_not_test_only "$selected_apk"
 else
   echo "==> Assembling release APKs"
-  ./gradlew :app:assembleRelease
+  ./gradlew :app:assemblePlayRelease
 fi
 
 echo ""

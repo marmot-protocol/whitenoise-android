@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Play-flavor-only manifest additions.
+
+    The FCM messaging service and its `com.google.firebase.MESSAGING_EVENT`
+    intent filter live here, not in the shared main manifest, so the
+    `zapstore` (no-Firebase) build neither references the Firebase SDK class
+    (MarmotFirebaseMessagingService extends FirebaseMessagingService, which is
+    absent there) nor advertises an FCM receiver it can't service. The manifest
+    merger overlays this onto the main manifest for `play` variants only.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <service
+            android:name=".notifications.MarmotFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+    </application>
+
+</manifest>

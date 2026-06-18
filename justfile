@@ -10,22 +10,34 @@ export JAVA_HOME := env_var_or_default("JAVA_HOME", "/Applications/Android Studi
 # installs and release installs coexist on a device without a signing-cert
 # collision. Activity stays in the base namespace, so launch commands need
 # the full activity FQN, not the leading-dot shorthand.
+#
+# The app has two product flavors on the `distribution` dimension:
+#   play     — Google Play build with Firebase/FCM (the default for dev recipes)
+#   zapstore — no-Firebase build; native push is inert, local notifications only
+# Dev/release recipes target the `play` flavor by default to preserve the
+# previous (Firebase-included) behavior; use the `*-zapstore` recipes for the
+# no-FCM build. See issue #140.
 DEBUG_PKG := "dev.ipf.darkmatter.debug"
 RELEASE_PKG := "dev.ipf.darkmatter"
 MAIN_ACTIVITY := "dev.ipf.darkmatter.MainActivity"
-RELEASE_APK_DIR := "app/build/outputs/apk/release"
+RELEASE_APK_DIR := "app/build/outputs/apk/play/release"
 
 _default:
     @just --list
 
-# Build debug APK (per-ABI splits + universal).
+# Build debug APK (per-ABI splits + universal). Defaults to the `play` flavor.
 debug:
-    ./gradlew :app:assembleDebug
-    @ls -lh app/build/outputs/apk/debug/*.apk
+    ./gradlew :app:assemblePlayDebug
+    @ls -lh app/build/outputs/apk/play/debug/*.apk
 
-# Install the debug APK on the connected device.
+# Build the no-Firebase (zapstore) debug APK.
+debug-zapstore:
+    ./gradlew :app:assembleZapstoreDebug
+    @ls -lh app/build/outputs/apk/zapstore/debug/*.apk
+
+# Install the debug APK on the connected device. Defaults to the `play` flavor.
 install-debug:
-    ./gradlew :app:installDebug
+    ./gradlew :app:installPlayDebug
 
 # Launch the installed debug variant. Uses the activity FQN because
 # applicationId (dev.ipf.darkmatter.debug) no longer matches the namespace
@@ -40,9 +52,13 @@ run-debug: install-debug launch-debug
 uninstall-debug:
     adb uninstall {{DEBUG_PKG}}
 
-# Run unit tests.
+# Run unit tests. Defaults to the `play` flavor's debug variant.
 test:
-    ./gradlew :app:testDebugUnitTest
+    ./gradlew :app:testPlayDebugUnitTest
+
+# Run unit tests for the no-Firebase (zapstore) flavor.
+test-zapstore:
+    ./gradlew :app:testZapstoreDebugUnitTest
 
 # Lint Kotlin sources with ktlint (read-only; fails on violations). Also runs
 # as part of `./gradlew check`.
