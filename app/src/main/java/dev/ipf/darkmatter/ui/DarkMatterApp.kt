@@ -8780,31 +8780,13 @@ private fun MessageBubble(
                     )
                 }
                 val tallies = controller.reactions[record.messageIdHex].orEmpty()
-                // Hide reaction tallies on a deleted message — nothing to show,
-                // and nothing to long-press-toggle.
+                // Hide reaction tallies on a deleted message — nothing to show.
                 if (tallies.isNotEmpty() && !deleted) {
-                    val overflowing = tallies.size > MAX_VISIBLE_REACTIONS
-                    val visibleTallies = if (overflowing) tallies.take(MAX_VISIBLE_REACTIONS - 1) else tallies
-                    Row(
-                        // No explicit gap: the chips' 48dp min touch targets
-                        // already separate the visually-small pills.
-                        modifier = Modifier.offset(y = (-14).dp).padding(horizontal = 10.dp),
-                    ) {
-                        visibleTallies.forEach { tally ->
-                            ReactionTallyChip(
-                                tally = tally,
-                                onClick = { reactionSheetOpen = true },
-                                onLongClick = {
-                                    appState.launchMutation { controller.toggleReaction(tally.emoji, record) }
-                                },
-                            )
-                        }
-                        if (overflowing) {
-                            ReactionOverflowChip(
-                                count = tallies.size - visibleTallies.size,
-                                onClick = { reactionSheetOpen = true },
-                            )
-                        }
+                    Box(modifier = Modifier.offset(y = (-14).dp).padding(horizontal = 10.dp)) {
+                        ReactionSummaryChip(
+                            tallies = tallies,
+                            onClick = { reactionSheetOpen = true },
+                        )
                     }
                 }
                 if (reactionSheetOpen) {
@@ -8830,52 +8812,21 @@ private fun MessageBubble(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * One consolidated reaction pill: the distinct emojis clustered together with a
+ * total count, mirroring the familiar messenger style — a single compact target
+ * rather than a spread of separate chips. Tapping opens the reactor list, where
+ * a reaction can be removed.
+ */
 @Composable
-private fun ReactionTallyChip(
-    tally: ReactionTally,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-) {
-    val colorScheme = MaterialTheme.colorScheme
-    val viewReactorsLabel = stringResource(R.string.view_reactors)
-    val toggleReactionLabel = stringResource(R.string.toggle_reaction)
-    Surface(
-        // Pill stays visually compact; the touch target is padded back out to
-        // the 48dp minimum (this control also takes a long-press).
-        modifier =
-            Modifier
-                .minimumInteractiveComponentSize()
-                .semantics { selected = tally.mine }
-                .clip(RoundedCornerShape(percent = 50))
-                .combinedClickable(
-                    role = Role.Button,
-                    onClick = onClick,
-                    onClickLabel = viewReactorsLabel,
-                    onLongClick = onLongClick,
-                    onLongClickLabel = toggleReactionLabel,
-                ),
-        shape = RoundedCornerShape(percent = 50),
-        color = if (tally.mine) colorScheme.secondaryContainer else colorScheme.surfaceContainerHigh,
-        contentColor = if (tally.mine) colorScheme.onSecondaryContainer else colorScheme.onSurface,
-        border = BorderStroke(1.5.dp, colorScheme.surface),
-        tonalElevation = 1.dp,
-    ) {
-        Text(
-            text = if (tally.count > 1) "${tally.emoji} ${tally.count}" else tally.emoji,
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-            style = MaterialTheme.typography.labelMedium,
-        )
-    }
-}
-
-/** Collapsed "+N" stand-in for reactions beyond the visible cap; opens the reactor list. */
-@Composable
-private fun ReactionOverflowChip(
-    count: Int,
+private fun ReactionSummaryChip(
+    tallies: List<ReactionTally>,
     onClick: () -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val mine = tallies.any { it.mine }
+    val total = tallies.sumOf { it.count }
+    val emojis = tallies.take(MAX_VISIBLE_REACTIONS).joinToString(separator = "") { it.emoji }
     val viewReactorsLabel = stringResource(R.string.view_reactors)
     Surface(
         modifier =
@@ -8884,16 +8835,21 @@ private fun ReactionOverflowChip(
                 .clip(RoundedCornerShape(percent = 50))
                 .clickable(role = Role.Button, onClick = onClick, onClickLabel = viewReactorsLabel),
         shape = RoundedCornerShape(percent = 50),
-        color = colorScheme.surfaceContainerHigh,
-        contentColor = colorScheme.onSurface,
+        color = if (mine) colorScheme.secondaryContainer else colorScheme.surfaceContainerHigh,
+        contentColor = if (mine) colorScheme.onSecondaryContainer else colorScheme.onSurface,
         border = BorderStroke(1.5.dp, colorScheme.surface),
         tonalElevation = 1.dp,
     ) {
-        Text(
-            text = "+$count",
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-            style = MaterialTheme.typography.labelMedium,
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(emojis, style = MaterialTheme.typography.labelLarge)
+            if (total > 1) {
+                Text(total.toString(), style = MaterialTheme.typography.labelMedium)
+            }
+        }
     }
 }
 
@@ -9552,8 +9508,8 @@ private fun OutgoingMessageStatusIcon(
 // Gap between a bubble's text and its trailing inline footer.
 private val BubbleFooterGap = 8.dp
 
-// Distinct reaction chips shown on a bubble before collapsing the rest into a
-// single "+N" overflow chip — keeps the tally row from outgrowing the bubble.
+// Distinct emojis shown in the consolidated reaction pill; the total count
+// still reflects every reaction beyond them.
 private const val MAX_VISIBLE_REACTIONS = 4
 
 /** Legibility scrim for a footer overlaid on visual media (image/video). */
