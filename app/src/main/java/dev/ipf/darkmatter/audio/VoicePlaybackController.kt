@@ -17,8 +17,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+
+internal class VoicePlaybackRequestSerializer {
+    private val mutex = Mutex()
+
+    suspend fun <T> withSerializedPlayback(block: suspend () -> T): T = mutex.withLock { block() }
+}
 
 /**
  * Process-wide voice playback singleton. Only one MediaPlayer is active at
@@ -67,6 +75,10 @@ object VoicePlaybackController {
     private var currentKey: String? = null
     private var tickerJob: Job? = null
     private var currentSpeed: Float = 1f
+
+    // play() suspends while MediaPlayer prepares on IO; serialize callers so
+    // only one prepared player can ever reach start()/assignment.
+    private val playSerializer = VoicePlaybackRequestSerializer()
 
     private var audioManager: AudioManager? = null
     private var focusRequest: AudioFocusRequest? = null
@@ -149,6 +161,13 @@ object VoicePlaybackController {
      * the current player and start fresh. Any other key playing is stopped.
      */
     suspend fun play(
+        key: String,
+        file: File,
+    ) {
+        playSerializer.withSerializedPlayback { playLocked(key, file) }
+    }
+
+    private suspend fun playLocked(
         key: String,
         file: File,
     ) {
