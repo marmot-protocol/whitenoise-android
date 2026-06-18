@@ -115,9 +115,14 @@ object MessageProjector {
                     }
                     isDelete(record) -> {
                         for (deletedId in deletedTargetMessageIds(record)) {
-                            val deletedReaction = reactionById.remove(deletedId)
+                            val deletedReaction = reactionById[deletedId]
                             if (deletedReaction != null && deletedReaction.targetMessageId == targetMessageId) {
-                                sendersByEmoji[deletedReaction.emoji]?.remove(deletedReaction.sender)
+                                // Only the reaction's own author may retract it; ignore a
+                                // forged delete from another account trying to hide it.
+                                if (record.sender.lowercase() == deletedReaction.sender) {
+                                    reactionById.remove(deletedId)
+                                    sendersByEmoji[deletedReaction.emoji]?.remove(deletedReaction.sender)
+                                }
                             } else if (deletedId == targetMessageId) {
                                 for (senders in sendersByEmoji.values) {
                                     senders.remove(record.sender.lowercase())

@@ -73,7 +73,12 @@ class DiskByteCache(
                 index[hashed]
             } ?: return null
         return try {
-            entry.file.readBytes()
+            val bytes = entry.file.readBytes()
+            // The post-restart LRU rebuild uses file lastModified as the recency
+            // proxy, so a read must touch it or frequently-read entries look
+            // stale and get evicted first after a restart. Best-effort.
+            entry.file.setLastModified(System.currentTimeMillis())
+            bytes
         } catch (_: IOException) {
             // File vanished (manual delete, OS cache reap, FS corruption).
             // Drop the index entry and report miss; the caller will re-fetch.

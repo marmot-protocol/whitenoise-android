@@ -60,6 +60,18 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun get_refreshesFileLastModifiedForReadRecency() {
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        cache.put("a", ByteArray(40))
+        val file = dir.listFiles { f -> f.isFile }!!.single()
+        file.setLastModified(1_000L)
+        cache.get("a")
+        // Post-restart rehydration orders by lastModified, so a read must
+        // refresh it or read-hot entries get evicted first. See #228.
+        assertTrue(file.lastModified() > 1_000L)
+    }
+
+    @Test
     fun pastCap_evictsLRU() {
         // 100-byte cap; three 40-byte entries push over → oldest evicted.
         val cache = DiskByteCache(dir, maxBytes = 100)

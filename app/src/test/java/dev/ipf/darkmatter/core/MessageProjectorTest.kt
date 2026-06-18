@@ -48,6 +48,21 @@ class MessageProjectorTest {
     }
 
     @Test
+    fun reactionTalliesIgnoreAForgedDeleteFromAnotherAccount() {
+        val records =
+            listOf(
+                reaction("r1", sender = "alice", target = "m1", emoji = "👍", at = 1u),
+                // bob forges a delete of alice's reaction event — only alice may
+                // retract it, so the tally must survive.
+                delete("d1", sender = "bob", target = "r1", at = 2u),
+            )
+
+        val tallies = MessageProjector.reactionTallies(records, targetMessageId = "m1", myAccountId = "carol")
+
+        assertEquals(listOf(ReactionTally(emoji = "👍", count = 1, mine = false)), tallies)
+    }
+
+    @Test
     fun displayBodyUsesTextAndMediaTagsFromCurrentBindings() {
         val reply =
             message(
