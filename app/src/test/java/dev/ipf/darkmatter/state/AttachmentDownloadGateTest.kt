@@ -89,6 +89,7 @@ class AttachmentDownloadGateTest {
                 gate.withRetryingPermit(
                     maxAttempts = 3,
                     initialBackoffMillis = 25,
+                    maxBackoffMillis = 100,
                     sleep = { delayMillis ->
                         events += "sleep:$delayMillis"
                         withTimeout(1_000) {

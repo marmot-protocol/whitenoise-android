@@ -29,6 +29,11 @@ internal class AttachmentDownloadGate(
 
     private val semaphore = Semaphore(parallelism)
 
+    /**
+     * Acquires one raw permit. Kept available for tests and for any future
+     * one-shot internal callers; media downloads should normally use
+     * [withRetryingPermit] so transient FFI/Blossom races can self-heal.
+     */
     suspend fun <T> withPermit(block: suspend () -> T): T = semaphore.withPermit { block() }
 
     suspend fun <T> withRetryingPermit(
