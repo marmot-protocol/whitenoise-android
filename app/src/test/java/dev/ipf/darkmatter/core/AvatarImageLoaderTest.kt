@@ -54,4 +54,37 @@ class AvatarImageLoaderTest {
         // 1500/2 = 750 still > 512; need 1500/4 = 375.
         assertEquals(4, avatarDecodeSampleSize(width = 1500, height = 1500, maxDimension = 512))
     }
+
+    @Test
+    fun avatarFailureExpiryCacheDropsExpiredEntriesWhenFull() {
+        val failures = AvatarFailureExpiryCache(maxEntries = 3)
+        failures.recordFailure(url = "https://example.com/stale-1.png", expiresAtMillis = 1_000L, nowMillis = 0L)
+        failures.recordFailure(url = "https://example.com/stale-2.png", expiresAtMillis = 1_000L, nowMillis = 0L)
+        failures.recordFailure(url = "https://example.com/stale-3.png", expiresAtMillis = 1_000L, nowMillis = 0L)
+
+        failures.recordFailure(url = "https://example.com/fresh.png", expiresAtMillis = 3_000L, nowMillis = 2_000L)
+
+        assertEquals(1, failures.size)
+        assertEquals(false, failures.isFresh(url = "https://example.com/stale-1.png", nowMillis = 2_500L))
+        assertEquals(true, failures.isFresh(url = "https://example.com/fresh.png", nowMillis = 2_500L))
+    }
+
+    @Test
+    fun avatarFailureExpiryCacheEvictsOldestEntriesWhenFailuresRemainFresh() {
+        val failures = AvatarFailureExpiryCache(maxEntries = 3)
+        (1..5).forEach { index ->
+            failures.recordFailure(
+                url = "https://example.com/avatar-$index.png",
+                expiresAtMillis = 10_000L,
+                nowMillis = 0L,
+            )
+        }
+
+        assertEquals(3, failures.size)
+        assertEquals(false, failures.isFresh(url = "https://example.com/avatar-1.png", nowMillis = 1_000L))
+        assertEquals(false, failures.isFresh(url = "https://example.com/avatar-2.png", nowMillis = 1_000L))
+        assertEquals(true, failures.isFresh(url = "https://example.com/avatar-3.png", nowMillis = 1_000L))
+        assertEquals(true, failures.isFresh(url = "https://example.com/avatar-4.png", nowMillis = 1_000L))
+        assertEquals(true, failures.isFresh(url = "https://example.com/avatar-5.png", nowMillis = 1_000L))
+    }
 }
