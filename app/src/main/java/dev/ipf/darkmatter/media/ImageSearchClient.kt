@@ -49,6 +49,28 @@ fun sanitizeHttpsAvatarUrl(raw: String?): String? {
 }
 
 /**
+ * Search handshake fetches carry the user's query and the DDG vqd token. They
+ * must stay on DuckDuckGo-controlled hosts; arbitrary public HTTPS redirects
+ * are only acceptable for the final result image/thumbnail URLs.
+ */
+internal fun sanitizeDuckDuckGoFetchUrl(raw: String?): String? {
+    val safe = sanitizeHttpsAvatarUrl(raw) ?: return null
+    val parsed = runCatching { URI(safe) }.getOrNull() ?: return null
+    if (!isDuckDuckGoFetchHost(parsed.host)) return null
+    return safe
+}
+
+private fun isDuckDuckGoFetchHost(host: String?): Boolean {
+    val normalized =
+        host
+            ?.trim()
+            ?.removeSuffix(".")
+            ?.lowercase()
+            .orEmpty()
+    return normalized == "duckduckgo.com" || normalized.endsWith(".duckduckgo.com")
+}
+
+/**
  * One image-search hit. URLs are already validated as `https://` non-private
  * hosts at this point; the source-host and dimensions labels are display-only
  * and may be null when the upstream payload omits them.
@@ -118,23 +140,26 @@ class DuckDuckGoImageSearchClient(
         }
 
     /**
-     * Manual-redirect GET that re-validates the HTTPS scheme + host safety
-     * at EVERY hop. `HttpURLConnection.instanceFollowRedirects = true` would
-     * silently follow an https→http downgrade (the kind of attack a hostile
-     * search-engine response could engineer), so we hop ourselves with a
-     * bounded counter and a per-hop validator.
+     * Manual-redirect GET that re-validates HTTPS, host safety, and the
+     * DuckDuckGo host pin at EVERY hop. `HttpURLConnection.instanceFollowRedirects = true`
+     * would silently follow an https→http downgrade or a DDG→third-party hop
+     * (leaking the user's query/token), so we hop ourselves with a bounded
+     * counter and a per-hop validator.
      */
     private fun httpGetString(initial: URL): String? {
         var currentSpec = initial.toString()
         var hops = 0
         while (true) {
-            val safeSpec = sanitizeHttpsAvatarUrl(currentSpec) ?: return null
+            val safeSpec = sanitizeDuckDuckGoFetchUrl(currentSpec) ?: return null
             val parsed = runCatching { URL(safeSpec) }.getOrNull() ?: return null
             // Re-validate the authority on the URL we actually open: URI (used by
             // the sanitizer) and URL can parse the authority differently, so guard
             // the host we connect to rather than trusting the URI's view.
+            val host = parsed.host ?: return null
             if (!parsed.userInfo.isNullOrEmpty()) return null
-            if (parsed.host.isNullOrBlank() || HostSafety.isPrivateOrLoopbackHost(parsed.host)) return null
+            if (host.isBlank() || HostSafety.isPrivateOrLoopbackHost(host) || !isDuckDuckGoFetchHost(host)) {
+                return null
+            }
             val connection = (parsed.openConnection() as? HttpURLConnection) ?: return null
             try {
                 connection.connectTimeout = timeoutMillis
