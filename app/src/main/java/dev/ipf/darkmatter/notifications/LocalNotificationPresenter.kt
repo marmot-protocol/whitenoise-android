@@ -94,6 +94,7 @@ class LocalNotificationPresenter(
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setPublicVersion(redactedPublicVersion(category))
                 .setSilent(false)
 
         when (update.trigger) {
@@ -123,6 +124,19 @@ class LocalNotificationPresenter(
         }
         return true
     }
+
+    // Shown in place of the real card whenever the lockscreen redacts private
+    // notifications. The OS can auto-generate one, but that behaviour varies by
+    // OEM; supplying our own guarantees no sender, body, or group name ever
+    // reaches the lockscreen — only the app name.
+    private fun redactedPublicVersion(category: String): Notification =
+        NotificationCompat
+            .Builder(context, CHANNEL_MESSAGES)
+            .setSmallIcon(R.drawable.ic_stat_darkmatter)
+            .setContentTitle(context.getString(R.string.app_name))
+            .setCategory(category)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
 
     fun cancel(
         notificationTag: String,
