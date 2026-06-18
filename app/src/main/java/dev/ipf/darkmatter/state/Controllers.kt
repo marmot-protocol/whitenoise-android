@@ -1845,7 +1845,25 @@ class ConversationController(
         recomputeReactions()
         try {
             if (alreadyMine) {
-                appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
+                // Retract just the tapped emoji by deleting its own reaction
+                // event; the FFI unreact is target-only and clears the latest
+                // reaction, so it would drop the wrong emoji when a user holds
+                // more than one on the same message.
+                val me = appState.activeAccount?.accountIdHex
+                val reactionEventId =
+                    timelineRecords[target]
+                        ?.reactions
+                        ?.userReactions
+                        ?.firstOrNull {
+                            it.sender.equals(me, ignoreCase = true) &&
+                                it.emoji == emoji &&
+                                it.reactionMessageIdHex.isNotBlank()
+                        }?.reactionMessageIdHex
+                if (reactionEventId != null) {
+                    appState.marmotIo { deleteMessage(account, group.groupIdHex, reactionEventId) }
+                } else {
+                    appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
+                }
             } else {
                 appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
             }
