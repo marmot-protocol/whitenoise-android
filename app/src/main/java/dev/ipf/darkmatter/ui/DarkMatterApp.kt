@@ -6368,7 +6368,12 @@ private fun ConversationScreen(
                             pictureUrl = controller.group.avatarUrl,
                         )
                         Column {
-                            Text(controller.title(groupTitleCopy), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                controller.title(groupTitleCopy),
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                             Text(
                                 controller.subtitle(
                                     justYou = stringResource(R.string.just_you),
@@ -6390,10 +6395,13 @@ private fun ConversationScreen(
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.chat_actions))
                     }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false },
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
                         DropdownMenuItem(
                             text = { Text(stringResource(if (controller.group.archived) R.string.unarchive else R.string.archive)) },
-                            leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
                             enabled = !controller.mutationInFlight,
                             onClick = {
                                 menuOpen = false
@@ -6403,7 +6411,6 @@ private fun ConversationScreen(
                         if (controller.isSelfMember) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.leave)) },
-                                leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
                                 enabled = !controller.mutationInFlight,
                                 onClick = {
                                     menuOpen = false
