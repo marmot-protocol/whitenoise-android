@@ -11,7 +11,7 @@ internal class ProfileRefreshGate(
         accountIdHex: String,
         nowMillis: Long,
     ): Boolean {
-        retryAfterMillis.entries.removeAll { (_, retryAfter) -> retryAfter <= nowMillis }
+        pruneExpired(nowMillis)
         if (accountIdHex in inFlight) return false
         if (nowMillis < retryAfterMillis.getOrDefault(accountIdHex, 0L)) return false
         inFlight.add(accountIdHex)
@@ -24,7 +24,19 @@ internal class ProfileRefreshGate(
         nowMillis: Long,
     ) {
         inFlight.remove(accountIdHex)
+        // Sweep elapsed cooldowns here too: tryStart is the only other place
+        // that prunes, so on a gate that goes quiescent after a burst of
+        // finish() calls (e.g. many distinct senders seen between tryStart
+        // calls in a large group) the map would otherwise grow with one
+        // never-evicted entry per distinct pubkey for the process lifetime
+        // (see #230). Pruning on every finish keeps the retained set bounded
+        // by the number of pubkeys with a *live* (unexpired) cooldown.
+        pruneExpired(nowMillis)
         retryAfterMillis[accountIdHex] = nowMillis + retryCooldownMillis
+    }
+
+    private fun pruneExpired(nowMillis: Long) {
+        retryAfterMillis.entries.removeAll { (_, retryAfter) -> retryAfter <= nowMillis }
     }
 
     @Synchronized

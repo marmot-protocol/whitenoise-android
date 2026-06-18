@@ -7,6 +7,7 @@ import android.media.AudioManager
 import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
 import android.util.Log
+import android.util.LruCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,6 +31,13 @@ object VoicePlaybackController {
     private const val TAG = "VoicePlaybackController"
     private const val TICK_INTERVAL_MS = 60L
 
+    // Cap on cached per-clip durations. Each entry is a boxed Int keyed by an
+    // absolute file path; without a bound the map held one entry per distinct
+    // voice clip ever probed for the process lifetime (see #230). 256 is far
+    // more than the clips visible in any realistic scroll window, while
+    // keeping worst-case memory flat regardless of session length.
+    private const val DURATION_CACHE_MAX_ENTRIES = 256
+
     /**
      * Voice playback speeds available to the user. Tap the bubble's speed
      * pill to cycle. Persists across pause/resume and across clips so a
@@ -49,7 +57,11 @@ object VoicePlaybackController {
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val durationCache = mutableMapOf<String, Int>()
+
+    // Count-bounded LRU (android.util.LruCache is internally synchronized).
+    // Mirrors AvatarImageLoader's bounded-cache approach for the same class
+    // of process-lifetime leak.
+    private val durationCache = LruCache<String, Int>(DURATION_CACHE_MAX_ENTRIES)
 
     private var player: MediaPlayer? = null
     private var currentKey: String? = null
@@ -117,7 +129,7 @@ object VoicePlaybackController {
      */
     suspend fun probeDuration(file: File): Int {
         val path = file.absolutePath
-        durationCache[path]?.let { return it }
+        durationCache.get(path)?.let { return it }
         val probed =
             withContext(Dispatchers.IO) {
                 runCatching {
@@ -127,7 +139,7 @@ object VoicePlaybackController {
                     }
                 }.getOrDefault(0)
             }
-        durationCache[path] = probed
+        durationCache.put(path, probed)
         return probed
     }
 
@@ -200,7 +212,7 @@ object VoicePlaybackController {
         mp.start()
         player = mp
         currentKey = key
-        durationCache[file.absolutePath] = mp.duration
+        durationCache.put(file.absolutePath, mp.duration)
         applySpeedToActive()
         _state.value =
             PlaybackState(

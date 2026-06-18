@@ -41,4 +41,20 @@ class ProfileRefreshGateTest {
 
         assertEquals(0, gate.retainedCooldownCount())
     }
+
+    @Test
+    fun quiescentGatePrunesExpiredCooldownsOnFinish() {
+        // A burst of distinct senders finishing, with no intervening
+        // tryStart, must not accumulate one never-evicted cooldown entry per
+        // pubkey for the process lifetime (#230). finish() sweeps elapsed
+        // cooldowns, so the retained set tracks only *live* cooldowns.
+        gate.finish("alice", nowMillis = 100L) // cooldown until 1_100L
+        gate.finish("bob", nowMillis = 100L) // cooldown until 1_100L
+        assertEquals(2, gate.retainedCooldownCount())
+
+        // carol finishes after alice/bob cooldowns have elapsed; their stale
+        // entries are swept even though no tryStart ran in between.
+        gate.finish("carol", nowMillis = 2_000L)
+        assertEquals(1, gate.retainedCooldownCount())
+    }
 }

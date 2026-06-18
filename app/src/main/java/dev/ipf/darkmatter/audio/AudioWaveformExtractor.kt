@@ -4,11 +4,11 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.util.Log
+import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.ByteOrder
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 
 /**
@@ -24,17 +24,26 @@ object AudioWaveformExtractor {
     private const val TIMEOUT_US = 10_000L
     private const val FLOOR = 0.05f
 
-    private val cache = ConcurrentHashMap<String, FloatArray>()
+    // Cap on cached waveforms. Each value is a 64-float array (~256 B of
+    // payload plus object overhead) keyed by absolute file path; without a
+    // bound the map held one entry per distinct clip ever decoded for the
+    // process lifetime (see #230). 256 covers any realistic scroll window
+    // while keeping worst-case memory flat. android.util.LruCache is
+    // internally synchronized, preserving the prior ConcurrentHashMap's
+    // thread-safety guarantee.
+    private const val CACHE_MAX_ENTRIES = 256
+
+    private val cache = LruCache<String, FloatArray>(CACHE_MAX_ENTRIES)
 
     suspend fun decode(file: File): FloatArray? {
-        cache[file.absolutePath]?.let { return it }
+        cache.get(file.absolutePath)?.let { return it }
         val result =
             withContext(Dispatchers.IO) {
                 runCatching { decodeBlocking(file) }
                     .onFailure { Log.w(TAG, "decode failed", it) }
                     .getOrNull()
             }
-        if (result != null) cache[file.absolutePath] = result
+        if (result != null) cache.put(file.absolutePath, result)
         return result
     }
 
