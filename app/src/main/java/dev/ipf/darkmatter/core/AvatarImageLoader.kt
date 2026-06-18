@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.LinkedHashMap
 
 object AvatarImageLoader {
     private const val CONNECT_TIMEOUT_MS = 5_000
@@ -28,6 +29,7 @@ object AvatarImageLoader {
     // <400KB, this holds dozens of avatars without unbounded memory growth.
     private const val CACHE_SIZE_BYTES = 16 * 1024 * 1024
     private const val FAILURE_TTL_MS = 60_000L
+    private const val FAILURE_CACHE_MAX_ENTRIES = 512
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Any()
@@ -39,7 +41,7 @@ object AvatarImageLoader {
             ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
         }
     private val inFlight = mutableMapOf<String, CompletableDeferred<ImageBitmap?>>()
-    private val failureExpiresAt = mutableMapOf<String, Long>()
+    private val failureExpiresAt = AvatarFailureExpiryCache(FAILURE_CACHE_MAX_ENTRIES)
 
     // Bumped by clear(); fetches launched under an older generation discard
     // their results so a logout/account-switch can't be re-polluted by an
@@ -71,7 +73,12 @@ object AvatarImageLoader {
                             cache.put(url, image)
                             failureExpiresAt.remove(url)
                         } else {
-                            failureExpiresAt[url] = System.currentTimeMillis() + FAILURE_TTL_MS
+                            val nowMillis = System.currentTimeMillis()
+                            failureExpiresAt.recordFailure(
+                                url = url,
+                                expiresAtMillis = nowMillis + FAILURE_TTL_MS,
+                                nowMillis = nowMillis,
+                            )
                         }
                         inFlight.remove(url)
                         // Complete INSIDE the lock so any concurrent `load(url)`
@@ -115,11 +122,7 @@ object AvatarImageLoader {
     private fun isFailureFresh(
         url: String,
         nowMillis: Long,
-    ): Boolean {
-        val fresh = isAvatarFailureFresh(failureExpiresAt[url], nowMillis)
-        if (!fresh) failureExpiresAt.remove(url)
-        return fresh
-    }
+    ): Boolean = failureExpiresAt.isFresh(url, nowMillis)
 
     private fun fetch(url: String): ImageBitmap? {
         // Manual redirect handling so we can validate the HTTPS scheme on
@@ -197,6 +200,62 @@ internal fun isAvatarFailureFresh(
     expiresAt: Long?,
     nowMillis: Long,
 ): Boolean = expiresAt != null && nowMillis < expiresAt
+
+internal class AvatarFailureExpiryCache(
+    private val maxEntries: Int,
+) {
+    init {
+        require(maxEntries > 0) { "maxEntries must be positive" }
+    }
+
+    private val expiresAtByUrl =
+        object : LinkedHashMap<String, Long>(maxEntries + 1, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean = size > maxEntries
+        }
+
+    val size: Int
+        get() = expiresAtByUrl.size
+
+    fun recordFailure(
+        url: String,
+        expiresAtMillis: Long,
+        nowMillis: Long,
+    ) {
+        if (expiresAtByUrl.size >= maxEntries) {
+            removeExpired(nowMillis)
+        }
+        expiresAtByUrl[url] = expiresAtMillis
+    }
+
+    fun remove(url: String) {
+        expiresAtByUrl.remove(url)
+    }
+
+    fun clear() {
+        expiresAtByUrl.clear()
+    }
+
+    fun isFresh(
+        url: String,
+        nowMillis: Long,
+    ): Boolean {
+        val fresh = isAvatarFailureFresh(expiresAtByUrl[url], nowMillis)
+        if (!fresh) {
+            expiresAtByUrl.remove(url)
+        }
+        return fresh
+    }
+
+    private fun removeExpired(nowMillis: Long) {
+        val iterator = expiresAtByUrl.entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (!isAvatarFailureFresh(entry.value, nowMillis)) {
+                iterator.remove()
+            }
+        }
+    }
+}
 
 internal fun avatarDecodeSampleSize(
     width: Int,
