@@ -44,6 +44,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -8418,21 +8419,11 @@ private fun MessageBubble(
                                         )
                                     }
                                     if (footerOnVisualMedia) {
-                                        MediaScrimFooter(
-                                            modifier =
-                                                Modifier
-                                                    .align(Alignment.BottomEnd)
-                                                    .padding(6.dp),
-                                        ) {
-                                            MessageInlineFooter(
-                                                timeText = rememberedRelativeTime(record.recordedAt),
-                                                color = Color.White,
-                                                showStatus = mine,
-                                                status = item.status,
-                                                editedLabel = null,
-                                                onEditedClick = null,
-                                            )
-                                        }
+                                        MediaFooterOverlay(
+                                            timeText = rememberedRelativeTime(record.recordedAt),
+                                            showStatus = mine,
+                                            status = item.status,
+                                        )
                                     }
                                 }
                             } else {
@@ -8554,6 +8545,8 @@ private fun MessageBubble(
                                     )
                                 }
                             }
+                        val footerOnPendingVisual =
+                            !deleted && !invalidated && !anyConfirmedMedia && pendingVisualRefs.size == 1
                         if (!deleted && !invalidated && !anyConfirmedMedia && pendingVisualRefs.isNotEmpty()) {
                             val uploadFailed = item.status == MessageStatus.Failed
                             val retryUpload: () -> Unit = {
@@ -8561,27 +8554,34 @@ private fun MessageBubble(
                             }
                             if (pendingVisualRefs.size == 1) {
                                 val entry = pendingVisualRefs.first()
-                                if (MediaReferenceParser.isVideoMedia(entry.value)) {
-                                    MediaVideoBubble(
-                                        messageIdHex = record.messageIdHex,
-                                        attachmentIndex = entry.index,
-                                        reference = entry.value,
-                                        mine = true,
-                                        controller = controller,
-                                        appState = appState,
-                                        uploading = !uploadFailed,
-                                        uploadFailed = uploadFailed,
-                                        onRetryUpload = if (uploadFailed) retryUpload else null,
-                                    )
-                                } else {
-                                    MediaImageBubble(
-                                        item = item,
-                                        reference = entry.value,
-                                        attachmentIndex = entry.index,
-                                        controller = controller,
-                                        appState = appState,
-                                        mine = true,
-                                        uploading = !uploadFailed,
+                                Box {
+                                    if (MediaReferenceParser.isVideoMedia(entry.value)) {
+                                        MediaVideoBubble(
+                                            messageIdHex = record.messageIdHex,
+                                            attachmentIndex = entry.index,
+                                            reference = entry.value,
+                                            mine = true,
+                                            controller = controller,
+                                            appState = appState,
+                                            uploading = !uploadFailed,
+                                            uploadFailed = uploadFailed,
+                                            onRetryUpload = if (uploadFailed) retryUpload else null,
+                                        )
+                                    } else {
+                                        MediaImageBubble(
+                                            item = item,
+                                            reference = entry.value,
+                                            attachmentIndex = entry.index,
+                                            controller = controller,
+                                            appState = appState,
+                                            mine = true,
+                                            uploading = !uploadFailed,
+                                        )
+                                    }
+                                    MediaFooterOverlay(
+                                        timeText = rememberedRelativeTime(record.recordedAt),
+                                        showStatus = true,
+                                        status = item.status,
                                     )
                                 }
                             } else {
@@ -8705,7 +8705,7 @@ private fun MessageBubble(
                                     )
                                 }
                             }
-                        } else if (!footerOnVisualMedia) {
+                        } else if (!footerOnVisualMedia && !footerOnPendingVisual) {
                             Box(modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start)) {
                                 inlineFooter()
                             }
@@ -9556,6 +9556,30 @@ private fun MediaScrimFooter(
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         content()
+    }
+}
+
+/** Time (+ outgoing status) overlaid on the bottom-right of a visual-media bubble. */
+@Composable
+private fun BoxScope.MediaFooterOverlay(
+    timeText: String,
+    showStatus: Boolean,
+    status: MessageStatus,
+) {
+    MediaScrimFooter(
+        modifier =
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(6.dp),
+    ) {
+        MessageInlineFooter(
+            timeText = timeText,
+            color = Color.White,
+            showStatus = showStatus,
+            status = status,
+            editedLabel = null,
+            onEditedClick = null,
+        )
     }
 }
 
