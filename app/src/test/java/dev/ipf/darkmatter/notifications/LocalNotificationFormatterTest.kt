@@ -124,6 +124,28 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun conversationDismissalKeyMatchesPostedMessageNotificationKey() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    groupIdHex = "group-a",
+                ),
+            )
+
+        assertEquals(
+            NotificationDismissalKey(
+                tag = content?.notificationTag ?: error("missing content"),
+                id = content.notificationId,
+            ),
+            LocalNotificationFormatter.conversationDismissalKey(
+                accountRef = "account",
+                groupIdHex = "group-a",
+            ),
+        )
+    }
+
+    @Test
     fun differentConversationsGetDistinctTags() {
         val launch = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"))
         val ops = LocalNotificationFormatter.content(update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-b"))

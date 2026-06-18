@@ -44,6 +44,17 @@ class LocalNotificationPresenter(
             Manifest.permission.POST_NOTIFICATIONS,
         ) == PackageManager.PERMISSION_GRANTED
 
+    fun dismissConversationMessages(
+        accountRef: String,
+        groupIdHex: String,
+    ): Boolean {
+        if (accountRef.isBlank() || groupIdHex.isBlank()) return false
+        val key = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
+        NotificationManagerCompat.from(context).cancel(key.tag, key.id)
+        notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
+        return true
+    }
+
     @SuppressLint("MissingPermission")
     fun show(
         update: NotificationUpdateFfi,
@@ -143,7 +154,7 @@ class LocalNotificationPresenter(
         val existing =
             runCatching { manager.activeNotifications }
                 .getOrNull()
-                ?.firstOrNull { it.tag == tag && it.id == MESSAGE_NOTIFICATION_ID }
+                ?.firstOrNull { it.tag == tag && it.id == LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID }
                 ?: return null
         return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing.notification)
     }
@@ -175,7 +186,6 @@ class LocalNotificationPresenter(
 
         // Per-conversation cards share id 0; the per-conversation tag keeps them
         // distinct, so reusing (tag, 0) updates the right conversation's card.
-        private const val MESSAGE_NOTIFICATION_ID = 0
         private const val MAX_MESSAGE_HISTORY = 25
     }
 }

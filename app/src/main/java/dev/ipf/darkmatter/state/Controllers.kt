@@ -848,6 +848,7 @@ class ChatsController(
                 ?.takeIf { it.isNotBlank() } ?: return false
         return runCatching {
             appState.marmotIo { markTimelineMessageRead(account, item.group.groupIdHex, lastId) }
+            appState.dismissConversationNotifications(account, item.group.groupIdHex)
             true
         }.onFailure {
             if (it is CancellationException) throw it
@@ -2804,6 +2805,7 @@ class ConversationController(
         val messageId = latest.messageIdHex.takeIf { it.isNotBlank() } ?: return
         runCatching {
             appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, messageId) }
+            appState.dismissConversationNotifications(account, group.groupIdHex)
         }.onFailure {
             Log.w("DMConversation", "mark read failed for ${group.groupIdHex.take(8)} message=${messageId.take(8)}", it)
         }
@@ -2831,6 +2833,7 @@ class ConversationController(
         lastReadMessageId = trimmed
         runCatching {
             appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, trimmed) }
+            appState.dismissConversationNotifications(account, group.groupIdHex)
         }.onFailure {
             lastReadMessageId = previous
             if (it is CancellationException) throw it

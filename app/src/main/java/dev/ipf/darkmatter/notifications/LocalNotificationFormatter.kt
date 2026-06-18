@@ -21,8 +21,24 @@ data class LocalNotificationContent(
     val conversationTitle: String?,
 )
 
+data class NotificationDismissalKey(
+    val tag: String,
+    val id: Int,
+)
+
 object LocalNotificationFormatter {
+    const val MESSAGE_NOTIFICATION_ID = 0
+
     private val whitespaceRun = Regex("\\s+")
+
+    fun conversationDismissalKey(
+        accountRef: String,
+        groupIdHex: String,
+    ): NotificationDismissalKey =
+        NotificationDismissalKey(
+            tag = "$accountRef|$groupIdHex",
+            id = MESSAGE_NOTIFICATION_ID,
+        )
 
     fun content(
         update: NotificationUpdateFfi,
@@ -52,10 +68,15 @@ object LocalNotificationFormatter {
             // independent alerts. Invites stay individual (per notification key).
             notificationTag =
                 when (update.trigger) {
-                    NotificationTriggerFfi.NEW_MESSAGE -> "${update.accountRef}|${update.groupIdHex}"
+                    NotificationTriggerFfi.NEW_MESSAGE ->
+                        conversationDismissalKey(update.accountRef, update.groupIdHex).tag
                     NotificationTriggerFfi.GROUP_INVITE -> update.notificationKey
                 },
-            notificationId = 0,
+            notificationId =
+                when (update.trigger) {
+                    NotificationTriggerFfi.NEW_MESSAGE -> MESSAGE_NOTIFICATION_ID
+                    NotificationTriggerFfi.GROUP_INVITE -> 0
+                },
             title = title,
             body = body,
             senderName = senderName,
