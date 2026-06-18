@@ -134,6 +134,7 @@
     <string name="toast_notification_conversation_unavailable">That conversation is no longer available</string>
     <string name="message_reacted">Reacted %1$s</string>
     <string name="message_reaction_fallback">to a message</string>
+    <string name="message_actions">Message actions</string>
     <string name="message_deleted_preview">Deleted a message</string>
     <string name="message_invalidated_preview">Didn\'t reach the group</string>
     <string name="agent_stream_started">Agent stream started</string>
