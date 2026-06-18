@@ -506,4 +506,6 @@
     <string name="profile_nip05_invalid">Insira um endereço como name@example.com.</string>
     <string name="profile_lightning_hint">Endereço Lightning, ex. you@walletprovider.com</string>
     <string name="profile_lightning_invalid">Insira um endereço Lightning como name@example.com.</string>
+    <string name="reaction_tap_to_remove">Toque para remover</string>
+    <string name="chat_list_filter_groups">Grupos</string>
 </resources>

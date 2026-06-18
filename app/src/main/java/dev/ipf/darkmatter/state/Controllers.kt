@@ -1845,7 +1845,37 @@ class ConversationController(
         recomputeReactions()
         try {
             if (alreadyMine) {
-                appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
+                // Retract just the tapped emoji by deleting its own reaction
+                // event; the FFI unreact is target-only and clears the latest
+                // reaction, so it would drop the wrong emoji when a user holds
+                // more than one on the same message.
+                // activeAccountRef can be set while the account row hasn't loaded
+                // into `accounts` yet; surface that distinctly from an ambiguous
+                // reaction so the failure reason isn't misleading.
+                val me =
+                    appState.activeAccount?.accountIdHex
+                        ?: error("no active account to retract reaction")
+                val ownReactions =
+                    timelineRecords[target]
+                        ?.reactions
+                        ?.userReactions
+                        .orEmpty()
+                        .filter { it.sender.equals(me, ignoreCase = true) }
+                val reactionEventId =
+                    ownReactions
+                        .firstOrNull { it.emoji == emoji && it.reactionMessageIdHex.isNotBlank() }
+                        ?.reactionMessageIdHex
+                when {
+                    reactionEventId != null ->
+                        appState.marmotIo { deleteMessage(account, group.groupIdHex, reactionEventId) }
+                    // Target-only unreact is safe only when this is the single
+                    // reaction to clear; with several it could drop another emoji.
+                    ownReactions.size == 1 && ownReactions.first().emoji == emoji ->
+                        appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
+                    // No event id yet (optimistic/unsynced) and ambiguous — fail so
+                    // the optimistic toggle reverts instead of retracting the wrong one.
+                    else -> error("no reaction event to retract for $emoji")
+                }
             } else {
                 appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
             }

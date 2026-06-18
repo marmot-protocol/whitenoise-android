@@ -28,6 +28,7 @@
     <string name="chat_list_search_hint">Search chats</string>
     <string name="chat_list_filter_all">All</string>
     <string name="chat_list_filter_unread">Unread</string>
+    <string name="chat_list_filter_groups">Groups</string>
     <string name="chat_list_no_unread">All caught up</string>
     <string name="chat_list_no_results_for">No results for \"%1$s\"</string>
     <string name="chat_row_swipe_archive">Archive</string>
@@ -114,6 +115,7 @@
     <string name="reaction_filter_all">All</string>
     <string name="view_reactors">View who reacted</string>
     <string name="toggle_reaction">Toggle reaction</string>
+    <string name="reaction_tap_to_remove">Tap to remove</string>
     <string name="member_actions">Member actions</string>
     <string name="remove_admin">Remove admin</string>
     <string name="adding_admin">Adding admin...</string>

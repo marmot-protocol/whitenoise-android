@@ -503,4 +503,6 @@
     <string name="profile_nip05_invalid">请输入类似 name@example.com 的地址。</string>
     <string name="profile_lightning_hint">Lightning 地址，例如 you@walletprovider.com</string>
     <string name="profile_lightning_invalid">请输入类似 name@example.com 的 Lightning 地址。</string>
+    <string name="reaction_tap_to_remove">点按以移除</string>
+    <string name="chat_list_filter_groups">群组</string>
 </resources>

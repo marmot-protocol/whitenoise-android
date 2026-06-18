@@ -7,6 +7,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.text.format.DateUtils
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
@@ -43,6 +44,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -141,6 +143,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
@@ -213,6 +216,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -227,6 +231,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -239,6 +244,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -336,12 +342,16 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 private enum class MainSection {
@@ -1041,7 +1051,6 @@ private fun ChatsScreen(
     var newChatTitle by remember { mutableStateOf(R.string.new_chat) }
     var newChatDirect by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
-    var showArchived by remember { mutableStateOf(false) }
     var quickActionsExpanded by remember { mutableStateOf(false) }
     // Search expand/collapse + live query. The search input is anchored in
     // the top bar; tapping the magnifier swaps the chrome (account avatar
@@ -1051,6 +1060,9 @@ private fun ChatsScreen(
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(ChatListFilter.All) }
+    // The Archived filter is a view switch, not a row predicate: it swaps the
+    // source list to archived chats (replacing the old dedicated Archived row).
+    val showArchived = filter == ChatListFilter.Archived
     val searchFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
 
@@ -1106,12 +1118,16 @@ private fun ChatsScreen(
         remember(controller.archivedItems) {
             controller.archivedItems.count { it.hasUnread }
         }
+    // Leave the archived view if its last chat is unarchived — the chip is then
+    // hidden, so don't strand the selection on it.
+    LaunchedEffect(controller.archivedItems.isEmpty(), filter) {
+        if (filter == ChatListFilter.Archived && controller.archivedItems.isEmpty()) filter = ChatListFilter.All
+    }
 
     Scaffold(
         topBar = {
             ChatListTopBar(
                 appState = appState,
-                showArchived = showArchived,
                 searchOpen = searchOpen,
                 searchQuery = searchQuery,
                 searchFocusRequester = searchFocusRequester,
@@ -1137,12 +1153,11 @@ private fun ChatsScreen(
                         appState.present(R.string.chat_list_voice_unavailable)
                     }
                 },
-                onArchivedBack = { showArchived = false },
                 onOpenSettings = onOpenSettings,
             )
         },
         floatingActionButton = {
-            if (!showArchived && !searchOpen) {
+            if (!searchOpen) {
                 QuickActionFabMenu(
                     expanded = quickActionsExpanded,
                     onExpandedChange = { quickActionsExpanded = it },
@@ -1166,36 +1181,14 @@ private fun ChatsScreen(
             // in the active and archived lists. They're sticky above the
             // list rather than sticky inside the LazyColumn so they survive
             // an empty-state swap without flicker.
-            if (sourceList.isNotEmpty()) {
+            if (controller.items.isNotEmpty() || controller.archivedItems.isNotEmpty()) {
                 ChatListFilterChips(
                     filter = filter,
                     onChange = { filter = it },
-                    activeHasUnread =
-                        if (showArchived) {
-                            archivedUnreadCount > 0
-                        } else {
-                            controller.items.any { it.hasUnread }
-                        },
+                    activeUnreadCount = controller.items.count { it.hasUnread },
+                    hasArchived = controller.archivedItems.isNotEmpty(),
+                    archivedUnreadCount = archivedUnreadCount,
                 )
-            }
-            // Archived folder tile hoisted out of the LazyColumn so it
-            // survives the empty-active-list case (when every chat has
-            // been archived, the LazyColumn never mounts and an
-            // in-list tile would vanish with it). Same gating as
-            // before: hidden in the archived view, while search is
-            // open, and when the Unread filter is on.
-            if (
-                !showArchived &&
-                !searchOpen &&
-                filter == ChatListFilter.All &&
-                controller.archivedItems.isNotEmpty()
-            ) {
-                ArchivedFolderRow(
-                    totalCount = controller.archivedItems.size,
-                    unreadCount = archivedUnreadCount,
-                    onClick = { showArchived = true },
-                )
-                HorizontalDivider()
             }
             Box(Modifier.fillMaxSize()) {
                 when {
@@ -1285,10 +1278,9 @@ private fun ChatsScreen(
     }
 }
 
-/** Three-way filter state for the chat list. `Groups` is held back from
- *  v1 because the direct-vs-group distinction is partly inferred from
- *  `memberCount`, which isn't always populated for archived rows. */
-private enum class ChatListFilter { All, Unread }
+/** Chat-list filter state. `Archived` swaps the source list to archived chats
+ *  rather than predicate-filtering the active one. */
+private enum class ChatListFilter { All, Unread, Groups, Archived }
 
 private fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,
@@ -1299,8 +1291,11 @@ private fun applyChatListSearchAndFilter(
 ): List<ChatListItem> {
     val byFilter =
         when (filter) {
-            ChatListFilter.All -> source
+            // Archived swaps the source list upstream, so there's nothing extra
+            // to filter here — show every archived chat.
+            ChatListFilter.All, ChatListFilter.Archived -> source
             ChatListFilter.Unread -> source.filter { it.hasUnread }
+            ChatListFilter.Groups -> source.filter { it.memberCount > 2 }
         }
     val needle = rawQuery.trim()
     if (needle.isEmpty()) return byFilter
@@ -1358,7 +1353,6 @@ private fun chatListItemDisplayTitle(
 @Composable
 private fun ChatListTopBar(
     appState: DarkMatterAppState,
-    showArchived: Boolean,
     searchOpen: Boolean,
     searchQuery: String,
     searchFocusRequester: FocusRequester,
@@ -1366,7 +1360,6 @@ private fun ChatListTopBar(
     onSearchOpen: () -> Unit,
     onSearchClose: () -> Unit,
     onMic: () -> Unit,
-    onArchivedBack: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     TopAppBar(
@@ -1395,7 +1388,6 @@ private fun ChatListTopBar(
                                 imeAction = ImeAction.Search,
                             ),
                     )
-                showArchived -> Text(stringResource(R.string.archived))
                 else -> Unit
             }
         },
@@ -1403,13 +1395,6 @@ private fun ChatListTopBar(
             when {
                 searchOpen ->
                     IconButton(onClick = onSearchClose) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                showArchived ->
-                    IconButton(onClick = onArchivedBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.back),
@@ -1458,7 +1443,9 @@ private fun ChatListTopBar(
 private fun ChatListFilterChips(
     filter: ChatListFilter,
     onChange: (ChatListFilter) -> Unit,
-    activeHasUnread: Boolean,
+    activeUnreadCount: Int,
+    hasArchived: Boolean,
+    archivedUnreadCount: Int,
 ) {
     Row(
         modifier =
@@ -1467,18 +1454,63 @@ private fun ChatListFilterChips(
                 .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FilterChip(
-            selected = filter == ChatListFilter.All,
-            onClick = { onChange(ChatListFilter.All) },
-            label = { Text(stringResource(R.string.chat_list_filter_all)) },
+        ChatListFilterChip(filter, ChatListFilter.All, R.string.chat_list_filter_all, onChange)
+        ChatListFilterChip(
+            filter,
+            ChatListFilter.Unread,
+            R.string.chat_list_filter_unread,
+            onChange,
+            trailingCount = activeUnreadCount,
         )
-        FilterChip(
-            selected = filter == ChatListFilter.Unread,
-            onClick = { onChange(ChatListFilter.Unread) },
-            label = { Text(stringResource(R.string.chat_list_filter_unread)) },
-            enabled = activeHasUnread || filter == ChatListFilter.Unread,
-        )
+        ChatListFilterChip(filter, ChatListFilter.Groups, R.string.chat_list_filter_groups, onChange)
+        if (hasArchived || filter == ChatListFilter.Archived) {
+            ChatListFilterChip(
+                filter,
+                ChatListFilter.Archived,
+                R.string.archived,
+                onChange,
+                trailingCount = archivedUnreadCount,
+            )
+        }
     }
+}
+
+@Composable
+private fun ChatListFilterChip(
+    current: ChatListFilter,
+    value: ChatListFilter,
+    @StringRes labelRes: Int,
+    onChange: (ChatListFilter) -> Unit,
+    enabled: Boolean = true,
+    trailingCount: Int = 0,
+) {
+    val selected = current == value
+    FilterChip(
+        selected = selected,
+        onClick = { onChange(value) },
+        enabled = enabled,
+        label = { Text(stringResource(labelRes)) },
+        trailingIcon =
+            if (trailingCount > 0) {
+                {
+                    Text(
+                        text = if (trailingCount > 99) "99+" else trailingCount.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            } else {
+                null
+            },
+        shape = RoundedCornerShape(percent = 50),
+        border = null,
+        colors =
+            FilterChipDefaults.filterChipColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+    )
 }
 
 @Composable
@@ -1510,48 +1542,6 @@ private fun ChatListNoResults(
             )
         }
     }
-}
-
-@Composable
-private fun ArchivedFolderRow(
-    totalCount: Int,
-    unreadCount: Int,
-    onClick: () -> Unit,
-) {
-    // Folder-style tile at the top of the active list: same row shape as a
-    // ChatRow (44.dp leading slot + headline + supporting + trailing badge)
-    // so the rhythm doesn't break. Trailing badge shows unread-within-
-    // archived (folder-of-mail style); supporting text shows the total.
-    ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
-        leadingContent = {
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Default.Archive,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        headlineContent = { Text(stringResource(R.string.archived)) },
-        supportingContent = {
-            Text(pluralStringResource(R.plurals.archived_chats_count, totalCount, totalCount))
-        },
-        trailingContent = {
-            if (unreadCount > 0) {
-                Badge {
-                    Text(if (unreadCount > 99) "99+" else unreadCount.toString())
-                }
-            }
-        },
-    )
 }
 
 /**
@@ -1867,20 +1857,27 @@ private fun ChatRow(
             )
         },
         trailingContent = {
-            Column(horizontalAlignment = Alignment.End) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     rememberedRelativeTime(item.latestAt ?: 0uL),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color =
+                        if (item.hasUnread) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 )
                 if (item.group.pendingConfirmation) {
                     Badge { Text(stringResource(R.string.invite)) }
                 } else if (item.hasUnread) {
-                    Badge {
+                    // Default Badge is error-red, which reads as an alert not a count.
+                    Badge(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
                         Text(if (item.unreadCount > 99uL) "99+" else item.unreadCount.toString())
                     }
-                } else if (item.memberCount > 2) {
-                    Badge { Text(item.memberCount.toString()) }
                 }
             }
         },
@@ -5347,6 +5344,61 @@ private fun UnreadMessagesDivider(count: Int) {
     }
 }
 
+private fun differentDay(
+    a: ULong,
+    b: ULong,
+): Boolean {
+    val zone = ZoneId.systemDefault()
+    return Instant.ofEpochSecond(a.toLong()).atZone(zone).toLocalDate() !=
+        Instant.ofEpochSecond(b.toLong()).atZone(zone).toLocalDate()
+}
+
+// Today/Yesterday, then weekday within a week, then a locale-medium date —
+// all sourced from the platform so the ribbon needs no new translation keys.
+private fun messageDayLabel(
+    epochSeconds: ULong,
+    locale: Locale,
+): String {
+    if (epochSeconds == 0uL) return ""
+    val zone = ZoneId.systemDefault()
+    val date = Instant.ofEpochSecond(epochSeconds.toLong()).atZone(zone).toLocalDate()
+    val days = ChronoUnit.DAYS.between(date, LocalDate.now(zone))
+    return when {
+        days <= 0L || days == 1L ->
+            DateUtils
+                .getRelativeTimeSpanString(
+                    epochSeconds.toLong() * 1000L,
+                    System.currentTimeMillis(),
+                    DateUtils.DAY_IN_MILLIS,
+                ).toString()
+        days in 2L..6L -> date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, locale)
+        else -> date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))
+    }
+}
+
+@Composable
+private fun DaySeparator(label: String) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier =
+                Modifier
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                    ).padding(horizontal = 12.dp, vertical = 4.dp),
+        )
+    }
+}
+
 /**
  * Centered one-line row for a kind-1210 group system event ("%s changed the
  * group avatar", membership changes, renames). Rendered from `system_type` +
@@ -5399,6 +5451,9 @@ private fun GroupSystemRow(
         )
     }
 }
+
+// How many rows from the top to begin prefetching the next older page.
+private const val OLDER_PAGE_PREFETCH_ROWS = 4
 
 /**
  * Shared definition of "user is at (or near) the newest message". Used both
@@ -5502,6 +5557,11 @@ private fun ConversationScreen(
     var confirmLeaveFromTopBar by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var initialTimelineAnchored by remember(chat.id) { mutableStateOf(false) }
+    // Id of the newest row the bottom-follow has reacted to. A real append
+    // gives a new last id while the previous one stays in the list; an
+    // older-page load trims the newest rows, so the previous id is gone and
+    // no follow fires. Keyed on id (not recordedAt) to survive same-second tails.
+    var lastFollowedLatestId by remember(chat.id) { mutableStateOf<String?>(null) }
     var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
     var highlightedMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     var navigateReplyJob by remember(chat.id) { mutableStateOf<Job?>(null) }
@@ -6245,8 +6305,28 @@ private fun ConversationScreen(
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         }
     val latestTimelineItemId = renderedTimeline.lastOrNull()?.id
+    val transcriptLocale = LocalConfiguration.current.locales[0]
     val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
     val bottomTimelineIndex = renderedTimeline.size + 1 + olderHeaderCount
+
+    // Extend history a few rows before the reader reaches the top, while a
+    // keyed message is still the anchor. Compose's keyed prepend then holds
+    // those messages at the same offset in the same measure pass — the new
+    // page lands above the fold and the reader scrolls up into it with no jump
+    // or blink (no post-hoc scroll, which is what caused the flip).
+    LaunchedEffect(listState, controller) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collect { firstIndex ->
+                if (
+                    initialTimelineAnchored &&
+                    controller.hasMoreBefore &&
+                    !controller.isLoadingOlder &&
+                    firstIndex <= olderHeaderCount + OLDER_PAGE_PREFETCH_ROWS
+                ) {
+                    controller.loadOlder()
+                }
+            }
+    }
     // Capture the unread boundary at chat open. Stays fixed for the lifetime
     // of this composable (per chat.id) so the "N unread messages" divider
     // doesn't keep moving as the user scrolls and marks messages as read.
@@ -6309,11 +6389,22 @@ private fun ConversationScreen(
                     }
                 listState.scrollToItem(targetIndex)
                 initialTimelineAnchored = true
-            } else if (nearBottom) {
-                // User is still pinned to the newest message; follow new
-                // incoming messages down. Reading older history isn't
-                // interrupted by this branch (see issue #59).
-                listState.scrollToItem(bottomTimelineIndex)
+                lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
+            } else {
+                val latestId = renderedTimeline.lastOrNull()?.id
+                val previousId = lastFollowedLatestId
+                // A genuine append: the last id changed and the row we last
+                // followed is still present (an older-page trim drops it, so
+                // that path is excluded). Id-based, so same-second tails count.
+                val isAppend =
+                    previousId != null &&
+                        latestId != null &&
+                        latestId != previousId &&
+                        renderedTimeline.any { it.id == previousId }
+                lastFollowedLatestId = latestId ?: previousId
+                if (isAppend && nearBottom) {
+                    listState.scrollToItem(bottomTimelineIndex)
+                }
             }
         }
     }
@@ -6368,7 +6459,12 @@ private fun ConversationScreen(
                             pictureUrl = controller.group.avatarUrl,
                         )
                         Column {
-                            Text(controller.title(groupTitleCopy), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                controller.title(groupTitleCopy),
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                             Text(
                                 controller.subtitle(
                                     justYou = stringResource(R.string.just_you),
@@ -6390,10 +6486,13 @@ private fun ConversationScreen(
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.chat_actions))
                     }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false },
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
                         DropdownMenuItem(
                             text = { Text(stringResource(if (controller.group.archived) R.string.unarchive else R.string.archive)) },
-                            leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
                             enabled = !controller.mutationInFlight,
                             onClick = {
                                 menuOpen = false
@@ -6403,7 +6502,6 @@ private fun ConversationScreen(
                         if (controller.isSelfMember) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.leave)) },
-                                leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
                                 enabled = !controller.mutationInFlight,
                                 onClick = {
                                     menuOpen = false
@@ -6518,7 +6616,7 @@ private fun ConversationScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(bottom = 8.dp),
                         ) {
-                            item { Spacer(Modifier.height(4.dp)) }
+                            item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
                             if (controller.hasMoreBefore || controller.isLoadingOlder) {
                                 item(key = "older-messages-loading") {
                                     Box(
@@ -6535,17 +6633,23 @@ private fun ConversationScreen(
                                     }
                                 }
                             }
-                            items(
+                            itemsIndexed(
                                 renderedTimeline,
-                                key = { it.id },
+                                key = { _, item -> item.id },
                                 // Pool layouts by category so Compose can reuse
                                 // the heavier MessageBubble slot across scroll
                                 // without recreating layout nodes for the
                                 // simpler centered group-system rows.
-                                contentType = { item ->
+                                contentType = { _, item ->
                                     if (MessageProjector.isGroupSystem(item.record)) "groupSystem" else "message"
                                 },
-                            ) { item ->
+                            ) { index, item ->
+                                // Rendered inside the slot, not as its own item, so
+                                // the anchor index math stays intact.
+                                val older = renderedTimeline.getOrNull(index - 1)
+                                if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
+                                    DaySeparator(messageDayLabel(item.record.recordedAt, transcriptLocale))
+                                }
                                 if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
                                     UnreadMessagesDivider(count = entryUnreadCount)
                                 }
@@ -6554,7 +6658,7 @@ private fun ConversationScreen(
                                 // never a bubble with the raw JSON content.
                                 if (MessageProjector.isGroupSystem(item.record)) {
                                     GroupSystemRow(record = item.record, appState = appState)
-                                    return@items
+                                    return@itemsIndexed
                                 }
                                 MessageBubble(
                                     item = item,
@@ -6571,7 +6675,39 @@ private fun ConversationScreen(
                                     onReplyPreviewClick = { navigateToReplyTarget(it) },
                                 )
                             }
-                            item { Spacer(Modifier.height(8.dp)) }
+                            item(key = "bottom-spacer") { Spacer(Modifier.height(8.dp)) }
+                        }
+                        // Day of the topmost visible message, shown only while
+                        // scrolling — the inline separators carry it at rest.
+                        val stickyTimelineIndex =
+                            (listState.firstVisibleItemIndex - 1 - olderHeaderCount)
+                                .coerceIn(0, (renderedTimeline.size - 1).coerceAtLeast(0))
+                        val stickyDayLabel =
+                            renderedTimeline
+                                .getOrNull(stickyTimelineIndex)
+                                ?.record
+                                ?.recordedAt
+                                ?.let { messageDayLabel(it, transcriptLocale) }
+                                .orEmpty()
+                        val stickyAlpha by animateFloatAsState(
+                            targetValue = if (listState.isScrollInProgress && stickyDayLabel.isNotEmpty()) 1f else 0f,
+                            label = "stickyDayRibbon",
+                        )
+                        if (initialTimelineAnchored && stickyAlpha > 0.01f) {
+                            Text(
+                                text = stickyDayLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 8.dp)
+                                        .alpha(stickyAlpha)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.surfaceVariant,
+                                            shape = RoundedCornerShape(12.dp),
+                                        ).padding(horizontal = 12.dp, vertical = 4.dp),
+                            )
                         }
                         if (!initialTimelineAnchored) {
                             LoadingScreen()
@@ -8115,7 +8251,7 @@ private fun MessageBubble(
                     tonalElevation = if (mine) 1.dp else 0.dp,
                 ) {
                     Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (!mine) {
+                        if (showSenderAvatar) {
                             Text(
                                 appState.displayName(record.sender),
                                 style = MaterialTheme.typography.labelMedium,
@@ -8220,27 +8356,44 @@ private fun MessageBubble(
                             remember(imageAttachments, videoAttachments) {
                                 (imageAttachments + videoAttachments).sortedBy { it.index }
                             }
+                        // An uncaptioned single image/video carries the footer
+                        // overlaid on its bottom-right; a caption (if any) takes
+                        // it instead via the text path below.
+                        val footerOnVisualMedia =
+                            !deleted &&
+                                !invalidated &&
+                                visualAttachments.size == 1 &&
+                                (editState?.latestText ?: record.plaintext).isBlank()
                         if (!deleted && !invalidated && visualAttachments.isNotEmpty()) {
                             if (visualAttachments.size == 1) {
                                 val entry = visualAttachments.first()
-                                if (MediaReferenceParser.isVideoMedia(entry.value)) {
-                                    MediaVideoBubble(
-                                        messageIdHex = record.messageIdHex,
-                                        attachmentIndex = entry.index,
-                                        reference = entry.value,
-                                        mine = mine,
-                                        controller = controller,
-                                        appState = appState,
-                                    )
-                                } else {
-                                    MediaImageBubble(
-                                        item = item,
-                                        reference = entry.value,
-                                        attachmentIndex = entry.index,
-                                        controller = controller,
-                                        appState = appState,
-                                        mine = mine,
-                                    )
+                                Box {
+                                    if (MediaReferenceParser.isVideoMedia(entry.value)) {
+                                        MediaVideoBubble(
+                                            messageIdHex = record.messageIdHex,
+                                            attachmentIndex = entry.index,
+                                            reference = entry.value,
+                                            mine = mine,
+                                            controller = controller,
+                                            appState = appState,
+                                        )
+                                    } else {
+                                        MediaImageBubble(
+                                            item = item,
+                                            reference = entry.value,
+                                            attachmentIndex = entry.index,
+                                            controller = controller,
+                                            appState = appState,
+                                            mine = mine,
+                                        )
+                                    }
+                                    if (footerOnVisualMedia) {
+                                        MediaFooterOverlay(
+                                            timeText = rememberedRelativeTime(record.recordedAt),
+                                            showStatus = mine,
+                                            status = item.status,
+                                        )
+                                    }
                                 }
                             } else {
                                 MediaVisualGridBubble(
@@ -8361,6 +8514,8 @@ private fun MessageBubble(
                                     )
                                 }
                             }
+                        val footerOnPendingVisual =
+                            !deleted && !invalidated && !anyConfirmedMedia && pendingVisualRefs.size == 1
                         if (!deleted && !invalidated && !anyConfirmedMedia && pendingVisualRefs.isNotEmpty()) {
                             val uploadFailed = item.status == MessageStatus.Failed
                             val retryUpload: () -> Unit = {
@@ -8368,27 +8523,34 @@ private fun MessageBubble(
                             }
                             if (pendingVisualRefs.size == 1) {
                                 val entry = pendingVisualRefs.first()
-                                if (MediaReferenceParser.isVideoMedia(entry.value)) {
-                                    MediaVideoBubble(
-                                        messageIdHex = record.messageIdHex,
-                                        attachmentIndex = entry.index,
-                                        reference = entry.value,
-                                        mine = true,
-                                        controller = controller,
-                                        appState = appState,
-                                        uploading = !uploadFailed,
-                                        uploadFailed = uploadFailed,
-                                        onRetryUpload = if (uploadFailed) retryUpload else null,
-                                    )
-                                } else {
-                                    MediaImageBubble(
-                                        item = item,
-                                        reference = entry.value,
-                                        attachmentIndex = entry.index,
-                                        controller = controller,
-                                        appState = appState,
-                                        mine = true,
-                                        uploading = !uploadFailed,
+                                Box {
+                                    if (MediaReferenceParser.isVideoMedia(entry.value)) {
+                                        MediaVideoBubble(
+                                            messageIdHex = record.messageIdHex,
+                                            attachmentIndex = entry.index,
+                                            reference = entry.value,
+                                            mine = true,
+                                            controller = controller,
+                                            appState = appState,
+                                            uploading = !uploadFailed,
+                                            uploadFailed = uploadFailed,
+                                            onRetryUpload = if (uploadFailed) retryUpload else null,
+                                        )
+                                    } else {
+                                        MediaImageBubble(
+                                            item = item,
+                                            reference = entry.value,
+                                            attachmentIndex = entry.index,
+                                            controller = controller,
+                                            appState = appState,
+                                            mine = true,
+                                            uploading = !uploadFailed,
+                                        )
+                                    }
+                                    MediaFooterOverlay(
+                                        timeText = rememberedRelativeTime(record.recordedAt),
+                                        showStatus = true,
+                                        status = item.status,
                                     )
                                 }
                             } else {
@@ -8444,72 +8606,85 @@ private fun MessageBubble(
                                     (editState?.latestText ?: record.plaintext).takeIf { it.isNotBlank() }
                                 else -> displayedBody
                             }
-                        if (bodyTextToRender != null) {
-                            // Markdown only when the tokens describe exactly
-                            // the text we're about to show: tombstone copy,
-                            // imeta-filename fallbacks, etc. all diverge from
-                            // record.plaintext and must stay plain. An empty
-                            // document (legacy record, parse failure) falls
-                            // through to the unchanged plain-text path.
-                            val markdownDocument = record.contentTokens
-                            if (!deleted &&
-                                !invalidated &&
-                                markdownDocument.blocks.isNotEmpty() &&
-                                bodyTextToRender == record.plaintext
-                            ) {
-                                // Mention names resolve through the profile
-                                // cache; npub taps stay in-app via the
-                                // profile sheet (never an external nostr:
-                                // intent).
-                                MarkdownMessageBody(
-                                    markdownDocument,
-                                    mentionDisplayName =
-                                        remember(appState) {
-                                            { bech32: String -> appState.mentionDisplayName(bech32) }
-                                        },
-                                    onNostrProfileTap =
-                                        remember(appState) {
-                                            { bech32: String -> appState.presentNostrProfile(bech32) }
-                                        },
-                                )
+                        val editedLabel =
+                            if (editState != null && record.kind == 9uL && !deleted && !invalidated) {
+                                if (editState.count > 1) {
+                                    stringResource(R.string.edited_count, editState.count)
+                                } else {
+                                    stringResource(R.string.edited)
+                                }
                             } else {
-                                Text(
-                                    bodyTextToRender,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
+                                null
+                            }
+                        val inlineFooter: @Composable () -> Unit = {
+                            MessageInlineFooter(
+                                timeText = rememberedRelativeTime(record.recordedAt),
+                                color = timestampColor,
+                                showStatus = mine && !deleted && !invalidated,
+                                status = item.status,
+                                editedLabel = editedLabel,
+                                onEditedClick = if (editState != null) ({ editHistoryOpen = true }) else null,
+                            )
+                        }
+                        // Last-line geometry of the body so the footer can sit on
+                        // that line when it fits, not merely when the widest line does.
+                        var lastLineLayout by remember(record.messageIdHex) { mutableStateOf<TextLayoutResult?>(null) }
+                        if (bodyTextToRender != null) {
+                            BubbleFooterLayout(
+                                footer = inlineFooter,
+                                modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start),
+                                lastLineWidth =
+                                    lastLineLayout?.let { layout ->
+                                        if (layout.lineCount > 0) ceil(layout.getLineRight(layout.lineCount - 1)).toInt() else null
+                                    },
+                            ) {
+                                // Markdown only when the tokens describe exactly
+                                // the text we're about to show: tombstone copy,
+                                // imeta-filename fallbacks, etc. all diverge from
+                                // record.plaintext and must stay plain. An empty
+                                // document (legacy record, parse failure) falls
+                                // through to the unchanged plain-text path.
+                                val markdownDocument = record.contentTokens
+                                if (!deleted &&
+                                    !invalidated &&
+                                    markdownDocument.blocks.isNotEmpty() &&
+                                    bodyTextToRender == record.plaintext
+                                ) {
+                                    // Mention names resolve through the profile
+                                    // cache; npub taps stay in-app via the
+                                    // profile sheet (never an external nostr:
+                                    // intent).
+                                    MarkdownMessageBody(
+                                        markdownDocument,
+                                        mentionDisplayName =
+                                            remember(appState) {
+                                                { bech32: String -> appState.mentionDisplayName(bech32) }
+                                            },
+                                        onNostrProfileTap =
+                                            remember(appState) {
+                                                { bech32: String -> appState.presentNostrProfile(bech32) }
+                                            },
+                                        onLastTextLayout = { lastLineLayout = it },
+                                    )
+                                } else {
+                                    Text(
+                                        bodyTextToRender,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        onTextLayout = { lastLineLayout = it },
+                                    )
+                                }
+                            }
+                        } else if (!footerOnVisualMedia && !footerOnPendingVisual) {
+                            Box(modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start)) {
+                                inlineFooter()
                             }
                         }
-                        Row(
-                            modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                rememberedRelativeTime(record.recordedAt),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = timestampColor,
-                            )
-                            // "(edited · N)" affordance. Renders only on
-                            // unedited rows whose original is still a
-                            // displayable chat kind (kind 9). Tap opens the
-                            // history modal listing each version + timestamp.
-                            if (editState != null && record.kind == 9uL && !deleted && !invalidated) {
-                                Text(
-                                    text =
-                                        if (editState.count > 1) {
-                                            stringResource(R.string.edited_count, editState.count)
-                                        } else {
-                                            stringResource(R.string.edited)
-                                        },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = timestampColor,
-                                    modifier = Modifier.clickable { editHistoryOpen = true },
-                                )
-                            }
-                            if (mine) {
-                                OutgoingMessageStatusIcon(item.status, tint = timestampColor)
-                            }
-                            if (mine && item.status == MessageStatus.Failed) {
+                        if (mine && item.status == MessageStatus.Failed) {
+                            Row(
+                                modifier = Modifier.align(Alignment.End),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 IconButton(
                                     onClick = { appState.launchMutation { controller.retryFailedSend(item) } },
                                     modifier = Modifier.size(24.dp),
@@ -8533,45 +8708,45 @@ private fun MessageBubble(
                                     )
                                 }
                             }
-                            MessageActionMenu(
-                                // Never render the menu for a deleted message, even
-                                // if it was open when the delete landed.
-                                expanded = menuOpen && !deleted,
-                                canDelete = mine && record.messageIdHex.isNotBlank() && !deleted,
-                                canEdit = mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
-                                quickReactionEmojis = quickReactionEmojis,
-                                onDismissRequest = { menuOpen = false },
-                                onReact = { emoji ->
-                                    menuOpen = false
-                                    reactWithEmoji(emoji)
-                                },
-                                onOpenEmojiPicker = {
-                                    menuOpen = false
-                                    emojiPickerOpen = true
-                                },
-                                onReply = ::beginReply,
-                                onEdit = {
-                                    menuOpen = false
-                                    // Cancel any reply-in-progress: reply and
-                                    // edit modes are mutually exclusive in the
-                                    // composer banner.
-                                    controller.replyingTo = null
-                                    controller.editingMessageId = record.messageIdHex
-                                },
-                                onCopyText = ::copyMessageText,
-                                onInfo = ::openInfoSheet,
-                                onDelete = {
-                                    menuOpen = false
-                                    // launchMutation so the MLS commit + Nostr publish
-                                    // survive navigating away from the conversation —
-                                    // the optimistic tombstone is already set in the
-                                    // controller's state and the FFI write needs to
-                                    // complete regardless of whether this bubble is
-                                    // still in composition.
-                                    appState.launchMutation { controller.deleteMessage(record) }
-                                },
-                            )
                         }
+                        MessageActionMenu(
+                            // Never render the menu for a deleted message, even
+                            // if it was open when the delete landed.
+                            expanded = menuOpen && !deleted,
+                            canDelete = mine && record.messageIdHex.isNotBlank() && !deleted,
+                            canEdit = mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
+                            quickReactionEmojis = quickReactionEmojis,
+                            onDismissRequest = { menuOpen = false },
+                            onReact = { emoji ->
+                                menuOpen = false
+                                reactWithEmoji(emoji)
+                            },
+                            onOpenEmojiPicker = {
+                                menuOpen = false
+                                emojiPickerOpen = true
+                            },
+                            onReply = ::beginReply,
+                            onEdit = {
+                                menuOpen = false
+                                // Cancel any reply-in-progress: reply and
+                                // edit modes are mutually exclusive in the
+                                // composer banner.
+                                controller.replyingTo = null
+                                controller.editingMessageId = record.messageIdHex
+                            },
+                            onCopyText = ::copyMessageText,
+                            onInfo = ::openInfoSheet,
+                            onDelete = {
+                                menuOpen = false
+                                // launchMutation so the MLS commit + Nostr publish
+                                // survive navigating away from the conversation —
+                                // the optimistic tombstone is already set in the
+                                // controller's state and the FFI write needs to
+                                // complete regardless of whether this bubble is
+                                // still in composition.
+                                appState.launchMutation { controller.deleteMessage(record) }
+                            },
+                        )
                     }
                 }
                 if (emojiPickerOpen) {
@@ -8605,19 +8780,13 @@ private fun MessageBubble(
                     )
                 }
                 val tallies = controller.reactions[record.messageIdHex].orEmpty()
-                // Hide reaction tallies on a deleted message — nothing to show,
-                // and nothing to long-press-toggle.
+                // Hide reaction tallies on a deleted message — nothing to show.
                 if (tallies.isNotEmpty() && !deleted) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
-                        tallies.forEach { tally ->
-                            ReactionTallyChip(
-                                tally = tally,
-                                onClick = { reactionSheetOpen = true },
-                                onLongClick = {
-                                    appState.launchMutation { controller.toggleReaction(tally.emoji, record) }
-                                },
-                            )
-                        }
+                    Box(modifier = Modifier.offset(y = (-14).dp).padding(horizontal = 10.dp)) {
+                        ReactionSummaryChip(
+                            tallies = tallies,
+                            onClick = { reactionSheetOpen = true },
+                        )
                     }
                 }
                 if (reactionSheetOpen) {
@@ -8633,6 +8802,7 @@ private fun MessageBubble(
                         ReactionDetailsSheet(
                             participants = participants,
                             appState = appState,
+                            onRemoveOwnReaction = { emoji -> appState.launchMutation { controller.toggleReaction(emoji, record) } },
                             onDismissRequest = { reactionSheetOpen = false },
                         )
                     }
@@ -8642,39 +8812,46 @@ private fun MessageBubble(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * One consolidated reaction pill: the distinct emojis clustered together with a
+ * total count, mirroring the familiar messenger style — a single compact target
+ * rather than a spread of separate chips. Tapping opens the reactor list, where
+ * a reaction can be removed.
+ */
 @Composable
-private fun ReactionTallyChip(
-    tally: ReactionTally,
+private fun ReactionSummaryChip(
+    tallies: List<ReactionTally>,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val mine = tallies.any { it.mine }
+    val total = tallies.sumOf { it.count }
+    val emojis = tallies.take(MAX_VISIBLE_REACTIONS).joinToString(separator = "") { it.emoji }
     val viewReactorsLabel = stringResource(R.string.view_reactors)
-    val toggleReactionLabel = stringResource(R.string.toggle_reaction)
     Surface(
         modifier =
             Modifier
+                // Expose the "you reacted" state to TalkBack, not just via color.
+                .semantics { selected = mine }
                 .minimumInteractiveComponentSize()
-                .semantics { selected = tally.mine }
-                .clip(RoundedCornerShape(8.dp))
-                .combinedClickable(
-                    role = Role.Button,
-                    onClick = onClick,
-                    onClickLabel = viewReactorsLabel,
-                    onLongClick = onLongClick,
-                    onLongClickLabel = toggleReactionLabel,
-                ),
-        shape = RoundedCornerShape(8.dp),
-        color = if (tally.mine) colorScheme.secondaryContainer else colorScheme.surfaceContainerHigh,
-        contentColor = if (tally.mine) colorScheme.onSecondaryContainer else colorScheme.onSurface,
+                .clip(RoundedCornerShape(percent = 50))
+                .clickable(role = Role.Button, onClick = onClick, onClickLabel = viewReactorsLabel),
+        shape = RoundedCornerShape(percent = 50),
+        color = if (mine) colorScheme.secondaryContainer else colorScheme.surfaceContainerHigh,
+        contentColor = if (mine) colorScheme.onSecondaryContainer else colorScheme.onSurface,
+        border = BorderStroke(1.5.dp, colorScheme.surface),
         tonalElevation = 1.dp,
     ) {
-        Text(
-            text = "${tally.emoji} ${tally.count}",
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.labelLarge,
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(emojis, style = MaterialTheme.typography.labelLarge)
+            if (total > 1) {
+                Text(total.toString(), style = MaterialTheme.typography.labelMedium)
+            }
+        }
     }
 }
 
@@ -8683,6 +8860,7 @@ private fun ReactionTallyChip(
 private fun ReactionDetailsSheet(
     participants: List<ReactionParticipant>,
     appState: DarkMatterAppState,
+    onRemoveOwnReaction: (String) -> Unit,
     onDismissRequest: () -> Unit,
 ) {
     var selectedEmoji by remember(participants) { mutableStateOf<String?>(null) }
@@ -8734,10 +8912,12 @@ private fun ReactionDetailsSheet(
                     visibleParticipants,
                     key = { index, participant -> "${participant.sender}:${participant.emoji}:${participant.reactedAt}:$index" },
                 ) { _, participant ->
+                    val isMine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true)
                     ReactionParticipantRow(
                         participant = participant,
                         appState = appState,
-                        mine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true),
+                        mine = isMine,
+                        onRemove = if (isMine) ({ onRemoveOwnReaction(participant.emoji) }) else null,
                     )
                 }
             }
@@ -8750,14 +8930,16 @@ private fun ReactionParticipantRow(
     participant: ReactionParticipant,
     appState: DarkMatterAppState,
     mine: Boolean,
+    onRemove: (() -> Unit)?,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
-                .clickable { appState.presentProfile(appState.npub(participant.sender)) }
-                .padding(horizontal = 4.dp, vertical = 8.dp),
+                .clickable {
+                    if (mine && onRemove != null) onRemove() else appState.presentProfile(appState.npub(participant.sender))
+                }.padding(horizontal = 4.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -8767,14 +8949,21 @@ private fun ReactionParticipantRow(
             size = 44.dp,
             pictureUrl = appState.avatarUrl(participant.sender),
         )
-        Text(
-            text = if (mine) stringResource(R.string.you) else appState.displayName(participant.sender),
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = if (mine) stringResource(R.string.you) else appState.displayName(participant.sender),
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (mine) {
+                Text(
+                    text = stringResource(R.string.reaction_tap_to_remove),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         Text(
             text = participant.emoji,
             style = MaterialTheme.typography.headlineSmall,
@@ -9315,6 +9504,129 @@ private fun OutgoingMessageStatusIcon(
                 modifier = Modifier.size(14.dp),
                 tint = MaterialTheme.colorScheme.error,
             )
+    }
+}
+
+// Gap between a bubble's text and its trailing inline footer.
+private val BubbleFooterGap = 8.dp
+
+// Distinct emojis shown in the consolidated reaction pill; the total count
+// still reflects every reaction beyond them.
+private const val MAX_VISIBLE_REACTIONS = 4
+
+/** Legibility scrim for a footer overlaid on visual media (image/video). */
+@Composable
+private fun MediaScrimFooter(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier
+            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(percent = 50))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        content()
+    }
+}
+
+/** Time (+ outgoing status) overlaid on the bottom-right of a visual-media bubble. */
+@Composable
+private fun BoxScope.MediaFooterOverlay(
+    timeText: String,
+    showStatus: Boolean,
+    status: MessageStatus,
+) {
+    MediaScrimFooter(
+        modifier =
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(6.dp),
+    ) {
+        MessageInlineFooter(
+            timeText = timeText,
+            color = Color.White,
+            showStatus = showStatus,
+            status = status,
+            editedLabel = null,
+            onEditedClick = null,
+        )
+    }
+}
+
+/**
+ * Bottom-end footer for a message bubble: an optional "edited" affordance, the
+ * time, and (outgoing only) the send-status icon, in a subtle tint.
+ */
+@Composable
+private fun MessageInlineFooter(
+    timeText: String,
+    color: Color,
+    showStatus: Boolean,
+    status: MessageStatus,
+    editedLabel: String?,
+    onEditedClick: (() -> Unit)?,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (editedLabel != null) {
+            Text(
+                text = editedLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = color,
+                modifier = if (onEditedClick != null) Modifier.clickable(onClick = onEditedClick) else Modifier,
+            )
+        }
+        Text(
+            text = timeText,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+        )
+        if (showStatus) {
+            OutgoingMessageStatusIcon(status, tint = color)
+        }
+    }
+}
+
+/**
+ * Lays [content] with [footer] pinned bottom-end. The footer joins the last
+ * line when it leaves room ([lastLineWidth], the real last-line right edge when
+ * the caller can supply it; otherwise the widest line); else it drops to its
+ * own line below. Either way it stays right of the text and never overlaps.
+ */
+@Composable
+private fun BubbleFooterLayout(
+    footer: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    lastLineWidth: Int? = null,
+    content: @Composable () -> Unit,
+) {
+    Layout(
+        modifier = modifier,
+        content = {
+            Box { content() }
+            Box { footer() }
+        },
+    ) { measurables, constraints ->
+        val footerPlaceable = measurables[1].measure(Constraints())
+        val contentPlaceable = measurables[0].measure(constraints.copy(minWidth = 0))
+        val gap = BubbleFooterGap.roundToPx()
+        val lastRight = (lastLineWidth ?: contentPlaceable.width).coerceIn(0, contentPlaceable.width)
+        val inline = lastRight + gap + footerPlaceable.width <= constraints.maxWidth
+        if (inline) {
+            val width = maxOf(contentPlaceable.width, lastRight + gap + footerPlaceable.width)
+            layout(width, contentPlaceable.height) {
+                contentPlaceable.place(0, 0)
+                footerPlaceable.place(width - footerPlaceable.width, contentPlaceable.height - footerPlaceable.height)
+            }
+        } else {
+            val width = maxOf(contentPlaceable.width, footerPlaceable.width).coerceAtMost(constraints.maxWidth)
+            layout(width, contentPlaceable.height + footerPlaceable.height) {
+                contentPlaceable.place(0, 0)
+                footerPlaceable.place(width - footerPlaceable.width, contentPlaceable.height)
+            }
+        }
     }
 }
 
