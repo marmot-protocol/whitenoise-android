@@ -1185,7 +1185,11 @@ class ConversationController(
     @Volatile
     private var timelineSubscription: TimelineMessagesSubscription? = null
     private val activeStreamIds = mutableSetOf<String>()
-    private val removedStreamIds = mutableSetOf<String>()
+
+    // Bounded LRU set: tombstones are capped so an agent-heavy conversation
+    // kept open for a long time can't grow memory or per-batch filter cost
+    // without bound. See #200.
+    private val removedStreamIds = BoundedStreamTombstones()
     private var hasLoadedOlderPages = false
 
     // Last message id we successfully marked as read on the Rust side.
