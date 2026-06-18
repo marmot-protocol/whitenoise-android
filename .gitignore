@@ -20,3 +20,6 @@ app/google-services.json
 
 # Claude Code local runtime state
 .claude/
+
+# Kotlin incremental/compile artifacts
+.kotlin/
