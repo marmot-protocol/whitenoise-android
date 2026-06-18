@@ -637,6 +637,18 @@ class ChatsController(
         var chatListSubscription: ChatListSubscription? = null
         var chatsSubscription: ChatsSubscription? = null
         try {
+            // Converge this (just-bound) account's store before we snapshot it.
+            // One SQLite store exists per account-device identity, so on a
+            // multi-account device an inactive account never ingests a sibling
+            // account's group rename / avatar / membership commit until its own
+            // worker catches up. Without this, switching to a second account in
+            // a shared group shows the pre-rename title (#252) — the projection
+            // we're about to read is stale, not wrong. catchUpAccounts pumps
+            // every running worker, so the snapshot below sees the converged
+            // state instead of us caching the change Android-side. Best-effort
+            // (swallows failures internally) so an offline/slow relay can't
+            // block the chat list from rendering its last-known projection.
+            appState.catchUpAccounts()
             val chatListStream = appState.marmotIo { subscribeChatList(accountRef, includeArchived = true) }
             chatListSubscription = chatListStream
             val chatStream = appState.marmotIo { subscribeChats(accountRef, includeArchived = true) }
