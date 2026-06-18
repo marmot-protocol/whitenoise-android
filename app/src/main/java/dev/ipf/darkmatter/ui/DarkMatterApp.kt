@@ -222,6 +222,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -9441,24 +9442,28 @@ private fun ComposerBar(
                 onDismiss = onCancelReply,
             )
         }
-        val isRecordingVoice = voiceRecordingController?.isRecording == true
+        val activeRecordingController = voiceRecordingController?.takeIf { it.isRecording }
+        val isRecordingVoice = activeRecordingController != null
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Trailing MicHoldButton call site below must be shared by both
-            // branches — different call sites break the pointer-gesture identity.
-            if (isRecordingVoice && voiceRecordingController != null) {
-                RecordingStripLeading(controller = voiceRecordingController, modifier = Modifier.weight(1f))
-            } else {
+            // Keep the text field composed while recording. Removing the focused
+            // BasicTextField makes Android dismiss the IME, which then removes
+            // imePadding and drops this whole bottom bar under the user's finger.
+            // The recording strip is only a visual overlay; focus stays with the
+            // hidden composer so an already-open keyboard remains open.
+            Box(modifier = Modifier.weight(1f)) {
                 ComposerPill(
                     textFieldValue = textFieldValue,
                     composerFocus = composerFocus,
                     onValueChange = { value ->
-                        textFieldValue = value
-                        // While editing, the field holds the edit candidate,
-                        // not a fresh chat draft. Persisting it would clobber
-                        // whatever the user was composing before they tapped
-                        // Edit — that's the snapshot we restore from
-                        // preEditFieldValue on cancel/submit.
-                        if (editingMessageId == null) onDraftChange(value.text)
+                        if (!isRecordingVoice) {
+                            textFieldValue = value
+                            // While editing, the field holds the edit candidate,
+                            // not a fresh chat draft. Persisting it would clobber
+                            // whatever the user was composing before they tapped
+                            // Edit — that's the snapshot we restore from
+                            // preEditFieldValue on cancel/submit.
+                            if (editingMessageId == null) onDraftChange(value.text)
+                        }
                     },
                     onAttachMenuToggle = { attachMenuOpen = !attachMenuOpen },
                     attachMenuOpen = attachMenuOpen,
@@ -9466,11 +9471,34 @@ private fun ComposerBar(
                     onCaptureFromCamera = onCaptureFromCamera,
                     onPickFromGallery = onPickFromGallery,
                     onPickDocument = onPickDocument,
-                    modifier = Modifier.weight(1f),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .alpha(if (isRecordingVoice) 0f else 1f)
+                            .then(if (isRecordingVoice) Modifier.clearAndSetSemantics {} else Modifier),
                 )
+                if (activeRecordingController != null) {
+                    RecordingStripLeading(
+                        controller = activeRecordingController,
+                        modifier =
+                            Modifier
+                                .matchParentSize()
+                                .pointerInput(activeRecordingController) {
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            event.changes.forEach { it.consume() }
+                                        }
+                                    }
+                                },
+                    )
+                }
             }
+            // Trailing MicHoldButton call site below must stay shared by both
+            // recording and non-recording states; separate call sites break the
+            // pointer-gesture identity for the active hold gesture.
             val showMicButton =
-                text.isBlank() &&
+                (text.isBlank() || isRecordingVoice) &&
                     editingMessageId == null &&
                     voiceRecordingController != null
             if (showMicButton && voiceRecordingController?.locked == true) {
