@@ -961,6 +961,10 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1126,6 +1130,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_quarantined_groups(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_react_to_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`emoji`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_refresh_profile(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,
@@ -1145,6 +1151,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_reply_to_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_republish_key_package(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_retry_hydrate_quarantined_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_self_demote_admin(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
@@ -1470,6 +1478,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_push_registration(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_quarantined_groups(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_react_to_message(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_refresh_profile(
@@ -1489,6 +1499,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_reply_to_message(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_republish_key_package(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_retry_hydrate_quarantined_group(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_self_demote_admin(
     ): Short
@@ -1769,6 +1781,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_push_registration() != 38312.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_quarantined_groups() != 7043.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_react_to_message() != 39138.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1797,6 +1812,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_republish_key_package() != 44103.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_retry_hydrate_quarantined_group() != 51443.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_self_demote_admin() != 8845.toShort()) {
@@ -3967,6 +3985,17 @@ public interface MarmotInterface {
     fun `pushRegistration`(`accountRef`: kotlin.String): PushRegistrationFfi?
     
     /**
+     * Stored groups that failed session-open hydration and were skipped so the
+     * rest of the account could open (darkmatter#151 / #417). These groups are
+     * not in the live roster and otherwise vanish from the account with no
+     * explanation; surface them in a per-group recovery flow (darkmatter#426)
+     * distinct from healthy and archived groups, using `reason` to pick the
+     * per-reason guidance, and offer
+     * [`Self::retry_hydrate_quarantined_group`].
+     */
+    suspend fun `quarantinedGroups`(`accountRef`: kotlin.String): List<AppQuarantinedGroupFfi>
+    
+    /**
      * React to `target_message_id` with `emoji` (an "add" reaction).
      */
     suspend fun `reactToMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String, `emoji`: kotlin.String): SendSummaryFfi
@@ -4017,6 +4046,18 @@ public interface MarmotInterface {
      * publish a fresh one.
      */
     suspend fun `republishKeyPackage`(`accountRef`: kotlin.String): kotlin.ULong
+    
+    /**
+     * Re-attempt hydration of a single quarantined group (darkmatter#426).
+     *
+     * Non-destructive, user-initiated recovery for a transiently-bad group
+     * (e.g. a partial DB restore that has since completed). Returns `true` if
+     * the group recovered and is now a live chat (it leaves the quarantine
+     * list and reappears in the chat list), `false` if it is still unhealthy
+     * and stays quarantined. Errors with `UnknownGroup` if the id is not
+     * currently quarantined.
+     */
+    suspend fun `retryHydrateQuarantinedGroup`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): kotlin.Boolean
     
     /**
      * Step down as an admin of `group_id_hex` (demote the active account).
@@ -5375,6 +5416,36 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Stored groups that failed session-open hydration and were skipped so the
+     * rest of the account could open (darkmatter#151 / #417). These groups are
+     * not in the live roster and otherwise vanish from the account with no
+     * explanation; surface them in a per-group recovery flow (darkmatter#426)
+     * distinct from healthy and archived groups, using `reason` to pick the
+     * per-reason guidance, and offer
+     * [`Self::retry_hydrate_quarantined_group`].
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `quarantinedGroups`(`accountRef`: kotlin.String) : List<AppQuarantinedGroupFfi> {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_quarantined_groups(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterSequenceTypeAppQuarantinedGroupFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * React to `target_message_id` with `emoji` (an "add" reaction).
      */
     @Throws(MarmotKitException::class)
@@ -5603,6 +5674,37 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_u64(future) },
         // lift function
         { FfiConverterULong.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Re-attempt hydration of a single quarantined group (darkmatter#426).
+     *
+     * Non-destructive, user-initiated recovery for a transiently-bad group
+     * (e.g. a partial DB restore that has since completed). Returns `true` if
+     * the group recovered and is now a live chat (it leaves the quarantine
+     * list and reappears in the chat list), `false` if it is still unhealthy
+     * and stays quarantined. Errors with `UnknownGroup` if the id is not
+     * currently quarantined.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `retryHydrateQuarantinedGroup`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : kotlin.Boolean {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_retry_hydrate_quarantined_group(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_i8(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_i8(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_i8(future) },
+        // lift function
+        { FfiConverterBoolean.lift(it) },
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
@@ -7800,6 +7902,44 @@ public object FfiConverterTypeAppMessageRecordFfi: FfiConverterRustBuffer<AppMes
             FfiConverterSequenceTypeMessageTagFfi.write(value.`tags`, buf)
             FfiConverterULong.write(value.`recordedAt`, buf)
             FfiConverterULong.write(value.`receivedAt`, buf)
+    }
+}
+
+
+
+/**
+ * A stored group that failed session-open hydration and was skipped so the
+ * rest of the account could open (darkmatter#151 / #417). Surfaced so the app
+ * can present a per-group recovery flow (darkmatter#426) distinct from healthy
+ * and archived groups, and offer a non-destructive re-hydration retry.
+ */
+data class AppQuarantinedGroupFfi (
+    var `groupIdHex`: kotlin.String, 
+    var `reason`: AppGroupHydrationQuarantineReasonFfi
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAppQuarantinedGroupFfi: FfiConverterRustBuffer<AppQuarantinedGroupFfi> {
+    override fun read(buf: ByteBuffer): AppQuarantinedGroupFfi {
+        return AppQuarantinedGroupFfi(
+            FfiConverterString.read(buf),
+            FfiConverterTypeAppGroupHydrationQuarantineReasonFfi.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AppQuarantinedGroupFfi) = (
+            FfiConverterString.allocationSize(value.`groupIdHex`) +
+            FfiConverterTypeAppGroupHydrationQuarantineReasonFfi.allocationSize(value.`reason`)
+    )
+
+    override fun write(value: AppQuarantinedGroupFfi, buf: ByteBuffer) {
+            FfiConverterString.write(value.`groupIdHex`, buf)
+            FfiConverterTypeAppGroupHydrationQuarantineReasonFfi.write(value.`reason`, buf)
     }
 }
 
@@ -10486,6 +10626,63 @@ public object FfiConverterTypeAgentStreamUpdateFfi : FfiConverterRustBuffer<Agen
 
 
 
+/**
+ * Coarse, privacy-safe reason a stored group failed session-open hydration and
+ * was quarantined (darkmatter#151 / #417). Carries no group/member ids,
+ * payloads, or key material — only a category the client can map to per-reason
+ * recovery guidance.
+ */
+
+enum class AppGroupHydrationQuarantineReasonFfi {
+    
+    /**
+     * OpenMLS returned an error while loading the stored group state.
+     */
+    OPEN_MLS_LOAD_FAILED,
+    /**
+     * Marmot metadata referenced a group whose OpenMLS state was missing.
+     */
+    OPEN_MLS_GROUP_MISSING,
+    /**
+     * Member credentials, account-identity proofs, or ratchet-tree export
+     * validation failed for the loaded MLS group.
+     */
+    MEMBER_VALIDATION_FAILED,
+    /**
+     * The Marmot group record could not be loaded or refreshed.
+     */
+    GROUP_RECORD_LOAD_FAILED,
+    /**
+     * Hydrate found a stranded pending commit, but recovery itself failed.
+     */
+    PENDING_COMMIT_RECOVERY_FAILED;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAppGroupHydrationQuarantineReasonFfi: FfiConverterRustBuffer<AppGroupHydrationQuarantineReasonFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        AppGroupHydrationQuarantineReasonFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: AppGroupHydrationQuarantineReasonFfi) = 4UL
+
+    override fun write(value: AppGroupHydrationQuarantineReasonFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
 sealed class ChatListSubscriptionUpdateFfi {
     
     data class Row(
@@ -10603,6 +10800,321 @@ public object FfiConverterTypeChatListUpdateTriggerFfi: FfiConverterRustBuffer<C
 
 
 
+/**
+ * FFI projection of [`cgka_traits::engine::GroupEvent`]. The previous FFI
+ * firehose collapsed every group event to bare `account_id_hex` /
+ * `account_label`, discarding the group id, event kind, and the typed
+ * recovery details (quarantine reason, recovered epoch) — so native clients
+ * could not react to the typed events the recovery feature surfaces
+ * (darkmatter#441 finding 1). This enum mirrors each `GroupEvent` variant and
+ * carries its privacy-safe scalar fields: ids are hex-encoded, epochs are
+ * `u64`, and the two deeply-nested inner enums (`GroupStateChange`,
+ * `AppMessageInvalidationReason`) are surfaced as stable low-cardinality tag
+ * strings rather than re-modeled in full. No payloads, ciphertext, plaintext,
+ * or key material cross the boundary.
+ */
+sealed class GroupEventKindFfi {
+    
+    object GroupCreated : GroupEventKindFfi()
+    
+    
+    data class GroupJoined(
+        val `viaWelcomeHex`: kotlin.String, 
+        val `welcomerIdHex`: kotlin.String?) : GroupEventKindFfi() {
+        companion object
+    }
+    
+    data class MessageReceived(
+        val `senderIdHex`: kotlin.String, 
+        val `epoch`: kotlin.ULong) : GroupEventKindFfi() {
+        companion object
+    }
+    
+    data class AppMessageInvalidated(
+        val `messageIdHex`: kotlin.String, 
+        val `epoch`: kotlin.ULong, 
+        val `reason`: kotlin.String, 
+        val `decryptedPayloadRef`: kotlin.String?) : GroupEventKindFfi() {
+        companion object
+    }
+    
+    data class GroupStateChanged(
+        val `epoch`: kotlin.ULong, 
+        val `actorIdHex`: kotlin.String?, 
+        val `change`: kotlin.String, 
+        val `originCommitIdHex`: kotlin.String?) : GroupEventKindFfi() {
+        companion object
+    }
+    
+    data class GroupHydrationQuarantined(
+        val `reason`: AppGroupHydrationQuarantineReasonFfi) : GroupEventKindFfi() {
+        companion object
+    }
+    
+    data class EpochChanged(
+        val `from`: kotlin.ULong, 
+        val `to`: kotlin.ULong) : GroupEventKindFfi() {
+        companion object
+    }
+    
+    data class ForkRecovered(
+        val `sourceEpoch`: kotlin.ULong, 
+        val `recoveredEpoch`: kotlin.ULong, 
+        val `invalidatedCommitIdHex`: kotlin.String) : GroupEventKindFfi() {
+        companion object
+    }
+    
+    data class CommitRolledBack(
+        val `invalidatedCommitIdHex`: kotlin.String) : GroupEventKindFfi() {
+        companion object
+    }
+    
+    object GroupUnrecoverable : GroupEventKindFfi()
+    
+    
+    data class PendingCommitRecovered(
+        val `recoveredEpoch`: kotlin.ULong) : GroupEventKindFfi() {
+        companion object
+    }
+    
+    data class GroupHydrationRecovered(
+        val `recoveredEpoch`: kotlin.ULong) : GroupEventKindFfi() {
+        companion object
+    }
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEventKindFfi>{
+    override fun read(buf: ByteBuffer): GroupEventKindFfi {
+        return when(buf.getInt()) {
+            1 -> GroupEventKindFfi.GroupCreated
+            2 -> GroupEventKindFfi.GroupJoined(
+                FfiConverterString.read(buf),
+                FfiConverterOptionalString.read(buf),
+                )
+            3 -> GroupEventKindFfi.MessageReceived(
+                FfiConverterString.read(buf),
+                FfiConverterULong.read(buf),
+                )
+            4 -> GroupEventKindFfi.AppMessageInvalidated(
+                FfiConverterString.read(buf),
+                FfiConverterULong.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterOptionalString.read(buf),
+                )
+            5 -> GroupEventKindFfi.GroupStateChanged(
+                FfiConverterULong.read(buf),
+                FfiConverterOptionalString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterOptionalString.read(buf),
+                )
+            6 -> GroupEventKindFfi.GroupHydrationQuarantined(
+                FfiConverterTypeAppGroupHydrationQuarantineReasonFfi.read(buf),
+                )
+            7 -> GroupEventKindFfi.EpochChanged(
+                FfiConverterULong.read(buf),
+                FfiConverterULong.read(buf),
+                )
+            8 -> GroupEventKindFfi.ForkRecovered(
+                FfiConverterULong.read(buf),
+                FfiConverterULong.read(buf),
+                FfiConverterString.read(buf),
+                )
+            9 -> GroupEventKindFfi.CommitRolledBack(
+                FfiConverterString.read(buf),
+                )
+            10 -> GroupEventKindFfi.GroupUnrecoverable
+            11 -> GroupEventKindFfi.PendingCommitRecovered(
+                FfiConverterULong.read(buf),
+                )
+            12 -> GroupEventKindFfi.GroupHydrationRecovered(
+                FfiConverterULong.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: GroupEventKindFfi) = when(value) {
+        is GroupEventKindFfi.GroupCreated -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is GroupEventKindFfi.GroupJoined -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`viaWelcomeHex`)
+                + FfiConverterOptionalString.allocationSize(value.`welcomerIdHex`)
+            )
+        }
+        is GroupEventKindFfi.MessageReceived -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`senderIdHex`)
+                + FfiConverterULong.allocationSize(value.`epoch`)
+            )
+        }
+        is GroupEventKindFfi.AppMessageInvalidated -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`messageIdHex`)
+                + FfiConverterULong.allocationSize(value.`epoch`)
+                + FfiConverterString.allocationSize(value.`reason`)
+                + FfiConverterOptionalString.allocationSize(value.`decryptedPayloadRef`)
+            )
+        }
+        is GroupEventKindFfi.GroupStateChanged -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterULong.allocationSize(value.`epoch`)
+                + FfiConverterOptionalString.allocationSize(value.`actorIdHex`)
+                + FfiConverterString.allocationSize(value.`change`)
+                + FfiConverterOptionalString.allocationSize(value.`originCommitIdHex`)
+            )
+        }
+        is GroupEventKindFfi.GroupHydrationQuarantined -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeAppGroupHydrationQuarantineReasonFfi.allocationSize(value.`reason`)
+            )
+        }
+        is GroupEventKindFfi.EpochChanged -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterULong.allocationSize(value.`from`)
+                + FfiConverterULong.allocationSize(value.`to`)
+            )
+        }
+        is GroupEventKindFfi.ForkRecovered -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterULong.allocationSize(value.`sourceEpoch`)
+                + FfiConverterULong.allocationSize(value.`recoveredEpoch`)
+                + FfiConverterString.allocationSize(value.`invalidatedCommitIdHex`)
+            )
+        }
+        is GroupEventKindFfi.CommitRolledBack -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`invalidatedCommitIdHex`)
+            )
+        }
+        is GroupEventKindFfi.GroupUnrecoverable -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is GroupEventKindFfi.PendingCommitRecovered -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterULong.allocationSize(value.`recoveredEpoch`)
+            )
+        }
+        is GroupEventKindFfi.GroupHydrationRecovered -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterULong.allocationSize(value.`recoveredEpoch`)
+            )
+        }
+    }
+
+    override fun write(value: GroupEventKindFfi, buf: ByteBuffer) {
+        when(value) {
+            is GroupEventKindFfi.GroupCreated -> {
+                buf.putInt(1)
+                Unit
+            }
+            is GroupEventKindFfi.GroupJoined -> {
+                buf.putInt(2)
+                FfiConverterString.write(value.`viaWelcomeHex`, buf)
+                FfiConverterOptionalString.write(value.`welcomerIdHex`, buf)
+                Unit
+            }
+            is GroupEventKindFfi.MessageReceived -> {
+                buf.putInt(3)
+                FfiConverterString.write(value.`senderIdHex`, buf)
+                FfiConverterULong.write(value.`epoch`, buf)
+                Unit
+            }
+            is GroupEventKindFfi.AppMessageInvalidated -> {
+                buf.putInt(4)
+                FfiConverterString.write(value.`messageIdHex`, buf)
+                FfiConverterULong.write(value.`epoch`, buf)
+                FfiConverterString.write(value.`reason`, buf)
+                FfiConverterOptionalString.write(value.`decryptedPayloadRef`, buf)
+                Unit
+            }
+            is GroupEventKindFfi.GroupStateChanged -> {
+                buf.putInt(5)
+                FfiConverterULong.write(value.`epoch`, buf)
+                FfiConverterOptionalString.write(value.`actorIdHex`, buf)
+                FfiConverterString.write(value.`change`, buf)
+                FfiConverterOptionalString.write(value.`originCommitIdHex`, buf)
+                Unit
+            }
+            is GroupEventKindFfi.GroupHydrationQuarantined -> {
+                buf.putInt(6)
+                FfiConverterTypeAppGroupHydrationQuarantineReasonFfi.write(value.`reason`, buf)
+                Unit
+            }
+            is GroupEventKindFfi.EpochChanged -> {
+                buf.putInt(7)
+                FfiConverterULong.write(value.`from`, buf)
+                FfiConverterULong.write(value.`to`, buf)
+                Unit
+            }
+            is GroupEventKindFfi.ForkRecovered -> {
+                buf.putInt(8)
+                FfiConverterULong.write(value.`sourceEpoch`, buf)
+                FfiConverterULong.write(value.`recoveredEpoch`, buf)
+                FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
+                Unit
+            }
+            is GroupEventKindFfi.CommitRolledBack -> {
+                buf.putInt(9)
+                FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
+                Unit
+            }
+            is GroupEventKindFfi.GroupUnrecoverable -> {
+                buf.putInt(10)
+                Unit
+            }
+            is GroupEventKindFfi.PendingCommitRecovered -> {
+                buf.putInt(11)
+                FfiConverterULong.write(value.`recoveredEpoch`, buf)
+                Unit
+            }
+            is GroupEventKindFfi.GroupHydrationRecovered -> {
+                buf.putInt(12)
+                FfiConverterULong.write(value.`recoveredEpoch`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
 
 enum class MarkdownAlignmentFfi {
     
@@ -10705,8 +11217,8 @@ sealed class MarkdownBlockFfi {
     }
     
     data class Table(
-        val `alignments`: kotlin.collections.List<MarkdownAlignmentFfi>, 
-        val `header`: kotlin.collections.List<MarkdownTableCellFfi>, 
+        val `alignments`: kotlin.collections.List<MarkdownAlignmentFfi>,
+        val `header`: kotlin.collections.List<MarkdownTableCellFfi>,
         val `rows`: kotlin.collections.List<kotlin.collections.List<MarkdownTableCellFfi>>) : MarkdownBlockFfi() {
         companion object
     }
@@ -11360,7 +11872,9 @@ sealed class MarmotEventFfi {
     
     data class GroupEvent(
         val `accountIdHex`: kotlin.String, 
-        val `accountLabel`: kotlin.String) : MarmotEventFfi() {
+        val `accountLabel`: kotlin.String, 
+        val `groupIdHex`: kotlin.String, 
+        val `event`: GroupEventKindFfi) : MarmotEventFfi() {
         companion object
     }
     
@@ -11407,6 +11921,8 @@ public object FfiConverterTypeMarmotEventFfi : FfiConverterRustBuffer<MarmotEven
             5 -> MarmotEventFfi.GroupEvent(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterTypeGroupEventKindFfi.read(buf),
                 )
             6 -> MarmotEventFfi.AccountError(
                 FfiConverterString.read(buf),
@@ -11460,6 +11976,8 @@ public object FfiConverterTypeMarmotEventFfi : FfiConverterRustBuffer<MarmotEven
                 4UL
                 + FfiConverterString.allocationSize(value.`accountIdHex`)
                 + FfiConverterString.allocationSize(value.`accountLabel`)
+                + FfiConverterString.allocationSize(value.`groupIdHex`)
+                + FfiConverterTypeGroupEventKindFfi.allocationSize(value.`event`)
             )
         }
         is MarmotEventFfi.AccountError -> {
@@ -11511,6 +12029,8 @@ public object FfiConverterTypeMarmotEventFfi : FfiConverterRustBuffer<MarmotEven
                 buf.putInt(5)
                 FfiConverterString.write(value.`accountIdHex`, buf)
                 FfiConverterString.write(value.`accountLabel`, buf)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                FfiConverterTypeGroupEventKindFfi.write(value.`event`, buf)
                 Unit
             }
             is MarmotEventFfi.AccountError -> {
@@ -13275,6 +13795,34 @@ public object FfiConverterSequenceTypeAppMessageRecordFfi: FfiConverterRustBuffe
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeAppMessageRecordFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeAppQuarantinedGroupFfi: FfiConverterRustBuffer<List<AppQuarantinedGroupFfi>> {
+    override fun read(buf: ByteBuffer): List<AppQuarantinedGroupFfi> {
+        val len = buf.getInt()
+        return List<AppQuarantinedGroupFfi>(len) {
+            FfiConverterTypeAppQuarantinedGroupFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<AppQuarantinedGroupFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeAppQuarantinedGroupFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<AppQuarantinedGroupFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeAppQuarantinedGroupFfi.write(it, buf)
         }
     }
 }
