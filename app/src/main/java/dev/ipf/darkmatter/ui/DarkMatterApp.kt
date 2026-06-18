@@ -9377,7 +9377,10 @@ private fun ComposerBar(
     // Claim focus on edit-entry so the IME opens with the caret at the end
     // of the prefill, without making the user tap the field a second time.
     val composerFocus = remember { FocusRequester() }
-    LaunchedEffect(editingMessageId, editingInitialText) {
+    // Keyed on editingMessageId only: prefill once when an edit session starts,
+    // not on every reprojection of editingInitialText — otherwise a background
+    // timeline update would overwrite the user's in-progress edit.
+    LaunchedEffect(editingMessageId) {
         if (editingMessageId != null) {
             // Save the in-flight composer once per edit session, then push
             // the message's current text into the input so the user edits

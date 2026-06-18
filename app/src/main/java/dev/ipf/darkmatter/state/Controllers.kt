@@ -211,6 +211,17 @@ internal fun chatRowPreviewMarkdownSource(row: ChatListRowFfi): String? {
     return preview.plaintext.takeIf { it.isNotBlank() }
 }
 
+/**
+ * Next optimistic timelineOrder: one past the max across both the published
+ * timeline and the in-flight optimistic items. Including `pending` is what
+ * stops back-to-back optimistic sends from colliding while a publish is still
+ * coalescing (the published list is stale in that window). See #225.
+ */
+internal fun nextTimelineOrder(
+    published: Sequence<ULong>,
+    pending: Sequence<ULong>,
+): ULong = (published + pending).maxOrNull()?.plus(1uL) ?: 1uL
+
 private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
     AppGroupRecordFfi(
         groupIdHex = row.groupIdHex,
@@ -3049,12 +3060,10 @@ class ConversationController(
     }
 
     private fun nextOptimisticTimelineOrder(): ULong =
-        timeline
-            .asSequence()
-            .map { it.timelineOrder }
-            .maxOrNull()
-            ?.plus(1uL)
-            ?: 1uL
+        nextTimelineOrder(
+            published = timeline.asSequence().map { it.timelineOrder },
+            pending = optimisticMessages.values.asSequence().map { it.timelineOrder },
+        )
 
     private fun recomputeReactions() {
         // Lowercased to match baseReactionSenders(): hex account-id casing can
