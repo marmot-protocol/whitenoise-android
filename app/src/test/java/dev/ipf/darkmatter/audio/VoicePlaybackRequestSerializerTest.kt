@@ -15,6 +15,8 @@ class VoicePlaybackRequestSerializerTest {
     @Test
     fun playbackRequestsDoNotOverlapAcrossSuspendingPrepareWork() {
         runBlocking {
+            // MediaPlayer itself is not usable in JVM tests, so this covers the
+            // serialization seam that VoicePlaybackController.play() holds around prepare().
             val serializer = VoicePlaybackRequestSerializer()
             val firstEntered = CompletableDeferred<Unit>()
             val releaseFirst = CompletableDeferred<Unit>()
