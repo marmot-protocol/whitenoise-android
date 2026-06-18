@@ -717,7 +717,16 @@ class ChatsController(
             isLoading = false
             error = throwable.message ?: throwable.javaClass.simpleName
         } finally {
-            withContext(Dispatchers.IO) {
+            // Must be NonCancellable: the pause-on-foreground model (issue #6)
+            // tears these streams down by cancelling this coroutine when the
+            // LaunchedEffect re-keys on conversation open. A cancelled coroutine
+            // skips cancellable suspensions in finally, so a plain
+            // withContext(Dispatchers.IO) here would throw before close() runs
+            // and leave the account-wide chat-list/chats subscriptions alive
+            // alongside ConversationController — the exact duplicate stream work
+            // this PR removes. NonCancellable guarantees the close() calls run.
+            // (Same pattern as the agent-stream cleanup below.)
+            withContext(NonCancellable + Dispatchers.IO) {
                 runCatching { chatListSubscription?.close() }
                 runCatching { chatsSubscription?.close() }
             }
