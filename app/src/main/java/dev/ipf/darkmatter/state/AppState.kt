@@ -532,6 +532,35 @@ class DarkMatterAppState(
         }
 
     /**
+     * Drive Marmot's per-account catch-up so every signed-in account on this
+     * device processes the events its worker has pending — most importantly
+     * the MLS commits / kind-1210 group-system rows that peers (including the
+     * device's *other* local accounts) published while it was inactive.
+     *
+     * The engine owns one SQLite store per account-device identity, so an
+     * inactive account never sees a sibling account's group rename, avatar
+     * change, or membership commit until its own worker ingests that event.
+     * `catchUpAccounts` pumps all running workers, so calling it before we
+     * read an account's projection makes that account's source-of-truth store
+     * current first — rather than caching the change Android-side (which the
+     * repo's source-of-truth rule forbids). See issue #252 (group rename not
+     * propagating to a second same-device account) and the adjacent
+     * convergence cases #107 / #116 / #151.
+     *
+     * Best-effort: catch-up is a relay round-trip that can be slow or fail
+     * offline, and a read surface must still render its last-known projection
+     * in that case. Failures are swallowed (cancellation re-thrown) so a
+     * caller can always `await` this without it becoming a hard gate.
+     */
+    suspend fun catchUpAccounts() {
+        runCatching { marmotIo { catchUpAccounts() } }
+            .onFailure {
+                rethrowIfCancellation(it)
+                appStateDebug(it) { "catchUpAccounts failed: ${it.readableMessage()}" }
+            }
+    }
+
+    /**
      * Memoize an in-flight attachment download keyed on [cacheKey] and route
      * the work through [mutationsScope] so it survives caller cancellation
      * (e.g. the user tapped a file and swiped away). Concurrent callers for
