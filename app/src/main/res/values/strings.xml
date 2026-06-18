@@ -114,6 +114,7 @@
     <string name="reaction_filter_all">All</string>
     <string name="view_reactors">View who reacted</string>
     <string name="toggle_reaction">Toggle reaction</string>
+    <string name="reaction_tap_to_remove">Tap to remove</string>
     <string name="member_actions">Member actions</string>
     <string name="remove_admin">Remove admin</string>
     <string name="adding_admin">Adding admin...</string>

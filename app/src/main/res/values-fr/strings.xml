@@ -506,4 +506,5 @@
     <string name="profile_nip05_invalid">Saisissez une adresse comme name@example.com.</string>
     <string name="profile_lightning_hint">Adresse Lightning, p. ex. you@walletprovider.com</string>
     <string name="profile_lightning_invalid">Saisissez une adresse Lightning comme name@example.com.</string>
+    <string name="reaction_tap_to_remove">Toucher pour retirer</string>
 </resources>

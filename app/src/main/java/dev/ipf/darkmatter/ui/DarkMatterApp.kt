@@ -8636,6 +8636,7 @@ private fun MessageBubble(
                         ReactionDetailsSheet(
                             participants = participants,
                             appState = appState,
+                            onRemoveOwnReaction = { emoji -> appState.launchMutation { controller.toggleReaction(emoji, record) } },
                             onDismissRequest = { reactionSheetOpen = false },
                         )
                     }
@@ -8687,6 +8688,7 @@ private fun ReactionTallyChip(
 private fun ReactionDetailsSheet(
     participants: List<ReactionParticipant>,
     appState: DarkMatterAppState,
+    onRemoveOwnReaction: (String) -> Unit,
     onDismissRequest: () -> Unit,
 ) {
     var selectedEmoji by remember(participants) { mutableStateOf<String?>(null) }
@@ -8738,10 +8740,12 @@ private fun ReactionDetailsSheet(
                     visibleParticipants,
                     key = { index, participant -> "${participant.sender}:${participant.emoji}:${participant.reactedAt}:$index" },
                 ) { _, participant ->
+                    val isMine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true)
                     ReactionParticipantRow(
                         participant = participant,
                         appState = appState,
-                        mine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true),
+                        mine = isMine,
+                        onRemove = if (isMine) ({ onRemoveOwnReaction(participant.emoji) }) else null,
                     )
                 }
             }
@@ -8754,14 +8758,16 @@ private fun ReactionParticipantRow(
     participant: ReactionParticipant,
     appState: DarkMatterAppState,
     mine: Boolean,
+    onRemove: (() -> Unit)?,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
-                .clickable { appState.presentProfile(appState.npub(participant.sender)) }
-                .padding(horizontal = 4.dp, vertical = 8.dp),
+                .clickable {
+                    if (mine && onRemove != null) onRemove() else appState.presentProfile(appState.npub(participant.sender))
+                }.padding(horizontal = 4.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -8771,14 +8777,21 @@ private fun ReactionParticipantRow(
             size = 44.dp,
             pictureUrl = appState.avatarUrl(participant.sender),
         )
-        Text(
-            text = if (mine) stringResource(R.string.you) else appState.displayName(participant.sender),
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = if (mine) stringResource(R.string.you) else appState.displayName(participant.sender),
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (mine) {
+                Text(
+                    text = stringResource(R.string.reaction_tap_to_remove),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         Text(
             text = participant.emoji,
             style = MaterialTheme.typography.headlineSmall,
