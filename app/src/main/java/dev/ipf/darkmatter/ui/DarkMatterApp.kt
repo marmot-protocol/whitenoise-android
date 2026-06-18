@@ -8115,7 +8115,7 @@ private fun MessageBubble(
                     tonalElevation = if (mine) 1.dp else 0.dp,
                 ) {
                     Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (!mine) {
+                        if (showSenderAvatar) {
                             Text(
                                 appState.displayName(record.sender),
                                 style = MaterialTheme.typography.labelMedium,
@@ -8608,7 +8608,10 @@ private fun MessageBubble(
                 // Hide reaction tallies on a deleted message — nothing to show,
                 // and nothing to long-press-toggle.
                 if (tallies.isNotEmpty() && !deleted) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.offset(y = (-14).dp).padding(horizontal = 12.dp),
+                    ) {
                         tallies.forEach { tally ->
                             ReactionTallyChip(
                                 tally = tally,
@@ -8657,7 +8660,7 @@ private fun ReactionTallyChip(
             Modifier
                 .minimumInteractiveComponentSize()
                 .semantics { selected = tally.mine }
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(percent = 50))
                 .combinedClickable(
                     role = Role.Button,
                     onClick = onClick,
@@ -8665,9 +8668,10 @@ private fun ReactionTallyChip(
                     onLongClick = onLongClick,
                     onLongClickLabel = toggleReactionLabel,
                 ),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(percent = 50),
         color = if (tally.mine) colorScheme.secondaryContainer else colorScheme.surfaceContainerHigh,
         contentColor = if (tally.mine) colorScheme.onSecondaryContainer else colorScheme.onSurface,
+        border = BorderStroke(2.dp, colorScheme.surface),
         tonalElevation = 1.dp,
     ) {
         Text(
