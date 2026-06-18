@@ -4,8 +4,10 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NotificationTargetTest {
@@ -151,6 +153,153 @@ class NotificationTargetTest {
             NotificationNavigation.targetUriString(""),
             NotificationNavigation.targetUriString(""),
         )
+    }
+
+    // ---- Notification actions ----------------------------------------------
+
+    @Test
+    fun actionTarget_messageNotification_requiresMessageTarget() {
+        val target =
+            NotificationActions.targetFromUpdate(
+                update(messageId = "m1"),
+                notificationTag = "acct-a|group-1",
+                notificationId = 0,
+            )
+        assertEquals(
+            NotificationActionTarget(
+                NotificationTarget("acct-a", "group-1", "m1", NotificationTargetKind.MESSAGE),
+                "acct-a|group-1",
+                0,
+            ),
+            target,
+        )
+        assertNull(
+            NotificationActions.targetFromUpdate(
+                update(trigger = NotificationTriggerFfi.GROUP_INVITE, messageId = "m1"),
+                notificationTag = "invite-key",
+                notificationId = 0,
+            ),
+        )
+        assertNull(
+            NotificationActions.targetFromUpdate(
+                update(messageId = null),
+                notificationTag = "acct-a|group-1",
+                notificationId = 0,
+            ),
+        )
+        assertNull(
+            NotificationActions.targetFromUpdate(
+                update(messageId = "m1"),
+                notificationTag = " ",
+                notificationId = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun actionParseFields_validReply_roundTrips() {
+        val action =
+            NotificationActions.parseFields(
+                action = NotificationActions.ACTION_REPLY,
+                accountRef = "acct-a",
+                groupIdHex = "group-1",
+                messageIdHex = "m1",
+                targetKindName = "MESSAGE",
+                notificationTag = "acct-a|group-1",
+                notificationId = 0,
+            )
+        assertEquals(
+            NotificationAction(
+                NotificationActionKind.REPLY,
+                NotificationTarget("acct-a", "group-1", "m1", NotificationTargetKind.MESSAGE),
+                "acct-a|group-1",
+                0,
+            ),
+            action,
+        )
+    }
+
+    @Test
+    fun actionParseFields_rejectsUntrustedOrIncompletePayloads() {
+        assertNull(
+            NotificationActions.parseFields(
+                action = "android.intent.action.VIEW",
+                accountRef = "acct-a",
+                groupIdHex = "group-1",
+                messageIdHex = "m1",
+                targetKindName = "MESSAGE",
+                notificationTag = "acct-a|group-1",
+                notificationId = 0,
+            ),
+        )
+        assertNull(
+            NotificationActions.parseFields(
+                action = NotificationActions.ACTION_MARK_READ,
+                accountRef = "acct-a",
+                groupIdHex = "group-1",
+                messageIdHex = null,
+                targetKindName = "MESSAGE",
+                notificationTag = "acct-a|group-1",
+                notificationId = 0,
+            ),
+        )
+        assertNull(
+            NotificationActions.parseFields(
+                action = NotificationActions.ACTION_MARK_READ,
+                accountRef = "acct-a",
+                groupIdHex = "group-1",
+                messageIdHex = "m1",
+                targetKindName = "INVITE",
+                notificationTag = "acct-a|group-1",
+                notificationId = 0,
+            ),
+        )
+        assertNull(
+            NotificationActions.parseFields(
+                action = NotificationActions.ACTION_MARK_READ,
+                accountRef = "acct-a",
+                groupIdHex = "group-1",
+                messageIdHex = "m1",
+                targetKindName = "MESSAGE",
+                notificationTag = " ",
+                notificationId = 0,
+            ),
+        )
+        assertNull(
+            NotificationActions.parseFields(
+                action = NotificationActions.ACTION_MARK_READ,
+                accountRef = "acct-a",
+                groupIdHex = "group-1",
+                messageIdHex = "m1",
+                targetKindName = "MESSAGE",
+                notificationTag = "acct-a|group-1",
+                notificationId = null,
+            ),
+        )
+    }
+
+    @Test
+    fun actionIdentity_isDistinctPerKindAndTag() {
+        assertNotEquals(
+            NotificationActions.requestCode(NotificationActionKind.REPLY, "acct-a|group-1"),
+            NotificationActions.requestCode(NotificationActionKind.MARK_READ, "acct-a|group-1"),
+        )
+        assertNotEquals(
+            NotificationActions.requestCode(NotificationActionKind.REPLY, "acct-a|group-1"),
+            NotificationActions.requestCode(NotificationActionKind.REPLY, "acct-a|group-2"),
+        )
+        assertNotEquals(
+            NotificationActions.actionUriString(NotificationActionKind.REPLY, "acct-a|group-1"),
+            NotificationActions.actionUriString(NotificationActionKind.MARK_READ, "acct-a|group-1"),
+        )
+    }
+
+    @Test
+    fun replyActionHandled_requiresSentAndMarkedRead() {
+        assertTrue(notificationReplyActionHandled(sent = true, markedRead = true))
+        assertFalse(notificationReplyActionHandled(sent = true, markedRead = false))
+        assertFalse(notificationReplyActionHandled(sent = false, markedRead = true))
+        assertFalse(notificationReplyActionHandled(sent = false, markedRead = false))
     }
 
     // ---- resolveNotificationNav (routing FSM) -------------------------------

@@ -149,12 +149,42 @@ object NotificationNavigation {
         kindName: String?,
     ): NotificationTarget? {
         if (action != ACTION_OPEN) return null
+        return parseTargetExtras(accountRef, groupIdHex, messageIdHex, kindName)
+    }
+
+    /** Parse target extras independent of the Intent action. Used by notification actions. */
+    fun parseTargetExtras(
+        accountRef: String?,
+        groupIdHex: String?,
+        messageIdHex: String?,
+        kindName: String?,
+    ): NotificationTarget? {
         val account = accountRef?.takeIf { it.isNotBlank() } ?: return null
         val group = groupIdHex?.takeIf { it.isNotBlank() } ?: return null
         val kind = NotificationTargetKind.entries.firstOrNull { it.name == kindName } ?: return null
         val message = messageIdHex?.takeIf { it.isNotBlank() && kind == NotificationTargetKind.MESSAGE }
         return NotificationTarget(account, group, message, kind)
     }
+
+    /** Stamp [target]'s validated routing fields onto [intent]. */
+    fun applyTargetExtras(
+        intent: Intent,
+        target: NotificationTarget,
+    ) {
+        intent.putExtra(EXTRA_ACCOUNT_REF, target.accountRef)
+        intent.putExtra(EXTRA_GROUP_ID, target.groupIdHex)
+        intent.putExtra(EXTRA_MESSAGE_ID, target.messageIdHex)
+        intent.putExtra(EXTRA_KIND, target.kind.name)
+    }
+
+    /** Parse target extras from an [Intent] whose action has already been validated. */
+    fun parseTarget(intent: Intent): NotificationTarget? =
+        parseTargetExtras(
+            accountRef = intent.getStringExtra(EXTRA_ACCOUNT_REF),
+            groupIdHex = intent.getStringExtra(EXTRA_GROUP_ID),
+            messageIdHex = intent.getStringExtra(EXTRA_MESSAGE_ID),
+            kindName = intent.getStringExtra(EXTRA_KIND),
+        )
 
     /** Stamp [target] onto a content [intent] (action + unique data + extras). */
     fun applyToIntent(
@@ -164,10 +194,7 @@ object NotificationNavigation {
     ) {
         intent.action = ACTION_OPEN
         intent.data = Uri.parse(targetUriString(notificationKey))
-        intent.putExtra(EXTRA_ACCOUNT_REF, target.accountRef)
-        intent.putExtra(EXTRA_GROUP_ID, target.groupIdHex)
-        intent.putExtra(EXTRA_MESSAGE_ID, target.messageIdHex)
-        intent.putExtra(EXTRA_KIND, target.kind.name)
+        applyTargetExtras(intent, target)
     }
 
     /** Parse a tapped content [intent] back into a target (untrusted). */

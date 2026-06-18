@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
+import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.MainActivity
@@ -98,7 +99,16 @@ class LocalNotificationPresenter(
         when (update.trigger) {
             // Messages stack into one per-conversation card; invites are
             // one-off events, so keep them as a plain expandable notification.
-            NotificationTriggerFfi.NEW_MESSAGE -> builder.setStyle(messagingStyle(update, content, conversationTitleOverride))
+            NotificationTriggerFfi.NEW_MESSAGE -> {
+                builder.setStyle(messagingStyle(update, content, conversationTitleOverride))
+                NotificationActions
+                    .targetFromUpdate(update, content.notificationTag, content.notificationId)
+                    ?.let { actionTarget ->
+                        builder.addAction(replyNotificationAction(actionTarget))
+                        builder.addAction(markReadNotificationAction(actionTarget))
+                    }
+            }
+
             NotificationTriggerFfi.GROUP_INVITE ->
                 builder
                     .setContentTitle(content.title)
@@ -112,6 +122,14 @@ class LocalNotificationPresenter(
             "posted tag=${content.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
         }
         return true
+    }
+
+    fun cancel(
+        notificationTag: String,
+        notificationId: Int,
+    ) {
+        NotificationManagerCompat.from(context).cancel(notificationTag, notificationId)
+        notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
     }
 
     // Accumulate every message from a conversation into one card. Android keys a
@@ -157,6 +175,58 @@ class LocalNotificationPresenter(
                 ?.firstOrNull { it.tag == tag && it.id == LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID }
                 ?: return null
         return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing.notification)
+    }
+
+    private fun replyNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action {
+        val remoteInput =
+            RemoteInput
+                .Builder(NotificationActions.KEY_TEXT_REPLY)
+                .setLabel(context.getString(R.string.message))
+                .build()
+        return NotificationCompat
+            .Action
+            .Builder(
+                R.drawable.ic_stat_darkmatter,
+                context.getString(R.string.reply),
+                actionPendingIntent(actionTarget, NotificationActionKind.REPLY),
+            ).addRemoteInput(remoteInput)
+            .setAllowGeneratedReplies(true)
+            .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+            .setShowsUserInterface(false)
+            .build()
+    }
+
+    private fun markReadNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action =
+        NotificationCompat
+            .Action
+            .Builder(
+                R.drawable.ic_stat_darkmatter,
+                context.getString(R.string.chat_row_action_mark_read),
+                actionPendingIntent(actionTarget, NotificationActionKind.MARK_READ),
+            ).setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ)
+            .setShowsUserInterface(false)
+            .build()
+
+    private fun actionPendingIntent(
+        actionTarget: NotificationActionTarget,
+        kind: NotificationActionKind,
+    ): PendingIntent {
+        val actionIntent =
+            Intent(context, NotificationActionReceiver::class.java).apply {
+                NotificationActions.applyToIntent(this, kind, actionTarget)
+            }
+        val mutableFlag =
+            if (kind == NotificationActionKind.REPLY) {
+                PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_IMMUTABLE
+            }
+        return PendingIntent.getBroadcast(
+            context,
+            NotificationActions.requestCode(kind, actionTarget.notificationTag),
+            actionIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag,
+        )
     }
 
     private fun conversationPendingIntent(
