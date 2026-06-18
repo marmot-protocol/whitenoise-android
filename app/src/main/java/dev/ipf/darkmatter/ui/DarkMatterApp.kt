@@ -5598,6 +5598,10 @@ private fun ConversationScreen(
     var confirmLeaveFromTopBar by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var initialTimelineAnchored by remember(chat.id) { mutableStateOf(false) }
+    // Set while a load-older is restoring scroll position, so the bottom-follow
+    // effect doesn't fight it: replaceWindow can cap-trim the newest rows and
+    // change the last id, which would otherwise snap the reader to the bottom.
+    var restoringOlderScroll by remember(chat.id) { mutableStateOf(false) }
     var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
     var highlightedMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     var navigateReplyJob by remember(chat.id) { mutableStateOf<Job?>(null) }
@@ -6344,6 +6348,33 @@ private fun ConversationScreen(
     val transcriptLocale = LocalConfiguration.current.locales[0]
     val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
     val bottomTimelineIndex = renderedTimeline.size + 1 + olderHeaderCount
+
+    // Load older messages without losing the reader's place: anchor on the
+    // topmost visible message, paginate, then restore that message to the same
+    // pixel offset. The freshly-prepended history sits above it, so the reader
+    // stays put and scrolls up into it (instead of being snapped to newest).
+    fun loadOlderKeepingPosition() {
+        scope.launch {
+            val olderHeader = olderHeaderCount
+            val firstMsg = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index >= 1 + olderHeader }
+            val anchorId = firstMsg?.let { renderedTimeline.getOrNull(it.index - 1 - olderHeader)?.id }
+            val anchorOffset = firstMsg?.offset ?: 0
+            restoringOlderScroll = true
+            try {
+                controller.loadOlder()
+                if (anchorId != null) {
+                    val newRendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+                    val newIdx = newRendered.indexOfFirst { it.id == anchorId }
+                    if (newIdx >= 0) {
+                        val newOlderHeader = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+                        listState.scrollToItem(1 + newOlderHeader + newIdx, (-anchorOffset).coerceAtLeast(0))
+                    }
+                }
+            } finally {
+                restoringOlderScroll = false
+            }
+        }
+    }
     // Capture the unread boundary at chat open. Stays fixed for the lifetime
     // of this composable (per chat.id) so the "N unread messages" divider
     // doesn't keep moving as the user scrolls and marks messages as read.
@@ -6406,10 +6437,12 @@ private fun ConversationScreen(
                     }
                 listState.scrollToItem(targetIndex)
                 initialTimelineAnchored = true
-            } else if (nearBottom) {
+            } else if (nearBottom && !restoringOlderScroll) {
                 // User is still pinned to the newest message; follow new
                 // incoming messages down. Reading older history isn't
-                // interrupted by this branch (see issue #59).
+                // interrupted by this branch (see issue #59). Suppressed during
+                // a load-older restore so a cap-trim of the newest rows doesn't
+                // yank the reader back to the bottom.
                 listState.scrollToItem(bottomTimelineIndex)
             }
         }
@@ -6632,7 +6665,7 @@ private fun ConversationScreen(
                                         if (controller.isLoadingOlder) {
                                             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                                         } else {
-                                            IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
+                                            IconButton(onClick = { loadOlderKeepingPosition() }) {
                                                 Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                                             }
                                         }
