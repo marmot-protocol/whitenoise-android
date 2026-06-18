@@ -176,6 +176,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -1277,9 +1278,8 @@ private fun ChatsScreen(
     }
 }
 
-/** Three-way filter state for the chat list. `Groups` is held back from
- *  v1 because the direct-vs-group distinction is partly inferred from
- *  `memberCount`, which isn't always populated for archived rows. */
+/** Chat-list filter state. `Archived` swaps the source list to archived chats
+ *  rather than predicate-filtering the active one. */
 private enum class ChatListFilter { All, Unread, Groups, Archived }
 
 private fun applyChatListSearchAndFilter(
@@ -8786,7 +8786,8 @@ private fun MessageBubble(
                     val overflowing = tallies.size > MAX_VISIBLE_REACTIONS
                     val visibleTallies = if (overflowing) tallies.take(MAX_VISIBLE_REACTIONS - 1) else tallies
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        // No explicit gap: the chips' 48dp min touch targets
+                        // already separate the visually-small pills.
                         modifier = Modifier.offset(y = (-14).dp).padding(horizontal = 10.dp),
                     ) {
                         visibleTallies.forEach { tally ->
@@ -8840,8 +8841,11 @@ private fun ReactionTallyChip(
     val viewReactorsLabel = stringResource(R.string.view_reactors)
     val toggleReactionLabel = stringResource(R.string.toggle_reaction)
     Surface(
+        // Pill stays visually compact; the touch target is padded back out to
+        // the 48dp minimum (this control also takes a long-press).
         modifier =
             Modifier
+                .minimumInteractiveComponentSize()
                 .semantics { selected = tally.mine }
                 .clip(RoundedCornerShape(percent = 50))
                 .combinedClickable(
@@ -8872,11 +8876,13 @@ private fun ReactionOverflowChip(
     onClick: () -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val viewReactorsLabel = stringResource(R.string.view_reactors)
     Surface(
         modifier =
             Modifier
+                .minimumInteractiveComponentSize()
                 .clip(RoundedCornerShape(percent = 50))
-                .clickable(role = Role.Button, onClick = onClick),
+                .clickable(role = Role.Button, onClick = onClick, onClickLabel = viewReactorsLabel),
         shape = RoundedCornerShape(percent = 50),
         color = colorScheme.surfaceContainerHigh,
         contentColor = colorScheme.onSurface,
