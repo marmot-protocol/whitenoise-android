@@ -506,4 +506,6 @@
     <string name="profile_nip05_invalid">name@example.com gibi bir adres girin.</string>
     <string name="profile_lightning_hint">Lightning adresi, örn. you@walletprovider.com</string>
     <string name="profile_lightning_invalid">name@example.com gibi bir Lightning adresi girin.</string>
+    <string name="reaction_tap_to_remove">Kaldırmak için dokun</string>
+    <string name="chat_list_filter_groups">Gruplar</string>
 </resources>

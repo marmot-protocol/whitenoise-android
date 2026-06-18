@@ -26,6 +26,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.LinkInteractionListener
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -79,6 +80,10 @@ internal fun MarkdownMessageBody(
     modifier: Modifier = Modifier,
     mentionDisplayName: ((String) -> String?)? = null,
     onNostrProfileTap: ((String) -> Unit)? = null,
+    // Reports the layout of the final paragraph/heading so a caller can place
+    // an inline footer against the last line. Fires only for a text-bearing
+    // last block; other block types leave it unset.
+    onLastTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     // One listener for every link in the document; the tapped destination
@@ -104,8 +109,13 @@ internal fun MarkdownMessageBody(
             MarkdownBodyContext(linkListener, mentionDisplayName)
         }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        document.blocks.forEach { block ->
-            MarkdownBlockView(block, bodyContext, depth = 0)
+        document.blocks.forEachIndexed { index, block ->
+            MarkdownBlockView(
+                block,
+                bodyContext,
+                depth = 0,
+                onTextLayout = if (index == document.blocks.lastIndex) onLastTextLayout else null,
+            )
         }
     }
 }
@@ -144,6 +154,7 @@ private fun MarkdownBlockView(
     block: MarkdownBlockFfi,
     ctx: MarkdownBodyContext,
     depth: Int,
+    onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     // Past the nesting cap, stop descending: render a plain ellipsis marker
     // instead of recursing into another quote/list level. Bounds the render
@@ -157,11 +168,13 @@ private fun MarkdownBlockView(
             Text(
                 rememberMarkdownInlineText(block.inlines, ctx),
                 style = MaterialTheme.typography.bodyLarge,
+                onTextLayout = { onTextLayout?.invoke(it) },
             )
         is MarkdownBlockFfi.Heading ->
             Text(
                 rememberMarkdownInlineText(block.inlines, ctx),
                 style = markdownHeadingTextStyle(block.level.toInt(), MaterialTheme.typography),
+                onTextLayout = { onTextLayout?.invoke(it) },
             )
         MarkdownBlockFfi.ThematicBreak ->
             HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.25f))
@@ -657,8 +670,12 @@ internal fun markdownDocumentToPreviewAnnotatedString(
                 appendPreviewBlock(block, codeStyle, maxLength, mentionDisplayName, depth = 0)
             }
         }
-    return if (flattened.length > maxLength) flattened.subSequence(0, maxLength) else flattened
+    return if (flattened.length > maxLength) flattened.subSequence(0, flattened.safeCutEnd(maxLength)) else flattened
 }
+
+// Pull a cut back off a high surrogate so a preview never ends on half a
+// supplementary-plane char (which renders as the � replacement glyph).
+private fun CharSequence.safeCutEnd(end: Int): Int = if (end in 1..length && this[end - 1].isHighSurrogate()) end - 1 else end
 
 private fun AnnotatedString.Builder.appendPreviewBlock(
     block: MarkdownBlockFfi,
@@ -746,7 +763,7 @@ private fun AnnotatedString.Builder.appendPreviewSegment(
     val remaining = maxLength - length - separator
     if (remaining <= 0) return
     if (separator == 1) append(' ')
-    append(if (segment.length > remaining) segment.subSequence(0, remaining) else segment)
+    append(if (segment.length > remaining) segment.subSequence(0, segment.safeCutEnd(remaining)) else segment)
 }
 
 private fun AnnotatedString.Builder.appendPreviewInlines(
