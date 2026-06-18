@@ -126,6 +126,25 @@ class DraftStoreTest {
         assertEquals("preloaded", s.get("a", "g"))
     }
 
+    @Test
+    fun migrationCopiesEveryDraftThenWipesLegacyPlaintext() {
+        // The encrypted-store migration must be one-way: every plaintext draft
+        // lands in the secure store and the plaintext source is then cleared,
+        // so no draft survives in cleartext on disk.
+        val secure = mutableMapOf<String, String>()
+        var legacyWiped = false
+        migrateDrafts(
+            legacy = mapOf(draftKey("a", "g1") to "one", draftKey("a", "g2") to "two"),
+            writeSecure = { key, value -> secure[key] = value },
+            clearLegacy = { legacyWiped = true },
+        )
+        assertEquals(
+            mapOf(draftKey("a", "g1") to "one", draftKey("a", "g2") to "two"),
+            secure,
+        )
+        assertTrue("legacy plaintext must be wiped after migration", legacyWiped)
+    }
+
     private fun draftKey(
         account: String,
         group: String,

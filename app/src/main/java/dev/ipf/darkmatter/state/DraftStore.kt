@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 
 /**
  * Persistence layer for unsent conversation drafts. The storage map is keyed
@@ -88,15 +90,25 @@ class DraftStore internal constructor(
     ): String = "$accountIdHex $groupIdHex"
 
     companion object {
-        fun forContext(context: Context): DraftStore = DraftStore(SharedPreferencesDraftPersistence(context.applicationContext))
+        fun forContext(context: Context): DraftStore = DraftStore(EncryptedDraftPersistence(context.applicationContext))
     }
 }
 
-internal class SharedPreferencesDraftPersistence(
+/**
+ * Draft text is message-shaped plaintext, so it is held in an
+ * [EncryptedSharedPreferences] store keyed by the Android Keystore rather than
+ * the plaintext file the drafts originally shipped in. Existing plaintext
+ * drafts are migrated into the encrypted store once, then the plaintext file
+ * is wiped.
+ */
+internal class EncryptedDraftPersistence(
     context: Context,
 ) : DraftPersistence {
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences("darkmatter.drafts", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = openSecure(context.applicationContext)
+
+    init {
+        migrateLegacyPlaintext(context.applicationContext, prefs)
+    }
 
     override fun read(): Map<String, String> {
         @Suppress("UNCHECKED_CAST")
@@ -113,4 +125,68 @@ internal class SharedPreferencesDraftPersistence(
                 if (value == null) remove(key) else putString(key, value)
             }.apply()
     }
+
+    private companion object {
+        const val SECURE_FILE = "darkmatter.drafts.secure"
+        const val LEGACY_FILE = "darkmatter.drafts"
+
+        fun openSecure(context: Context): SharedPreferences =
+            try {
+                create(context)
+            } catch (error: Exception) {
+                // A rotated or cleared Keystore key leaves the file
+                // undecryptable; drafts are disposable, so drop the corrupt
+                // store and start fresh rather than crashing on launch.
+                context.deleteSharedPreferences(SECURE_FILE)
+                create(context)
+            }
+
+        fun create(context: Context): SharedPreferences {
+            val masterKey =
+                MasterKey
+                    .Builder(context)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+            return EncryptedSharedPreferences.create(
+                context,
+                SECURE_FILE,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
+        }
+
+        fun migrateLegacyPlaintext(
+            context: Context,
+            secure: SharedPreferences,
+        ) {
+            val legacy = context.getSharedPreferences(LEGACY_FILE, Context.MODE_PRIVATE)
+
+            @Suppress("UNCHECKED_CAST")
+            val legacyDrafts = legacy.all.filterValues { it is String } as Map<String, String>
+            if (legacyDrafts.isEmpty()) return
+            migrateDrafts(
+                legacy = legacyDrafts,
+                writeSecure = { key, value -> secure.edit().putString(key, value).apply() },
+                clearLegacy = {
+                    legacy.edit().clear().apply()
+                    context.deleteSharedPreferences(LEGACY_FILE)
+                },
+            )
+        }
+    }
+}
+
+/**
+ * One-way migration: copy every legacy plaintext draft into the encrypted
+ * store, then wipe the plaintext source. Pure over its collaborators so the
+ * copy-then-clear guarantee can be unit-tested without an Android Keystore.
+ */
+internal fun migrateDrafts(
+    legacy: Map<String, String>,
+    writeSecure: (String, String) -> Unit,
+    clearLegacy: () -> Unit,
+) {
+    legacy.forEach { (key, value) -> writeSecure(key, value) }
+    clearLegacy()
 }
