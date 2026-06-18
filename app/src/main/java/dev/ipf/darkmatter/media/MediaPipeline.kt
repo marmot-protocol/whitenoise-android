@@ -66,6 +66,49 @@ object MediaPipeline {
         return buffer.toByteArray()
     }
 
+    /**
+     * Copy [stream] into [target] without ever writing bytes beyond [cap].
+     * Returns false when the stream would exceed the cap; callers may delete
+     * or ignore the partial file. Doesn't close [stream].
+     */
+    internal fun copyStreamToFileWithinCap(
+        stream: java.io.InputStream,
+        target: java.io.File,
+        cap: Long,
+    ): Boolean {
+        require(cap >= 0L) { "cap must be non-negative" }
+        val chunk = ByteArray(64 * 1024)
+        var total = 0L
+        target.outputStream().use { out ->
+            while (true) {
+                val read = stream.read(chunk)
+                if (read < 0) break
+                val readLong = read.toLong()
+                if (readLong > cap - total) return false
+                out.write(chunk, 0, read)
+                total += readLong
+            }
+        }
+        return true
+    }
+
+    /** Read [source] into one exact-size ByteArray; avoids ByteArrayOutputStream's final copy. */
+    internal fun readFileBytesExact(source: java.io.File): ByteArray {
+        val length = source.length()
+        if (length > Int.MAX_VALUE) throw java.io.IOException("file too large")
+        val bytes = ByteArray(length.toInt())
+        source.inputStream().use { input ->
+            var offset = 0
+            while (offset < bytes.size) {
+                val read = input.read(bytes, offset, bytes.size - offset)
+                if (read < 0) throw java.io.EOFException("file ended before expected length")
+                offset += read
+            }
+            if (input.read() >= 0) throw java.io.IOException("file grew while reading")
+        }
+        return bytes
+    }
+
     /** Max longer-edge (px) for in-bubble thumbnail decodes (shared by the
      *  UI bubble and the send-path thumbnail seed). */
     const val THUMBNAIL_MAX_EDGE_PX: Int = 1280
@@ -348,35 +391,27 @@ object MediaPipeline {
 
         val perFileCap = minOf(VIDEO_MAX_BYTES, remainingBytes.coerceAtLeast(0L))
         if (perFileCap <= 0L) return VideoReadResult.TooLarge
-        var overflowed = false
-        val bytes =
-            runCatching {
-                resolver.openInputStream(uri)?.use { stream ->
-                    val out = ByteArrayOutputStream()
-                    val buf = ByteArray(64 * 1024)
-                    var total = 0L
-                    while (true) {
-                        val n = stream.read(buf)
-                        if (n < 0) break
-                        total += n.toLong()
-                        if (total > perFileCap) {
-                            overflowed = true
-                            return@use null
-                        }
-                        out.write(buf, 0, n)
-                    }
-                    out.toByteArray()
-                }
-            }.getOrNull()
-        if (overflowed) return VideoReadResult.TooLarge
-        if (bytes == null) return VideoReadResult.Failed
 
-        // MediaMetadataRetriever needs a seekable source — write to a temp
-        // file. Sloppier alternatives (FileDescriptor from URI) work only
-        // for some providers; the temp file path is universal.
-        val tmp = java.io.File.createTempFile("vidmeta-", null, context.cacheDir)
+        // MediaMetadataRetriever needs a seekable source. Stream the picked
+        // video straight into that temp file instead of first growing a
+        // ByteArrayOutputStream and then copying it into the file; the final
+        // upload ByteArray is allocated once from the finished file below.
+        val tmp =
+            runCatching { java.io.File.createTempFile("vidmeta-", null, context.cacheDir) }
+                .getOrElse { return VideoReadResult.Failed }
         try {
-            tmp.writeBytes(bytes)
+            val copiedWithinCap =
+                runCatching {
+                    resolver.openInputStream(uri)?.use { stream ->
+                        copyStreamToFileWithinCap(stream, tmp, perFileCap)
+                    }
+                }.getOrNull()
+            when (copiedWithinCap) {
+                true -> Unit
+                false -> return VideoReadResult.TooLarge
+                null -> return VideoReadResult.Failed
+            }
+
             val mmr = android.media.MediaMetadataRetriever()
             try {
                 mmr.setDataSource(tmp.absolutePath)
@@ -413,6 +448,7 @@ object MediaPipeline {
                             .getOrNull()
                     }
                 poster?.recycle()
+                val bytes = runCatching { readFileBytesExact(tmp) }.getOrElse { return VideoReadResult.Failed }
                 return VideoReadResult.Success(
                     VideoForUpload(
                         bytes = bytes,

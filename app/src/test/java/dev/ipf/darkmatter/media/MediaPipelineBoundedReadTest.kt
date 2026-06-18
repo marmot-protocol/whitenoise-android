@@ -1,9 +1,12 @@
 package dev.ipf.darkmatter.media
 
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import java.io.File
 
 class MediaPipelineBoundedReadTest {
     @Test
@@ -42,5 +45,43 @@ class MediaPipelineBoundedReadTest {
     fun readsEmptyStream() {
         val result = MediaPipeline.readBoundedBytes(ByteArrayInputStream(ByteArray(0)), cap = 1024)
         assertArrayEquals(ByteArray(0), result)
+    }
+
+    @Test
+    fun copiesStreamToFileAtCapBoundary() {
+        val source = ByteArray(64 * 1024) { i -> (i % 251).toByte() }
+        val tmp = File.createTempFile("media-pipeline-copy-", ".bin")
+        try {
+            assertTrue(MediaPipeline.copyStreamToFileWithinCap(ByteArrayInputStream(source), tmp, cap = source.size.toLong()))
+            assertArrayEquals(source, tmp.readBytes())
+        } finally {
+            tmp.delete()
+        }
+    }
+
+    @Test
+    fun copyStreamToFileRejectsOneByteOverCapWithoutWritingOverflow() {
+        val cap = 64 * 1024L
+        val source = ByteArray(cap.toInt() + 1) { i -> (i % 251).toByte() }
+        val tmp = File.createTempFile("media-pipeline-copy-", ".bin")
+        try {
+            assertFalse(MediaPipeline.copyStreamToFileWithinCap(ByteArrayInputStream(source), tmp, cap = cap))
+            assertTrue("overflow chunk must not be written", tmp.length() <= cap)
+            assertArrayEquals(source.copyOfRange(0, tmp.length().toInt()), tmp.readBytes())
+        } finally {
+            tmp.delete()
+        }
+    }
+
+    @Test
+    fun readsFileBytesExactly() {
+        val source = ByteArray(128 * 1024) { i -> (i % 251).toByte() }
+        val tmp = File.createTempFile("media-pipeline-read-", ".bin")
+        try {
+            tmp.writeBytes(source)
+            assertArrayEquals(source, MediaPipeline.readFileBytesExact(tmp))
+        } finally {
+            tmp.delete()
+        }
     }
 }
