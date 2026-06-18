@@ -9,6 +9,17 @@ lifecycleRuntimeKtx = "2.6.1"
 activityCompose = "1.8.0"
 kotlin = "2.2.10"
 composeBom = "2026.05.01"
+# material3 is deliberately pinned ABOVE the version the Compose BOM supplies
+# (compose-bom 2026.05.01 -> material3 1.4.0 stable). The QuickActionFabMenu in
+# DarkMatterApp.kt uses the Material 3 expressive FAB-menu APIs
+# (FloatingActionButtonMenu / FloatingActionButtonMenuItem /
+# ToggleFloatingActionButton / ToggleFloatingActionButtonDefaults.animateIcon),
+# which do not exist in any stable or -rc material3 release yet (latest stable
+# is 1.4.0; the expressive FAB-menu set ships only on the 1.5.0-alpha line).
+# This is an exact-version pin, not a floating range, so the alpha cannot drift
+# under us. Revisit and drop this override the moment a 1.5.0 beta/rc/stable that
+# carries these APIs is published, at which point material3 can return to being
+# BOM-managed like every other Compose artifact in this catalog.
 material3 = "1.5.0-alpha20"
 emoji2 = "1.6.0"
 coroutines = "1.11.0"
