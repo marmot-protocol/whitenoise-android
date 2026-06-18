@@ -1,5 +1,6 @@
 package dev.ipf.darkmatter.state
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -7,6 +8,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.fail
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.max
@@ -74,6 +76,65 @@ class AttachmentDownloadGateTest {
             release.complete(Unit)
             jobs.awaitAll()
             assertEquals(3, started.get())
+        }
+    }
+
+    @Test
+    fun retriesTransientFailuresAfterReleasingPermit() {
+        runBlocking {
+            val gate = AttachmentDownloadGate(parallelism = 1)
+            val events = mutableListOf<String>()
+            var attempts = 0
+            val result =
+                gate.withRetryingPermit(
+                    maxAttempts = 3,
+                    initialBackoffMillis = 25,
+                    sleep = { delayMillis ->
+                        events += "sleep:$delayMillis"
+                        withTimeout(1_000) {
+                            gate.withPermit { events += "sibling" }
+                        }
+                    },
+                ) {
+                    attempts += 1
+                    events += "attempt:$attempts"
+                    if (attempts < 3) error("transient")
+                    "ok"
+                }
+
+            assertEquals("ok", result)
+            assertEquals(
+                listOf(
+                    "attempt:1",
+                    "sleep:25",
+                    "sibling",
+                    "attempt:2",
+                    "sleep:50",
+                    "sibling",
+                    "attempt:3",
+                ),
+                events,
+            )
+        }
+    }
+
+    @Test
+    fun cancellationIsNotRetried() {
+        runBlocking {
+            val gate = AttachmentDownloadGate(parallelism = 1)
+            var attempts = 0
+            try {
+                gate.withRetryingPermit(
+                    maxAttempts = 3,
+                    sleep = { fail("cancellation must not back off") },
+                ) {
+                    attempts += 1
+                    throw CancellationException("gone")
+                }
+                fail("expected cancellation")
+            } catch (_: CancellationException) {
+                assertEquals(1, attempts)
+            }
         }
     }
 }

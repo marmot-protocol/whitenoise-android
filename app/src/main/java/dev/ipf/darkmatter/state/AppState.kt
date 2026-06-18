@@ -356,8 +356,9 @@ class DarkMatterAppState(
 
     // Bound attachment fetches without making a visible album wait for one
     // network/decrypt round-trip per tile. The gate still prevents an
-    // unbounded burst from swamping the Blossom / FFI stack, but small albums
-    // and adjacent voice notes can overlap their connection setup and decrypts.
+    // unbounded burst from swamping the Blossom / FFI stack, and bounded
+    // retries keep transient queued-behind failures from sticking tiles in
+    // `failed` before the user has a chance to see the media.
     private val attachmentDownloadGate = AttachmentDownloadGate()
     private val recentConversationStateKeys = LinkedHashMap<String, Unit>(16, 0.75f, true)
 
@@ -547,10 +548,11 @@ class DarkMatterAppState(
                 mutationsScope.async {
                     // Cap concurrent attachment fetches so an N-tile album
                     // doesn't saturate the underlying network or Blossom
-                    // stack into per-tile failures. The gate is acquired
+                    // stack, and retry short-lived per-tile failures before
+                    // surfacing a manual retry state. The gate is acquired
                     // inside the Deferred so callers only suspend at `await()`.
                     val downloadScope = this
-                    attachmentDownloadGate.withPermit { downloadScope.block() }
+                    attachmentDownloadGate.withRetryingPermit { downloadScope.block() }
                 }
             inFlightDownloads[cacheKey] = deferred
             // Drop the map entry via `invokeOnCompletion` (fires AFTER the
