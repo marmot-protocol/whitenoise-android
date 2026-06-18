@@ -1721,8 +1721,9 @@ class ConversationController(
                         .decodeSampledBitmap(attachment.plaintextBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
                         ?.let { appState.mediaThumbnailCache.put(confirmedKey, it) }
                     val bytesToPersist = attachment.plaintextBytes
+                    val cacheGeneration = appState.diskMediaCache.generation()
                     appState.launchMutation {
-                        withContext(Dispatchers.IO) { appState.diskMediaCache.put(confirmedKey, bytesToPersist) }
+                        withContext(Dispatchers.IO) { appState.diskMediaCache.put(confirmedKey, bytesToPersist, cacheGeneration) }
                     }
                 }
             }
@@ -2018,6 +2019,9 @@ class ConversationController(
         val groupIdHex = group.groupIdHex
         val deferred =
             appState.memoizedDownload(cacheKey) {
+                // Capture before the fetch so a sign-out wipe mid-download
+                // rejects the L2 persist below. See #154.
+                val cacheGeneration = appState.diskMediaCache.generation()
                 val result =
                     runCatching {
                         appState.marmotIo { downloadMedia(account, groupIdHex, reference) }
@@ -2045,7 +2049,7 @@ class ConversationController(
                     val plaintext = result.plaintext
                     // Persist to L2 still on this background scope (same
                     // lifetime as the FFI fetch).
-                    withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, plaintext) }
+                    withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, plaintext, cacheGeneration) }
                 }
                 result.plaintext
             }
@@ -2101,8 +2105,9 @@ class ConversationController(
                 .decodeSampledBitmap(attachment.plaintextBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
                 ?.let { appState.mediaThumbnailCache.put(cacheKey, it) }
             val bytesToPersist = attachment.plaintextBytes
+            val cacheGeneration = appState.diskMediaCache.generation()
             appState.launchMutation {
-                withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, bytesToPersist) }
+                withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, bytesToPersist, cacheGeneration) }
             }
         }
     }
