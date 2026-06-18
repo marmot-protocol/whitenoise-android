@@ -1,12 +1,14 @@
 package dev.ipf.darkmatter.media
 
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.nio.file.Files
 
 class MediaPipelineBoundedReadTest {
     @Test
@@ -82,6 +84,22 @@ class MediaPipelineBoundedReadTest {
             assertArrayEquals(source, MediaPipeline.readFileBytesExact(tmp))
         } finally {
             tmp.delete()
+        }
+    }
+
+    @Test
+    fun createsVideoMetadataTempFilesUnderWipeCoveredVideoCache() {
+        val cacheRoot = Files.createTempDirectory("media-pipeline-cache-").toFile()
+        val tmp = MediaPipeline.createVideoMetadataTempFile(cacheRoot)
+        try {
+            assertTrue("metadata temp file should be created", tmp != null)
+            val tmpFile = tmp!!
+            assertTrue("metadata temp file should exist", tmpFile.exists())
+            assertTrue("metadata temp file should use vidmeta prefix", tmpFile.name.startsWith("vidmeta-"))
+            assertEquals(File(cacheRoot, MediaCacheDirs.VIDEO).canonicalFile, tmpFile.parentFile!!.canonicalFile)
+        } finally {
+            tmp?.delete()
+            cacheRoot.deleteRecursively()
         }
     }
 }

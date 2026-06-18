@@ -393,12 +393,12 @@ object MediaPipeline {
         if (perFileCap <= 0L) return VideoReadResult.TooLarge
 
         // MediaMetadataRetriever needs a seekable source. Stream the picked
-        // video straight into that temp file instead of first growing a
-        // ByteArrayOutputStream and then copying it into the file; the final
-        // upload ByteArray is allocated once from the finished file below.
-        val tmp =
-            runCatching { java.io.File.createTempFile("vidmeta-", null, context.cacheDir) }
-                .getOrElse { return VideoReadResult.Failed }
+        // video straight into a temp file under the wipe-covered video cache
+        // instead of first growing a ByteArrayOutputStream and then copying it
+        // into the file; the final upload ByteArray is allocated once from the
+        // finished file below. If the process dies before the `finally` delete,
+        // sign-out wipe and the startup janitor still reclaim the plaintext.
+        val tmp = createVideoMetadataTempFile(context.cacheDir) ?: return VideoReadResult.Failed
         try {
             val copiedWithinCap =
                 runCatching {
@@ -477,5 +477,11 @@ object MediaPipeline {
                 ?.use { c ->
                     if (c.moveToFirst()) c.getString(0) else null
                 }
+        }.getOrNull()
+
+    internal fun createVideoMetadataTempFile(cacheDir: java.io.File): java.io.File? =
+        runCatching {
+            val dir = java.io.File(cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }
+            java.io.File.createTempFile("vidmeta-", null, dir)
         }.getOrNull()
 }
