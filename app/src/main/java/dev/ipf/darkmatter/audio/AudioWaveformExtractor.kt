@@ -26,6 +26,10 @@ object AudioWaveformExtractor {
     private const val TAG = "WaveformExtractor"
     private const val TIMEOUT_US = 10_000L
     private const val FLOOR = 0.05f
+
+    // Decode work runs on Dispatchers.IO but still holds a scarce MediaCodec.
+    // These generous caps cover slow/corrupt clips without letting a stream that
+    // never emits EOS pin the codec and worker thread indefinitely.
     private const val MAX_DECODE_LOOP_ITERATIONS = 20_000
     private const val MAX_DECODE_ELAPSED_NANOS = 30_000_000_000L
 
