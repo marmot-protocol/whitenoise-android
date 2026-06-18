@@ -312,6 +312,7 @@
     <string name="toast_profile_published_detail">Seus metadados kind:0 estão ativos em relés %1$d.</string>
     <string name="toast_couldnt_publish_profile">Não foi possível publicar o perfil</string>
     <string name="toast_send_failed">Falha no envio</string>
+    <string name="toast_send_not_ready">Ainda conectando — sua mensagem não foi enviada. Ela ficou na caixa de texto; tente novamente em instantes.</string>
     <string name="toast_reaction_failed">A reação falhou</string>
     <string name="toast_couldnt_delete_message">Falha ao excluir mensagem. Por favor, tente novamente.</string>
     <string name="toast_couldnt_edit_message">Não foi possível editar a mensagem</string>

@@ -306,6 +306,23 @@ data class ReactionParticipant(
     val reactedAt: ULong,
 )
 
+/**
+ * Whether a text [send] can commit an optimistic record. Pulled out as a pure
+ * predicate so the UI's "clear the input" decision is driven by the *same*
+ * answer the controller uses to decide whether to insert the optimistic bubble
+ * — the two must never disagree, otherwise the input clears while the message
+ * is silently dropped (issue #264).
+ *
+ * `accountRef` null → no active account bound yet; blank text → nothing to send;
+ * `canSend` false → membership not yet verified (the composer is intentionally
+ * shown during the `refreshMembers()` load window) or the user is not a member.
+ */
+internal fun canAcceptTextSend(
+    accountRef: String?,
+    trimmed: String,
+    canSend: Boolean,
+): Boolean = accountRef != null && trimmed.isNotEmpty() && canSend
+
 internal fun optimisticMessageIdForProjection(
     optimisticMessages: Collection<TimelineMessage>,
     projected: AppMessageRecordFfi,
@@ -1422,11 +1439,35 @@ class ConversationController(
         }
     }
 
-    suspend fun send(text: String) {
+    /**
+     * Send a text message. [onAccepted] runs only once the optimistic bubble
+     * has been committed to the projection and published — i.e. the send has
+     * actually started. The caller uses it to clear the input/draft and scroll
+     * to newest. It is deliberately NOT invoked when a guard rejects the send
+     * (no account yet, blank text, or membership not yet verified) so the UI
+     * keeps the user's text instead of clearing it into the void (issue #264).
+     * The edit path also leaves [onAccepted] uncalled: the composer restores its
+     * pre-edit draft via the `editingMessageId` LaunchedEffect, not by clearing.
+     */
+    suspend fun send(
+        text: String,
+        onAccepted: () -> Unit = {},
+    ) {
         val trimmed = text.trim()
-        val account = conversationAccountRef ?: return
-        if (trimmed.isEmpty()) return
-        if (!canSendMessages) return
+        val accountRef = conversationAccountRef
+        if (!canAcceptTextSend(accountRef, trimmed, canSendMessages)) {
+            // The only guard a user with non-blank text can realistically hit is
+            // membership not yet verified (the composer is shown during the
+            // `refreshMembers()` load window). Surface it instead of dropping
+            // the message silently — the input is preserved by not calling
+            // onAccepted, and the toast tells the user to retry in a moment.
+            if (accountRef != null && trimmed.isNotEmpty()) {
+                appState.present(R.string.toast_send_not_ready)
+            }
+            return
+        }
+        // Non-null guaranteed by canAcceptTextSend above.
+        val account = requireNotNull(accountRef)
 
         // Edit mode short-circuits the normal send path: publish a kind-1009
         // edit instead, then clear edit state. The bubble's text rebinds
@@ -1473,6 +1514,12 @@ class ConversationController(
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
         replyingTo = null
+        // The optimistic bubble is now in the projection and published — the
+        // send has visibly started. Only now is it safe to clear the input and
+        // draft (issue #264): clearing earlier, synchronously in the UI on the
+        // mere act of dispatching this coroutine, lost the text whenever a
+        // guard above bailed before this point.
+        onAccepted()
         try {
             val summary =
                 if (replyTarget != null) {

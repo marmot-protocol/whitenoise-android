@@ -312,6 +312,7 @@
     <string name="toast_profile_published_detail">Sus metadatos kind:0 están activos en los relés %1$d.</string>
     <string name="toast_couldnt_publish_profile">No se pudo publicar el perfil</string>
     <string name="toast_send_failed">Envío fallido</string>
+    <string name="toast_send_not_ready">Aún conectando — tu mensaje no se envió. Se conservó en el cuadro de texto; inténtalo de nuevo en un momento.</string>
     <string name="toast_reaction_failed">La reacción falló</string>
     <string name="toast_couldnt_delete_message">Error al eliminar el mensaje. Por favor, inténtalo de nuevo.</string>
     <string name="toast_couldnt_edit_message">No se pudo editar el mensaje</string>

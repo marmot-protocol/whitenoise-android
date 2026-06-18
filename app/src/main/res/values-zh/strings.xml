@@ -311,6 +311,7 @@
     <string name="toast_profile_published_detail">您的 kind:0 元数据在 %1$d 中继上实时存在。</string>
     <string name="toast_couldnt_publish_profile">无法发布个人资料</string>
     <string name="toast_send_failed">发送失败</string>
+    <string name="toast_send_not_ready">正在连接 — 消息未发送。文字已保留在输入框中，请稍后重试。</string>
     <string name="toast_reaction_failed">反应失败</string>
     <string name="toast_couldnt_delete_message">删除消息失败。请重试。</string>
     <string name="toast_couldnt_edit_message">无法编辑消息</string>

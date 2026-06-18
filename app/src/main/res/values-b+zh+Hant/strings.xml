@@ -311,6 +311,7 @@
     <string name="toast_profile_published_detail">您的 kind:0 元資料在 %1$d 中繼上即時存在。</string>
     <string name="toast_couldnt_publish_profile">無法發布個人檔案</string>
     <string name="toast_send_failed">發送失敗</string>
+    <string name="toast_send_not_ready">正在連線 — 訊息尚未送出。文字已保留在輸入框中，請稍後再試。</string>
     <string name="toast_reaction_failed">反應失敗</string>
     <string name="toast_couldnt_delete_message">刪除訊息失敗。請再試一次。</string>
     <string name="toast_couldnt_edit_message">無法編輯訊息</string>

@@ -314,6 +314,7 @@
     <string name="toast_profile_published_detail">Ваши метаданные kind:0 доступны на реле %1$d.</string>
     <string name="toast_couldnt_publish_profile">Не удалось опубликовать профиль</string>
     <string name="toast_send_failed">Отправить не удалось</string>
+    <string name="toast_send_not_ready">Ещё подключаемся — сообщение не отправлено. Оно сохранено в поле ввода; повторите попытку через мгновение.</string>
     <string name="toast_reaction_failed">Реакция не удалась</string>
     <string name="toast_couldnt_delete_message">Не удалось удалить сообщение. Попробуйте снова.</string>
     <string name="toast_couldnt_edit_message">Не удалось изменить сообщение</string>

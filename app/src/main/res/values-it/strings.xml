@@ -312,6 +312,7 @@
     <string name="toast_profile_published_detail">I tuoi metadati kind:0 sono attivi sui relè %1$d.</string>
     <string name="toast_couldnt_publish_profile">Impossibile pubblicare il profilo</string>
     <string name="toast_send_failed">Invio non riuscito</string>
+    <string name="toast_send_not_ready">Connessione in corso — il messaggio non è stato inviato. È rimasto nella casella; riprova tra un istante.</string>
     <string name="toast_reaction_failed">La reazione è fallita</string>
     <string name="toast_couldnt_delete_message">Eliminazione del messaggio fallita. Riprova.</string>
     <string name="toast_couldnt_edit_message">Impossibile modificare il messaggio</string>

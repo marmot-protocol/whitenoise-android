@@ -312,6 +312,7 @@
     <string name="toast_profile_published_detail">Ihre kind:0-Metadaten sind live auf %1$d-Relays.</string>
     <string name="toast_couldnt_publish_profile">Profil konnte nicht veröffentlicht werden</string>
     <string name="toast_send_failed">Senden fehlgeschlagen</string>
+    <string name="toast_send_not_ready">Verbindung wird noch hergestellt — deine Nachricht wurde nicht gesendet. Sie bleibt im Eingabefeld; versuche es gleich erneut.</string>
     <string name="toast_reaction_failed">Reaktion fehlgeschlagen</string>
     <string name="toast_couldnt_delete_message">Nachricht konnte nicht gelöscht werden. Bitte erneut versuchen.</string>
     <string name="toast_couldnt_edit_message">Nachricht konnte nicht bearbeitet werden</string>

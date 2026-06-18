@@ -6549,7 +6549,7 @@ private fun ConversationScreen(
                         replyingTo = controller.replyingTo,
                         messageTextCopy = messageTextCopy,
                         onCancelReply = { controller.replyingTo = null },
-                        onSend = { appState.launchMutation { controller.send(it) } },
+                        onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
                         initialDraft = appState.draftFor(groupIdHex).orEmpty(),
                         onDraftChange = { appState.setDraft(groupIdHex, it) },
                         draftKey = groupIdHex,
@@ -9727,7 +9727,7 @@ private fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
     messageTextCopy: MessageTextCopy,
     onCancelReply: () -> Unit,
-    onSend: (String) -> Unit,
+    onSend: (text: String, onAccepted: () -> Unit) -> Unit,
     modifier: Modifier = Modifier,
     initialDraft: String = "",
     onDraftChange: (String) -> Unit = {},
@@ -9923,18 +9923,25 @@ private fun ComposerBar(
                     onClick = {
                         if (text.isNotBlank()) {
                             val sendingEdit = editingMessageId != null
-                            onSend(text)
-                            // For an in-place edit: the LaunchedEffect that
-                            // watches `editingMessageId` will restore the pre-edit
-                            // composer (text + caret) once the controller clears
-                            // edit state — so don't blank the field here, don't
-                            // blank the persisted draft, and don't scroll to
-                            // newest (the bubble's row didn't move, the body
-                            // just rebinds).
-                            if (!sendingEdit) {
-                                textFieldValue = TextFieldValue("")
-                                onDraftChange("")
-                                onAfterSend()
+                            val sentText = text
+                            // Clear the input/draft and scroll-to-newest ONLY
+                            // after the controller confirms the optimistic
+                            // bubble is committed (it invokes onAccepted then).
+                            // If a guard rejects the send the callback never
+                            // runs, so the user's text stays in the field
+                            // instead of vanishing silently (issue #264).
+                            //
+                            // For an in-place edit the controller short-circuits
+                            // and never calls onAccepted; the LaunchedEffect that
+                            // watches `editingMessageId` restores the pre-edit
+                            // composer (text + caret) once edit state clears — so
+                            // we pass a no-op and don't blank the field here.
+                            onSend(sentText) {
+                                if (!sendingEdit) {
+                                    textFieldValue = TextFieldValue("")
+                                    onDraftChange("")
+                                    onAfterSend()
+                                }
                             }
                         }
                     },

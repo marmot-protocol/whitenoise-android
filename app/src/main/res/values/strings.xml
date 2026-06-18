@@ -357,6 +357,7 @@
     <string name="toast_profile_published_detail">Your kind:0 metadata is live on %1$d relays.</string>
     <string name="toast_couldnt_publish_profile">Couldn\'t publish profile</string>
     <string name="toast_send_failed">Send failed</string>
+    <string name="toast_send_not_ready">Still connecting — your message wasn\'t sent. It\'s kept in the box; try again in a moment.</string>
     <string name="toast_reaction_failed">Reaction failed</string>
     <string name="toast_couldnt_delete_message">Couldn\'t delete message</string>
     <string name="toast_couldnt_edit_message">Couldn\'t edit message</string>

@@ -312,6 +312,7 @@
     <string name="toast_profile_published_detail">Vos métadonnées kind:0 sont en direct sur les relais %1$d.</string>
     <string name="toast_couldnt_publish_profile">Impossible de publier le profil</string>
     <string name="toast_send_failed">Échec de l’envoi</string>
+    <string name="toast_send_not_ready">Connexion en cours — votre message n’a pas été envoyé. Il est conservé dans le champ ; réessayez dans un instant.</string>
     <string name="toast_reaction_failed">La réaction a échoué</string>
     <string name="toast_couldnt_delete_message">Échec de la suppression du message. Veuillez réessayer.</string>
     <string name="toast_couldnt_edit_message">Impossible de modifier le message</string>
