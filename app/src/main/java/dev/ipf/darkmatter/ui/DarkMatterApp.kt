@@ -1484,7 +1484,6 @@ private fun ChatListFilterChips(
     }
 }
 
-/** A single chat-list filter pill: borderless and filled, brand-tinted when selected (WhatsApp-style). */
 @Composable
 private fun ChatListFilterChip(
     current: ChatListFilter,
@@ -1547,9 +1546,6 @@ private fun ArchivedFolderRow(
     unreadCount: Int,
     onClick: () -> Unit,
 ) {
-    // Slim entry at the top of the active list (WhatsApp-style): a small
-    // archive glyph + "Archived" label, noticeably shorter than a chat row,
-    // with the unread-within-archived count trailing in the brand accent.
     Row(
         modifier =
             Modifier
@@ -1897,8 +1893,6 @@ private fun ChatRow(
                 Text(
                     rememberedRelativeTime(item.latestAt ?: 0uL),
                     style = MaterialTheme.typography.labelSmall,
-                    // Accent the timestamp when there's something unread, the
-                    // way WhatsApp does, so the eye lands on active threads.
                     color =
                         if (item.hasUnread) {
                             MaterialTheme.colorScheme.primary
@@ -1909,8 +1903,7 @@ private fun ChatRow(
                 if (item.group.pendingConfirmation) {
                     Badge { Text(stringResource(R.string.invite)) }
                 } else if (item.hasUnread) {
-                    // Brand-coloured unread pill — Material's default Badge is
-                    // error-red, which reads as an alert rather than a count.
+                    // Default Badge is error-red, which reads as an alert not a count.
                     Badge(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -5383,7 +5376,6 @@ private fun UnreadMessagesDivider(count: Int) {
     }
 }
 
-/** True when two epoch-second timestamps fall on different calendar days in the device zone. */
 private fun differentDay(
     a: ULong,
     b: ULong,
@@ -5393,11 +5385,8 @@ private fun differentDay(
         Instant.ofEpochSecond(b.toLong()).atZone(zone).toLocalDate()
 }
 
-/**
- * Relative day label for a transcript date ribbon: "Today"/"Yesterday" for the
- * last two days, the weekday name within the past week, then a locale-medium
- * date. All strings come from the platform, so no new translation keys.
- */
+// Today/Yesterday, then weekday within a week, then a locale-medium date —
+// all sourced from the platform so the ribbon needs no new translation keys.
 private fun messageDayLabel(
     epochSeconds: ULong,
     locale: Locale,
@@ -5419,7 +5408,6 @@ private fun messageDayLabel(
     }
 }
 
-/** Centered date pill for the transcript day ribbon (mirrors [UnreadMessagesDivider]'s pill, sans dividers). */
 @Composable
 private fun DaySeparator(label: String) {
     Box(
@@ -6349,10 +6337,8 @@ private fun ConversationScreen(
     val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
     val bottomTimelineIndex = renderedTimeline.size + 1 + olderHeaderCount
 
-    // Load older messages without losing the reader's place: anchor on the
-    // topmost visible message, paginate, then restore that message to the same
-    // pixel offset. The freshly-prepended history sits above it, so the reader
-    // stays put and scrolls up into it (instead of being snapped to newest).
+    // Anchor on the topmost visible message, paginate, then restore it to the
+    // same pixel offset so the reader stays put instead of snapping to newest.
     fun loadOlderKeepingPosition() {
         scope.launch {
             val olderHeader = olderHeaderCount
@@ -6683,11 +6669,8 @@ private fun ConversationScreen(
                                     if (MessageProjector.isGroupSystem(item.record)) "groupSystem" else "message"
                                 },
                             ) { index, item ->
-                                // Date ribbon: header above the first message of
-                                // each calendar day (list is oldest→newest, so the
-                                // older neighbour is index-1). Rendered inside the
-                                // slot, not as its own item, to keep the anchor
-                                // index math (#155) untouched.
+                                // Rendered inside the slot, not as its own item, so
+                                // the anchor index math stays intact.
                                 val older = renderedTimeline.getOrNull(index - 1)
                                 if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
                                     DaySeparator(messageDayLabel(item.record.recordedAt, transcriptLocale))
@@ -6719,9 +6702,8 @@ private fun ConversationScreen(
                             }
                             item { Spacer(Modifier.height(8.dp)) }
                         }
-                        // Sticky date ribbon: the day of the topmost visible
-                        // message, floated over the transcript and faded in only
-                        // while scrolling (the inline separators carry it at rest).
+                        // Day of the topmost visible message, shown only while
+                        // scrolling — the inline separators carry it at rest.
                         val stickyTimelineIndex =
                             (listState.firstVisibleItemIndex - 1 - olderHeaderCount)
                                 .coerceIn(0, (renderedTimeline.size - 1).coerceAtLeast(0))
