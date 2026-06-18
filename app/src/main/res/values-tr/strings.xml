@@ -128,6 +128,7 @@
     <string name="toast_original_message_unavailable">Orijinal mesaj kullanılamıyor.</string>
     <string name="message_reacted">%1$s ile tepki verildi</string>
     <string name="message_reaction_fallback">bir mesaja</string>
+    <string name="message_actions">Mesaj eylemleri</string>
     <string name="message_deleted_preview">Mesaj silindi</string>
     <string name="agent_stream_started">Ajan akışı başlatıldı</string>
     <string name="stream_finished">Akış bitti</string>

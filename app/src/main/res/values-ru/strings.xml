@@ -130,6 +130,7 @@
     <string name="toast_original_message_unavailable">Исходное сообщение недоступно.</string>
     <string name="message_reacted">Реакция: %1$s</string>
     <string name="message_reaction_fallback">на сообщение</string>
+    <string name="message_actions">Действия с сообщением</string>
     <string name="message_deleted_preview">Сообщение удалено</string>
     <string name="agent_stream_started">Поток агента запущен</string>
     <string name="stream_finished">Поток завершен</string>

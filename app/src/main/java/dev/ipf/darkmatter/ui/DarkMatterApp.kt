@@ -228,6 +228,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -8098,6 +8099,7 @@ private fun MessageBubble(
     val maxSwipeOffsetPx = with(density) { 72.dp.toPx() }
     val messageTextCopy = rememberMessageTextCopy()
     val deletedBodyText = stringResource(R.string.message_deleted)
+    val messageActionsLabel = stringResource(R.string.message_actions)
     val invalidatedBodyText = stringResource(R.string.message_invalidated)
     // Cached like the media references below: displayBody sanitizes/allocates
     // per call, and recomputing it for every visible bubble on every timeline
@@ -8258,6 +8260,27 @@ private fun MessageBubble(
                                         )
                                         menuOpen = true
                                     }
+                                }
+                            }
+                        },
+                    ).then(
+                        // The raw pointerInput above only fires on a physical
+                        // pointer long-press, so it leaves accessibility services
+                        // (TalkBack, Switch Access) and keyboard/semantic callers
+                        // without a way to reach the actions menu — a regression
+                        // from the old combinedClickable, which exposed an
+                        // onLongClick semantic action for the whole row (#262).
+                        // Re-publish that action via Modifier.semantics so the
+                        // reply/copy/delete/reaction entry point stays reachable
+                        // without a hold gesture. Guarded by `!deleted` to match
+                        // the pointer detector (a deleted message has no menu).
+                        if (deleted) {
+                            Modifier
+                        } else {
+                            Modifier.semantics {
+                                onLongClick(label = messageActionsLabel) {
+                                    menuOpen = true
+                                    true
                                 }
                             }
                         },

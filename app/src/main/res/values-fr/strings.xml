@@ -128,6 +128,7 @@
     <string name="toast_original_message_unavailable">Le message d’origine est indisponible.</string>
     <string name="message_reacted">A réagi avec %1$s</string>
     <string name="message_reaction_fallback">à un message</string>
+    <string name="message_actions">Actions du message</string>
     <string name="message_deleted_preview">Message supprimé</string>
     <string name="agent_stream_started">Flux de l’agent démarré</string>
     <string name="stream_finished">Flux terminé</string>
