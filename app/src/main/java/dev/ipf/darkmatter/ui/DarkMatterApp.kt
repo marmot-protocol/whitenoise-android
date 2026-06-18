@@ -8386,27 +8386,54 @@ private fun MessageBubble(
                             remember(imageAttachments, videoAttachments) {
                                 (imageAttachments + videoAttachments).sortedBy { it.index }
                             }
+                        // An uncaptioned single image/video carries the footer
+                        // overlaid on its bottom-right; a caption (if any) takes
+                        // it instead via the text path below.
+                        val footerOnVisualMedia =
+                            !deleted &&
+                                !invalidated &&
+                                visualAttachments.size == 1 &&
+                                (editState?.latestText ?: record.plaintext).isBlank()
                         if (!deleted && !invalidated && visualAttachments.isNotEmpty()) {
                             if (visualAttachments.size == 1) {
                                 val entry = visualAttachments.first()
-                                if (MediaReferenceParser.isVideoMedia(entry.value)) {
-                                    MediaVideoBubble(
-                                        messageIdHex = record.messageIdHex,
-                                        attachmentIndex = entry.index,
-                                        reference = entry.value,
-                                        mine = mine,
-                                        controller = controller,
-                                        appState = appState,
-                                    )
-                                } else {
-                                    MediaImageBubble(
-                                        item = item,
-                                        reference = entry.value,
-                                        attachmentIndex = entry.index,
-                                        controller = controller,
-                                        appState = appState,
-                                        mine = mine,
-                                    )
+                                Box {
+                                    if (MediaReferenceParser.isVideoMedia(entry.value)) {
+                                        MediaVideoBubble(
+                                            messageIdHex = record.messageIdHex,
+                                            attachmentIndex = entry.index,
+                                            reference = entry.value,
+                                            mine = mine,
+                                            controller = controller,
+                                            appState = appState,
+                                        )
+                                    } else {
+                                        MediaImageBubble(
+                                            item = item,
+                                            reference = entry.value,
+                                            attachmentIndex = entry.index,
+                                            controller = controller,
+                                            appState = appState,
+                                            mine = mine,
+                                        )
+                                    }
+                                    if (footerOnVisualMedia) {
+                                        MediaScrimFooter(
+                                            modifier =
+                                                Modifier
+                                                    .align(Alignment.BottomEnd)
+                                                    .padding(6.dp),
+                                        ) {
+                                            MessageInlineFooter(
+                                                timeText = rememberedRelativeTime(record.recordedAt),
+                                                color = Color.White,
+                                                showStatus = mine,
+                                                status = item.status,
+                                                editedLabel = null,
+                                                onEditedClick = null,
+                                            )
+                                        }
+                                    }
                                 }
                             } else {
                                 MediaVisualGridBubble(
@@ -8678,7 +8705,7 @@ private fun MessageBubble(
                                     )
                                 }
                             }
-                        } else {
+                        } else if (!footerOnVisualMedia) {
                             Box(modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start)) {
                                 inlineFooter()
                             }
@@ -9516,6 +9543,21 @@ private fun OutgoingMessageStatusIcon(
 
 // Gap between a bubble's text and its trailing inline footer.
 private val BubbleFooterGap = 8.dp
+
+/** Legibility scrim for a footer overlaid on visual media (image/video). */
+@Composable
+private fun MediaScrimFooter(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier
+            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(percent = 50))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        content()
+    }
+}
 
 /**
  * Bottom-end footer for a message bubble: an optional "edited" affordance, the
