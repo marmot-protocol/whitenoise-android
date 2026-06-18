@@ -61,9 +61,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.net.IDN
 import java.net.URI
@@ -356,12 +354,12 @@ class DarkMatterAppState(
     private val inFlightDownloads = mutableMapOf<String, Deferred<ByteArray>>()
     private val inFlightDownloadsLock = Any()
 
-    // Strictly serialize attachment fetches. A 6-tile album otherwise fires
-    // N parallel Blossom calls on `mutationsScope` and the underlying FFI
-    // surfaces errors on the queued-behind tiles, leaving them stuck in
-    // `failed`. Throughput stays adequate because the Rust core does its
-    // own pipelining inside a single fetch.
-    private val attachmentDownloadSemaphore = Semaphore(1)
+    // Bound attachment fetches without making a visible album wait for one
+    // network/decrypt round-trip per tile. The gate still prevents an
+    // unbounded burst from swamping the Blossom / FFI stack, and bounded
+    // retries keep transient queued-behind failures from sticking tiles in
+    // `failed` before the user has a chance to see the media.
+    private val attachmentDownloadGate = AttachmentDownloadGate()
     private val recentConversationStateKeys = LinkedHashMap<String, Unit>(16, 0.75f, true)
 
     val draftStore: DraftStore = DraftStore.forContext(appContext)
@@ -550,10 +548,11 @@ class DarkMatterAppState(
                 mutationsScope.async {
                     // Cap concurrent attachment fetches so an N-tile album
                     // doesn't saturate the underlying network or Blossom
-                    // stack into per-tile failures. Permits are acquired
-                    // inside the Deferred so the semaphore never blocks
-                    // the caller's `await()`.
-                    attachmentDownloadSemaphore.withPermit { block() }
+                    // stack, and retry short-lived per-tile failures before
+                    // surfacing a manual retry state. The gate is acquired
+                    // inside the Deferred so callers only suspend at `await()`.
+                    val downloadScope = this
+                    attachmentDownloadGate.withRetryingPermit { downloadScope.block() }
                 }
             inFlightDownloads[cacheKey] = deferred
             // Drop the map entry via `invokeOnCompletion` (fires AFTER the
