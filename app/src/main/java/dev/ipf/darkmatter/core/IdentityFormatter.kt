@@ -49,6 +49,8 @@ object IdentityFormatter {
         return String(Character.toChars(first)) + String(Character.toChars(second))
     }
 
+    private const val CLOCK_SKEW_TOLERANCE_SECONDS = 60L
+
     fun relativeTime(
         epochSeconds: ULong,
         copy: RelativeTimeCopy = RelativeTimeCopy.Default,
@@ -59,8 +61,8 @@ object IdentityFormatter {
         val now = Instant.now()
         val delta = now.epochSecond - instant.epochSecond
         return when {
-            // Sender clock skew or a relay-provided future timestamp.
-            delta < 0 -> copy.future
+            // Clock skew within tolerance reads as "now", not "future".
+            delta < -CLOCK_SKEW_TOLERANCE_SECONDS -> copy.future
             delta < 60 -> copy.now
             delta < 3_600 -> String.format(locale, copy.minutesFormat, delta / 60)
             delta < 86_400 -> String.format(locale, copy.hoursFormat, delta / 3_600)

@@ -193,11 +193,11 @@ class MarkdownInlineTextTest {
         assertTrue(isOpenableMarkdownLink("HTTP://EXAMPLE.COM"))
         assertTrue(isOpenableMarkdownLink("mailto:user@example.com"))
         assertTrue(isOpenableMarkdownLink("MAILTO:USER@EXAMPLE.COM"))
-        assertTrue(isOpenableMarkdownLink("tel:+15551234567"))
-        assertTrue(isOpenableMarkdownLink("whitenoise://invite/abc"))
-        assertTrue(isOpenableMarkdownLink("whitenoise-staging://invite/abc"))
-        // Padded variants normalize, they don't slip through raw.
-        assertTrue(isOpenableMarkdownLink("  tel:+15551234567  "))
+        // tel: and custom app schemes are not openable.
+        assertFalse(isOpenableMarkdownLink("tel:+15551234567"))
+        assertFalse(isOpenableMarkdownLink("whitenoise://invite/abc"))
+        assertFalse(isOpenableMarkdownLink("whitenoise-staging://invite/abc"))
+        assertFalse(isOpenableMarkdownLink("  tel:+15551234567  "))
         // Denied: script/data/file/ftp and anything unknown stays inert.
         assertFalse(isOpenableMarkdownLink("javascript:alert(1)"))
         assertFalse(isOpenableMarkdownLink("data:text/html;base64,PGI+"))
@@ -212,7 +212,7 @@ class MarkdownInlineTextTest {
     }
 
     @Test
-    fun mailtoAndTelLinksCarryAnnotations() {
+    fun mailtoLinkCarriesAnnotationButTelStaysInert() {
         val annotated =
             build(
                 listOf(
@@ -231,9 +231,9 @@ class MarkdownInlineTextTest {
             )
         assertEquals("mail call", annotated.text)
         val links = annotated.getLinkAnnotations(0, annotated.length)
-        assertEquals(2, links.size)
+        // tel: is inert, so only mailto carries an annotation.
+        assertEquals(1, links.size)
         assertEquals("mailto:user@example.com", (links[0].item as LinkAnnotation.Url).url)
-        assertEquals("tel:+15551234567", (links[1].item as LinkAnnotation.Url).url)
     }
 
     @Test

@@ -837,14 +837,13 @@ internal fun markdownListMarker(
     }
 
 /**
- * Explicit scheme allowlist — only these are handed to `ACTION_VIEW`;
- * everything else (javascript:, data:, file:, ftp:, intent:, anything
- * unknown) stays inert text. nostr: is also absent on purpose: profile
- * entities route in-app via [NOSTR_PROFILE_LINK_TAG_PREFIX], never to an
- * arbitrary external handler.
+ * Schemes handed to `ACTION_VIEW`; everything else stays inert text. `tel:` and
+ * custom app schemes are excluded so an untrusted peer link can't dial or
+ * deep-link into another app; `nostr:` routes in-app via
+ * [NOSTR_PROFILE_LINK_TAG_PREFIX], never out.
  */
 private val openableMarkdownLinkSchemes =
-    setOf("http", "https", "mailto", "tel", "whitenoise", "whitenoise-staging")
+    setOf("http", "https", "mailto")
 
 internal fun isOpenableMarkdownLink(dest: String): Boolean {
     val trimmed = dest.trim()
