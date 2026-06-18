@@ -2677,7 +2677,11 @@ class ConversationController(
         pruneConfirmedOptimisticMessages()
         pruneConfirmedOptimisticReactions()
         recomputeReactions()
-        renderTimeline()
+        // The pass above already projected every record into the by-id and
+        // order indexes (and reconciled optimistics), exactly like the live
+        // update paths do — so publish directly. A second full rebuild here
+        // re-projected every held record on each page load. See #74.
+        publishTimelineFromIndexes()
         return page.messages
             .map { TimelineProjector.toAppMessageRecord(it) }
             .filter { MessageProjector.isStreamStart(it) }
@@ -2861,13 +2865,6 @@ class ConversationController(
             .forEach(optimisticReactionChanges::remove)
     }
 
-    private fun renderTimeline() {
-        timelineItemsById.clear()
-        timelineOrder.clear()
-        timelineRecords.values.forEach(::upsertProjectedRecord)
-        publishTimelineFromIndexes()
-    }
-
     private fun upsertProjectedRecord(
         record: TimelineMessageRecordFfi,
         reconcileOptimistic: Boolean = false,
@@ -2886,10 +2883,9 @@ class ConversationController(
         // records them with distinct local timestamps), so full equality
         // would never fire — but the bubble's content is identical.
         //
-        // Also require the by-id index to already hold the item, otherwise
-        // renderTimeline (clears timelineItemsById + timelineOrder but not
-        // timelineRecords, then re-calls this fn for each record) would
-        // short-circuit on every record and leave the timeline empty.
+        // Also require the by-id index to already hold the item: only skip the
+        // re-projection when the bubble is genuinely still on screen. If the
+        // record is held but unprojected, fall through and (re)build it.
         val existing = timelineRecords[record.messageIdHex]
         val previousItemId = existing?.let(::projectedItemId)
         if (
