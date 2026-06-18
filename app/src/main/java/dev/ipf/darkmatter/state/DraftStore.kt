@@ -6,6 +6,8 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import java.io.IOException
+import java.security.GeneralSecurityException
 
 /**
  * Persistence layer for unsent conversation drafts. The storage map is keyed
@@ -133,13 +135,20 @@ internal class EncryptedDraftPersistence(
         fun openSecure(context: Context): SharedPreferences =
             try {
                 create(context)
-            } catch (error: Exception) {
-                // A rotated or cleared Keystore key leaves the file
-                // undecryptable; drafts are disposable, so drop the corrupt
-                // store and start fresh rather than crashing on launch.
-                context.deleteSharedPreferences(SECURE_FILE)
-                create(context)
+            } catch (error: GeneralSecurityException) {
+                // A rotated/cleared Keystore key or tampered keyset leaves the
+                // file undecryptable; drafts are disposable, so drop the corrupt
+                // store and start fresh. Unrelated failures propagate rather
+                // than silently wiping valid drafts.
+                recreateAfterCorruption(context)
+            } catch (error: IOException) {
+                recreateAfterCorruption(context)
             }
+
+        fun recreateAfterCorruption(context: Context): SharedPreferences {
+            context.deleteSharedPreferences(SECURE_FILE)
+            return create(context)
+        }
 
         fun create(context: Context): SharedPreferences {
             val masterKey =
