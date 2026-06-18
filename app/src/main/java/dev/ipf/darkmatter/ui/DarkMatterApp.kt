@@ -5593,10 +5593,11 @@ private fun ConversationScreen(
     var confirmLeaveFromTopBar by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var initialTimelineAnchored by remember(chat.id) { mutableStateOf(false) }
-    // Newest timestamp the bottom-follow has reacted to. Only a strictly newer
-    // value is a real append; older-page loads trim the newest rows (the last
-    // id changes downward), so they never trigger a follow.
-    var lastFollowedLatestAt by remember(chat.id) { mutableStateOf(0uL) }
+    // Id of the newest row the bottom-follow has reacted to. A real append
+    // gives a new last id while the previous one stays in the list; an
+    // older-page load trims the newest rows, so the previous id is gone and
+    // no follow fires. Keyed on id (not recordedAt) to survive same-second tails.
+    var lastFollowedLatestId by remember(chat.id) { mutableStateOf<String?>(null) }
     var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
     var highlightedMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     var navigateReplyJob by remember(chat.id) { mutableStateOf<Job?>(null) }
@@ -6424,14 +6425,19 @@ private fun ConversationScreen(
                     }
                 listState.scrollToItem(targetIndex)
                 initialTimelineAnchored = true
-                lastFollowedLatestAt = renderedTimeline.lastOrNull()?.record?.recordedAt ?: 0uL
+                lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
             } else {
-                val latestAt = renderedTimeline.lastOrNull()?.record?.recordedAt ?: 0uL
-                val isAppend = latestAt > lastFollowedLatestAt
-                lastFollowedLatestAt = maxOf(lastFollowedLatestAt, latestAt)
-                // Follow only a genuinely new message at the bottom; older-page
-                // loads trim the newest rows, so they never qualify and the
-                // reader's place is left untouched.
+                val latestId = renderedTimeline.lastOrNull()?.id
+                val previousId = lastFollowedLatestId
+                // A genuine append: the last id changed and the row we last
+                // followed is still present (an older-page trim drops it, so
+                // that path is excluded). Id-based, so same-second tails count.
+                val isAppend =
+                    previousId != null &&
+                        latestId != null &&
+                        latestId != previousId &&
+                        renderedTimeline.any { it.id == previousId }
+                lastFollowedLatestId = latestId ?: previousId
                 if (isAppend && nearBottom) {
                     listState.scrollToItem(bottomTimelineIndex)
                 }
