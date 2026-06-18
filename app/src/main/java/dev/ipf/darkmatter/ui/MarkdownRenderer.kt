@@ -670,8 +670,12 @@ internal fun markdownDocumentToPreviewAnnotatedString(
                 appendPreviewBlock(block, codeStyle, maxLength, mentionDisplayName, depth = 0)
             }
         }
-    return if (flattened.length > maxLength) flattened.subSequence(0, maxLength) else flattened
+    return if (flattened.length > maxLength) flattened.subSequence(0, flattened.safeCutEnd(maxLength)) else flattened
 }
+
+// Pull a cut back off a high surrogate so a preview never ends on half a
+// supplementary-plane char (which renders as the � replacement glyph).
+private fun CharSequence.safeCutEnd(end: Int): Int = if (end in 1..length && this[end - 1].isHighSurrogate()) end - 1 else end
 
 private fun AnnotatedString.Builder.appendPreviewBlock(
     block: MarkdownBlockFfi,
@@ -759,7 +763,7 @@ private fun AnnotatedString.Builder.appendPreviewSegment(
     val remaining = maxLength - length - separator
     if (remaining <= 0) return
     if (separator == 1) append(' ')
-    append(if (segment.length > remaining) segment.subSequence(0, remaining) else segment)
+    append(if (segment.length > remaining) segment.subSequence(0, segment.safeCutEnd(remaining)) else segment)
 }
 
 private fun AnnotatedString.Builder.appendPreviewInlines(
