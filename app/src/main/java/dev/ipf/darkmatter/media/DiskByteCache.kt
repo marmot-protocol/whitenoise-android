@@ -36,6 +36,11 @@ class DiskByteCache(
     private var residentBytes: Long = 0L
     private var hydrated = false
 
+    // Bumped on every clear(). A deferred put() captures this at schedule time
+    // and is rejected if a wipe intervened, so decrypted plaintext from a
+    // signed-out session can't be re-persisted after sign-out. See #154.
+    private var generation = 0
+
     // No directory I/O in the constructor: the scan + per-file stat are
     // deferred to the first cache operation so they don't run on the main
     // thread at app launch (the cache is constructed eagerly as an AppState
@@ -93,12 +98,21 @@ class DiskByteCache(
         }
     }
 
+    /** Wipe generation to capture when scheduling a deferred [put]. */
+    @Synchronized
+    fun generation(): Int = generation
+
     @Synchronized
     fun put(
         key: String,
         bytes: ByteArray,
+        expectedGeneration: Int,
     ) {
         if (bytes.isEmpty()) return
+        // Reject a write whose session was wiped while it sat queued: clear()
+        // bumps `generation` under this same lock, so a put scheduled before
+        // the wipe skips here and no plaintext lands after sign-out. See #154.
+        if (expectedGeneration != generation) return
         ensureHydrated()
         val hashed = fileNameFor(key)
         val existing = index.remove(hashed)
@@ -131,8 +145,20 @@ class DiskByteCache(
         evictUntilUnderCap()
     }
 
+    /** Immediate write at the current generation. Deferred/background writes
+     *  that must honor a sign-out wipe should capture [generation] at schedule
+     *  time and use the three-arg overload instead. */
+    @Synchronized
+    fun put(
+        key: String,
+        bytes: ByteArray,
+    ) = put(key, bytes, generation)
+
     @Synchronized
     fun clear() {
+        // Bump first so any put scheduled against the prior generation is
+        // rejected even if it grabs this lock right after the wipe. See #154.
+        generation++
         // Hold the lock for the whole wipe. Deleting outside it (an earlier
         // #99 attempt) let a concurrent put() recreate a `.bin` that the orphan
         // sweep then removed — a race. clear() runs on sign-out/account-switch,

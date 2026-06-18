@@ -43,6 +43,28 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun put_withStaleGeneration_isRejectedAfterClear() {
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        // Capture the generation a deferred write would have grabbed at
+        // schedule time, then sign-out wipes the cache before it lands.
+        val scheduledGeneration = cache.generation()
+        cache.clear()
+        cache.put("k", ByteArray(40) { 7 }, scheduledGeneration)
+        assertNull("a write from a wiped session must not re-persist", cache.get("k"))
+        assertEquals(0L, cache.residentBytes())
+    }
+
+    @Test
+    fun put_withCurrentGeneration_succeedsAfterClear() {
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        cache.clear()
+        // A write scheduled after the wipe (current generation) is honored.
+        cache.put("k", ByteArray(40) { 7 }, cache.generation())
+        assertNotNull(cache.get("k"))
+        assertEquals(40L, cache.residentBytes())
+    }
+
+    @Test
     fun emptyPut_ignored() {
         val cache = DiskByteCache(dir, maxBytes = 1024)
         cache.put("k", ByteArray(0))
