@@ -176,7 +176,6 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -8814,17 +8813,25 @@ private fun MessageBubble(
                 // Hide reaction tallies on a deleted message — nothing to show,
                 // and nothing to long-press-toggle.
                 if (tallies.isNotEmpty() && !deleted) {
+                    val overflowing = tallies.size > MAX_VISIBLE_REACTIONS
+                    val visibleTallies = if (overflowing) tallies.take(MAX_VISIBLE_REACTIONS - 1) else tallies
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.offset(y = (-14).dp).padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        modifier = Modifier.offset(y = (-14).dp).padding(horizontal = 10.dp),
                     ) {
-                        tallies.forEach { tally ->
+                        visibleTallies.forEach { tally ->
                             ReactionTallyChip(
                                 tally = tally,
                                 onClick = { reactionSheetOpen = true },
                                 onLongClick = {
                                     appState.launchMutation { controller.toggleReaction(tally.emoji, record) }
                                 },
+                            )
+                        }
+                        if (overflowing) {
+                            ReactionOverflowChip(
+                                count = tallies.size - visibleTallies.size,
+                                onClick = { reactionSheetOpen = true },
                             )
                         }
                     }
@@ -8865,7 +8872,6 @@ private fun ReactionTallyChip(
     Surface(
         modifier =
             Modifier
-                .minimumInteractiveComponentSize()
                 .semantics { selected = tally.mine }
                 .clip(RoundedCornerShape(percent = 50))
                 .combinedClickable(
@@ -8878,13 +8884,39 @@ private fun ReactionTallyChip(
         shape = RoundedCornerShape(percent = 50),
         color = if (tally.mine) colorScheme.secondaryContainer else colorScheme.surfaceContainerHigh,
         contentColor = if (tally.mine) colorScheme.onSecondaryContainer else colorScheme.onSurface,
-        border = BorderStroke(2.dp, colorScheme.surface),
+        border = BorderStroke(1.5.dp, colorScheme.surface),
         tonalElevation = 1.dp,
     ) {
         Text(
             text = if (tally.count > 1) "${tally.emoji} ${tally.count}" else tally.emoji,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelMedium,
+        )
+    }
+}
+
+/** Collapsed "+N" stand-in for reactions beyond the visible cap; opens the reactor list. */
+@Composable
+private fun ReactionOverflowChip(
+    count: Int,
+    onClick: () -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Surface(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(percent = 50))
+                .clickable(role = Role.Button, onClick = onClick),
+        shape = RoundedCornerShape(percent = 50),
+        color = colorScheme.surfaceContainerHigh,
+        contentColor = colorScheme.onSurface,
+        border = BorderStroke(1.5.dp, colorScheme.surface),
+        tonalElevation = 1.dp,
+    ) {
+        Text(
+            text = "+$count",
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelMedium,
         )
     }
 }
@@ -9543,6 +9575,10 @@ private fun OutgoingMessageStatusIcon(
 
 // Gap between a bubble's text and its trailing inline footer.
 private val BubbleFooterGap = 8.dp
+
+// Distinct reaction chips shown on a bubble before collapsing the rest into a
+// single "+N" overflow chip — keeps the tally row from outgrowing the bubble.
+private const val MAX_VISIBLE_REACTIONS = 4
 
 /** Legibility scrim for a footer overlaid on visual media (image/video). */
 @Composable
