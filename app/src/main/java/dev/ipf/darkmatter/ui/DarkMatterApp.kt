@@ -33,6 +33,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -113,6 +114,7 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MarkChatRead
 import androidx.compose.material.icons.filled.Mic
@@ -11653,6 +11655,11 @@ private fun ProfileEditScreen(
     var nip05 by remember(active?.accountIdHex) { mutableStateOf("") }
     var lud16 by remember(active?.accountIdHex) { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    // Drives the avatar bottom sheet (pick-from-photos / paste-link / remove).
+    // The picture URL no longer lives as a standalone editor row; it's edited
+    // exclusively through this control so the editor reads like an app screen,
+    // not a developer surface. See #286.
+    var showPictureSheet by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(active?.accountIdHex) {
@@ -11697,12 +11704,44 @@ private fun ProfileEditScreen(
                     if (active == null) {
                         Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
-                        Avatar(
-                            title = displayName.ifBlank { appState.shortNpub(active.accountIdHex) },
-                            seed = active.accountIdHex,
-                            size = 96.dp,
-                            pictureUrl = ProfileSanitizer.imageUrl(picture),
-                        )
+                        // Tappable avatar control: opens the picture bottom
+                        // sheet (paste-link / remove). A small edit badge
+                        // signals it's interactive. Replaces the old standalone
+                        // "Picture URL" text row. See #286.
+                        val editPictureLabel = stringResource(R.string.profile_picture_edit)
+                        Box(
+                            contentAlignment = Alignment.BottomEnd,
+                            modifier =
+                                Modifier
+                                    .clip(CircleShape)
+                                    .clickable(
+                                        onClickLabel = editPictureLabel,
+                                        role = Role.Button,
+                                    ) { showPictureSheet = true },
+                        ) {
+                            Avatar(
+                                title = displayName.ifBlank { appState.shortNpub(active.accountIdHex) },
+                                seed = active.accountIdHex,
+                                size = 96.dp,
+                                pictureUrl = ProfileSanitizer.imageUrl(picture),
+                            )
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary)
+                                        .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
                         Text(
                             displayName.ifBlank { stringResource(R.string.anonymous) },
                             style = MaterialTheme.typography.titleLarge,
@@ -11713,6 +11752,20 @@ private fun ProfileEditScreen(
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        // Surface an invalid stored picture URL right on the
+                        // avatar control. The inline Picture URL row is gone, so
+                        // without this an unsafe/malformed `picture` would
+                        // silently disable Publish with no on-screen reason; the
+                        // caption tells the user to tap the avatar to fix it.
+                        // See #286.
+                        if (picture.isNotBlank() && !ProfileFieldValidation.isAcceptablePictureUrl(picture)) {
+                            Text(
+                                stringResource(R.string.profile_picture_invalid),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
             }
@@ -11745,33 +11798,14 @@ private fun ProfileEditScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     // Client-side validation: flag a malformed picture URL or
-                    // nip-05 (red field) and block publish so we don't push junk
-                    // — or an SSRF-prone avatar URL — to relays. See #69.
+                    // nip-05 and block publish so we don't push junk — or an
+                    // SSRF-prone avatar URL — to relays. The picture URL is now
+                    // edited via the avatar control above (no inline row), but
+                    // the same guard still gates publish in case a bad value was
+                    // pasted there. See #69, #286.
                     val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
                     val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
                     val lud16Valid = ProfileFieldValidation.isAcceptableLud16(lud16)
-                    TextField(
-                        colors = profileFieldColors,
-                        value = picture,
-                        onValueChange = { picture = it },
-                        label = { Text(stringResource(R.string.picture_url)) },
-                        singleLine = true,
-                        isError = !pictureValid,
-                        supportingText = {
-                            Text(
-                                stringResource(
-                                    if (pictureValid) R.string.profile_picture_hint else R.string.profile_picture_invalid,
-                                ),
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions =
-                            KeyboardOptions(
-                                capitalization = KeyboardCapitalization.None,
-                                autoCorrectEnabled = false,
-                                keyboardType = KeyboardType.Uri,
-                            ),
-                    )
                     TextField(
                         colors = profileFieldColors,
                         value = nip05,
@@ -11839,6 +11873,200 @@ private fun ProfileEditScreen(
                         Text(stringResource(R.string.publish_to_relays))
                     }
                 }
+            }
+        }
+    }
+
+    if (showPictureSheet) {
+        ProfilePictureSheet(
+            currentUrl = picture,
+            avatarTitle = displayName.ifBlank { active?.let { appState.shortNpub(it.accountIdHex) }.orEmpty() },
+            avatarSeed = active?.accountIdHex.orEmpty(),
+            onPasteLink = { newUrl ->
+                // Persist the sanitized URL so any normalization (schemeless
+                // `//host` upgrade, trim) survives; an invalid URL never
+                // reaches here because the sheet's Apply is gated on validity.
+                picture = newUrl
+                showPictureSheet = false
+            },
+            onRemove = {
+                picture = ""
+                showPictureSheet = false
+            },
+            onDismiss = { showPictureSheet = false },
+        )
+    }
+}
+
+/**
+ * Bottom sheet for setting the account's kind:0 profile picture. Replaces the
+ * old standalone "Picture URL" text row (see #286).
+ *
+ * Two modes inside one sheet:
+ *  - Options list: "Paste a link" and "Remove picture" (only when one is set).
+ *  - Paste-link editor: an HTTPS URL field with a live preview avatar and the
+ *    same SSRF/HTTPS guard the publish path applies ([ProfileSanitizer.imageUrl],
+ *    see #89). Apply is gated on a sanitizable URL, so a malformed value can
+ *    never be committed from here.
+ *
+ * The device-pick → upload half of #286 ("Choose from photos") is deliberately
+ * NOT offered here: a kind:0 `picture` is public Nostr metadata that every
+ * client must fetch without an MLS group key, and the only byte-upload binding
+ * (`uploadMedia`) encrypts per-group — its output is unreadable as a public
+ * avatar. Wiring device-pick → upload needs a public Blossom upload FFI that
+ * doesn't exist yet plus a product/protocol decision (tracked in #307); this
+ * PR ships only the implementable URL-consolidation half, so #286 stays open.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfilePictureSheet(
+    currentUrl: String,
+    avatarTitle: String,
+    avatarSeed: String,
+    onPasteLink: (String) -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var pasteMode by remember { mutableStateOf(false) }
+    var urlDraft by remember(currentUrl) { mutableStateOf(currentUrl) }
+    val trimmedDraft = urlDraft.trim()
+    // Same guard the publish path uses; null means "not a safe https image
+    // URL" and the preview falls back to initials.
+    val sanitized = remember(trimmedDraft) { ProfileSanitizer.imageUrl(trimmedDraft) }
+    val currentSanitized = remember(currentUrl) { ProfileSanitizer.imageUrl(currentUrl) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(R.string.profile_picture_sheet_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (!pasteMode) {
+                // Preview row: avatar bubble seeded from the currently-set
+                // picture (sanitized), so the user sees what they're editing.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(bottom = 4.dp),
+                ) {
+                    Avatar(title = avatarTitle, seed = avatarSeed, size = 64.dp, pictureUrl = currentSanitized)
+                    Text(
+                        stringResource(
+                            if (currentSanitized != null) {
+                                R.string.profile_picture_subtitle_set
+                            } else {
+                                R.string.profile_picture_subtitle_none
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                ListItem(
+                    leadingContent = { Icon(Icons.Default.Link, contentDescription = null) },
+                    headlineContent = { Text(stringResource(R.string.profile_picture_paste_link)) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                urlDraft = currentUrl
+                                pasteMode = true
+                            },
+                )
+                if (currentUrl.isNotBlank()) {
+                    ListItem(
+                        leadingContent = {
+                            Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        },
+                        headlineContent = {
+                            Text(
+                                stringResource(R.string.profile_picture_remove),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { onRemove() },
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+            } else {
+                // Paste-link editor with live preview + validation.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Avatar(title = avatarTitle, seed = avatarSeed, size = 64.dp, pictureUrl = sanitized)
+                    Text(
+                        stringResource(
+                            when {
+                                trimmedDraft.isEmpty() -> R.string.profile_picture_subtitle_none
+                                sanitized == null -> R.string.profile_picture_invalid
+                                else -> R.string.profile_picture_subtitle_ready
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color =
+                            if (trimmedDraft.isNotEmpty() && sanitized == null) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                    )
+                }
+                OutlinedTextField(
+                    value = urlDraft,
+                    onValueChange = { urlDraft = it },
+                    label = { Text(stringResource(R.string.picture_url)) },
+                    placeholder = { Text("https://example.com/image.jpg") },
+                    singleLine = true,
+                    isError = trimmedDraft.isNotEmpty() && sanitized == null,
+                    supportingText = { Text(stringResource(R.string.profile_picture_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrectEnabled = false,
+                            keyboardType = KeyboardType.Uri,
+                        ),
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    OutlinedButton(
+                        onClick = { pasteMode = false },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Button(
+                        // Commit the SANITIZED URL so normalization survives.
+                        // Disabled while the draft is empty or unsafe so a bad
+                        // value can never be applied from here.
+                        onClick = { sanitized?.let { onPasteLink(it) } },
+                        enabled = sanitized != null,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.profile_picture_use_link))
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
             }
         }
     }

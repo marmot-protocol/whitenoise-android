@@ -508,6 +508,14 @@
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="profile_picture_hint">公開的 HTTPS 圖片網址</string>
     <string name="profile_picture_invalid">僅允許公開的 HTTPS 圖片網址。</string>
+    <string name="profile_picture_edit">編輯頭像</string>
+    <string name="profile_picture_sheet_title">頭像</string>
+    <string name="profile_picture_subtitle_set">你目前的頭像。</string>
+    <string name="profile_picture_subtitle_none">尚未設定頭像。</string>
+    <string name="profile_picture_subtitle_ready">可以使用此連結。</string>
+    <string name="profile_picture_paste_link">貼上連結</string>
+    <string name="profile_picture_remove">移除頭像</string>
+    <string name="profile_picture_use_link">使用此連結</string>
     <string name="profile_nip05_hint">名稱@網域</string>
     <string name="profile_nip05_invalid">請輸入類似 name@example.com 的位址。</string>
     <string name="profile_lightning_hint">Lightning 位址，例如 you@walletprovider.com</string>

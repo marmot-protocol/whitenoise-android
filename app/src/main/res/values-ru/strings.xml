@@ -526,6 +526,14 @@
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="profile_picture_hint">Публичный HTTPS-URL изображения</string>
     <string name="profile_picture_invalid">Разрешены только публичные HTTPS-URL изображений.</string>
+    <string name="profile_picture_edit">Изменить фото профиля</string>
+    <string name="profile_picture_sheet_title">Фото профиля</string>
+    <string name="profile_picture_subtitle_set">Ваше текущее фото профиля.</string>
+    <string name="profile_picture_subtitle_none">Фото ещё не задано.</string>
+    <string name="profile_picture_subtitle_ready">Готово использовать эту ссылку.</string>
+    <string name="profile_picture_paste_link">Вставить ссылку</string>
+    <string name="profile_picture_remove">Удалить фото</string>
+    <string name="profile_picture_use_link">Использовать ссылку</string>
     <string name="profile_nip05_hint">имя@домен</string>
     <string name="profile_nip05_invalid">Введите адрес вида name@example.com.</string>
     <string name="profile_lightning_hint">Lightning-адрес, например you@walletprovider.com</string>

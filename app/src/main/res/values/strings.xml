@@ -240,6 +240,14 @@
     <string name="lightning">Lightning</string>
     <string name="profile_picture_hint">Public HTTPS image URL</string>
     <string name="profile_picture_invalid">Only public HTTPS image URLs are allowed.</string>
+    <string name="profile_picture_edit">Edit profile picture</string>
+    <string name="profile_picture_sheet_title">Profile picture</string>
+    <string name="profile_picture_subtitle_set">Your current profile picture.</string>
+    <string name="profile_picture_subtitle_none">No picture set yet.</string>
+    <string name="profile_picture_subtitle_ready">Ready to use this link.</string>
+    <string name="profile_picture_paste_link">Paste a link</string>
+    <string name="profile_picture_remove">Remove picture</string>
+    <string name="profile_picture_use_link">Use this link</string>
     <string name="profile_nip05_hint">name@domain</string>
     <string name="profile_nip05_invalid">Enter an address like name@example.com.</string>
     <string name="profile_lightning_hint">Lightning address, e.g. you@walletprovider.com</string>

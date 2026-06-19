@@ -517,6 +517,14 @@
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="profile_picture_hint">URL de imagem HTTPS pública</string>
     <string name="profile_picture_invalid">Apenas URLs de imagem HTTPS públicas são permitidas.</string>
+    <string name="profile_picture_edit">Editar foto de perfil</string>
+    <string name="profile_picture_sheet_title">Foto de perfil</string>
+    <string name="profile_picture_subtitle_set">Sua foto de perfil atual.</string>
+    <string name="profile_picture_subtitle_none">Nenhuma foto definida ainda.</string>
+    <string name="profile_picture_subtitle_ready">Pronto para usar este link.</string>
+    <string name="profile_picture_paste_link">Colar um link</string>
+    <string name="profile_picture_remove">Remover foto</string>
+    <string name="profile_picture_use_link">Usar este link</string>
     <string name="profile_nip05_hint">nome@domínio</string>
     <string name="profile_nip05_invalid">Insira um endereço como name@example.com.</string>
     <string name="profile_lightning_hint">Endereço Lightning, ex. you@walletprovider.com</string>

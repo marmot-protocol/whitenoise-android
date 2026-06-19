@@ -514,6 +514,14 @@
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="profile_picture_hint">Herkese açık HTTPS resim URL\'si</string>
     <string name="profile_picture_invalid">Yalnızca herkese açık HTTPS resim URL\'lerine izin verilir.</string>
+    <string name="profile_picture_edit">Profil resmini düzenle</string>
+    <string name="profile_picture_sheet_title">Profil resmi</string>
+    <string name="profile_picture_subtitle_set">Mevcut profil resminiz.</string>
+    <string name="profile_picture_subtitle_none">Henüz resim ayarlanmadı.</string>
+    <string name="profile_picture_subtitle_ready">Bu bağlantı kullanıma hazır.</string>
+    <string name="profile_picture_paste_link">Bağlantı yapıştır</string>
+    <string name="profile_picture_remove">Resmi kaldır</string>
+    <string name="profile_picture_use_link">Bu bağlantıyı kullan</string>
     <string name="profile_nip05_hint">ad@alan</string>
     <string name="profile_nip05_invalid">name@example.com gibi bir adres girin.</string>
     <string name="profile_lightning_hint">Lightning adresi, örn. you@walletprovider.com</string>
