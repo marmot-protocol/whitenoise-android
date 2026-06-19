@@ -70,6 +70,7 @@ class LocalNotificationPresenter(
         // Route each notification to its per-type channel (#288) so the user's
         // OS-level sound / vibration / importance / mute choices apply per type.
         val channelId = NotificationChannelSpec.forUpdate(update).id
+        val isReaction = NotificationChannelSpec.forUpdate(update) == NotificationChannelSpec.REACTIONS
         val category =
             when (update.trigger) {
                 NotificationTriggerFfi.NEW_MESSAGE -> NotificationCompat.CATEGORY_MESSAGE
@@ -90,10 +91,20 @@ class LocalNotificationPresenter(
                 .setPublicVersion(redactedPublicVersion(channelId, category))
                 .setSilent(false)
 
-        when (update.trigger) {
+        when {
+            // Reactions get their own self-contained card (own tag/id on the
+            // reactions channel, see LocalNotificationFormatter) so they're muted
+            // independently of messages. They aren't repliable, so no
+            // MessagingStyle / reply / mark-read — just a plain expandable card.
+            isReaction ->
+                builder
+                    .setContentTitle(content.title)
+                    .setContentText(content.body)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
+
             // Messages stack into one per-conversation card; invites are
             // one-off events, so keep them as a plain expandable notification.
-            NotificationTriggerFfi.NEW_MESSAGE -> {
+            update.trigger == NotificationTriggerFfi.NEW_MESSAGE -> {
                 builder.setStyle(messagingStyle(update, content, conversationTitleOverride))
                 NotificationActions
                     .targetFromUpdate(update, content.notificationTag, content.notificationId)
@@ -103,7 +114,7 @@ class LocalNotificationPresenter(
                     }
             }
 
-            NotificationTriggerFfi.GROUP_INVITE ->
+            else ->
                 builder
                     .setContentTitle(content.title)
                     .setContentText(content.body)

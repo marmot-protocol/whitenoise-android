@@ -88,6 +88,71 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun reactionGetsItsOwnNotificationIdentityDistinctFromMessages() {
+        // #288: a reaction and a normal message in the SAME conversation must
+        // not share the (tag, id) Android keys on, or one would mutate the
+        // other's card and "mute reactions, keep messages" would break.
+        val message =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"),
+            )
+        val reaction =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "👍"),
+            )
+
+        assertEquals(LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID, message?.notificationId)
+        assertEquals(LocalNotificationFormatter.REACTION_NOTIFICATION_ID, reaction?.notificationId)
+        assertNotEquals(message?.notificationId, reaction?.notificationId)
+        assertNotEquals(message?.notificationTag, reaction?.notificationTag)
+    }
+
+    @Test
+    fun reactionsInTheSameConversationShareAReactionCard() {
+        // Multiple reactions in one chat collapse onto the same reaction card
+        // (distinct from the message card), so they stay independently mute-able
+        // without fragmenting into N alerts.
+        val first =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "👍"),
+            )
+        val second =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "❤️"),
+            )
+
+        assertEquals(first?.notificationTag, second?.notificationTag)
+        assertEquals(first?.notificationId, second?.notificationId)
+    }
+
+    @Test
+    fun reactionTagDoesNotCollideWithTheConversationDismissalKey() {
+        // dismissConversationMessages cancels (account|group, id 0). The reaction
+        // card must live outside that key so dismissing a conversation's messages
+        // does not silently clear its reactions and vice versa.
+        val reaction =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "👍"),
+            )
+        val dismissal = LocalNotificationFormatter.conversationDismissalKey("account", "group-a")
+
+        assertNotEquals(dismissal.tag, reaction?.notificationTag)
+        assertNotEquals(dismissal.id, reaction?.notificationId)
+    }
+
+    @Test
+    fun blankReactionEmojiKeepsTheNormalMessageIdentity() {
+        // A blank emoji is not a reaction — it stays on the message card.
+        val content =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "   "),
+            )
+
+        assertEquals(LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID, content?.notificationId)
+        assertEquals("account|group-a", content?.notificationTag)
+    }
+
+    @Test
     fun nonReactionMessageStillUsesPreviewText() {
         val content =
             LocalNotificationFormatter.content(
