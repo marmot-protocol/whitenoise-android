@@ -7147,6 +7147,11 @@ private fun ConversationScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             modifier =
                                 Modifier
+                                    // Fill the title slot so the whole strip between
+                                    // the back arrow and the overflow menu opens
+                                    // details, not just the avatar/name. Those two
+                                    // live in their own slots and keep their taps.
+                                    .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable { showDetails = true }
                                     .semantics { contentDescription = openDetailsDescription },
