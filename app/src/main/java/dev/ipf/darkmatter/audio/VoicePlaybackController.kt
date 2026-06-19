@@ -293,12 +293,18 @@ object VoicePlaybackController {
     ) {
         val mp = player ?: return
         if (currentKey != key) return
-        val clamped = positionMs.coerceIn(0, mp.duration.coerceAtLeast(0))
+        // Read mp.duration once, inside a guard: if the player has been driven
+        // into the Error state but not yet nulled (OnError/OnCompletion post
+        // releasePlayerInternal() to Main, leaving a window where player != null
+        // and the player is in Error), getDuration() throws IllegalStateException.
+        // Fall back to the last known duration so a seek can never crash the UI.
+        val duration = runCatching { mp.duration }.getOrDefault(_state.value.durationMs)
+        val clamped = positionMs.coerceIn(0, duration.coerceAtLeast(0))
         runCatching { mp.seekTo(clamped) }
         _state.value =
             _state.value.copy(
                 positionMs = clamped,
-                durationMs = if (mp.duration > 0) mp.duration else _state.value.durationMs,
+                durationMs = if (duration > 0) duration else _state.value.durationMs,
             )
     }
 
