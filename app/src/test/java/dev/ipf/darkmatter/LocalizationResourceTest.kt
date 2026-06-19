@@ -71,6 +71,9 @@ class LocalizationResourceTest {
     private companion object {
         val identicalValueAllowedKeys =
             setOf(
+                // Pure positional-format string ("current/total"); no
+                // translatable text, identical across every locale by design.
+                "conversation_search_match_count",
                 "admin",
                 "app_name",
                 "app_preferences",
