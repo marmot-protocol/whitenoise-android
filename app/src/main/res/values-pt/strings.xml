@@ -523,4 +523,13 @@
     <string name="profile_lightning_invalid">Insira um endereço Lightning como name@example.com.</string>
     <string name="reaction_tap_to_remove">Toque para remover</string>
     <string name="chat_list_filter_groups">Grupos</string>
+    <!-- Conversation in-chat search (#292) -->
+    <string name="conversation_search_open">Pesquisar na conversa</string>
+    <string name="conversation_search_hint">Pesquisar nesta conversa</string>
+    <string name="conversation_search_clear">Limpar pesquisa</string>
+    <string name="conversation_search_close">Fechar pesquisa</string>
+    <string name="conversation_search_prev">Resultado anterior</string>
+    <string name="conversation_search_next">Próximo resultado</string>
+    <string name="conversation_search_match_count">%1$d/%2$d</string>
+    <string name="conversation_search_no_matches">Nenhum resultado</string>
 </resources>

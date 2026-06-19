@@ -532,4 +532,13 @@
     <string name="profile_lightning_invalid">Введите Lightning-адрес вида name@example.com.</string>
     <string name="reaction_tap_to_remove">Нажмите, чтобы убрать</string>
     <string name="chat_list_filter_groups">Группы</string>
+    <!-- Conversation in-chat search (#292) -->
+    <string name="conversation_search_open">Искать в чате</string>
+    <string name="conversation_search_hint">Поиск в этом чате</string>
+    <string name="conversation_search_clear">Очистить поиск</string>
+    <string name="conversation_search_close">Закрыть поиск</string>
+    <string name="conversation_search_prev">Предыдущее совпадение</string>
+    <string name="conversation_search_next">Следующее совпадение</string>
+    <string name="conversation_search_match_count">%1$d/%2$d</string>
+    <string name="conversation_search_no_matches">Совпадений нет</string>
 </resources>

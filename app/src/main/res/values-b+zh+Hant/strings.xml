@@ -514,4 +514,13 @@
     <string name="profile_lightning_invalid">請輸入類似 name@example.com 的 Lightning 位址。</string>
     <string name="reaction_tap_to_remove">輕觸以移除</string>
     <string name="chat_list_filter_groups">群組</string>
+    <!-- Conversation in-chat search (#292) -->
+    <string name="conversation_search_open">在聊天中搜尋</string>
+    <string name="conversation_search_hint">搜尋此聊天</string>
+    <string name="conversation_search_clear">清除搜尋</string>
+    <string name="conversation_search_close">關閉搜尋</string>
+    <string name="conversation_search_prev">上一個符合項目</string>
+    <string name="conversation_search_next">下一個符合項目</string>
+    <string name="conversation_search_match_count">%1$d/%2$d</string>
+    <string name="conversation_search_no_matches">無符合項目</string>
 </resources>
