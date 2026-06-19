@@ -888,6 +888,16 @@ private fun MainShell(
         chatsController.bind(appState.activeAccountRef)
     }
 
+    // Freshness model for #6: the chat-list subscription stays bound while a
+    // conversation is foregrounded (returning shows the current list instantly,
+    // no reload), but its recompute is paused so account-wide list projection
+    // doesn't contend with the conversation's own streams on the heaviest nav
+    // path. The subscription keeps draining updates into the controller's maps
+    // throughout; one recompute flushes on return.
+    LaunchedEffect(chatsController, selectedChat == null) {
+        chatsController.setChatListVisible(selectedChat == null)
+    }
+
     // Notification tap routing: switch to the target account if needed, wait
     // for its chat list, then open the conversation — or fall back to the chat
     // list with a toast for a stale/removed target. Pure logic in

@@ -580,6 +580,13 @@ class ChatsController(
     private var chatRows = listOf<ChatListRowFfi>()
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
 
+    // Whether the chat list is on screen. While a conversation is foregrounded
+    // the subscription stays warm (updates keep folding into the maps above),
+    // but the recompute is deferred so list projection doesn't compete with the
+    // conversation on the heaviest nav path. See #6.
+    private var chatListVisible = true
+    private var pendingRecompute = false
+
     // Per-group member snapshots fetched via the `groupMembers` FFI.
     // The chat-list FFI doesn't include member rosters on each row, so
     // for unnamed groups we'd otherwise have nothing to feed the
@@ -717,10 +724,18 @@ class ChatsController(
             isLoading = false
             error = throwable.message ?: throwable.javaClass.simpleName
         } finally {
-            withContext(Dispatchers.IO) {
+            // NonCancellable: bind() is cancelled on teardown (account switch,
+            // dispose, runtime-generation change). A cancelled coroutine skips
+            // cancellable suspensions in finally, so a plain
+            // withContext(Dispatchers.IO) here would throw before close() runs
+            // and leak the account-wide chat-list/chats subscriptions.
+            // NonCancellable guarantees the close() calls run. (Originally
+            // surfaced in #270.)
+            withContext(NonCancellable + Dispatchers.IO) {
                 runCatching { chatListSubscription?.close() }
                 runCatching { chatsSubscription?.close() }
             }
+            chatsDebug { "unbind account=${accountRef?.take(8) ?: "<none>"} (chat-list + chats subscriptions closed)" }
         }
     }
 
@@ -904,7 +919,27 @@ class ChatsController(
         row.lastMessage?.sender?.let(appState::requestProfile)
     }
 
+    /**
+     * Called by the shell when a conversation is foregrounded (`false`) or the
+     * chat list is back on screen (`true`). The subscription stays alive either
+     * way — returning shows the current list with no reload — only the
+     * recompute is paused while hidden and flushed once on return. See #6.
+     */
+    fun setChatListVisible(visible: Boolean) {
+        if (visible == chatListVisible) return
+        chatListVisible = visible
+        if (visible && pendingRecompute) recompute()
+    }
+
     private fun recompute() {
+        // Hidden behind an open conversation: keep folding updates into the
+        // backing maps (done by the caller) but defer the projection rebuild +
+        // member/preview fan-out until the list returns, then run once. See #6.
+        if (!chatListVisible) {
+            pendingRecompute = true
+            return
+        }
+        pendingRecompute = false
         val me = appState.activeAccount?.accountIdHex
         val all =
             chatRows
