@@ -1313,7 +1313,9 @@ private fun applyChatListSearchAndFilter(
             // to filter here — show every archived chat.
             ChatListFilter.All, ChatListFilter.Archived -> source
             ChatListFilter.Unread -> source.filter { it.hasUnread }
-            ChatListFilter.Groups -> source.filter { it.memberCount > 2 }
+            // A named two-member chat is a group, not a DM — classify by type,
+            // not raw headcount, so it isn't wrongly hidden here.
+            ChatListFilter.Groups -> source.filter { !GroupProjector.isDm(it.memberCount, it.group.name) }
         }
     val needle = rawQuery.trim()
     if (needle.isEmpty()) return byFilter
