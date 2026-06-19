@@ -7396,10 +7396,11 @@ private fun GroupDetailsScreen(
             }
 
             SectionCard(title = stringResource(R.string.info)) {
-                DiagnosticRow(
-                    stringResource(R.string.group_id),
-                    IdentityFormatter.short(controller.group.groupIdHex),
-                    copyValue = controller.group.groupIdHex,
+                CopyableValueRow(
+                    label = stringResource(R.string.group_id),
+                    display = IdentityFormatter.short(controller.group.groupIdHex),
+                    value = controller.group.groupIdHex,
+                    clipboard = clipboard,
                     appState = appState,
                 )
                 DiagnosticRow(
