@@ -42,6 +42,15 @@ object AudioWaveformExtractor {
     // thread-safety guarantee.
     private const val CACHE_MAX_ENTRIES = 256
 
+    // android.media.AudioFormat.ENCODING_PCM_* values, redeclared so the pure
+    // decode logic stays free of the Android framework (keeps decodeBlocking
+    // unit-testable). The Android codec wrapper maps the output format's
+    // KEY_PCM_ENCODING into these.
+    private const val ENCODING_PCM_16BIT = 2
+    private const val ENCODING_PCM_8BIT = 3
+    private const val ENCODING_PCM_FLOAT = 4
+    private const val ENCODING_PCM_32BIT = 22
+
     private val cache = LruCache<String, FloatArray>(CACHE_MAX_ENTRIES)
 
     suspend fun decode(file: File): FloatArray? {
@@ -100,8 +109,6 @@ object AudioWaveformExtractor {
             }
             activeExtractor.selectTrack(trackIdx)
             val mime = activeExtractor.mime(format)!!
-            val durationUs = (activeExtractor.durationUs(format) ?: 1L).coerceAtLeast(1L)
-            val sliceDurationUs = (durationUs / BARS).coerceAtLeast(1L)
 
             val activeCodec = resources.createCodec(mime).also { codec = it }
             activeCodec.configure(format)
@@ -109,12 +116,28 @@ object AudioWaveformExtractor {
             codecStarted = true
             val info = AudioDecoderOutputInfo()
 
-            // Track BOTH the peak per bucket and the running sum. Peak amplitude
-            // produces visually punchier bars than mean-abs (real speech has
-            // many quiet samples between syllables; mean averages them down).
-            val peaks = IntArray(BARS)
-            val sums = LongArray(BARS)
-            val counts = IntArray(BARS)
+            // One folded-amplitude summary per output buffer ("chunk"). We bucket
+            // by decoded-frame index, not presentationTimeUs: decoded PCM is
+            // uniform in time, so a frame's global index is proportional to its
+            // timestamp. That keeps the waveform correct even when the track omits
+            // KEY_DURATION — the old pts/duration math collapsed every sample into
+            // the final bar in that case. The total frame count is only known once
+            // decoding finishes, so bucketing is deferred to the end. Chunk count
+            // is bounded by the codec loop guard. See #277.
+            val chunkFrameStarts = ArrayList<Long>()
+            val chunkFrameCounts = ArrayList<Int>()
+            val chunkSums = ArrayList<Double>()
+            val chunkPeaks = ArrayList<Float>()
+            var totalFrames = 0L
+
+            // Output PCM layout, resolved once the codec reports its output
+            // format. A decoder may emit float or 8-bit PCM and may be
+            // multichannel; we interpret samples accordingly and fold channels to
+            // a single per-frame amplitude instead of assuming interleaved 16-bit.
+            var channelCount = 1
+            var pcmEncoding = ENCODING_PCM_16BIT
+            var formatResolved = false
+
             var endOfStream = false
             var loopIterations = 0
             val startedAtNanos = nanoTime()
@@ -146,23 +169,52 @@ object AudioWaveformExtractor {
 
                 val outIdx = activeCodec.dequeueOutputBuffer(info, TIMEOUT_US)
                 if (outIdx >= 0) {
+                    if (!formatResolved) {
+                        channelCount = activeCodec.outputChannelCount().coerceAtLeast(1)
+                        pcmEncoding = activeCodec.outputPcmEncoding()
+                        formatResolved = true
+                    }
                     val outBuf = activeCodec.getOutputBuffer(outIdx)
                     if (outBuf != null && info.size > 0) {
                         outBuf.position(info.offset)
                         outBuf.limit(info.offset + info.size)
                         outBuf.order(ByteOrder.LITTLE_ENDIAN)
-                        val shortBuf = outBuf.asShortBuffer()
-                        val bucket = (info.presentationTimeUs / sliceDurationUs).toInt().coerceIn(0, BARS - 1)
-                        while (shortBuf.hasRemaining()) {
-                            val v = abs(shortBuf.get().toInt())
-                            sums[bucket] += v.toLong()
-                            counts[bucket]++
-                            if (v > peaks[bucket]) peaks[bucket] = v
+                        var sum = 0.0
+                        var peak = 0f
+                        var frames = 0
+                        forEachFrameAmplitude(outBuf, info.size, channelCount, pcmEncoding) { amp ->
+                            sum += amp
+                            if (amp > peak) peak = amp
+                            frames++
+                        }
+                        if (frames > 0) {
+                            chunkFrameStarts.add(totalFrames)
+                            chunkFrameCounts.add(frames)
+                            chunkSums.add(sum)
+                            chunkPeaks.add(peak)
+                            totalFrames += frames
                         }
                     }
                     activeCodec.releaseOutputBuffer(outIdx, false)
                     if (info.endOfStream) break
                 }
+            }
+
+            if (totalFrames <= 0L) return null
+
+            // Track BOTH the peak per bucket and the running sum. Peak amplitude
+            // produces visually punchier bars than mean-abs (real speech has
+            // many quiet samples between syllables; mean averages them down).
+            // Each chunk lands in the bucket for its first frame, so chunk
+            // position maps to bar position proportionally to time.
+            val peaks = FloatArray(BARS)
+            val sums = DoubleArray(BARS)
+            val counts = IntArray(BARS)
+            for (i in chunkFrameStarts.indices) {
+                val bucket = ((chunkFrameStarts[i] * BARS) / totalFrames).toInt().coerceIn(0, BARS - 1)
+                if (chunkPeaks[i] > peaks[bucket]) peaks[bucket] = chunkPeaks[i]
+                sums[bucket] += chunkSums[i]
+                counts[bucket] += chunkFrameCounts[i]
             }
 
             // Hybrid signal: peak per bucket biased by mean (peak * 0.7 +
@@ -172,8 +224,8 @@ object AudioWaveformExtractor {
             // dynamics, not raw linear power.
             val hybrid =
                 FloatArray(BARS) { i ->
-                    val mean = if (counts[i] > 0) sums[i].toFloat() / counts[i].toFloat() else 0f
-                    peaks[i].toFloat() * 0.7f + mean * 0.3f
+                    val mean = if (counts[i] > 0) (sums[i] / counts[i]).toFloat() else 0f
+                    peaks[i] * 0.7f + mean * 0.3f
                 }
             val maxV = hybrid.maxOrNull()?.takeIf { it > 0f } ?: return null
             return FloatArray(BARS) { i ->
@@ -184,6 +236,61 @@ object AudioWaveformExtractor {
             if (codecStarted) runCatching { codec?.stop() }
             runCatching { codec?.release() }
             runCatching { extractor?.release() }
+        }
+    }
+
+    /**
+     * Walk [buf] (positioned/limited to one output buffer of [byteCount] bytes)
+     * frame by frame, folding [channelCount] interleaved channels into a single
+     * mean amplitude in `[0, 1]` per frame. Samples are read according to
+     * [pcmEncoding] so float / 8-bit / 32-bit output isn't misread as 16-bit.
+     * Unknown encodings fall back to signed 16-bit, the decoder default.
+     */
+    private inline fun forEachFrameAmplitude(
+        buf: ByteBuffer,
+        byteCount: Int,
+        channelCount: Int,
+        pcmEncoding: Int,
+        onFrame: (Float) -> Unit,
+    ) {
+        val channels = channelCount.coerceAtLeast(1)
+        when (pcmEncoding) {
+            ENCODING_PCM_FLOAT -> {
+                val fb = buf.asFloatBuffer()
+                val frames = (byteCount / 4) / channels
+                repeat(frames) {
+                    var acc = 0f
+                    repeat(channels) { acc += abs(fb.get()) }
+                    onFrame((acc / channels).coerceIn(0f, 1f))
+                }
+            }
+            ENCODING_PCM_8BIT -> {
+                val frames = byteCount / channels
+                repeat(frames) {
+                    var acc = 0f
+                    // 8-bit PCM is unsigned, centred at 128.
+                    repeat(channels) { acc += abs((buf.get().toInt() and 0xFF) - 128) / 128f }
+                    onFrame((acc / channels).coerceIn(0f, 1f))
+                }
+            }
+            ENCODING_PCM_32BIT -> {
+                val ib = buf.asIntBuffer()
+                val frames = (byteCount / 4) / channels
+                repeat(frames) {
+                    var acc = 0f
+                    repeat(channels) { acc += (abs(ib.get().toLong()) / 2_147_483_648.0).toFloat() }
+                    onFrame((acc / channels).coerceIn(0f, 1f))
+                }
+            }
+            else -> {
+                val sb = buf.asShortBuffer()
+                val frames = (byteCount / 2) / channels
+                repeat(frames) {
+                    var acc = 0f
+                    repeat(channels) { acc += abs(sb.get().toInt()) / 32768f }
+                    onFrame((acc / channels).coerceIn(0f, 1f))
+                }
+            }
         }
     }
 }
@@ -253,6 +360,12 @@ internal interface AudioDecoderCodec<FormatT> {
         index: Int,
         render: Boolean,
     )
+
+    // Output PCM layout, read after decoding has started. Defaults match the
+    // decoder default (mono, signed 16-bit) for resources that don't expose it.
+    fun outputChannelCount(): Int = 1
+
+    fun outputPcmEncoding(): Int = 2
 
     fun stop()
 
@@ -345,6 +458,16 @@ private class AndroidAudioDecoderCodec(
     }
 
     override fun getOutputBuffer(index: Int): ByteBuffer? = codec.getOutputBuffer(index)
+
+    override fun outputChannelCount(): Int = runCatching { codec.outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT) }.getOrDefault(1)
+
+    override fun outputPcmEncoding(): Int =
+        runCatching {
+            val fmt = codec.outputFormat
+            // KEY_PCM_ENCODING (API 24+) is absent when the decoder emits the
+            // default signed 16-bit PCM.
+            if (fmt.containsKey(MediaFormat.KEY_PCM_ENCODING)) fmt.getInteger(MediaFormat.KEY_PCM_ENCODING) else 2
+        }.getOrDefault(2)
 
     override fun releaseOutputBuffer(
         index: Int,

@@ -151,7 +151,11 @@ object VoicePlaybackController {
                     }
                 }.getOrDefault(0)
             }
-        durationCache.put(path, probed)
+        // Only cache a real duration. A transient probe (file still being
+        // written, momentary IO error) yields 0; caching that would pin the
+        // clip to "no duration" for the entry's lifetime, so leave it uncached
+        // and let the next display retry.
+        if (probed > 0) durationCache.put(path, probed)
         return probed
     }
 

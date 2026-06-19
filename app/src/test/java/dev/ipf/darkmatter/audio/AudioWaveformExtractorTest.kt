@@ -126,6 +126,64 @@ class AudioWaveformExtractorTest {
     }
 
     @Test
+    fun missingDuration_spreadsEnergyAcrossBarsByFrameIndex() {
+        // Two equal-length chunks: a loud one first, a quiet one second. The
+        // extractor buckets by decoded-frame index, so the first lands at bar 0
+        // and the second near the middle — energy must NOT collapse into the
+        // last bar (the pre-fix behavior when KEY_DURATION was absent). See #277.
+        val extractor = FakeExtractor(formats = listOf(FakeFormat(mime = "audio/mp4a-latm")))
+        val loud = shortPcm(3_000, 3_000)
+        val quiet = shortPcm(1_000, 1_000)
+        val codec =
+            FakeCodec(
+                outputs =
+                    listOf(
+                        loud to AudioDecoderOutputInfo(offset = 0, size = 4, presentationTimeUs = 0, endOfStream = false),
+                        quiet to AudioDecoderOutputInfo(offset = 0, size = 4, presentationTimeUs = 0, endOfStream = true),
+                    ),
+            )
+        val resources = FakeResources(extractor = extractor, codec = codec)
+
+        val result =
+            AudioWaveformExtractor.decodeBlocking(filePath = "/tmp/noduration.aac", resources = resources)
+
+        assertNotNull(result)
+        result!!
+        assertEquals(1.0f, result[0], 0.0001f) // loud chunk, normalized to the max
+        assertTrue("middle bar should carry the quieter second chunk", result[32] > 0.05f)
+        assertEquals("last bar must stay at floor, not absorb everything", 0.05f, result[63], 0.0001f)
+        assertTrue(codec.released)
+    }
+
+    @Test
+    fun floatPcmOutput_interpretedAsFloatsNotShorts() {
+        // ENCODING_PCM_FLOAT == 4. Samples are normalized floats in [-1, 1];
+        // reading them as 16-bit shorts would yield nonsense amplitudes.
+        val extractor = FakeExtractor(formats = listOf(FakeFormat(mime = "audio/mp4a-latm")))
+        val pcm = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
+        pcm.putFloat(0.5f)
+        pcm.putFloat(-1.0f)
+        pcm.flip()
+        val codec =
+            FakeCodec(
+                outputBuffer = pcm,
+                outputInfo = AudioDecoderOutputInfo(offset = 0, size = 8, presentationTimeUs = 0, endOfStream = true),
+                encoding = 4,
+            )
+        val resources = FakeResources(extractor = extractor, codec = codec)
+
+        val result =
+            AudioWaveformExtractor.decodeBlocking(filePath = "/tmp/float.aac", resources = resources)
+
+        assertNotNull(result)
+        result!!
+        assertEquals(AudioWaveformExtractor.BARS, result.size)
+        assertEquals(1.0f, result[0], 0.0001f) // peak |−1.0| dominates the single bucket
+        assertEquals(0.05f, result[1], 0.0001f)
+        assertTrue(codec.released)
+    }
+
+    @Test
     fun decodeLoopGuard_releasesExtractorAndCodec() {
         val extractor = FakeExtractor(formats = listOf(FakeFormat(mime = "audio/mp4a-latm")))
         val codec = FakeCodec()
@@ -167,6 +225,13 @@ class AudioWaveformExtractorTest {
         assertTrue(extractor.released)
         assertTrue(codec.released)
     }
+}
+
+private fun shortPcm(vararg samples: Int): ByteBuffer {
+    val buf = ByteBuffer.allocate(samples.size * 2).order(ByteOrder.LITTLE_ENDIAN)
+    samples.forEach { buf.putShort(it.toShort()) }
+    buf.flip()
+    return buf
 }
 
 private data class FakeFormat(
@@ -223,12 +288,24 @@ private class FakeCodec(
     val createFailure: RuntimeException? = null,
     private val configureFailure: RuntimeException? = null,
     private val startFailure: RuntimeException? = null,
-    private val outputBuffer: ByteBuffer? = null,
-    private val outputInfo: AudioDecoderOutputInfo? = null,
+    outputBuffer: ByteBuffer? = null,
+    outputInfo: AudioDecoderOutputInfo? = null,
+    outputs: List<Pair<ByteBuffer, AudioDecoderOutputInfo>> = emptyList(),
+    private val channels: Int = 1,
+    private val encoding: Int = 2,
 ) : AudioDecoderCodec<FakeFormat> {
     var created = false
     var released = false
-    private var outputDequeued = false
+
+    // Either a sequence of output buffers, or the single legacy buffer.
+    private val effectiveOutputs: List<Pair<ByteBuffer, AudioDecoderOutputInfo>> =
+        when {
+            outputs.isNotEmpty() -> outputs
+            outputBuffer != null && outputInfo != null -> listOf(outputBuffer to outputInfo)
+            else -> emptyList()
+        }
+    private var outIndex = 0
+    private var lastReturned = -1
 
     override fun configure(format: FakeFormat) {
         configureFailure?.let { throw it }
@@ -254,9 +331,10 @@ private class FakeCodec(
         info: AudioDecoderOutputInfo,
         timeoutUs: Long,
     ): Int {
-        val nextInfo = outputInfo ?: return -1
-        if (outputDequeued) return -1
-        outputDequeued = true
+        if (outIndex >= effectiveOutputs.size) return -1
+        val nextInfo = effectiveOutputs[outIndex].second
+        lastReturned = outIndex
+        outIndex++
         info.offset = nextInfo.offset
         info.size = nextInfo.size
         info.presentationTimeUs = nextInfo.presentationTimeUs
@@ -264,7 +342,11 @@ private class FakeCodec(
         return 0
     }
 
-    override fun getOutputBuffer(index: Int): ByteBuffer? = outputBuffer?.duplicate()
+    override fun getOutputBuffer(index: Int): ByteBuffer? = effectiveOutputs.getOrNull(lastReturned)?.first?.duplicate()
+
+    override fun outputChannelCount(): Int = channels
+
+    override fun outputPcmEncoding(): Int = encoding
 
     override fun releaseOutputBuffer(
         index: Int,
