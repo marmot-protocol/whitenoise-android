@@ -257,6 +257,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.core.content.ContextCompat
 import androidx.core.os.ConfigurationCompat
@@ -9471,7 +9472,20 @@ private fun MessageActionMenu(
     onInfo: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismissRequest) {
+    // focusable = false keeps the soft keyboard up while this menu is open.
+    // A focusable popup window steals window focus from the conversation's
+    // host window, and Android dismisses the IME when the window holding the
+    // focused composer loses focus. That collapse then removes the composer's
+    // imePadding, reflowing the transcript down by the keyboard height mid
+    // gesture — so the long-press popover lands at a shifted position rather
+    // than where the user pressed (#284). Same "modal UI fights the IME"
+    // family as the voice-record bar in #207. Outside taps still dismiss via
+    // onDismissRequest; the menu items remain tappable without window focus.
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+        properties = PopupProperties(focusable = false),
+    ) {
         Column(
             modifier = Modifier.padding(8.dp).widthIn(min = 292.dp, max = 328.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
