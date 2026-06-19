@@ -223,6 +223,9 @@
     <string name="native_push">Push notifications</string>
     <string name="native_push_subtitle">Wake the app when the relay has new events to deliver.</string>
     <string name="native_push_unavailable_subtitle">Requires Google Play services and a build configured with a push server.</string>
+    <string name="notification_categories">Notification categories</string>
+    <string name="notification_categories_subtitle">Set sound, vibration, and importance for each type in Android settings.</string>
+    <string name="toast_notification_settings_unavailable">Couldn\'t open notification settings</string>
     <string name="switch_account">Switch Account</string>
     <string name="my_qr_code">My QR code</string>
     <string name="read_only">Read-only</string>
@@ -332,6 +335,14 @@
     <string name="waiting_for_events">Waiting for events.</string>
     <string name="notification_channel_messages">Messages</string>
     <string name="notification_channel_messages_description">Dark Matter messages and invites</string>
+    <string name="notification_channel_direct_messages">Direct messages</string>
+    <string name="notification_channel_direct_messages_description">One-to-one conversation messages</string>
+    <string name="notification_channel_group_messages">Group messages</string>
+    <string name="notification_channel_group_messages_description">Group conversation messages</string>
+    <string name="notification_channel_reactions">Reactions</string>
+    <string name="notification_channel_reactions_description">Reactions to your messages</string>
+    <string name="notification_channel_invites">Invites</string>
+    <string name="notification_channel_invites_description">Group invites and welcomes</string>
     <string name="notification_group_invite">Group invite</string>
     <string name="notification_new_message">New message</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>

@@ -176,6 +176,9 @@
     <string name="native_push">Notifiche push</string>
     <string name="native_push_subtitle">Risveglia l’app quando il relay ha nuovi eventi da consegnare.</string>
     <string name="native_push_unavailable_subtitle">Richiede i servizi Google Play e una build configurata con un server push.</string>
+    <string name="notification_categories">Categorie di notifiche</string>
+    <string name="notification_categories_subtitle">Imposta suono, vibrazione e importanza per ogni tipo nelle impostazioni Android.</string>
+    <string name="toast_notification_settings_unavailable">Impossibile aprire le impostazioni delle notifiche</string>
     <string name="switch_account">Cambia profilo</string>
     <string name="my_qr_code">Il mio codice QR</string>
     <string name="read_only">La chiave privata è archiviata in un signer esterno</string>
@@ -271,6 +274,14 @@
     <string name="waiting_for_events">In attesa degli eventi.</string>
     <string name="notification_channel_messages">Messaggi</string>
     <string name="notification_channel_messages_description">Dark Matter messaggi e inviti</string>
+    <string name="notification_channel_direct_messages">Messaggi diretti</string>
+    <string name="notification_channel_direct_messages_description">Messaggi delle conversazioni individuali</string>
+    <string name="notification_channel_group_messages">Messaggi di gruppo</string>
+    <string name="notification_channel_group_messages_description">Messaggi delle conversazioni di gruppo</string>
+    <string name="notification_channel_reactions">Reazioni</string>
+    <string name="notification_channel_reactions_description">Reazioni ai tuoi messaggi</string>
+    <string name="notification_channel_invites">Inviti</string>
+    <string name="notification_channel_invites_description">Inviti ai gruppi e messaggi di benvenuto</string>
     <string name="notification_group_invite">Sei stato invitato a una chat sicura</string>
     <string name="notification_new_message">Nuovo messaggio</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>

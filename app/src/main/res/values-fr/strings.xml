@@ -176,6 +176,9 @@
     <string name="native_push">Notifications push</string>
     <string name="native_push_subtitle">Réveille l’application lorsque le relais a de nouveaux événements à livrer.</string>
     <string name="native_push_unavailable_subtitle">Nécessite les services Google Play et une version configurée avec un serveur push.</string>
+    <string name="notification_categories">Catégories de notifications</string>
+    <string name="notification_categories_subtitle">Définissez le son, la vibration et l’importance par type dans les réglages Android.</string>
+    <string name="toast_notification_settings_unavailable">Impossible d’ouvrir les réglages de notifications</string>
     <string name="switch_account">Changer de profil</string>
     <string name="my_qr_code">Mon code QR</string>
     <string name="read_only">La clé privée est stockée dans un signataire externe</string>
@@ -271,6 +274,14 @@
     <string name="waiting_for_events">En attente des événements.</string>
     <string name="notification_channel_messages">Messages</string>
     <string name="notification_channel_messages_description">Dark Matter messages et invitations</string>
+    <string name="notification_channel_direct_messages">Messages directs</string>
+    <string name="notification_channel_direct_messages_description">Messages des conversations individuelles</string>
+    <string name="notification_channel_group_messages">Messages de groupe</string>
+    <string name="notification_channel_group_messages_description">Messages des conversations de groupe</string>
+    <string name="notification_channel_reactions">Réactions</string>
+    <string name="notification_channel_reactions_description">Réactions à vos messages</string>
+    <string name="notification_channel_invites">Invitations</string>
+    <string name="notification_channel_invites_description">Invitations de groupe et bienvenues</string>
     <string name="notification_group_invite">Vous avez été invité à une discussion sécurisée</string>
     <string name="notification_new_message">Nouveau message</string>
     <string name="notification_sender_in_group">%1$s dans %2$s</string>

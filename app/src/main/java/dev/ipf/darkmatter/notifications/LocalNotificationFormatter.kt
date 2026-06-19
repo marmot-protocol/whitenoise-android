@@ -29,6 +29,15 @@ data class NotificationDismissalKey(
 object LocalNotificationFormatter {
     const val MESSAGE_NOTIFICATION_ID = 0
 
+    // Reactions (#288) live on their own channel AND need their own stable
+    // notification identity. Android keys a notification by (tag, id), not by
+    // channel, so if reactions reused the per-conversation message identity a
+    // reaction would mutate (or be mutated by) the normal message card and the
+    // "mute reactions, keep messages" user story would break. A distinct id +
+    // tag prefix keeps the two cards independent within the same conversation.
+    const val REACTION_NOTIFICATION_ID = 1
+    private const val REACTION_TAG_PREFIX = "reaction|"
+
     private val whitespaceRun = Regex("\\s+")
 
     fun conversationDismissalKey(
@@ -39,6 +48,9 @@ object LocalNotificationFormatter {
             tag = "$accountRef|$groupIdHex",
             id = MESSAGE_NOTIFICATION_ID,
         )
+
+    /** True when this update is a kind:7 reaction (a NEW_MESSAGE carrying an emoji). */
+    private fun NotificationUpdateFfi.isReaction(): Boolean = trigger == NotificationTriggerFfi.NEW_MESSAGE && !clean(reactionEmoji).isNullOrEmpty()
 
     fun content(
         update: NotificationUpdateFfi,
@@ -65,17 +77,22 @@ object LocalNotificationFormatter {
         return LocalNotificationContent(
             // Messages from one conversation share a per-account, per-group tag
             // so they accumulate into a single MessagingStyle card instead of N
-            // independent alerts. Invites stay individual (per notification key).
+            // independent alerts. Reactions in that same conversation get their
+            // own (prefixed tag, REACTION_NOTIFICATION_ID) so they form a
+            // separate card on the reactions channel and never mutate — or get
+            // mutated by — the normal message card. Invites stay individual.
             notificationTag =
-                when (update.trigger) {
-                    NotificationTriggerFfi.NEW_MESSAGE ->
-                        conversationDismissalKey(update.accountRef, update.groupIdHex).tag
-                    NotificationTriggerFfi.GROUP_INVITE -> update.notificationKey
+                when {
+                    update.trigger == NotificationTriggerFfi.GROUP_INVITE -> update.notificationKey
+                    update.isReaction() ->
+                        REACTION_TAG_PREFIX + conversationDismissalKey(update.accountRef, update.groupIdHex).tag
+                    else -> conversationDismissalKey(update.accountRef, update.groupIdHex).tag
                 },
             notificationId =
-                when (update.trigger) {
-                    NotificationTriggerFfi.NEW_MESSAGE -> MESSAGE_NOTIFICATION_ID
-                    NotificationTriggerFfi.GROUP_INVITE -> 0
+                when {
+                    update.trigger == NotificationTriggerFfi.GROUP_INVITE -> 0
+                    update.isReaction() -> REACTION_NOTIFICATION_ID
+                    else -> MESSAGE_NOTIFICATION_ID
                 },
             title = title,
             body = body,

@@ -7,9 +7,11 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.provider.Settings
 import android.text.format.DateUtils
 import android.util.Log
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -11382,6 +11384,7 @@ private fun NotificationsScreen(
     var pendingBackgroundConnectionEnable by remember { mutableStateOf(false) }
     var pendingNativePushEnable by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             appState.refreshLocalNotificationPermission()
@@ -11488,11 +11491,43 @@ private fun NotificationsScreen(
                             },
                         )
                     }
+                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    // Per-type controls (sound, vibration, importance, lockscreen,
+                    // DND bypass) live in the OS notification details — Android's
+                    // native per-channel UI. We deep-link there instead of
+                    // duplicating those toggles in-app. See #288.
+                    SettingsRow(
+                        title = stringResource(R.string.notification_categories),
+                        subtitle = stringResource(R.string.notification_categories_subtitle),
+                        onClick = { openAppNotificationSettings(context) },
+                    )
                 }
             }
         }
     }
 }
+
+// Open the OS app-notification details so the user gets native per-channel
+// controls (sound, vibration, importance, lockscreen, DND bypass). Falls back
+// to the generic app-details screen on the rare device that rejects the
+// channel-settings action, and finally toasts if even that fails. See #288.
+private fun openAppNotificationSettings(context: Context) {
+    val appNotificationIntent =
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    if (context.tryStartActivity(appNotificationIntent)) return
+
+    val appDetailsIntent =
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .setData(android.net.Uri.fromParts("package", context.packageName, null))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    if (context.tryStartActivity(appDetailsIntent)) return
+
+    Toast.makeText(context, R.string.toast_notification_settings_unavailable, Toast.LENGTH_SHORT).show()
+}
+
+private fun Context.tryStartActivity(intent: Intent): Boolean = runCatching { startActivity(intent) }.isSuccess
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

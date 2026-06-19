@@ -176,6 +176,9 @@
     <string name="native_push">Anlık bildirimler</string>
     <string name="native_push_subtitle">Röledeki yeni olayları teslim etmek için uygulamayı uyandırır.</string>
     <string name="native_push_unavailable_subtitle">Google Play hizmetleri ve push sunucusu yapılandırılmış bir derleme gerektirir.</string>
+    <string name="notification_categories">Bildirim kategorileri</string>
+    <string name="notification_categories_subtitle">Her tür için ses, titreşim ve önemi Android ayarlarından belirleyin.</string>
+    <string name="toast_notification_settings_unavailable">Bildirim ayarları açılamadı</string>
     <string name="switch_account">Profil değiştir</string>
     <string name="my_qr_code">QR kodum</string>
     <string name="read_only">Özel anahtar harici bir imzalayıcıda saklanıyor</string>
@@ -271,6 +274,14 @@
     <string name="waiting_for_events">Etkinlikleri bekliyorum.</string>
     <string name="notification_channel_messages">Mesajlar</string>
     <string name="notification_channel_messages_description">Dark Matter mesajlar ve davetler</string>
+    <string name="notification_channel_direct_messages">Doğrudan mesajlar</string>
+    <string name="notification_channel_direct_messages_description">Bire bir görüşme mesajları</string>
+    <string name="notification_channel_group_messages">Grup mesajları</string>
+    <string name="notification_channel_group_messages_description">Grup görüşmesi mesajları</string>
+    <string name="notification_channel_reactions">Tepkiler</string>
+    <string name="notification_channel_reactions_description">Mesajlarınıza verilen tepkiler</string>
+    <string name="notification_channel_invites">Davetler</string>
+    <string name="notification_channel_invites_description">Grup davetleri ve karşılamalar</string>
     <string name="notification_group_invite">Güvenli bir sohbete davet edildiniz</string>
     <string name="notification_new_message">Yeni mesaj</string>
     <string name="notification_sender_in_group">%1$s, %2$s içinde</string>

@@ -3,7 +3,6 @@ package dev.ipf.darkmatter.notifications
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -25,18 +24,9 @@ class LocalNotificationPresenter(
     private val context: Context,
 ) {
     fun ensureChannels() {
-        val manager = context.getSystemService(NotificationManager::class.java)
-        val channel =
-            NotificationChannel(
-                CHANNEL_MESSAGES,
-                context.getString(R.string.notification_channel_messages),
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = context.getString(R.string.notification_channel_messages_description)
-                enableVibration(true)
-                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
-            }
-        manager.createNotificationChannel(channel)
+        // Per-type channels (#288): direct messages, group messages, reactions,
+        // invites. The legacy single channel is retired in here too.
+        NotificationChannels.ensureChannels(context)
     }
 
     fun canPostNotifications(): Boolean =
@@ -77,6 +67,10 @@ class LocalNotificationPresenter(
         // every show() to avoid the per-notification Binder IPC into
         // NotificationManagerService.
 
+        // Route each notification to its per-type channel (#288) so the user's
+        // OS-level sound / vibration / importance / mute choices apply per type.
+        val channelId = NotificationChannelSpec.forUpdate(update).id
+        val isReaction = NotificationChannelSpec.forUpdate(update) == NotificationChannelSpec.REACTIONS
         val category =
             when (update.trigger) {
                 NotificationTriggerFfi.NEW_MESSAGE -> NotificationCompat.CATEGORY_MESSAGE
@@ -84,7 +78,7 @@ class LocalNotificationPresenter(
             }
         val builder =
             NotificationCompat
-                .Builder(context, CHANNEL_MESSAGES)
+                .Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_stat_darkmatter)
                 .setContentIntent(conversationPendingIntent(update, content.notificationTag))
                 .setCategory(category)
@@ -94,13 +88,23 @@ class LocalNotificationPresenter(
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                .setPublicVersion(redactedPublicVersion(category))
+                .setPublicVersion(redactedPublicVersion(channelId, category))
                 .setSilent(false)
 
-        when (update.trigger) {
+        when {
+            // Reactions get their own self-contained card (own tag/id on the
+            // reactions channel, see LocalNotificationFormatter) so they're muted
+            // independently of messages. They aren't repliable, so no
+            // MessagingStyle / reply / mark-read — just a plain expandable card.
+            isReaction ->
+                builder
+                    .setContentTitle(content.title)
+                    .setContentText(content.body)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
+
             // Messages stack into one per-conversation card; invites are
             // one-off events, so keep them as a plain expandable notification.
-            NotificationTriggerFfi.NEW_MESSAGE -> {
+            update.trigger == NotificationTriggerFfi.NEW_MESSAGE -> {
                 builder.setStyle(messagingStyle(update, content, conversationTitleOverride))
                 NotificationActions
                     .targetFromUpdate(update, content.notificationTag, content.notificationId)
@@ -110,7 +114,7 @@ class LocalNotificationPresenter(
                     }
             }
 
-            NotificationTriggerFfi.GROUP_INVITE ->
+            else ->
                 builder
                     .setContentTitle(content.title)
                     .setContentText(content.body)
@@ -129,9 +133,12 @@ class LocalNotificationPresenter(
     // notifications. The OS can auto-generate one, but that behaviour varies by
     // OEM; supplying our own guarantees no sender, body, or group name ever
     // reaches the lockscreen — only the app name.
-    private fun redactedPublicVersion(category: String): Notification =
+    private fun redactedPublicVersion(
+        channelId: String,
+        category: String,
+    ): Notification =
         NotificationCompat
-            .Builder(context, CHANNEL_MESSAGES)
+            .Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_darkmatter)
             .setContentTitle(context.getString(R.string.app_name))
             .setCategory(category)
@@ -266,8 +273,6 @@ class LocalNotificationPresenter(
     }
 
     companion object {
-        const val CHANNEL_MESSAGES = "darkmatter.messages.v2"
-
         // Per-conversation cards share id 0; the per-conversation tag keeps them
         // distinct, so reusing (tag, 0) updates the right conversation's card.
         private const val MAX_MESSAGE_HISTORY = 25

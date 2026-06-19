@@ -175,6 +175,9 @@
     <string name="native_push">推送通知</string>
     <string name="native_push_subtitle">中继有新事件需要送达时唤醒应用。</string>
     <string name="native_push_unavailable_subtitle">需要 Google Play 服务，以及配置了推送服务器的构建版本。</string>
+    <string name="notification_categories">通知类别</string>
+    <string name="notification_categories_subtitle">在 Android 设置中为每种类型设置声音、振动和重要性。</string>
+    <string name="toast_notification_settings_unavailable">无法打开通知设置</string>
     <string name="switch_account">切换账号</string>
     <string name="my_qr_code">我的 QR 代码</string>
     <string name="read_only">私钥存储在外部签名器中</string>
@@ -270,6 +273,14 @@
     <string name="waiting_for_events">等待事件发生。</string>
     <string name="notification_channel_messages">消息</string>
     <string name="notification_channel_messages_description">Dark Matter 消息和邀请</string>
+    <string name="notification_channel_direct_messages">私信</string>
+    <string name="notification_channel_direct_messages_description">一对一会话消息</string>
+    <string name="notification_channel_group_messages">群组消息</string>
+    <string name="notification_channel_group_messages_description">群组会话消息</string>
+    <string name="notification_channel_reactions">回应</string>
+    <string name="notification_channel_reactions_description">对你消息的回应</string>
+    <string name="notification_channel_invites">邀请</string>
+    <string name="notification_channel_invites_description">群组邀请和欢迎</string>
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新消息</string>
     <string name="notification_sender_in_group">%1$s 在 %2$s 中</string>
