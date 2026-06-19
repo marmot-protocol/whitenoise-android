@@ -184,7 +184,11 @@ data class ToastMessage(
 private data class ProfilePresentation(
     val displayName: String?,
     val avatarUrl: String?,
-)
+) {
+    companion object {
+        val Empty = ProfilePresentation(displayName = null, avatarUrl = null)
+    }
+}
 
 enum class RelayListKind {
     Nip65,
@@ -393,6 +397,14 @@ class DarkMatterAppState(
     val profileRevisionForCompose: Int
         get() = profileRevision
     private val profilePresentations = mutableMapOf<String, ProfilePresentation>()
+
+    // Materialized profile metadata, populated off-main by [refreshProfile].
+    // Read accessors serve from here so composition never crosses the FFI.
+    private val userProfiles = mutableMapOf<String, UserProfileMetadataFfi>()
+
+    // Ids with an in-flight local materialization, so a cache miss launches at
+    // most one local read per id. Distinct from the relay-refresh cooldown gate.
+    private val materializingProfiles = mutableSetOf<String>()
     private val profilePresentationLock = Any()
     private val groupMemberSnapshots = mutableMapOf<String, GroupMemberSnapshot>()
     private val groupMemberSnapshotLock = Any()
@@ -916,7 +928,11 @@ class DarkMatterAppState(
     private fun clearCrossAccountCaches() {
         profileCacheEpoch.incrementAndGet()
         npubs.clear()
-        synchronized(profilePresentationLock) { profilePresentations.clear() }
+        synchronized(profilePresentationLock) {
+            profilePresentations.clear()
+            userProfiles.clear()
+            materializingProfiles.clear()
+        }
         synchronized(groupMemberSnapshotLock) { groupMemberSnapshots.clear() }
         profileRevision += 1
     }
@@ -1661,6 +1677,11 @@ class DarkMatterAppState(
 
     fun npub(accountIdHex: String): String {
         npubs[accountIdHex]?.let { return it }
+        // npub is a pure hex→bech32 encoding of the pubkey — no storage read, so
+        // no DB-lock contention, and safe to resolve inline (unlike displayName /
+        // userProfile, which this change moves off the composition thread).
+        // Resolving here also keeps it independent of whether a published profile
+        // exists — an account with no profile metadata still gets a real npub.
         val resolved = runCatching { marmot().npub(accountIdHex) }.getOrNull() ?: return accountIdHex
         npubs[accountIdHex] = resolved
         return resolved
@@ -1672,6 +1693,7 @@ class DarkMatterAppState(
         // Observe profile cache invalidations for Compose callers.
         profileRevision
         return cachedUserProfile(accountIdHex) ?: run {
+            ensureProfileMaterialized(accountIdHex)
             requestProfile(accountIdHex)
             null
         }
@@ -1761,14 +1783,23 @@ class DarkMatterAppState(
                 profileRefreshGate.finish(accountIdHex, System.currentTimeMillis())
             }
         if (profile != null) {
-            // Resolve the presentation off the main thread: readProfilePresentation
-            // does blocking FFI and this completion runs on profileScope
-            // (Main.immediate). Then apply the in-memory state on the main thread.
-            val presentation = marmotIo { readProfilePresentation(accountIdHex) }
+            // Resolve everything that needs the FFI off the main thread (this
+            // completion runs on profileScope = Main.immediate), then apply the
+            // in-memory caches on the main thread. The read accessors serve from
+            // these caches so composition never crosses the binding. See #4, #49.
+            val displayName =
+                marmotIo { runCatching { marmot().displayName(accountIdHex) }.getOrNull() }
+                    ?.let { ProfileSanitizer.displayName(it) }
+            val presentation =
+                ProfilePresentation(
+                    displayName = displayName,
+                    avatarUrl = ProfileSanitizer.imageUrl(profile.picture),
+                )
             // Drop the result if an account switch / sign-out cleared the caches
             // while this refresh was in flight, so we don't repopulate them with
             // the previous account's data.
             if (profileCacheEpoch.get() == epoch) {
+                synchronized(profilePresentationLock) { userProfiles[accountIdHex] = profile }
                 applyProfilePresentation(accountIdHex, presentation)
             }
         }
@@ -2121,34 +2152,63 @@ class DarkMatterAppState(
             .applicationLocales = LocaleList.forLanguageTags(tag)
     }
 
-    private fun cachedUserProfile(accountIdHex: String): UserProfileMetadataFfi? = runCatching { marmot().userProfile(accountIdHex) }.getOrNull()
+    private fun cachedUserProfile(accountIdHex: String): UserProfileMetadataFfi? = synchronized(profilePresentationLock) { userProfiles[accountIdHex] }
 
     private fun profilePresentation(accountIdHex: String): ProfilePresentation {
         profileRevision
         synchronized(profilePresentationLock) {
             profilePresentations[accountIdHex]?.let { return it }
         }
-        val presentation = readProfilePresentation(accountIdHex)
-        synchronized(profilePresentationLock) {
-            profilePresentations[accountIdHex] = presentation
-        }
-        return presentation
+        // Cache miss: never cross the FFI on the caller's thread — these
+        // accessors run during composition. Materialize from local storage
+        // off-main (instant, ungated — survives an account-switch cache clear)
+        // and return an empty presentation; it bumps [profileRevision] to
+        // recompose once resolved. The relay refresh for freshness is the
+        // wrappers' job (displayName/avatarUrl call requestProfile). See #4, #49.
+        ensureProfileMaterialized(accountIdHex)
+        return ProfilePresentation.Empty
     }
 
-    private fun readProfilePresentation(accountIdHex: String): ProfilePresentation {
-        val displayName =
-            runCatching { marmot().displayName(accountIdHex) }
-                .getOrNull()
-                ?.let { ProfileSanitizer.displayName(it) }
-        val avatarUrl = ProfileSanitizer.imageUrl(cachedUserProfile(accountIdHex)?.picture)
-        return ProfilePresentation(displayName = displayName, avatarUrl = avatarUrl)
+    /**
+     * Populate the profile caches from *local* storage off the main thread.
+     * `displayName`/`userProfile` are local reads (no relay/network), so this is
+     * cheap and deliberately ungated — unlike the relay refresh, it must always
+     * run after a cache clear (e.g. account switch) so names re-resolve at once
+     * instead of waiting on a gated network round-trip.
+     */
+    private fun ensureProfileMaterialized(accountIdHex: String) {
+        val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
+        synchronized(profilePresentationLock) {
+            if (profilePresentations.containsKey(id)) return
+            if (!materializingProfiles.add(id)) return
+        }
+        val epoch = profileCacheEpoch.get()
+        profileScope.launch {
+            try {
+                val profile = marmotIo { runCatching { marmot().userProfile(id) }.getOrNull() }
+                val displayName =
+                    marmotIo { runCatching { marmot().displayName(id) }.getOrNull() }
+                        ?.let { ProfileSanitizer.displayName(it) }
+                val presentation =
+                    ProfilePresentation(
+                        displayName = displayName,
+                        avatarUrl = ProfileSanitizer.imageUrl(profile?.picture),
+                    )
+                if (profileCacheEpoch.get() == epoch) {
+                    synchronized(profilePresentationLock) { profile?.let { userProfiles[id] = it } }
+                    applyProfilePresentation(id, presentation)
+                }
+            } finally {
+                synchronized(profilePresentationLock) { materializingProfiles.remove(id) }
+            }
+        }
     }
 
     /**
      * Store a freshly-resolved [presentation] and bump [profileRevision] if it
      * changed. Pure in-memory state work, no FFI — safe on the main thread.
-     * The blocking [readProfilePresentation] read is the caller's job to run
-     * off-main (see [refreshProfile]).
+     * The blocking FFI reads are the caller's job to run off-main (see
+     * [refreshProfile]).
      */
     private fun applyProfilePresentation(
         accountIdHex: String,
@@ -2166,6 +2226,8 @@ class DarkMatterAppState(
     private fun notifyProfilesChanged() {
         synchronized(profilePresentationLock) {
             profilePresentations.clear()
+            userProfiles.clear()
+            materializingProfiles.clear()
         }
         profileRevision += 1
     }
