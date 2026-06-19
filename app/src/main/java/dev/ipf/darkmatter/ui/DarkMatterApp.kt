@@ -208,6 +208,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -224,6 +225,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -239,6 +242,7 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
@@ -254,16 +258,22 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.core.content.ContextCompat
@@ -511,6 +521,25 @@ private fun rememberedRelativeTime(epochSeconds: ULong): String =
         rememberRelativeTimeCopy(),
         LocalConfiguration.current.locales[0],
     )
+
+// Clock time only (locale-aware short form, e.g. "3:28 PM" / "15:28"). The
+// transcript groups messages under day separators, so a bubble footer doesn't
+// need the date — just the time. The full date stays available in message
+// details.
+@Composable
+private fun rememberedClockTime(epochSeconds: ULong): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return remember(epochSeconds, locale) {
+        if (epochSeconds == 0uL) {
+            ""
+        } else {
+            Instant
+                .ofEpochSecond(epochSeconds.toLong())
+                .atZone(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale))
+        }
+    }
+}
 
 private val AppThemeMode.labelRes: Int
     @StringRes
@@ -6056,6 +6085,12 @@ private fun ConversationScreen(
     var showDetails by remember { mutableStateOf(false) }
     var confirmLeaveFromTopBar by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    // Single conversation-level owner of which message's action menu is open, so
+    // only one popover can be open at a time. With the keyboard up the menu is
+    // non-focusable (#284), so long-pressing several bubbles would otherwise
+    // stack several popovers; deriving each bubble's open state from this one id
+    // makes opening one close any other.
+    var openActionMenuId by remember(chat.id) { mutableStateOf<String?>(null) }
     var initialTimelineAnchored by remember(chat.id) { mutableStateOf(false) }
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
@@ -7420,6 +7455,10 @@ private fun ConversationScreen(
                                     appState = appState,
                                     highlighted = item.record.messageIdHex == highlightedMessageId,
                                     recentReactionEmojis = recentReactionEmojis,
+                                    isActionMenuOpen = openActionMenuId == item.record.messageIdHex,
+                                    onActionMenuOpenChange = { open ->
+                                        openActionMenuId = if (open) item.record.messageIdHex else null
+                                    },
                                     // Lambdas, not method references: the Compose
                                     // compiler memoizes lambdas but allocates a fresh
                                     // function reference per recomposition, which made
@@ -8814,6 +8853,8 @@ private fun MessageBubble(
     appState: DarkMatterAppState,
     highlighted: Boolean,
     recentReactionEmojis: List<String>,
+    isActionMenuOpen: Boolean,
+    onActionMenuOpenChange: (Boolean) -> Unit,
     onReactionEmojiPicked: (String) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
 ) {
@@ -8832,7 +8873,13 @@ private fun MessageBubble(
             else -> MaterialTheme.colorScheme.surfaceVariant
         }
     val scope = rememberCoroutineScope()
-    var menuOpen by remember { mutableStateOf(false) }
+    // Window-space y of the long-press touch so the action popover can anchor
+    // near the finger on a bubble taller than the screen instead of
+    // degenerating to the visible bubble top (#326). Window space (not
+    // row-local) so the menu can offset against its own anchor regardless of
+    // where in the transcript the bubble sits.
+    var longPressWindowY by remember { mutableStateOf<Float?>(null) }
+    var rowBoundsTopPx by remember { mutableStateOf(0f) }
     var swipeDrag by remember(record.messageIdHex) { mutableStateOf(0f) }
     val animatedSwipeOffset by animateFloatAsState(targetValue = swipeDrag, label = "replySwipeOffset")
     val clipboard = LocalClipboardManager.current
@@ -8888,6 +8935,11 @@ private fun MessageBubble(
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
     var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    // A long body clips to a few lines with an inline Read More; opening it
+    // routes through a full-screen view rather than expanding in place, so the
+    // only state to track is whether that view is showing. Resets on re-entry
+    // by keying on the message id (#325).
+    var expandedFullView by remember(record.messageIdHex) { mutableStateOf(false) }
     var infoSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var editHistoryOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var reactionSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
@@ -8896,7 +8948,7 @@ private fun MessageBubble(
     // the message is deleted out from under it (optimistic or remote delete).
     LaunchedEffect(deleted) {
         if (deleted) {
-            menuOpen = false
+            onActionMenuOpenChange(false)
             emojiPickerOpen = false
             reactionSheetOpen = false
         }
@@ -8904,11 +8956,11 @@ private fun MessageBubble(
 
     fun beginReply() {
         controller.replyingTo = record
-        menuOpen = false
+        onActionMenuOpenChange(false)
     }
 
     fun openInfoSheet() {
-        menuOpen = false
+        onActionMenuOpenChange(false)
         infoSheetOpen = true
     }
 
@@ -8925,7 +8977,7 @@ private fun MessageBubble(
     fun copyMessageText() {
         clipboard.setText(AnnotatedString(displayedBody))
         appState.present(R.string.copied)
-        menuOpen = false
+        onActionMenuOpenChange(false)
     }
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -8998,10 +9050,14 @@ private fun MessageBubble(
                                     val longPress = awaitLongPressOrCancellation(down.id)
                                     if (longPress != null) {
                                         longPress.consume()
+                                        // Capture the press y in window space before
+                                        // opening so the popover anchors at the
+                                        // finger, not the bubble top (#326).
+                                        longPressWindowY = rowBoundsTopPx + longPress.position.y
                                         haptics.performHapticFeedback(
                                             androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
                                         )
-                                        menuOpen = true
+                                        onActionMenuOpenChange(true)
                                     }
                                 }
                             }
@@ -9022,12 +9078,18 @@ private fun MessageBubble(
                         } else {
                             Modifier.semantics {
                                 onLongClick(label = messageActionsLabel) {
-                                    menuOpen = true
+                                    // Accessibility entry has no touch point;
+                                    // anchor to the bubble top (#326).
+                                    longPressWindowY = null
+                                    onActionMenuOpenChange(true)
                                     true
                                 }
                             }
                         },
-                    ),
+                    )
+                    // Window-space top of the row, added to the local press y so
+                    // the popover can be offset against the menu's own anchor (#326).
+                    .onGloballyPositioned { rowBoundsTopPx = it.boundsInWindow().top },
             horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
         ) {
             if (showSenderAvatar) {
@@ -9071,7 +9133,12 @@ private fun MessageBubble(
                                 modifier =
                                     Modifier.combinedClickable(
                                         onClick = { appState.presentProfile(appState.npub(record.sender)) },
-                                        onLongClick = { if (!deleted) menuOpen = true },
+                                        onLongClick = {
+                                            if (!deleted) {
+                                                longPressWindowY = null
+                                                onActionMenuOpenChange(true)
+                                            }
+                                        },
                                     ),
                             )
                         }
@@ -9201,7 +9268,7 @@ private fun MessageBubble(
                                     }
                                     if (footerOnVisualMedia) {
                                         MediaFooterOverlay(
-                                            timeText = rememberedRelativeTime(record.recordedAt),
+                                            timeText = rememberedClockTime(record.recordedAt),
                                             showStatus = mine,
                                             status = item.status,
                                         )
@@ -9360,7 +9427,7 @@ private fun MessageBubble(
                                         )
                                     }
                                     MediaFooterOverlay(
-                                        timeText = rememberedRelativeTime(record.recordedAt),
+                                        timeText = rememberedClockTime(record.recordedAt),
                                         showStatus = true,
                                         status = item.status,
                                     )
@@ -9430,7 +9497,7 @@ private fun MessageBubble(
                             }
                         val inlineFooter: @Composable () -> Unit = {
                             MessageInlineFooter(
-                                timeText = rememberedRelativeTime(record.recordedAt),
+                                timeText = rememberedClockTime(record.recordedAt),
                                 color = timestampColor,
                                 showStatus = mine && !deleted && !invalidated,
                                 status = item.status,
@@ -9441,6 +9508,19 @@ private fun MessageBubble(
                         // Last-line geometry of the body so the footer can sit on
                         // that line when it fits, not merely when the widest line does.
                         var lastLineLayout by remember(record.messageIdHex) { mutableStateOf<TextLayoutResult?>(null) }
+                        // Overflow decision is derived from a measurement of the FULL
+                        // body only. Keeping it separate from lastLineLayout (which
+                        // the currently-rendered text updates) avoids a recompose
+                        // loop: once we clip, the clipped text no longer overflows,
+                        // which would otherwise flip the decision back and forth.
+                        var bodyFullLayout by remember(record.messageIdHex) { mutableStateOf<TextLayoutResult?>(null) }
+                        // A long body collapses to MESSAGE_COLLAPSE_LINE_LIMIT lines
+                        // with an inline Read More that opens the full-screen view;
+                        // tombstones and edit/info copy never collapse (#325).
+                        val collapsible = !deleted && !invalidated
+                        val readMoreLabel = stringResource(R.string.message_read_more)
+                        val readMoreStyle =
+                            SpanStyle(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         if (bodyTextToRender != null) {
                             BubbleFooterLayout(
                                 footer = inlineFooter,
@@ -9462,28 +9542,120 @@ private fun MessageBubble(
                                     markdownDocument.blocks.isNotEmpty() &&
                                     bodyTextToRender == record.plaintext
                                 ) {
-                                    // Mention names resolve through the profile
-                                    // cache; npub taps stay in-app via the
-                                    // profile sheet (never an external nostr:
-                                    // intent).
-                                    MarkdownMessageBody(
-                                        markdownDocument,
-                                        mentionDisplayName =
-                                            remember(appState) {
-                                                { bech32: String -> appState.mentionDisplayName(bech32) }
-                                            },
-                                        onNostrProfileTap =
-                                            remember(appState) {
-                                                { bech32: String -> appState.presentNostrProfile(bech32) }
-                                            },
-                                        onLastTextLayout = { lastLineLayout = it },
-                                    )
+                                    // Markdown can't be cleanly truncated to a line
+                                    // count mid-document, so clip to the height of
+                                    // MESSAGE_COLLAPSE_LINE_LIMIT body-large lines
+                                    // and drop a Read More beneath when the natural
+                                    // content is taller. The natural height is
+                                    // measured on the inner content (clipToBounds is
+                                    // visual only and doesn't constrain it); the
+                                    // overflow flag latches true so applying the cap
+                                    // can't shrink the measurement and flip it back.
+                                    val lineHeightPx =
+                                        with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
+                                    val maxBodyHeightPx = lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT
+                                    val maxBodyHeightDp = with(density) { maxBodyHeightPx.toDp() }
+                                    var markdownOverflows by remember(record.messageIdHex) { mutableStateOf(false) }
+                                    val collapseMarkdown = collapsible && markdownOverflows
+                                    Column {
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .onSizeChanged {
+                                                        if (collapsible && it.height > maxBodyHeightPx) {
+                                                            markdownOverflows = true
+                                                        }
+                                                    }.then(
+                                                        if (collapseMarkdown) {
+                                                            Modifier
+                                                                .heightIn(max = maxBodyHeightDp)
+                                                                .clipToBounds()
+                                                        } else {
+                                                            Modifier
+                                                        },
+                                                    ),
+                                        ) {
+                                            // Mention names resolve through the profile
+                                            // cache; npub taps stay in-app via the
+                                            // profile sheet (never an external nostr:
+                                            // intent).
+                                            MarkdownMessageBody(
+                                                markdownDocument,
+                                                mentionDisplayName =
+                                                    remember(appState) {
+                                                        { bech32: String -> appState.mentionDisplayName(bech32) }
+                                                    },
+                                                onNostrProfileTap =
+                                                    remember(appState) {
+                                                        { bech32: String -> appState.presentNostrProfile(bech32) }
+                                                    },
+                                                onLastTextLayout = { lastLineLayout = it },
+                                            )
+                                        }
+                                        if (collapseMarkdown) {
+                                            Text(
+                                                readMoreLabel,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.clickable { expandedFullView = true },
+                                            )
+                                        }
+                                    }
                                 } else {
-                                    Text(
-                                        bodyTextToRender,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        onTextLayout = { lastLineLayout = it },
-                                    )
+                                    // Plain text truncates inline: render up to the
+                                    // line limit, and if that overflows rebuild the
+                                    // clipped text ending with "… Read More" (bold,
+                                    // onSurface — reads as dark emphasis, not a link).
+                                    // Measured with maxLines = limit + 1, so visual
+                                    // overflow means the body needs more than one
+                                    // extra line past the limit — clip it.
+                                    val overflows =
+                                        collapsible &&
+                                            bodyFullLayout?.let {
+                                                it.hasVisualOverflow && it.lineCount > MESSAGE_COLLAPSE_LINE_LIMIT
+                                            } == true
+                                    if (overflows) {
+                                        val layout = bodyFullLayout!!
+                                        // Cut at the last fully-visible line, trim trailing
+                                        // whitespace, then append the ellipsis + a Read More
+                                        // link. Only the Read More span is clickable, so a
+                                        // long-press anywhere on the bubble still falls through
+                                        // to the action menu rather than expanding the bubble.
+                                        val cut =
+                                            remember(bodyTextToRender, layout) {
+                                                bodyTextToRender
+                                                    .substring(0, layout.getLineEnd(MESSAGE_COLLAPSE_LINE_LIMIT - 1, visibleEnd = true))
+                                                    .trimEnd()
+                                            }
+                                        val clippedText =
+                                            buildAnnotatedString {
+                                                append(cut)
+                                                append("… ")
+                                                withLink(
+                                                    LinkAnnotation.Clickable("read_more") { expandedFullView = true },
+                                                ) {
+                                                    withStyle(readMoreStyle) { append(readMoreLabel) }
+                                                }
+                                            }
+                                        Text(
+                                            clippedText,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            // Footer geometry follows the clipped text's
+                                            // real last line, not the full measurement.
+                                            onTextLayout = { lastLineLayout = it },
+                                        )
+                                    } else {
+                                        Text(
+                                            bodyTextToRender,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            maxLines = if (collapsible) MESSAGE_COLLAPSE_LINE_LIMIT + 1 else Int.MAX_VALUE,
+                                            onTextLayout = {
+                                                lastLineLayout = it
+                                                bodyFullLayout = it
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         } else if (!footerOnVisualMedia && !footerOnPendingVisual) {
@@ -9524,22 +9696,24 @@ private fun MessageBubble(
                         MessageActionMenu(
                             // Never render the menu for a deleted message, even
                             // if it was open when the delete landed.
-                            expanded = menuOpen && !deleted,
+                            expanded = isActionMenuOpen && !deleted,
+                            anchorWindowYPx = longPressWindowY,
+                            alignEnd = mine,
                             canDelete = mine && record.messageIdHex.isNotBlank() && !deleted,
                             canEdit = mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
                             quickReactionEmojis = quickReactionEmojis,
-                            onDismissRequest = { menuOpen = false },
+                            onDismissRequest = { onActionMenuOpenChange(false) },
                             onReact = { emoji ->
-                                menuOpen = false
+                                onActionMenuOpenChange(false)
                                 reactWithEmoji(emoji)
                             },
                             onOpenEmojiPicker = {
-                                menuOpen = false
+                                onActionMenuOpenChange(false)
                                 emojiPickerOpen = true
                             },
                             onReply = ::beginReply,
                             onEdit = {
-                                menuOpen = false
+                                onActionMenuOpenChange(false)
                                 // Cancel any reply-in-progress: reply and
                                 // edit modes are mutually exclusive in the
                                 // composer banner.
@@ -9549,7 +9723,7 @@ private fun MessageBubble(
                             onCopyText = ::copyMessageText,
                             onInfo = ::openInfoSheet,
                             onDelete = {
-                                menuOpen = false
+                                onActionMenuOpenChange(false)
                                 // launchMutation so the MLS commit + Nostr publish
                                 // survive navigating away from the conversation —
                                 // the optimistic tombstone is already set in the
@@ -9560,6 +9734,32 @@ private fun MessageBubble(
                             },
                         )
                     }
+                }
+                if (expandedFullView) {
+                    MessageFullScreenView(
+                        senderDisplayName = appState.displayName(record.sender),
+                        senderSeed = record.sender,
+                        senderAvatarUrl = appState.avatarUrl(record.sender),
+                        body = displayedBody,
+                        timeText = rememberedClockTime(record.recordedAt),
+                        showStatus = mine && !deleted && !invalidated,
+                        status = item.status,
+                        canDelete = mine && record.messageIdHex.isNotBlank() && !deleted,
+                        onReply = {
+                            expandedFullView = false
+                            beginReply()
+                        },
+                        onReact = {
+                            expandedFullView = false
+                            emojiPickerOpen = true
+                        },
+                        onCopy = ::copyMessageText,
+                        onDelete = {
+                            expandedFullView = false
+                            appState.launchMutation { controller.deleteMessage(record) }
+                        },
+                        onDismiss = { expandedFullView = false },
+                    )
                 }
                 if (emojiPickerOpen) {
                     EmojiPickerSheet(
@@ -9618,6 +9818,154 @@ private fun MessageBubble(
                             onDismissRequest = { reactionSheetOpen = false },
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Full-screen reader for a body too long to show inline. Reached from the
+ * collapsed bubble's Read More; Back returns to the conversation unchanged
+ * (#325). A full-bleed Dialog avoids touching the existing nav backstack.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MessageFullScreenView(
+    senderDisplayName: String,
+    senderSeed: String,
+    senderAvatarUrl: String?,
+    body: String,
+    timeText: String,
+    showStatus: Boolean,
+    status: MessageStatus,
+    canDelete: Boolean,
+    onReply: () -> Unit,
+    onReact: () -> Unit,
+    onCopy: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnBackPress = true,
+            ),
+    ) {
+        var overflowOpen by remember { mutableStateOf(false) }
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        // The sender identity lives in the bar itself — avatar +
+                        // name with the send time (and delivery status for own
+                        // messages) as a subtitle — so the body below is just the
+                        // message, no redundant in-content header.
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Avatar(title = senderDisplayName, seed = senderSeed, size = 36.dp, pictureUrl = senderAvatarUrl)
+                            Column {
+                                Text(
+                                    senderDisplayName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        timeText,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    if (showStatus) {
+                                        OutgoingMessageStatusIcon(status, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { overflowOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.message_actions))
+                        }
+                        DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.reply)) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null) },
+                                onClick = {
+                                    overflowOpen = false
+                                    onReply()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.message_react)) },
+                                leadingIcon = { Icon(Icons.Default.EmojiEmotions, contentDescription = null) },
+                                onClick = {
+                                    overflowOpen = false
+                                    onReact()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.copy_text)) },
+                                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                                onClick = {
+                                    overflowOpen = false
+                                    onCopy()
+                                },
+                            )
+                            if (canDelete) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.delete)) },
+                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                    onClick = {
+                                        overflowOpen = false
+                                        onDelete()
+                                    },
+                                )
+                            }
+                        }
+                    },
+                    // The Dialog window already sits below the status bar, so the
+                    // bar's own status-bar inset would double the gap and inflate
+                    // its height. Zero it to render at the standard compact height.
+                    windowInsets = WindowInsets(0, 0, 0, 0),
+                )
+            },
+        ) { padding ->
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        body,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
                 }
             }
         }
@@ -9985,6 +10333,8 @@ private fun EditHistoryVersionRow(
 @Composable
 private fun MessageActionMenu(
     expanded: Boolean,
+    anchorWindowYPx: Float?,
+    alignEnd: Boolean,
     canDelete: Boolean,
     canEdit: Boolean,
     quickReactionEmojis: List<String>,
@@ -10028,103 +10378,153 @@ private fun MessageActionMenu(
     // scrim popup as a second sibling only while expanded would otherwise add
     // an extra Arrangement.spacedBy gap, visibly growing the bubble height on
     // long-press (#284 review).
+    val density = LocalDensity.current
+    // Single zero-size Box wrapper: this composable always contributes exactly
+    // ONE (zero-height) child to the caller's spacedBy bubble Column, open or
+    // not. Emitting the scrim + menu popups as bare siblings only while expanded
+    // adds extra Arrangement.spacedBy gaps that visibly grow the bubble on
+    // long-press (#284 review). The popups themselves render in their own
+    // windows, so the Box stays zero-size either way.
     Box {
-        if (expanded) {
-            BackHandler(enabled = true) { onDismissRequest() }
-            // Scrim popup: composed before the menu so the menu renders on top of
-            // it. Fills the window and swallows any tap as a pure dismissal.
-            Popup(
-                properties =
-                    PopupProperties(
-                        focusable = false,
-                        // We own dismissal via the tap handler below; let the menu's
-                        // own outside-tap detection stay off so a single outside tap
-                        // is handled exactly once, here, and consumed.
-                        dismissOnClickOutside = false,
-                    ),
-                onDismissRequest = onDismissRequest,
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTapGestures { onDismissRequest() }
-                            },
-                )
-            }
+        if (!expanded) return@Box
+        BackHandler(enabled = true) { onDismissRequest() }
+        // Scrim popup: composed before the menu so the menu renders on top of it.
+        // Fills the window and swallows any tap as a pure dismissal.
+        Popup(
+            properties =
+                PopupProperties(
+                    focusable = false,
+                    // We own dismissal via the tap handler below; let the menu's own
+                    // outside-tap detection stay off so a single outside tap is
+                    // handled exactly once, here, and consumed.
+                    dismissOnClickOutside = false,
+                ),
+            onDismissRequest = onDismissRequest,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTapGestures { onDismissRequest() }
+                        },
+            )
         }
-        DropdownMenu(
-            expanded = expanded,
+        // Position the popup purely from the captured window touch y, independent of
+        // any anchor's layout position. DropdownMenu derived flip-above from the
+        // anchor's bounds, so a bubble taller than the viewport (anchor off-screen)
+        // could send the menu above the finger even with room below (#326). This
+        // provider clamps/flips against the window directly.
+        val edgeInsetPx = with(density) { 8.dp.roundToPx() }
+        val positionProvider =
+            remember(anchorWindowYPx, alignEnd, edgeInsetPx) {
+                object : PopupPositionProvider {
+                    override fun calculatePosition(
+                        anchorBounds: IntRect,
+                        windowSize: IntSize,
+                        layoutDirection: LayoutDirection,
+                        popupContentSize: IntSize,
+                    ): IntOffset {
+                        val touchY = anchorWindowYPx?.roundToInt() ?: (windowSize.height / 2)
+                        // Horizontal: hug the bubble side, clamped inside the window.
+                        val x =
+                            if (alignEnd) {
+                                windowSize.width - popupContentSize.width - edgeInsetPx
+                            } else {
+                                edgeInsetPx
+                            }.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                        // Vertical: top at the touch y; flip upward if it would spill
+                        // past the bottom inset; if it still doesn't fit, clamp to top.
+                        val bottomLimit = windowSize.height - edgeInsetPx
+                        val y =
+                            when {
+                                touchY + popupContentSize.height <= bottomLimit -> touchY
+                                popupContentSize.height <= touchY - edgeInsetPx -> touchY - popupContentSize.height
+                                else -> edgeInsetPx
+                            }.coerceIn(edgeInsetPx, (windowSize.height - popupContentSize.height).coerceAtLeast(0))
+                        return IntOffset(x, y)
+                    }
+                }
+            }
+        Popup(
+            popupPositionProvider = positionProvider,
             onDismissRequest = onDismissRequest,
             properties =
                 PopupProperties(
                     focusable = false,
                     // Outside taps are handled by the scrim above (which also blocks
-                    // click-through); disabling the menu's own outside-dismiss keeps
-                    // a single tap from being processed twice.
+                    // click-through); disabling the menu's own outside-dismiss keeps a
+                    // single tap from being processed twice.
                     dismissOnClickOutside = false,
                 ),
         ) {
-            Column(
-                modifier = Modifier.padding(8.dp).widthIn(min = 292.dp, max = 328.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            // Surface restores the menu chrome (rounded shape + elevation) that
+            // DropdownMenu provided.
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                tonalElevation = 3.dp,
+                shadowElevation = 6.dp,
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    quickReactionEmojis.forEach { emoji ->
-                        EmojiActionButton(
-                            emoji = emoji,
-                            onClick = { onReact(emoji) },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    IconButton(
-                        onClick = onOpenEmojiPicker,
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.EmojiEmotions,
-                            contentDescription = stringResource(R.string.open_emoji_picker),
-                        )
-                    }
-                }
-                HorizontalDivider()
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.padding(8.dp).widthIn(min = 292.dp, max = 328.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    MessageActionButton(
-                        label = stringResource(R.string.reply),
-                        icon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        onClick = onReply,
-                    )
-                    if (canEdit) {
-                        MessageActionButton(
-                            label = stringResource(R.string.edit),
-                            icon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onEdit,
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        quickReactionEmojis.forEach { emoji ->
+                            EmojiActionButton(
+                                emoji = emoji,
+                                onClick = { onReact(emoji) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        IconButton(
+                            onClick = onOpenEmojiPicker,
+                            modifier = Modifier.size(36.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.EmojiEmotions,
+                                contentDescription = stringResource(R.string.open_emoji_picker),
+                            )
+                        }
                     }
-                    MessageActionButton(
-                        label = stringResource(R.string.copy_text),
-                        icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        onClick = onCopyText,
-                    )
-                    MessageActionButton(
-                        label = stringResource(R.string.message_info),
-                        icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        onClick = onInfo,
-                    )
-                    if (canDelete) {
+                    HorizontalDivider()
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
                         MessageActionButton(
-                            label = stringResource(R.string.delete),
-                            icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onDelete,
+                            label = stringResource(R.string.reply),
+                            icon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onReply,
                         )
+                        if (canEdit) {
+                            MessageActionButton(
+                                label = stringResource(R.string.edit),
+                                icon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                onClick = onEdit,
+                            )
+                        }
+                        MessageActionButton(
+                            label = stringResource(R.string.copy_text),
+                            icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onCopyText,
+                        )
+                        MessageActionButton(
+                            label = stringResource(R.string.message_info),
+                            icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onInfo,
+                        )
+                        if (canDelete) {
+                            MessageActionButton(
+                                label = stringResource(R.string.delete),
+                                icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                onClick = onDelete,
+                            )
+                        }
                     }
                 }
             }
@@ -10390,6 +10790,10 @@ private fun OutgoingMessageStatusIcon(
 
 // Gap between a bubble's text and its trailing inline footer.
 private val BubbleFooterGap = 8.dp
+
+// A body longer than this many rendered lines collapses to a Read More that
+// opens the full-screen view rather than spilling down the transcript (#325).
+private const val MESSAGE_COLLAPSE_LINE_LIMIT = 12
 
 // Distinct emojis shown in the consolidated reaction pill; the total count
 // still reflects every reaction beyond them.

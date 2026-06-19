@@ -537,4 +537,6 @@
     <string name="conversation_search_next">Sonraki eşleşme</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Eşleşme yok</string>
+    <string name="message_read_more">Daha fazla oku</string>
+    <string name="message_react">Tepki ver</string>
 </resources>

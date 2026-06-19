@@ -549,4 +549,6 @@
     <string name="conversation_search_next">Следующее совпадение</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Совпадений нет</string>
+    <string name="message_read_more">Читать далее</string>
+    <string name="message_react">Отреагировать</string>
 </resources>

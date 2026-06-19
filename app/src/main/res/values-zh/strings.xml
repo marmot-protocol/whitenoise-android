@@ -531,4 +531,6 @@
     <string name="conversation_search_next">下一个匹配项</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">无匹配项</string>
+    <string name="message_read_more">阅读更多</string>
+    <string name="message_react">回应</string>
 </resources>

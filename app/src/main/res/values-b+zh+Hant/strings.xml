@@ -531,4 +531,6 @@
     <string name="conversation_search_next">下一個符合項目</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">無符合項目</string>
+    <string name="message_read_more">閱讀更多</string>
+    <string name="message_react">回應</string>
 </resources>

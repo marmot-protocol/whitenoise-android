@@ -537,4 +537,6 @@
     <string name="conversation_search_next">Nächster Treffer</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Keine Treffer</string>
+    <string name="message_read_more">Mehr lesen</string>
+    <string name="message_react">Reagieren</string>
 </resources>

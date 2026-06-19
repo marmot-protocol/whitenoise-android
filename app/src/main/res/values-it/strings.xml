@@ -540,4 +540,6 @@
     <string name="conversation_search_next">Risultato successivo</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Nessun risultato</string>
+    <string name="message_read_more">Leggi tutto</string>
+    <string name="message_react">Reagisci</string>
 </resources>
