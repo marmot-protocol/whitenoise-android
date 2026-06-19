@@ -116,7 +116,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MarkChatRead
 import androidx.compose.material.icons.filled.Mic
@@ -4377,7 +4376,7 @@ private fun formatFileSize(bytes: Long): String {
 
 private enum class OpenAttachmentResult { Opened, NoHandler, Error }
 
-/** Which `GroupImageSearchSheet` button is currently driving an in-flight
+/** Which `ImageSearchSheet` button is currently driving an in-flight
  *  mutation, so the sheet can place the spinner on it. */
 private enum class GroupImageAction { Apply, Remove }
 
@@ -7839,10 +7838,12 @@ private fun GroupDetailsScreen(
     }
 
     if (showImageSearch) {
-        GroupImageSearchSheet(
+        ImageSearchSheet(
             initialUrl = controller.group.avatarUrl.orEmpty(),
-            groupTitle = controller.title(groupTitleCopy),
-            groupSeed = controller.group.groupIdHex,
+            header = stringResource(R.string.group_image_search_title),
+            title = controller.title(groupTitleCopy),
+            seed = controller.group.groupIdHex,
+            urlLabel = stringResource(R.string.group_avatar_url),
             // True whenever ANY mutation is running on this controller — not
             // just one started by this sheet. Prevents queuing a second
             // avatar update on top of an in-flight one and prevents
@@ -7986,10 +7987,12 @@ private fun GroupDetailsScreen(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun GroupImageSearchSheet(
+private fun ImageSearchSheet(
     initialUrl: String,
-    groupTitle: String,
-    groupSeed: String,
+    header: String,
+    title: String,
+    seed: String,
+    urlLabel: String,
     applyInFlight: Boolean,
     onApply: (String?) -> Unit,
     onDismiss: () -> Unit,
@@ -8089,26 +8092,26 @@ private fun GroupImageSearchSheet(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
-                stringResource(R.string.group_image_search_title),
+                header,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
             // Live preview row: avatar bubble seeded from the current draft
-            // URL, plus the group's name so the user knows what they're
+            // URL, plus the entity's name so the user knows what they're
             // editing.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Avatar(
-                    title = groupTitle,
-                    seed = groupSeed,
+                    title = title,
+                    seed = seed,
                     size = 64.dp,
                     pictureUrl = previewUrl,
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        groupTitle.ifBlank { stringResource(R.string.group_image_search_title) },
+                        title.ifBlank { header },
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -8129,7 +8132,7 @@ private fun GroupImageSearchSheet(
             OutlinedTextField(
                 value = urlDraft,
                 onValueChange = { urlDraft = it },
-                label = { Text(stringResource(R.string.group_avatar_url)) },
+                label = { Text(urlLabel) },
                 placeholder = { Text("https://example.com/image.jpg") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -12043,7 +12046,7 @@ private fun ProfileEditScreen(
                         // "Picture URL" text row. See #286.
                         val editPictureLabel = stringResource(R.string.profile_picture_edit)
                         Box(
-                            contentAlignment = Alignment.BottomEnd,
+                            contentAlignment = Alignment.Center,
                             modifier =
                                 Modifier
                                     .clip(CircleShape)
@@ -12058,20 +12061,22 @@ private fun ProfileEditScreen(
                                 size = 96.dp,
                                 pictureUrl = ProfileSanitizer.imageUrl(picture),
                             )
+                            // Centered "tap to change" affordance: a dim scrim
+                            // over the whole avatar with a camera glyph, so the
+                            // image always reads as editable.
                             Box(
                                 modifier =
                                     Modifier
-                                        .size(30.dp)
+                                        .size(96.dp)
                                         .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary)
-                                        .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                                        .background(Color.Black.copy(alpha = 0.32f)),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
-                                    Icons.Default.Edit,
+                                    Icons.Default.PhotoCamera,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(16.dp),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp),
                                 )
                             }
                         }
@@ -12211,197 +12216,23 @@ private fun ProfileEditScreen(
     }
 
     if (showPictureSheet) {
-        ProfilePictureSheet(
-            currentUrl = picture,
-            avatarTitle = displayName.ifBlank { active?.let { appState.shortNpub(it.accountIdHex) }.orEmpty() },
-            avatarSeed = active?.accountIdHex.orEmpty(),
-            onPasteLink = { newUrl ->
-                // Persist the sanitized URL so any normalization (schemeless
-                // `//host` upgrade, trim) survives; an invalid URL never
-                // reaches here because the sheet's Apply is gated on validity.
-                picture = newUrl
-                showPictureSheet = false
-            },
-            onRemove = {
-                picture = ""
+        ImageSearchSheet(
+            initialUrl = picture,
+            header = stringResource(R.string.profile_picture_sheet_title),
+            title = displayName.ifBlank { active?.let { appState.shortNpub(it.accountIdHex) }.orEmpty() },
+            seed = active?.accountIdHex.orEmpty(),
+            urlLabel = stringResource(R.string.profile_picture_hint),
+            // The profile editor stages edits locally and persists on Publish,
+            // so there's no in-flight mutation to gate on here.
+            applyInFlight = false,
+            onApply = { picked ->
+                // picked is the sanitized URL (Apply) or null (Remove); either
+                // way it's normalized by the sheet before reaching us.
+                picture = picked.orEmpty()
                 showPictureSheet = false
             },
             onDismiss = { showPictureSheet = false },
         )
-    }
-}
-
-/**
- * Bottom sheet for setting the account's kind:0 profile picture. Replaces the
- * old standalone "Picture URL" text row (see #286).
- *
- * Two modes inside one sheet:
- *  - Options list: "Paste a link" and "Remove picture" (only when one is set).
- *  - Paste-link editor: an HTTPS URL field with a live preview avatar and the
- *    same SSRF/HTTPS guard the publish path applies ([ProfileSanitizer.imageUrl],
- *    see #89). Apply is gated on a sanitizable URL, so a malformed value can
- *    never be committed from here.
- *
- * The device-pick → upload half of #286 ("Choose from photos") is deliberately
- * NOT offered here: a kind:0 `picture` is public Nostr metadata that every
- * client must fetch without an MLS group key, and the only byte-upload binding
- * (`uploadMedia`) encrypts per-group — its output is unreadable as a public
- * avatar. Wiring device-pick → upload needs a public Blossom upload FFI that
- * doesn't exist yet plus a product/protocol decision (tracked in #307); this
- * PR ships only the implementable URL-consolidation half, so #286 stays open.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ProfilePictureSheet(
-    currentUrl: String,
-    avatarTitle: String,
-    avatarSeed: String,
-    onPasteLink: (String) -> Unit,
-    onRemove: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var pasteMode by remember { mutableStateOf(false) }
-    var urlDraft by remember(currentUrl) { mutableStateOf(currentUrl) }
-    val trimmedDraft = urlDraft.trim()
-    // Same guard the publish path uses; null means "not a safe https image
-    // URL" and the preview falls back to initials.
-    val sanitized = remember(trimmedDraft) { ProfileSanitizer.imageUrl(trimmedDraft) }
-    val currentSanitized = remember(currentUrl) { ProfileSanitizer.imageUrl(currentUrl) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .imePadding()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                stringResource(R.string.profile_picture_sheet_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            if (!pasteMode) {
-                // Preview row: avatar bubble seeded from the currently-set
-                // picture (sanitized), so the user sees what they're editing.
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.padding(bottom = 4.dp),
-                ) {
-                    Avatar(title = avatarTitle, seed = avatarSeed, size = 64.dp, pictureUrl = currentSanitized)
-                    Text(
-                        stringResource(
-                            if (currentSanitized != null) {
-                                R.string.profile_picture_subtitle_set
-                            } else {
-                                R.string.profile_picture_subtitle_none
-                            },
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                ListItem(
-                    leadingContent = { Icon(Icons.Default.Link, contentDescription = null) },
-                    headlineContent = { Text(stringResource(R.string.profile_picture_paste_link)) },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                urlDraft = currentUrl
-                                pasteMode = true
-                            },
-                )
-                if (currentUrl.isNotBlank()) {
-                    ListItem(
-                        leadingContent = {
-                            Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                        },
-                        headlineContent = {
-                            Text(
-                                stringResource(R.string.profile_picture_remove),
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable { onRemove() },
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-            } else {
-                // Paste-link editor with live preview + validation.
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Avatar(title = avatarTitle, seed = avatarSeed, size = 64.dp, pictureUrl = sanitized)
-                    Text(
-                        stringResource(
-                            when {
-                                trimmedDraft.isEmpty() -> R.string.profile_picture_subtitle_none
-                                sanitized == null -> R.string.profile_picture_invalid
-                                else -> R.string.profile_picture_subtitle_ready
-                            },
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color =
-                            if (trimmedDraft.isNotEmpty() && sanitized == null) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                    )
-                }
-                OutlinedTextField(
-                    value = urlDraft,
-                    onValueChange = { urlDraft = it },
-                    label = { Text(stringResource(R.string.picture_url)) },
-                    placeholder = { Text("https://example.com/image.jpg") },
-                    singleLine = true,
-                    isError = trimmedDraft.isNotEmpty() && sanitized == null,
-                    supportingText = { Text(stringResource(R.string.profile_picture_hint)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions =
-                        KeyboardOptions(
-                            capitalization = KeyboardCapitalization.None,
-                            autoCorrectEnabled = false,
-                            keyboardType = KeyboardType.Uri,
-                        ),
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    OutlinedButton(
-                        onClick = { pasteMode = false },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                    Button(
-                        // Commit the SANITIZED URL so normalization survives.
-                        // Disabled while the draft is empty or unsafe so a bad
-                        // value can never be applied from here.
-                        onClick = { sanitized?.let { onPasteLink(it) } },
-                        enabled = sanitized != null,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.profile_picture_use_link))
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-            }
-        }
     }
 }
 
