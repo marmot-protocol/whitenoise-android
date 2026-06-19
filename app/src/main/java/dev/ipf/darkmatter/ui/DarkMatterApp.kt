@@ -261,6 +261,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.core.content.ContextCompat
 import androidx.core.os.ConfigurationCompat
@@ -9809,66 +9811,135 @@ private fun MessageActionMenu(
     onInfo: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismissRequest) {
-        Column(
-            modifier = Modifier.padding(8.dp).widthIn(min = 292.dp, max = 328.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+    // focusable = false keeps the soft keyboard up while this menu is open.
+    // A focusable popup window steals window focus from the conversation's
+    // host window, and Android dismisses the IME when the window holding the
+    // focused composer loses focus. That collapse then removes the composer's
+    // imePadding, reflowing the transcript down by the keyboard height mid
+    // gesture — so the long-press popover lands at a shifted position rather
+    // than where the user pressed (#284). Same "modal UI fights the IME"
+    // family as the voice-record bar in #207.
+    //
+    // A non-focusable popup has two gaps versus the old focusable menu that we
+    // restore explicitly here, without re-focusing (which would collapse the
+    // IME again):
+    //   1. Back dismissal — Popup's dismissOnBackPress is a no-op while the
+    //      popup is non-focusable, so a Back press would fall through to the
+    //      IME/activity instead of closing the menu. A host-window BackHandler
+    //      (same pattern as QuickActionFabMenu) closes the menu on Back. It
+    //      runs in the conversation window and does not touch IME focus.
+    //   2. Outside-tap click-through — events outside a non-focusable popup are
+    //      delivered to the windows beneath it, so a dismiss tap would also
+    //      activate the underlying chat content (open a profile, a link, the
+    //      media viewer, etc.). A full-window, non-focusable scrim Popup placed
+    //      below this menu consumes those taps: tapping it dismisses the menu
+    //      and the press is consumed so it never reaches the transcript. The
+    //      scrim is itself non-focusable, so it preserves the open keyboard.
+    //
+    // Everything below is wrapped in a single zero-size Box so this composable
+    // always contributes exactly ONE (zero-height) child to the caller's
+    // spacedBy bubble Column, whether or not the menu is open. Emitting the
+    // scrim popup as a second sibling only while expanded would otherwise add
+    // an extra Arrangement.spacedBy gap, visibly growing the bubble height on
+    // long-press (#284 review).
+    Box {
+        if (expanded) {
+            BackHandler(enabled = true) { onDismissRequest() }
+            // Scrim popup: composed before the menu so the menu renders on top of
+            // it. Fills the window and swallows any tap as a pure dismissal.
+            Popup(
+                properties =
+                    PopupProperties(
+                        focusable = false,
+                        // We own dismissal via the tap handler below; let the menu's
+                        // own outside-tap detection stay off so a single outside tap
+                        // is handled exactly once, here, and consumed.
+                        dismissOnClickOutside = false,
+                    ),
+                onDismissRequest = onDismissRequest,
             ) {
-                quickReactionEmojis.forEach { emoji ->
-                    EmojiActionButton(
-                        emoji = emoji,
-                        onClick = { onReact(emoji) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                IconButton(
-                    onClick = onOpenEmojiPicker,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        Icons.Default.EmojiEmotions,
-                        contentDescription = stringResource(R.string.open_emoji_picker),
-                    )
-                }
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectTapGestures { onDismissRequest() }
+                            },
+                )
             }
-            HorizontalDivider()
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = onDismissRequest,
+            properties =
+                PopupProperties(
+                    focusable = false,
+                    // Outside taps are handled by the scrim above (which also blocks
+                    // click-through); disabling the menu's own outside-dismiss keeps
+                    // a single tap from being processed twice.
+                    dismissOnClickOutside = false,
+                ),
+        ) {
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(8.dp).widthIn(min = 292.dp, max = 328.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                MessageActionButton(
-                    label = stringResource(R.string.reply),
-                    icon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                    onClick = onReply,
-                )
-                if (canEdit) {
-                    MessageActionButton(
-                        label = stringResource(R.string.edit),
-                        icon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        onClick = onEdit,
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    quickReactionEmojis.forEach { emoji ->
+                        EmojiActionButton(
+                            emoji = emoji,
+                            onClick = { onReact(emoji) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    IconButton(
+                        onClick = onOpenEmojiPicker,
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.EmojiEmotions,
+                            contentDescription = stringResource(R.string.open_emoji_picker),
+                        )
+                    }
                 }
-                MessageActionButton(
-                    label = stringResource(R.string.copy_text),
-                    icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                    onClick = onCopyText,
-                )
-                MessageActionButton(
-                    label = stringResource(R.string.message_info),
-                    icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                    onClick = onInfo,
-                )
-                if (canDelete) {
+                HorizontalDivider()
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                     MessageActionButton(
-                        label = stringResource(R.string.delete),
-                        icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        onClick = onDelete,
+                        label = stringResource(R.string.reply),
+                        icon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        onClick = onReply,
                     )
+                    if (canEdit) {
+                        MessageActionButton(
+                            label = stringResource(R.string.edit),
+                            icon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onEdit,
+                        )
+                    }
+                    MessageActionButton(
+                        label = stringResource(R.string.copy_text),
+                        icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        onClick = onCopyText,
+                    )
+                    MessageActionButton(
+                        label = stringResource(R.string.message_info),
+                        icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        onClick = onInfo,
+                    )
+                    if (canDelete) {
+                        MessageActionButton(
+                            label = stringResource(R.string.delete),
+                            icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = onDelete,
+                        )
+                    }
                 }
             }
         }
