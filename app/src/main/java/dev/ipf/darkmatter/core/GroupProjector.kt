@@ -97,6 +97,18 @@ object GroupProjector {
         mine: Boolean,
     ): Boolean = !mine && memberCount > 2
 
+    /**
+     * A conversation is a DM when it has exactly two members **and** no group
+     * name. A named two-member group is still a group, and anything larger is
+     * always a group regardless of name. (The core's canonical `isDm` isn't
+     * exposed on the group/chat-list records, so classify from the fields we
+     * have — the same name/headcount signals [displayTitle] already uses.)
+     */
+    fun isDm(
+        memberCount: Int,
+        name: String,
+    ): Boolean = memberCount == 2 && name.isBlank()
+
     fun memberRef(member: AppGroupMemberRecordFfi): String = member.account?.takeIf { it.isNotBlank() } ?: member.memberIdHex
 
     fun isAdmin(

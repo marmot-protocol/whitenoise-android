@@ -20,6 +20,18 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun isDmRequiresExactlyTwoMembersAndNoName() {
+        // Unnamed pair → DM.
+        assertTrue(GroupProjector.isDm(memberCount = 2, name = ""))
+        assertTrue(GroupProjector.isDm(memberCount = 2, name = "   "))
+        // Named pair → group, not a DM.
+        assertFalse(GroupProjector.isDm(memberCount = 2, name = "Project Marmot"))
+        // Larger conversations are always groups, named or not.
+        assertFalse(GroupProjector.isDm(memberCount = 3, name = ""))
+        assertFalse(GroupProjector.isDm(memberCount = 5, name = "Team"))
+    }
+
+    @Test
     fun adminStatusAcceptsAccountOrMemberCredentialIds() {
         val group = group(admins = listOf("alice", "credential-b"))
 
