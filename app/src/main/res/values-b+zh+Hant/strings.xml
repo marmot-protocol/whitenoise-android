@@ -75,6 +75,10 @@
     <string name="decline">拒絕</string>
     <string name="accept">接受</string>
     <string name="profile">個人檔案</string>
+    <string name="profile_no_bio">尚無簡介。</string>
+    <string name="profile_shared_groups">共同群組</string>
+    <string name="profile_no_shared_groups">尚無共同群組。</string>
+    <string name="profile_view_picture">查看頭像</string>
     <string name="dismiss">關閉</string>
     <string name="edit">編輯</string>
     <string name="save_group">保存群組</string>

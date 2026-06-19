@@ -78,6 +78,10 @@
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>
     <string name="profile">Профиль</string>
+    <string name="profile_no_bio">Биографии пока нет.</string>
+    <string name="profile_shared_groups">Общие группы</string>
+    <string name="profile_no_shared_groups">Пока нет общих групп.</string>
+    <string name="profile_view_picture">Посмотреть фото профиля</string>
     <string name="dismiss">Закрыть</string>
     <string name="edit">Изменить</string>
     <string name="save_group">Сохранить группу</string>
