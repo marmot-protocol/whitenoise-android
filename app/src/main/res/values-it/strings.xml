@@ -522,8 +522,6 @@
     <string name="profile_picture_subtitle_set">La tua immagine del profilo attuale.</string>
     <string name="profile_picture_subtitle_none">Nessuna immagine impostata.</string>
     <string name="profile_picture_subtitle_ready">Pronto a usare questo link.</string>
-    <string name="profile_picture_choose_photo">Scegli dalle foto</string>
-    <string name="profile_picture_choose_photo_unavailable">Disponibile a breve — per ora incolla un link.</string>
     <string name="profile_picture_paste_link">Incolla un link</string>
     <string name="profile_picture_remove">Rimuovi immagine</string>
     <string name="profile_picture_use_link">Usa questo link</string>

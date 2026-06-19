@@ -522,8 +522,6 @@
     <string name="profile_picture_subtitle_set">Tu foto de perfil actual.</string>
     <string name="profile_picture_subtitle_none">Aún no has establecido una foto.</string>
     <string name="profile_picture_subtitle_ready">Listo para usar este enlace.</string>
-    <string name="profile_picture_choose_photo">Elegir de las fotos</string>
-    <string name="profile_picture_choose_photo_unavailable">Próximamente: pega un enlace por ahora.</string>
     <string name="profile_picture_paste_link">Pegar un enlace</string>
     <string name="profile_picture_remove">Quitar foto</string>
     <string name="profile_picture_use_link">Usar este enlace</string>

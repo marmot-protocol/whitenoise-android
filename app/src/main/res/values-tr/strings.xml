@@ -519,8 +519,6 @@
     <string name="profile_picture_subtitle_set">Mevcut profil resminiz.</string>
     <string name="profile_picture_subtitle_none">Henüz resim ayarlanmadı.</string>
     <string name="profile_picture_subtitle_ready">Bu bağlantı kullanıma hazır.</string>
-    <string name="profile_picture_choose_photo">Fotoğraflardan seç</string>
-    <string name="profile_picture_choose_photo_unavailable">Yakında — şimdilik bir bağlantı yapıştırın.</string>
     <string name="profile_picture_paste_link">Bağlantı yapıştır</string>
     <string name="profile_picture_remove">Resmi kaldır</string>
     <string name="profile_picture_use_link">Bu bağlantıyı kullan</string>

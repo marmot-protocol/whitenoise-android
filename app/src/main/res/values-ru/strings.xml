@@ -531,8 +531,6 @@
     <string name="profile_picture_subtitle_set">Ваше текущее фото профиля.</string>
     <string name="profile_picture_subtitle_none">Фото ещё не задано.</string>
     <string name="profile_picture_subtitle_ready">Готово использовать эту ссылку.</string>
-    <string name="profile_picture_choose_photo">Выбрать из фото</string>
-    <string name="profile_picture_choose_photo_unavailable">Скоро — пока вставьте ссылку.</string>
     <string name="profile_picture_paste_link">Вставить ссылку</string>
     <string name="profile_picture_remove">Удалить фото</string>
     <string name="profile_picture_use_link">Использовать ссылку</string>

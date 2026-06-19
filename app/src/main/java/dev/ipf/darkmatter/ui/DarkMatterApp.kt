@@ -11705,9 +11705,9 @@ private fun ProfileEditScreen(
                         Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         // Tappable avatar control: opens the picture bottom
-                        // sheet (choose-from-photos / paste-link / remove). A
-                        // small edit badge signals it's interactive. Replaces
-                        // the old standalone "Picture URL" text row. See #286.
+                        // sheet (paste-link / remove). A small edit badge
+                        // signals it's interactive. Replaces the old standalone
+                        // "Picture URL" text row. See #286.
                         val editPictureLabel = stringResource(R.string.profile_picture_edit)
                         Box(
                             contentAlignment = Alignment.BottomEnd,
@@ -11752,6 +11752,20 @@ private fun ProfileEditScreen(
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        // Surface an invalid stored picture URL right on the
+                        // avatar control. The inline Picture URL row is gone, so
+                        // without this an unsafe/malformed `picture` would
+                        // silently disable Publish with no on-screen reason; the
+                        // caption tells the user to tap the avatar to fix it.
+                        // See #286.
+                        if (picture.isNotBlank() && !ProfileFieldValidation.isAcceptablePictureUrl(picture)) {
+                            Text(
+                                stringResource(R.string.profile_picture_invalid),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
             }
@@ -11889,21 +11903,19 @@ private fun ProfileEditScreen(
  * old standalone "Picture URL" text row (see #286).
  *
  * Two modes inside one sheet:
- *  - Options list: "Choose from photos" (device pick + upload), "Paste a
- *    link", and "Remove picture" (only when one is set).
+ *  - Options list: "Paste a link" and "Remove picture" (only when one is set).
  *  - Paste-link editor: an HTTPS URL field with a live preview avatar and the
  *    same SSRF/HTTPS guard the publish path applies ([ProfileSanitizer.imageUrl],
  *    see #89). Apply is gated on a sanitizable URL, so a malformed value can
  *    never be committed from here.
  *
- * "Choose from photos" is intentionally DISABLED for now: a kind:0 `picture`
- * is public Nostr metadata that every client must fetch without an MLS group
- * key, and the only byte-upload binding (`uploadMedia`) encrypts per-group —
- * its output is unreadable as a public avatar. Wiring device-pick → upload
- * needs a public Blossom upload FFI that doesn't exist yet (see #286). The row
- * is shown-but-disabled so the editor already reads with the intended shape and
- * lights up for free once that binding lands, rather than offering a control
- * that silently does nothing.
+ * The device-pick → upload half of #286 ("Choose from photos") is deliberately
+ * NOT offered here: a kind:0 `picture` is public Nostr metadata that every
+ * client must fetch without an MLS group key, and the only byte-upload binding
+ * (`uploadMedia`) encrypts per-group — its output is unreadable as a public
+ * avatar. Wiring device-pick → upload needs a public Blossom upload FFI that
+ * doesn't exist yet plus a product/protocol decision (tracked in #307); this
+ * PR ships only the implementable URL-consolidation half, so #286 stays open.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -11962,19 +11974,6 @@ private fun ProfilePictureSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                // Device pick: disabled until a public upload binding exists.
-                // `.alpha` dims the whole row so it reads as non-interactive;
-                // no onClick is wired, so tapping it is a no-op.
-                ListItem(
-                    leadingContent = { Icon(Icons.Default.Image, contentDescription = null) },
-                    headlineContent = { Text(stringResource(R.string.profile_picture_choose_photo)) },
-                    supportingContent = { Text(stringResource(R.string.profile_picture_choose_photo_unavailable)) },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .alpha(0.5f),
-                )
                 ListItem(
                     leadingContent = { Icon(Icons.Default.Link, contentDescription = null) },
                     headlineContent = { Text(stringResource(R.string.profile_picture_paste_link)) },

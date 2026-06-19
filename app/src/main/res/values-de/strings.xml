@@ -519,8 +519,6 @@
     <string name="profile_picture_subtitle_set">Ihr aktuelles Profilbild.</string>
     <string name="profile_picture_subtitle_none">Noch kein Bild festgelegt.</string>
     <string name="profile_picture_subtitle_ready">Bereit, diesen Link zu verwenden.</string>
-    <string name="profile_picture_choose_photo">Aus Fotos auswählen</string>
-    <string name="profile_picture_choose_photo_unavailable">Demnächst – fügen Sie vorerst einen Link ein.</string>
     <string name="profile_picture_paste_link">Link einfügen</string>
     <string name="profile_picture_remove">Bild entfernen</string>
     <string name="profile_picture_use_link">Diesen Link verwenden</string>

@@ -513,8 +513,6 @@
     <string name="profile_picture_subtitle_set">你目前的頭像。</string>
     <string name="profile_picture_subtitle_none">尚未設定頭像。</string>
     <string name="profile_picture_subtitle_ready">可以使用此連結。</string>
-    <string name="profile_picture_choose_photo">從相片中選擇</string>
-    <string name="profile_picture_choose_photo_unavailable">即將推出 — 目前請貼上連結。</string>
     <string name="profile_picture_paste_link">貼上連結</string>
     <string name="profile_picture_remove">移除頭像</string>
     <string name="profile_picture_use_link">使用此連結</string>
