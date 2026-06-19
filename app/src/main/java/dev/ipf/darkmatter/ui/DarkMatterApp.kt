@@ -236,8 +236,10 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -278,6 +280,7 @@ import dev.ipf.darkmatter.core.GroupSystemCopy
 import dev.ipf.darkmatter.core.GroupSystemEvents
 import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
+import dev.ipf.darkmatter.core.MessageBodyMatch
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ProfileFieldValidation
@@ -288,6 +291,7 @@ import dev.ipf.darkmatter.core.ReactionTally
 import dev.ipf.darkmatter.core.RecentEmojiList
 import dev.ipf.darkmatter.core.RecipientReference
 import dev.ipf.darkmatter.core.ReplySwipe
+import dev.ipf.darkmatter.core.SnippetHighlight
 import dev.ipf.darkmatter.core.TimelineProjector
 import dev.ipf.darkmatter.core.replyMediaKindFromMime
 import dev.ipf.darkmatter.media.DuckDuckGoImageSearchClient
@@ -342,7 +346,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -880,6 +886,12 @@ private fun MainShell(
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedChat by remember { mutableStateOf<ChatListItem?>(null) }
+    // When a conversation is opened from a chat-list message-body search hit
+    // (issue #290), this carries the matched message id so ConversationScreen
+    // can scroll to and briefly highlight it on open. Null for every other
+    // open path (row tap, notification, new-chat), which lands at the normal
+    // unread/newest anchor.
+    var selectedChatFocusMessageId by remember { mutableStateOf<String?>(null) }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
@@ -959,7 +971,10 @@ private fun MainShell(
                 settingsDetailName = null
                 allChats
                     .firstOrNull { it.group.groupIdHex == step.groupIdHex }
-                    ?.let { selectedChat = it }
+                    ?.let {
+                        selectedChatFocusMessageId = null
+                        selectedChat = it
+                    }
                 onNotificationTargetHandled(target)
             }
             NotificationNavStep.MissingAccount -> {
@@ -994,7 +1009,11 @@ private fun MainShell(
         ConversationScreen(
             appState = appState,
             chat = selectedChat!!,
-            onBack = { selectedChat = null },
+            focusMessageId = selectedChatFocusMessageId,
+            onBack = {
+                selectedChat = null
+                selectedChatFocusMessageId = null
+            },
         )
         return
     }
@@ -1008,7 +1027,10 @@ private fun MainShell(
                     sectionName = MainSection.Settings.name
                     settingsDetailName = null
                 },
-                onOpenGroup = { selectedChat = it },
+                onOpenGroup = { item, focusMessageId ->
+                    selectedChatFocusMessageId = focusMessageId
+                    selectedChat = item
+                },
             )
         MainSection.Settings ->
             SettingsScreen(
@@ -1067,7 +1089,10 @@ private fun ChatsScreen(
     appState: DarkMatterAppState,
     controller: ChatsController,
     onOpenSettings: () -> Unit,
-    onOpenGroup: (ChatListItem) -> Unit,
+    // (chat, focusMessageId): focusMessageId is non-null only when the row was
+    // a message-body search hit (issue #290); the conversation then scrolls to
+    // that message on open.
+    onOpenGroup: (ChatListItem, String?) -> Unit,
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChat by remember { mutableStateOf(false) }
@@ -1082,6 +1107,13 @@ private fun ChatsScreen(
     // next open starts fresh.
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    // Async message-body search results (issue #290), keyed by group id. The
+    // title/preview match in `applyChatListSearchAndFilter` is synchronous;
+    // body matching has to query each conversation's local timeline via the
+    // `timelineMessages` FFI, so it lands here a debounce later. A row uses
+    // its entry (if any) to render the highlighted snippet line and to scroll
+    // to the matched message on tap-through.
+    var bodyMatches by remember { mutableStateOf<Map<String, MessageBodyMatch>>(emptyMap()) }
     var filter by remember { mutableStateOf(ChatListFilter.All) }
     // The Archived filter is a view switch, not a row predicate: it swaps the
     // source list to archived chats (replacing the old dedicated Archived row).
@@ -1146,9 +1178,33 @@ private fun ChatsScreen(
     // state. Keying on `profileRev` re-fires the filter when the
     // backing presentation cache invalidates.
     val profileRev = appState.profileRevisionForCompose
+    // Debounced async message-body search. Re-runs whenever the query or the
+    // source list changes; the trimmed query is the unit of work, so edits
+    // that don't change the trimmed needle (e.g. trailing spaces) don't
+    // re-query. A blank query clears results immediately (no debounce) so the
+    // snippet lines vanish the moment the field is emptied. The 275 ms wait
+    // sits inside the existing chat-list input-debounce band (250–300 ms);
+    // each keystroke cancels the prior in-flight search via the LaunchedEffect
+    // key change, so only the settled query hits the FFI.
+    val trimmedQuery = searchQuery.trim()
+    LaunchedEffect(trimmedQuery, sourceList) {
+        if (trimmedQuery.isEmpty()) {
+            bodyMatches = emptyMap()
+            return@LaunchedEffect
+        }
+        delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
+        bodyMatches = controller.searchMessageBodies(sourceList, trimmedQuery)
+    }
     val visibleItems =
-        remember(sourceList, searchQuery, filter, groupTitleCopy, profileRev) {
-            applyChatListSearchAndFilter(sourceList, searchQuery, filter, appState, groupTitleCopy)
+        remember(sourceList, searchQuery, filter, groupTitleCopy, profileRev, bodyMatches) {
+            applyChatListSearchAndFilter(
+                sourceList,
+                searchQuery,
+                filter,
+                appState,
+                groupTitleCopy,
+                bodyMatchGroupIds = bodyMatches.keys,
+            )
         }
     val archivedUnreadCount =
         remember(controller.archivedItems) {
@@ -1256,11 +1312,13 @@ private fun ChatsScreen(
                     else ->
                         LazyColumn(Modifier.fillMaxSize()) {
                             items(visibleItems, key = { it.id }) { item ->
+                                val bodyMatch = bodyMatches[item.id]
                                 SwipeableChatRow(
                                     item = item,
                                     appState = appState,
                                     isInArchivedView = showArchived,
-                                    onOpen = { onOpenGroup(item) },
+                                    bodyMatch = bodyMatch,
+                                    onOpen = { onOpenGroup(item, bodyMatch?.messageIdHex) },
                                     onSwipeArchiveToggle = { onSettled ->
                                         // Swipe path: suppress the plain
                                         // confirmation toast and instead
@@ -1343,7 +1401,7 @@ private fun ChatsScreen(
                         } == true
                 }
             },
-            onOpenConversation = onOpenGroup,
+            onOpenConversation = { chat -> onOpenGroup(chat, null) },
             onDismiss = { showNewChat = false },
         )
     }
@@ -1374,6 +1432,7 @@ private fun applyChatListSearchAndFilter(
     filter: ChatListFilter,
     appState: DarkMatterAppState,
     titleCopy: GroupTitleCopy,
+    bodyMatchGroupIds: Set<String> = emptySet(),
 ): List<ChatListItem> {
     val byFilter =
         when (filter) {
@@ -1397,7 +1456,16 @@ private fun applyChatListSearchAndFilter(
         val title = chatListItemDisplayTitle(item, appState, titleCopy).lowercase()
         if (title.contains(ciNeedle)) return@filter true
         val preview = item.projectedPreviewText().lowercase()
-        preview.contains(ciNeedle)
+        if (preview.contains(ciNeedle)) return@filter true
+        // Message-body matches (issue #290): the async per-chat search
+        // (ChatsController.searchMessageBodies) found the needle inside this
+        // conversation's local timeline even though it isn't in the title or
+        // preview line. The matched message id + highlighted snippet ride a
+        // separate map keyed by group id; here we only need to know the chat
+        // qualifies so it joins the result set. Body matches still pass
+        // through the chip filter above, so an Unread/Groups filter narrows
+        // them the same way it narrows title/preview hits.
+        item.group.groupIdHex in bodyMatchGroupIds
     }
 }
 
@@ -1722,6 +1790,9 @@ private fun SwipeableChatRow(
     onSwipeArchiveToggle: (onSettled: () -> Unit) -> Unit,
     onMenuArchiveToggle: () -> Unit,
     onMarkRead: () -> Unit,
+    // Non-null when this row matched the chat-list search on a message body
+    // (issue #290); drives the highlighted snippet line under the row.
+    bodyMatch: MessageBodyMatch? = null,
 ) {
     val density = LocalDensity.current
     // Horizontal travel must lead vertical by both a ratio AND an
@@ -1886,6 +1957,7 @@ private fun SwipeableChatRow(
                 appState = appState,
                 onClick = onOpen,
                 onLongClick = { menuOpen = true },
+                bodyMatch = bodyMatch,
             )
             DropdownMenu(
                 expanded = menuOpen,
@@ -1994,12 +2066,35 @@ fun QuickActionFabMenu(
     }
 }
 
+/**
+ * Render a [SnippetHighlight] as an [AnnotatedString] with the matched needle
+ * range styled by [highlight]. The range is guaranteed valid by
+ * `ChatListMessageSearch.buildSnippet`, but we clamp defensively so a future
+ * change to the snippet builder can never throw here on the chat-list hot path.
+ */
+private fun highlightedSnippet(
+    snippet: SnippetHighlight,
+    highlight: SpanStyle,
+): AnnotatedString {
+    val text = snippet.text
+    val start = snippet.highlightStart.coerceIn(0, text.length)
+    val end = snippet.highlightEnd.coerceIn(start, text.length)
+    return buildAnnotatedString {
+        append(text)
+        if (end > start) addStyle(highlight, start, end)
+    }
+}
+
 @Composable
 private fun ChatRow(
     item: ChatListItem,
     appState: DarkMatterAppState,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
+    // Message-body search hit for this row (issue #290): when present, a
+    // second supporting line shows the matched message with the needle
+    // highlighted, so the user can see why the chat appeared in the results.
+    bodyMatch: MessageBodyMatch? = null,
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     val messageTextCopy = rememberMessageTextCopy()
@@ -2067,12 +2162,36 @@ private fun ChatRow(
                         },
                     )
                 }
-            Text(
-                text = preview,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = preview,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
+                )
+                // Search snippet line: only for rows matched on a message body
+                // (not title/preview), so a normal chat list and title/preview
+                // hits keep the single-line layout. The matched needle is
+                // emphasized so the reason the chat surfaced is obvious.
+                if (bodyMatch != null) {
+                    val highlightStyle =
+                        SpanStyle(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    val snippetText =
+                        remember(bodyMatch.snippet, highlightStyle) {
+                            highlightedSnippet(bodyMatch.snippet, highlightStyle)
+                        }
+                    Text(
+                        text = snippetText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         },
         trailingContent = {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -5673,6 +5792,11 @@ private fun GroupSystemRow(
 // How many rows from the top to begin prefetching the next older page.
 private const val OLDER_PAGE_PREFETCH_ROWS = 4
 
+// Debounce before the chat-list message-body search fires its per-chat FFI
+// queries (issue #290). Sits inside the existing 250–300 ms chat-list input
+// debounce band so a fast typist doesn't trigger a query per keystroke.
+private const val CHAT_LIST_SEARCH_DEBOUNCE_MS: Long = 275L
+
 /**
  * Shared definition of "user is at (or near) the newest message". Used both
  * by the auto-scroll LaunchedEffect (issue #59) and the jump-to-newest FAB
@@ -5739,6 +5863,10 @@ private fun ConversationScreen(
     appState: DarkMatterAppState,
     chat: ChatListItem,
     onBack: () -> Unit,
+    // When opened from a chat-list message-body search hit (issue #290), the
+    // matched message id to scroll to and briefly highlight once the timeline
+    // has paged it in. Null for every normal open path.
+    focusMessageId: String? = null,
 ) {
     // Push the global snackbar host above the conversation composer so
     // a toast (e.g. the post-invite-accept confirmation) doesn't
@@ -6638,6 +6766,40 @@ private fun ConversationScreen(
                     listState.scrollToItem(bottomTimelineIndex)
                 }
             }
+        }
+    }
+
+    // Scroll-to-message for a chat-list message-body search hit (issue #290).
+    // Waits for the first-open anchor to settle, then pages the local timeline
+    // back until the matched message is materialized and scrolls to it with a
+    // brief highlight — the same affordance the reply-jump uses. Fires once
+    // per (chat.id, focusMessageId); a missing message (e.g. it was deleted
+    // between the search and the tap) just toasts and leaves the user at the
+    // normal anchor. Local-only: loadUntilMessageAvailable paginates the
+    // already-persisted store, never a relay fetch.
+    LaunchedEffect(chat.id, focusMessageId) {
+        val target = focusMessageId ?: return@LaunchedEffect
+        // Let the initial unread/newest anchor run first so our scroll isn't
+        // immediately overwritten by it.
+        snapshotFlow { initialTimelineAnchored }.filter { it }.first()
+        if (!controller.loadUntilMessageAvailable(target)) {
+            appState.present(R.string.toast_original_message_unavailable)
+            return@LaunchedEffect
+        }
+        val timelineIndex =
+            controller.timeline
+                .filterNot { MessageProjector.isEdit(it.record) }
+                .indexOfFirst { it.record.messageIdHex == target }
+        if (timelineIndex < 0) {
+            appState.present(R.string.toast_original_message_unavailable)
+            return@LaunchedEffect
+        }
+        val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+        listState.animateScrollToItem(1 + olderMessagesHeaderCount + timelineIndex)
+        highlightedMessageId = target
+        delay(1_500L)
+        if (highlightedMessageId == target) {
+            highlightedMessageId = null
         }
     }
 

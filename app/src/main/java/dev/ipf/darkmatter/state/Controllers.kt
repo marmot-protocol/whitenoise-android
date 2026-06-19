@@ -7,9 +7,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
+import dev.ipf.darkmatter.core.ChatListMessageSearch
 import dev.ipf.darkmatter.core.EditState
 import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.core.GroupSystemEvents
+import dev.ipf.darkmatter.core.MessageBodyMatch
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ReactionTally
@@ -52,11 +54,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
@@ -777,6 +783,101 @@ class ChatsController(
     }
 
     /**
+     * Search message bodies across the given chats' local timelines for
+     * [rawQuery] (issue #290). Returns, per matched group, the first
+     * (newest-first, the order the FFI search returns) searchable message
+     * whose plaintext contains the needle, with a highlighted snippet for
+     * the chat row's secondary line and the message id for tap-through
+     * scroll-to-message.
+     *
+     * Local-only by construction: this drives the `timelineMessages` FFI
+     * search primitive, which reads the account's local SQLite store (the
+     * source of truth) and triggers no relay fetch. Per the AGENTS.md
+     * source-of-truth rule we add no Android-side message cache — each call
+     * re-queries the engine.
+     *
+     * Per-chat queries fan out concurrently (bounded by [SEARCH_FANOUT]) off
+     * the main thread. The FFI `search` field already narrows the scan in
+     * the engine; we additionally gate each returned row through
+     * [ChatListMessageSearch.isSearchableBody] so reactions, deletes,
+     * edits, stream-start, and kind-1210 system rows can never surface as a
+     * body match even if the engine's text index includes them.
+     *
+     * Returns an empty map for a blank needle or when no account is bound.
+     * Cancellation propagates (the caller debounces and cancels superseded
+     * queries).
+     */
+    suspend fun searchMessageBodies(
+        chats: List<ChatListItem>,
+        rawQuery: String,
+    ): Map<String, MessageBodyMatch> {
+        val account = accountRef ?: return emptyMap()
+        val needle = rawQuery.trim()
+        if (needle.isEmpty()) return emptyMap()
+        val ciNeedle = needle.lowercase()
+        return withContext(Dispatchers.IO) {
+            val semaphore = Semaphore(SEARCH_FANOUT)
+            coroutineScope {
+                val deferred =
+                    chats.map { item ->
+                        async {
+                            semaphore.withPermit {
+                                searchOneChat(account, item.group.groupIdHex, needle, ciNeedle)
+                            }
+                        }
+                    }
+                deferred.awaitAll().filterNotNull().associateBy { it.groupIdHex }
+            }
+        }
+    }
+
+    private suspend fun searchOneChat(
+        account: String,
+        groupIdHex: String,
+        needle: String,
+        ciNeedle: String,
+    ): MessageBodyMatch? {
+        val page =
+            runCatching {
+                appState.marmotIo {
+                    timelineMessages(
+                        account,
+                        TimelineMessageQueryFfi(
+                            groupIdHex = groupIdHex,
+                            search = needle,
+                            before = null,
+                            beforeMessageId = null,
+                            after = null,
+                            afterMessageId = null,
+                            limit = SEARCH_PER_CHAT_LIMIT,
+                        ),
+                    )
+                }
+            }.getOrElse { throwable ->
+                if (throwable is CancellationException) throw throwable
+                // A single chat's search failing (e.g. transient engine
+                // error) must not blank the whole result set — drop just
+                // this chat and let the others surface.
+                chatsDebug(throwable) {
+                    "message-body search failed group=${groupIdHex.take(8)}: " +
+                        (throwable.message ?: throwable.javaClass.simpleName)
+                }
+                return null
+            }
+        val match =
+            page.messages.firstOrNull { record ->
+                ChatListMessageSearch.isSearchableBody(record.kind, record.deleted, record.plaintext) &&
+                    ChatListMessageSearch.bodyMatches(record.plaintext, ciNeedle)
+            } ?: return null
+        val snippet = ChatListMessageSearch.buildSnippet(match.plaintext, needle) ?: return null
+        return MessageBodyMatch(
+            groupIdHex = groupIdHex,
+            messageIdHex = match.messageIdHex,
+            snippet = snippet,
+        )
+    }
+
+    /**
      * Flip the archived flag on `groupIdHex` from the chat-list surface
      * (swipe / long-press menu). Mirrors `ConversationController.setArchived`
      * but takes the id by parameter since the caller doesn't have an open
@@ -1129,6 +1230,14 @@ private inline fun chatsDebug(
 }
 
 private val ConversationTimelinePageLimit = 50u
+
+// Chat-list message-body search (issue #290). [SEARCH_FANOUT] caps the number
+// of per-chat `timelineMessages` FFI queries running at once so a large chat
+// list doesn't flood the IO dispatcher; [SEARCH_PER_CHAT_LIMIT] caps how many
+// matching rows the engine returns per chat — we only need the newest match to
+// surface the row and its snippet, so a small page keeps each query cheap.
+private const val SEARCH_FANOUT = 6
+private val SEARCH_PER_CHAT_LIMIT = 5u
 
 // Cap on how many subscription updates one coalesced batch can absorb. A
 // runaway producer shouldn't be able to wedge the UI behind an unbounded
