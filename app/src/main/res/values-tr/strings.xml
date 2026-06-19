@@ -528,4 +528,13 @@
     <string name="profile_lightning_invalid">name@example.com gibi bir Lightning adresi girin.</string>
     <string name="reaction_tap_to_remove">Kaldırmak için dokun</string>
     <string name="chat_list_filter_groups">Gruplar</string>
+    <!-- Conversation in-chat search (#292) -->
+    <string name="conversation_search_open">Ara</string>
+    <string name="conversation_search_hint">Bu sohbette ara</string>
+    <string name="conversation_search_clear">Aramayı temizle</string>
+    <string name="conversation_search_close">Aramayı kapat</string>
+    <string name="conversation_search_prev">Önceki eşleşme</string>
+    <string name="conversation_search_next">Sonraki eşleşme</string>
+    <string name="conversation_search_match_count">%1$d/%2$d</string>
+    <string name="conversation_search_no_matches">Eşleşme yok</string>
 </resources>

@@ -114,6 +114,8 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MarkChatRead
@@ -253,6 +255,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -281,6 +284,7 @@ import dev.ipf.darkmatter.core.GroupSystemEvents
 import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MessageProjector
+import dev.ipf.darkmatter.core.MessageSearch
 import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ProfileFieldValidation
 import dev.ipf.darkmatter.core.ProfileLink
@@ -1527,6 +1531,136 @@ private fun ChatListTopBar(
             }
         },
     )
+}
+
+// Roomier than Material's default menu-item padding so conversation overflow
+// rows read as full lines of text rather than compact cells.
+private val conversationMenuItemPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp)
+
+/**
+ * Inline top-bar search for a single conversation (#292): a back arrow plus an
+ * auto-focused field (✕ clears). The result count and previous/next match
+ * navigation live on the bottom bar above the keyboard
+ * ([ConversationSearchNavBar]); the IME "search" action steps to the next
+ * match so the on-screen keyboard alone can walk the results.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConversationSearchTopBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit,
+    onClose: () -> Unit,
+    onSearchAction: () -> Unit,
+    focusRequester: FocusRequester,
+) {
+    val hasQuery = query.isNotBlank()
+    TopAppBar(
+        title = {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.conversation_search_hint)) },
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                    ),
+                // Clear sits inline in the field; match navigation and the
+                // result count live on the bottom bar above the keyboard.
+                trailingIcon = {
+                    if (hasQuery) {
+                        IconButton(onClick = onClear) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.conversation_search_clear),
+                            )
+                        }
+                    }
+                },
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Search,
+                    ),
+                keyboardActions = KeyboardActions(onSearch = { onSearchAction() }),
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onClose) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.conversation_search_close),
+                )
+            }
+        },
+    )
+}
+
+/**
+ * Search match navigation pinned above the keyboard while in-chat search is
+ * open: a centered result count with previous/next steppers on the trailing
+ * edge. Lives in the conversation `bottomBar` slot in place of the composer,
+ * mirroring the composer's `navigationBarsPadding().imePadding()` so it rides
+ * up with the soft keyboard rather than hiding behind it.
+ */
+@Composable
+private fun ConversationSearchNavBar(
+    matchCount: Int,
+    activeIndex: Int,
+    hasQuery: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+) {
+    val navEnabled = matchCount > 0
+    Surface(tonalElevation = 3.dp) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(start = 16.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text =
+                    when {
+                        !hasQuery -> ""
+                        matchCount > 0 ->
+                            stringResource(
+                                R.string.conversation_search_match_count,
+                                activeIndex + 1,
+                                matchCount,
+                            )
+                        else -> stringResource(R.string.conversation_search_no_matches)
+                    },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onPrev, enabled = navEnabled) {
+                Icon(
+                    Icons.Default.KeyboardArrowUp,
+                    contentDescription = stringResource(R.string.conversation_search_prev),
+                )
+            }
+            IconButton(onClick = onNext, enabled = navEnabled) {
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.conversation_search_next),
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -5785,6 +5919,22 @@ private fun ConversationScreen(
     var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
     var highlightedMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     var navigateReplyJob by remember(chat.id) { mutableStateOf<Job?>(null) }
+    // In-chat search (#292). Opening from the overflow menu swaps the top
+    // bar into an inline search field; closing it restores the normal bar.
+    // `searchPinnedMatchId` keeps the active match anchored to a concrete
+    // message id so the N/M cursor follows that message as older pages load
+    // and the match set grows. `searchJob` serializes scroll-jump coroutines
+    // the same way `navigateReplyJob` does for reply navigation.
+    var searchOpen by remember(chat.id) { mutableStateOf(false) }
+    var searchQuery by remember(chat.id) { mutableStateOf("") }
+    var searchPinnedMatchId by remember(chat.id) { mutableStateOf<String?>(null) }
+    var searchJob by remember(chat.id) { mutableStateOf<Job?>(null) }
+    // Scroll anchor captured the moment search opens, restored verbatim on
+    // close so leaving search returns the list to where the reader was —
+    // #292 requires "Closing search restores the normal top bar and scroll
+    // position." Pair = (firstVisibleItemIndex, firstVisibleItemScrollOffset).
+    var preSearchScrollAnchor by remember(chat.id) { mutableStateOf<Pair<Int, Int>?>(null) }
+    val searchFocusRequester = remember { FocusRequester() }
     // Jump-to-newest plumbing.
     //
     // Badge = incoming messages newer than the highest-index timeline row the
@@ -6520,10 +6670,6 @@ private fun ConversationScreen(
             }
     }
 
-    BackHandler {
-        onBack()
-    }
-
     LaunchedEffect(controller) {
         initialTimelineLoadStarted = true
         controller.start()
@@ -6542,6 +6688,125 @@ private fun ConversationScreen(
     val transcriptLocale = LocalConfiguration.current.locales[0]
     val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
     val bottomTimelineIndex = renderedTimeline.size + 1 + olderHeaderCount
+
+    // In-chat search match set. Computed over the currently-loaded, rendered
+    // (edit-filtered) timeline only — no relay fetch, no full-history preload.
+    // Reactions / deletes / group-system / agent-stream rows carry no
+    // user-typed body and are excluded by `MessageSearch.isSearchable`. As
+    // older pages load, `renderedTimeline` grows and the match set expands
+    // naturally. Keyed on `controller.timeline` (not just `renderedTimeline`'s
+    // edges/size) so a kind-1009 edit — which changes the body returned by
+    // `controller.displayedText(...)` without altering the rendered timeline's
+    // first/last id or size — re-runs the derivation and keeps matches fresh.
+    val searchMatchIds =
+        remember(searchQuery, controller.timeline, renderedTimeline) {
+            if (searchQuery.isBlank()) {
+                emptyList()
+            } else {
+                // Restrict to rows that carry a user-typed body, then run the
+                // shared substring matcher over those bodies and map the hit
+                // indices back to message ids (timeline order preserved).
+                // Snapshot the body once per row so the displayed (post-edit)
+                // text used for matching is the same text used to map hits.
+                val searchable =
+                    renderedTimeline.mapNotNull { item ->
+                        val body = controller.displayedText(item.record)
+                        if (MessageSearch.isSearchable(item.record, body)) {
+                            item.record.messageIdHex to body
+                        } else {
+                            null
+                        }
+                    }
+                val bodies = searchable.map { it.second }
+                MessageSearch
+                    .matchIndices(bodies, searchQuery)
+                    .map { searchable[it].first }
+            }
+        }
+    // The active match ordinal, re-anchored to the pinned message id so it
+    // tracks that message as the set grows. -1 when there are no matches.
+    val searchActiveIndex = MessageSearch.resolveCursor(searchMatchIds, searchPinnedMatchId)
+    // Keep the pin valid: if the resolved cursor fell back to the first match
+    // (pin gone / unset) adopt that match id as the new pin so subsequent
+    // steps move relative to a real anchor.
+    LaunchedEffect(searchMatchIds, searchActiveIndex) {
+        if (searchActiveIndex >= 0) {
+            val resolvedId = searchMatchIds[searchActiveIndex]
+            if (searchPinnedMatchId != resolvedId) searchPinnedMatchId = resolvedId
+        }
+    }
+
+    fun scrollToSearchMatch(messageIdHex: String) {
+        searchJob?.cancel()
+        searchJob =
+            scope.launch {
+                // Local-only: the message is already in the loaded window
+                // (matches are derived from it), so this resolves immediately;
+                // the helper is reused for symmetry with reply navigation and
+                // guards the rare case where a concurrent trim dropped the row.
+                if (!controller.loadUntilMessageAvailable(messageIdHex)) return@launch
+                val timelineIndex =
+                    renderedTimeline.indexOfFirst { it.record.messageIdHex == messageIdHex }
+                if (timelineIndex < 0) return@launch
+                listState.animateScrollToItem(1 + olderHeaderCount + timelineIndex)
+                highlightedMessageId = messageIdHex
+                delay(1_500L)
+                if (highlightedMessageId == messageIdHex) {
+                    highlightedMessageId = null
+                }
+            }
+    }
+
+    // Step the cursor (next = forward/newer, previous = backward/older) with
+    // wrap-around, pin the new match, and jump+highlight it.
+    fun navigateToSearchMatch(forward: Boolean) {
+        if (searchMatchIds.isEmpty()) return
+        val next = MessageSearch.step(searchActiveIndex, searchMatchIds.size, forward)
+        if (next < 0) return
+        val targetId = searchMatchIds[next]
+        searchPinnedMatchId = targetId
+        scrollToSearchMatch(targetId)
+    }
+
+    fun closeSearch() {
+        searchOpen = false
+        searchQuery = ""
+        searchPinnedMatchId = null
+        searchJob?.cancel()
+        highlightedMessageId = null
+        // Restore the scroll position captured when search opened (#292). The
+        // cancel above stops any in-flight search scroll-jump, so this resolves
+        // to the pre-search anchor without racing the search animation.
+        preSearchScrollAnchor?.let { (index, offset) ->
+            searchJob =
+                scope.launch {
+                    listState.scrollToItem(index, offset)
+                }
+        }
+        preSearchScrollAnchor = null
+    }
+
+    // Back closes an open search first (restoring the normal bar) before it
+    // leaves the conversation — matching the chat-list search affordance.
+    BackHandler {
+        if (searchOpen) closeSearch() else onBack()
+    }
+
+    // Auto-focus the field on open; clear transient highlight on close.
+    LaunchedEffect(searchOpen) {
+        if (searchOpen) {
+            searchFocusRequester.requestFocus()
+        }
+    }
+    // Jump to the first match as soon as one exists for the current query, so
+    // typing immediately scrolls to (and highlights) the newest match without
+    // requiring the user to tap an arrow first.
+    LaunchedEffect(searchMatchIds.firstOrNull(), searchOpen) {
+        if (searchOpen && searchMatchIds.isNotEmpty()) {
+            val firstId = searchMatchIds[searchActiveIndex.coerceAtLeast(0)]
+            scrollToSearchMatch(firstId)
+        }
+    }
 
     // Extend history a few rows before the reader reaches the top, while a
     // keyed message is still the anchor. Compose's keyed prepend then holds
@@ -6675,80 +6940,148 @@ private fun ConversationScreen(
     val openDetailsDescription = stringResource(R.string.details)
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { showDetails = true }
-                                .semantics { contentDescription = openDetailsDescription },
-                    ) {
-                        Avatar(
-                            title = controller.title(groupTitleCopy),
-                            seed = controller.group.groupIdHex,
-                            size = 36.dp,
-                            pictureUrl = controller.group.avatarUrl,
-                        )
-                        Column {
-                            Text(
-                                controller.title(groupTitleCopy),
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+            if (searchOpen) {
+                ConversationSearchTopBar(
+                    query = searchQuery,
+                    onQueryChange = {
+                        searchQuery = it
+                        // Re-anchor the cursor to the new query's match set on
+                        // the next derivation; clearing the pin makes it land
+                        // on the first match again.
+                        searchPinnedMatchId = null
+                    },
+                    onClear = {
+                        searchQuery = ""
+                        searchPinnedMatchId = null
+                    },
+                    onClose = { closeSearch() },
+                    onSearchAction = { navigateToSearchMatch(forward = true) },
+                    focusRequester = searchFocusRequester,
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { showDetails = true }
+                                    .semantics { contentDescription = openDetailsDescription },
+                        ) {
+                            Avatar(
+                                title = controller.title(groupTitleCopy),
+                                seed = controller.group.groupIdHex,
+                                size = 36.dp,
+                                pictureUrl = controller.group.avatarUrl,
                             )
-                            Text(
-                                controller.subtitle(
-                                    justYou = stringResource(R.string.just_you),
-                                    oneMember = stringResource(R.string.one_member),
-                                    membersFormat = stringResource(R.string.members_count),
-                                ),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Column {
+                                Text(
+                                    controller.title(groupTitleCopy),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    controller.subtitle(
+                                        justYou = stringResource(R.string.just_you),
+                                        oneMember = stringResource(R.string.one_member),
+                                        membersFormat = stringResource(R.string.members_count),
+                                    ),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.chat_actions))
-                    }
-                    DropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { menuOpen = false },
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(if (controller.group.archived) R.string.unarchive else R.string.archive)) },
-                            enabled = !controller.mutationInFlight,
-                            onClick = {
-                                menuOpen = false
-                                appState.launchMutation { controller.setArchived(!controller.group.archived) }
-                            },
-                        )
-                        if (controller.isSelfMember) {
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.chat_actions))
+                        }
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false },
+                            shape = RoundedCornerShape(20.dp),
+                            // Inset the panel from the right screen edge instead
+                            // of letting it sit flush against it.
+                            offset = DpOffset(x = (-8).dp, y = 0.dp),
+                            modifier = Modifier.widthIn(min = 232.dp),
+                        ) {
+                            // Iconless, roomier rows: each entry reads as a
+                            // full-width tappable line of body-large text rather
+                            // than a compact icon+label cell.
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.leave)) },
+                                text = {
+                                    Text(
+                                        stringResource(R.string.conversation_search_open),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                },
+                                contentPadding = conversationMenuItemPadding,
+                                onClick = {
+                                    menuOpen = false
+                                    // Snapshot the current scroll position before the
+                                    // search auto-scroll effect can move the list, so
+                                    // closing search can restore it (#292).
+                                    preSearchScrollAnchor =
+                                        listState.firstVisibleItemIndex to
+                                        listState.firstVisibleItemScrollOffset
+                                    searchOpen = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(if (controller.group.archived) R.string.unarchive else R.string.archive),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                },
+                                contentPadding = conversationMenuItemPadding,
                                 enabled = !controller.mutationInFlight,
                                 onClick = {
                                     menuOpen = false
-                                    confirmLeaveFromTopBar = true
+                                    appState.launchMutation { controller.setArchived(!controller.group.archived) }
                                 },
                             )
+                            if (controller.isSelfMember) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.leave),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                        )
+                                    },
+                                    contentPadding = conversationMenuItemPadding,
+                                    enabled = !controller.mutationInFlight,
+                                    onClick = {
+                                        menuOpen = false
+                                        confirmLeaveFromTopBar = true
+                                    },
+                                )
+                            }
                         }
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
         bottomBar = {
             when {
+                // While search is open the composer steps aside for the match
+                // navigation bar pinned above the keyboard.
+                searchOpen ->
+                    ConversationSearchNavBar(
+                        matchCount = searchMatchIds.size,
+                        activeIndex = searchActiveIndex,
+                        hasQuery = searchQuery.isNotBlank(),
+                        onPrev = { navigateToSearchMatch(forward = false) },
+                        onNext = { navigateToSearchMatch(forward = true) },
+                    )
                 controller.error != null || controller.group.pendingConfirmation -> Unit
                 // Only suppress the composer when we've *confirmed* the user
                 // is no longer a member. The kicked-notice branch must lose
