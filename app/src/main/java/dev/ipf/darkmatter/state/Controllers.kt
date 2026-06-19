@@ -783,16 +783,26 @@ class ChatsController(
      * conversation. Standard mutation-lock + toast pattern; local group
      * record is updated immediately so the row reflows without waiting on
      * the projection echo.
+     *
+     * Pass `notify = false` to suppress the built-in success toast. The
+     * swipe-to-archive path uses this so it can surface its own
+     * actionable "Chat archived — Undo" snackbar instead of the plain
+     * confirmation (see #296); the long-press menu keeps `notify = true`.
+     * The failure toast always fires regardless of `notify`, since a
+     * silent failure would leave the user with no signal.
      */
     suspend fun setArchived(
         groupIdHex: String,
         archived: Boolean,
+        notify: Boolean = true,
     ): Boolean {
         val account = accountRef ?: return false
         return runCatching {
             val updated = appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
             appState.applyLocalGroupUpdate(updated)
-            appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
+            if (notify) {
+                appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
+            }
             true
         }.onFailure {
             if (it is CancellationException) throw it

@@ -333,6 +333,7 @@
     <string name="toast_couldnt_decline_invite">Impossible de refuser l’invitation</string>
     <string name="toast_chat_archived">Discussion archivée</string>
     <string name="toast_chat_restored">Chat restauré</string>
+    <string name="action_undo">Annuler</string>
     <string name="toast_couldnt_update_chat">Impossible de mettre à jour la discussion</string>
     <string name="toast_group_updated">Groupe mis à jour</string>
     <string name="toast_couldnt_update_group">Impossible de mettre à jour le groupe</string>

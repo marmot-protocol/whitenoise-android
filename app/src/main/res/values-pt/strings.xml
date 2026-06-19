@@ -333,6 +333,7 @@
     <string name="toast_couldnt_decline_invite">Não foi possível recusar o convite</string>
     <string name="toast_chat_archived">Bate-papo arquivado</string>
     <string name="toast_chat_restored">Bate-papo restaurado</string>
+    <string name="action_undo">Desfazer</string>
     <string name="toast_couldnt_update_chat">Não foi possível atualizar a conversa</string>
     <string name="toast_group_updated">Grupo atualizado</string>
     <string name="toast_couldnt_update_group">Não foi possível atualizar o grupo</string>

@@ -163,8 +163,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -213,8 +215,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -265,6 +269,7 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
+import dev.ipf.darkmatter.core.ArchiveSwipe
 import dev.ipf.darkmatter.core.AvatarImageLoader
 import dev.ipf.darkmatter.core.DiagnosticFormatter
 import dev.ipf.darkmatter.core.EditState
@@ -1083,6 +1088,19 @@ private fun ChatsScreen(
     val showArchived = filter == ChatListFilter.Archived
     val searchFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
+    // Chat-list-local snackbar host for the swipe-to-archive Undo
+    // affordance (#296). Kept separate from the app-level toast host so
+    // the actionable snackbar (with its Undo button + result callback)
+    // doesn't have to be threaded through the global fire-and-forget
+    // toast model.
+    val chatsSnackbarHostState = remember { SnackbarHostState() }
+    // Resolve the swipe-archive snackbar copy at composition time
+    // (stringResource), not via context.getString inside the gesture
+    // coroutine — the latter trips lint's LocalContextGetResourceValueCall
+    // and wouldn't react to a configuration change.
+    val chatArchivedMessage = stringResource(R.string.toast_chat_archived)
+    val chatRestoredMessage = stringResource(R.string.toast_chat_restored)
+    val undoActionLabel = stringResource(R.string.action_undo)
 
     LaunchedEffect(showArchived) {
         if (showArchived) quickActionsExpanded = false
@@ -1143,6 +1161,7 @@ private fun ChatsScreen(
     }
 
     Scaffold(
+        snackbarHost = { DarkMatterSnackbarHost(chatsSnackbarHostState) },
         topBar = {
             ChatListTopBar(
                 appState = appState,
@@ -1242,8 +1261,57 @@ private fun ChatsScreen(
                                     appState = appState,
                                     isInArchivedView = showArchived,
                                     onOpen = { onOpenGroup(item) },
-                                    onArchiveToggle = {
-                                        controller.setArchived(item.group.groupIdHex, !item.group.archived)
+                                    onSwipeArchiveToggle = { onSettled ->
+                                        // Swipe path: suppress the plain
+                                        // confirmation toast and instead
+                                        // surface an actionable Undo
+                                        // snackbar so an accidental swipe
+                                        // has a no-cost recovery (#296).
+                                        // Unarchiving (swiping in the
+                                        // archived view) reuses the same
+                                        // affordance symmetrically.
+                                        //
+                                        // Runs in the chat-list `scope`
+                                        // (not the row's) so the snackbar
+                                        // survives the row leaving the
+                                        // active list when it archives.
+                                        val groupId = item.group.groupIdHex
+                                        val wasArchived = item.group.archived
+                                        scope.launch {
+                                            try {
+                                                val ok =
+                                                    controller.setArchived(groupId, !wasArchived, notify = false)
+                                                if (ok) {
+                                                    val message =
+                                                        if (!wasArchived) {
+                                                            chatArchivedMessage
+                                                        } else {
+                                                            chatRestoredMessage
+                                                        }
+                                                    val result =
+                                                        chatsSnackbarHostState.showSnackbar(
+                                                            message = message,
+                                                            actionLabel = undoActionLabel,
+                                                            withDismissAction = false,
+                                                            duration = SnackbarDuration.Short,
+                                                        )
+                                                    if (result == SnackbarResult.ActionPerformed) {
+                                                        // Revert to the pre-swipe archived
+                                                        // state. Silent (notify = false) so
+                                                        // the undo doesn't stack another
+                                                        // snackbar.
+                                                        controller.setArchived(groupId, wasArchived, notify = false)
+                                                    }
+                                                }
+                                            } finally {
+                                                onSettled()
+                                            }
+                                        }
+                                    },
+                                    onMenuArchiveToggle = {
+                                        scope.launch {
+                                            controller.setArchived(item.group.groupIdHex, !item.group.archived)
+                                        }
                                     },
                                     onMarkRead = {
                                         scope.launch { controller.markAllRead(item) }
@@ -1564,6 +1632,44 @@ private fun ChatListNoResults(
     }
 }
 
+// --- Swipe-to-archive gesture tuning (#296) ---
+//
+// These govern when a horizontal drag on a chat row is treated as an
+// intentional archive swipe vs. an incidental sideways component of a
+// vertical scroll.
+
+/**
+ * Axis-dominance factor used by the directional lock-out. The swipe is
+ * only locked out when vertical travel exceeds horizontal by at least
+ * this factor (2×), i.e. the thumb is moving clearly more down than
+ * sideways — an unambiguous scroll. Below this the gesture stays
+ * ambiguous and the swipe box remains enabled.
+ */
+private const val AXIS_LOCK_RATIO = 2f
+
+/**
+ * On top of [AXIS_LOCK_RATIO], the dominant axis must also lead the
+ * other by at least this absolute margin before the lock-out fires.
+ * Guards the near-origin case where a tiny travel can satisfy the ratio
+ * against a tiny opposite-axis travel (e.g. 4px vs 1px) yet is plainly
+ * just jitter, not a deliberate scroll.
+ */
+private const val AXIS_LOCK_MIN_LEAD_DP = 24
+
+/**
+ * Cumulative travel (on either axis) below which the gesture is treated
+ * as ambiguous finger jitter and the lock-out is not even evaluated.
+ * Roughly Compose's default touch slop.
+ */
+private const val AXIS_LOCK_SLOP_DP = 8
+
+/**
+ * Fraction of the row width the user must drag past before the archive
+ * dismiss commits. Replaces Material3's default fixed 56dp anchor with a
+ * deliberate ~half-row long-swipe.
+ */
+private const val ARCHIVE_POSITIONAL_THRESHOLD_FRACTION = 0.5f
+
 /**
  * Chat row wrapped in a SwipeToDismissBox + long-press menu.
  *
@@ -1581,6 +1687,30 @@ private fun ChatListNoResults(
  * the next time the same row composes elsewhere (e.g. when the user
  * enters the archived view), causing the archive action to replay and
  * silently unarchive the chat.
+ *
+ * ## Accidental-archive hardening (#296)
+ *
+ * Two guards keep a vertical scroll from being read as a swipe-archive:
+ *
+ * 1. **Directional axis-lock.** A pointer-input watcher on the Initial
+ *    pass observes (without consuming) the drag from pointer-down. It
+ *    keeps watching the whole gesture and only *permanently* disables
+ *    the swipe box's gestures once vertical travel clearly dominates
+ *    horizontal — by [AXIS_LOCK_RATIO] *and* at least [AXIS_LOCK_MIN_LEAD_DP]
+ *    — i.e. an unambiguous scroll, so the LazyColumn wins outright.
+ *    Crucially it does *not* make a one-way decision the instant travel
+ *    clears the slop: a normal incremental horizontal swipe crosses the
+ *    small slop long before it builds the 24dp horizontal lead, so an
+ *    early decision there would wrongly kill the swipe for the rest of
+ *    the gesture (#296 review). Reset on pointer-up.
+ * 2. **High positional threshold.** Even a clean horizontal drag must
+ *    travel past 50% of the row width before the dismiss commits (vs.
+ *    Material3's default fixed 56dp), so the gesture has to be
+ *    deliberate.
+ *
+ * Committing the archive surfaces an Undo snackbar (wired by the caller
+ * via [onSwipeArchiveToggle]); the long-press menu keeps the plain
+ * confirmation toast via [onMenuArchiveToggle].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1589,22 +1719,33 @@ private fun SwipeableChatRow(
     appState: DarkMatterAppState,
     isInArchivedView: Boolean,
     onOpen: () -> Unit,
-    onArchiveToggle: suspend () -> Unit,
+    onSwipeArchiveToggle: (onSettled: () -> Unit) -> Unit,
+    onMenuArchiveToggle: () -> Unit,
     onMarkRead: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    // Horizontal travel must lead vertical by both a ratio AND an
+    // absolute pixel margin before the gesture counts as a swipe; a
+    // thumb traveling mostly down the screen never clears these.
+    val axisLockMinLeadPx = with(density) { AXIS_LOCK_MIN_LEAD_DP.dp.toPx() }
+    val slopPx = with(density) { AXIS_LOCK_SLOP_DP.dp.toPx() }
+    // Drives SwipeToDismissBox.gesturesEnabled. Starts enabled; the
+    // axis-lock flips it false for the duration of a vertical-dominant
+    // drag, then pointer-up restores it. Keyed on item.id so a recycled
+    // slot starts fresh.
+    var swipeGesturesEnabled by remember(item.id) { mutableStateOf(true) }
     // Tracks the archive-state we've already fired against. A wavering
     // swipe gesture can cross the dismissal threshold more than once
     // (user drags past → back → past again as they hesitate), which
-    // would otherwise re-fire `onArchiveToggle()` and toggle archived
+    // would otherwise re-fire `onSwipeArchiveToggle` and toggle archived
     // back to its previous state. Reset to `null` when the row's
     // backing `archived` flips (the source-list reshuffle replaces
     // this composable instance), when a fresh `item.id` lands in this
-    // slot, OR when the toggle coroutine completes — that last reset
-    // is what unlocks a retry if `setArchived` failed silently and
-    // left `item.archived` unchanged (without it the guard would stay
-    // armed against the same archived value and the row would refuse
-    // a second swipe). See CodeRabbit's third-pass note.
+    // slot, OR when the caller signals the archive flow has settled (the
+    // `onSettled` callback below) — that last reset is what unlocks a
+    // retry if `setArchived` failed silently and left `item.archived`
+    // unchanged (without it the guard would stay armed against the same
+    // archived value and the row would refuse a second swipe).
     var firedForArchived by remember(item.id) { mutableStateOf<Boolean?>(null) }
     val dismissState =
         rememberSwipeToDismissBoxState(
@@ -1613,20 +1754,21 @@ private fun SwipeableChatRow(
                     firedForArchived != item.group.archived
                 ) {
                     firedForArchived = item.group.archived
-                    scope.launch {
-                        try {
-                            onArchiveToggle()
-                        } finally {
-                            // Whether the mutation succeeded (then
-                            // `item.group.archived` has flipped and the
-                            // guard naturally invalidates) or failed
-                            // (`item.group.archived` is still the value
-                            // we fired against, so the guard would
-                            // refuse a second swipe), clearing the
-                            // sentinel is always safe.
-                            firedForArchived = null
-                        }
-                    }
+                    // Fire-and-forget into the CALLER's (chat-list)
+                    // coroutine scope via onSwipeArchiveToggle, NOT this
+                    // row's `scope`. Archiving drops the item out of the
+                    // active list, so this row leaves composition almost
+                    // immediately and its `rememberCoroutineScope` is
+                    // cancelled — running the Undo snackbar here would
+                    // cancel it before it could show. The caller owns a
+                    // scope that outlives the reshuffle and invokes
+                    // `onSettled` when the archive + snackbar window
+                    // resolves so we can clear the re-fire guard (the
+                    // reset matters for the failure path, where the row
+                    // stays put and must accept a retry; on success the
+                    // row remounts and `remember(item.id)` reinitialises
+                    // the guard anyway).
+                    onSwipeArchiveToggle { firedForArchived = null }
                 }
                 // Always return false so the dismiss state never escapes
                 // Settled. `rememberSwipeToDismissBoxState` uses
@@ -1643,12 +1785,68 @@ private fun SwipeableChatRow(
                 // controller mutation propagates.
                 false
             },
+            // Require a deliberate ~half-row drag before committing the
+            // dismiss, instead of Material3's default fixed 56dp anchor
+            // (#296). Combined with the axis-lock below this makes the
+            // archive gesture intentional rather than incidental.
+            positionalThreshold = { totalDistance -> totalDistance * ARCHIVE_POSITIONAL_THRESHOLD_FRACTION },
         )
     var menuOpen by remember { mutableStateOf(false) }
+    // Initial-pass axis-lock watcher. Observes the drag without
+    // consuming it (so the SwipeToDismissBox still sees the events on
+    // the Main pass) and decides, once travel clears the slop, whether
+    // this gesture is allowed to drive the swipe. RTL flips the sign of
+    // the "forward" (StartToEnd) horizontal direction; we only care
+    // about magnitude vs. the vertical axis here, so direction sign
+    // doesn't matter for the dominance test.
+    val axisLockModifier =
+        Modifier.pointerInput(item.id) {
+            awaitEachGesture {
+                awaitFirstDown(requireUnconsumed = false)
+                var dx = 0f
+                var dy = 0f
+                var lockedOut = false
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull() ?: break
+                    if (change.changedToUp()) break
+                    val delta = change.positionChange()
+                    dx += delta.x
+                    dy += delta.y
+                    // Don't make a one-way decision at the slop: a normal
+                    // incremental horizontal swipe crosses the small slop
+                    // long before it has built up the 24dp horizontal lead,
+                    // so deciding there would wrongly disable the swipe for
+                    // the rest of the gesture (#296 review). Instead keep
+                    // observing and only PERMANENTLY lock the swipe out once
+                    // vertical travel clearly dominates — a real scroll. Until
+                    // then the swipe box stays enabled and its deliberate
+                    // half-row positional threshold is what gates an archive.
+                    if (!lockedOut &&
+                        ArchiveSwipe.axisDecided(dx, dy, slopPx) &&
+                        ArchiveSwipe.shouldLockOutSwipe(
+                            dx = dx,
+                            dy = dy,
+                            ratio = AXIS_LOCK_RATIO,
+                            minLeadPx = axisLockMinLeadPx,
+                        )
+                    ) {
+                        lockedOut = true
+                        swipeGesturesEnabled = false
+                    }
+                    if (event.changes.all { it.changedToUp() }) break
+                }
+                // Re-arm for the next gesture regardless of how this one
+                // ended (lift, cancel, or our own early break).
+                swipeGesturesEnabled = true
+            }
+        }
     SwipeToDismissBox(
         state = dismissState,
+        modifier = axisLockModifier,
         enableDismissFromStartToEnd = true,
         enableDismissFromEndToStart = false,
+        gesturesEnabled = swipeGesturesEnabled,
         backgroundContent = {
             // Coloured background only when the gesture is actively
             // dragging — otherwise the row paints over a transparent box.
@@ -1713,7 +1911,7 @@ private fun SwipeableChatRow(
                     },
                     onClick = {
                         menuOpen = false
-                        scope.launch { onArchiveToggle() }
+                        onMenuArchiveToggle()
                     },
                 )
                 if (item.hasUnread) {
