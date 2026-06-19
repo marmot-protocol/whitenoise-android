@@ -56,7 +56,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -85,6 +87,69 @@ internal data class SignOutOutcome(
     val nextActiveRef: String?,
     val phase: AppPhase,
 )
+
+internal fun shouldAcceptMediaUploadForAccount(
+    conversationAccountRef: String?,
+    capturedMediaUploadSessionEpoch: Int,
+    activeAccountRef: String?,
+    currentMediaUploadSessionEpoch: Int,
+): Boolean =
+    conversationAccountRef != null &&
+        conversationAccountRef == activeAccountRef &&
+        capturedMediaUploadSessionEpoch == currentMediaUploadSessionEpoch
+
+internal class InFlightMediaUploads {
+    private val lock = Any()
+    private val jobs = mutableMapOf<String, Job>()
+
+    fun track(
+        conversationKey: String,
+        uploadKey: String,
+        job: Job,
+    ) {
+        val key = registryKey(conversationKey, uploadKey)
+        synchronized(lock) {
+            jobs[key] = job
+        }
+        job.invokeOnCompletion {
+            synchronized(lock) {
+                if (jobs[key] === job) {
+                    jobs.remove(key)
+                }
+            }
+        }
+    }
+
+    fun untrack(
+        conversationKey: String,
+        uploadKey: String,
+        job: Job,
+    ) {
+        val key = registryKey(conversationKey, uploadKey)
+        synchronized(lock) {
+            if (jobs[key] === job) {
+                jobs.remove(key)
+            }
+        }
+    }
+
+    fun cancelAll(): Int {
+        val active =
+            synchronized(lock) {
+                jobs
+                    .values
+                    .toSet()
+                    .also { jobs.clear() }
+            }
+        active.forEach { it.cancel(CancellationException("media upload cancelled by account switch")) }
+        return active.size
+    }
+
+    private fun registryKey(
+        conversationKey: String,
+        uploadKey: String,
+    ): String = "$conversationKey\u0000$uploadKey"
+}
 
 /**
  * The active-account ref and app phase after signing [activeRef] out. Sign-out
@@ -353,6 +418,7 @@ class DarkMatterAppState(
     // Deferred instead of spawning a second Blossom fetch.
     private val inFlightDownloads = mutableMapOf<String, Deferred<ByteArray>>()
     private val inFlightDownloadsLock = Any()
+    private val inFlightMediaUploads = InFlightMediaUploads()
 
     // Bound attachment fetches without making a visible album wait for one
     // network/decrypt round-trip per tile. The gate still prevents an
@@ -373,6 +439,9 @@ class DarkMatterAppState(
     // the epoch moved, so a job that resolves after a switch can't write the
     // old account's data back into the just-cleared caches.
     private val profileCacheEpoch =
+        java.util.concurrent.atomic
+            .AtomicInteger(0)
+    private val mediaUploadSessionEpoch =
         java.util.concurrent.atomic
             .AtomicInteger(0)
     private var notificationJob: Job? = null
@@ -479,6 +548,31 @@ class DarkMatterAppState(
             val key = retainConversationState(accountRef, groupIdHex)
             activeUploadKeysByConversation.getOrPut(key) { mutableSetOf() }
         }
+
+    internal fun mediaUploadSessionEpoch(): Int = mediaUploadSessionEpoch.get()
+
+    internal suspend fun trackInFlightMediaUpload(
+        accountRef: String?,
+        groupIdHex: String,
+        uploadKey: String,
+    ): Job? {
+        val context = currentCoroutineContext()
+        context.ensureActive()
+        val job = context[Job] ?: return null
+        inFlightMediaUploads.track(conversationKey(accountRef, groupIdHex), uploadKey, job)
+        return job
+    }
+
+    internal fun untrackInFlightMediaUpload(
+        accountRef: String?,
+        groupIdHex: String,
+        uploadKey: String,
+        job: Job?,
+    ) {
+        if (job != null) {
+            inFlightMediaUploads.untrack(conversationKey(accountRef, groupIdHex), uploadKey, job)
+        }
+    }
 
     internal fun pendingProjectionsAwaitingBridge(
         accountRef: String?,
@@ -733,6 +827,13 @@ class DarkMatterAppState(
     private fun clearInMemoryMediaCaches() {
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
+        mediaUploadSessionEpoch.incrementAndGet()
+        // Uploads run on the app-lifetime mutation scope so they can survive
+        // conversation-screen disposal. Account switch/sign-out is different:
+        // cancel those old-account sends before dropping the retained bytes so
+        // a cancelled upload cannot resume against an emptied retained-upload
+        // map and falsely mark the bubble Failed (or publish after the switch).
+        inFlightMediaUploads.cancelAll()
         // The four per-conversation maps below hold (or potentially hold)
         // decrypted plaintext keyed by account/group. Wiping them at the
         // same call site keeps account-switch and sign-out symmetric with
