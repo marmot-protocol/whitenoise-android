@@ -48,6 +48,56 @@ class MessageProjectorTest {
     }
 
     @Test
+    fun reactionTalliesKeepDuplicateReactionWhenOneIsRetracted() {
+        val records =
+            listOf(
+                // alice double-taps the same emoji: two distinct reaction events.
+                reaction("r1", sender = "alice", target = "m1", emoji = "👍", at = 1u),
+                reaction("r2", sender = "alice", target = "m1", emoji = "👍", at = 2u),
+                // She retracts only one of them (r1). r2 is still live, so the 👍
+                // tally must stay at 1 instead of vanishing.
+                delete("d1", sender = "alice", target = "r1", at = 3u),
+            )
+
+        val tallies = MessageProjector.reactionTallies(records, targetMessageId = "m1", myAccountId = "alice")
+
+        assertEquals(listOf(ReactionTally(emoji = "👍", count = 1, mine = true)), tallies)
+    }
+
+    @Test
+    fun reactionTalliesDropEmojiOnlyAfterAllDuplicateReactionsAreRetracted() {
+        val records =
+            listOf(
+                reaction("r1", sender = "alice", target = "m1", emoji = "👍", at = 1u),
+                reaction("r2", sender = "alice", target = "m1", emoji = "👍", at = 2u),
+                // Retract both of alice's 👍 events; the emoji disappears entirely.
+                delete("d1", sender = "alice", target = "r1", at = 3u),
+                delete("d2", sender = "alice", target = "r2", at = 4u),
+            )
+
+        val tallies = MessageProjector.reactionTallies(records, targetMessageId = "m1", myAccountId = "alice")
+
+        assertEquals(emptyList<ReactionTally>(), tallies)
+    }
+
+    @Test
+    fun reactionTalliesMessageDeleteClearsEveryDuplicateFromTheSender() {
+        val records =
+            listOf(
+                reaction("r1", sender = "alice", target = "m1", emoji = "👍", at = 1u),
+                reaction("r2", sender = "alice", target = "m1", emoji = "👍", at = 2u),
+                reaction("r3", sender = "bob", target = "m1", emoji = "👍", at = 3u),
+                // alice deletes the reacted-to message itself: all of her reactions
+                // on m1 are retracted, but bob's survives so 👍 stays at 1.
+                delete("d1", sender = "alice", target = "m1", at = 4u),
+            )
+
+        val tallies = MessageProjector.reactionTallies(records, targetMessageId = "m1", myAccountId = "bob")
+
+        assertEquals(listOf(ReactionTally(emoji = "👍", count = 1, mine = true)), tallies)
+    }
+
+    @Test
     fun reactionTalliesIgnoreAForgedDeleteFromAnotherAccount() {
         val records =
             listOf(
