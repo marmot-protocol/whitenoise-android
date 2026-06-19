@@ -191,6 +191,8 @@
     <string name="couldnt_read_profile_code">Bu profil kodu okunamadı.</string>
     <string name="profile_qr_code">Profil QR kodu</string>
     <string name="cancel">İptal</string>
+    <string name="link_confirm_title">Harici bağlantıyı aç?</string>
+    <string name="link_confirm_open">Aç</string>
     <string name="point_camera_at_profile_qr">Kamerayı bir Dark Matter profiline QR doğrultun</string>
     <string name="camera_access_required">QR kodlarını taramak için cihaz ayarlarınızda kamera erişimini etkinleştirin.</string>
     <string name="allow_camera">Kameraya İzin Ver</string>

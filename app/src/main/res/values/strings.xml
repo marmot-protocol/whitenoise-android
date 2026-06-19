@@ -240,6 +240,8 @@
     <string name="couldnt_read_profile_code">Couldn\'t read this profile code.</string>
     <string name="profile_qr_code">Profile QR code</string>
     <string name="cancel">Cancel</string>
+    <string name="link_confirm_title">Open external link?</string>
+    <string name="link_confirm_open">Open</string>
     <string name="point_camera_at_profile_qr">Point the camera at a Dark Matter profile QR</string>
     <string name="camera_access_required">Camera access is required to scan QR codes.</string>
     <string name="allow_camera">Allow Camera</string>

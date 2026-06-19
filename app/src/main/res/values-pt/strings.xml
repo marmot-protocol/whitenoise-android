@@ -191,6 +191,8 @@
     <string name="couldnt_read_profile_code">Não foi possível ler este código de perfil.</string>
     <string name="profile_qr_code">Código QR do perfil</string>
     <string name="cancel">Cancelar</string>
+    <string name="link_confirm_title">Abrir link externo?</string>
+    <string name="link_confirm_open">Abrir</string>
     <string name="point_camera_at_profile_qr">Aponte a câmera para um perfil Dark Matter QR</string>
     <string name="camera_access_required">Por favor, habilite o acesso à câmera nas configurações do seu dispositivo para escanear códigos QR.</string>
     <string name="allow_camera">Permitir câmera</string>
