@@ -323,6 +323,86 @@ internal fun canAcceptTextSend(
     canSend: Boolean,
 ): Boolean = accountRef != null && trimmed.isNotEmpty() && canSend
 
+/**
+ * How many times a text/reply send retries the FFI publish before surfacing a
+ * user-visible failure, and how long it waits between attempts. The send path
+ * in the Marmot runtime already retries individual relay sockets, but a publish
+ * that begins during a *transient* connectivity gap (doze wake, network change,
+ * background-connection toggle mid-reconnect) can see an empty/under-connected
+ * pool at the single instant it fans out and fail fast with a *connect-phase*
+ * failure — even though a relay reconnects a moment later (issue #294). One
+ * bounded retry sweep across [SEND_RETRY_ATTEMPTS], gated by
+ * [isTransientRelaySendError], gives the pool that moment before we tell the
+ * user the send failed, so a momentary gap no longer surfaces as a hard error
+ * while a sustained outage (all attempts exhausted) still does. Only failures
+ * that prove the event never left the device are retried, so a re-send can
+ * never duplicate a message that actually reached a relay.
+ */
+internal const val SEND_RETRY_ATTEMPTS: Int = 3
+internal val SEND_RETRY_BACKOFF_MS: Long = 700L
+
+/**
+ * Whether [throwable] is a relay-connectivity failure that proves the event was
+ * **never transmitted to any relay**, and is therefore safe to re-send by
+ * re-entering the high-level FFI send. Recognizes only the *connect-phase*
+ * reasons the Nostr transport surfaces when the relay pool is momentarily empty
+ * or still handshaking at fan-out time (issue #294).
+ *
+ * IDEMPOTENCY IS THE CONTRACT. The bounded retry in [publishTextWithRetry]
+ * retries by calling `sendText` / `replyToMessage` again, and each call builds a
+ * **new** inner app event in the Marmot runtime
+ * (`marmot-app::runtime::send_message`) — there is no caller-supplied
+ * idempotency key. So we may only retry failures that happen *before* the
+ * transport ever calls `send_event_to`; otherwise a relay that accepted the
+ * first event but whose ack was lost/late would receive a second, distinct
+ * event and peers would see a duplicate user message (adversarial review of
+ * PR #299). The deliberately EXCLUDED post-send / ambiguous reasons are:
+ *   - `send event timed out`          — `send_event_to` was called; the frame
+ *                                        may have landed, only the OK ack timed
+ *                                        out (transport-nostr-adapter
+ *                                        `sdk_client.rs` "send event timed out").
+ *   - `relay did not acknowledge event` — the relay returned the event in
+ *                                        `output.failed`; it WAS transmitted.
+ *   - `publish timed out after Ns: accepted X of required Y` /
+ *     `insufficient publish acknowledgements: accepted X of required Y`
+ *                                      — the same string is emitted whether
+ *                                        `accepted` is 0 or > 0, so we cannot
+ *                                        prove nothing landed.
+ *   - `TransportClosed`               — surfaces from BOTH the worker
+ *                                        command-send channel (pre-publish) and
+ *                                        the response channel *after* the worker
+ *                                        may have already published
+ *                                        (`marmot-app::runtime` response await);
+ *                                        the UniFFI variant carries an empty
+ *                                        message so the two are indistinguishable,
+ *                                        hence ambiguous.
+ * A manual retry affordance (a user re-tapping send) is the right place to
+ * recover those ambiguous cases, because the user can see whether the message
+ * actually went through — an automatic re-send cannot.
+ *
+ * String-matched on the FFI error message + cause chain because the UniFFI
+ * surface flattens these into [dev.ipf.marmotkit.MarmotKitException.Publish] /
+ * `.Runtime` without a typed connectivity code. Keep the matched phrases in sync
+ * with the transport-nostr-adapter connect-phase reasons (`connect relay timed
+ * out`, `connection refused`, `connection reset`, `no relay endpoints`).
+ * Under-matching reverts to fail-fast (the message just isn't auto-retried);
+ * over-matching risks duplicate sends, so the predicate is deliberately narrow.
+ */
+internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
+    val text =
+        generateSequence(throwable) { it.cause }
+            .joinToString(separator = "\n") { error ->
+                listOfNotNull(error.message, error.javaClass.simpleName).joinToString(" ")
+            }.lowercase()
+    // Connect-phase only: the transport raises these before it ever calls
+    // `send_event_to`, so the event provably never reached a relay and a
+    // re-send cannot duplicate it.
+    return ("connect relay" in text && ("timed out" in text || "timeout" in text)) ||
+        ("connection refused" in text) ||
+        ("connection reset" in text) ||
+        ("no relay endpoints" in text)
+}
+
 internal fun optimisticMessageIdForProjection(
     optimisticMessages: Collection<TimelineMessage>,
     projected: AppMessageRecordFfi,
@@ -1578,12 +1658,15 @@ class ConversationController(
         // guard above bailed before this point.
         onAccepted()
         try {
+            // Publish with a bounded retry sweep so a *transient* relay-pool gap
+            // (socket teardown mid-reconnect, doze wake, network change) doesn't
+            // surface as a user-visible "send failed" the instant the pool looks
+            // empty (issue #294). A terminal/logic error fails on the first
+            // attempt; only a sustained connectivity outage — every attempt
+            // exhausted — keeps the hard failure. The optimistic bubble stays
+            // Pending across retries, so the user sees "sending", not "failed".
             val summary =
-                if (replyTarget != null) {
-                    appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, trimmed) }
-                } else {
-                    appState.marmotIo { sendText(account, group.groupIdHex, trimmed) }
-                }
+                publishTextWithRetry(replyTarget, account, trimmed)
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = optimistic.copy(messageIdHex = confirmedId)
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
@@ -1611,6 +1694,73 @@ class ConversationController(
             publishTimelineFromIndexes()
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
+    }
+
+    /**
+     * Publish a text/reply message, re-sending across [SEND_RETRY_ATTEMPTS] only
+     * when the failure proves the event never reached a relay
+     * ([isTransientRelaySendError] — connect-phase failures). Because each
+     * attempt re-enters the high-level FFI send and the runtime builds a fresh
+     * inner app event per call, retrying any ambiguous post-send failure could
+     * duplicate a message; the classifier is narrowed to connect-phase reasons
+     * precisely so this re-send is idempotent. Terminal errors and ambiguous
+     * post-send failures rethrow immediately on the first attempt. Between
+     * attempts it waits [SEND_RETRY_BACKOFF_MS] to give the relay pool time to
+     * (re)connect, and logs the relay-health snapshot at the retry decision
+     * point — aggregate connection counts only, no relay URLs/account/group/
+     * message ids — so the intermittent failure window from #294 is diagnosable
+     * from logcat without leaking PII.
+     */
+    private suspend fun publishTextWithRetry(
+        replyTarget: String?,
+        account: String,
+        trimmed: String,
+    ): dev.ipf.marmotkit.SendSummaryFfi {
+        var lastTransient: Throwable? = null
+        for (attempt in 1..SEND_RETRY_ATTEMPTS) {
+            try {
+                return if (replyTarget != null) {
+                    appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, trimmed) }
+                } else {
+                    appState.marmotIo { sendText(account, group.groupIdHex, trimmed) }
+                }
+            } catch (throwable: Throwable) {
+                throwable.rethrowIfCancellation()
+                if (!isTransientRelaySendError(throwable)) throw throwable
+                lastTransient = throwable
+                logSendRetry(attempt, throwable)
+                if (attempt < SEND_RETRY_ATTEMPTS) {
+                    kotlinx.coroutines.delay(SEND_RETRY_BACKOFF_MS)
+                }
+            }
+        }
+        // Budget exhausted on a sustained connectivity gap: surface the failure.
+        throw lastTransient ?: IllegalStateException("send retry budget exhausted")
+    }
+
+    /**
+     * Trace a transient send retry with the current relay-health snapshot.
+     * Aggregate connection-state counts only (no relay URLs, account/group/
+     * message ids, or payload) so the #294 failure window is observable without
+     * violating the repo's privacy posture. Best-effort: a failure to read
+     * health must never escalate a send retry into an error.
+     */
+    private suspend fun logSendRetry(
+        attempt: Int,
+        throwable: Throwable,
+    ) {
+        if (!BuildConfig.DEBUG) return
+        val health = runCatching { appState.marmotIo { relayHealth() } }.getOrNull()
+        val healthSummary =
+            health?.let {
+                "total=${it.totalRelays} connected=${it.connected} connecting=${it.connecting} " +
+                    "pending=${it.pending} disconnected=${it.disconnected} terminated=${it.terminated}"
+            } ?: "unavailable"
+        Log.d(
+            "ConversationController",
+            "transient send failure (attempt $attempt/$SEND_RETRY_ATTEMPTS): " +
+                "${throwable.javaClass.simpleName} relayHealth[$healthSummary]",
+        )
     }
 
     /**
