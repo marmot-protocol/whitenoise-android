@@ -64,17 +64,28 @@ class NotificationActionReceiver : BroadcastReceiver() {
                                 groupIdHex = action.target.groupIdHex,
                                 text = reply,
                             )
-                        val markedRead =
-                            if (sent) {
+                        if (sent) {
+                            // mark-read is a best-effort UX nicety; a transient
+                            // failure (or thrown FFI/network error) must never keep
+                            // the notification alive, or its still-active inline
+                            // RemoteInput field would let the user re-send the same
+                            // reply and post a duplicate message to the group.
+                            runCatching {
                                 appState.markNotificationMessageRead(
                                     accountRef = action.target.accountRef,
                                     groupIdHex = action.target.groupIdHex,
                                     messageIdHex = action.target.messageIdHex.orEmpty(),
                                 )
-                            } else {
-                                false
+                            }.onFailure { throwable ->
+                                Log.w(
+                                    "DMNotifyAction",
+                                    "reply sent but mark-read failed group=${action.target.groupIdHex.take(8)} " +
+                                        "message=${action.target.messageIdHex.orEmpty().take(8)}",
+                                    throwable,
+                                )
                             }
-                        notificationReplyActionHandled(sent = sent, markedRead = markedRead)
+                        }
+                        notificationReplyActionHandled(sent = sent)
                     }
                 }
 
@@ -92,7 +103,4 @@ class NotificationActionReceiver : BroadcastReceiver() {
     }
 }
 
-internal fun notificationReplyActionHandled(
-    sent: Boolean,
-    markedRead: Boolean,
-): Boolean = sent && markedRead
+internal fun notificationReplyActionHandled(sent: Boolean): Boolean = sent
