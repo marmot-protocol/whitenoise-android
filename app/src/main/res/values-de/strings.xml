@@ -333,6 +333,7 @@
     <string name="toast_couldnt_decline_invite">Einladung konnte nicht abgelehnt werden</string>
     <string name="toast_chat_archived">Chat archiviert</string>
     <string name="toast_chat_restored">Chat wiederhergestellt</string>
+    <string name="action_undo">Rückgängig</string>
     <string name="toast_couldnt_update_chat">Chat konnte nicht aktualisiert werden</string>
     <string name="toast_group_updated">Gruppe aktualisiert</string>
     <string name="toast_couldnt_update_group">Gruppe konnte nicht aktualisiert werden</string>

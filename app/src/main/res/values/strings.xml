@@ -378,6 +378,7 @@
     <string name="toast_couldnt_decline_invite">Couldn\'t decline invite</string>
     <string name="toast_chat_archived">Chat archived</string>
     <string name="toast_chat_restored">Chat restored</string>
+    <string name="action_undo">Undo</string>
     <string name="toast_couldnt_update_chat">Couldn\'t update chat</string>
     <string name="toast_group_updated">Group updated</string>
     <string name="toast_couldnt_update_group">Couldn\'t update group</string>

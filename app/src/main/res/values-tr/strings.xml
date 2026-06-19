@@ -333,6 +333,7 @@
     <string name="toast_couldnt_decline_invite">Davet reddedilemedi</string>
     <string name="toast_chat_archived">Sohbet arşivlendi</string>
     <string name="toast_chat_restored">Sohbet geri yüklendi</string>
+    <string name="action_undo">Geri al</string>
     <string name="toast_couldnt_update_chat">Sohbet güncellenemedi</string>
     <string name="toast_group_updated">Grup güncellendi</string>
     <string name="toast_couldnt_update_group">Grup güncellenemedi</string>

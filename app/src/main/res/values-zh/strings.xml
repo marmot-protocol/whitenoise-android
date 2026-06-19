@@ -332,6 +332,7 @@
     <string name="toast_couldnt_decline_invite">无法拒绝邀请</string>
     <string name="toast_chat_archived">聊天记录已存档</string>
     <string name="toast_chat_restored">聊天已恢复</string>
+    <string name="action_undo">撤销</string>
     <string name="toast_couldnt_update_chat">无法更新聊天</string>
     <string name="toast_group_updated">群组已更新</string>
     <string name="toast_couldnt_update_group">无法更新群组</string>
