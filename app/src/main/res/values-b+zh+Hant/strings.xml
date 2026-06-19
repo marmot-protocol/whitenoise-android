@@ -190,6 +190,8 @@
     <string name="couldnt_read_profile_code">無法讀取此個人檔案碼。</string>
     <string name="profile_qr_code">個人資料QR碼</string>
     <string name="cancel">取消</string>
+    <string name="link_confirm_title">開啟外部連結？</string>
+    <string name="link_confirm_open">開啟</string>
     <string name="point_camera_at_profile_qr">将相机对准 Dark Matter 轮廓 QR</string>
     <string name="camera_access_required">請在裝置設定中開啟相機權限，以掃描 QR 碼。</string>
     <string name="allow_camera">允許拍照</string>

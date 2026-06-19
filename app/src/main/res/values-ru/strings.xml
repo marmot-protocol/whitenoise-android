@@ -193,6 +193,8 @@
     <string name="couldnt_read_profile_code">Не удалось прочитать этот код профиля.</string>
     <string name="profile_qr_code">QR код профиля</string>
     <string name="cancel">Отмена</string>
+    <string name="link_confirm_title">Открыть внешнюю ссылку?</string>
+    <string name="link_confirm_open">Открыть</string>
     <string name="point_camera_at_profile_qr">Наведите камеру на профиль Dark Matter QR.</string>
     <string name="camera_access_required">Пожалуйста, включите доступ к камере в настройках устройства для сканирования QR-кодов.</string>
     <string name="allow_camera">Разрешить камеру</string>

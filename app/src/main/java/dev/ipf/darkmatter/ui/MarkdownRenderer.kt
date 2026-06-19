@@ -13,15 +13,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.LinkInteractionListener
@@ -39,6 +45,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.ipf.darkmatter.R
 import dev.ipf.marmotkit.MarkdownAlignmentFfi
 import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
@@ -86,20 +93,26 @@ internal fun MarkdownMessageBody(
     onLastTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    // One listener for every link in the document; the tapped destination
-    // rides in on the annotation itself. URL annotations go through the
-    // scheme gate to ACTION_VIEW; Clickable annotations carry a nostr
-    // profile entity and stay in-app.
+    // A tapped spoofable `[label](url)` link parks its destination here until
+    // the user confirms it in the dialog below (#273).
+    var pendingLinkUrl by remember { mutableStateOf<String?>(null) }
+    // One listener for every link in the document; the tapped destination rides
+    // in on the annotation. Autolink URL annotations open directly (visible text
+    // == destination, not spoofable); confirm-link Clickable annotations surface
+    // the real URL first; nostr-profile Clickable annotations stay in-app.
     val linkListener =
         remember(context, onNostrProfileTap) {
             LinkInteractionListener { annotation ->
                 when (annotation) {
                     is LinkAnnotation.Url -> openMarkdownLink(context, annotation.url)
                     is LinkAnnotation.Clickable ->
-                        annotation.tag
-                            .takeIf { it.startsWith(NOSTR_PROFILE_LINK_TAG_PREFIX) }
-                            ?.removePrefix(NOSTR_PROFILE_LINK_TAG_PREFIX)
-                            ?.let { bech32 -> onNostrProfileTap?.invoke(bech32) }
+                        when {
+                            annotation.tag.startsWith(CONFIRM_LINK_TAG_PREFIX) ->
+                                pendingLinkUrl = annotation.tag.removePrefix(CONFIRM_LINK_TAG_PREFIX)
+                            annotation.tag.startsWith(NOSTR_PROFILE_LINK_TAG_PREFIX) ->
+                                onNostrProfileTap?.invoke(annotation.tag.removePrefix(NOSTR_PROFILE_LINK_TAG_PREFIX))
+                            else -> Unit
+                        }
                     else -> Unit
                 }
             }
@@ -117,6 +130,28 @@ internal fun MarkdownMessageBody(
                 onTextLayout = if (index == document.blocks.lastIndex) onLastTextLayout else null,
             )
         }
+    }
+    pendingLinkUrl?.let { url ->
+        AlertDialog(
+            onDismissRequest = { pendingLinkUrl = null },
+            title = { Text(stringResource(R.string.link_confirm_title)) },
+            // Show the full destination so a label spoofing a trusted URL can't
+            // hide where the tap actually goes.
+            text = { Text(url, style = MaterialTheme.typography.bodyMedium) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingLinkUrl = null
+                        openMarkdownLink(context, url)
+                    },
+                ) { Text(stringResource(R.string.link_confirm_open)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingLinkUrl = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     }
 }
 
@@ -417,6 +452,12 @@ private fun collectBlockMentionBech32s(
  */
 internal const val NOSTR_PROFILE_LINK_TAG_PREFIX = "nostr-profile:"
 
+// `[label](url)` links (and images) carry an attacker-chosen label over a
+// possibly-different destination, so their taps route through a confirmation
+// that surfaces the real URL before leaving the app (anti-phishing, #273).
+// Autolinks (visible text == destination) are not spoofable and open directly.
+internal const val CONFIRM_LINK_TAG_PREFIX = "confirm-link:"
+
 /**
  * Pure inline-tree → [AnnotatedString] mapping (kept free of composition so
  * it's unit-testable). Only allowlisted destinations (see
@@ -589,7 +630,16 @@ private fun AnnotatedString.Builder.appendMarkdownLink(
     // produce a zero-length, untappable annotation — show the URL itself.
     val visible = children.ifEmpty { listOf(MarkdownInlineFfi.Text(normalizedDest)) }
     if (isOpenableMarkdownLink(normalizedDest)) {
-        withLink(LinkAnnotation.Url(normalizedDest, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)) {
+        // The label is attacker-chosen and may not match the destination, so
+        // route the tap through a confirmation (Clickable + confirm tag) that
+        // shows the real URL, rather than a direct-opening Url annotation. See #273.
+        withLink(
+            LinkAnnotation.Clickable(
+                CONFIRM_LINK_TAG_PREFIX + normalizedDest,
+                TextLinkStyles(style = ctx.linkStyle),
+                ctx.linkListener,
+            ),
+        ) {
             appendMarkdownInlines(visible, ctx, depth)
         }
     } else {
