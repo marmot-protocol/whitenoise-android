@@ -1400,7 +1400,6 @@ private fun ChatsScreen(
                                         scope.launch { controller.markAllRead(item) }
                                     },
                                 )
-                                HorizontalDivider()
                             }
                         }
                 }
