@@ -11,11 +11,18 @@ The Android app should not become a second database for Dark Matter data. If a s
 ## Common Commands
 
 ```bash
-just test
-just debug
-just install-debug
-just apk
-just release-fast
+just test                  # unit tests
+just lint                  # ktlint check (read-only)
+just format                # ktlint format (rewrites in place)
+just debug                 # build debug APKs
+just install-debug         # install debug on connected device
+just run-debug             # install + launch debug
+just apk                   # signed arm64-v8a release APK (fast)
+just release               # signed release APKs, rebuilds Marmot bindings
+just release-fast          # signed release APKs, reuses checked-in bindings
+just install-release       # install release arm64-v8a on connected device
+just keystore-gen          # one-time release keystore generation
+just keystore-fingerprint  # print SHA-256 of release keystore
 ```
 
 Direct Gradle equivalents:
@@ -26,44 +33,61 @@ Direct Gradle equivalents:
 ./gradlew :app:installDebug
 ```
 
+The debug variant uses an `applicationIdSuffix` of `.debug` (`dev.ipf.darkmatter.debug`), so it installs alongside the release build (`dev.ipf.darkmatter`) without collision.
+
 ## Release Builds
 
-Release builds use signing values from `local.properties` or the matching environment variables:
+Release builds use signing values from `local.properties` or matching environment variables:
 
 - `DARKMATTER_KEYSTORE_PATH`
 - `DARKMATTER_KEYSTORE_PASSWORD`
 - `DARKMATTER_KEY_ALIAS`
 - `DARKMATTER_KEY_PASSWORD`
 
-Telemetry and audit-log upload runtime configuration is also read from
-`local.properties` or environment variables so endpoints and tokens stay out of
-Git:
+Release packaging fails if signing is unconfigured. To override for a local smoke build, set:
+
+- `DARKMATTER_ALLOW_UNSIGNED_RELEASE=true`
+
+Runtime configuration is also read from `local.properties` or environment variables so endpoints and tokens stay out of Git.
+
+**Telemetry / audit:**
 
 - `DARKMATTER_OTLP_ENDPOINT`
 - `DARKMATTER_OTLP_AUTH_TOKEN`
 - `DARKMATTER_AUDIT_LOG_ENDPOINT`
 - `DARKMATTER_AUDIT_LOG_AUTH_TOKEN`
-- `OTLP_TOKEN_DARKMATTER_ANDROID` (fallback auth token for both telemetry and audit logs)
-- `DARKMATTER_DEPLOYMENT_ENVIRONMENT` (defaults to `android-release`)
+- `OTLP_TOKEN_DARKMATTER_ANDROID` (fallback auth token for OTLP only; audit logs require their own token)
+- `DARKMATTER_DEPLOYMENT_ENVIRONMENT` (defaults to `production`)
+- `DARKMATTER_TELEMETRY_TENANT` (defaults to `darkmatter-android`)
 
-Use:
+**Push (MIP-05):**
+
+- `DARKMATTER_PUSH_SERVER_PUBKEY_HEX` — push-server identity pubkey
+- `DARKMATTER_PUSH_RELAY_HINT` (defaults to `wss://relay.eu.whitenoise.chat`)
+
+Unset push values mean the runtime treats push as unconfigured rather than registering against a default server.
+
+`app/google-services.json` is optional. When present, the Firebase plugin is applied and FCM works; when absent, the app falls back to local notifications.
+
+### Building a release
 
 ```bash
 just apk
 ```
 
-This builds the signed `arm64-v8a` release APK only, using the checked-in Marmot
-bindings and native libraries. The output filename is
-`darkmatter-v8a-release-YYYY-MM-DD.apk`. The release folder is printed as the
-final line for Finder.
-
-Use:
+Builds the signed `arm64-v8a` release APK using the checked-in Marmot bindings and native libraries. The output filename is `darkmatter-v8a-release-YYYY-MM-DD.apk`. The release folder is printed as the final line for Finder.
 
 ```bash
 just release
 ```
 
-Use `just release-fast` when the checked-in Marmot bindings and native libraries are already current.
+Builds all signed APKs (per-ABI + universal) and rebuilds the Marmot bindings. Assumes a sibling checkout of the `darkmatter` Rust workspace at `../darkmatter`; override with `DARKMATTER_MARMOT_DIR`.
+
+```bash
+just release-fast
+```
+
+Same as `just release` but reuses the checked-in Marmot bindings and native libraries.
 
 ## Device Testing
 
