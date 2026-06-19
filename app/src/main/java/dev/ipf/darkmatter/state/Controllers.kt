@@ -2689,7 +2689,8 @@ class ConversationController(
                 inviteSent = true
                 if (addAsAdmin) {
                     refs.forEach { ref ->
-                        appState.marmotIo { promoteAdmin(account, group.groupIdHex, ref) }
+                        val target = appState.marmotIo { accountIdHex(ref) } ?: ref
+                        appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
                     }
                 }
                 refreshMembers()
