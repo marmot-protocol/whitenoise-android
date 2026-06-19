@@ -455,9 +455,24 @@
     <string name="group_avatar_url">URL аватара</string>
     <string name="relative_time_future">будущее</string>
     <string name="relative_time_now">сейчас</string>
-    <string name="relative_time_minutes">%1$d мин</string>
-    <string name="relative_time_hours">%1$d ч</string>
-    <string name="relative_time_days">%1$d дн</string>
+    <plurals name="relative_time_minutes">
+        <item quantity="one">%1$d минута</item>
+        <item quantity="few">%1$d минуты</item>
+        <item quantity="many">%1$d минут</item>
+        <item quantity="other">%1$d минут</item>
+    </plurals>
+    <plurals name="relative_time_hours">
+        <item quantity="one">%1$d час</item>
+        <item quantity="few">%1$d часа</item>
+        <item quantity="many">%1$d часов</item>
+        <item quantity="other">%1$d часов</item>
+    </plurals>
+    <plurals name="relative_time_days">
+        <item quantity="one">%1$d день</item>
+        <item quantity="few">%1$d дня</item>
+        <item quantity="many">%1$d дней</item>
+        <item quantity="other">%1$d дней</item>
+    </plurals>
     <string name="group_system_member_added">%1$s добавил(а) %2$s</string>
     <string name="group_system_member_added_passive">%1$s добавлен(а)</string>
     <string name="group_system_member_removed">%1$s удалил(а) %2$s</string>

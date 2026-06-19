@@ -449,9 +449,18 @@
     <string name="group_avatar_url">Avatar URL\'si</string>
     <string name="relative_time_future">gelecek</string>
     <string name="relative_time_now">şimdi</string>
-    <string name="relative_time_minutes">%1$d dk</string>
-    <string name="relative_time_hours">%1$d sa</string>
-    <string name="relative_time_days">%1$d g</string>
+    <plurals name="relative_time_minutes">
+        <item quantity="one">%1$d dk</item>
+        <item quantity="other">%1$d dk</item>
+    </plurals>
+    <plurals name="relative_time_hours">
+        <item quantity="one">%1$d sa</item>
+        <item quantity="other">%1$d sa</item>
+    </plurals>
+    <plurals name="relative_time_days">
+        <item quantity="one">%1$d g</item>
+        <item quantity="other">%1$d g</item>
+    </plurals>
     <string name="group_system_member_added">%1$s, %2$s kişisini ekledi</string>
     <string name="group_system_member_added_passive">%1$s eklendi</string>
     <string name="group_system_member_removed">%1$s, %2$s kişisini çıkardı</string>

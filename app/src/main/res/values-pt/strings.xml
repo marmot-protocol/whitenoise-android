@@ -449,9 +449,21 @@
     <string name="group_avatar_url">URL do avatar</string>
     <string name="relative_time_future">futuro</string>
     <string name="relative_time_now">agora</string>
-    <string name="relative_time_minutes">%1$d min</string>
-    <string name="relative_time_hours">%1$d h</string>
-    <string name="relative_time_days">%1$d d</string>
+    <plurals name="relative_time_minutes">
+        <item quantity="one">%1$d min</item>
+        <item quantity="many">%1$d min</item>
+        <item quantity="other">%1$d min</item>
+    </plurals>
+    <plurals name="relative_time_hours">
+        <item quantity="one">%1$d h</item>
+        <item quantity="many">%1$d h</item>
+        <item quantity="other">%1$d h</item>
+    </plurals>
+    <plurals name="relative_time_days">
+        <item quantity="one">%1$d d</item>
+        <item quantity="many">%1$d d</item>
+        <item quantity="other">%1$d d</item>
+    </plurals>
     <string name="group_system_member_added">%1$s adicionou %2$s</string>
     <string name="group_system_member_added_passive">%1$s foi adicionado</string>
     <string name="group_system_member_removed">%1$s removeu %2$s</string>

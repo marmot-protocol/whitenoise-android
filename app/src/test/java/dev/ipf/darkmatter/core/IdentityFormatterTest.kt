@@ -65,12 +65,29 @@ class IdentityFormatterTest {
             RelativeTimeCopy(
                 future = "FUT",
                 now = "NOW",
-                minutesFormat = "%1\$d-min",
-                hoursFormat = "%1\$d-hr",
-                daysFormat = "%1\$d-day",
+                minutes = { count -> "$count-min" },
+                hours = { count -> "$count-hr" },
+                days = { count -> "$count-day" },
             )
 
         assertEquals("2-hr", IdentityFormatter.relativeTime(twoHoursAgo, copy, Locale.US))
+    }
+
+    @Test
+    fun relativeTimePassesCountToPluralCallback() {
+        // The unit callbacks must receive the integer count so a real
+        // getQuantityString-backed callback can pick the correct plural form.
+        val fortyFiveMinutesAgo = (Instant.now().epochSecond - (45 * 60L)).toULong()
+        val copy =
+            RelativeTimeCopy(
+                future = "FUT",
+                now = "NOW",
+                minutes = { count -> "min=$count" },
+                hours = { count -> "hr=$count" },
+                days = { count -> "day=$count" },
+            )
+
+        assertEquals("min=45", IdentityFormatter.relativeTime(fortyFiveMinutesAgo, copy, Locale.US))
     }
 
     @Test

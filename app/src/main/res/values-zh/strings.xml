@@ -446,9 +446,15 @@
     <string name="group_avatar_url">头像 URL</string>
     <string name="relative_time_future">未来</string>
     <string name="relative_time_now">现在</string>
-    <string name="relative_time_minutes">%1$d分钟</string>
-    <string name="relative_time_hours">%1$d小时</string>
-    <string name="relative_time_days">%1$d天</string>
+    <plurals name="relative_time_minutes">
+        <item quantity="other">%1$d分钟</item>
+    </plurals>
+    <plurals name="relative_time_hours">
+        <item quantity="other">%1$d小时</item>
+    </plurals>
+    <plurals name="relative_time_days">
+        <item quantity="other">%1$d天</item>
+    </plurals>
     <string name="group_system_member_added">%1$s 添加了 %2$s</string>
     <string name="group_system_member_added_passive">%1$s 已被添加</string>
     <string name="group_system_member_removed">%1$s 移除了 %2$s</string>
