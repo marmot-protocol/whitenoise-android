@@ -7164,15 +7164,17 @@ private fun ConversationScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                Text(
-                                    controller.subtitle(
-                                        justYou = stringResource(R.string.just_you),
-                                        oneMember = stringResource(R.string.one_member),
-                                        membersFormat = stringResource(R.string.members_count),
-                                    ),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                if (!controller.isDm) {
+                                    Text(
+                                        controller.subtitle(
+                                            justYou = stringResource(R.string.just_you),
+                                            oneMember = stringResource(R.string.one_member),
+                                            membersFormat = stringResource(R.string.members_count),
+                                        ),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     },

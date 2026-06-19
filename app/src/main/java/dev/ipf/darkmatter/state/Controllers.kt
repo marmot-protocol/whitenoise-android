@@ -1533,6 +1533,12 @@ class ConversationController(
             return GroupProjector.inviteAccount(group, other)
         }
 
+    // A nameless two-member conversation, classified the same way the chat list
+    // and notifications do. The header title is already the counterparty's name,
+    // so the "2 members" subtitle is redundant noise here.
+    val isDm: Boolean
+        get() = GroupProjector.isDm(members.size, group.name)
+
     val subtitle: String
         get() = subtitle(justYou = "Just you", oneMember = "1 member", membersFormat = "%1\$d members")
 
