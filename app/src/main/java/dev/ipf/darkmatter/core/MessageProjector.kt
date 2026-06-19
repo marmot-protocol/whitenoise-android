@@ -96,7 +96,10 @@ object MessageProjector {
         targetMessageId: String,
         myAccountId: String?,
     ): List<ReactionTally> {
-        val sendersByEmoji = linkedMapOf<String, MutableSet<String>>()
+        // Track each surviving reaction event individually. Presence is derived
+        // from these records at the end, not maintained incrementally: a sender
+        // can emit several distinct events for the same emoji (replay,
+        // convergence, double-tap), so retracting one must not erase the others.
         val reactionById = linkedMapOf<String, ReactionRecord>()
         records
             .asSequence()
@@ -111,27 +114,36 @@ object MessageProjector {
                         // drift between events, and a case-variant duplicate would
                         // double-count or break the remove path below.
                         reactionById[record.messageIdHex] = ReactionRecord(target, emoji, record.sender.lowercase())
-                        sendersByEmoji.getOrPut(emoji) { linkedSetOf() }.add(record.sender.lowercase())
                     }
                     isDelete(record) -> {
+                        val deleter = record.sender.lowercase()
                         for (deletedId in deletedTargetMessageIds(record)) {
                             val deletedReaction = reactionById[deletedId]
                             if (deletedReaction != null && deletedReaction.targetMessageId == targetMessageId) {
                                 // Only the reaction's own author may retract it; ignore a
                                 // forged delete from another account trying to hide it.
-                                if (record.sender.lowercase() == deletedReaction.sender) {
+                                // Drops just this event — a same-sender, same-emoji
+                                // duplicate stays live so the tally is not erased.
+                                if (deleter == deletedReaction.sender) {
                                     reactionById.remove(deletedId)
-                                    sendersByEmoji[deletedReaction.emoji]?.remove(deletedReaction.sender)
                                 }
                             } else if (deletedId == targetMessageId) {
-                                for (senders in sendersByEmoji.values) {
-                                    senders.remove(record.sender.lowercase())
-                                }
+                                // Deleting the reacted-to message retracts every reaction
+                                // the deleter authored on it (across all emoji).
+                                reactionById.values.removeAll { it.sender == deleter }
                             }
                         }
                     }
                 }
             }
+
+        // Group the surviving events by emoji and count distinct senders. Using
+        // reactionById's insertion order (sorted by recordedAt above) keeps the
+        // per-emoji order stable for the emoji tiebreaker in the final sort.
+        val sendersByEmoji = linkedMapOf<String, MutableSet<String>>()
+        for (reaction in reactionById.values) {
+            sendersByEmoji.getOrPut(reaction.emoji) { linkedSetOf() }.add(reaction.sender)
+        }
 
         return sendersByEmoji
             .mapNotNull { (emoji, senders) ->
