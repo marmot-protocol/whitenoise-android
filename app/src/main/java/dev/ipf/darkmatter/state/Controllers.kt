@@ -300,6 +300,29 @@ data class TimelineMessage(
     val timelineOrder: ULong = 0uL,
 )
 
+/**
+ * Preserve a failed optimistic text send as a local timeline row instead of
+ * deleting the user's draft on publish failure. The failed row keeps the same
+ * temp id/order so retry/delete affordances can operate on the live optimistic
+ * state and the body remains copyable from the bubble.
+ */
+internal fun retainFailedOptimisticTextSend(
+    optimisticMessages: MutableMap<String, TimelineMessage>,
+    messageById: MutableMap<String, AppMessageRecordFfi>,
+    key: String,
+    optimistic: AppMessageRecordFfi,
+    timelineOrder: ULong,
+) {
+    messageById[optimistic.messageIdHex] = optimistic
+    optimisticMessages[key] =
+        TimelineMessage(
+            key,
+            optimistic,
+            MessageStatus.Failed,
+            timelineOrder = timelineOrder,
+        )
+}
+
 data class ReactionParticipant(
     val sender: String,
     val emoji: String,
@@ -1641,9 +1664,10 @@ class ConversationController(
                 receivedAt = now,
             )
         val optimisticOrder = nextOptimisticTimelineOrder()
-        optimisticMessages["msg:$tempId"] =
+        val optimisticKey = "msg:$tempId"
+        optimisticMessages[optimisticKey] =
             TimelineMessage(
-                "msg:$tempId",
+                optimisticKey,
                 optimistic,
                 MessageStatus.Pending,
                 timelineOrder = optimisticOrder,
@@ -1670,7 +1694,7 @@ class ConversationController(
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = optimistic.copy(messageIdHex = confirmedId)
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
-            optimisticMessages.remove("msg:$tempId")
+            optimisticMessages.remove(optimisticKey)
             messageById.remove(tempId)
             if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
                 optimisticMessages["msg:$confirmedId"] =
@@ -1684,13 +1708,13 @@ class ConversationController(
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
-            optimisticMessages["msg:$tempId"] =
-                TimelineMessage(
-                    "msg:$tempId",
-                    optimistic,
-                    MessageStatus.Failed,
-                    timelineOrder = optimisticOrder,
-                )
+            retainFailedOptimisticTextSend(
+                optimisticMessages = optimisticMessages,
+                messageById = messageById,
+                key = optimisticKey,
+                optimistic = optimistic,
+                timelineOrder = optimisticOrder,
+            )
             publishTimelineFromIndexes()
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }

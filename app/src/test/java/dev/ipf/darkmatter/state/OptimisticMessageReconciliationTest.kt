@@ -158,6 +158,27 @@ class OptimisticMessageReconciliationTest {
         )
     }
 
+    @Test
+    fun failedTextSendRetainsOptimisticBubbleForRetryAndCopy() {
+        val optimistic = message("temp-id", plaintext = "copy me later")
+        val optimisticMessages = linkedMapOf<String, TimelineMessage>()
+        val messageById = linkedMapOf<String, AppMessageRecordFfi>()
+
+        retainFailedOptimisticTextSend(
+            optimisticMessages = optimisticMessages,
+            messageById = messageById,
+            key = "msg:temp-id",
+            optimistic = optimistic,
+            timelineOrder = 42uL,
+        )
+
+        val failed = optimisticMessages["msg:temp-id"]
+        assertEquals(MessageStatus.Failed, failed?.status)
+        assertEquals("copy me later", failed?.record?.plaintext)
+        assertEquals(42uL, failed?.timelineOrder)
+        assertEquals(optimistic, messageById["temp-id"])
+    }
+
     private fun mediaPending(
         id: String,
         filename: String,
