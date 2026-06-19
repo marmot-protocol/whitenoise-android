@@ -7,9 +7,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
+import dev.ipf.darkmatter.core.ChatListMessageSearch
 import dev.ipf.darkmatter.core.EditState
 import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.core.GroupSystemEvents
+import dev.ipf.darkmatter.core.MessageBodyMatch
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ReactionTally
@@ -52,11 +54,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
@@ -857,6 +863,136 @@ class ChatsController(
     }
 
     /**
+     * Search message bodies across the given chats' local timelines for
+     * [rawQuery] (issue #290). Returns, per matched group, the first
+     * (newest-first, the order the FFI search returns) searchable message
+     * whose plaintext contains the needle, with a highlighted snippet for
+     * the chat row's secondary line and the message id for tap-through
+     * scroll-to-message.
+     *
+     * Local-only by construction: this drives the `timelineMessages` FFI
+     * search primitive, which reads the account's local SQLite store (the
+     * source of truth) and triggers no relay fetch. Per the AGENTS.md
+     * source-of-truth rule we add no Android-side message cache — each call
+     * re-queries the engine.
+     *
+     * Per-chat queries fan out concurrently (bounded by [SEARCH_FANOUT]) off
+     * the main thread. The FFI `search` field already narrows the scan in
+     * the engine; we additionally gate each returned row through
+     * [ChatListMessageSearch.isSearchableBody] so reactions, deletes,
+     * edits, stream-start, and kind-1210 system rows can never surface as a
+     * body match even if the engine's text index includes them.
+     *
+     * Returns an empty map for a blank needle or when no account is bound.
+     * Cancellation propagates (the caller debounces and cancels superseded
+     * queries).
+     */
+    suspend fun searchMessageBodies(
+        chats: List<ChatListItem>,
+        rawQuery: String,
+    ): Map<String, MessageBodyMatch> {
+        val account = accountRef ?: return emptyMap()
+        val needle = rawQuery.trim()
+        if (needle.isEmpty()) return emptyMap()
+        val ciNeedle = needle.lowercase()
+        return withContext(Dispatchers.IO) {
+            val semaphore = Semaphore(SEARCH_FANOUT)
+            coroutineScope {
+                val deferred =
+                    chats.map { item ->
+                        async {
+                            semaphore.withPermit {
+                                searchOneChat(account, item.group.groupIdHex, needle, ciNeedle)
+                            }
+                        }
+                    }
+                deferred.awaitAll().filterNotNull().associateBy { it.groupIdHex }
+            }
+        }
+    }
+
+    private suspend fun searchOneChat(
+        account: String,
+        groupIdHex: String,
+        needle: String,
+        ciNeedle: String,
+    ): MessageBodyMatch? {
+        // The FFI `search` field narrows to rows whose text matches the needle,
+        // but it can't filter by kind/deleted — that gating happens client-side
+        // via [ChatListMessageSearch.isSearchableBody]. So a single small page
+        // is unsafe: if the newest SEARCH_PER_CHAT_LIMIT needle hits are all
+        // excluded rows (reactions, deletes, kind:1210 system events, …) but an
+        // older kind:1/9/1209 body also matches, a one-shot query would return
+        // null and drop the chat. Page backwards through the needle-matching
+        // rows until the first eligible body match surfaces or the local
+        // timeline is exhausted, capped at SEARCH_MAX_PAGES so a pathological
+        // history (thousands of excluded hits) can't pin an IO thread.
+        var beforeMessageId: String? = null
+        var pagesScanned = 0
+        while (pagesScanned < SEARCH_MAX_PAGES) {
+            val page =
+                runCatching {
+                    appState.marmotIo {
+                        timelineMessages(
+                            account,
+                            TimelineMessageQueryFfi(
+                                groupIdHex = groupIdHex,
+                                search = needle,
+                                before = null,
+                                beforeMessageId = beforeMessageId,
+                                after = null,
+                                afterMessageId = null,
+                                limit = SEARCH_PER_CHAT_LIMIT,
+                            ),
+                        )
+                    }
+                }.getOrElse { throwable ->
+                    if (throwable is CancellationException) throw throwable
+                    // A single chat's search failing (e.g. transient engine
+                    // error) must not blank the whole result set — drop just
+                    // this chat and let the others surface.
+                    chatsDebug(throwable) {
+                        "message-body search failed group=${groupIdHex.take(8)}: " +
+                            (throwable.message ?: throwable.javaClass.simpleName)
+                    }
+                    return null
+                }
+            pagesScanned++
+            val match =
+                ChatListMessageSearch.firstEligibleBodyMatch(
+                    page.messages.map { record ->
+                        object : ChatListMessageSearch.SearchableRecord {
+                            override val kind = record.kind
+                            override val deleted = record.deleted
+                            override val plaintext = record.plaintext
+                            override val messageIdHex = record.messageIdHex
+                        }
+                    },
+                    ciNeedle,
+                )
+            if (match != null) {
+                val snippet = ChatListMessageSearch.buildSnippet(match.plaintext, needle) ?: return null
+                return MessageBodyMatch(
+                    groupIdHex = groupIdHex,
+                    messageIdHex = match.messageIdHex,
+                    snippet = snippet,
+                )
+            }
+            // No eligible match in this page. Stop if the engine has no older
+            // rows, or if the page was empty (defensive: nothing to page from).
+            if (!page.hasMoreBefore || page.messages.isEmpty()) return null
+            // Cursor to the oldest row in this page so the next query returns
+            // strictly older needle hits. Use the minimum timelineAt (tie-broken
+            // by id) rather than assuming a fixed array order.
+            beforeMessageId =
+                page.messages
+                    .minWith(compareBy({ it.timelineAt }, { it.messageIdHex }))
+                    .messageIdHex
+        }
+        return null
+    }
+
+    /**
      * Flip the archived flag on `groupIdHex` from the chat-list surface
      * (swipe / long-press menu). Mirrors `ConversationController.setArchived`
      * but takes the id by parameter since the caller doesn't have an open
@@ -1209,6 +1345,18 @@ private inline fun chatsDebug(
 }
 
 private val ConversationTimelinePageLimit = 50u
+
+// Chat-list message-body search (issue #290). [SEARCH_FANOUT] caps the number
+// of per-chat `timelineMessages` FFI queries running at once so a large chat
+// list doesn't flood the IO dispatcher; [SEARCH_PER_CHAT_LIMIT] is the page
+// size for each backward-paging query. The engine's `search` field narrows to
+// needle-matching rows but can't filter by kind/deleted, so a single page is
+// unsafe (newer excluded hits could hide an older eligible body); searchOneChat
+// pages backwards up to [SEARCH_MAX_PAGES] pages until the first eligible body
+// match surfaces or the local timeline is exhausted, bounding worst-case work.
+private const val SEARCH_FANOUT = 6
+private val SEARCH_PER_CHAT_LIMIT = 5u
+private const val SEARCH_MAX_PAGES = 20
 
 // Cap on how many subscription updates one coalesced batch can absorb. A
 // runaway producer shouldn't be able to wedge the UI behind an unbounded
