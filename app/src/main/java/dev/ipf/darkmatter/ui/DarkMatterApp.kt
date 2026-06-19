@@ -7120,6 +7120,7 @@ private fun GroupDetailsScreen(
     var name by remember(controller.group.groupIdHex, controller.group.name) { mutableStateOf(controller.group.name) }
     var description by remember(controller.group.groupIdHex, controller.group.description) { mutableStateOf(controller.group.description) }
     var pendingMember by remember { mutableStateOf("") }
+    var pendingMemberAsAdmin by remember { mutableStateOf(false) }
     var pendingMemberError by remember { mutableStateOf<String?>(null) }
     var showMemberScanner by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -7329,6 +7330,7 @@ private fun GroupDetailsScreen(
                         TextButton(
                             onClick = {
                                 pendingMemberError = null
+                                pendingMemberAsAdmin = false
                                 showAddMember = true
                             },
                             enabled = activeMutation == null && !controller.mutationInFlight,
@@ -7361,6 +7363,13 @@ private fun GroupDetailsScreen(
                             runGroupMutation(
                                 action = GroupMutationAction.DemoteAdmin,
                                 mutation = { controller.setMemberAdmin(member, admin = false) },
+                                target = member.memberIdHex,
+                            )
+                        },
+                        onSelfDemote = {
+                            runGroupMutation(
+                                action = GroupMutationAction.SelfDemoteAdmin,
+                                mutation = { controller.stepDownAsAdmin() },
                                 target = member.memberIdHex,
                             )
                         },
@@ -7529,7 +7538,12 @@ private fun GroupDetailsScreen(
     }
 
     if (showAddMember) {
-        ModalBottomSheet(onDismissRequest = { showAddMember = false }) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showAddMember = false
+                pendingMemberAsAdmin = false
+            },
+        ) {
             Column(
                 Modifier.fillMaxWidth().padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -7556,6 +7570,18 @@ private fun GroupDetailsScreen(
                     },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.add_as_admin), style = MaterialTheme.typography.bodyLarge)
+                    Switch(
+                        checked = pendingMemberAsAdmin,
+                        onCheckedChange = { pendingMemberAsAdmin = it },
+                        enabled = activeMutation == null && !controller.mutationInFlight,
+                    )
+                }
                 Button(
                     onClick = {
                         val ref =
@@ -7566,10 +7592,11 @@ private fun GroupDetailsScreen(
                         pendingMemberError = null
                         runGroupMutation(
                             action = GroupMutationAction.InviteMember,
-                            mutation = { controller.inviteMembers(listOf(ref)) },
+                            mutation = { controller.inviteMembers(listOf(ref), addAsAdmin = pendingMemberAsAdmin) },
                             target = ref,
                             onSuccess = {
                                 pendingMember = ""
+                                pendingMemberAsAdmin = false
                                 pendingMemberError = null
                                 pendingInvites = (pendingInvites + ref).distinct()
                                 showAddMember = false
@@ -8147,6 +8174,7 @@ private enum class GroupMutationAction {
     RemoveMember,
     PromoteAdmin,
     DemoteAdmin,
+    SelfDemoteAdmin,
     Archive,
     Leave,
 }
@@ -8164,9 +8192,9 @@ private fun GroupMemberRow(
     activeMutation: ActiveGroupMutation?,
     onPromote: () -> Unit,
     onDemote: () -> Unit,
+    onSelfDemote: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val copyNpubLabel = stringResource(R.string.copy)
     val isAdmin = controller.isAdmin(member)
@@ -8175,7 +8203,8 @@ private fun GroupMemberRow(
             member,
             appState.activeAccount?.accountIdHex,
         )
-    val canManage = controller.isSelfMember && controller.isSelfAdmin && !isSelfRow
+    val canManageOtherMember = controller.isSelfMember && controller.isSelfAdmin && !isSelfRow
+    val canStepDown = controller.isSelfMember && controller.isSelfAdmin && isSelfRow && isAdmin
     val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
 
     Row(
@@ -8238,33 +8267,40 @@ private fun GroupMemberRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        } else if (canManage) {
-            Box {
-                IconButton(onClick = { menuOpen = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.member_actions))
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(if (isAdmin) R.string.remove_admin else R.string.make_admin)) },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+        } else if (canManageOtherMember) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.admin),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Switch(
+                    checked = isAdmin,
+                    enabled = !controller.mutationInFlight,
+                    onCheckedChange = { checked ->
+                        if (checked != isAdmin) {
+                            if (checked) onPromote() else onDemote()
+                        }
+                    },
+                )
+                if (!isAdmin) {
+                    IconButton(
+                        onClick = onRemove,
                         enabled = !controller.mutationInFlight,
-                        onClick = {
-                            menuOpen = false
-                            if (isAdmin) onDemote() else onPromote()
-                        },
-                    )
-                    if (!isAdmin) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.remove_member)) },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                            enabled = !controller.mutationInFlight,
-                            onClick = {
-                                menuOpen = false
-                                onRemove()
-                            },
-                        )
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.remove_member))
                     }
                 }
+            }
+        } else if (canStepDown) {
+            TextButton(
+                onClick = onSelfDemote,
+                enabled = !controller.mutationInFlight,
+            ) {
+                Text(stringResource(R.string.step_down_as_admin))
             }
         }
     }
@@ -8275,7 +8311,9 @@ private val GroupMutationAction.memberStatusLabelRes: Int
     get() =
         when (this) {
             GroupMutationAction.PromoteAdmin -> R.string.adding_admin
-            GroupMutationAction.DemoteAdmin -> R.string.removing_admin
+            GroupMutationAction.DemoteAdmin,
+            GroupMutationAction.SelfDemoteAdmin,
+            -> R.string.removing_admin
             GroupMutationAction.RemoveMember -> R.string.removing_member
             else -> R.string.member_actions
         }
