@@ -464,16 +464,23 @@ private fun rememberConversationControllerCopy(): ConversationControllerCopy =
 private fun rememberRelativeTimeCopy(): dev.ipf.darkmatter.core.RelativeTimeCopy {
     val future = stringResource(R.string.relative_time_future)
     val now = stringResource(R.string.relative_time_now)
-    val minutesFormat = stringResource(R.string.relative_time_minutes)
-    val hoursFormat = stringResource(R.string.relative_time_hours)
-    val daysFormat = stringResource(R.string.relative_time_days)
-    return remember(future, now, minutesFormat, hoursFormat, daysFormat) {
+    // Resolve plural-aware unit strings through getQuantityString so inflected
+    // locales (Russian one/few/many, etc.) render the correct grammatical form
+    // for the count. The Resources handle comes from the Compose LocalContext.
+    val resources = LocalContext.current.resources
+    return remember(future, now, resources) {
         dev.ipf.darkmatter.core.RelativeTimeCopy(
             future = future,
             now = now,
-            minutesFormat = minutesFormat,
-            hoursFormat = hoursFormat,
-            daysFormat = daysFormat,
+            minutes = { count ->
+                resources.getQuantityString(R.plurals.relative_time_minutes, count, count)
+            },
+            hours = { count ->
+                resources.getQuantityString(R.plurals.relative_time_hours, count, count)
+            },
+            days = { count ->
+                resources.getQuantityString(R.plurals.relative_time_days, count, count)
+            },
         )
     }
 }

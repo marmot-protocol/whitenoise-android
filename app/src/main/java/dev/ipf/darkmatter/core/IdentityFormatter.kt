@@ -64,9 +64,13 @@ object IdentityFormatter {
             // Clock skew within tolerance reads as "now", not "future".
             delta < -CLOCK_SKEW_TOLERANCE_SECONDS -> copy.future
             delta < 60 -> copy.now
-            delta < 3_600 -> String.format(locale, copy.minutesFormat, delta / 60)
-            delta < 86_400 -> String.format(locale, copy.hoursFormat, delta / 3_600)
-            delta < 604_800 -> String.format(locale, copy.daysFormat, delta / 86_400)
+            // Plural-aware unit rendering: the callbacks resolve the correct
+            // grammatical form (e.g. Russian one/few/many) for the count. The
+            // count is clamped to a non-negative Int — every delta here is well
+            // within the day/week ranges below, so the conversion is safe.
+            delta < 3_600 -> copy.minutes((delta / 60).toInt())
+            delta < 86_400 -> copy.hours((delta / 3_600).toInt())
+            delta < 604_800 -> copy.days((delta / 86_400).toInt())
             else ->
                 // Locale-aware month-day ordering rather than forced "MMM d".
                 DateTimeFormatter
@@ -78,21 +82,37 @@ object IdentityFormatter {
     }
 }
 
+/**
+ * Copy used by [IdentityFormatter.relativeTime].
+ *
+ * The unit branches (minutes / hours / days) are resolved through plural-aware
+ * callbacks rather than `String.format` against a flat `<string>`. This lets the
+ * Compose layer back each callback with `Resources.getQuantityString(...)` so
+ * inflected locales (Russian one/few/many, Polish, Arabic, ...) render the
+ * grammatically correct form for the count. Keeping the callbacks here — instead
+ * of threading a `Context` into [IdentityFormatter] — preserves the formatter as
+ * a pure, JVM-testable function with no Android dependency.
+ */
 data class RelativeTimeCopy(
     val future: String,
     val now: String,
-    val minutesFormat: String,
-    val hoursFormat: String,
-    val daysFormat: String,
+    val minutes: (count: Int) -> String,
+    val hours: (count: Int) -> String,
+    val days: (count: Int) -> String,
 ) {
     companion object {
+        /**
+         * Locale-agnostic fallback used as the default argument and in pure unit
+         * tests. Renders compact non-pluralized forms (e.g. "2m", "3h", "5d").
+         * Real UI supplies plural-aware callbacks via the Compose layer.
+         */
         val Default =
             RelativeTimeCopy(
                 future = "future",
                 now = "now",
-                minutesFormat = "%1\$dm",
-                hoursFormat = "%1\$dh",
-                daysFormat = "%1\$dd",
+                minutes = { count -> "${count}m" },
+                hours = { count -> "${count}h" },
+                days = { count -> "${count}d" },
             )
     }
 }
