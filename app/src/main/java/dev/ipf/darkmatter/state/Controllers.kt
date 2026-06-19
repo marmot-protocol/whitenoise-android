@@ -2683,15 +2683,21 @@ class ConversationController(
             val account = appState.activeAccountRef ?: return@withMutationLockResult false
             val refs = memberRefs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
             if (refs.isEmpty()) return@withMutationLockResult false
+            val adminTargets =
+                if (addAsAdmin) {
+                    refs.map { ref ->
+                        appState.marmotIo { accountIdHex(ref) }
+                            ?: throw IllegalArgumentException("Invalid member reference")
+                    }
+                } else {
+                    emptyList()
+                }
             var inviteSent = false
             try {
                 appState.marmotIo { inviteMembers(account, group.groupIdHex, refs) }
                 inviteSent = true
-                if (addAsAdmin) {
-                    refs.forEach { ref ->
-                        val target = appState.marmotIo { accountIdHex(ref) } ?: ref
-                        appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
-                    }
+                adminTargets.forEach { target ->
+                    appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
                 }
                 refreshMembers()
                 appState.present(R.string.toast_invite_sent)
