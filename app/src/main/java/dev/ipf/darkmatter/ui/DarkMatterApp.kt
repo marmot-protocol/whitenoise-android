@@ -193,6 +193,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -653,7 +654,7 @@ private val LocalSnackbarBottomInset =
 fun DarkMatterSnackbarHost(
     hostState: SnackbarHostState,
     modifier: Modifier = Modifier,
-    snackbar: @Composable (SnackbarData) -> Unit = { Snackbar(snackbarData = it) },
+    snackbar: @Composable (SnackbarData) -> Unit = { SwipeDismissibleSnackbar(it) },
 ) {
     val extraInset = LocalSnackbarBottomInset.current.value
     SnackbarHost(
@@ -666,6 +667,45 @@ fun DarkMatterSnackbarHost(
                 .padding(bottom = 16.dp + extraInset),
         snackbar = snackbar,
     )
+}
+
+/**
+ * A [Snackbar] the user can swipe away horizontally (issue #352). Material 3's
+ * [SnackbarHost] does not wire up swipe-to-dismiss itself, so a snackbar
+ * otherwise sits until it times out or an action is tapped. Wrapping it in a
+ * [SwipeToDismissBox] restores the standard Material gesture: a horizontal
+ * swipe in either direction calls [SnackbarData.dismiss], which resolves the
+ * host's suspending `showSnackbar` with [SnackbarResult.Dismissed] (never
+ * [SnackbarResult.ActionPerformed]), so actionable snackbars — e.g. the
+ * chat-list swipe-to-archive Undo — treat a swipe-away as "ignored", not as
+ * tapping the action.
+ *
+ * The box is re-keyed per [SnackbarData] so its dismiss state resets for each
+ * new snackbar; without that, a settled-away state would carry over and the
+ * next snackbar would never render.
+ */
+@Composable
+fun SwipeDismissibleSnackbar(data: SnackbarData) {
+    val dismissState =
+        key(data) {
+            rememberSwipeToDismissBoxState(
+                confirmValueChange = { target ->
+                    if (target != SwipeToDismissBoxValue.Settled) {
+                        data.dismiss()
+                    }
+                    // Let the box animate the snackbar off in the swipe
+                    // direction; data.dismiss() pulls it from the host so it
+                    // does not re-enter once the gesture settles.
+                    true
+                },
+            )
+        }
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {},
+    ) {
+        Snackbar(snackbarData = data)
+    }
 }
 
 @Composable
@@ -1141,6 +1181,18 @@ private fun ChatsScreen(
     val chatArchivedMessage = stringResource(R.string.toast_chat_archived)
     val chatRestoredMessage = stringResource(R.string.toast_chat_restored)
     val undoActionLabel = stringResource(R.string.action_undo)
+
+    // Lift the snackbar hosts (the app-level toast host AND this screen's
+    // local undo host both flow through DarkMatterSnackbarHost, which reads
+    // LocalSnackbarBottomInset) above the quick-action FAB so a toast can't
+    // sit over the FAB and intercept its taps for the toast's duration —
+    // issue #352. Resets to zero on dispose so other surfaces aren't
+    // affected, mirroring ConversationScreen's composer lift (#122).
+    val snackbarBottomInset = LocalSnackbarBottomInset.current
+    DisposableEffect(Unit) {
+        snackbarBottomInset.value = FAB_SNACKBAR_INSET
+        onDispose { snackbarBottomInset.value = 0.dp }
+    }
 
     LaunchedEffect(showArchived) {
         if (showArchived) quickActionsExpanded = false
@@ -2620,6 +2672,15 @@ private const val ConversationNearBottomItemSlack = 3
 // composer's measured height instead of hardcoding so multi-line and
 // attachment-preview states stay covered exactly.
 private val COMPOSER_SNACKBAR_INSET = 72.dp
+
+// Approximate clearance the chat-list quick-action FAB occupies above the
+// navigation bar. Used by ChatsScreen to push the global + chat-list snackbar
+// hosts above the FAB so a toast (e.g. "npub copied" from a profile sheet)
+// doesn't sit over the FAB and swallow its taps for the toast's duration —
+// issue #352. The toggle FAB is ~56.dp and the Scaffold floats it 16.dp above
+// the bottom inset; 80.dp clears that stack with a small gap so the lifted
+// snackbar reads as sitting *above* the FAB, per Material guidance.
+private val FAB_SNACKBAR_INSET = 80.dp
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
 
