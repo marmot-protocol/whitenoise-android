@@ -45,12 +45,10 @@ object MentionComposer {
 
     /**
      * The npub bech32 grammar (lowercase, no `b`/`i`/`o`/`1` in the body).
-     * Used both to recognize an already-inserted chip run and to bound the
-     * whole-token backspace. A real npub is `npub1` + 58 body chars (length
-     * 63), but matching the full run greedily lets us treat a partially-typed
-     * or future-length entity as one token too.
+     * A real npub is `npub1` + 58 body chars (length 63), but matching the
+     * full run greedily lets us treat a partially-typed or future-length entity
+     * as one token too.
      */
-    private val NPUB_RUN = Regex("npub1[ac-hj-np-z02-9]+")
 
     /** A composer mention chip: `@` immediately followed by an npub run. */
     private val MENTION_CHIP = Regex("@npub1[ac-hj-np-z02-9]+")
@@ -87,10 +85,13 @@ object MentionComposer {
         // The `@` must begin a word: start-of-text or preceded by whitespace.
         if (i > 0 && !text[i - 1].isWhitespace()) return null
         val query = text.substring(i + 1, caret)
-        // Don't reopen the picker when the caret is sitting in an already
-        // inserted `@npub1…` chip.
-        if (query.startsWith("npub1") && NPUB_RUN.matchAt(query, 0)?.range?.last == query.lastIndex) {
-            return null
+        // Don't reopen the picker when the caret is inside or at the right edge
+        // of an already-inserted `@npub1…` chip. The trigger `@` we just found
+        // may be the start of a completed chip; if a chip begins at `i` and the
+        // caret sits within or just past it, the user is editing around an
+        // atomic token, not composing a fresh query — suppress the picker.
+        MENTION_CHIP.matchAt(text, i)?.let { chip ->
+            if (caret <= chip.range.last + 1) return null
         }
         return ActiveQuery(start = i, query = query)
     }
@@ -170,14 +171,25 @@ object MentionComposer {
      * Compose reports the post-edit state; we compare the user's [oldText] /
      * [oldCaret] against the proposed [newText] / [newCaret]. When the edit is
      * exactly the single-character deletion the IME performs on Backspace AND
-     * the deleted character was the last char of an `@npub1…` chip (i.e. the
-     * caret was at the chip's right edge), return the [Insertion] that instead
-     * removes the whole chip in one keypress. Returns null when the edit isn't
-     * a right-edge-of-chip backspace, so the caller applies the IME edit as-is.
+     * that deletion lands at a chip boundary, return the [Insertion] that
+     * instead removes the whole chip in one keypress. Two boundary positions
+     * count as "at the chip":
+     *
+     *  1. The caret is at the chip's right edge (`…@npub1…▮`) — the deleted
+     *     char is the chip's last char. Widen the deletion to the whole chip.
+     *  2. The caret is just past the single trailing space [insertMention]
+     *     appends (`…@npub1… ▮`) — the deleted char is that space. This is the
+     *     caret position immediately after inserting a chip, so the *first*
+     *     Backspace must still feel atomic: remove the chip AND its trailing
+     *     space together rather than leaving a bare `@npub1…` behind that would
+     *     then need a second keypress.
+     *
+     * Returns null when the edit isn't one of those chip-boundary backspaces,
+     * so the caller applies the IME edit verbatim.
      *
      * This makes the chip feel atomic on delete without storing a hidden span:
      * the literal `@npub1…` run is the chip, and we just widen the deletion to
-     * cover all of it.
+     * cover all of it (plus the trailing space when that's what was hit).
      */
     fun wholeChipBackspace(
         oldText: String,
@@ -194,11 +206,77 @@ object MentionComposer {
         // before newCaret is unchanged, everything after is shifted by one.
         if (oldText.substring(0, newCaret) != newText.substring(0, newCaret)) return null
         if (oldText.substring(oldCaret) != newText.substring(newCaret)) return null
-        // Find a chip in oldText whose right edge is exactly at oldCaret.
-        val chip = chipEndingAt(oldText, oldCaret) ?: return null
-        val before = oldText.substring(0, chip.first)
-        val after = oldText.substring(chip.last + 1)
-        return Insertion(text = before + after, selection = before.length)
+        // Case 1: a chip ends exactly at the caret — widen to the whole chip.
+        chipEndingAt(oldText, oldCaret)?.let { chip ->
+            val before = oldText.substring(0, chip.first)
+            val after = oldText.substring(chip.last + 1)
+            return Insertion(text = before + after, selection = before.length)
+        }
+        // Case 2: the caret is just past a chip's single trailing space (the
+        // post-insert caret position). The deleted char is that space; instead
+        // remove the chip and the space as one unit so the first Backspace
+        // after insertion still deletes the chip atomically.
+        if (oldCaret >= 1 && oldText[oldCaret - 1] == ' ') {
+            chipEndingAt(oldText, oldCaret - 1)?.let { chip ->
+                val before = oldText.substring(0, chip.first)
+                // Drop the chip plus the one trailing space (oldCaret - 1).
+                val after = oldText.substring(oldCaret)
+                return Insertion(text = before + after, selection = before.length)
+            }
+        }
+        return null
+    }
+
+    /**
+     * Clamp a (possibly ranged) selection so neither endpoint rests *inside* a
+     * mention chip. A chip is atomic: the caret may sit at its left or right
+     * edge but never between its characters, and a selection edge inside a chip
+     * snaps to the nearer chip edge. This is applied by the UI to every
+     * post-edit selection so taps, long-presses, and arrow keys can't land the
+     * caret in the middle of an `@npub1…` token (which would let normal edits
+     * corrupt it or reopen the picker mid-token).
+     *
+     * Returns the clamped [start, end] pair (same order as given; a collapsed
+     * caret stays collapsed). Endpoints already at an edge or in plain text are
+     * returned unchanged.
+     */
+    data class Selection(
+        val start: Int,
+        val end: Int,
+    )
+
+    fun clampSelectionOutOfChips(
+        text: String,
+        start: Int,
+        end: Int,
+    ): Selection {
+        val ranges = chipRanges(text)
+        return Selection(
+            start = clampOffsetOutOfChips(start, ranges),
+            end = clampOffsetOutOfChips(end, ranges),
+        )
+    }
+
+    /**
+     * Push a single caret [offset] out of any chip it lands strictly inside,
+     * snapping to whichever chip edge is closer (ties go to the right edge so a
+     * forward tap/drag settles past the chip). Offsets at an edge — `chip.first`
+     * or `chip.last + 1` — are already valid and returned as-is.
+     */
+    private fun clampOffsetOutOfChips(
+        offset: Int,
+        ranges: List<IntRange>,
+    ): Int {
+        for (r in ranges) {
+            val leftEdge = r.first
+            val rightEdge = r.last + 1
+            if (offset > leftEdge && offset < rightEdge) {
+                val distToLeft = offset - leftEdge
+                val distToRight = rightEdge - offset
+                return if (distToLeft < distToRight) leftEdge else rightEdge
+            }
+        }
+        return offset
     }
 
     /**

@@ -11377,9 +11377,11 @@ private fun ComposerBar(
                     onValueChange = { value ->
                         if (!isRecordingVoice) {
                             // #414: a single Backspace at the right edge of an
-                            // `@npub1…` chip deletes the whole chip in one
-                            // keypress, so a mention reads as one token. Falls
-                            // through to the verbatim IME edit otherwise.
+                            // `@npub1…` chip (or just past its trailing space,
+                            // the post-insert caret position) deletes the whole
+                            // chip in one keypress, so a mention reads as one
+                            // token. Falls through to the verbatim IME edit
+                            // otherwise.
                             val whole =
                                 MentionComposer.wholeChipBackspace(
                                     oldText = textFieldValue.text,
@@ -11387,11 +11389,34 @@ private fun ComposerBar(
                                     newText = value.text,
                                     newCaret = value.selection.start,
                                 )
-                            val applied =
+                            val edited =
                                 if (whole != null) {
                                     TextFieldValue(text = whole.text, selection = TextRange(whole.selection))
                                 } else {
                                     value
+                                }
+                            // #414: keep the caret/selection out of the interior
+                            // of any `@npub1…` chip so a tap, drag, or arrow key
+                            // can't land inside the token (which would let a
+                            // stray edit corrupt it or reopen the picker
+                            // mid-token). Only in groups, where chips exist.
+                            val applied =
+                                if (mentionPickerEnabled) {
+                                    val clamped =
+                                        MentionComposer.clampSelectionOutOfChips(
+                                            edited.text,
+                                            edited.selection.start,
+                                            edited.selection.end,
+                                        )
+                                    if (clamped.start != edited.selection.start ||
+                                        clamped.end != edited.selection.end
+                                    ) {
+                                        edited.copy(selection = TextRange(clamped.start, clamped.end))
+                                    } else {
+                                        edited
+                                    }
+                                } else {
+                                    edited
                                 }
                             textFieldValue = applied
                             // While editing, the field holds the edit candidate,
