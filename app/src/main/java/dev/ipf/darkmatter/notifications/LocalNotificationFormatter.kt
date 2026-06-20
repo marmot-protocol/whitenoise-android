@@ -29,7 +29,7 @@ data class NotificationDismissalKey(
 object LocalNotificationFormatter {
     const val MESSAGE_NOTIFICATION_ID = 0
 
-    // Reactions (#288) live on their own channel AND need their own stable
+    // Reactions live on their own channel AND need their own stable
     // notification identity. Android keys a notification by (tag, id), not by
     // channel, so if reactions reused the per-conversation message identity a
     // reaction would mutate (or be mutated by) the normal message card and the
@@ -40,6 +40,14 @@ object LocalNotificationFormatter {
 
     private val whitespaceRun = Regex("\\s+")
 
+    // Invites stamp the account + group they're for into these extras so the
+    // dismissal path can find and cancel them — their card is tagged by the
+    // opaque notificationKey, which isn't reconstructable from (accountRef,
+    // groupIdHex). Both are matched: the same group can exist in more than one
+    // local account, so the group id alone would clear another account's invite.
+    const val EXTRA_DISMISS_ACCOUNT_REF = "dev.ipf.darkmatter.notify.dismiss_account_ref"
+    const val EXTRA_DISMISS_GROUP_ID = "dev.ipf.darkmatter.notify.dismiss_group_id"
+
     fun conversationDismissalKey(
         accountRef: String,
         groupIdHex: String,
@@ -47,6 +55,18 @@ object LocalNotificationFormatter {
         NotificationDismissalKey(
             tag = "$accountRef|$groupIdHex",
             id = MESSAGE_NOTIFICATION_ID,
+        )
+
+    // Reaction cards live under their own (prefixed tag, REACTION_NOTIFICATION_ID)
+    // identity, so dismissing a conversation has to target this key on top of
+    // the message key to clear them.
+    fun reactionDismissalKey(
+        accountRef: String,
+        groupIdHex: String,
+    ): NotificationDismissalKey =
+        NotificationDismissalKey(
+            tag = REACTION_TAG_PREFIX + conversationDismissalKey(accountRef, groupIdHex).tag,
+            id = REACTION_NOTIFICATION_ID,
         )
 
     /** True when this update is a kind:7 reaction (a NEW_MESSAGE carrying an emoji). */
@@ -59,7 +79,7 @@ object LocalNotificationFormatter {
         // contact name and, failing that, formats an npub). The FFI payload's
         // displayName is often null for incoming messages even when the app
         // already has a name for that pubkey, so the override is what keeps the
-        // notification from falling back to a raw hex key. See #206.
+        // notification from falling back to a raw hex key.
         senderNameOverride: String? = null,
     ): LocalNotificationContent? {
         if (update.isFromSelf) return null

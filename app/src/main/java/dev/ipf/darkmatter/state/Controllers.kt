@@ -2832,6 +2832,7 @@ class ConversationController(
         val account = appState.activeAccountRef ?: return false
         return runCatching {
             group = appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) }
+            appState.dismissConversationNotifications(account, group.groupIdHex)
             refreshMembers()
             refreshCurrentTimeline(account).forEach { streamId ->
                 if (activeStreamIds.add(streamId)) {
@@ -2852,6 +2853,7 @@ class ConversationController(
         val account = appState.activeAccountRef ?: return false
         return runCatching {
             appState.marmotIo { declineGroupInvite(account, group.groupIdHex) }
+            appState.dismissConversationNotifications(account, group.groupIdHex)
             group = group.copy(pendingConfirmation = false, archived = true)
             appState.applyLocalGroupUpdate(group)
             appState.present(R.string.toast_invite_declined)

@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Bundle
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -24,8 +25,6 @@ class LocalNotificationPresenter(
     private val context: Context,
 ) {
     fun ensureChannels() {
-        // Per-type channels (#288): direct messages, group messages, reactions,
-        // invites. The legacy single channel is retired in here too.
         NotificationChannels.ensureChannels(context)
     }
 
@@ -35,15 +34,43 @@ class LocalNotificationPresenter(
             Manifest.permission.POST_NOTIFICATIONS,
         ) == PackageManager.PERMISSION_GRANTED
 
+    // Opening / reading a conversation clears every card for it: the
+    // accumulating message card, the separate reaction card, and any pending
+    // group-invite card. Invites are tagged by their opaque notificationKey, not
+    // the per-conversation tag, so they're found by the account + group stamped
+    // into their extras at post time rather than by key.
     fun dismissConversationMessages(
         accountRef: String,
         groupIdHex: String,
     ): Boolean {
         if (accountRef.isBlank() || groupIdHex.isBlank()) return false
-        val key = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
-        NotificationManagerCompat.from(context).cancel(key.tag, key.id)
+        val manager = NotificationManagerCompat.from(context)
+        val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
+        val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
+        manager.cancel(message.tag, message.id)
+        manager.cancel(reaction.tag, reaction.id)
+        dismissInvitesForGroup(accountRef, groupIdHex)
         notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
         return true
+    }
+
+    // Invite cards carry no per-conversation tag, so match them by the account +
+    // group stamped into their extras and cancel each by its own (tag, id). Both
+    // must match: the same group can exist in more than one local account, so the
+    // group id alone would clear another account's invite for that group.
+    fun dismissInvitesForGroup(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        if (accountRef.isBlank() || groupIdHex.isBlank()) return
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        runCatching { manager.activeNotifications }
+            .getOrNull()
+            ?.filter {
+                val extras = it.notification.extras ?: return@filter false
+                extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID) == groupIdHex &&
+                    extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF) == accountRef
+            }?.forEach { NotificationManagerCompat.from(context).cancel(it.tag, it.id) }
     }
 
     @SuppressLint("MissingPermission")
@@ -67,8 +94,8 @@ class LocalNotificationPresenter(
         // every show() to avoid the per-notification Binder IPC into
         // NotificationManagerService.
 
-        // Route each notification to its per-type channel (#288) so the user's
-        // OS-level sound / vibration / importance / mute choices apply per type.
+        // Route each notification to its per-type channel so the user's OS-level
+        // sound / vibration / importance / mute choices apply per type.
         val channelId = NotificationChannelSpec.forUpdate(update).id
         val isReaction = NotificationChannelSpec.forUpdate(update) == NotificationChannelSpec.REACTIONS
         val category =
@@ -114,11 +141,23 @@ class LocalNotificationPresenter(
                     }
             }
 
-            else ->
+            else -> {
                 builder
                     .setContentTitle(content.title)
                     .setContentText(content.body)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
+                // Stamp the invited-to account + group so accepting/declining or
+                // opening that conversation can find and dismiss this card (its
+                // tag is the opaque key).
+                if (update.trigger == NotificationTriggerFfi.GROUP_INVITE && update.groupIdHex.isNotBlank()) {
+                    builder.addExtras(
+                        Bundle().apply {
+                            putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, update.accountRef)
+                            putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, update.groupIdHex)
+                        },
+                    )
+                }
+            }
         }
 
         NotificationManagerCompat.from(context).notify(content.notificationTag, content.notificationId, builder.build())
