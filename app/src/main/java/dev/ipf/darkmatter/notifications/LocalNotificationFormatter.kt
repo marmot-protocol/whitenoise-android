@@ -29,7 +29,7 @@ data class NotificationDismissalKey(
 object LocalNotificationFormatter {
     const val MESSAGE_NOTIFICATION_ID = 0
 
-    // Reactions (#288) live on their own channel AND need their own stable
+    // Reactions live on their own channel AND need their own stable
     // notification identity. Android keys a notification by (tag, id), not by
     // channel, so if reactions reused the per-conversation message identity a
     // reaction would mutate (or be mutated by) the normal message card and the
@@ -57,7 +57,7 @@ object LocalNotificationFormatter {
 
     // Reaction cards live under their own (prefixed tag, REACTION_NOTIFICATION_ID)
     // identity, so dismissing a conversation has to target this key on top of
-    // the message key to clear them. See #288.
+    // the message key to clear them.
     fun reactionDismissalKey(
         accountRef: String,
         groupIdHex: String,
@@ -77,7 +77,7 @@ object LocalNotificationFormatter {
         // contact name and, failing that, formats an npub). The FFI payload's
         // displayName is often null for incoming messages even when the app
         // already has a name for that pubkey, so the override is what keeps the
-        // notification from falling back to a raw hex key. See #206.
+        // notification from falling back to a raw hex key.
         senderNameOverride: String? = null,
     ): LocalNotificationContent? {
         if (update.isFromSelf) return null

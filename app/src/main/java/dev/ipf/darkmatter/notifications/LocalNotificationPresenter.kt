@@ -25,8 +25,6 @@ class LocalNotificationPresenter(
     private val context: Context,
 ) {
     fun ensureChannels() {
-        // Per-type channels (#288): direct messages, group messages, reactions,
-        // invites. The legacy single channel is retired in here too.
         NotificationChannels.ensureChannels(context)
     }
 
@@ -37,10 +35,10 @@ class LocalNotificationPresenter(
         ) == PackageManager.PERMISSION_GRANTED
 
     // Opening / reading a conversation clears every card for it: the
-    // accumulating message card, the separate reaction card (#288), and any
-    // pending group-invite card. Invites are tagged by their opaque
-    // notificationKey, not the per-conversation tag, so they're found by the
-    // group id stamped into their extras at post time rather than by key.
+    // accumulating message card, the separate reaction card, and any pending
+    // group-invite card. Invites are tagged by their opaque notificationKey, not
+    // the per-conversation tag, so they're found by the group id stamped into
+    // their extras at post time rather than by key.
     fun dismissConversationMessages(
         accountRef: String,
         groupIdHex: String,
@@ -87,8 +85,8 @@ class LocalNotificationPresenter(
         // every show() to avoid the per-notification Binder IPC into
         // NotificationManagerService.
 
-        // Route each notification to its per-type channel (#288) so the user's
-        // OS-level sound / vibration / importance / mute choices apply per type.
+        // Route each notification to its per-type channel so the user's OS-level
+        // sound / vibration / importance / mute choices apply per type.
         val channelId = NotificationChannelSpec.forUpdate(update).id
         val isReaction = NotificationChannelSpec.forUpdate(update) == NotificationChannelSpec.REACTIONS
         val category =
@@ -140,7 +138,7 @@ class LocalNotificationPresenter(
                     .setContentText(content.body)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
                 // Stamp the invited-to group so opening that conversation can
-                // find and dismiss this card (its tag is the opaque key, #342).
+                // find and dismiss this card (its tag is the opaque key).
                 if (update.trigger == NotificationTriggerFfi.GROUP_INVITE && update.groupIdHex.isNotBlank()) {
                     builder.addExtras(
                         Bundle().apply {

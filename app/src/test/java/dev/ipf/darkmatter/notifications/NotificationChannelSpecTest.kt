@@ -77,12 +77,13 @@ class NotificationChannelSpecTest {
         // change a live channel's importance) with the old ID retired.
         assertEquals("messages_dm", NotificationChannelSpec.DIRECT_MESSAGES.id)
         assertEquals("messages_group", NotificationChannelSpec.GROUP_MESSAGES.id)
-        // Re-keyed from the original low-importance "reactions" channel so
-        // reactions heads-up; the old ID is retired on the OS side.
+        // Reactions and invites were re-keyed (importance raised) so they
+        // heads-up; the old IDs are retired on the OS side.
         assertEquals("reactions_v2", NotificationChannelSpec.REACTIONS.id)
-        assertEquals("invites", NotificationChannelSpec.INVITES.id)
+        assertEquals("invites_v2", NotificationChannelSpec.INVITES.id)
         assertEquals("darkmatter.messages.v2", NotificationChannelSpec.LEGACY_MESSAGES_CHANNEL_ID)
         assertEquals("reactions", NotificationChannelSpec.LEGACY_REACTIONS_CHANNEL_ID)
+        assertEquals("invites", NotificationChannelSpec.LEGACY_INVITES_CHANNEL_ID)
     }
 
     private fun update(

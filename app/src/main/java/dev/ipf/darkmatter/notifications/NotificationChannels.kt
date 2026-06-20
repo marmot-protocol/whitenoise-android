@@ -7,23 +7,18 @@ import android.content.Context
 import dev.ipf.darkmatter.R
 
 /**
- * Creates and maintains the per-type notification channels for #288.
+ * Creates and maintains the per-type notification channels.
  *
  * Each [NotificationChannelSpec] becomes one OS channel so the user gets native
  * per-type controls (sound, vibration, importance, badge, lockscreen visibility,
  * DND bypass) from the system notification details — no in-app duplication of
  * those toggles. Muting a type is just setting its OS channel to "None".
  *
- * Migration from the legacy single channel
- * ([NotificationChannelSpec.LEGACY_MESSAGES_CHANNEL_ID]): #288 requires the
- * user's existing sound / vibration / importance choices survive the split.
- * Android won't let an app rename or re-key a channel, so the only ways to carry
- * the settings forward are (a) reuse the old ID, or (b) copy the user-mutable
- * fields onto the replacement before deleting the old channel. We do (b): the
- * legacy channel's role is taken over by [NotificationChannelSpec.DIRECT_MESSAGES]
- * with its stable `messages_dm` ID, and any user overrides on the old channel
- * (importance, sound, vibration, lights, lockscreen visibility, badge, DND
- * bypass) are copied across before the old channel is deleted.
+ * Android won't let an app rename or re-key a channel, so to carry a user's
+ * existing sound / vibration / importance choices across the split from the
+ * legacy single channel ([NotificationChannelSpec.LEGACY_MESSAGES_CHANNEL_ID])
+ * its role is taken over by [NotificationChannelSpec.DIRECT_MESSAGES] and the
+ * user-mutable fields are copied onto it before the old channel is deleted.
  */
 object NotificationChannels {
     fun ensureChannels(context: Context) {
@@ -45,16 +40,14 @@ object NotificationChannels {
             }
             manager.createNotificationChannel(channel)
         }
-        // Retire the pre-#288 single channel. Safe to call repeatedly: deleting
-        // a missing channel is a no-op. We do this last, after messages_dm has
-        // been created with the migrated settings, so a partial run never leaves
-        // the user with no message channel and never loses their settings.
+        // Retire channels replaced above. Safe to call repeatedly: deleting a
+        // missing channel is a no-op. Done last, after the replacements exist,
+        // so a partial run never leaves the user without a channel. The reactions
+        // and invites channels are re-keyed (not migrated) because their
+        // importance was raised and a live channel's importance can't change.
         manager.deleteNotificationChannel(NotificationChannelSpec.LEGACY_MESSAGES_CHANNEL_ID)
-        // Retire the original low-importance reactions channel now that
-        // reactions_v2 carries them at high importance (heads-up). A live
-        // channel's importance can't be raised, so the old one is deleted and
-        // replaced by the re-keyed spec above.
         manager.deleteNotificationChannel(NotificationChannelSpec.LEGACY_REACTIONS_CHANNEL_ID)
+        manager.deleteNotificationChannel(NotificationChannelSpec.LEGACY_INVITES_CHANNEL_ID)
     }
 
     /**
@@ -92,10 +85,9 @@ object NotificationChannels {
             importanceOverride ?: spec.importance.toAndroidImportance(),
         ).apply {
             description = context.getString(spec.descriptionRes())
-            // Preserve the legacy message-channel behaviour for the message
-            // channels (vibrate + private lockscreen); reactions/invites inherit
-            // OS defaults for their importance and stay private on the lockscreen
-            // so a redacted public version is always shown instead of the body.
+            // Every channel stays private on the lockscreen so a redacted public
+            // version is shown instead of the body. Only the message channels opt
+            // into explicit vibration to match the legacy single channel.
             lockscreenVisibility = Notification.VISIBILITY_PRIVATE
             when (spec) {
                 NotificationChannelSpec.DIRECT_MESSAGES,

@@ -89,9 +89,9 @@ class LocalNotificationFormatterTest {
 
     @Test
     fun reactionGetsItsOwnNotificationIdentityDistinctFromMessages() {
-        // #288: a reaction and a normal message in the SAME conversation must
-        // not share the (tag, id) Android keys on, or one would mutate the
-        // other's card and "mute reactions, keep messages" would break.
+        // A reaction and a normal message in the SAME conversation must not
+        // share the (tag, id) Android keys on, or one would mutate the other's
+        // card and "mute reactions, keep messages" would break.
         val message =
             LocalNotificationFormatter.content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"),
@@ -143,7 +143,7 @@ class LocalNotificationFormatterTest {
     @Test
     fun reactionDismissalKeyMatchesThePostedReactionIdentity() {
         // Opening a conversation must cancel the exact (tag, id) the reaction
-        // card was posted under, or reaction cards linger after read (#369).
+        // card was posted under, or reaction cards linger after read.
         val reaction =
             LocalNotificationFormatter.content(
                 update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "👍"),
@@ -244,7 +244,7 @@ class LocalNotificationFormatterTest {
     fun senderNameOverrideTakesPrecedenceOverPayloadDisplayName() {
         // The caller resolves the sender name (cached profile / contact name,
         // else npub). When present it must win over the FFI payload name and the
-        // hex-key fallback. See #206.
+        // hex-key fallback.
         val content =
             LocalNotificationFormatter.content(
                 update(
@@ -261,9 +261,8 @@ class LocalNotificationFormatterTest {
 
     @Test
     fun senderNameOverrideIsUsedWhenPayloadDisplayNameIsNull() {
-        // The crux of #206: payload displayName is null even though the app has
-        // a name (npub) for the sender. The override must be used instead of the
-        // raw hex key.
+        // Payload displayName is null even though the app has a name (npub) for
+        // the sender. The override must be used instead of the raw hex key.
         val npub = "npub1qy88wumn8ghj7"
         val content =
             LocalNotificationFormatter.content(
