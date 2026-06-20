@@ -50,6 +50,22 @@ val hasReleaseSigning =
         !releaseKeyPassword.isNullOrBlank() &&
         file(releaseKeystorePath!!).exists()
 
+val debugKeystorePath = signingProperty("DARKMATTER_DEBUG_KEYSTORE_PATH")
+val debugKeystorePassword = signingProperty("DARKMATTER_DEBUG_KEYSTORE_PASSWORD")
+val debugKeyAlias = signingProperty("DARKMATTER_DEBUG_KEY_ALIAS")
+val debugKeyPassword = signingProperty("DARKMATTER_DEBUG_KEY_PASSWORD")
+val hasDebugSigning =
+    !debugKeystorePath.isNullOrBlank() &&
+        !debugKeystorePassword.isNullOrBlank() &&
+        !debugKeyAlias.isNullOrBlank() &&
+        !debugKeyPassword.isNullOrBlank() &&
+        file(debugKeystorePath!!).exists()
+
+val appVersionCode =
+    runtimeConfigProperty("DARKMATTER_VERSION_CODE", "4").toIntOrNull()
+        ?: throw GradleException("DARKMATTER_VERSION_CODE must be an integer")
+val appVersionName = runtimeConfigProperty("DARKMATTER_VERSION_NAME", "2026.6.8")
+
 // Escape hatch for the unsigned-release guard below. Off by default: a release
 // build without signing must fail rather than emit an uninstallable artifact.
 val allowUnsignedRelease =
@@ -65,8 +81,8 @@ android {
         applicationId = "dev.ipf.darkmatter"
         minSdk = 34
         targetSdk = 36
-        versionCode = 4
-        versionName = "2026.6.8"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -115,6 +131,14 @@ android {
     }
 
     signingConfigs {
+        if (hasDebugSigning) {
+            create("ciDebug") {
+                storeFile = file(debugKeystorePath!!)
+                storePassword = debugKeystorePassword
+                keyAlias = debugKeyAlias
+                keyPassword = debugKeyPassword
+            }
+        }
         if (hasReleaseSigning) {
             create("release") {
                 storeFile = file(releaseKeystorePath!!)
@@ -132,6 +156,9 @@ android {
             // entries, SharedPreferences) so the two installs never collide.
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            if (hasDebugSigning) {
+                signingConfig = signingConfigs.getByName("ciDebug")
+            }
         }
         release {
             isMinifyEnabled = true

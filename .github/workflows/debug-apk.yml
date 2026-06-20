@@ -1,44 +1,152 @@
-name: Debug APK
-
-# Builds the debug variant on every push to the default branch and publishes
-# the universal APK as a workflow artifact so internal testers can grab the
-# latest build without a local Android toolchain. Debug-only: the artifact is
-# signed with the public debug keystore and uses the `.debug` applicationId
-# suffix, so it installs side-by-side with the store build. Not a release flow.
+name: Build debug APK
 
 on:
   push:
-    branches: [main, master]
+    branches:
+      - master
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: debug-apk-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+env:
+  ANDROID_COMPILE_SDK: "37.0"
+  ANDROID_BUILD_TOOLS: "37.0.0"
+  DEBUG_APK_NAME: darkmatter-latest-main-debug.apk
 
-      - name: Set up JDK
+jobs:
+  build-debug-apk:
+    name: Build and publish debug APK
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-${ANDROID_COMPILE_SDK}" \
+            "build-tools;${ANDROID_BUILD_TOOLS}"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Assemble debug
-        run: ./gradlew :app:assembleDebug --no-daemon
+      - name: Restore stable debug signing key
+        env:
+          DARKMATTER_DEBUG_KEYSTORE_BASE64: ${{ secrets.DARKMATTER_DEBUG_KEYSTORE_BASE64 }}
+          DARKMATTER_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DARKMATTER_DEBUG_KEYSTORE_PASSWORD }}
+          DARKMATTER_DEBUG_KEY_ALIAS: ${{ secrets.DARKMATTER_DEBUG_KEY_ALIAS }}
+          DARKMATTER_DEBUG_KEY_PASSWORD: ${{ secrets.DARKMATTER_DEBUG_KEY_PASSWORD }}
+        run: |
+          missing=0
+          for name in \
+            DARKMATTER_DEBUG_KEYSTORE_BASE64 \
+            DARKMATTER_DEBUG_KEYSTORE_PASSWORD \
+            DARKMATTER_DEBUG_KEY_ALIAS \
+            DARKMATTER_DEBUG_KEY_PASSWORD
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error title=Missing debug signing secret::$name is required for reproducible debug APK updates."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
 
-      - name: Upload debug APK
+          keystore="$RUNNER_TEMP/darkmatter-ci-debug.keystore"
+          printf '%s' "$DARKMATTER_DEBUG_KEYSTORE_BASE64" | base64 --decode >"$keystore"
+          {
+            echo "DARKMATTER_DEBUG_KEYSTORE_PATH=$keystore"
+            echo "DARKMATTER_DEBUG_KEYSTORE_PASSWORD=$DARKMATTER_DEBUG_KEYSTORE_PASSWORD"
+            echo "DARKMATTER_DEBUG_KEY_ALIAS=$DARKMATTER_DEBUG_KEY_ALIAS"
+            echo "DARKMATTER_DEBUG_KEY_PASSWORD=$DARKMATTER_DEBUG_KEY_PASSWORD"
+          } >>"$GITHUB_ENV"
+
+      - name: Set monotonic debug version
+        run: |
+          version_code="$(git rev-list --count HEAD)"
+          short_sha="$(git rev-parse --short=7 HEAD)"
+          {
+            echo "DARKMATTER_VERSION_CODE=$version_code"
+            echo "DARKMATTER_VERSION_NAME=master-$short_sha"
+          } >>"$GITHUB_ENV"
+
+      - name: Build debug APK
+        run: ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Collect debug APK artifacts
+        run: |
+          mkdir -p build/debug-apk
+          cp app/build/outputs/apk/debug/*.apk build/debug-apk/
+          cp app/build/outputs/apk/debug/app-universal-debug.apk "build/debug-apk/${DEBUG_APK_NAME}"
+          (
+            cd build/debug-apk
+            sha256sum *.apk >SHA256SUMS
+          )
+
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: darkmatter-debug-apk
-          path: app/build/outputs/apk/debug/*universal*.apk
+          name: darkmatter-debug-apk-${{ github.run_number }}
+          path: |
+            build/debug-apk/*.apk
+            build/debug-apk/SHA256SUMS
+          retention-days: 60
           if-no-files-found: error
+
+      - name: Publish rolling latest-main release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat >"$RUNNER_TEMP/release-notes.md" <<EOF
+          Rolling debug APK built from ${GITHUB_REPOSITORY}@${GITHUB_SHA}.
+
+          - Branch: ${GITHUB_REF_NAME}
+          - Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          - Application ID: dev.ipf.darkmatter.debug
+          - Version code: ${DARKMATTER_VERSION_CODE}
+          - Version name: ${DARKMATTER_VERSION_NAME}-debug
+
+          This is for internal QA only. It is not a release-signing path.
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f latest-main "$GITHUB_SHA"
+          git push --force origin refs/tags/latest-main
+
+          if gh release view latest-main >/dev/null 2>&1; then
+            gh release edit latest-main \
+              --title "Latest main debug APK" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" \
+              --prerelease
+          else
+            gh release create latest-main \
+              --title "Latest main debug APK" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" \
+              --prerelease \
+              --target "$GITHUB_SHA"
+          fi
+
+          gh release upload latest-main \
+            "build/debug-apk/${DEBUG_APK_NAME}" \
+            build/debug-apk/SHA256SUMS \
+            --clobber

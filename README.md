@@ -1,12 +1,8 @@
 # Dark Matter Android
 
-[![Debug APK](https://github.com/marmot-protocol/darkmatter-android/actions/workflows/debug-apk.yml/badge.svg)](https://github.com/marmot-protocol/darkmatter-android/actions/workflows/debug-apk.yml)
+[![Latest debug APK](https://github.com/marmot-protocol/darkmatter-android/actions/workflows/debug-apk.yml/badge.svg?branch=master)](https://github.com/marmot-protocol/darkmatter-android/releases/download/latest-main/darkmatter-latest-main-debug.apk)
 
 Android client for Dark Matter.
-
-## Latest Debug Build
-
-Each push to the default branch builds a debug APK and uploads it as a workflow artifact. Grab the latest one from the most recent successful [Debug APK run](https://github.com/marmot-protocol/darkmatter-android/actions/workflows/debug-apk.yml?query=is%3Asuccess) — open the run and download `darkmatter-debug-apk` under Artifacts. It is the universal debug variant (`.debug` applicationId suffix), so it installs alongside the store build for side-by-side testing.
 
 ## Project Shape
 
@@ -40,6 +36,12 @@ Direct Gradle equivalents:
 ```
 
 The debug variant uses an `applicationIdSuffix` of `.debug` (`dev.ipf.darkmatter.debug`), so it installs alongside the release build (`dev.ipf.darkmatter`) without collision.
+
+## Latest Debug APK
+
+The [latest debug APK](https://github.com/marmot-protocol/darkmatter-android/releases/download/latest-main/darkmatter-latest-main-debug.apk) is rebuilt by GitHub Actions on every push to the default branch (`master`). The workflow uploads the split debug APKs as 60-day run artifacts and refreshes the anonymous `latest-main` prerelease asset linked above.
+
+CI signs debug APKs with the repository `DARKMATTER_DEBUG_*` signing secrets and sets a monotonic `versionCode` from the commit count, so each successful default-branch APK installs over the previous debug APK without touching the release app. This is for internal QA only; production release signing remains separate.
 
 ## Release Builds
 
