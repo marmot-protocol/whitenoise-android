@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 import java.time.ZoneId
@@ -9,6 +10,37 @@ import java.time.format.FormatStyle
 import java.util.Locale
 
 class IdentityFormatterTest {
+    @Test
+    fun shortNeverReturnsStringLongerThanInput() {
+        // Regression for #377: with the default 8/4 split, an ellipsis is 3
+        // characters, so any abbreviated form is `prefix + 3 + suffix = 15`
+        // chars. Inputs of length 14 or 15 used to expand instead of shrink
+        // because the guard counted the ellipsis as a single char.
+        for (length in 0..40) {
+            val input = "a".repeat(length)
+            val shortened = IdentityFormatter.short(input)
+            assertTrue(
+                "short(${length}-char input) returned ${shortened.length} chars: $shortened",
+                shortened.length <= input.length,
+            )
+        }
+    }
+
+    @Test
+    fun shortReturnsInputUnchangedWhenAbbreviationWouldNotShorten() {
+        // 8 + 3 (ellipsis) + 4 = 15. Inputs of length 15 or less must round-trip.
+        assertEquals("a".repeat(15), IdentityFormatter.short("a".repeat(15)))
+        assertEquals("a".repeat(14), IdentityFormatter.short("a".repeat(14)))
+        assertEquals("a".repeat(13), IdentityFormatter.short("a".repeat(13)))
+    }
+
+    @Test
+    fun shortAbbreviatesInputsLongerThanPrefixSuffixAndEllipsis() {
+        // 16-char input is the first length where abbreviation is a real win.
+        val input = "abcdefghIJKLMNOP"
+        assertEquals("abcdefgh...MNOP", IdentityFormatter.short(input))
+    }
+
     @Test
     fun farFutureTimestampUsesExplicitLabel() {
         val tomorrow = (Instant.now().epochSecond + 86_400L).toULong()
