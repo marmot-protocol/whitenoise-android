@@ -178,6 +178,8 @@
     <string name="notifications_settings_subtitle">Alertas locais e conexão em segundo plano</string>
     <string name="security_and_privacy">Segurança e privacidade</string>
     <string name="security_privacy_settings_subtitle">Telemetria, logs de auditoria, diagnósticos</string>
+    <string name="force_incognito_keyboard">Forçar teclado anônimo</string>
+    <string name="force_incognito_keyboard_subtitle">Impede que o teclado aprenda, sugira ou sincronize o que você digita neste app. Respeitado pela maioria dos teclados modernos; alguns teclados de terceiros podem ignorar essa indicação.</string>
     <string name="telemetry">Telemetria</string>
     <string name="telemetry_settings_subtitle">Compartilhar telemetria de conexão dos relays.</string>
     <string name="audit_logs">Logs de auditoria</string>

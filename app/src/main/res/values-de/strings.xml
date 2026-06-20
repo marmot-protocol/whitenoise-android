@@ -178,6 +178,8 @@
     <string name="notifications_settings_subtitle">Lokale Warnungen und Hintergrundverbindung</string>
     <string name="security_and_privacy">Sicherheit &amp; Datenschutz</string>
     <string name="security_privacy_settings_subtitle">Telemetrie, Prüfprotokolle, Diagnose</string>
+    <string name="force_incognito_keyboard">Inkognito-Tastatur erzwingen</string>
+    <string name="force_incognito_keyboard_subtitle">Verhindert, dass Ihre Tastatur lernt, vorschlägt oder synchronisiert, was Sie in dieser App eingeben. Wird von den meisten modernen Tastaturen beachtet; manche Drittanbieter-Tastaturen ignorieren diesen Hinweis möglicherweise.</string>
     <string name="telemetry">Telemetrie</string>
     <string name="telemetry_settings_subtitle">Relay-Verbindungstelemetrie teilen.</string>
     <string name="audit_logs">Prüfprotokolle</string>

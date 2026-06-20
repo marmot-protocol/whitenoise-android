@@ -177,6 +177,8 @@
     <string name="notifications_settings_subtitle">本地警報和後台連接</string>
     <string name="security_and_privacy">安全與隱私</string>
     <string name="security_privacy_settings_subtitle">遙測、稽核日誌、診斷</string>
+    <string name="force_incognito_keyboard">強制無痕鍵盤</string>
+    <string name="force_incognito_keyboard_subtitle">防止鍵盤學習、建議或同步你在本應用程式中輸入的內容。大多數現代鍵盤會遵循此設定；某些第三方鍵盤可能會忽略此提示。</string>
     <string name="telemetry">遙測</string>
     <string name="telemetry_settings_subtitle">分享中繼連線遙測。</string>
     <string name="audit_logs">稽核日誌</string>

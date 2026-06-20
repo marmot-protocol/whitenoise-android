@@ -180,6 +180,8 @@
     <string name="notifications_settings_subtitle">Локальные оповещения и фоновое соединение</string>
     <string name="security_and_privacy">Безопасность и конфиденциальность</string>
     <string name="security_privacy_settings_subtitle">Телеметрия, журналы аудита, диагностика</string>
+    <string name="force_incognito_keyboard">Принудительно включить инкогнито-клавиатуру</string>
+    <string name="force_incognito_keyboard_subtitle">Запрещает клавиатуре запоминать, предлагать или синхронизировать то, что вы вводите в этом приложении. Учитывается большинством современных клавиатур; некоторые сторонние клавиатуры могут игнорировать эту подсказку.</string>
     <string name="telemetry">Телеметрия</string>
     <string name="telemetry_settings_subtitle">Передавать телеметрию соединений с реле.</string>
     <string name="audit_logs">Журналы аудита</string>
