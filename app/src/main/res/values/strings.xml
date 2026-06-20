@@ -108,6 +108,11 @@
     <string name="error_one_valid_member_reference">Enter one valid npub, profile link, or public key.</string>
     <string name="add_member">Add Member</string>
     <string name="adding_member">Adding member...</string>
+    <!-- @-mention composer picker (#414) -->
+    <string name="mention_picker_title">Mention a member</string>
+    <string name="mention_picker_member">Mention %1$s</string>
+    <string name="mention_picker_dismiss">Dismiss member picker</string>
+    <string name="mentioned_you">You were mentioned</string>
     <string name="invite_pending">Invite pending: %1$s</string>
     <string name="latest_group_error">Latest group error: %1$s</string>
     <string name="actions">Actions</string>

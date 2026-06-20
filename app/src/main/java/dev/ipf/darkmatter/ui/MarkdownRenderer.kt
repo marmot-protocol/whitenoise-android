@@ -445,6 +445,32 @@ private fun collectBlockMentionBech32s(
 }
 
 /**
+ * True when [document] contains a `NostrMention` that resolves to
+ * [accountIdHex] — i.e. the current account was @-mentioned in the message.
+ * The receiver's bubble uses this to paint the "you were mentioned" treatment
+ * (#414) so a self-mention is spottable while scrolling.
+ *
+ * [resolveAccountIdHex] maps a mention's bech32 (npub/nprofile) to its hex
+ * pubkey via the FFI; it's passed in (rather than called here) to keep this a
+ * pure, unit-testable walk over the parsed document. A null/blank
+ * [accountIdHex] (signed out) is never a match. Comparison is
+ * case-insensitive because hex pubkeys round-trip through the FFI in either
+ * case.
+ */
+internal fun documentMentionsAccount(
+    document: MarkdownDocumentFfi,
+    accountIdHex: String?,
+    resolveAccountIdHex: (String) -> String?,
+): Boolean {
+    val self = accountIdHex?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return false
+    val bech32s = mutableSetOf<String>()
+    collectBlockMentionBech32s(document.blocks, bech32s, depth = 0)
+    return bech32s.any { bech32 ->
+        resolveAccountIdHex(bech32)?.trim()?.lowercase() == self
+    }
+}
+
+/**
  * [LinkAnnotation.Clickable] tag prefix for nostr profile entities
  * (npub/nprofile). These deliberately do NOT become [LinkAnnotation.Url]s:
  * an identity tap must stay in-app (profile sheet), never fan out to whatever
@@ -574,9 +600,19 @@ private fun AnnotatedString.Builder.appendNostrEntity(
     // when those are null, Material's Text falls back to the theme's default
     // link color (primary), which is invisible on the outgoing
     // primary-container bubble. Same color policy as linkStyle itself.
+    //
+    // A resolved mention also gets a slight background tint (#414) so it reads
+    // as a highlighted token, not just bold text. The tint is an alpha wash of
+    // the same content-derived link color rather than a scheme token, so it
+    // stays visible on both the incoming surfaceVariant and outgoing
+    // primaryContainer bubbles (a token fill would vanish into one of them).
     val style =
         if (name != null) {
-            SpanStyle(color = ctx.linkStyle.color, fontWeight = FontWeight.Bold)
+            SpanStyle(
+                color = ctx.linkStyle.color,
+                fontWeight = FontWeight.Bold,
+                background = ctx.linkStyle.color.copy(alpha = 0.12f),
+            )
         } else {
             ctx.codeStyle.copy(color = ctx.linkStyle.color)
         }
