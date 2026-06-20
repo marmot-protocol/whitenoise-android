@@ -19,8 +19,8 @@ class QuickActionFabMenuTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun expandsToProfileScannerAndCreateGroupActions() {
-        var profileClicks = 0
+    fun expandsToNewChatScannerAndCreateGroupActions() {
+        var newChatClicks = 0
         var scannerClicks = 0
         var createGroupClicks = 0
 
@@ -30,30 +30,30 @@ class QuickActionFabMenuTest {
                 QuickActionFabMenu(
                     expanded = expanded,
                     onExpandedChange = { expanded = it },
-                    onMyProfile = { profileClicks += 1 },
                     onScanQr = { scannerClicks += 1 },
+                    onNewChat = { newChatClicks += 1 },
                     onCreateGroup = { createGroupClicks += 1 },
                 )
             }
         }
 
-        composeRule.onNodeWithText("My Profile").assertDoesNotExist()
+        composeRule.onNodeWithText("New Chat").assertDoesNotExist()
 
         composeRule.onNodeWithContentDescription("Open quick actions").performClick()
         composeRule.onNodeWithContentDescription("Close quick actions").assertIsDisplayed()
-        composeRule.onNodeWithText("My Profile").assertIsDisplayed()
+        composeRule.onNodeWithText("New Chat").assertIsDisplayed()
+        composeRule.onNodeWithText("New Group").assertIsDisplayed()
         composeRule.onNodeWithText("Scan QR Code").assertIsDisplayed()
-        composeRule.onNodeWithText("Create Group").assertIsDisplayed()
 
-        composeRule.onNodeWithText("My Profile").performClick()
-        composeRule.runOnIdle { assertEquals(1, profileClicks) }
+        composeRule.onNodeWithText("New Chat").performClick()
+        composeRule.runOnIdle { assertEquals(1, newChatClicks) }
 
         composeRule.onNodeWithContentDescription("Open quick actions").performClick()
         composeRule.onNodeWithText("Scan QR Code").performClick()
         composeRule.runOnIdle { assertEquals(1, scannerClicks) }
 
         composeRule.onNodeWithContentDescription("Open quick actions").performClick()
-        composeRule.onNodeWithText("Create Group").performClick()
+        composeRule.onNodeWithText("New Group").performClick()
         composeRule.runOnIdle { assertEquals(1, createGroupClicks) }
     }
 }
