@@ -50,6 +50,11 @@ object NotificationChannels {
         // been created with the migrated settings, so a partial run never leaves
         // the user with no message channel and never loses their settings.
         manager.deleteNotificationChannel(NotificationChannelSpec.LEGACY_MESSAGES_CHANNEL_ID)
+        // Retire the original low-importance reactions channel now that
+        // reactions_v2 carries them at high importance (heads-up). A live
+        // channel's importance can't be raised, so the old one is deleted and
+        // replaced by the re-keyed spec above.
+        manager.deleteNotificationChannel(NotificationChannelSpec.LEGACY_REACTIONS_CHANNEL_ID)
     }
 
     /**
