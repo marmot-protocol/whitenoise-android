@@ -72,17 +72,27 @@ class DiskByteCache(
         // file OUTSIDE it. Holding the monitor across readBytes() serialized
         // every concurrent media load and blocked clear() for the duration of
         // disk I/O. See #99.
-        val entry =
+        val (entry, generationAtLookup) =
             synchronized(this) {
                 ensureHydrated()
-                index[hashed]
-            } ?: return null
+                (index[hashed] ?: return null) to generation
+            }
         return try {
             val bytes = entry.file.readBytes()
-            // The post-restart LRU rebuild uses file lastModified as the recency
-            // proxy, so a read must touch it or frequently-read entries look
-            // stale and get evicted first after a restart. Best-effort.
-            entry.file.setLastModified(System.currentTimeMillis())
+            synchronized(this) {
+                // A concurrent clear() (sign-out / account switch) bumps
+                // `generation` and deletes files under this lock, but an
+                // already-open read still succeeds after the unlink on POSIX —
+                // so re-check before handing back plaintext for a session that
+                // was wiped mid-read. Mirrors put()'s write-side guard (#154).
+                // See #376.
+                if (generation != generationAtLookup || index[hashed] !== entry) return null
+                // The post-restart LRU rebuild uses file lastModified as the
+                // recency proxy, so a read must touch it or frequently-read
+                // entries look stale and get evicted first after a restart.
+                // Best-effort.
+                entry.file.setLastModified(System.currentTimeMillis())
+            }
             bytes
         } catch (_: IOException) {
             // File vanished (manual delete, OS cache reap, FS corruption).
