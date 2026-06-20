@@ -169,7 +169,28 @@ object MediaPipeline {
             BitmapFactory.Options().apply {
                 inSampleSize = computeInSampleSize(bounds.outWidth, bounds.outHeight, targetW, targetH)
             }
-        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+        // The power-of-two sample only lands the decode in [target, 2×target),
+        // so a source just under 2× the cap decodes at up to ~4× the intended
+        // area — on the viewer path that's a ~100 MB bitmap (OOM / decompression
+        // bomb). Scale to the exact target to enforce the documented bound, and
+        // guard OOM like readDownscaledJpeg rather than crashing. See #368.
+        val decoded =
+            try {
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+            } catch (_: OutOfMemoryError) {
+                null
+            } ?: return null
+        if (decoded.width == targetW && decoded.height == targetH) return decoded
+        return try {
+            Bitmap
+                .createScaledBitmap(decoded, targetW, targetH, true)
+                .also { if (it !== decoded) decoded.recycle() }
+        } catch (_: OutOfMemoryError) {
+            // The scale itself OOM'd — free the intermediate so a large native
+            // allocation isn't retained right when memory is already tight.
+            decoded.recycle()
+            null
+        }
     }
 
     /**
