@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Bundle
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -35,15 +36,34 @@ class LocalNotificationPresenter(
             Manifest.permission.POST_NOTIFICATIONS,
         ) == PackageManager.PERMISSION_GRANTED
 
+    // Opening / reading a conversation clears every card for it: the
+    // accumulating message card, the separate reaction card (#288), and any
+    // pending group-invite card. Invites are tagged by their opaque
+    // notificationKey, not the per-conversation tag, so they're found by the
+    // group id stamped into their extras at post time rather than by key.
     fun dismissConversationMessages(
         accountRef: String,
         groupIdHex: String,
     ): Boolean {
         if (accountRef.isBlank() || groupIdHex.isBlank()) return false
-        val key = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
-        NotificationManagerCompat.from(context).cancel(key.tag, key.id)
+        val manager = NotificationManagerCompat.from(context)
+        val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
+        val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
+        manager.cancel(message.tag, message.id)
+        manager.cancel(reaction.tag, reaction.id)
+        dismissInvitesForGroup(groupIdHex)
         notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
         return true
+    }
+
+    // Invite cards carry no per-conversation tag, so match them by the group id
+    // stamped into their extras and cancel each by its own (tag, id).
+    private fun dismissInvitesForGroup(groupIdHex: String) {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        runCatching { manager.activeNotifications }
+            .getOrNull()
+            ?.filter { it.notification.extras?.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID) == groupIdHex }
+            ?.forEach { NotificationManagerCompat.from(context).cancel(it.tag, it.id) }
     }
 
     @SuppressLint("MissingPermission")
@@ -114,11 +134,21 @@ class LocalNotificationPresenter(
                     }
             }
 
-            else ->
+            else -> {
                 builder
                     .setContentTitle(content.title)
                     .setContentText(content.body)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
+                // Stamp the invited-to group so opening that conversation can
+                // find and dismiss this card (its tag is the opaque key, #342).
+                if (update.trigger == NotificationTriggerFfi.GROUP_INVITE && update.groupIdHex.isNotBlank()) {
+                    builder.addExtras(
+                        Bundle().apply {
+                            putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, update.groupIdHex)
+                        },
+                    )
+                }
+            }
         }
 
         NotificationManagerCompat.from(context).notify(content.notificationTag, content.notificationId, builder.build())
