@@ -873,10 +873,47 @@ class ChatsController(
         foldGroup(record)
     }
 
+    // Project every current chat row into a ChatListItem. Reads chatRows (kept
+    // current by the bind loop even when recompute is deferred behind an open
+    // conversation, #6), so on-demand callers — shared groups, DM lookup,
+    // by-id resolution for navigation — see freshly created/updated groups
+    // instead of the stale `items` snapshot.
+    private fun currentProjectedItems(): List<ChatListItem> {
+        val me = appState.activeAccount?.accountIdHex
+        return chatRows.map { row ->
+            chatListItemFromProjection(
+                row = row,
+                group = groupRecordsById[row.groupIdHex],
+                activeAccountIdHex = me,
+                members = memberCacheByGroup[row.groupIdHex],
+                previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
+            )
+        }
+    }
+
     fun sharedGroupsWith(
         accountIdHex: String,
         activeAccountIdHex: String?,
-    ): List<ChatListItem> = sharedChatListItemsWith(items + archivedItems, accountIdHex, activeAccountIdHex)
+    ): List<ChatListItem> = sharedChatListItemsWith(currentProjectedItems(), accountIdHex, activeAccountIdHex)
+
+    /**
+     * The confirmed 1:1 DM with [reference] (npub or hex), or null. A 1:1 is a
+     * confirmed two-member group whose counterparty is the target; the
+     * counterparty is stored as hex, so compare in both hex and npub forms.
+     * Shared with the new-chat sheet so "open existing DM" and "don't create a
+     * duplicate DM" agree on what counts as an existing one.
+     */
+    fun existingDirectChat(reference: String): ChatListItem? =
+        currentProjectedItems().firstOrNull { chat ->
+            chat.memberCount == 2 &&
+                !chat.group.pendingConfirmation &&
+                chat.otherMemberAccount?.let { other ->
+                    other.equals(reference, ignoreCase = true) ||
+                        appState.npub(other).equals(reference, ignoreCase = true)
+                } == true
+        }
+
+    fun chatItemForGroup(groupIdHex: String): ChatListItem? = currentProjectedItems().firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
 
     private fun foldChatRow(row: ChatListRowFfi) {
         chatRows =
@@ -1197,19 +1234,7 @@ class ChatsController(
             return
         }
         pendingRecompute = false
-        val me = appState.activeAccount?.accountIdHex
-        val all =
-            chatRows
-                .map { row ->
-                    chatListItemFromProjection(
-                        row = row,
-                        group = groupRecordsById[row.groupIdHex],
-                        activeAccountIdHex = me,
-                        members = memberCacheByGroup[row.groupIdHex],
-                        previewTokens =
-                            chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
-                    )
-                }.let(::sortChatListItems)
+        val all = sortChatListItems(currentProjectedItems())
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
         chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }

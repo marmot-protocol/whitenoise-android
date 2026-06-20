@@ -65,6 +65,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.IDN
 import java.net.URI
 import java.util.Locale
@@ -633,6 +634,8 @@ class DarkMatterAppState(
     }
 
     fun sharedGroupsWith(accountIdHex: String): List<ChatListItem> = chatsController?.sharedGroupsWith(accountIdHex, activeAccount?.accountIdHex).orEmpty()
+
+    fun existingDirectChat(reference: String): ChatListItem? = chatsController?.existingDirectChat(reference)
 
     suspend fun <T> marmotIo(block: suspend Marmot.() -> T): T =
         withContext(Dispatchers.IO) {
@@ -1849,18 +1852,39 @@ class DarkMatterAppState(
         pendingProfileNpub = null
     }
 
-    suspend fun startProfileChat(npub: String): Boolean {
-        val account = activeAccountRef ?: return false
+    /**
+     * Create a 1:1 DM group with [npub] and return its group id hex, or null on
+     * failure (a toast explains why). Caller can open the new chat once the
+     * chat-list projection surfaces it — see [awaitChatListItem].
+     */
+    suspend fun startProfileChat(npub: String): String? {
+        val account = activeAccountRef ?: return null
         return runCatching {
             marmotIo { createGroup(account, "", listOf(npub), null) }
-            present(R.string.toast_chat_started)
-            true
         }.getOrElse {
             rethrowIfCancellation(it)
             present(R.string.toast_couldnt_start_chat, AppText.Plain(it.readableMessage()))
-            false
+            null
         }
     }
+
+    /**
+     * Suspend until the chat list materializes [groupIdHex] (a freshly created
+     * group surfaces a beat after `createGroup` returns, via the worker's
+     * recompute), or null if it doesn't within [timeoutMs].
+     */
+    suspend fun awaitChatListItem(
+        groupIdHex: String,
+        timeoutMs: Long = 5000,
+    ): ChatListItem? =
+        withTimeoutOrNull(timeoutMs) {
+            var item = chatsController?.chatItemForGroup(groupIdHex)
+            while (item == null) {
+                delay(50)
+                item = chatsController?.chatItemForGroup(groupIdHex)
+            }
+            item
+        }
 
     suspend fun publishProfile(profile: UserProfileMetadataFfi) {
         val account = activeAccountRef ?: return

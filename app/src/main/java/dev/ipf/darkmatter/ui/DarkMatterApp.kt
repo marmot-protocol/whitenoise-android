@@ -1508,19 +1508,7 @@ private fun ChatsScreen(
             appState = appState,
             titleRes = newChatTitle,
             directMessage = newChatDirect,
-            existingDirectChat = { pubkey ->
-                // A 1:1 is a confirmed two-member group whose counterparty is
-                // the target. The recipient may be an npub or hex while
-                // otherMemberAccount is hex, so compare in both forms.
-                (controller.items + controller.archivedItems).firstOrNull { chat ->
-                    chat.memberCount == 2 &&
-                        !chat.group.pendingConfirmation &&
-                        chat.otherMemberAccount?.let { other ->
-                            other.equals(pubkey, ignoreCase = true) ||
-                                appState.npub(other).equals(pubkey, ignoreCase = true)
-                        } == true
-                }
-            },
+            existingDirectChat = { pubkey -> appState.existingDirectChat(pubkey) },
             onOpenConversation = { chat -> onOpenGroup(chat, null) },
             onDismiss = { showNewChat = false },
         )
@@ -6181,7 +6169,10 @@ private fun ConversationScreen(
             )
         }
     var menuOpen by remember { mutableStateOf(false) }
-    var showDetails by remember { mutableStateOf(false) }
+    // Keyed on chat.id so opening a different conversation (e.g. via Message or
+    // a shared-group tap from a profile opened on this group's details page)
+    // lands on the conversation, not the new chat's details page.
+    var showDetails by remember(chat.id) { mutableStateOf(false) }
     var confirmLeaveFromTopBar by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     // Single conversation-level owner of which message's action menu is open, so
@@ -12445,7 +12436,22 @@ private fun ProfileSheet(
             ?.nip05
             ?.trim()
             ?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
-    val sharedGroups = hex?.let { appState.sharedGroupsWith(it) }.orEmpty()
+    val sharedGroups =
+        hex
+            ?.let { appState.sharedGroupsWith(it) }
+            .orEmpty()
+            // Only named, multi-member groups belong in this list: the 1:1 DM is
+            // reached via the Message button, and an unnamed group would just
+            // read as "Group of N people".
+            .filter { it.memberCount > 2 && it.group.name.isNotBlank() }
+    // The existing 1:1 DM with this person, if any — the confirmed two-member
+    // group with them. Drives the Message button: open it when present,
+    // otherwise start a new DM.
+    val directMessageGroup = appState.existingDirectChat(npub)
+    // True while a brand-new DM is being created+published, so the Message
+    // button shows progress and we don't dismiss into a blank gap before the
+    // conversation opens.
+    var creatingChat by remember(npub) { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -12519,15 +12525,39 @@ private fun ProfileSheet(
                 Text(stringResource(R.string.couldnt_read_profile_code), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Button(
-                onClick = {},
-                // 1:1 DMs aren't a product feature yet; button is intentionally
-                // disabled until they are.
-                enabled = false,
+                // Opens the existing 1:1 DM, or starts a new one with this
+                // person when none exists yet. The create runs in the
+                // process-lifetime mutation scope (Main.immediate) so the MLS
+                // commit + Nostr publish finish regardless; we keep the sheet up
+                // with a spinner until the conversation is ready, then navigate
+                // straight in — no dismiss-into-a-blank-gap.
+                onClick = {
+                    val existing = directMessageGroup
+                    if (existing != null) {
+                        onOpenGroup(existing)
+                    } else {
+                        creatingChat = true
+                        appState.launchMutation {
+                            val groupId = appState.startProfileChat(npub)
+                            val item = groupId?.let { appState.awaitChatListItem(it) }
+                            if (item != null) onOpenGroup(item) else creatingChat = false
+                        }
+                    }
+                },
+                enabled = hex != null && !creatingChat,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Default.Group, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.message))
+                if (creatingChat) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                } else {
+                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.message))
+                }
             }
         }
     }
