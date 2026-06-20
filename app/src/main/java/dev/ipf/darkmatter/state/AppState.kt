@@ -256,6 +256,60 @@ private fun String.relayHostCandidate(): String? {
     return if (count { it == ':' } == 1) substringBefore(":") else this
 }
 
+/**
+ * Access-order conversation-state retention with an optional protected key for
+ * the chat currently on screen. The protected key is promoted before overflow
+ * pruning so an active controller's optimistic/retry state cannot be aged out
+ * by other conversations touching their own state maps.
+ */
+internal class ConversationStateRetention(
+    private val maxEntries: Int,
+) {
+    private val recentKeys = LinkedHashMap<String, Unit>(16, 0.75f, true)
+
+    init {
+        require(maxEntries > 0) { "maxEntries must be positive" }
+    }
+
+    fun retain(
+        key: String,
+        protectedKey: String? = null,
+    ): List<String> {
+        recentKeys[key] = Unit
+        promoteProtected(protectedKey)
+        return evictOverflow(protectedKey)
+    }
+
+    fun promote(
+        key: String,
+        protectedKey: String? = null,
+    ): List<String> {
+        if (recentKeys.containsKey(key)) {
+            recentKeys[key] = Unit
+        }
+        promoteProtected(protectedKey)
+        return evictOverflow(protectedKey)
+    }
+
+    fun keysSnapshot(): List<String> = recentKeys.keys.toList()
+
+    private fun promoteProtected(protectedKey: String?) {
+        if (protectedKey != null && recentKeys.containsKey(protectedKey)) {
+            recentKeys[protectedKey] = Unit
+        }
+    }
+
+    private fun evictOverflow(protectedKey: String?): List<String> {
+        val evicted = mutableListOf<String>()
+        while (recentKeys.size > maxEntries) {
+            val staleKey = recentKeys.keys.firstOrNull { it != protectedKey } ?: break
+            recentKeys.remove(staleKey)
+            evicted += staleKey
+        }
+        return evicted
+    }
+}
+
 class DarkMatterAppState(
     context: Context,
 ) {
@@ -438,7 +492,7 @@ class DarkMatterAppState(
     // retries keep transient queued-behind failures from sticking tiles in
     // `failed` before the user has a chance to see the media.
     private val attachmentDownloadGate = AttachmentDownloadGate()
-    private val recentConversationStateKeys = LinkedHashMap<String, Unit>(16, 0.75f, true)
+    private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
 
     val draftStore: DraftStore = DraftStore.forContext(appContext)
 
@@ -600,20 +654,36 @@ class DarkMatterAppState(
         groupIdHex: String,
     ): String {
         val key = conversationKey(accountRef, groupIdHex)
-        recentConversationStateKeys[key] = Unit
-        while (recentConversationStateKeys.size > MAX_RETAINED_CONVERSATION_STATES) {
-            val staleKey = recentConversationStateKeys.entries.first().key
-            recentConversationStateKeys.remove(staleKey)
-            optimisticMessagesByConversation.remove(staleKey)
-            projectedMessageIdsByConversation.remove(staleKey)
-            timelineOrderOverridesByConversation.remove(staleKey)
-            timelineTimestampOverridesByConversation.remove(staleKey)
-            retainedMediaUploadsByConversation.remove(staleKey)
-            activeUploadKeysByConversation.remove(staleKey)
-            pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
-        }
+        conversationStateRetention
+            .retain(key, protectedKey = activeConversationStateKey())
+            .forEach(::removeConversationState)
         return key
     }
+
+    private fun promoteConversationState(
+        accountRef: String?,
+        groupIdHex: String,
+    ) {
+        val key = conversationKey(accountRef, groupIdHex)
+        conversationStateRetention
+            .promote(key, protectedKey = key)
+            .forEach(::removeConversationState)
+    }
+
+    private fun removeConversationState(staleKey: String) {
+        optimisticMessagesByConversation.remove(staleKey)
+        projectedMessageIdsByConversation.remove(staleKey)
+        timelineOrderOverridesByConversation.remove(staleKey)
+        timelineTimestampOverridesByConversation.remove(staleKey)
+        retainedMediaUploadsByConversation.remove(staleKey)
+        activeUploadKeysByConversation.remove(staleKey)
+        pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
+    }
+
+    private fun activeConversationStateKey(): String? =
+        activeConversationGroupIdHex?.let { groupIdHex ->
+            conversationKey(activeConversationAccountRef, groupIdHex)
+        }
 
     private fun conversationKey(
         accountRef: String?,
@@ -1227,6 +1297,11 @@ class DarkMatterAppState(
         // The chat screen always runs under the active account, so capture it
         // now; clear it when the conversation closes.
         activeConversationAccountRef = if (groupIdHex != null) activeAccountRef else null
+        if (groupIdHex != null) {
+            synchronized(conversationStateLock) {
+                promoteConversationState(activeConversationAccountRef, groupIdHex)
+            }
+        }
         appStateDebug {
             "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
         }
