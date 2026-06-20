@@ -4148,6 +4148,40 @@ private fun MediaFileBubble(
     var cached by remember(pillKey) {
         mutableStateOf(mine || controller.hasCachedAttachment(messageIdHex, attachmentIndex))
     }
+    // Auto-download gate (#407): own sends are already cached; incoming
+    // documents honor the Documents matrix row for the active connection.
+    // Re-keyed on the matrix so flipping a toggle re-gates an un-fetched
+    // file. A tap flips this to true so manual fetch/open is always
+    // available regardless of the policy.
+    var startDownload by remember(pillKey, appState.mediaAutoDownloadMatrix) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Document))
+    }
+
+    // When the Documents policy allows auto-download, prefetch the bytes into
+    // the attachment cache so the file is ready to open without a tap. We
+    // only materialize (warm the L1/L2 cache); opening still happens on tap
+    // via openAttachmentExternally below. Mirrors the audio/video bubbles.
+    LaunchedEffect(pillKey, reference.sourceEpoch, startDownload) {
+        if (cached) return@LaunchedEffect
+        if (!startDownload) return@LaunchedEffect
+        // Receive-side imeta-parsed refs start with sourceEpoch=0 until the
+        // controller's listMedia FFI lands the real epoch; the FFI download
+        // path errors with "missing encrypted media secret for epoch 0".
+        // Skip + retry once the projection rebinds the bubble with a real
+        // epoch. Own sends keep epoch 0 valid (retained bytes short-circuit).
+        if (!mine && reference.sourceEpoch == 0uL) return@LaunchedEffect
+        inFlight = true
+        runCatching {
+            controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
+        }.onSuccess {
+            cached = true
+            failed = false
+        }.onFailure {
+            if (it is kotlinx.coroutines.CancellationException) throw it
+            Log.w("MediaFileBubble", "auto-download failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
+        }
+        inFlight = false
+    }
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -4157,6 +4191,9 @@ private fun MediaFileBubble(
                 .fillMaxWidth()
                 .clickable(enabled = !inFlight) {
                     failed = false
+                    // Tap is an explicit opt-in: ensure the gate is open so a
+                    // policy-gated file still fetches on demand.
+                    startDownload = true
                     inFlight = true
                     scope.launch {
                         val outcome =
