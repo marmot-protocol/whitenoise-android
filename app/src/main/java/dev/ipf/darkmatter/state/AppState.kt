@@ -1898,6 +1898,14 @@ class DarkMatterAppState(
 
     private fun nostrEntityAccountIdHex(bech32: String): String? = runCatching { marmot().accountIdHex(bech32.trim()) }.getOrNull()
 
+    /**
+     * Public bech32 (npub/nprofile) → hex pubkey resolver for the renderer's
+     * self-mention detection (#414). Pure FFI encoding (no storage read), so
+     * it's safe to call from the receiver-bubble path; returns null when the
+     * reference doesn't normalize to a pubkey.
+     */
+    fun accountIdHexForMention(bech32: String): String? = nostrEntityAccountIdHex(bech32)
+
     fun clearPresentedProfile() {
         pendingProfileNpub = null
     }
