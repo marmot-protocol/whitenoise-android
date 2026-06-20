@@ -93,7 +93,14 @@ data class ChatListItem(
         get() = projection?.title?.takeIf { it.isNotBlank() }
 
     val latestAt: ULong?
-        get() = projection?.lastMessage?.timelineAt ?: latest?.recordedAt
+        // Prefer the last message's timeline timestamp. A freshly-created chat
+        // has no message yet, so fall back to the projection's `updatedAt`
+        // (set to `now` when the engine first projects the row on group create
+        // — see storage-sqlite chat_list `rebuild_chat_list_row_for_group_tx`,
+        // same unix-seconds unit as `timelineAt`). Without this fallback a new
+        // DM/group would sort with `0uL` and land at the bottom of the chat
+        // list instead of the top (issue #321).
+        get() = projection?.lastMessage?.timelineAt ?: projection?.updatedAt ?: latest?.recordedAt
 
     val unreadCount: ULong
         get() = projection?.unreadCount ?: 0uL
