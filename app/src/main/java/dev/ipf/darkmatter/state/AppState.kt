@@ -23,6 +23,7 @@ import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.HostSafety
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.MarmotClient
+import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.ProfileLink
 import dev.ipf.darkmatter.core.ProfileSanitizer
 import dev.ipf.darkmatter.notifications.BackgroundConnectionPreferences
@@ -742,7 +743,7 @@ class DarkMatterAppState(
         text: String,
     ) {
         val trimmed = text.trim()
-        val targets = targetGroupIds.distinct().filter { it.isNotBlank() }
+        val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
         if (trimmed.isEmpty() || targets.isEmpty()) return
         val account = activeAccount?.accountIdHex ?: return
         launchMutation {

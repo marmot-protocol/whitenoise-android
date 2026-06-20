@@ -9651,6 +9651,24 @@ private fun MessageBubble(
                 else -> MessageProjector.displayBody(record, messageTextCopy)
             }
         }
+    // Issue #390 v1 forwards text only. Forward must be hidden for any record
+    // whose displayed body is a synthetic surrogate (media filename/placeholder,
+    // "Reacted …", delete/system summaries, agent-stream copy) — forwarding
+    // `displayedBody` there would send misleading text into other groups. The
+    // raw text to forward is the edit-aware verbatim body, never the display
+    // fallback; `forwardBody` is null exactly when the message is not a
+    // forwardable text record, which also drives the menu gate below.
+    val forwardBody: String? =
+        remember(record, editState, deleted, invalidated) {
+            if (deleted || invalidated) {
+                null
+            } else {
+                MessageProjector.forwardableText(
+                    record,
+                    editedText = editState?.latestText?.takeIf { record.kind == 9uL },
+                )
+            }
+        }
     val showSenderAvatar =
         GroupProjector.shouldShowTranscriptSenderAvatar(
             memberCount = controller.members.size,
@@ -9713,6 +9731,10 @@ private fun MessageBubble(
     }
 
     fun beginForward() {
+        // Defensive: the menu only renders Forward when forwardBody != null, but
+        // gate here too so a stale tap can never open the picker for a non-text
+        // record (issue #390 is text-only).
+        if (forwardBody == null) return
         onActionMenuOpenChange(false)
         forwardSheetOpen = true
     }
@@ -10471,6 +10493,7 @@ private fun MessageBubble(
                             alignEnd = mine,
                             canDelete = mine && record.messageIdHex.isNotBlank() && !deleted,
                             canEdit = mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
+                            canForward = forwardBody != null,
                             quickReactionEmojis = quickReactionEmojis,
                             onDismissRequest = { onActionMenuOpenChange(false) },
                             onReact = { emoji ->
@@ -10562,14 +10585,14 @@ private fun MessageBubble(
                         },
                     )
                 }
-                if (forwardSheetOpen) {
+                if (forwardSheetOpen && forwardBody != null) {
                     ForwardMessageSheet(
                         appState = appState,
-                        body = displayedBody,
+                        body = forwardBody,
                         originGroupIdHex = record.groupIdHex,
                         onDismiss = { forwardSheetOpen = false },
                         onForward = { targetGroupIds ->
-                            appState.forwardText(targetGroupIds, displayedBody)
+                            appState.forwardText(targetGroupIds, forwardBody)
                         },
                     )
                 }
@@ -11119,6 +11142,7 @@ private fun MessageActionMenu(
     alignEnd: Boolean,
     canDelete: Boolean,
     canEdit: Boolean,
+    canForward: Boolean,
     quickReactionEmojis: List<String>,
     onDismissRequest: () -> Unit,
     onReact: (String) -> Unit,
@@ -11296,11 +11320,13 @@ private fun MessageActionMenu(
                             icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             onClick = onCopyText,
                         )
-                        MessageActionButton(
-                            label = stringResource(R.string.forward),
-                            icon = { Icon(Icons.AutoMirrored.Filled.Forward, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onForward,
-                        )
+                        if (canForward) {
+                            MessageActionButton(
+                                label = stringResource(R.string.forward),
+                                icon = { Icon(Icons.AutoMirrored.Filled.Forward, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                onClick = onForward,
+                            )
+                        }
                         MessageActionButton(
                             label = stringResource(R.string.message_info),
                             icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
