@@ -2973,23 +2973,51 @@ class ConversationController(
             }.getOrDefault(false)
         }
 
-    suspend fun inviteMembers(memberRefs: List<String>): Boolean =
+    suspend fun inviteMembers(
+        memberRefs: List<String>,
+        addAsAdmin: Boolean = false,
+    ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val account = appState.activeAccountRef ?: return@withMutationLockResult false
             val refs = memberRefs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
             if (refs.isEmpty()) return@withMutationLockResult false
-            runCatching {
+            val adminTargets =
+                if (addAsAdmin) {
+                    refs.map { ref ->
+                        appState.marmotIo { accountIdHex(ref) }
+                            ?: throw IllegalArgumentException("Invalid member reference")
+                    }
+                } else {
+                    emptyList()
+                }
+            var inviteSent = false
+            try {
                 appState.marmotIo { inviteMembers(account, group.groupIdHex, refs) }
+                inviteSent = true
+                adminTargets.forEach { target ->
+                    appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
+                }
                 refreshMembers()
                 appState.present(R.string.toast_invite_sent)
                 true
-            }.onFailure {
-                it.rethrowIfCancellation()
-                val message = mutationError(it)
-                lastMutationError = message
-                appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message))
-            }.getOrDefault(false)
+            } catch (throwable: Throwable) {
+                throwable.rethrowIfCancellation()
+                val message = mutationError(throwable)
+                if (inviteSent && addAsAdmin) {
+                    // The invite is already out; keep the UI honest about the
+                    // partial success and leave the row-level Admin switch as the
+                    // retry path once the member appears in details.
+                    refreshMembers()
+                    lastMutationError = "Invite sent, but admin promotion failed: $message"
+                    appState.present(R.string.toast_invite_sent_but_couldnt_add_admin, AppText.Plain(message))
+                    true
+                } else {
+                    lastMutationError = message
+                    appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message))
+                    false
+                }
+            }
         }
 
     suspend fun removeMember(member: AppGroupMemberRecordFfi): Boolean =
@@ -3026,7 +3054,7 @@ class ConversationController(
             // group, so they require a Nostr pubkey hex — not a local-account
             // label. memberRef can return either; memberIdHex is always the hex.
             val target = member.memberIdHex
-            if (!admin && isAdmin(member) && group.admins.size <= 1) {
+            if (!admin && isAdmin(member) && group.admins.distinctBy { it.lowercase() }.size <= 1) {
                 appState.present(R.string.toast_keep_one_admin, R.string.toast_promote_before_removing_admin)
                 return@withMutationLockResult false
             }
@@ -3050,6 +3078,36 @@ class ConversationController(
                     appState.present(R.string.toast_admin_removed)
                 }
                 refreshMembers()
+                true
+            }.onFailure {
+                it.rethrowIfCancellation()
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message))
+            }.getOrDefault(false)
+        }
+
+    suspend fun stepDownAsAdmin(): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            val activeAccountIdHex = appState.activeAccount?.accountIdHex ?: return@withMutationLockResult false
+            if (!GroupProjector.isAdminRef(group, activeAccountIdHex)) return@withMutationLockResult false
+            if (group.admins.distinctBy { it.lowercase() }.size <= 1) {
+                appState.present(R.string.toast_keep_one_admin, R.string.toast_promote_before_removing_admin)
+                return@withMutationLockResult false
+            }
+            runCatching {
+                appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
+                // Case-insensitive so hex-casing drift between the admin list
+                // and the active account id doesn't leave the row switch on
+                // after a successful self-demote.
+                group =
+                    group.copy(
+                        admins = group.admins.filterNot { it.equals(activeAccountIdHex, ignoreCase = true) },
+                    )
+                refreshMembers()
+                appState.present(R.string.toast_admin_removed)
                 true
             }.onFailure {
                 it.rethrowIfCancellation()
