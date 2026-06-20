@@ -161,6 +161,18 @@
     <string name="copy_text">Копировать текст</string>
     <string name="open_emoji_picker">Открыть выбор эмодзи</string>
     <string name="reply">Ответить</string>
+    <string name="forward">Переслать</string>
+    <string name="forward_to">Переслать в</string>
+    <string name="forward_search_chats">Поиск чатов</string>
+    <string name="forward_no_chats">Нет других чатов для пересылки.</string>
+    <string name="forward_no_matches">Нет чатов, соответствующих запросу.</string>
+    <plurals name="forward_to_chats_count">
+        <item quantity="one">Переслать в %1$d чат</item>
+        <item quantity="other">Переслать в %1$d чатов</item>
+    </plurals>
+    <string name="toast_forwarded_to_chats">Переслано в %1$s чатов</string>
+    <string name="toast_forwarded_partial">Переслано в %1$s чатов; некоторые не удалось</string>
+    <string name="toast_forward_failed">Не удалось переслать сообщение</string>
     <string name="delete">Удалить</string>
     <string name="sent">Отправлено</string>
     <string name="send_failed">Не удалось отправить сообщение. Попробуйте снова.</string>

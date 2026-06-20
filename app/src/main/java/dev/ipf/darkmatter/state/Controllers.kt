@@ -964,6 +964,24 @@ class ChatsController(
 
     fun chatItemForGroup(groupIdHex: String): ChatListItem? = currentProjectedItems().firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
 
+    /**
+     * Chats the active account can forward a message into, recent first.
+     *
+     * A forward fans a fresh send into each selected group (encrypted under
+     * that group's own state — see [DarkMatterAppState.forwardText]), so the
+     * targets are the same confirmed conversations the chat list shows: an
+     * invite (`pendingConfirmation`) is not yet a joined group the account can
+     * send into, so it is excluded. Archived chats are included by default so a
+     * forward can reach a muted/parked conversation (the issue leaves
+     * archived-target handling open; allowing it keeps the picker complete and
+     * is the less surprising default). Ordering reuses [sortChatListItems] so
+     * the picker matches the chat list's "recent first" feel.
+     */
+    fun forwardTargets(): List<ChatListItem> =
+        sortChatListItems(
+            currentProjectedItems().filterNot { it.group.pendingConfirmation },
+        )
+
     private fun foldChatRow(row: ChatListRowFfi) {
         chatRows =
             if (chatRows.any { it.groupIdHex == row.groupIdHex }) {

@@ -158,6 +158,18 @@
     <string name="copy_text">複製文字</string>
     <string name="open_emoji_picker">開啟表情符號選擇器</string>
     <string name="reply">回覆</string>
+    <string name="forward">轉發</string>
+    <string name="forward_to">轉發至</string>
+    <string name="forward_search_chats">搜尋聊天</string>
+    <string name="forward_no_chats">沒有其他可轉發的聊天。</string>
+    <string name="forward_no_matches">沒有符合搜尋的聊天。</string>
+    <plurals name="forward_to_chats_count">
+        <item quantity="one">轉發至 %1$d 個聊天</item>
+        <item quantity="other">轉發至 %1$d 個聊天</item>
+    </plurals>
+    <string name="toast_forwarded_to_chats">已轉發至 %1$s 個聊天</string>
+    <string name="toast_forwarded_partial">已轉發至 %1$s 個聊天；部分失敗</string>
+    <string name="toast_forward_failed">無法轉發訊息</string>
     <string name="delete">刪除</string>
     <string name="sent">已傳送</string>
     <string name="send_failed">訊息傳送失敗。請再試一次。</string>

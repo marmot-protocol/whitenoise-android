@@ -213,6 +213,18 @@
     <string name="copy_text">Copy text</string>
     <string name="open_emoji_picker">Open emoji picker</string>
     <string name="reply">Reply</string>
+    <string name="forward">Forward</string>
+    <string name="forward_to">Forward to</string>
+    <string name="forward_search_chats">Search chats</string>
+    <string name="forward_no_chats">No other chats to forward to.</string>
+    <string name="forward_no_matches">No chats match your search.</string>
+    <plurals name="forward_to_chats_count">
+        <item quantity="one">Forward to %1$d chat</item>
+        <item quantity="other">Forward to %1$d chats</item>
+    </plurals>
+    <string name="toast_forwarded_to_chats">Forwarded to %1$s chats</string>
+    <string name="toast_forwarded_partial">Forwarded to %1$s chats; some failed</string>
+    <string name="toast_forward_failed">Couldn\'t forward message</string>
     <string name="delete">Delete</string>
     <string name="sent">Sent</string>
     <string name="send_failed">Send failed</string>

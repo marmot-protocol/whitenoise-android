@@ -709,6 +709,66 @@ class DarkMatterAppState(
         chatsController?.applyLocalGroupUpdate(record)
     }
 
+    /**
+     * Confirmed chats the active account can forward a message into, recent
+     * first. Empty when no chats controller is attached yet (the chat-list
+     * stream hasn't bound) — the forward picker then shows its empty state.
+     */
+    fun forwardTargets(): List<ChatListItem> = chatsController?.forwardTargets().orEmpty()
+
+    /**
+     * Forward [text] into each of [targetGroupIds] as a fresh send.
+     *
+     * Each target is an independent [sendText] into that group, so the message
+     * is re-encrypted under that group's own MLS state — there is no
+     * cross-group key reuse and no source-group key material leaves the origin
+     * conversation. The plain body is sent verbatim: it carries neither the
+     * original sender's pubkey nor the source group id, so a forward never
+     * leaks cross-group attribution (issue #390 privacy notes). The optional
+     * receiver-visible "Forwarded" label is deliberately *not* embedded here —
+     * the FFI text-send carries no source-free forward marker, so a
+     * receiver-visible label would require either an engine change or a content
+     * marker that crosses the group boundary; that is a separate product/privacy
+     * decision tracked as a follow-up.
+     *
+     * Sends fan out on [launchMutation] so each MLS commit + Nostr publish
+     * survives the picker sheet dismissing immediately after the user confirms.
+     * Per-target failures are counted and surfaced in the result toast rather
+     * than aborting the remaining targets — one unreachable group must not block
+     * delivery to the others. Blank text and an empty target set are no-ops.
+     */
+    fun forwardText(
+        targetGroupIds: List<String>,
+        text: String,
+    ) {
+        val trimmed = text.trim()
+        val targets = targetGroupIds.distinct().filter { it.isNotBlank() }
+        if (trimmed.isEmpty() || targets.isEmpty()) return
+        val account = activeAccount?.accountIdHex ?: return
+        launchMutation {
+            var failures = 0
+            for (groupIdHex in targets) {
+                val ok =
+                    runCatching {
+                        marmotIo { sendText(account, groupIdHex, trimmed) }
+                    }.isSuccess
+                if (!ok) failures += 1
+            }
+            val delivered = targets.size - failures
+            when {
+                failures == 0 ->
+                    present(R.string.toast_forwarded_to_chats, AppText.Plain(delivered.toString()))
+                delivered == 0 ->
+                    present(R.string.toast_forward_failed)
+                else ->
+                    present(
+                        R.string.toast_forwarded_partial,
+                        AppText.Plain("$delivered/${targets.size}"),
+                    )
+            }
+        }
+    }
+
     fun sharedGroupsWith(accountIdHex: String): List<ChatListItem> = chatsController?.sharedGroupsWith(accountIdHex, activeAccount?.accountIdHex).orEmpty()
 
     fun existingDirectChat(reference: String): ChatListItem? = chatsController?.existingDirectChat(reference)
