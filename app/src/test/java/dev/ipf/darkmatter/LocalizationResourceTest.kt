@@ -128,6 +128,17 @@ class LocalizationResourceTest {
                 "reply_media_voice",
                 "reply_media_document",
                 "toast_couldnt_process_video",
+                // Brand / loan-word tokens in the auto-download matrix (#407)
+                // that are legitimately identical to English in several
+                // locales: "Wi-Fi"/"Roaming" as borrowed terms and the media
+                // type names ("Audio", "Video", and "Images"/"Documents" in
+                // French) that share spelling with English.
+                "network_wifi",
+                "network_roaming",
+                "media_type_images",
+                "media_type_audio",
+                "media_type_video",
+                "media_type_documents",
             )
     }
 }

@@ -401,6 +401,8 @@
     <string name="members_count">%1$d участников</string>
     <string name="appearance">Оформление</string>
     <string name="appearance_settings_subtitle">Тема и язык</string>
+    <string name="data_and_storage">Данные и хранилище</string>
+    <string name="data_and_storage_settings_subtitle">Автозагрузка медиа</string>
     <string name="app_preferences">Приложение</string>
     <string name="settings_version_label">Версия %1$s</string>
     <string name="theme">Тема</string>
@@ -477,9 +479,15 @@
     <string name="group_image_search_preview_subtitle_invalid">Используйте публичный HTTPS-URL</string>
     <string name="group_image_search_preview_subtitle_ready">Нажмите «Использовать это изображение», чтобы применить</string>
     <string name="media_auto_download_title">Автозагрузка медиа</string>
-    <string name="media_auto_download_always">Всегда</string>
-    <string name="media_auto_download_wifi">Только по Wi-Fi</string>
-    <string name="media_auto_download_never">Никогда</string>
+    <string name="media_auto_download_subtitle">Документы и большие видео могут расходовать много трафика. Выберите, что загружать автоматически для каждого типа подключения.</string>
+    <string name="network_wifi">Wi-Fi</string>
+    <string name="network_mobile">Мобильные данные</string>
+    <string name="network_roaming">Роуминг</string>
+    <string name="network_metered">Лимитные подключения</string>
+    <string name="media_type_images">Изображения</string>
+    <string name="media_type_audio">Аудио</string>
+    <string name="media_type_video">Видео</string>
+    <string name="media_type_documents">Документы</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d изображение выбрано</item>
         <item quantity="few">%1$d изображения выбрано</item>

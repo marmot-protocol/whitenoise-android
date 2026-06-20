@@ -351,7 +351,8 @@ import dev.ipf.darkmatter.state.ChatsController
 import dev.ipf.darkmatter.state.ConversationController
 import dev.ipf.darkmatter.state.ConversationControllerCopy
 import dev.ipf.darkmatter.state.DarkMatterAppState
-import dev.ipf.darkmatter.state.MediaAutoDownloadPolicy
+import dev.ipf.darkmatter.state.MediaAutoDownloadNetwork
+import dev.ipf.darkmatter.state.MediaAutoDownloadType
 import dev.ipf.darkmatter.state.MessageStatus
 import dev.ipf.darkmatter.state.MessageStatusLabels
 import dev.ipf.darkmatter.state.OutgoingMessageIndicator
@@ -412,6 +413,7 @@ private enum class MainSection {
 
 private enum class SettingsDetail {
     Appearance,
+    Data,
     Profile,
     Identity,
     Relays,
@@ -569,15 +571,6 @@ private val AppThemeMode.labelRes: Int
             AppThemeMode.Light -> R.string.theme_light
             AppThemeMode.Dark -> R.string.theme_dark
             AppThemeMode.Amoled -> R.string.theme_amoled
-        }
-
-private val MediaAutoDownloadPolicy.labelRes: Int
-    @StringRes
-    get() =
-        when (this) {
-            MediaAutoDownloadPolicy.Always -> R.string.media_auto_download_always
-            MediaAutoDownloadPolicy.WifiOnly -> R.string.media_auto_download_wifi
-            MediaAutoDownloadPolicy.Never -> R.string.media_auto_download_never
         }
 
 @Composable
@@ -3414,8 +3407,8 @@ private fun MediaImageBubble(
     // Auto-download gating (#10): own messages always render (bytes are cached
     // from the send), incoming honor the policy. Keyed on the policy so
     // flipping the setting re-gates undownloaded bubbles.
-    var startDownload by remember(key, attachmentIndex, appState.mediaAutoDownloadPolicy) {
-        mutableStateOf(mine || appState.shouldAutoDownloadMedia())
+    var startDownload by remember(key, attachmentIndex, appState.mediaAutoDownloadMatrix) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image))
     }
 
     LaunchedEffect(key, attachmentIndex, epoch, startDownload, reloadToken) {
@@ -3813,8 +3806,8 @@ private fun MediaVideoGridTile(
     var posterBitmap by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
-    var startDownload by remember(messageIdHex, attachmentIndex, appState.mediaAutoDownloadPolicy) {
-        mutableStateOf(mine || appState.shouldAutoDownloadMedia())
+    var startDownload by remember(messageIdHex, attachmentIndex, appState.mediaAutoDownloadMatrix) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video))
     }
 
     LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload) {
@@ -3995,8 +3988,8 @@ private fun MediaImageGridTile(
     // policy applies to album tiles too. Outgoing tiles (`mine`) always
     // download because the bytes are seeded from the send. Re-keyed on
     // the policy so flipping the setting re-gates undownloaded tiles.
-    var startDownload by remember(tileSlot, appState.mediaAutoDownloadPolicy) {
-        mutableStateOf(mine || appState.shouldAutoDownloadMedia())
+    var startDownload by remember(tileSlot, appState.mediaAutoDownloadMatrix) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image))
     }
 
     LaunchedEffect(decodeKey, startDownload, reloadToken) {
@@ -4296,8 +4289,8 @@ private fun MediaVideoBubble(
     // no (e.g. Wi-Fi-only on cellular), a tap flips startDownload=true so
     // the user always has a path to fetch — never "looks present but can't
     // be opened". See PR #191 reviewer feedback.
-    var startDownload by remember(pillKey, appState.mediaAutoDownloadPolicy) {
-        mutableStateOf(mine || appState.shouldAutoDownloadMedia())
+    var startDownload by remember(pillKey, appState.mediaAutoDownloadMatrix) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video))
     }
 
     LaunchedEffect(pillKey, epoch, startDownload) {
@@ -4627,6 +4620,14 @@ private fun MediaVoiceBubble(
     var totalDurationMs by remember(pillKey) { mutableStateOf(0) }
     var loading by remember(pillKey) { mutableStateOf(false) }
     var failed by remember(pillKey) { mutableStateOf(false) }
+    // Auto-download gate (#407): own clips always materialize (bytes are
+    // cached from the send), incoming honor the Audio matrix row. Re-keyed on
+    // the matrix so flipping a toggle re-gates an un-fetched clip. A tap on
+    // the bubble flips this to true so manual fetch/playback is always
+    // available even when auto-download is off.
+    var startDownload by remember(pillKey, appState.mediaAutoDownloadMatrix) {
+        mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio))
+    }
 
     val playback by dev.ipf.darkmatter.audio.VoicePlaybackController.state
         .collectAsState()
@@ -4664,8 +4665,13 @@ private fun MediaVoiceBubble(
     }
     val waveform: FloatArray = realWaveform ?: pseudoWaveform
 
-    LaunchedEffect(pillKey, reference.sourceEpoch) {
+    LaunchedEffect(pillKey, reference.sourceEpoch, startDownload) {
         if (localFile != null) return@LaunchedEffect
+        // Honor the auto-download gate: when Audio is off for the active
+        // connection the clip waits behind a Download affordance until the
+        // user opts in (tap flips startDownload=true). Manual playback below
+        // stays available regardless.
+        if (!startDownload) return@LaunchedEffect
         // Receive-side imeta-parsed refs start with sourceEpoch=0 until the
         // controller's listMedia FFI lands the real epoch; the FFI download
         // path errors with "missing encrypted media secret for epoch 0".
@@ -4731,6 +4737,14 @@ private fun MediaVoiceBubble(
                         .size(48.dp)
                         .clickable(enabled = !loading) {
                             failed = false
+                            // First tap on an un-fetched, auto-download-off clip
+                            // is a Download affordance: opt in and let the
+                            // gated effect fetch it, rather than fetch+play in
+                            // one tap. Mirrors the video bubble's tap-to-fetch.
+                            if (!startDownload && localFile == null) {
+                                startDownload = true
+                                return@clickable
+                            }
                             if (isPlayingThis) {
                                 dev.ipf.darkmatter.audio.VoicePlaybackController
                                     .pause()
@@ -4774,6 +4788,13 @@ private fun MediaVoiceBubble(
                             Icon(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = stringResource(R.string.voice_message_failed),
+                                tint = onAccent,
+                                modifier = Modifier.size(26.dp),
+                            )
+                        !startDownload && localFile == null ->
+                            Icon(
+                                imageVector = Icons.Default.ArrowDownward,
+                                contentDescription = stringResource(R.string.media_tap_to_download),
                                 tint = onAccent,
                                 modifier = Modifier.size(26.dp),
                             )
@@ -12497,6 +12518,7 @@ private fun SettingsScreen(
 
     when (detail) {
         SettingsDetail.Appearance -> AppearanceScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Data -> AutoDownloadDataScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Identity -> IdentityScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
@@ -12581,6 +12603,10 @@ private fun SettingsHomeScreen(
                         stringResource(R.string.appearance),
                         stringResource(R.string.appearance_settings_subtitle),
                     ) { onOpenDetail(SettingsDetail.Appearance) }
+                    SettingsRow(
+                        stringResource(R.string.data_and_storage),
+                        stringResource(R.string.data_and_storage_settings_subtitle),
+                    ) { onOpenDetail(SettingsDetail.Data) }
                     SettingsRow(
                         stringResource(R.string.notifications),
                         stringResource(R.string.notifications_settings_subtitle),
@@ -12678,20 +12704,80 @@ private fun AppearanceScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Settings -> Data and storage -> the per-type, per-network media
+ * auto-download matrix (issue #407). Renders four grouped lists (one per
+ * network type), each with four [SettingsSwitchRow] toggles. Toggles persist
+ * immediately via [DarkMatterAppState.setMediaAutoDownload]; there is no Save
+ * button.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AutoDownloadDataScreen(
+    appState: DarkMatterAppState,
+    onBack: () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.data_and_storage)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                SectionCard(title = stringResource(R.string.media_auto_download_title)) {
-                    MediaAutoDownloadPolicy.entries.forEach { policy ->
-                        SelectableSettingsRow(
-                            title = stringResource(policy.labelRes),
-                            selected = appState.mediaAutoDownloadPolicy == policy,
-                            onClick = { appState.updateMediaAutoDownloadPolicy(policy) },
-                        )
+                Text(
+                    text = stringResource(R.string.media_auto_download_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            MediaAutoDownloadNetwork.entries.forEach { network ->
+                item {
+                    SectionCard(title = stringResource(network.labelRes)) {
+                        MediaAutoDownloadType.entries.forEach { type ->
+                            SettingsSwitchRow(
+                                title = stringResource(type.labelRes),
+                                subtitle = null,
+                                checked = appState.mediaAutoDownloadMatrix.isEnabled(type, network),
+                                onCheckedChange = { appState.setMediaAutoDownload(type, network, it) },
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
+private val MediaAutoDownloadNetwork.labelRes: Int
+    @StringRes
+    get() =
+        when (this) {
+            MediaAutoDownloadNetwork.WiFi -> R.string.network_wifi
+            MediaAutoDownloadNetwork.Mobile -> R.string.network_mobile
+            MediaAutoDownloadNetwork.Roaming -> R.string.network_roaming
+            MediaAutoDownloadNetwork.Metered -> R.string.network_metered
+        }
+
+private val MediaAutoDownloadType.labelRes: Int
+    @StringRes
+    get() =
+        when (this) {
+            MediaAutoDownloadType.Image -> R.string.media_type_images
+            MediaAutoDownloadType.Audio -> R.string.media_type_audio
+            MediaAutoDownloadType.Video -> R.string.media_type_video
+            MediaAutoDownloadType.Document -> R.string.media_type_documents
+        }
 
 @Composable
 private fun SelectableSettingsRow(
@@ -13011,7 +13097,7 @@ private fun SecurityPrivacyScreen(
 @Composable
 private fun SettingsSwitchRow(
     title: String,
-    subtitle: String,
+    subtitle: String?,
     checked: Boolean,
     enabled: Boolean = true,
     busy: Boolean = false,
@@ -13020,7 +13106,9 @@ private fun SettingsSwitchRow(
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (subtitle != null) {
+                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         if (busy) {
             CircularProgressIndicator(

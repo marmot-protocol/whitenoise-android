@@ -494,6 +494,8 @@
     <string name="members_count">%1$d members</string>
     <string name="appearance">Appearance</string>
     <string name="appearance_settings_subtitle">Theme and language</string>
+    <string name="data_and_storage">Data and storage</string>
+    <string name="data_and_storage_settings_subtitle">Media auto-download</string>
     <string name="app_preferences">App</string>
     <string name="settings_version_label">Version %1$s</string>
     <string name="theme">Theme</string>
@@ -567,9 +569,15 @@
     <string name="group_image_search_preview_subtitle_invalid">Use a public HTTPS URL</string>
     <string name="group_image_search_preview_subtitle_ready">Tap Use this image to apply</string>
     <string name="media_auto_download_title">Auto-download media</string>
-    <string name="media_auto_download_always">Always</string>
-    <string name="media_auto_download_wifi">On Wi-Fi only</string>
-    <string name="media_auto_download_never">Never</string>
+    <string name="media_auto_download_subtitle">Documents and large videos can use a lot of data. Choose what downloads automatically on each connection.</string>
+    <string name="network_wifi">Wi-Fi</string>
+    <string name="network_mobile">Mobile data</string>
+    <string name="network_roaming">Roaming</string>
+    <string name="network_metered">Metered connections</string>
+    <string name="media_type_images">Images</string>
+    <string name="media_type_audio">Audio</string>
+    <string name="media_type_video">Video</string>
+    <string name="media_type_documents">Documents</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d image selected</item>
         <item quantity="other">%1$d images selected</item>
