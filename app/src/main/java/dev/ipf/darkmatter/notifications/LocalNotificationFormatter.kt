@@ -40,6 +40,12 @@ object LocalNotificationFormatter {
 
     private val whitespaceRun = Regex("\\s+")
 
+    // Invites stamp the group they're for into this extra so the open/read
+    // dismissal path can find and cancel them by group id — their card is
+    // tagged by the opaque notificationKey, which isn't reconstructable from
+    // (accountRef, groupIdHex) alone.
+    const val EXTRA_DISMISS_GROUP_ID = "dev.ipf.darkmatter.notify.dismiss_group_id"
+
     fun conversationDismissalKey(
         accountRef: String,
         groupIdHex: String,
@@ -47,6 +53,18 @@ object LocalNotificationFormatter {
         NotificationDismissalKey(
             tag = "$accountRef|$groupIdHex",
             id = MESSAGE_NOTIFICATION_ID,
+        )
+
+    // Reaction cards live under their own (prefixed tag, REACTION_NOTIFICATION_ID)
+    // identity, so dismissing a conversation has to target this key on top of
+    // the message key to clear them. See #288.
+    fun reactionDismissalKey(
+        accountRef: String,
+        groupIdHex: String,
+    ): NotificationDismissalKey =
+        NotificationDismissalKey(
+            tag = REACTION_TAG_PREFIX + conversationDismissalKey(accountRef, groupIdHex).tag,
+            id = REACTION_NOTIFICATION_ID,
         )
 
     /** True when this update is a kind:7 reaction (a NEW_MESSAGE carrying an emoji). */

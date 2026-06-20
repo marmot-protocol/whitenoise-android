@@ -141,6 +141,20 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun reactionDismissalKeyMatchesThePostedReactionIdentity() {
+        // Opening a conversation must cancel the exact (tag, id) the reaction
+        // card was posted under, or reaction cards linger after read (#369).
+        val reaction =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "👍"),
+            )
+        val dismissal = LocalNotificationFormatter.reactionDismissalKey("account", "group-a")
+
+        assertEquals(reaction?.notificationTag, dismissal.tag)
+        assertEquals(reaction?.notificationId, dismissal.id)
+    }
+
+    @Test
     fun blankReactionEmojiKeepsTheNormalMessageIdentity() {
         // A blank emoji is not a reaction — it stays on the message card.
         val content =
