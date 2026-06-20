@@ -149,10 +149,12 @@ internal fun chatListItemSortKey(item: ChatListItem): String =
  * snapshot lets the caller hand in the group's member roster fetched
  * separately (the chat-list FFI doesn't include members on each row).
  * When present, the snapshot drives the `otherMemberAccount` /
- * `memberCount` fields that `GroupProjector.displayTitle` reads — that's
- * how an unnamed group resolves to "Group of N people" or the other
- * member's display name instead of leaking the group hex into the UI.
- * Without it, both fields fall back to null/0 and the local projection
+ * `memberCount` fields that `GroupProjector.displayTitle` reads and stays on
+ * the item as [ChatListItem.memberSnapshot] for local shared-group
+ * intersections — that's how an unnamed group resolves to "Group of N people"
+ * or the other member's display name instead of leaking the group hex into the
+ * UI.
+ * Without it, those fields fall back to null/0 and the local projection
  * shows a short group hex until [ChatsController]'s async members fetch
  * fills the cache.
  */
@@ -197,7 +199,7 @@ internal fun chatListItemFromProjection(
             },
         otherMemberAccount = otherMember,
         memberCount = memberCount,
-        memberSnapshot = null,
+        memberSnapshot = members?.let(::GroupMemberSnapshot),
         projection = row,
         previewTokens = previewTokens,
     )
@@ -268,6 +270,25 @@ data class GroupMemberSnapshot(
     val memberCount: Int = members.size
 
     fun otherMemberAccount(activeAccountIdHex: String?): String? = GroupProjector.otherMemberAccount(members, activeAccountIdHex)
+
+    fun containsAccount(accountIdHex: String): Boolean {
+        val normalized = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return false
+        return members.any { it.memberIdHex.equals(normalized, ignoreCase = true) }
+    }
+}
+
+internal fun sharedChatListItemsWith(
+    items: Iterable<ChatListItem>,
+    targetAccountIdHex: String,
+    activeAccountIdHex: String?,
+): List<ChatListItem> {
+    val active = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() } ?: return emptyList()
+    val target = targetAccountIdHex.trim().takeIf { it.isNotEmpty() } ?: return emptyList()
+    return items
+        .filter { item ->
+            val snapshot = item.memberSnapshot ?: return@filter false
+            snapshot.containsAccount(active) && snapshot.containsAccount(target)
+        }.distinctBy { it.group.groupIdHex.lowercase() }
 }
 
 enum class MessageStatus {
@@ -675,10 +696,9 @@ class ChatsController(
 
     // Per-group member snapshots fetched via the `groupMembers` FFI.
     // The chat-list FFI doesn't include member rosters on each row, so
-    // for unnamed groups we'd otherwise have nothing to feed the
-    // GroupProjector.displayTitle fallback and the UI would leak the
-    // raw group id hex. Filled lazily on first `recompute()` per group;
-    // re-fetched on bind.
+    // these snapshots drive both unnamed-group title fallback and local
+    // shared-groups derivation for the profile sheet. Filled lazily on first
+    // `recompute()` per group; re-fetched on bind.
     private var memberCacheByGroup: Map<String, List<AppGroupMemberRecordFfi>> = emptyMap()
 
     // Tracks groups whose member fetch is currently in flight, so we don't
@@ -689,6 +709,12 @@ class ChatsController(
     // `finally` so a failed fetch can be retried on the next recompute;
     // `bind()` clears the set alongside the cache to reset both at once.
     private val inFlightMemberFetches = mutableSetOf<String>()
+
+    // Widening member snapshots to every group makes the chat-list projection
+    // much more useful, but the app should not start one roster FFI call per
+    // group on large accounts. Keep the one-shot per-group invariant above,
+    // while bounding simultaneous FFI/IO work.
+    private val memberFetchGate = Semaphore(MEMBER_FETCH_FANOUT)
 
     // Parsed markdown for each row's last-message preview, keyed by the exact
     // plaintext (tokens must always describe the text beside them — keying by
@@ -846,6 +872,11 @@ class ChatsController(
             }
         foldGroup(record)
     }
+
+    fun sharedGroupsWith(
+        accountIdHex: String,
+        activeAccountIdHex: String?,
+    ): List<ChatListItem> = sharedChatListItemsWith(items + archivedItems, accountIdHex, activeAccountIdHex)
 
     private fun foldChatRow(row: ChatListRowFfi) {
         chatRows =
@@ -1182,10 +1213,9 @@ class ChatsController(
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
         chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }
-        // For any unnamed group we don't yet have members cached for,
-        // fan out a one-shot members fetch so the title can resolve from
-        // the local projector. Only unnamed groups need this — named
-        // groups display `group.name` directly without member data.
+        // For any group we don't yet have members cached for, fan out a
+        // one-shot members fetch so unnamed titles and the profile sheet's
+        // shared-groups list can resolve from local snapshots.
         schedulePendingMemberFetches()
         // Likewise, fan out off-main markdown parses for any preview text we
         // haven't tokenized yet; each completion folds back via recompute().
@@ -1193,10 +1223,10 @@ class ChatsController(
     }
 
     /**
-     * Walk the current chat rows and, for any unnamed group without
-     * cached members or an in-flight fetch, kick off a `groupMembers`
-     * FFI call. On success the cache updates and `recompute()` runs
-     * again so the row reshuffles into its proper title.
+     * Walk the current chat rows and, for any group without cached members or
+     * an in-flight fetch, kick off a `groupMembers` FFI call. On success the
+     * cache updates and `recompute()` runs again so row titles and profile-sheet
+     * shared-group intersections see the local member snapshot.
      */
     private fun schedulePendingMemberFetches() {
         val account = accountRef ?: return
@@ -1204,10 +1234,7 @@ class ChatsController(
         val pending =
             chatRows
                 .asSequence()
-                .filter {
-                    val groupName = groupRecordsById[it.groupIdHex]?.name ?: it.groupName
-                    groupName.isBlank()
-                }.map { it.groupIdHex }
+                .map { it.groupIdHex }
                 .filterNot { memberCacheByGroup.containsKey(it) }
                 .filterNot { it in inFlightMemberFetches }
                 .toList()
@@ -1216,14 +1243,18 @@ class ChatsController(
         pending.forEach { groupIdHex ->
             appState.launchMutation {
                 try {
-                    val members = appState.marmotIo { groupMembers(account, groupIdHex) }
-                    if (bindEpoch != epoch) return@launchMutation
-                    members
-                        .map { it.memberIdHex }
-                        .filter { it.isNotBlank() }
-                        .forEach(appState::requestProfile)
-                    memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
-                    recompute()
+                    memberFetchGate.withPermit {
+                        if (bindEpoch != epoch) return@withPermit
+                        val members = appState.marmotIo { groupMembers(account, groupIdHex) }
+                        if (bindEpoch == epoch) {
+                            members
+                                .map { it.memberIdHex }
+                                .filter { it.isNotBlank() }
+                                .forEach(appState::requestProfile)
+                            memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
+                            recompute()
+                        }
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Throwable) {
@@ -1357,6 +1388,11 @@ private val ConversationTimelinePageLimit = 50u
 private const val SEARCH_FANOUT = 6
 private val SEARCH_PER_CHAT_LIMIT = 5u
 private const val SEARCH_MAX_PAGES = 20
+
+// Maximum number of `groupMembers` FFI roster reads running at once from the
+// chat-list projection. Keeps large accounts from flooding IO at startup while
+// still letting shared-group snapshots materialize in the background.
+private const val MEMBER_FETCH_FANOUT = 4
 
 // Cap on how many subscription updates one coalesced batch can absorb. A
 // runaway producer shouldn't be able to wedge the UI behind an unbounded

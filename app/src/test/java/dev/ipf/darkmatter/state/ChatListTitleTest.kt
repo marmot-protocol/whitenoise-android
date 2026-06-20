@@ -144,14 +144,30 @@ class ChatListTitleTest {
         assertEquals("Alice", title)
     }
 
+    @Test
+    fun sharedGroupsRequireLocalAndTargetMembersInSnapshot() {
+        val me = "me-acc"
+        val alice = "alice-acc"
+        val bob = "bob-acc"
+        val shared = chatItem("shared", name = "Shared", members = listOf(member(me, true), member(alice, false)))
+        val missingTarget = chatItem("missing-target", name = "No Alice", members = listOf(member(me, true), member(bob, false)))
+        val missingSelf = chatItem("missing-self", name = "No Me", members = listOf(member(alice, false), member(bob, false)))
+        val noSnapshot = chatItem("no-snapshot", name = "Unknown", members = null)
+
+        val matches = sharedChatListItemsWith(listOf(shared, missingTarget, missingSelf, noSnapshot), "ALICE-ACC", "ME-ACC")
+
+        assertEquals(listOf("shared"), matches.map { it.group.groupIdHex })
+    }
+
     // --- fixtures ---
 
     private fun group(
         name: String,
         pendingConfirmation: Boolean = false,
         welcomer: String? = null,
+        groupId: String = "test-group",
     ) = AppGroupRecordFfi(
-        groupIdHex = "test-group",
+        groupIdHex = groupId,
         endpoint = "endpoint",
         name = name,
         description = "",
@@ -167,6 +183,18 @@ class ChatListTitleTest {
         welcomerAccountIdHex = welcomer,
         viaWelcomeMessageIdHex = null,
     )
+
+    private fun chatItem(
+        groupId: String,
+        name: String,
+        members: List<AppGroupMemberRecordFfi>?,
+    ): ChatListItem =
+        chatListItemFromProjection(
+            row = row(groupId = groupId, rawTitle = name),
+            group = group(name = name, groupId = groupId),
+            activeAccountIdHex = "me-acc",
+            members = members,
+        )
 
     private fun row(
         groupId: String,

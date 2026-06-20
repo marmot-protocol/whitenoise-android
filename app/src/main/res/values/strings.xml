@@ -88,6 +88,10 @@
     <string name="decline">Decline</string>
     <string name="accept">Accept</string>
     <string name="profile">Profile</string>
+    <string name="profile_no_bio">No bio yet.</string>
+    <string name="profile_shared_groups">Shared groups</string>
+    <string name="profile_no_shared_groups">No shared groups yet.</string>
+    <string name="profile_view_picture">View profile picture</string>
     <string name="dismiss">Dismiss</string>
     <string name="edit">Edit</string>
     <string name="save_group">Save Group</string>

@@ -76,6 +76,10 @@
     <string name="decline">Reddet</string>
     <string name="accept">Kabul et</string>
     <string name="profile">Profil</string>
+    <string name="profile_no_bio">Henüz biyografi yok.</string>
+    <string name="profile_shared_groups">Ortak gruplar</string>
+    <string name="profile_no_shared_groups">Henüz ortak grup yok.</string>
+    <string name="profile_view_picture">Profil resmini görüntüle</string>
     <string name="dismiss">Kapat</string>
     <string name="edit">Düzenle</string>
     <string name="save_group">Grubu Kaydet</string>

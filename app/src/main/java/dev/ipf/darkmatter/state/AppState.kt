@@ -632,6 +632,8 @@ class DarkMatterAppState(
         chatsController?.applyLocalGroupUpdate(record)
     }
 
+    fun sharedGroupsWith(accountIdHex: String): List<ChatListItem> = chatsController?.sharedGroupsWith(accountIdHex, activeAccount?.accountIdHex).orEmpty()
+
     suspend fun <T> marmotIo(block: suspend Marmot.() -> T): T =
         withContext(Dispatchers.IO) {
             marmot().block()

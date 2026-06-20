@@ -76,6 +76,10 @@
     <string name="decline">Recusar</string>
     <string name="accept">Aceitar</string>
     <string name="profile">Perfil</string>
+    <string name="profile_no_bio">Ainda sem bio.</string>
+    <string name="profile_shared_groups">Grupos compartilhados</string>
+    <string name="profile_no_shared_groups">Ainda não há grupos compartilhados.</string>
+    <string name="profile_view_picture">Ver foto do perfil</string>
     <string name="dismiss">Fechar</string>
     <string name="edit">Editar</string>
     <string name="save_group">Salvar grupo</string>
