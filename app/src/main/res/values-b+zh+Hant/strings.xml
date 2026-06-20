@@ -398,6 +398,8 @@
     <string name="members_count">%1$d 位成員</string>
     <string name="appearance">外觀</string>
     <string name="appearance_settings_subtitle">主題和語言</string>
+    <string name="data_and_storage">資料與儲存空間</string>
+    <string name="data_and_storage_settings_subtitle">媒體自動下載</string>
     <string name="app_preferences">應用程式</string>
     <string name="settings_version_label">版本 %1$s</string>
     <string name="theme">主題</string>
@@ -471,9 +473,15 @@
     <string name="group_image_search_preview_subtitle_invalid">使用公開的 HTTPS URL</string>
     <string name="group_image_search_preview_subtitle_ready">點按「使用此圖片」以套用</string>
     <string name="media_auto_download_title">自動下載媒體</string>
-    <string name="media_auto_download_always">一律</string>
-    <string name="media_auto_download_wifi">僅限 Wi-Fi</string>
-    <string name="media_auto_download_never">永不</string>
+    <string name="media_auto_download_subtitle">文件和大型影片可能會消耗大量數據。請選擇在每種連線下自動下載的內容。</string>
+    <string name="network_wifi">Wi-Fi</string>
+    <string name="network_mobile">行動數據</string>
+    <string name="network_roaming">漫遊</string>
+    <string name="network_metered">計量付費連線</string>
+    <string name="media_type_images">圖片</string>
+    <string name="media_type_audio">音訊</string>
+    <string name="media_type_video">影片</string>
+    <string name="media_type_documents">文件</string>
     <plurals name="media_selected_count">
         <item quantity="other">已選擇 %1$d 張圖片</item>
     </plurals>

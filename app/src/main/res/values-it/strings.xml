@@ -399,6 +399,8 @@
     <string name="members_count">%1$d membri</string>
     <string name="appearance">Aspetto</string>
     <string name="appearance_settings_subtitle">Tema e lingua</string>
+    <string name="data_and_storage">Dati e archiviazione</string>
+    <string name="data_and_storage_settings_subtitle">Download automatico dei media</string>
     <string name="app_preferences">App</string>
     <string name="settings_version_label">Versione %1$s</string>
     <string name="theme">Tema</string>
@@ -473,9 +475,15 @@
     <string name="group_image_search_preview_subtitle_invalid">Usa un URL HTTPS pubblico</string>
     <string name="group_image_search_preview_subtitle_ready">Tocca «Usa questa immagine» per applicare</string>
     <string name="media_auto_download_title">Download automatico dei media</string>
-    <string name="media_auto_download_always">Sempre</string>
-    <string name="media_auto_download_wifi">Solo Wi-Fi</string>
-    <string name="media_auto_download_never">Mai</string>
+    <string name="media_auto_download_subtitle">I documenti e i video di grandi dimensioni possono consumare molti dati. Scegli cosa scaricare automaticamente su ogni connessione.</string>
+    <string name="network_wifi">Wi-Fi</string>
+    <string name="network_mobile">Dati mobili</string>
+    <string name="network_roaming">Roaming</string>
+    <string name="network_metered">Connessioni a consumo</string>
+    <string name="media_type_images">Immagini</string>
+    <string name="media_type_audio">Audio</string>
+    <string name="media_type_video">Video</string>
+    <string name="media_type_documents">Documenti</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d immagine selezionata</item>
         <item quantity="other">%1$d immagini selezionate</item>

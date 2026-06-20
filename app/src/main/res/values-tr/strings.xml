@@ -399,6 +399,8 @@
     <string name="members_count">%1$d üye</string>
     <string name="appearance">Görünüm</string>
     <string name="appearance_settings_subtitle">Tema ve dil</string>
+    <string name="data_and_storage">Veri ve depolama</string>
+    <string name="data_and_storage_settings_subtitle">Medyayı otomatik indir</string>
     <string name="app_preferences">Uygulama</string>
     <string name="settings_version_label">Sürüm %1$s</string>
     <string name="theme">Tema</string>
@@ -473,9 +475,15 @@
     <string name="group_image_search_preview_subtitle_invalid">Genel bir HTTPS URL kullanın</string>
     <string name="group_image_search_preview_subtitle_ready">Uygulamak için \"Bu görseli kullan\"a dokunun</string>
     <string name="media_auto_download_title">Medyayı otomatik indir</string>
-    <string name="media_auto_download_always">Her zaman</string>
-    <string name="media_auto_download_wifi">Yalnızca Wi-Fi\'de</string>
-    <string name="media_auto_download_never">Asla</string>
+    <string name="media_auto_download_subtitle">Belgeler ve büyük videolar çok fazla veri kullanabilir. Her bağlantıda neyin otomatik indirileceğini seçin.</string>
+    <string name="network_wifi">Wi-Fi</string>
+    <string name="network_mobile">Mobil veri</string>
+    <string name="network_roaming">Dolaşım</string>
+    <string name="network_metered">Sayaçlı bağlantılar</string>
+    <string name="media_type_images">Görseller</string>
+    <string name="media_type_audio">Ses</string>
+    <string name="media_type_video">Video</string>
+    <string name="media_type_documents">Belgeler</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d görüntü seçildi</item>
         <item quantity="other">%1$d görüntü seçildi</item>

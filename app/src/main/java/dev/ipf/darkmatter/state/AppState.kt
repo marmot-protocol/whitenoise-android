@@ -404,9 +404,13 @@ class DarkMatterAppState(
     var themeMode by mutableStateOf(AppThemeMode.fromPreference(preferences.getString(THEME_MODE_KEY, null)))
         private set
 
-    var mediaAutoDownloadPolicy by mutableStateOf(
-        MediaAutoDownloadPolicy.fromPreference(preferences.getString(MEDIA_AUTO_DOWNLOAD_KEY, null)),
-    )
+    /**
+     * Per-account media auto-download matrix (issue #407). Reloaded whenever
+     * the active account changes (see [reloadMediaAutoDownloadMatrix]); the
+     * bubble call sites key their gate `remember` on this so flipping a toggle
+     * re-gates undownloaded media immediately.
+     */
+    var mediaAutoDownloadMatrix by mutableStateOf(loadMediaAutoDownloadMatrix(activeAccountRef))
         private set
 
     var languageTag by mutableStateOf(preferences.getString(LANGUAGE_TAG_KEY, null).orEmpty())
@@ -850,6 +854,12 @@ class DarkMatterAppState(
             } else {
                 if (activeAccountRef == null || accounts.none { it.label == activeAccountRef }) {
                     setActiveAccount(accounts.first().label)
+                } else {
+                    // Active ref survived from a prior launch and wasn't routed
+                    // through setActiveAccount; the matrix was seeded against the
+                    // "default" bucket before accounts loaded, so re-key it on the
+                    // real account now.
+                    reloadMediaAutoDownloadMatrix()
                 }
                 refreshLocalNotificationSettings()
                 phase = AppPhase.Ready
@@ -964,6 +974,7 @@ class DarkMatterAppState(
         }
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
+        reloadMediaAutoDownloadMatrix()
         accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
         notificationScope.launch {
             configurePrivacyRuntime()
@@ -1109,6 +1120,7 @@ class DarkMatterAppState(
             .apply {
                 if (next == null) remove(ACTIVE_ACCOUNT_KEY) else putString(ACTIVE_ACCOUNT_KEY, next)
             }.apply()
+        reloadMediaAutoDownloadMatrix()
         // Signing out the last active account must leave a usable state, not a
         // MainShell with no active account. See issue #11.
         phase = outcome.phase
@@ -1178,6 +1190,7 @@ class DarkMatterAppState(
             .apply {
                 if (next == null) remove(ACTIVE_ACCOUNT_KEY) else putString(ACTIVE_ACCOUNT_KEY, next)
             }.apply()
+        reloadMediaAutoDownloadMatrix()
         phase = if (next == null) AppPhase.Onboarding else AppPhase.Ready
         next?.let { label ->
             refreshedAccounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
@@ -1365,27 +1378,112 @@ class DarkMatterAppState(
         preferences.edit().putString(THEME_MODE_KEY, mode.preferenceValue).apply()
     }
 
-    fun updateMediaAutoDownloadPolicy(policy: MediaAutoDownloadPolicy) {
-        mediaAutoDownloadPolicy = policy
-        preferences.edit().putString(MEDIA_AUTO_DOWNLOAD_KEY, policy.preferenceValue).apply()
+    /**
+     * Toggle one cell of the active account's auto-download matrix, persist it
+     * immediately, and update the observable state so open bubbles re-gate.
+     */
+    fun setMediaAutoDownload(
+        type: MediaAutoDownloadType,
+        network: MediaAutoDownloadNetwork,
+        enabled: Boolean,
+    ) {
+        val updated = mediaAutoDownloadMatrix.withToggle(type, network, enabled)
+        if (updated == mediaAutoDownloadMatrix) return
+        mediaAutoDownloadMatrix = updated
+        preferences.edit().putString(mediaAutoDownloadPrefKey(activeAccountRef), updated.toPreference()).apply()
     }
 
     /**
-     * Whether an incoming attachment should be fetched/decrypted automatically
-     * given the current [mediaAutoDownloadPolicy] and network metering.
+     * Whether an incoming attachment of [type] should be fetched/decrypted
+     * automatically given the active account's matrix and every network the
+     * live connection currently matches (most-restrictive rule, issue #407).
      */
-    fun shouldAutoDownloadMedia(): Boolean =
-        when (mediaAutoDownloadPolicy) {
-            MediaAutoDownloadPolicy.Always -> true
-            MediaAutoDownloadPolicy.Never -> false
-            MediaAutoDownloadPolicy.WifiOnly -> !isActiveNetworkMetered()
-        }
+    fun shouldAutoDownloadMedia(type: MediaAutoDownloadType): Boolean = mediaAutoDownloadMatrix.shouldAutoDownload(type, activeNetworkTypes())
 
-    private fun isActiveNetworkMetered(): Boolean {
+    /**
+     * Every [MediaAutoDownloadNetwork] the active connection currently matches.
+     * A single connection can match several at once (e.g. cellular that is both
+     * roaming and metered). An empty set (no/unknown connection) makes the
+     * decision conservatively fall to "do not auto-download".
+     */
+    private fun activeNetworkTypes(): Set<MediaAutoDownloadNetwork> {
         val cm =
             appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
-                ?: return true // Unknown → treat as metered (conservative).
-        return cm.isActiveNetworkMetered
+                ?: return emptySet()
+        val network = cm.activeNetwork ?: return emptySet()
+        val caps = cm.getNetworkCapabilities(network) ?: return emptySet()
+        val types = mutableSetOf<MediaAutoDownloadNetwork>()
+        if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
+            types += MediaAutoDownloadNetwork.WiFi
+        }
+        if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR)) {
+            types += MediaAutoDownloadNetwork.Mobile
+            if (!caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)) {
+                types += MediaAutoDownloadNetwork.Roaming
+            }
+        }
+        if (!caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) {
+            types += MediaAutoDownloadNetwork.Metered
+        }
+        return types
+    }
+
+    /**
+     * Refreshes [mediaAutoDownloadMatrix] for the current active account.
+     * Called whenever [activeAccountRef] changes so per-account toggles follow
+     * an account switch, sign-out, or cold-start bind.
+     */
+    private fun reloadMediaAutoDownloadMatrix() {
+        mediaAutoDownloadMatrix = loadMediaAutoDownloadMatrix(activeAccountRef)
+    }
+
+    /**
+     * Loads (or seeds) the matrix for [accountRef]. A never-before-seen account
+     * is seeded from [MediaAutoDownloadMatrix.DEFAULT], migrating any value the
+     * device still carries under the legacy 3-state key. The seeded matrix is
+     * persisted so subsequent reads are stable.
+     */
+    private fun loadMediaAutoDownloadMatrix(accountRef: String?): MediaAutoDownloadMatrix {
+        val account = accountRef?.let { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex }
+        val key = mediaAutoDownloadPrefKey(accountRef)
+        val stored = preferences.getString(key, null)
+        if (stored != null) return MediaAutoDownloadMatrix.fromPreference(stored)
+        // Only consume the legacy global key once a real account is bound, so
+        // the migrated value lands on the user's account rather than the
+        // transient pre-bootstrap "default" bucket.
+        val seeded = if (account != null) migratedDefaultMatrix() else MediaAutoDownloadMatrix.DEFAULT
+        preferences.edit().putString(key, seeded.toPreference()).apply()
+        return seeded
+    }
+
+    /**
+     * One-time migration from the legacy [MEDIA_AUTO_DOWNLOAD_KEY] 3-state
+     * policy: Always -> all cells ON, Never -> all cells OFF, WifiOnly/absent
+     * -> [MediaAutoDownloadMatrix.DEFAULT]. The legacy key is dropped once read.
+     */
+    private fun migratedDefaultMatrix(): MediaAutoDownloadMatrix {
+        val legacy = preferences.getString(MEDIA_AUTO_DOWNLOAD_KEY, null)
+        if (legacy != null) preferences.edit().remove(MEDIA_AUTO_DOWNLOAD_KEY).apply()
+        return when (legacy) {
+            "always" -> allCellsMatrix(on = true)
+            "never" -> allCellsMatrix(on = false)
+            else -> MediaAutoDownloadMatrix.DEFAULT
+        }
+    }
+
+    private fun allCellsMatrix(on: Boolean): MediaAutoDownloadMatrix {
+        var matrix = MediaAutoDownloadMatrix(emptySet())
+        for (type in MediaAutoDownloadType.entries) {
+            for (network in MediaAutoDownloadNetwork.entries) {
+                matrix = matrix.withToggle(type, network, on)
+            }
+        }
+        return matrix
+    }
+
+    private fun mediaAutoDownloadPrefKey(accountRef: String?): String {
+        val account = accountRef?.let { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex }
+        return "$MEDIA_AUTO_DOWNLOAD_MATRIX_KEY_PREFIX${account ?: "default"}"
     }
 
     fun updateLanguageTag(tag: String) {
@@ -2414,6 +2512,11 @@ class DarkMatterAppState(
         private const val DEVELOPER_MODE_KEY = "developer_mode"
         private const val THEME_MODE_KEY = "theme_mode"
         private const val MEDIA_AUTO_DOWNLOAD_KEY = "media_auto_download"
+
+        // Per-account matrix prefs (issue #407), keyed by accountIdHex (or a
+        // "default" bucket when no account is bound). Distinct from the legacy
+        // 3-state key, which this migrates from on first per-account load.
+        private const val MEDIA_AUTO_DOWNLOAD_MATRIX_KEY_PREFIX = "media_auto_download_matrix:"
         private const val DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY = "default_notifications_enable_attempted"
 
         // 24 MiB cap on decrypted attachment bytes resident in memory —

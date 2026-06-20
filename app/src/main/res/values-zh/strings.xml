@@ -398,6 +398,8 @@
     <string name="members_count">%1$d 位成员</string>
     <string name="appearance">外观</string>
     <string name="appearance_settings_subtitle">主题和语言</string>
+    <string name="data_and_storage">数据和存储</string>
+    <string name="data_and_storage_settings_subtitle">媒体自动下载</string>
     <string name="app_preferences">应用</string>
     <string name="settings_version_label">版本 %1$s</string>
     <string name="theme">主题</string>
@@ -471,9 +473,15 @@
     <string name="group_image_search_preview_subtitle_invalid">使用公开的 HTTPS URL</string>
     <string name="group_image_search_preview_subtitle_ready">点击「使用此图片」以应用</string>
     <string name="media_auto_download_title">自动下载媒体</string>
-    <string name="media_auto_download_always">始终</string>
-    <string name="media_auto_download_wifi">仅 Wi-Fi</string>
-    <string name="media_auto_download_never">从不</string>
+    <string name="media_auto_download_subtitle">文档和大型视频可能会消耗大量流量。请选择在每种连接下自动下载的内容。</string>
+    <string name="network_wifi">Wi-Fi</string>
+    <string name="network_mobile">移动数据</string>
+    <string name="network_roaming">漫游</string>
+    <string name="network_metered">按量计费的连接</string>
+    <string name="media_type_images">图片</string>
+    <string name="media_type_audio">音频</string>
+    <string name="media_type_video">视频</string>
+    <string name="media_type_documents">文档</string>
     <plurals name="media_selected_count">
         <item quantity="other">已选择 %1$d 张图片</item>
     </plurals>
