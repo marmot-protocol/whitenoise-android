@@ -142,6 +142,7 @@ object MediaReferenceParser {
         if (raw.isBlank()) return false
         val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return false
         if (uri.scheme?.lowercase() != "https") return false
+        if (!uri.userInfo.isNullOrEmpty()) return false
         val host = uri.host ?: return false
         if (host.isBlank()) return false
         return !HostSafety.isPrivateOrLoopbackHost(host)

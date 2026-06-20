@@ -136,6 +136,11 @@ object AvatarImageLoader {
         while (true) {
             val parsed = runCatching { URL(current) }.getOrNull() ?: return null
             if (parsed.protocol != "https") return null
+            // Reject embedded credentials (https://user:pass@host/). They'd be
+            // sent to the host on connect, and the authority parsing differs
+            // from a server's — a parser-confusion gap the other URL guards
+            // already close.
+            if (!parsed.userInfo.isNullOrEmpty()) return null
             // SSRF: validate the host on EVERY hop, not just the first. A
             // public https URL can 30x-redirect to https://127.0.0.1/ (or any
             // private/loopback literal, including the non-dotted encodings
