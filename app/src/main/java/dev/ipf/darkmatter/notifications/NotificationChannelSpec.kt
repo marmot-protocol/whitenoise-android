@@ -43,11 +43,14 @@ enum class NotificationChannelSpec(
     GROUP_MESSAGES("messages_group", ChannelImportance.HIGH),
 
     /**
-     * kind:7 reactions to the local user's messages (surfaced by PR #190). Low
-     * importance by default so the reaction noise can be muted independently of
-     * mentions / direct messages.
+     * kind:7 reactions to the local user's messages (surfaced by PR #190).
+     * High importance so a reaction heads-up like a message; still its own
+     * channel so users can mute it independently of mentions / direct messages.
+     * The id is bumped from the original low-importance `reactions` channel
+     * because Android can't raise a live channel's importance — the old one is
+     * retired in [NotificationChannels.ensureChannels].
      */
-    REACTIONS("reactions", ChannelImportance.LOW),
+    REACTIONS("reactions_v2", ChannelImportance.HIGH),
 
     /** kind:444 Welcomes and group-join events. */
     INVITES("invites", ChannelImportance.DEFAULT),
@@ -61,6 +64,14 @@ enum class NotificationChannelSpec(
          * dead entry in the app's notification settings.
          */
         const val LEGACY_MESSAGES_CHANNEL_ID = "darkmatter.messages.v2"
+
+        /**
+         * The original low-importance reactions channel. Retired in favour of
+         * the high-importance `reactions_v2` so reactions heads-up; deleted on
+         * the OS side by [NotificationChannels.ensureChannels] (a live channel's
+         * importance can't be raised, so it must be re-keyed).
+         */
+        const val LEGACY_REACTIONS_CHANNEL_ID = "reactions"
 
         /**
          * Map a notification to its channel using only the signals the FFI
