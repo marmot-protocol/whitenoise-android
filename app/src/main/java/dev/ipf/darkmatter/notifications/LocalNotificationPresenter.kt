@@ -153,6 +153,43 @@ class LocalNotificationPresenter(
         notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
     }
 
+    /**
+     * Re-post the (tag, id) notification carrying a RemoteInput history entry —
+     * the documented "reply handled" signal that clears the system's
+     * FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY. A direct-reply notification is
+     * lifetime-extended by the system (API 34+) and a bare [cancel] is ignored
+     * while that flag is set, so the caller must do this (and let it settle)
+     * before cancelling. Returns true once the live notification was found and
+     * re-posted; false if it isn't in the active set yet (caller should retry —
+     * the extension is applied a beat after the reply broadcast fires).
+     */
+    fun markDirectReplyHandled(
+        notificationTag: String,
+        notificationId: Int,
+        replyText: String,
+    ): Boolean {
+        val active =
+            runCatching {
+                context
+                    .getSystemService(NotificationManager::class.java)
+                    ?.activeNotifications
+                    ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
+            }.getOrNull() ?: return false
+        return runCatching {
+            val resolved =
+                NotificationCompat
+                    .Builder(context, active.notification.channelId)
+                    .setSmallIcon(R.drawable.ic_stat_darkmatter)
+                    .setRemoteInputHistory(arrayOf(replyText))
+                    .setSilent(true)
+                    .setOnlyAlertOnce(true)
+                    .build()
+            NotificationManagerCompat.from(context).notify(notificationTag, notificationId, resolved)
+            notificationDebug { "reply-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
+            true
+        }.getOrDefault(false)
+    }
+
     // Accumulate every message from a conversation into one card. Android keys a
     // notification by (tag, id); reusing the per-conversation tag updates the
     // existing card, and MessagingStyle appends the new line to the previous

@@ -295,11 +295,13 @@ class NotificationTargetTest {
     }
 
     @Test
-    fun replyActionHandled_requiresSentAndMarkedRead() {
-        assertTrue(notificationReplyActionHandled(sent = true, markedRead = true))
-        assertFalse(notificationReplyActionHandled(sent = true, markedRead = false))
-        assertFalse(notificationReplyActionHandled(sent = false, markedRead = true))
-        assertFalse(notificationReplyActionHandled(sent = false, markedRead = false))
+    fun replyActionHandled_gatesOnSentOnly_markReadIsBestEffort() {
+        // A successful send must dismiss the notification regardless of whether
+        // the best-effort mark-read step succeeded. Gating on mark-read would
+        // leave the inline RemoteInput field active and let the user re-send,
+        // posting a duplicate message to the group (issue #272).
+        assertTrue(notificationReplyActionHandled(sent = true))
+        assertFalse(notificationReplyActionHandled(sent = false))
     }
 
     // ---- resolveNotificationNav (routing FSM) -------------------------------
