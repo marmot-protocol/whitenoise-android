@@ -30,6 +30,10 @@
     <string name="chat_list_filter_unread">Okunmamış</string>
     <string name="chat_list_no_unread">Hepsi okundu</string>
     <string name="chat_list_no_results_for">\"%1$s\" için sonuç yok</string>
+    <string name="chat_list_search_resolving">Profil aranıyor…</string>
+    <string name="chat_list_search_open_profile">Profili aç</string>
+    <string name="chat_list_search_nip05_not_found">\"%1$s\" için profil bulunamadı</string>
+    <string name="chat_list_search_invalid_npub">Bu geçerli bir npub gibi görünmüyor</string>
     <string name="chat_row_swipe_archive">Arşivle</string>
     <string name="chat_row_swipe_unarchive">Arşivden çıkar</string>
     <string name="chat_row_action_archive">Arşivle</string>

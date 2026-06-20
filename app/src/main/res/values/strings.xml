@@ -31,6 +31,10 @@
     <string name="chat_list_filter_groups">Groups</string>
     <string name="chat_list_no_unread">All caught up</string>
     <string name="chat_list_no_results_for">No results for \"%1$s\"</string>
+    <string name="chat_list_search_resolving">Looking up profile…</string>
+    <string name="chat_list_search_open_profile">Open profile</string>
+    <string name="chat_list_search_nip05_not_found">No profile found for \"%1$s\"</string>
+    <string name="chat_list_search_invalid_npub">That doesn\'t look like a valid npub</string>
     <string name="chat_row_swipe_archive">Archive</string>
     <string name="chat_row_swipe_unarchive">Unarchive</string>
     <string name="chat_row_action_archive">Archive</string>

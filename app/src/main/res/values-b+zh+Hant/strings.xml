@@ -30,6 +30,10 @@
     <string name="chat_list_filter_unread">未讀</string>
     <string name="chat_list_no_unread">全部已讀</string>
     <string name="chat_list_no_results_for">找不到「%1$s」</string>
+    <string name="chat_list_search_resolving">正在查找個人檔案…</string>
+    <string name="chat_list_search_open_profile">開啟個人檔案</string>
+    <string name="chat_list_search_nip05_not_found">找不到「%1$s」的個人檔案</string>
+    <string name="chat_list_search_invalid_npub">這看起來不是有效的 npub</string>
     <string name="chat_row_swipe_archive">封存</string>
     <string name="chat_row_swipe_unarchive">取消封存</string>
     <string name="chat_row_action_archive">封存</string>
