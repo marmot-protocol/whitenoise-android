@@ -293,6 +293,7 @@ import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.ArchiveSwipe
 import dev.ipf.darkmatter.core.AvatarImageLoader
+import dev.ipf.darkmatter.core.ChatListIdentifierSearch
 import dev.ipf.darkmatter.core.ChatListMessageSearch
 import dev.ipf.darkmatter.core.DiagnosticFormatter
 import dev.ipf.darkmatter.core.EditState
@@ -305,6 +306,7 @@ import dev.ipf.darkmatter.core.MessageBodyMatch
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageSearch
 import dev.ipf.darkmatter.core.MessageTextCopy
+import dev.ipf.darkmatter.core.Nip05Resolver
 import dev.ipf.darkmatter.core.ProfileFieldValidation
 import dev.ipf.darkmatter.core.ProfileLink
 import dev.ipf.darkmatter.core.ProfileSanitizer
@@ -1261,6 +1263,11 @@ private fun ChatsScreen(
     // its entry (if any) to render the highlighted snippet line and to scroll
     // to the matched message on tap-through.
     var bodyMatches by remember { mutableStateOf<Map<String, MessageBodyMatch>>(emptyMap()) }
+    // Resolution state for a pasted Nostr identifier in the search field (#344).
+    // An npub resolves synchronously; a NIP-05 address resolves over the network
+    // (loading → resolved/failed). Plain-text queries stay [None] and the list
+    // filters exactly as before.
+    var identifierResolution by remember { mutableStateOf<IdentifierResolution>(IdentifierResolution.None) }
     var filter by remember { mutableStateOf(ChatListFilter.All) }
     // The Archived filter is a view switch, not a row predicate: it swaps the
     // source list to archived chats (replacing the old dedicated Archived row).
@@ -1361,6 +1368,47 @@ private fun ChatsScreen(
         delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
         bodyMatches = controller.searchMessageBodies(sourceList, trimmedQuery)
     }
+    // Resolve a pasted Nostr identifier in the search field (#344). An npub is
+    // validated (and normalized) via the FFI key parser — no network. A NIP-05
+    // address shows a loading state, then a `/.well-known/nostr.json` lookup
+    // resolves it to a pubkey. Each keystroke re-keys this effect, cancelling
+    // any in-flight lookup, and a plain-text query resets to None so the list
+    // filters as before. The resolve result drives ChatListIdentifierResult.
+    LaunchedEffect(trimmedQuery) {
+        when (val id = ChatListIdentifierSearch.classify(trimmedQuery)) {
+            null -> identifierResolution = IdentifierResolution.None
+            is ChatListIdentifierSearch.Identifier.Npub -> {
+                // accountIdHex validates the bech32 key (rejecting a checksum
+                // failure that the cheap format check in ProfileLink lets
+                // through); a non-null result means the npub is real.
+                val hex = appState.accountIdHex(id.npub)
+                identifierResolution =
+                    if (hex != null) {
+                        IdentifierResolution.Resolved(id.npub)
+                    } else {
+                        IdentifierResolution.Failed(R.string.chat_list_search_invalid_npub)
+                    }
+            }
+            is ChatListIdentifierSearch.Identifier.Nip05 -> {
+                identifierResolution = IdentifierResolution.Resolving
+                // Small debounce so a half-typed address (e.g. mid-domain)
+                // doesn't fire a lookup on every keystroke; the effect re-keys
+                // and cancels the prior attempt as the user keeps typing.
+                delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
+                val hex = Nip05Resolver.resolve(id.identifier)
+                val npub = hex?.let { appState.npub(it) }
+                identifierResolution =
+                    if (npub != null) {
+                        IdentifierResolution.Resolved(npub)
+                    } else {
+                        IdentifierResolution.Failed(
+                            R.string.chat_list_search_nip05_not_found,
+                            id.identifier,
+                        )
+                    }
+            }
+        }
+    }
     val visibleItems =
         remember(sourceList, searchQuery, filter, groupTitleCopy, profileRev, bodyMatches) {
             applyChatListSearchAndFilter(
@@ -1449,6 +1497,27 @@ private fun ChatsScreen(
                     archivedUnreadCount = archivedUnreadCount,
                 )
             }
+            // Pasted-identifier resolution result (#344). Sits above the list so
+            // a recognized npub / NIP-05 surfaces a tappable result while
+            // plain-text queries below keep filtering the list. When the active
+            // account already has a 1:1 chat with the resolved key, the result
+            // IS that chat row and tapping it opens the conversation directly
+            // (issue #344 step 2); otherwise it's an "open profile" affordance
+            // routing into the shared profile sheet, which handles the
+            // Start-chat path (step 3). Hidden for plain-text queries.
+            ChatListIdentifierResult(
+                resolution = identifierResolution,
+                appState = appState,
+                existingDirectChat = { npub -> appState.existingDirectChat(npub) },
+                onOpenChat = { chat ->
+                    searchOpen = false
+                    onOpenGroup(chat, null)
+                },
+                onOpenProfile = { npub ->
+                    searchOpen = false
+                    appState.presentProfile(npub)
+                },
+            )
             Box(Modifier.fillMaxSize()) {
                 when {
                     controller.isLoading && sourceList.isEmpty() -> LoadingScreen()
@@ -1470,6 +1539,7 @@ private fun ChatsScreen(
                             newChatDirect = true
                             showNewChat = true
                         })
+                    visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None -> Unit
                     visibleItems.isEmpty() ->
                         ChatListNoResults(
                             query = searchQuery.trim(),
@@ -1596,6 +1666,128 @@ private fun ChatsScreen(
 /** Chat-list filter state. `Archived` swaps the source list to archived chats
  *  rather than predicate-filtering the active one. */
 private enum class ChatListFilter { All, Unread, Groups, Archived }
+
+/**
+ * Resolution state for a chat-list search query that parsed as a Nostr
+ * identifier (npub / NIP-05) — issue #344. An npub resolves synchronously to
+ * its key; a NIP-05 address has to be looked up over the network, so it passes
+ * through [Resolving] before landing on [Resolved] or [Failed]. [None] is the
+ * ordinary plain-text-query case where the chat list filters as before.
+ */
+private sealed interface IdentifierResolution {
+    data object None : IdentifierResolution
+
+    data object Resolving : IdentifierResolution
+
+    /** Resolved to a profile; [npub] is ready to hand to the profile sheet. */
+    data class Resolved(val npub: String) : IdentifierResolution
+
+    /** Resolution failed; [messageRes] is the inline error to show. */
+    data class Failed(
+        @StringRes val messageRes: Int,
+        val arg: String? = null,
+    ) : IdentifierResolution
+}
+
+/**
+ * Inline chat-list search result for a pasted Nostr identifier (#344). Renders
+ * the resolve lifecycle: a spinner while a NIP-05 lookup is in flight; once
+ * resolved, either the existing 1:1 chat row (when the active account already
+ * has a DM with the resolved key — tapping opens that conversation directly,
+ * issue #344 step 2) or an "open profile" row (no existing chat — tapping
+ * routes into the shared profile sheet, which surfaces the Start-chat
+ * affordance, step 3); or an inline error on failure. Plain-text queries never
+ * reach here — they keep filtering the list as before.
+ */
+@Composable
+private fun ChatListIdentifierResult(
+    resolution: IdentifierResolution,
+    appState: DarkMatterAppState,
+    existingDirectChat: (String) -> ChatListItem?,
+    onOpenChat: (ChatListItem) -> Unit,
+    onOpenProfile: (String) -> Unit,
+) {
+    when (resolution) {
+        IdentifierResolution.None -> Unit
+        IdentifierResolution.Resolving ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Text(
+                    stringResource(R.string.chat_list_search_resolving),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        is IdentifierResolution.Resolved -> {
+            // Surface the existing 1:1 chat as the top result so a single tap
+            // opens the conversation (issue #344 step 2). existingDirectChat
+            // reads snapshot-backed projected items, so this recomposes if the
+            // chat list lands the DM after the npub already resolved. Only when
+            // there is no existing DM do we fall back to the profile preview /
+            // Start-chat path (step 3).
+            val existing = existingDirectChat(resolution.npub)
+            if (existing != null) {
+                ChatRow(
+                    item = existing,
+                    appState = appState,
+                    onClick = { onOpenChat(existing) },
+                )
+            } else {
+                ListItem(
+                    modifier =
+                        Modifier.clickable(role = Role.Button) { onOpenProfile(resolution.npub) },
+                    leadingContent = {
+                        Avatar(
+                            title = IdentityFormatter.short(resolution.npub),
+                            seed = resolution.npub,
+                            size = 40.dp,
+                            pictureUrl = null,
+                        )
+                    },
+                    headlineContent = {
+                        Text(
+                            stringResource(R.string.chat_list_search_open_profile),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            IdentityFormatter.short(resolution.npub, prefix = 12, suffix = 8),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
+                    },
+                )
+            }
+        }
+        is IdentifierResolution.Failed ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(
+                    Icons.Default.ErrorOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    resolution.arg
+                        ?.let { stringResource(resolution.messageRes, it) }
+                        ?: stringResource(resolution.messageRes),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+    }
+}
 
 private fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,

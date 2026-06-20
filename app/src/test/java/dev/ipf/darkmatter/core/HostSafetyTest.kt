@@ -3,6 +3,7 @@ package dev.ipf.darkmatter.core
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.InetAddress
 
 class HostSafetyTest {
     @Test
@@ -125,5 +126,84 @@ class HostSafetyTest {
         assertTrue(HostSafety.isPrivateOrLoopbackHost(""))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("   "))
         assertTrue(HostSafety.isPrivateOrLoopbackHost(null))
+    }
+
+    // --- Resolve-time address checks (DNS-rebinding guard, #344) ---
+    // InetAddress.getByAddress builds an address from raw bytes with NO DNS
+    // lookup, so these stay fully offline.
+
+    private fun ipv4(a: Int, b: Int, c: Int, d: Int): InetAddress =
+        InetAddress.getByAddress(byteArrayOf(a.toByte(), b.toByte(), c.toByte(), d.toByte()))
+
+    private fun ipv6(vararg bytes: Int): InetAddress =
+        InetAddress.getByAddress(ByteArray(16) { bytes[it].toByte() })
+
+    @Test
+    fun resolvedLoopbackAndRfc1918AddressesAreFlagged() {
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(127, 0, 0, 1)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(10, 0, 0, 1)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(172, 16, 0, 1)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(192, 168, 1, 1)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(169, 254, 1, 1)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(0, 0, 0, 0)))
+    }
+
+    @Test
+    fun resolvedCgnatAddressIsFlagged() {
+        // 100.64/10 carrier-grade NAT — not caught by the JDK helpers, so this
+        // exercises the byte classifier fall-through.
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(100, 64, 0, 1)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(100, 127, 255, 255)))
+    }
+
+    @Test
+    fun resolvedPublicAddressesAreAllowed() {
+        assertFalse(HostSafety.isPrivateOrLoopbackAddress(ipv4(8, 8, 8, 8)))
+        assertFalse(HostSafety.isPrivateOrLoopbackAddress(ipv4(1, 1, 1, 1)))
+        // Just outside CGNAT and RFC-1918 blocks.
+        assertFalse(HostSafety.isPrivateOrLoopbackAddress(ipv4(100, 128, 0, 1)))
+        assertFalse(HostSafety.isPrivateOrLoopbackAddress(ipv4(172, 32, 0, 1)))
+    }
+
+    @Test
+    fun resolvedIpv6LoopbackAndUniqueLocalAreFlagged() {
+        // ::1 loopback.
+        assertTrue(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+            ),
+        )
+        // fc00::/7 unique-local (fd00:: variant) — byte classifier fall-through.
+        assertTrue(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0xFD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+            ),
+        )
+        // fe80::/10 link-local.
+        assertTrue(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0xFE, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+            ),
+        )
+    }
+
+    @Test
+    fun resolvedIpv4MappedPrivateAddressIsFlagged() {
+        // ::ffff:192.168.0.1 — the embedded private IPv4 must be followed.
+        assertTrue(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, 192, 168, 0, 1),
+            ),
+        )
+    }
+
+    @Test
+    fun resolvedPublicIpv6IsAllowed() {
+        // 2001:4860:4860::8888 (Google public DNS).
+        assertFalse(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0x20, 0x01, 0x48, 0x60, 0x48, 0x60, 0, 0, 0, 0, 0, 0, 0, 0, 0x88, 0x88),
+            ),
+        )
     }
 }
