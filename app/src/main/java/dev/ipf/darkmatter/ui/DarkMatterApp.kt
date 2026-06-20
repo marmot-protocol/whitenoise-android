@@ -2521,6 +2521,7 @@ private fun NewChatSheet(
     val scope = rememberCoroutineScope()
     val validRecipientReferenceError = stringResource(R.string.error_valid_recipient_reference)
     val missingKeyPackageError = stringResource(R.string.error_missing_key_package)
+    val missingKeyPackageForFormat = stringResource(R.string.error_missing_key_package_for)
     val invalidIdentityReferenceError = stringResource(R.string.error_invalid_identity_reference)
     val groupPublishFailedFormat = stringResource(R.string.error_group_publish_failed)
     val notDarkMatterProfileQrError = stringResource(R.string.error_not_dark_matter_profile_qr)
@@ -2547,7 +2548,18 @@ private fun NewChatSheet(
     fun createGroupErrorMessage(throwable: Throwable): String =
         when (throwable) {
             is MarmotKitException.MissingKeyPackage ->
-                missingKeyPackageError
+                // Name the failing recipient so the user knows which invited
+                // member to ask, instead of a generic 'that account' (#322).
+                // chatMemberTitle returns the cached display name when one is
+                // known and falls back to a short npub otherwise — never the
+                // raw hex pubkey. Fall back to the generic copy if the engine
+                // ever reports a blank account ref (defensive: the FFI declares
+                // a non-null String, but the value can in principle be empty).
+                if (throwable.account.isNotBlank()) {
+                    String.format(missingKeyPackageForFormat, appState.chatMemberTitle(throwable.account))
+                } else {
+                    missingKeyPackageError
+                }
             is MarmotKitException.InvalidIdentity ->
                 invalidIdentityReferenceError
             is MarmotKitException.Publish ->

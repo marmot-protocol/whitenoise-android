@@ -51,6 +51,7 @@
     <string name="error_not_dark_matter_profile_qr">該 QR 程式碼不是 Dark Matter 設定檔。</string>
     <string name="error_valid_recipient_reference">輸入有效的 npub、設定檔連結或 hex 公鑰。</string>
     <string name="error_missing_key_package">該帳戶尚未發布密鑰包。請他們打開 Dark Matter，然後再試一次。</string>
+    <string name="error_missing_key_package_for">%1$s 尚未發布密鑰包。請他們打開 Dark Matter，然後再試一次。</string>
     <string name="error_invalid_identity_reference">該收件者不是有效的 Nostr 公鑰。使用 npub、設定檔連結或 hex 公鑰。</string>
     <string name="error_group_publish_failed">該群組已在本地創建，但發布失敗：%1$s</string>
     <string name="remove">移除</string>

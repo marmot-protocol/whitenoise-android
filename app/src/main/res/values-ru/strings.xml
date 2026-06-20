@@ -54,6 +54,7 @@
     <string name="error_not_dark_matter_profile_qr">Этот код QR не является профилем Dark Matter.</string>
     <string name="error_valid_recipient_reference">Введите действительный npub, ссылку на профиль или открытый ключ hex.</string>
     <string name="error_missing_key_package">Для этой учетной записи еще нет опубликованного пакета ключей. Попросите их открыть Dark Matter и повторите попытку.</string>
+    <string name="error_missing_key_package_for">Для %1$s еще нет опубликованного пакета ключей. Попросите их открыть Dark Matter и повторите попытку.</string>
     <string name="error_invalid_identity_reference">Этот получатель не является действительным открытым ключом Nostr. Используйте npub, ссылку на профиль или открытый ключ hex.</string>
     <string name="error_group_publish_failed">Группа была создана локально, но публикация не удалась: %1$s</string>
     <string name="remove">Удалить</string>

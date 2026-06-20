@@ -53,6 +53,7 @@
     <string name="error_not_dark_matter_profile_qr">That QR code is not a Dark Matter profile.</string>
     <string name="error_valid_recipient_reference">Enter a valid npub, profile link, or hex public key.</string>
     <string name="error_missing_key_package">That account does not have a published key package yet. Ask them to open Dark Matter, then try again.</string>
+    <string name="error_missing_key_package_for">%1$s does not have a published key package yet. Ask them to open Dark Matter, then try again.</string>
     <string name="error_invalid_identity_reference">That recipient is not a valid Nostr public key. Use an npub, profile link, or hex public key.</string>
     <string name="error_group_publish_failed">The group was created locally, but publishing failed: %1$s</string>
     <string name="remove">Remove</string>

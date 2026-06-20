@@ -52,6 +52,7 @@
     <string name="error_not_dark_matter_profile_qr">Quel codice QR non è un profilo Dark Matter.</string>
     <string name="error_valid_recipient_reference">Inserisci un npub valido, un collegamento al profilo o una chiave pubblica hex.</string>
     <string name="error_missing_key_package">Per quell’account non è ancora stato pubblicato un pacchetto di chiavi. Chiedi loro di aprire Dark Matter, quindi riprova.</string>
+    <string name="error_missing_key_package_for">Per %1$s non è ancora stato pubblicato un pacchetto di chiavi. Chiedi loro di aprire Dark Matter, quindi riprova.</string>
     <string name="error_invalid_identity_reference">Quel destinatario non è una chiave pubblica Nostr valida. Utilizza un npub, un collegamento al profilo o una chiave pubblica hex.</string>
     <string name="error_group_publish_failed">Il gruppo è stato creato localmente, ma la pubblicazione non è riuscita: %1$s</string>
     <string name="remove">Rimuovi</string>
