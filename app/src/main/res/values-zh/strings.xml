@@ -171,7 +171,7 @@
     <string name="local_notifications">通知</string>
     <string name="local_notifications_subtitle">在 Dark Matter 运行时显示消息并邀请警报。</string>
     <string name="keep_connected">保持连接</string>
-    <string name="keep_connected_subtitle">保持可见的后台服务运行以接收消息警报。</string>
+    <string name="keep_connected_subtitle">在 Dark Matter 后台运行时接收消息。</string>
     <string name="native_push">推送通知</string>
     <string name="native_push_subtitle">中继有新事件需要送达时唤醒应用。</string>
     <string name="native_push_unavailable_subtitle">需要 Google Play 服务，以及配置了推送服务器的构建版本。</string>

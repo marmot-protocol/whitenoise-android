@@ -172,7 +172,7 @@
     <string name="local_notifications">Notificaciones</string>
     <string name="local_notifications_subtitle">Mostrar mensajes e invitar alertas mientras se ejecuta Dark Matter.</string>
     <string name="keep_connected">Mantener conectado</string>
-    <string name="keep_connected_subtitle">Mantenga un servicio en segundo plano visible en ejecución para alertas de mensajes.</string>
+    <string name="keep_connected_subtitle">Recibe mensajes mientras Dark Matter se ejecuta en segundo plano.</string>
     <string name="native_push">Notificaciones push</string>
     <string name="native_push_subtitle">Despierta la aplicación cuando el relay tiene nuevos eventos para entregar.</string>
     <string name="native_push_unavailable_subtitle">Requiere los servicios de Google Play y una compilación configurada con un servidor push.</string>
