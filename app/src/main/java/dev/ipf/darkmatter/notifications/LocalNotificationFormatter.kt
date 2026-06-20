@@ -40,10 +40,12 @@ object LocalNotificationFormatter {
 
     private val whitespaceRun = Regex("\\s+")
 
-    // Invites stamp the group they're for into this extra so the open/read
-    // dismissal path can find and cancel them by group id — their card is
-    // tagged by the opaque notificationKey, which isn't reconstructable from
-    // (accountRef, groupIdHex) alone.
+    // Invites stamp the account + group they're for into these extras so the
+    // dismissal path can find and cancel them — their card is tagged by the
+    // opaque notificationKey, which isn't reconstructable from (accountRef,
+    // groupIdHex). Both are matched: the same group can exist in more than one
+    // local account, so the group id alone would clear another account's invite.
+    const val EXTRA_DISMISS_ACCOUNT_REF = "dev.ipf.darkmatter.notify.dismiss_account_ref"
     const val EXTRA_DISMISS_GROUP_ID = "dev.ipf.darkmatter.notify.dismiss_group_id"
 
     fun conversationDismissalKey(

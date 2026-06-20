@@ -37,8 +37,8 @@ class LocalNotificationPresenter(
     // Opening / reading a conversation clears every card for it: the
     // accumulating message card, the separate reaction card, and any pending
     // group-invite card. Invites are tagged by their opaque notificationKey, not
-    // the per-conversation tag, so they're found by the group id stamped into
-    // their extras at post time rather than by key.
+    // the per-conversation tag, so they're found by the account + group stamped
+    // into their extras at post time rather than by key.
     fun dismissConversationMessages(
         accountRef: String,
         groupIdHex: String,
@@ -49,19 +49,28 @@ class LocalNotificationPresenter(
         val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
         manager.cancel(message.tag, message.id)
         manager.cancel(reaction.tag, reaction.id)
-        dismissInvitesForGroup(groupIdHex)
+        dismissInvitesForGroup(accountRef, groupIdHex)
         notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
         return true
     }
 
-    // Invite cards carry no per-conversation tag, so match them by the group id
-    // stamped into their extras and cancel each by its own (tag, id).
-    private fun dismissInvitesForGroup(groupIdHex: String) {
+    // Invite cards carry no per-conversation tag, so match them by the account +
+    // group stamped into their extras and cancel each by its own (tag, id). Both
+    // must match: the same group can exist in more than one local account, so the
+    // group id alone would clear another account's invite for that group.
+    fun dismissInvitesForGroup(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        if (accountRef.isBlank() || groupIdHex.isBlank()) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         runCatching { manager.activeNotifications }
             .getOrNull()
-            ?.filter { it.notification.extras?.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID) == groupIdHex }
-            ?.forEach { NotificationManagerCompat.from(context).cancel(it.tag, it.id) }
+            ?.filter {
+                val extras = it.notification.extras ?: return@filter false
+                extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID) == groupIdHex &&
+                    extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF) == accountRef
+            }?.forEach { NotificationManagerCompat.from(context).cancel(it.tag, it.id) }
     }
 
     @SuppressLint("MissingPermission")
@@ -137,11 +146,13 @@ class LocalNotificationPresenter(
                     .setContentTitle(content.title)
                     .setContentText(content.body)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
-                // Stamp the invited-to group so opening that conversation can
-                // find and dismiss this card (its tag is the opaque key).
+                // Stamp the invited-to account + group so accepting/declining or
+                // opening that conversation can find and dismiss this card (its
+                // tag is the opaque key).
                 if (update.trigger == NotificationTriggerFfi.GROUP_INVITE && update.groupIdHex.isNotBlank()) {
                     builder.addExtras(
                         Bundle().apply {
+                            putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, update.accountRef)
                             putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, update.groupIdHex)
                         },
                     )
