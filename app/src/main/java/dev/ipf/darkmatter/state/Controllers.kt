@@ -49,12 +49,12 @@ import dev.ipf.marmotkit.TimelineMessagesSubscription
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineSubscriptionUpdateFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
@@ -63,7 +63,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -823,58 +822,44 @@ class ChatsController(
                     recompute()
                     retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
 
-                    supervisorScope {
-                        val eitherEnded = CompletableDeferred<Unit>()
-                        val chatListJob =
-                            launch {
-                                try {
-                                    while (isActive) {
-                                        val update =
-                                            withContext(Dispatchers.IO) {
-                                                chatListStream.nextUpdate()
-                                            } ?: break
-                                        when (update) {
-                                            is ChatListSubscriptionUpdateFfi.Row -> {
-                                                val row = update.row
-                                                requestChatRowProfiles(row)
-                                                chatsDebug {
-                                                    "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
-                                                }
-                                                foldChatRow(row)
+                    coroutineScope {
+                        runUntilFirstLiveSubscriptionEnds(
+                            first = {
+                                while (isActive) {
+                                    val update =
+                                        withContext(Dispatchers.IO) {
+                                            chatListStream.nextUpdate()
+                                        } ?: break
+                                    when (update) {
+                                        is ChatListSubscriptionUpdateFfi.Row -> {
+                                            val row = update.row
+                                            requestChatRowProfiles(row)
+                                            chatsDebug {
+                                                "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
                                             }
-                                            is ChatListSubscriptionUpdateFfi.RemoveRow -> {
-                                                chatsDebug {
-                                                    "chat list remove account=${accountRef.take(8)} trigger=${update.trigger} id=${update.groupIdHex.take(8)}"
-                                                }
-                                                removeChatRow(update.groupIdHex)
+                                            foldChatRow(row)
+                                        }
+                                        is ChatListSubscriptionUpdateFfi.RemoveRow -> {
+                                            chatsDebug {
+                                                "chat list remove account=${accountRef.take(8)} trigger=${update.trigger} id=${update.groupIdHex.take(8)}"
                                             }
+                                            removeChatRow(update.groupIdHex)
                                         }
                                     }
-                                } finally {
-                                    eitherEnded.complete(Unit)
                                 }
-                            }
-                        val chatsJob =
-                            launch {
-                                try {
-                                    while (isActive) {
-                                        val update =
-                                            withContext(Dispatchers.IO) {
-                                                chatStream.next()
-                                            } ?: break
-                                        requestGroupProfiles(update)
-                                        chatsDebug { "chat update account=${accountRef.take(8)} ${update.debugSummary()}" }
-                                        foldGroup(update)
-                                    }
-                                } finally {
-                                    eitherEnded.complete(Unit)
+                            },
+                            second = {
+                                while (isActive) {
+                                    val update =
+                                        withContext(Dispatchers.IO) {
+                                            chatStream.next()
+                                        } ?: break
+                                    requestGroupProfiles(update)
+                                    chatsDebug { "chat update account=${accountRef.take(8)} ${update.debugSummary()}" }
+                                    foldGroup(update)
                                 }
-                            }
-                        eitherEnded.await()
-                        chatListJob.cancel()
-                        chatsJob.cancel()
-                        chatListJob.join()
-                        chatsJob.join()
+                            },
+                        )
                     }
                 } catch (cancel: CancellationException) {
                     throw cancel
@@ -1715,11 +1700,25 @@ class ConversationController(
                             subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
                         }
                     timelineSubscription = timelineStream
-                    val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
+                    val timelineReconnect = timelineRecords.isNotEmpty()
                     val snapshotStreamIds =
-                        snapshot?.let { applyTimelinePage(it, replaceWindow = true, updatePagination = true) }.orEmpty()
-                    refreshMediaReferences()
-                    initializeReadState(account)
+                        if (timelineReconnect) {
+                            emptyList()
+                        } else {
+                            val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
+                            snapshot
+                                ?.let {
+                                    val streamIds =
+                                        applyTimelinePage(
+                                            it,
+                                            replaceWindow = true,
+                                            updatePagination = true,
+                                        )
+                                    refreshMediaReferences()
+                                    initializeReadState(account)
+                                    streamIds
+                                }.orEmpty()
+                        }
                     // Don't blanket-mark the absolute newest as read here — the UI
                     // layer now drives mark-read as the user scrolls so partial-read
                     // sessions retain accurate unread counts on the chat list.
@@ -1743,37 +1742,21 @@ class ConversationController(
                                 launch { watchAgentTextStream(account, streamId) }
                             }
                         }
-                        supervisorScope {
-                            val eitherEnded = CompletableDeferred<Unit>()
-                            val timelineJob =
-                                launch {
-                                    try {
-                                        runTimelineSubscriptionPipeline(account, timelineStream)
-                                    } finally {
-                                        eitherEnded.complete(Unit)
-                                    }
+                        runUntilFirstLiveSubscriptionEnds(
+                            first = {
+                                runTimelineSubscriptionPipeline(account, timelineStream)
+                            },
+                            second = {
+                                while (isActive) {
+                                    val update =
+                                        withContext(Dispatchers.IO) {
+                                            groupStream.next()
+                                        } ?: break
+                                    group = update
+                                    refreshMembers()
                                 }
-                            val groupJob =
-                                launch {
-                                    try {
-                                        while (isActive) {
-                                            val update =
-                                                withContext(Dispatchers.IO) {
-                                                    groupStream.next()
-                                                } ?: break
-                                            group = update
-                                            refreshMembers()
-                                        }
-                                    } finally {
-                                        eitherEnded.complete(Unit)
-                                    }
-                                }
-                            eitherEnded.await()
-                            timelineJob.cancel()
-                            groupJob.cancel()
-                            timelineJob.join()
-                            groupJob.join()
-                        }
+                            },
+                        )
                     }
                 } catch (cancel: CancellationException) {
                     throw cancel
@@ -1831,8 +1814,8 @@ class ConversationController(
         timelineStream: TimelineMessagesSubscription,
     ) {
         val timelineUpdates = Channel<TimelineSubscriptionUpdateFfi>(capacity = Channel.BUFFERED)
-        val pumpJob =
-            launch {
+        val pump =
+            async {
                 try {
                     while (isActive) {
                         val update =
@@ -1845,89 +1828,90 @@ class ConversationController(
                     timelineUpdates.close()
                 }
             }
-        val consumerJob =
-            launch {
-                while (isActive) {
-                    val first = timelineUpdates.receiveCatching().getOrNull() ?: break
-                    // Drain any updates that arrived within roughly one
-                    // 120Hz frame budget into a single batch. The runtime
-                    // can emit several updates back-to-back during a
-                    // sync burst (e.g. on conversation open, a Page
-                    // followed by a flurry of Projections); applying
-                    // them one at a time triggers N expensive recompose
-                    // passes (sort + dedup + edits aggregate). Batching
-                    // collapses them into one publish at the end. The
-                    // timeout only wraps the local channel receive; the
-                    // UniFFI nextUpdate() call above is always awaited to
-                    // completion so a timed-out drain can't consume and
-                    // drop a Rust subscription update.
-                    val batch = mutableListOf(first)
-                    while (batch.size < TIMELINE_BATCH_CAP) {
-                        val more =
-                            timelineUpdates.tryReceive().getOrNull()
-                                ?: withTimeoutOrNull(TIMELINE_BATCH_DRAIN_MS) {
-                                    timelineUpdates.receiveCatching().getOrNull()
-                                } ?: break
-                        batch += more
-                    }
-                    val streamIdsLaunched = mutableListOf<String>()
-                    coalesceTimelinePublishes {
-                        for (update in batch) {
-                            val streamIds =
-                                when (update) {
-                                    is TimelineSubscriptionUpdateFfi.Page -> {
-                                        val replaceWindow = !hasLoadedOlderPages
-                                        applyTimelinePage(
-                                            update.page,
-                                            replaceWindow = replaceWindow,
-                                            updatePagination = replaceWindow,
+        try {
+            while (isActive) {
+                val first = timelineUpdates.receiveCatching().getOrNull() ?: break
+                // Drain any updates that arrived within roughly one
+                // 120Hz frame budget into a single batch. The runtime
+                // can emit several updates back-to-back during a
+                // sync burst (e.g. on conversation open, a Page
+                // followed by a flurry of Projections); applying
+                // them one at a time triggers N expensive recompose
+                // passes (sort + dedup + edits aggregate). Batching
+                // collapses them into one publish at the end. The
+                // timeout only wraps the local channel receive; the
+                // UniFFI nextUpdate() call above is always awaited to
+                // completion so a timed-out drain can't consume and
+                // drop a Rust subscription update.
+                val batch = mutableListOf(first)
+                while (batch.size < TIMELINE_BATCH_CAP) {
+                    val more =
+                        timelineUpdates.tryReceive().getOrNull()
+                            ?: withTimeoutOrNull(TIMELINE_BATCH_DRAIN_MS) {
+                                timelineUpdates.receiveCatching().getOrNull()
+                            } ?: break
+                    batch += more
+                }
+                val streamIdsLaunched = mutableListOf<String>()
+                coalesceTimelinePublishes {
+                    for (update in batch) {
+                        val streamIds =
+                            when (update) {
+                                is TimelineSubscriptionUpdateFfi.Page -> {
+                                    val replaceWindow = !hasLoadedOlderPages
+                                    applyTimelinePage(
+                                        update.page,
+                                        replaceWindow = replaceWindow,
+                                        updatePagination = replaceWindow,
+                                    )
+                                }
+                                is TimelineSubscriptionUpdateFfi.Projection -> {
+                                    val projection = update.update.update
+                                    if (projection.groupIdHex == group.groupIdHex) {
+                                        applyChatListProjection(
+                                            projection.chatListTrigger,
+                                            projection.chatListRow,
                                         )
-                                    }
-                                    is TimelineSubscriptionUpdateFfi.Projection -> {
-                                        val projection = update.update.update
-                                        if (projection.groupIdHex == group.groupIdHex) {
-                                            applyChatListProjection(
-                                                projection.chatListTrigger,
-                                                projection.chatListRow,
-                                            )
-                                            applyTimelineChanges(projection.changes)
-                                        } else {
-                                            emptyList()
-                                        }
+                                        applyTimelineChanges(projection.changes)
+                                    } else {
+                                        emptyList()
                                     }
                                 }
-                            streamIdsLaunched += streamIds
+                            }
+                        streamIdsLaunched += streamIds
+                    }
+                }
+                // Refresh media references at most once per batch.
+                // `listMedia` is an unbounded scan — gate on whether
+                // any update in the batch actually touched media so
+                // text-only / reaction-only bursts don't pay for it.
+                val touchedMedia =
+                    batch.any { update ->
+                        when (update) {
+                            is TimelineSubscriptionUpdateFfi.Page -> pageContainsMedia(update.page)
+                            is TimelineSubscriptionUpdateFfi.Projection ->
+                                if (update.update.update.groupIdHex == group.groupIdHex) {
+                                    changesContainMedia(update.update.update.changes)
+                                } else {
+                                    false
+                                }
                         }
                     }
-                    // Refresh media references at most once per batch.
-                    // `listMedia` is an unbounded scan — gate on whether
-                    // any update in the batch actually touched media so
-                    // text-only / reaction-only bursts don't pay for it.
-                    val touchedMedia =
-                        batch.any { update ->
-                            when (update) {
-                                is TimelineSubscriptionUpdateFfi.Page -> pageContainsMedia(update.page)
-                                is TimelineSubscriptionUpdateFfi.Projection ->
-                                    if (update.update.update.groupIdHex == group.groupIdHex) {
-                                        changesContainMedia(update.update.update.changes)
-                                    } else {
-                                        false
-                                    }
-                            }
-                        }
-                    if (touchedMedia) refreshMediaReferences()
-                    // Scroll-driven mark-read in the UI layer handles
-                    // the user-visible read pointer.
-                    streamIdsLaunched.forEach { streamId ->
-                        if (activeStreamIds.add(streamId)) {
-                            launch { watchAgentTextStream(account, streamId) }
-                        }
+                if (touchedMedia) refreshMediaReferences()
+                // Scroll-driven mark-read in the UI layer handles
+                // the user-visible read pointer.
+                streamIdsLaunched.forEach { streamId ->
+                    if (activeStreamIds.add(streamId)) {
+                        launch { watchAgentTextStream(account, streamId) }
                     }
                 }
             }
-        pumpJob.join()
-        consumerJob.cancel()
-        consumerJob.join()
+        } finally {
+            if (pump.isActive) {
+                pump.cancel()
+            }
+        }
+        pump.await()
     }
 
     /**
