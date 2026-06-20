@@ -1080,6 +1080,11 @@ private fun MainShell(
         ProfileSheet(
             appState = appState,
             npub = npub,
+            onOpenGroup = { item ->
+                selectedChatFocusMessageId = null
+                selectedChat = item
+                appState.clearPresentedProfile()
+            },
             onDismiss = { appState.clearPresentedProfile() },
         )
     }
@@ -2354,6 +2359,9 @@ private fun ChatRow(
     val avatarAccount =
         inviteAccount
             ?: item.otherMemberAccount.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
+    val openableDmAvatarAccount =
+        avatarAccount
+            ?.takeIf { GroupProjector.isDm(memberCount = item.memberCount, name = item.group.name) }
     val rowModifier =
         if (onLongClick != null) {
             Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
@@ -2363,13 +2371,26 @@ private fun ChatRow(
     ListItem(
         modifier = rowModifier,
         leadingContent = {
-            Avatar(
-                title = title,
-                seed = avatarAccount ?: item.group.groupIdHex,
-                size = 44.dp,
-                // A group's own avatar URL wins over the member-derived avatar.
-                pictureUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
-            )
+            Box(
+                modifier =
+                    if (openableDmAvatarAccount != null) {
+                        Modifier
+                            .clip(CircleShape)
+                            .clickable(role = Role.Button) {
+                                appState.presentProfile(appState.npub(openableDmAvatarAccount))
+                            }
+                    } else {
+                        Modifier
+                    },
+            ) {
+                Avatar(
+                    title = title,
+                    seed = avatarAccount ?: item.group.groupIdHex,
+                    size = 44.dp,
+                    // A group's own avatar URL wins over the member-derived avatar.
+                    pictureUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
+                )
+            }
         },
         headlineContent = {
             Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -8815,7 +8836,11 @@ private fun GroupMemberRow(
     val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(role = Role.Button) { appState.presentProfile(appState.npub(member.memberIdHex)) }
+                .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Avatar(
@@ -12388,11 +12413,14 @@ private fun ProfileQrSheet(
 private fun ProfileSheet(
     appState: DarkMatterAppState,
     npub: String,
+    onOpenGroup: (ChatListItem) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
     var hex by remember(npub) { mutableStateOf<String?>(null) }
+    var fullPictureOpen by remember(npub) { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val groupTitleCopy = rememberGroupTitleCopy()
 
     LaunchedEffect(npub) {
         val resolved = appState.accountIdHex(npub)
@@ -12400,7 +12428,16 @@ private fun ProfileSheet(
         if (resolved != null) appState.refreshProfile(resolved)
     }
 
+    val profile = hex?.let { appState.userProfile(it) }
     val title = hex?.let { appState.displayName(it) } ?: IdentityFormatter.short(npub)
+    val pictureUrl = hex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
+    val about = ProfileSanitizer.about(profile?.about)
+    val nip05 =
+        profile
+            ?.nip05
+            ?.trim()
+            ?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
+    val sharedGroups = hex?.let { appState.sharedGroupsWith(it) }.orEmpty()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -12408,22 +12445,67 @@ private fun ProfileSheet(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Avatar(
-                title = title,
-                seed = hex ?: npub,
-                size = 96.dp,
-                pictureUrl = hex?.let { appState.avatarUrl(it) },
-            )
-            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            Button(
-                onClick = {
-                    clipboard.setText(AnnotatedString(npub))
-                    appState.present(R.string.toast_copied_npub)
-                },
+            Box(
+                modifier =
+                    Modifier
+                        .clip(CircleShape)
+                        .clickable(
+                            enabled = pictureUrl != null,
+                            onClickLabel = stringResource(R.string.profile_view_picture),
+                            role = Role.Button,
+                        ) { fullPictureOpen = true },
             ) {
-                Icon(Icons.Default.Check, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(IdentityFormatter.short(npub, prefix = 16, suffix = 14))
+                Avatar(
+                    title = title,
+                    seed = hex ?: npub,
+                    size = 112.dp,
+                    pictureUrl = pictureUrl,
+                )
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                if (nip05 != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(nip05, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            CopyableValueRow(
+                label = "npub",
+                display = IdentityFormatter.short(npub, prefix = 16, suffix = 14),
+                value = npub,
+                clipboard = clipboard,
+                appState = appState,
+            )
+            SectionCard(title = stringResource(R.string.about)) {
+                Text(
+                    about ?: stringResource(R.string.profile_no_bio),
+                    color = if (about == null) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            SectionCard(title = stringResource(R.string.profile_shared_groups)) {
+                if (sharedGroups.isEmpty()) {
+                    Text(stringResource(R.string.profile_no_shared_groups), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    sharedGroups.forEachIndexed { index, group ->
+                        ProfileSharedGroupRow(
+                            item = group,
+                            appState = appState,
+                            titleCopy = groupTitleCopy,
+                            onOpen = { onOpenGroup(group) },
+                        )
+                        if (index != sharedGroups.lastIndex) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        }
+                    }
+                }
             }
             if (hex == null) {
                 Text(stringResource(R.string.couldnt_read_profile_code), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -12441,6 +12523,106 @@ private fun ProfileSheet(
             }
         }
     }
+
+    if (fullPictureOpen && pictureUrl != null) {
+        ProfilePictureDialog(
+            title = title,
+            pictureUrl = pictureUrl,
+            onDismiss = { fullPictureOpen = false },
+        )
+    }
+}
+
+@Composable
+private fun ProfileSharedGroupRow(
+    item: ChatListItem,
+    appState: DarkMatterAppState,
+    titleCopy: GroupTitleCopy,
+    onOpen: () -> Unit,
+) {
+    val title = chatListItemDisplayTitle(item, appState, titleCopy)
+    val subtitle =
+        when {
+            item.group.archived -> stringResource(R.string.archived)
+            item.memberCount == 1 -> stringResource(R.string.one_member)
+            item.memberCount > 1 -> stringResource(R.string.members_count, item.memberCount)
+            else -> stringResource(R.string.members)
+        }
+    ListItem(
+        modifier = Modifier.clickable(role = Role.Button, onClick = onOpen),
+        leadingContent = {
+            Avatar(
+                title = title,
+                seed = item.group.groupIdHex,
+                size = 40.dp,
+                pictureUrl = item.group.avatarUrl,
+            )
+        },
+        headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
+}
+
+@Composable
+private fun ProfilePictureDialog(
+    title: String,
+    pictureUrl: String,
+    onDismiss: () -> Unit,
+) {
+    val imageState by produceState<ProfilePictureImageState>(
+        initialValue =
+            AvatarImageLoader.peek(pictureUrl)?.let(ProfilePictureImageState::Ready)
+                ?: ProfilePictureImageState.Loading,
+        key1 = pictureUrl,
+    ) {
+        if (value is ProfilePictureImageState.Ready) return@produceState
+        value =
+            AvatarImageLoader.load(pictureUrl)?.let(ProfilePictureImageState::Ready)
+                ?: ProfilePictureImageState.Failed
+    }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.92f))
+                .clickable(onClick = onDismiss)
+                .padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            when (val state = imageState) {
+                ProfilePictureImageState.Loading -> CircularProgressIndicator(color = Color.White)
+                ProfilePictureImageState.Failed ->
+                    Icon(Icons.Default.BrokenImage, contentDescription = null, tint = Color.White, modifier = Modifier.size(64.dp))
+                is ProfilePictureImageState.Ready ->
+                    Image(
+                        bitmap = state.image,
+                        contentDescription = title,
+                        modifier = Modifier.fillMaxWidth().fillMaxHeight(0.82f),
+                        contentScale = ContentScale.Fit,
+                    )
+            }
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
+            ) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss), tint = Color.White)
+            }
+        }
+    }
+}
+
+private sealed interface ProfilePictureImageState {
+    data object Loading : ProfilePictureImageState
+
+    data object Failed : ProfilePictureImageState
+
+    data class Ready(
+        val image: ImageBitmap,
+    ) : ProfilePictureImageState
 }
 
 @Composable

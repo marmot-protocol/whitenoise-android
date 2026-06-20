@@ -76,6 +76,10 @@
     <string name="decline">Rifiuta</string>
     <string name="accept">Accetta</string>
     <string name="profile">Profilo</string>
+    <string name="profile_no_bio">Ancora nessuna bio.</string>
+    <string name="profile_shared_groups">Gruppi condivisi</string>
+    <string name="profile_no_shared_groups">Ancora nessun gruppo condiviso.</string>
+    <string name="profile_view_picture">Visualizza immagine del profilo</string>
     <string name="dismiss">Chiudi</string>
     <string name="edit">Modifica</string>
     <string name="save_group">Salva gruppo</string>
