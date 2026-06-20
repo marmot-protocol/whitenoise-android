@@ -84,6 +84,7 @@
     <string name="you_are_no_longer_a_member">You are no longer a member of this group.</string>
     <string name="chat_row_draft_prefix">Draft: </string>
     <string name="jump_to_newest">Jump to newest</string>
+    <string name="scroll_to_top">Scroll to top</string>
     <string name="discard_failed_message">Discard failed message</string>
     <string name="invited_to_this_chat">You were invited to this chat.</string>
     <string name="decline">Decline</string>

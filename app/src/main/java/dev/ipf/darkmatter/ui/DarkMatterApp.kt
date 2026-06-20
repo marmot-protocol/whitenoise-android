@@ -30,6 +30,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -99,6 +103,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.BrokenImage
@@ -167,6 +172,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDuration
@@ -1372,6 +1378,25 @@ private fun ChatsScreen(
                 bodyMatchGroupIds = bodyMatches.keys,
             )
         }
+    // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
+    // scroll position for its visibility predicate and drive the animated
+    // scroll-to-top on tap. Wrapped in key(showArchived) so switching the
+    // active vs. archived view starts a fresh state at the top rather than
+    // carrying a stale scroll anchor across the source-list swap.
+    val chatListState = key(showArchived) { rememberLazyListState() }
+    // Hysteresis for the jump-to-top button: show once the user is ≥ 5 rows
+    // deep, hide only after they climb back to ≤ 2. The 3–4 dead band keeps a
+    // quick scroll wiggle near the threshold from toggling the button (issue
+    // #413). derivedStateOf reads the previous decision so the band is sticky.
+    var jumpToTopVisible by remember(showArchived) { mutableStateOf(false) }
+    val firstVisibleIndex by remember { derivedStateOf { chatListState.firstVisibleItemIndex } }
+    LaunchedEffect(firstVisibleIndex) {
+        if (firstVisibleIndex >= CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX) {
+            jumpToTopVisible = true
+        } else if (firstVisibleIndex <= CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX) {
+            jumpToTopVisible = false
+        }
+    }
     val archivedUnreadCount =
         remember(controller.archivedItems) {
             controller.archivedItems.count { it.hasUnread }
@@ -1476,7 +1501,7 @@ private fun ChatsScreen(
                             filter = filter,
                         )
                     else ->
-                        LazyColumn(Modifier.fillMaxSize()) {
+                        LazyColumn(Modifier.fillMaxSize(), state = chatListState) {
                             items(visibleItems, key = { it.id }) { item ->
                                 // Body-match snippet + tap-to-message focus are
                                 // for rows that matched ONLY on an older message
@@ -1561,6 +1586,49 @@ private fun ChatsScreen(
                                 )
                             }
                         }
+                }
+                // Jump-to-top FAB (issue #413). Overlaid on the chat-list Box
+                // (a sibling of the list `when`) and aligned bottom-end so it
+                // floats above the rows. Fades + slides in from the bottom-right
+                // when the user is scrolled deep, hides near the top — the
+                // `jumpToTopVisible` hysteresis above debounces threshold
+                // jitter. Lifted by FAB_SNACKBAR_INSET (the same clearance the
+                // snackbar hosts use, #352/#356) on top of the navigation-bar
+                // inset so it clears the quick-action FAB and the nav bar.
+                // Fully-qualified so Kotlin binds the top-level overload rather
+                // than the ColumnScope extension (the outer Column is also an
+                // implicit receiver here) — the bottom-end alignment is carried
+                // by the Modifier in the BoxScope, not a scoped AnimatedVisibility.
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = jumpToTopVisible,
+                    enter = fadeIn() + slideInHorizontally { it / 2 },
+                    exit = fadeOut() + slideOutHorizontally { it / 2 },
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .navigationBarsPadding()
+                            .padding(end = 16.dp, bottom = FAB_SNACKBAR_INSET),
+                ) {
+                    SmallFloatingActionButton(
+                        onClick = {
+                            scope.launch {
+                                // For a very deep scroll, animating every row to
+                                // the top is a multi-second crawl. Snap to a
+                                // near-top index first, then animate the final
+                                // viewport so the motion stays short and smooth
+                                // regardless of how far down the user was.
+                                if (chatListState.firstVisibleItemIndex > CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX) {
+                                    chatListState.scrollToItem(CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX)
+                                }
+                                chatListState.animateScrollToItem(0)
+                            }
+                        },
+                    ) {
+                        Icon(
+                            Icons.Default.ArrowUpward,
+                            contentDescription = stringResource(R.string.scroll_to_top),
+                        )
+                    }
                 }
             }
         }
@@ -2835,6 +2903,16 @@ private val COMPOSER_SNACKBAR_INSET = 72.dp
 // the bottom inset; 80.dp clears that stack with a small gap so the lifted
 // snackbar reads as sitting *above* the FAB, per Material guidance.
 private val FAB_SNACKBAR_INSET = 80.dp
+
+// Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
+// first visible row index reaches SHOW, and only hides again once it falls back
+// to HIDE — the 3–4 dead band gives hysteresis so a quick scroll wiggle near
+// the threshold doesn't flicker the button. SNAP bounds the tap animation: from
+// deeper than SNAP rows down we hard-jump to SNAP first, then animate the final
+// stretch, so a tap from hundreds of rows deep isn't a multi-second crawl.
+private const val CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX = 5
+private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
+private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
 
