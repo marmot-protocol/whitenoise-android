@@ -261,6 +261,7 @@
     <string name="diagnostic_sent_ping_to_self">已在 %1$s 向自己发送 ping</string>
     <string name="diagnostic_send_to_self_failed">发送给自己失败：%1$s</string>
     <string name="clear">清除</string>
+    <string name="paste">粘贴</string>
     <string name="live">实时</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">还没有中继快照。</string>

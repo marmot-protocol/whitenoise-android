@@ -262,6 +262,7 @@
     <string name="diagnostic_sent_ping_to_self">Ping enviado a si mismo en %1$s</string>
     <string name="diagnostic_send_to_self_failed">Error al enviarse a si mismo: %1$s</string>
     <string name="clear">Borrar</string>
+    <string name="paste">Pegar</string>
     <string name="live">En vivo</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Aún no hay instantánea de retransmisión.</string>

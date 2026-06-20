@@ -262,6 +262,7 @@
     <string name="diagnostic_sent_ping_to_self">Ping para si mesmo enviado em %1$s</string>
     <string name="diagnostic_send_to_self_failed">Falha ao enviar para si mesmo: %1$s</string>
     <string name="clear">Limpar</string>
+    <string name="paste">Colar</string>
     <string name="live">Ao vivo</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Nenhum instantâneo de retransmissão ainda.</string>

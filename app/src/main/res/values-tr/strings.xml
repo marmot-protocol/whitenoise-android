@@ -262,6 +262,7 @@
     <string name="diagnostic_sent_ping_to_self">Kendine ping %1$s içinde gönderildi</string>
     <string name="diagnostic_send_to_self_failed">Kendine gönderme başarısız: %1$s</string>
     <string name="clear">Temizle</string>
+    <string name="paste">Yapıştır</string>
     <string name="live">Canlı</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Henüz aktarma anlık görüntüsü yok.</string>
