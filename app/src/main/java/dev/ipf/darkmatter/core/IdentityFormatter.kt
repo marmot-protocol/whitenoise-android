@@ -7,13 +7,18 @@ import java.time.format.FormatStyle
 import java.util.Locale
 
 object IdentityFormatter {
+    private const val ELLIPSIS = "..."
+
     fun short(
         value: String,
         prefix: Int = 8,
         suffix: Int = 4,
     ): String {
-        if (value.length <= prefix + suffix + 1) return value
-        return "${value.take(prefix)}...${value.takeLast(suffix)}"
+        // Skip the abbreviation when it would not actually shorten the input.
+        // The previous guard used `+ 1` even though the ellipsis is 3 chars,
+        // so 14-char inputs with the 8/4 defaults expanded to 15 chars.
+        if (value.length <= prefix + suffix + ELLIPSIS.length) return value
+        return "${value.take(prefix)}$ELLIPSIS${value.takeLast(suffix)}"
     }
 
     fun initials(name: String): String {
