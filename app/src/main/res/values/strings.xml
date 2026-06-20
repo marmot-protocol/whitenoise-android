@@ -287,6 +287,30 @@
     <string name="account_session">Account Session</string>
     <string name="sign_out_session_help">Signing out only forgets which account is active. Identities stay in the device keychain.</string>
     <string name="sign_out_of_this_account">Sign out of this account</string>
+    <!-- Sign-out actions (#348). Two distinct affordances. -->
+    <string name="sign_out">Sign Out</string>
+    <string name="sign_out_and_wipe">Sign Out &amp; Wipe</string>
+    <string name="sign_out_sheet_title">Sign Out</string>
+    <string name="sign_out_sheet_stays_heading">Stays on this device</string>
+    <string name="sign_out_sheet_stays_body">Your groups, message history, and drafts are kept. The identity stays in the device keychain, so you can sign back in from the account picker.</string>
+    <string name="sign_out_sheet_changes_heading">What changes</string>
+    <string name="sign_out_sheet_changes_body">Push notifications for this account are turned off and in-memory caches are cleared.</string>
+    <string name="sign_out_and_wipe_sheet_title">Sign Out &amp; Wipe</string>
+    <string name="sign_out_and_wipe_sheet_intro">This permanently removes this account from this device.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_heading">What gets destroyed</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_db">The local message database and MLS group state for this account.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_keychain">The identity\'s keychain entry on this device.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_relays">Outstanding key packages published for this account on relays.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Signing back in with the same key starts fresh: groups are re-fetched and media re-downloaded.</string>
+    <string name="sign_out_and_wipe_confirm_title">Wipe this account?</string>
+    <string name="sign_out_and_wipe_confirm_body">This cannot be undone from this device. The local database, MLS state, keychain entry, and relay key packages for this account will be removed.</string>
+    <!-- Type-to-confirm gate for the destructive wipe (#348). The keyword is matched
+         case-insensitively; keep it short and unambiguous when translating. -->
+    <string name="sign_out_and_wipe_confirm_keyword" translatable="false">WIPE</string>
+    <string name="sign_out_and_wipe_confirm_instruction">Type %1$s to confirm.</string>
+    <string name="sign_out_and_wipe_confirm_field_label">Confirmation</string>
+    <string name="wipe">Wipe</string>
+    <string name="toast_signed_out_and_wiped">Account wiped from this device</string>
     <string name="copy">Copy</string>
     <string name="account_relay_lists">Account Relay Lists</string>
     <string name="no_relays">No relays</string>
