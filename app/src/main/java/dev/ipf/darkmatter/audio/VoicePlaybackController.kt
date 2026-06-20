@@ -235,14 +235,19 @@ object VoicePlaybackController {
         mp.start()
         player = mp
         currentKey = key
-        durationCache.put(file.absolutePath, mp.duration)
+        // Mirror probeDuration's positivity guard (#275): some streams report
+        // a non-positive duration at start() time. Caching that value would
+        // pin the clip to "no duration" via the durationCache read short-circuit
+        // and silently re-introduce the bug #275 fixed in probeDuration.
+        val reportedDurationMs = mp.duration
+        if (reportedDurationMs > 0) durationCache.put(file.absolutePath, reportedDurationMs)
         applySpeedToActive()
         _state.value =
             PlaybackState(
                 key = key,
                 isPlaying = true,
                 positionMs = 0,
-                durationMs = mp.duration,
+                durationMs = reportedDurationMs,
                 speed = currentSpeed,
             )
         startTicker()
