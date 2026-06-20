@@ -262,6 +262,7 @@
     <string name="diagnostic_sent_ping_to_self">Ping an sich selbst in %1$s gesendet</string>
     <string name="diagnostic_send_to_self_failed">Senden an sich selbst fehlgeschlagen: %1$s</string>
     <string name="clear">Löschen</string>
+    <string name="paste">Einfügen</string>
     <string name="live">Live</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Noch kein Staffel-Schnappschuss.</string>

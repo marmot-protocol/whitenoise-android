@@ -264,6 +264,7 @@
     <string name="diagnostic_sent_ping_to_self">Пинг себе отправлен в %1$s</string>
     <string name="diagnostic_send_to_self_failed">Не удалось отправить себе: %1$s</string>
     <string name="clear">Очистить</string>
+    <string name="paste">Вставить</string>
     <string name="live">Прямой эфир</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Снимка реле пока нет.</string>

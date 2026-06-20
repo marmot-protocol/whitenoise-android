@@ -349,6 +349,7 @@
     <string name="diagnostic_sent_ping_to_self">Sent ping to self in %1$s</string>
     <string name="diagnostic_send_to_self_failed">Send-to-self failed: %1$s</string>
     <string name="clear">Clear</string>
+    <string name="paste">Paste</string>
     <string name="live">Live</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">No relay snapshot yet.</string>

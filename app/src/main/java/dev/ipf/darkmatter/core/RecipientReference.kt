@@ -17,4 +17,25 @@ object RecipientReference {
         if (hexPublicKey.matches(trimmed)) return trimmed.lowercase()
         return null
     }
+
+    fun plausibleClipboardInput(
+        raw: String?,
+        allowHexPublicKey: Boolean = true,
+    ): String? {
+        val trimmed = raw?.trim().orEmpty()
+        if (trimmed.isEmpty()) return null
+
+        normalize(trimmed)?.let { normalized ->
+            if (allowHexPublicKey || !hexPublicKey.matches(normalized)) return normalized
+        }
+
+        val tokens = tokenize(trimmed)
+        if (tokens.isEmpty()) return null
+        val normalizedTokens =
+            tokens.map { token ->
+                normalize(token) ?: return null
+            }
+        if (!allowHexPublicKey && normalizedTokens.any { hexPublicKey.matches(it) }) return null
+        return trimmed
+    }
 }

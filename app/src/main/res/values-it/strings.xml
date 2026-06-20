@@ -262,6 +262,7 @@
     <string name="diagnostic_sent_ping_to_self">Ping a se stessi inviato in %1$s</string>
     <string name="diagnostic_send_to_self_failed">Invio a se stessi non riuscito: %1$s</string>
     <string name="clear">Cancella</string>
+    <string name="paste">Incolla</string>
     <string name="live">Live</string>
     <string name="relay_health">Relay Health</string>
     <string name="no_relay_snapshot_yet">Nessuna istantanea dell’inoltro ancora.</string>

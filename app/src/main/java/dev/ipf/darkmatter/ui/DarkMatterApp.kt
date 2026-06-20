@@ -105,6 +105,7 @@ import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
@@ -954,6 +955,68 @@ private fun SignInContent(
         }
     }
 }
+
+@Composable
+private fun PublicIdentifierFieldTrailingAction(
+    value: String,
+    enabled: Boolean = true,
+    allowHexPublicKey: Boolean = true,
+    onValueChange: (String) -> Unit,
+) {
+    val clipboardText = rememberClipboardPlainText()
+    val pasteValue =
+        remember(clipboardText, allowHexPublicKey) {
+            RecipientReference.plausibleClipboardInput(clipboardText, allowHexPublicKey)
+        }
+
+    when {
+        value.isNotEmpty() -> {
+            IconButton(onClick = { onValueChange("") }, enabled = enabled) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear))
+            }
+        }
+        pasteValue != null -> {
+            IconButton(onClick = { onValueChange(pasteValue) }, enabled = enabled) {
+                Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
+            }
+        }
+    }
+}
+
+@Composable
+private fun rememberClipboardPlainText(): String? {
+    val context = LocalContext.current
+    val clipboardManager =
+        remember(context) {
+            ContextCompat.getSystemService(context, android.content.ClipboardManager::class.java)
+        }
+    var clipboardText by remember(clipboardManager, context) {
+        mutableStateOf(clipboardManager?.primaryClipPlainText(context))
+    }
+
+    DisposableEffect(clipboardManager, context) {
+        if (clipboardManager == null) {
+            onDispose { }
+        } else {
+            val listener =
+                android.content.ClipboardManager.OnPrimaryClipChangedListener {
+                    clipboardText = clipboardManager.primaryClipPlainText(context)
+                }
+            clipboardManager.addPrimaryClipChangedListener(listener)
+            clipboardText = clipboardManager.primaryClipPlainText(context)
+            onDispose { clipboardManager.removePrimaryClipChangedListener(listener) }
+        }
+    }
+
+    return clipboardText
+}
+
+private fun android.content.ClipboardManager.primaryClipPlainText(context: android.content.Context): String? =
+    primaryClip
+        ?.takeIf { it.itemCount > 0 }
+        ?.getItemAt(0)
+        ?.coerceToText(context)
+        ?.toString()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2579,10 +2642,23 @@ private fun NewChatSheet(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = pending,
-                    onValueChange = { pending = it },
+                    onValueChange = {
+                        pending = it
+                        error = null
+                    },
                     label = { Text(stringResource(R.string.npub_or_hex_public_key)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
+                    trailingIcon = {
+                        PublicIdentifierFieldTrailingAction(
+                            value = pending,
+                            enabled = !busy,
+                            onValueChange = {
+                                pending = it
+                                error = null
+                            },
+                        )
+                    },
                     keyboardOptions =
                         KeyboardOptions(
                             capitalization = KeyboardCapitalization.None,
@@ -8204,8 +8280,18 @@ private fun GroupDetailsScreen(
                             { Text(message) }
                         },
                     trailingIcon = {
-                        IconButton(onClick = { showMemberScanner = true }) {
-                            Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_member_qr_code))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            PublicIdentifierFieldTrailingAction(
+                                value = pendingMember,
+                                enabled = activeMutation == null && !controller.mutationInFlight,
+                                onValueChange = {
+                                    pendingMember = it
+                                    pendingMemberError = null
+                                },
+                            )
+                            IconButton(onClick = { showMemberScanner = true }) {
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_member_qr_code))
+                            }
                         }
                     },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
