@@ -94,6 +94,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
@@ -302,6 +303,7 @@ import dev.ipf.darkmatter.core.GroupSystemCopy
 import dev.ipf.darkmatter.core.GroupSystemEvents
 import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
+import dev.ipf.darkmatter.core.LeaveAction
 import dev.ipf.darkmatter.core.MessageBodyMatch
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageSearch
@@ -8004,13 +8006,26 @@ private fun ConfirmDialog(
     confirmLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    destructive: Boolean = false,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text(confirmLabel) }
+            TextButton(
+                onClick = onConfirm,
+                // Material 3 destructive affordance: error-colored confirm
+                // text for irreversible actions (leave group, remove member).
+                colors =
+                    if (destructive) {
+                        ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        ButtonDefaults.textButtonColors()
+                    },
+            ) { Text(confirmLabel) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
@@ -8114,6 +8129,20 @@ private fun GroupDetailsScreen(
                 activeMutation = null
             }
         }
+    }
+
+    // Route the Leave action (#416) to the right confirm dialog based on the
+    // user's role in the group. Shared by the overflow item and the bottom
+    // destructive button so both surfaces stay in lockstep. The display name
+    // is resolved here (not in the dialog) so the variants read the same title.
+    fun requestLeave(displayName: String) {
+        controller.clearLastMutationError()
+        pendingConfirm =
+            when (GroupProjector.leaveAction(controller.group, appState.activeAccount?.accountIdHex, controller.members.size)) {
+                LeaveAction.SoleMemberDeletesGroup -> DetailsConfirm.LeaveSoleMember(displayName)
+                LeaveAction.SoleAdminMustTransfer -> DetailsConfirm.LeaveSoleAdmin(displayName)
+                LeaveAction.Standard -> DetailsConfirm.Leave(displayName)
+            }
     }
 
     LaunchedEffect(
@@ -8222,10 +8251,14 @@ private fun GroupDetailsScreen(
                                     )
                                 },
                                 leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
-                                enabled = controller.canLeaveGroup && activeMutation == null && !controller.mutationInFlight,
+                                // Always tappable for members (only greyed while a
+                                // mutation is in flight). The sole-admin gate is now
+                                // surfaced as an explanatory dialog by requestLeave
+                                // rather than a silently-disabled item.
+                                enabled = activeMutation == null && !controller.mutationInFlight,
                                 onClick = {
                                     menuOpen = false
-                                    pendingConfirm = DetailsConfirm.Leave
+                                    requestLeave(controller.title(groupTitleCopy))
                                 },
                             )
                         }
@@ -8379,6 +8412,44 @@ private fun GroupDetailsScreen(
                             DiagnosticRow(stringResource(R.string.required_components), state.requiredAppComponents.joinToString(", "))
                         }
                     }
+                }
+            }
+
+            // Destructive "Leave group" affordance at the bottom of the details
+            // screen (#416). Routes through requestLeave so the sole-admin and
+            // sole-member cases get their own confirm copy. On failure the
+            // controller's lastMutationError surfaces inline here (in addition
+            // to the snackbar) so the user stays on the screen and can retry.
+            if (controller.isSelfMember) {
+                val leaving = activeMutation?.action == GroupMutationAction.Leave
+                controller.lastMutationError?.let { error ->
+                    Text(
+                        error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                TextButton(
+                    onClick = { requestLeave(controller.title(groupTitleCopy)) },
+                    enabled = activeMutation == null && !controller.mutationInFlight,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors =
+                        ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                ) {
+                    if (leaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(if (leaving) R.string.leaving_chat else R.string.leave_group))
                 }
             }
         }
@@ -8566,11 +8637,12 @@ private fun GroupDetailsScreen(
                         )
                     },
                     onDismiss = { pendingConfirm = null },
+                    destructive = true,
                 )
-            DetailsConfirm.Leave ->
+            is DetailsConfirm.Leave ->
                 ConfirmDialog(
-                    title = stringResource(R.string.confirm_leave_title),
-                    message = stringResource(R.string.confirm_leave_message),
+                    title = stringResource(R.string.confirm_leave_title_named, confirm.groupName),
+                    message = stringResource(R.string.confirm_leave_message_named),
                     confirmLabel = stringResource(R.string.leave),
                     onConfirm = {
                         pendingConfirm = null
@@ -8579,13 +8651,50 @@ private fun GroupDetailsScreen(
                         // state writes from Main.immediate.
                         runGroupMutation(
                             action = GroupMutationAction.Leave,
-                            mutation = { controller.leaveGroup() },
+                            mutation = { controller.leaveGroup(displayName = confirm.groupName) },
                             onSuccess = {
                                 onLeft()
                             },
                         )
                     },
                     onDismiss = { pendingConfirm = null },
+                    destructive = true,
+                )
+            is DetailsConfirm.LeaveSoleMember ->
+                // Sole member: leaving dissolves the group entirely. Same engine
+                // path as a normal leave (no other member to orphan), but the copy
+                // makes the destructive "this deletes the group" consequence clear.
+                ConfirmDialog(
+                    title = stringResource(R.string.confirm_leave_sole_member_title, confirm.groupName),
+                    message = stringResource(R.string.confirm_leave_sole_member_message),
+                    confirmLabel = stringResource(R.string.leave),
+                    onConfirm = {
+                        pendingConfirm = null
+                        runGroupMutation(
+                            action = GroupMutationAction.Leave,
+                            mutation = { controller.leaveGroup(displayName = confirm.groupName) },
+                            onSuccess = {
+                                onLeft()
+                            },
+                        )
+                    },
+                    onDismiss = { pendingConfirm = null },
+                    destructive = true,
+                )
+            is DetailsConfirm.LeaveSoleAdmin ->
+                // Sole admin with other members: leaving would strand the group
+                // with no admin. This is an informational gate — no Leave button.
+                // The fix is to promote another member via their row's "Make
+                // admin" action, after which the standard Leave flow applies.
+                AlertDialog(
+                    onDismissRequest = { pendingConfirm = null },
+                    title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
+                    text = { Text(stringResource(R.string.confirm_leave_sole_admin_message, confirm.groupName)) },
+                    confirmButton = {
+                        TextButton(onClick = { pendingConfirm = null }) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    },
                 )
         }
     }
@@ -9095,7 +9204,32 @@ private sealed class DetailsConfirm {
         val member: AppGroupMemberRecordFfi,
     ) : DetailsConfirm()
 
-    data object Leave : DetailsConfirm()
+    /**
+     * Standard leave: the active account is an ordinary member (or an admin
+     * with at least one other admin left behind). Confirm → leave.
+     */
+    data class Leave(
+        val groupName: String,
+    ) : DetailsConfirm()
+
+    /**
+     * Sole-admin gate: the active account is the only admin of a group that
+     * still has other members. Leaving would strand the group with no admin,
+     * so this is an informational dialog (Cancel only, no Leave button) that
+     * asks the user to promote another member to admin first.
+     */
+    data class LeaveSoleAdmin(
+        val groupName: String,
+    ) : DetailsConfirm()
+
+    /**
+     * Sole-member leave: the active account is the only member left, so
+     * leaving dissolves the group entirely. Confirm → leave (the engine
+     * `leaveGroup` path drops the now-empty group from local projections).
+     */
+    data class LeaveSoleMember(
+        val groupName: String,
+    ) : DetailsConfirm()
 }
 
 private enum class GroupMutationAction {

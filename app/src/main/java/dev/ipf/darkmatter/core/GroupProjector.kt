@@ -166,4 +166,45 @@ object GroupProjector {
         if (memberCount == 1) return false
         return isAdminRef(group, activeAccountIdHex)
     }
+
+    /**
+     * Which leave-confirmation flow the group-settings "Leave group" action
+     * should present for the active account, derived purely from the group
+     * record + headcount so it can be unit-tested without Compose. The three
+     * cases (issue #416) are mutually exclusive:
+     *
+     * - [LeaveAction.SoleMemberDeletesGroup]: the active account is the only
+     *   member, so leaving dissolves the group entirely. Takes precedence over
+     *   the admin gate — a sole member orphans no one even if they're admin.
+     * - [LeaveAction.SoleAdminMustTransfer]: the active account is the only
+     *   admin of a group that still has other members. Leaving would strand the
+     *   group with no admin, so the flow blocks the leave and asks the user to
+     *   transfer admin first. Lines up with [canLeaveGroup] returning false.
+     * - [LeaveAction.Standard]: an ordinary leave — either a non-admin, or an
+     *   admin in a group that retains at least one other admin.
+     */
+    fun leaveAction(
+        group: AppGroupRecordFfi,
+        activeAccountIdHex: String?,
+        memberCount: Int,
+    ): LeaveAction {
+        // Sole member wins over the admin gate: dissolving a one-person group
+        // strands no one, so it's always a (destructive) leave, never a
+        // transfer-admin block. Mirrors canLeaveGroup's memberCount == 1 branch.
+        if (memberCount <= 1) return LeaveAction.SoleMemberDeletesGroup
+        if (isAdminRef(group, activeAccountIdHex) && group.admins.size <= 1) {
+            return LeaveAction.SoleAdminMustTransfer
+        }
+        return LeaveAction.Standard
+    }
+}
+
+/**
+ * The leave-confirmation variant the group-settings screen should show.
+ * See [GroupProjector.leaveAction].
+ */
+enum class LeaveAction {
+    Standard,
+    SoleAdminMustTransfer,
+    SoleMemberDeletesGroup,
 }

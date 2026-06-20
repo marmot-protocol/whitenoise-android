@@ -84,6 +84,49 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun leaveActionClassifiesTheStandardMemberCase() {
+        // Non-admin in a multi-member group → ordinary leave.
+        assertEquals(
+            LeaveAction.Standard,
+            GroupProjector.leaveAction(group(admins = listOf("alice")), activeAccountIdHex = "carol", memberCount = 3),
+        )
+        // Admin in a group that still has another admin → ordinary leave; the
+        // group keeps an admin after they go.
+        assertEquals(
+            LeaveAction.Standard,
+            GroupProjector.leaveAction(group(admins = listOf("alice", "bob")), activeAccountIdHex = "alice", memberCount = 3),
+        )
+    }
+
+    @Test
+    fun leaveActionForcesAdminTransferWhenSoleAdminWithOtherMembers() {
+        assertEquals(
+            LeaveAction.SoleAdminMustTransfer,
+            GroupProjector.leaveAction(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 3),
+        )
+        // Hex casing can drift between the admin list and the active account id.
+        assertEquals(
+            LeaveAction.SoleAdminMustTransfer,
+            GroupProjector.leaveAction(group(admins = listOf("ALICE")), activeAccountIdHex = "alice", memberCount = 3),
+        )
+    }
+
+    @Test
+    fun leaveActionDegradesToDeleteWhenSoleMember() {
+        // Sole member who is also the only admin → leaving dissolves the group.
+        // The sole-member branch wins over the sole-admin gate (no one orphaned).
+        assertEquals(
+            LeaveAction.SoleMemberDeletesGroup,
+            GroupProjector.leaveAction(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 1),
+        )
+        // Sole member who isn't an admin (degenerate, but classify defensively).
+        assertEquals(
+            LeaveAction.SoleMemberDeletesGroup,
+            GroupProjector.leaveAction(group(admins = emptyList()), activeAccountIdHex = "alice", memberCount = 1),
+        )
+    }
+
+    @Test
     fun unnamedChatTitleUsesOtherMemberDisplayName() {
         val unnamed = group(name = "")
 

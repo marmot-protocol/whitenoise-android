@@ -132,6 +132,14 @@
     <string name="confirm_remove_member_message">%1$s 将失去对此聊天的访问权限，不会收到通知。</string>
     <string name="confirm_leave_title">离开聊天？</string>
     <string name="confirm_leave_message">你将被移出此群组。重新加入需要新的邀请。</string>
+    <string name="leave_group">退出群组</string>
+    <string name="confirm_leave_title_named">退出%1$s？</string>
+    <string name="confirm_leave_message_named">你将不再收到此群组的新消息。</string>
+    <string name="confirm_leave_sole_admin_title">你是唯一的管理员</string>
+    <string name="confirm_leave_sole_admin_message">在退出%1$s前，请将另一位成员设为管理员，以便群组保留一位管理员。</string>
+    <string name="confirm_leave_sole_member_title">退出%1$s？</string>
+    <string name="confirm_leave_sole_member_message">你是唯一的成员。退出将彻底删除此群组。</string>
+    <string name="toast_left_named">已退出%1$s</string>
     <string name="message_deleted">此消息已被删除。</string>
     <string name="toast_original_message_unavailable">原始消息不可用。</string>
     <string name="message_reacted">已回应 %1$s</string>

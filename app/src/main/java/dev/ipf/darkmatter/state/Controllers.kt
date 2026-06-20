@@ -2824,7 +2824,13 @@ class ConversationController(
         publishTimelineFromIndexes()
     }
 
-    suspend fun leaveGroup(): Boolean =
+    /**
+     * Leave the open conversation. [displayName], when non-blank, selects the
+     * named success snackbar ("Left <name>") the group-settings Leave action
+     * wants (#416); callers without a display name (e.g. the conversation
+     * overflow) fall back to the generic "Left chat" copy.
+     */
+    suspend fun leaveGroup(displayName: String? = null): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val account = appState.activeAccountRef ?: return false
@@ -2845,7 +2851,12 @@ class ConversationController(
                         )
                 }
                 appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-                appState.present(R.string.toast_left_chat)
+                val name = displayName?.takeIf { it.isNotBlank() }
+                if (name != null) {
+                    appState.presentText(AppText.Resource(R.string.toast_left_named, listOf(name)))
+                } else {
+                    appState.present(R.string.toast_left_chat)
+                }
                 true
             }.getOrElse {
                 if (it is CancellationException) throw it
