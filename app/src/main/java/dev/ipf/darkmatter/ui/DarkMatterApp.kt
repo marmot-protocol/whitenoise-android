@@ -221,6 +221,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -265,8 +266,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -312,6 +315,7 @@ import dev.ipf.darkmatter.core.GroupTitleCopy
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.LeaveAction
 import dev.ipf.darkmatter.core.MessageBodyMatch
+import dev.ipf.darkmatter.core.MentionComposer
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageSearch
 import dev.ipf.darkmatter.core.MessageTextCopy
@@ -7806,6 +7810,31 @@ private fun ConversationScreen(
                         controller.editingMessageId?.let { id ->
                             controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                         }
+                    // #414: candidates for the @-mention picker — the group's
+                    // own roster minus the local account (you can't mention
+                    // yourself). Keyed on the roster + profile revision so a
+                    // late-arriving display name / nip05 re-derives the list.
+                    // The list already arrives most-recently-active first from
+                    // the roster, and MentionComposer.filter preserves order.
+                    val mentionPickerEnabled = !controller.isDm
+                    val mentionCandidates =
+                        if (mentionPickerEnabled) {
+                            val revision = appState.profileRevisionForCompose
+                            remember(controller.members, revision) {
+                                controller.members
+                                    .filterNot { it.local }
+                                    .map { member ->
+                                        MentionComposer.Candidate(
+                                            accountIdHex = member.memberIdHex,
+                                            npub = appState.npub(member.memberIdHex),
+                                            displayName = appState.displayName(member.memberIdHex),
+                                            nip05 = appState.userProfile(member.memberIdHex)?.nip05,
+                                        )
+                                    }
+                            }
+                        } else {
+                            emptyList()
+                        }
                     ComposerBar(
                         replyingTo = controller.replyingTo,
                         messageTextCopy = messageTextCopy,
@@ -7851,6 +7880,8 @@ private fun ConversationScreen(
                         },
                         voiceRecordingController = voiceRecordingController,
                         appState = appState,
+                        mentionCandidates = mentionCandidates,
+                        mentionPickerEnabled = mentionPickerEnabled,
                     )
                 }
             }
@@ -9506,6 +9537,25 @@ private fun MessageBubble(
             mine -> MaterialTheme.colorScheme.primaryContainer
             else -> MaterialTheme.colorScheme.surfaceVariant
         }
+    // #414: "you were mentioned" treatment. A received (not mine), live (not
+    // deleted/invalidated) message whose markdown body @-mentions the current
+    // account gets a left-edge accent line so a self-mention is spottable while
+    // scrolling. Keyed on the body tokens + account so a late account switch /
+    // profile load re-evaluates. The resolver is the FFI bech32→hex encoding;
+    // the detection walk itself is the pure documentMentionsAccount.
+    val selfAccountIdHex = appState.activeAccount?.accountIdHex
+    val mentionedSelf =
+        !mine &&
+            !deleted &&
+            !invalidated &&
+            remember(record.contentTokens, selfAccountIdHex) {
+                documentMentionsAccount(
+                    document = record.contentTokens,
+                    accountIdHex = selfAccountIdHex,
+                    resolveAccountIdHex = { bech32 -> appState.accountIdHexForMention(bech32) },
+                )
+            }
+    val mentionedYouLabel = stringResource(R.string.mentioned_you)
     val scope = rememberCoroutineScope()
     // Window-space y of the long-press touch so the action popover can anchor
     // near the finger on a bubble taller than the screen instead of
@@ -9758,7 +9808,40 @@ private fun MessageBubble(
                     border = if (highlighted) BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary) else null,
                     tonalElevation = if (mine) 1.dp else 0.dp,
                 ) {
-                    Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // #414: left-edge accent in the bubble's start gutter when
+                    // the current account is mentioned. Drawn in the 14.dp
+                    // start padding so it reads as a rail without reflowing the
+                    // content; uses the same content-derived accent the mention
+                    // highlight uses. drawBehind paints over the surface fill
+                    // (it's the Column's own background layer), so it stays
+                    // visible on the surfaceVariant received bubble.
+                    val mentionAccentColor = MaterialTheme.colorScheme.primary
+                    val mentionRailModifier =
+                        if (mentionedSelf) {
+                            Modifier
+                                .semantics { contentDescription = mentionedYouLabel }
+                                .drawBehind {
+                                    val railWidth = 3.dp.toPx()
+                                    val inset = 4.dp.toPx()
+                                    val radius = androidx.compose.ui.geometry.CornerRadius(railWidth / 2f, railWidth / 2f)
+                                    drawRoundRect(
+                                        color = mentionAccentColor,
+                                        topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+                                        size =
+                                            androidx.compose.ui.geometry.Size(
+                                                railWidth,
+                                                (size.height - inset * 2).coerceAtLeast(railWidth),
+                                            ),
+                                        cornerRadius = radius,
+                                    )
+                                }
+                        } else {
+                            Modifier
+                        }
+                    Column(
+                        mentionRailModifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
                         if (showSenderAvatar) {
                             Text(
                                 appState.displayName(record.sender),
@@ -11591,6 +11674,11 @@ private fun ComposerBar(
     editingInitialText: String? = null,
     onCancelEdit: () -> Unit = {},
     appState: DarkMatterAppState? = null,
+    // Group @-mention picker (#414): candidates the picker filters over, and
+    // whether this conversation is a group (the picker is suppressed in DMs —
+    // a 1:1 chat has no one to disambiguate, so typing `@` stays literal).
+    mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
+    mentionPickerEnabled: Boolean = false,
 ) {
     var attachMenuOpen by remember { mutableStateOf(false) }
     // Field state is a TextFieldValue (not a bare String) so the caret can
@@ -11676,6 +11764,34 @@ private fun ComposerBar(
                 onDismiss = onCancelReply,
             )
         }
+        // #414: live @-mention picker. Compute the open query from the current
+        // caret; suppressed entirely in DMs and while editing/recording or with
+        // no roster. Anchored directly above the composer input row, capped at
+        // ~50% of the viewport height.
+        val mentionQuery =
+            if (mentionPickerEnabled && editingMessageId == null) {
+                MentionComposer.activeMentionQuery(textFieldValue.text, textFieldValue.selection.start)
+                    .takeIf { textFieldValue.selection.collapsed }
+            } else {
+                null
+            }
+        val mentionMatches =
+            remember(mentionQuery?.query, mentionCandidates) {
+                if (mentionQuery == null) emptyList() else MentionComposer.filter(mentionQuery.query, mentionCandidates)
+            }
+        if (mentionQuery != null && mentionMatches.isNotEmpty()) {
+            val openQuery = mentionQuery
+            MentionPicker(
+                candidates = mentionMatches,
+                onPick = { candidate ->
+                    val insertion = MentionComposer.insertMention(textFieldValue.text, openQuery, candidate)
+                    val updated = TextFieldValue(text = insertion.text, selection = TextRange(insertion.selection))
+                    textFieldValue = updated
+                    if (editingMessageId == null) onDraftChange(updated.text)
+                    runCatching { composerFocus.requestFocus() }
+                },
+            )
+        }
         val activeRecordingController = voiceRecordingController?.takeIf { it.isRecording }
         val isRecordingVoice = activeRecordingController != null
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -11690,13 +11806,55 @@ private fun ComposerBar(
                     composerFocus = composerFocus,
                     onValueChange = { value ->
                         if (!isRecordingVoice) {
-                            textFieldValue = value
+                            // #414: a single Backspace at the right edge of an
+                            // `@npub1…` chip (or just past its trailing space,
+                            // the post-insert caret position) deletes the whole
+                            // chip in one keypress, so a mention reads as one
+                            // token. Falls through to the verbatim IME edit
+                            // otherwise.
+                            val whole =
+                                MentionComposer.wholeChipBackspace(
+                                    oldText = textFieldValue.text,
+                                    oldCaret = textFieldValue.selection.start,
+                                    newText = value.text,
+                                    newCaret = value.selection.start,
+                                )
+                            val edited =
+                                if (whole != null) {
+                                    TextFieldValue(text = whole.text, selection = TextRange(whole.selection))
+                                } else {
+                                    value
+                                }
+                            // #414: keep the caret/selection out of the interior
+                            // of any `@npub1…` chip so a tap, drag, or arrow key
+                            // can't land inside the token (which would let a
+                            // stray edit corrupt it or reopen the picker
+                            // mid-token). Only in groups, where chips exist.
+                            val applied =
+                                if (mentionPickerEnabled) {
+                                    val clamped =
+                                        MentionComposer.clampSelectionOutOfChips(
+                                            edited.text,
+                                            edited.selection.start,
+                                            edited.selection.end,
+                                        )
+                                    if (clamped.start != edited.selection.start ||
+                                        clamped.end != edited.selection.end
+                                    ) {
+                                        edited.copy(selection = TextRange(clamped.start, clamped.end))
+                                    } else {
+                                        edited
+                                    }
+                                } else {
+                                    edited
+                                }
+                            textFieldValue = applied
                             // While editing, the field holds the edit candidate,
                             // not a fresh chat draft. Persisting it would clobber
                             // whatever the user was composing before they tapped
                             // Edit — that's the snapshot we restore from
                             // preEditFieldValue on cancel/submit.
-                            if (editingMessageId == null) onDraftChange(value.text)
+                            if (editingMessageId == null) onDraftChange(applied.text)
                         }
                     },
                     onAttachMenuToggle = { attachMenuOpen = !attachMenuOpen },
@@ -11705,6 +11863,10 @@ private fun ComposerBar(
                     onCaptureFromCamera = onCaptureFromCamera,
                     onPickFromGallery = onPickFromGallery,
                     onPickDocument = onPickDocument,
+                    // #414: tint inserted `@npub1…` chips so they read as a
+                    // single styled token while composing. Only when the picker
+                    // is enabled (groups) — DMs never insert chips.
+                    highlightMentionChips = mentionPickerEnabled,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -11804,6 +11966,73 @@ private fun ComposerBar(
                         contentDescription = stringResource(R.string.send),
                         modifier = Modifier.size(20.dp),
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Floating member picker for the group composer's `@`-mention flow (#414).
+ * Anchored directly above the composer input row (it's the child placed just
+ * before the input [Row] in [ComposerBar]); capped at ~50% of the viewport
+ * height so the keyboard and a long roster both stay reachable. Tapping a row
+ * inserts that member as a chip via [MentionComposer.insertMention].
+ */
+@Composable
+private fun MentionPicker(
+    candidates: List<MentionComposer.Candidate>,
+    onPick: (MentionComposer.Candidate) -> Unit,
+) {
+    val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.5f).dp
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 3.dp,
+        shadowElevation = 6.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.heightIn(max = maxHeight)) {
+            Text(
+                stringResource(R.string.mention_picker_title),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            LazyColumn(Modifier.fillMaxWidth()) {
+                items(candidates, key = { it.accountIdHex }) { candidate ->
+                    val mentionLabel = stringResource(R.string.mention_picker_member, candidate.displayName)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { onPick(candidate) }
+                                .semantics { contentDescription = mentionLabel }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                    ) {
+                        Avatar(title = candidate.displayName, seed = candidate.accountIdHex, size = 36.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                candidate.displayName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            val subtitle = candidate.nip05?.takeIf { it.isNotBlank() }
+                            if (subtitle != null) {
+                                Text(
+                                    subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -12042,7 +12271,37 @@ private fun ComposerPill(
     onPickFromGallery: (() -> Unit)?,
     onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    highlightMentionChips: Boolean = false,
 ) {
+    // #414: paint `@npub1…` chip runs with the accent color + slight background
+    // tint so a mention reads as one styled token while composing. The mapping
+    // is identity (visible text == stored text) so caret math is untouched.
+    val chipColor = MaterialTheme.colorScheme.primary
+    val mentionVisualTransformation =
+        remember(highlightMentionChips, chipColor) {
+            if (!highlightMentionChips) {
+                VisualTransformation.None
+            } else {
+                VisualTransformation { text ->
+                    val styled =
+                        buildAnnotatedString {
+                            append(text.text)
+                            MentionComposer.chipRanges(text.text).forEach { range ->
+                                addStyle(
+                                    SpanStyle(
+                                        color = chipColor,
+                                        fontWeight = FontWeight.Medium,
+                                        background = chipColor.copy(alpha = 0.12f),
+                                    ),
+                                    range.first,
+                                    range.last + 1,
+                                )
+                            }
+                        }
+                    TransformedText(styled, OffsetMapping.Identity)
+                }
+            }
+        }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(22.dp),
@@ -12074,6 +12333,7 @@ private fun ComposerPill(
                             fontSize = 16.sp,
                         ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    visualTransformation = mentionVisualTransformation,
                     keyboardOptions =
                         KeyboardOptions(
                             capitalization = KeyboardCapitalization.Sentences,
