@@ -35,4 +35,23 @@ class RecipientReferenceTest {
             RecipientReference.tokenize("npub1alice, npub1bob\nnpub1carol"),
         )
     }
+
+    @Test
+    fun acceptsOnlyPublicIdentifierClipboardInput() {
+        val hex = "AB".repeat(32)
+
+        assertEquals(sampleNpub, RecipientReference.plausibleClipboardInput("darkmatter://profile/$sampleNpub"))
+        assertEquals(hex.lowercase(), RecipientReference.plausibleClipboardInput(hex))
+        assertNull(RecipientReference.plausibleClipboardInput("nsec1not-a-public-identifier"))
+        assertNull(RecipientReference.plausibleClipboardInput("just some notes"))
+        assertNull(RecipientReference.plausibleClipboardInput("  \n  "))
+    }
+
+    @Test
+    fun canRejectHexClipboardInputForNpubOnlyFields() {
+        val hex = "AB".repeat(32)
+
+        assertEquals(sampleNpub, RecipientReference.plausibleClipboardInput(sampleNpub, allowHexPublicKey = false))
+        assertNull(RecipientReference.plausibleClipboardInput(hex, allowHexPublicKey = false))
+    }
 }
