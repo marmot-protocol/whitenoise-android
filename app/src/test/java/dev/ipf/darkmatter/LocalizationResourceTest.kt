@@ -63,6 +63,10 @@ class LocalizationResourceTest {
         return buildMap {
             for (index in 0 until strings.length) {
                 val item = strings.item(index)
+                // translatable="false" strings (format-only or fixed keywords)
+                // live in the default values only and must not be replicated to
+                // locale files, so they are not part of the parity contract.
+                if (item.attributes.getNamedItem("translatable")?.nodeValue == "false") continue
                 put(item.attributes.getNamedItem("name").nodeValue, item.textContent)
             }
         }
