@@ -596,5 +596,6 @@
     <string name="sign_out_sheet_stays_heading">Permanece en este dispositivo</string>
     <string name="sign_out_sheet_title">Cerrar sesión</string>
     <string name="toast_signed_out_and_wiped">Cuenta borrada de este dispositivo</string>
+    <string name="toast_couldnt_wipe_account">No se pudo borrar la cuenta</string>
     <string name="wipe">Borrar</string>
 </resources>

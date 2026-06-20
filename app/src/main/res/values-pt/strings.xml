@@ -596,5 +596,6 @@
     <string name="sign_out_sheet_stays_heading">Permanece neste dispositivo</string>
     <string name="sign_out_sheet_title">Sair</string>
     <string name="toast_signed_out_and_wiped">Conta apagada deste dispositivo</string>
+    <string name="toast_couldnt_wipe_account">Não foi possível apagar a conta</string>
     <string name="wipe">Apagar</string>
 </resources>

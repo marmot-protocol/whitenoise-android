@@ -373,6 +373,7 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.RelayHealthFfi
@@ -6418,9 +6419,10 @@ private fun DaySeparator(label: String) {
 private fun GroupSystemRow(
     record: AppMessageRecordFfi,
     appState: DarkMatterAppState,
+    groupSystem: GroupSystemEventFfi? = null,
 ) {
     val copy = rememberGroupSystemCopy()
-    val event = remember(record.plaintext) { GroupSystemEvents.parse(record.plaintext) }
+    val event = remember(record.plaintext, groupSystem) { GroupSystemEvents.resolve(record.plaintext, groupSystem) }
     val summary =
         if (event != null) {
             run {
@@ -7964,7 +7966,11 @@ private fun ConversationScreen(
                                 // facts, not chat: render the centered summary row,
                                 // never a bubble with the raw JSON content.
                                 if (MessageProjector.isGroupSystem(item.record)) {
-                                    GroupSystemRow(record = item.record, appState = appState)
+                                    GroupSystemRow(
+                                        record = item.record,
+                                        appState = appState,
+                                        groupSystem = item.projected?.groupSystem,
+                                    )
                                     return@itemsIndexed
                                 }
                                 MessageBubble(
@@ -14188,16 +14194,10 @@ private fun AddIdentitySheet(
 }
 
 /**
- * Whether the destructive "Sign Out & Wipe" path is wired to a real engine
- * FFI yet. The relay-side + MLS cleanup (kind:5 KeyPackage deletions, best-effort
- * group leaves, account/MLS-DB/keychain teardown) lives in the darkmatter engine
- * sub-issue of #347 and does not exist on the binding surface yet. Per #348 we
- * gate the visible affordance on FFI availability so the UI never offers an
- * action the engine can't actually perform. Flip to `true` once
- * `signOutAndWipe`-style bindings land, then route the confirm-dialog's confirm
- * button at the new AppState method.
+ * Whether the destructive "Sign Out & Wipe" path is wired to Marmot's
+ * [dev.ipf.marmotkit.Marmot.signOutAndWipe] FFI.
  */
-private const val WIPE_ENGINE_FFI_AVAILABLE = false
+private const val WIPE_ENGINE_FFI_AVAILABLE = true
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -14206,6 +14206,7 @@ private fun IdentityScreen(
     onBack: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
     val active = appState.activeAccount
     var showSignOutSheet by remember { mutableStateOf(false) }
     var showWipeSheet by remember { mutableStateOf(false) }
@@ -14358,10 +14359,14 @@ private fun IdentityScreen(
                     onClick = {
                         showWipeConfirm = false
                         wipeConfirmInput = ""
-                        // Engine FFI not wired yet (WIPE_ENGINE_FFI_AVAILABLE is
-                        // false), so this branch is unreachable today. When the
-                        // signOutAndWipe binding lands, route it here and present
-                        // R.string.toast_signed_out_and_wiped on success.
+                        scope.launch {
+                            val outcome = appState.signOutAndWipeActiveAccount()
+                            if (outcome != null) {
+                                appState.present(R.string.toast_signed_out_and_wiped)
+                            } else {
+                                appState.present(R.string.toast_couldnt_wipe_account)
+                            }
+                        }
                     },
                     enabled = wipeConfirmed,
                 ) {

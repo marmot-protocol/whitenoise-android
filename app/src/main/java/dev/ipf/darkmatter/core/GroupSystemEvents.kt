@@ -1,5 +1,6 @@
 package dev.ipf.darkmatter.core
 
+import dev.ipf.marmotkit.GroupSystemEventFfi
 import org.json.JSONObject
 
 /**
@@ -121,6 +122,21 @@ object GroupSystemEvents {
             )
         }.getOrNull()
 
+    fun fromFfi(ffi: GroupSystemEventFfi): GroupSystemEvent =
+        GroupSystemEvent(
+            systemType = ffi.systemType,
+            text = ffi.text,
+            actor = ffi.actorAccountIdHex,
+            subject = ffi.subjectAccountIdHex,
+            name = ffi.name,
+        )
+
+    /** Prefer Marmot's structured projection; fall back to parsing kind-1210 JSON. */
+    fun resolve(
+        plaintext: String,
+        structured: GroupSystemEventFfi? = null,
+    ): GroupSystemEvent? = structured?.let { fromFfi(it) } ?: parse(plaintext)
+
     /**
      * The hex pubkey to attribute the change to: the payload's `actor` when
      * named, otherwise the event signer — a peer that omits `data.actor` but
@@ -228,8 +244,9 @@ object GroupSystemEvents {
     fun previewText(
         plaintext: String,
         copy: GroupSystemCopy = GroupSystemCopy.Default,
+        structured: GroupSystemEventFfi? = null,
     ): String {
-        val event = parse(plaintext) ?: return copy.fallback
+        val event = resolve(plaintext, structured) ?: return copy.fallback
         return summary(event, actorName = null, subjectName = null, copy = copy)
     }
 }

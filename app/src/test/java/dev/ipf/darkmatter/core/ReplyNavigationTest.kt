@@ -105,6 +105,7 @@ class ReplyNavigationTest {
             },
         mediaJson = null,
         agentTextStreamJson = null,
+        groupSystem = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         deleted = false,
         deletedByMessageIdHex = null,

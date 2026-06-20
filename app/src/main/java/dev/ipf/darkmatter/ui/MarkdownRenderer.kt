@@ -215,7 +215,7 @@ private fun MarkdownBlockView(
             HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.25f))
         is MarkdownBlockFfi.CodeBlock -> MarkdownCodeBlockView(block.content)
         is MarkdownBlockFfi.BlockQuote -> MarkdownBlockQuoteView(block.blocks, ctx, depth)
-        is MarkdownBlockFfi.List -> MarkdownListView(block, ctx, depth)
+        is MarkdownBlockFfi.ListBlock -> MarkdownListView(block, ctx, depth)
         is MarkdownBlockFfi.Table -> MarkdownTableView(block, ctx)
         // No math typesetting in v1 — show the raw TeX in the code treatment
         // so it at least reads as "source", not as broken prose.
@@ -286,7 +286,7 @@ private fun MarkdownBlockQuoteView(
 
 @Composable
 private fun MarkdownListView(
-    block: MarkdownBlockFfi.List,
+    block: MarkdownBlockFfi.ListBlock,
     ctx: MarkdownBodyContext,
     depth: Int,
 ) {
@@ -433,7 +433,7 @@ private fun collectBlockMentionBech32s(
             is MarkdownBlockFfi.Paragraph -> collectMentionBech32s(block.inlines, out, depth = 0)
             is MarkdownBlockFfi.Heading -> collectMentionBech32s(block.inlines, out, depth = 0)
             is MarkdownBlockFfi.BlockQuote -> collectBlockMentionBech32s(block.blocks, out, depth + 1)
-            is MarkdownBlockFfi.List ->
+            is MarkdownBlockFfi.ListBlock ->
                 block.items.forEach { collectBlockMentionBech32s(it.blocks, out, depth + 1) }
             is MarkdownBlockFfi.Table -> {
                 block.header.forEach { collectMentionBech32s(it.inlines, out, depth = 0) }
@@ -782,7 +782,7 @@ private fun AnnotatedString.Builder.appendPreviewBlock(
         is MarkdownBlockFfi.MathBlock -> appendPreviewCodeContent(block.content, codeStyle, maxLength)
         is MarkdownBlockFfi.BlockQuote ->
             block.blocks.forEach { appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1) }
-        is MarkdownBlockFfi.List ->
+        is MarkdownBlockFfi.ListBlock ->
             block.items.forEach { item ->
                 item.blocks.forEach { appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1) }
             }

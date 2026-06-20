@@ -216,7 +216,7 @@ class MarkdownPreviewTextTest {
             build(
                 listOf(
                     MarkdownBlockFfi.BlockQuote(listOf(paragraph("quoted"))),
-                    MarkdownBlockFfi.List(
+                    MarkdownBlockFfi.ListBlock(
                         kind = MarkdownListKindFfi.Bullet(marker = "-"),
                         tight = true,
                         items =

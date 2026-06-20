@@ -145,6 +145,8 @@ if [[ "$SKIP_BINDINGS" == "false" ]]; then
   echo "==> Copying generated bindings + native libs into Android repo"
   cp "$MARMOT_DIR/crates/marmot-uniffi/output/android/kotlin/dev/ipf/marmotkit/marmot_uniffi.kt" \
      "$REPO_DIR/app/src/main/java/dev/ipf/marmotkit/marmot_uniffi.kt"
+  bash "$REPO_DIR/scripts/patch-marmot-kotlin-bindings.sh" \
+    "$REPO_DIR/app/src/main/java/dev/ipf/marmotkit/marmot_uniffi.kt"
   for abi in arm64-v8a armeabi-v7a x86 x86_64; do
     cp "$MARMOT_DIR/crates/marmot-uniffi/output/android/jniLibs/$abi/libmarmot_uniffi.so" \
        "$REPO_DIR/app/src/main/jniLibs/$abi/libmarmot_uniffi.so"

@@ -596,5 +596,6 @@
     <string name="sign_out_sheet_stays_heading">Reste sur cet appareil</string>
     <string name="sign_out_sheet_title">Se déconnecter</string>
     <string name="toast_signed_out_and_wiped">Compte effacé de cet appareil</string>
+    <string name="toast_couldnt_wipe_account">Impossible d\'effacer le compte</string>
     <string name="wipe">Effacer</string>
 </resources>

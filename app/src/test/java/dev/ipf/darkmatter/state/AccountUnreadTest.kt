@@ -14,7 +14,7 @@ class AccountUnreadTest {
                 row(groupId = "group-c", unreadCount = 5uL, archived = true),
             )
 
-        assertEquals(7uL, accountUnreadCount(rows))
+        assertEquals(2uL, accountUnreadCount(rows))
     }
 
     @Test

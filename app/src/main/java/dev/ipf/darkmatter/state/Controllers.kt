@@ -1690,101 +1690,7 @@ class ConversationController(
         // chat-list bind / iOS conversation open).
         appState.catchUpAccounts()
         try {
-            var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
-            while (coroutineContext.isActive) {
-                var groupSubscription: GroupStateSubscription? = null
-                var timelineStream: TimelineMessagesSubscription? = null
-                try {
-                    timelineStream =
-                        appState.marmotIo {
-                            subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
-                        }
-                    timelineSubscription = timelineStream
-                    val timelineReconnect = timelineRecords.isNotEmpty()
-                    val snapshotStreamIds =
-                        if (timelineReconnect) {
-                            emptyList()
-                        } else {
-                            val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
-                            snapshot
-                                ?.let {
-                                    val streamIds =
-                                        applyTimelinePage(
-                                            it,
-                                            replaceWindow = true,
-                                            updatePagination = true,
-                                        )
-                                    refreshMediaReferences()
-                                    initializeReadState(account)
-                                    streamIds
-                                }.orEmpty()
-                        }
-                    // Don't blanket-mark the absolute newest as read here — the UI
-                    // layer now drives mark-read as the user scrolls so partial-read
-                    // sessions retain accurate unread counts on the chat list.
-
-                    val groupStream =
-                        appState.marmotIo { subscribeGroupState(account, group.groupIdHex) }
-                    groupSubscription = groupStream
-                    val groupSnapshot =
-                        withContext(Dispatchers.IO) {
-                            groupStream.snapshot()
-                        }
-                    groupSnapshot?.let { group = it }
-                    refreshMembers()
-                    isLoading = false
-                    error = null
-                    retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
-
-                    coroutineScope {
-                        snapshotStreamIds.forEach { streamId ->
-                            if (activeStreamIds.add(streamId)) {
-                                launch { watchAgentTextStream(account, streamId) }
-                            }
-                        }
-                        runUntilFirstLiveSubscriptionEnds(
-                            first = {
-                                runTimelineSubscriptionPipeline(account, timelineStream)
-                            },
-                            second = {
-                                while (isActive) {
-                                    val update =
-                                        withContext(Dispatchers.IO) {
-                                            groupStream.next()
-                                        } ?: break
-                                    group = update
-                                    refreshMembers()
-                                }
-                            },
-                        )
-                    }
-                } catch (cancel: CancellationException) {
-                    throw cancel
-                } catch (throwable: Throwable) {
-                    if (throwable.isUseAfterEviction()) {
-                        markActiveAccountRemovedFromMembers(account)
-                        isLoading = false
-                        error = null
-                        return
-                    }
-                    if (timelineRecords.isEmpty()) {
-                        isLoading = false
-                        error = throwable.message ?: throwable.javaClass.simpleName
-                    }
-                } finally {
-                    val closingTimeline = timelineStream
-                    if (timelineSubscription === closingTimeline) {
-                        timelineSubscription = null
-                    }
-                    withContext(NonCancellable + Dispatchers.IO) {
-                        runCatching { groupSubscription?.close() }
-                        runCatching { closingTimeline?.close() }
-                    }
-                }
-                if (!coroutineContext.isActive) break
-                delay(retryDelayMs)
-                retryDelayMs = nextLiveSubscriptionRetryDelayMillis(retryDelayMs)
-            }
+            runConversationSubscriptionLoop(account)
         } catch (cancel: CancellationException) {
             // Expected when the conversation screen leaves the composition.
             // Re-throw so cancellation propagates and we don't log it as an
@@ -1800,12 +1706,143 @@ class ConversationController(
             isLoading = false
             error = throwable.message ?: throwable.javaClass.simpleName
         } finally {
-            inviteStreamScope.cancel()
-            val closingSubscription = timelineSubscription
-            timelineSubscription = null
-            withContext(NonCancellable + Dispatchers.IO) {
-                runCatching { closingSubscription?.close() }
+            cleanupConversationSubscriptions()
+        }
+    }
+
+    /**
+     * Retry loop for the timeline + group-state live subscriptions. Extracted
+     * from [start] so R8 can compile the smaller suspend entrypoint (the
+     * monolithic method hit an invalid stack-map-table bug in release builds).
+     */
+    private suspend fun runConversationSubscriptionLoop(account: String) {
+        var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
+        while (coroutineContext.isActive) {
+            val (shouldExit, connected) = runConversationSubscriptionIteration(account)
+            if (shouldExit) return
+            if (connected) retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
+            if (!coroutineContext.isActive) break
+            delay(retryDelayMs)
+            retryDelayMs = nextLiveSubscriptionRetryDelayMillis(retryDelayMs)
+        }
+    }
+
+    /**
+     * One connect/reconnect attempt. Returns whether the caller should exit
+     * entirely (account evicted) and whether the subscriptions connected
+     * successfully (so the retry backoff can reset).
+     */
+    private suspend fun runConversationSubscriptionIteration(account: String): Pair<Boolean, Boolean> {
+        var groupSubscription: GroupStateSubscription? = null
+        var timelineStream: TimelineMessagesSubscription? = null
+        try {
+            timelineStream =
+                appState.marmotIo {
+                    subscribeTimelineMessages(account, group.groupIdHex, ConversationTimelinePageLimit)
+                }
+            timelineSubscription = timelineStream
+            val timelineReconnect = timelineRecords.isNotEmpty()
+            val snapshotStreamIds =
+                if (timelineReconnect) {
+                    emptyList()
+                } else {
+                    val snapshot = withContext(Dispatchers.IO) { timelineStream.snapshot() }
+                    snapshot
+                        ?.let {
+                            val streamIds =
+                                applyTimelinePage(
+                                    it,
+                                    replaceWindow = true,
+                                    updatePagination = true,
+                                )
+                            refreshMediaReferences()
+                            initializeReadState(account)
+                            streamIds
+                        }.orEmpty()
+                }
+            // Don't blanket-mark the absolute newest as read here — the UI
+            // layer now drives mark-read as the user scrolls so partial-read
+            // sessions retain accurate unread counts on the chat list.
+
+            val groupStream =
+                appState.marmotIo { subscribeGroupState(account, group.groupIdHex) }
+            groupSubscription = groupStream
+            val groupSnapshot =
+                withContext(Dispatchers.IO) {
+                    groupStream.snapshot()
+                }
+            groupSnapshot?.let { group = it }
+            refreshMembers()
+            isLoading = false
+            error = null
+            var connected = false
+
+            coroutineScope {
+                snapshotStreamIds.forEach { streamId ->
+                    if (activeStreamIds.add(streamId)) {
+                        launch { watchAgentTextStream(account, streamId) }
+                    }
+                }
+                connected = true
+                runUntilFirstLiveSubscriptionEnds(
+                    first = {
+                        runTimelineSubscriptionPipeline(account, timelineStream)
+                    },
+                    second = {
+                        runGroupStateSubscriptionLoop(groupStream)
+                    },
+                )
             }
+            return false to connected
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (throwable: Throwable) {
+            if (throwable.isUseAfterEviction()) {
+                markActiveAccountRemovedFromMembers(account)
+                isLoading = false
+                error = null
+                return true to false
+            }
+            if (timelineRecords.isEmpty()) {
+                isLoading = false
+                error = throwable.message ?: throwable.javaClass.simpleName
+            }
+        } finally {
+            closeConversationSubscriptionHandles(groupSubscription, timelineStream)
+        }
+        return false to false
+    }
+
+    private suspend fun runGroupStateSubscriptionLoop(groupStream: GroupStateSubscription) {
+        while (coroutineContext.isActive) {
+            val update =
+                withContext(Dispatchers.IO) {
+                    groupStream.next()
+                } ?: break
+            group = update
+            refreshMembers()
+        }
+    }
+
+    private suspend fun closeConversationSubscriptionHandles(
+        groupSubscription: GroupStateSubscription?,
+        timelineStream: TimelineMessagesSubscription?,
+    ) {
+        if (timelineSubscription === timelineStream) {
+            timelineSubscription = null
+        }
+        withContext(NonCancellable + Dispatchers.IO) {
+            runCatching { groupSubscription?.close() }
+            runCatching { timelineStream?.close() }
+        }
+    }
+
+    private suspend fun cleanupConversationSubscriptions() {
+        inviteStreamScope.cancel()
+        val closingSubscription = timelineSubscription
+        timelineSubscription = null
+        withContext(NonCancellable + Dispatchers.IO) {
+            runCatching { closingSubscription?.close() }
         }
     }
 

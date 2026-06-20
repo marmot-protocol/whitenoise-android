@@ -587,5 +587,6 @@
     <string name="sign_out_sheet_stays_heading">保留在本裝置上</string>
     <string name="sign_out_sheet_title">登出</string>
     <string name="toast_signed_out_and_wiped">帳戶已從本裝置清除</string>
+    <string name="toast_couldnt_wipe_account">無法清除帳戶</string>
     <string name="wipe">清除</string>
 </resources>

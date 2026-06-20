@@ -593,5 +593,6 @@
     <string name="sign_out_sheet_stays_heading">Bleibt auf diesem Gerät</string>
     <string name="sign_out_sheet_title">Abmelden</string>
     <string name="toast_signed_out_and_wiped">Konto von diesem Gerät gelöscht</string>
+    <string name="toast_couldnt_wipe_account">Konto konnte nicht gelöscht werden</string>
     <string name="wipe">Löschen</string>
 </resources>

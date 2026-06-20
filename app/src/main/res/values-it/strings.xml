@@ -596,5 +596,6 @@
     <string name="sign_out_sheet_stays_heading">Resta su questo dispositivo</string>
     <string name="sign_out_sheet_title">Esci</string>
     <string name="toast_signed_out_and_wiped">Account cancellato da questo dispositivo</string>
+    <string name="toast_couldnt_wipe_account">Impossibile cancellare l\'account</string>
     <string name="wipe">Cancella</string>
 </resources>

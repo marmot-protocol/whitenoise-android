@@ -47,6 +47,7 @@ import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.marmotkit.WipeOutcomeFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -922,8 +923,8 @@ class DarkMatterAppState(
     }
 
     private suspend fun refreshAccountUnreadCounts(accountSummaries: List<AccountSummaryFfi> = accounts) {
-        val refs = accountSummaries.map { it.label }.filter { it.isNotBlank() }
-        if (refs.isEmpty()) {
+        val localSigning = accountSummaries.filter { it.localSigning && it.label.isNotBlank() }
+        if (localSigning.isEmpty()) {
             accountUnreadCounts = emptyMap()
             return
         }
@@ -931,11 +932,9 @@ class DarkMatterAppState(
         val refreshedCounts =
             runCatching {
                 marmotIo {
-                    refs.associateWith { ref ->
-                        runCatching { accountUnreadCount(chatList(ref, includeArchived = true)) }
-                            .onFailure {
-                                appStateDebug(it) { "account unread refresh failed account=${ref.take(8)}: ${it.readableMessage()}" }
-                            }.getOrElse { previous[ref] ?: 0uL }
+                    val byHex = accountUnreadSummary().associateBy { it.accountIdHex }
+                    localSigning.associate { summary ->
+                        summary.label to (byHex[summary.accountIdHex]?.unreadCount ?: previous[summary.label] ?: 0uL)
                     }
                 }
             }.onFailure {
@@ -946,15 +945,7 @@ class DarkMatterAppState(
     }
 
     private suspend fun refreshAccountUnreadCount(accountRef: String) {
-        val ref = accountRef.takeIf { it.isNotBlank() } ?: return
-        val unreadCount =
-            runCatching {
-                marmotIo { accountUnreadCount(chatList(ref, includeArchived = true)) }
-            }.onFailure {
-                appStateDebug(it) { "account unread refresh failed account=${ref.take(8)}: ${it.readableMessage()}" }
-            }.getOrNull()
-                ?: return
-        updateAccountUnreadCount(ref, unreadCount)
+        refreshAccountUnreadCounts(accounts)
     }
 
     fun setActiveAccount(label: String) {
@@ -1153,6 +1144,46 @@ class DarkMatterAppState(
             if (next == null) pushTokenStore.clear()
             refreshLocalNotificationSettings()
         }
+    }
+
+    /**
+     * Destructive sign-out: leave MLS groups, delete relay KeyPackages, and
+     * wipe all local state for the active account via Marmot's
+     * [dev.ipf.marmotkit.Marmot.signOutAndWipe]. Returns the structured
+     * outcome so the UI can surface partial failures.
+     */
+    suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
+        val wipedRef = activeAccountRef ?: return null
+        clearInMemoryMediaCaches()
+        AvatarImageLoader.clear()
+        clearCrossAccountCaches()
+        val outcome =
+            runCatching {
+                marmotIo { signOutAndWipe(wipedRef) }
+            }.onFailure {
+                rethrowIfCancellation(it)
+                appStateDebug(it) { "signOutAndWipe failed account=${wipedRef.take(8)}: ${it.readableMessage()}" }
+            }.getOrNull()
+                ?: return null
+        wipeDecryptedMediaFromDisk()
+        pushTokenStore.clearPendingDisable(wipedRef)
+        pushTokenStore.clear()
+        val refreshedAccounts = runCatching { marmotIo { listAccounts() } }.getOrDefault(emptyList())
+        accounts = refreshedAccounts
+        refreshAccountUnreadCounts(refreshedAccounts)
+        val next = refreshedAccounts.firstOrNull()?.label
+        activeAccountRef = next
+        preferences
+            .edit()
+            .apply {
+                if (next == null) remove(ACTIVE_ACCOUNT_KEY) else putString(ACTIVE_ACCOUNT_KEY, next)
+            }.apply()
+        phase = if (next == null) AppPhase.Onboarding else AppPhase.Ready
+        next?.let { label ->
+            refreshedAccounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+        }
+        refreshLocalNotificationSettings()
+        return outcome
     }
 
     suspend fun accountRelayLists(): AccountRelayListsFfi? {

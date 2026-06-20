@@ -332,6 +332,7 @@
     <string name="sign_out_and_wipe_confirm_field_label">Confirmation</string>
     <string name="wipe">Wipe</string>
     <string name="toast_signed_out_and_wiped">Account wiped from this device</string>
+    <string name="toast_couldnt_wipe_account">Couldn\'t wipe account</string>
     <string name="copy">Copy</string>
     <string name="account_relay_lists">Account Relay Lists</string>
     <string name="no_relays">No relays</string>
