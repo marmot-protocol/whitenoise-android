@@ -133,6 +133,14 @@
     <string name="confirm_remove_member_message">%1$s perderá el acceso a este chat. No se le notificará.</string>
     <string name="confirm_leave_title">¿Salir del chat?</string>
     <string name="confirm_leave_message">Serás eliminado de este grupo. Necesitarás una nueva invitación para volver a unirte.</string>
+    <string name="leave_group">Salir del grupo</string>
+    <string name="confirm_leave_title_named">¿Salir de %1$s?</string>
+    <string name="confirm_leave_message_named">No recibirás nuevos mensajes de este grupo.</string>
+    <string name="confirm_leave_sole_admin_title">Eres el único administrador</string>
+    <string name="confirm_leave_sole_admin_message">Haz administrador a otro miembro antes de salir de %1$s, para que el grupo conserve un administrador.</string>
+    <string name="confirm_leave_sole_member_title">¿Salir de %1$s?</string>
+    <string name="confirm_leave_sole_member_message">Eres el único miembro. Al salir, este grupo se eliminará por completo.</string>
+    <string name="toast_left_named">Saliste de %1$s</string>
     <string name="message_deleted">Este mensaje fue eliminado.</string>
     <string name="toast_original_message_unavailable">El mensaje original no está disponible.</string>
     <string name="message_reacted">Reaccionó con %1$s</string>

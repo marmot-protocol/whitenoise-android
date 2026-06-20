@@ -133,6 +133,14 @@
     <string name="confirm_remove_member_message">%1$s perdra l\'accès à cette conversation. Aucune notification ne sera envoyée.</string>
     <string name="confirm_leave_title">Quitter la discussion ?</string>
     <string name="confirm_leave_message">Vous serez retiré de ce groupe. Une nouvelle invitation sera nécessaire pour le rejoindre.</string>
+    <string name="leave_group">Quitter le groupe</string>
+    <string name="confirm_leave_title_named">Quitter %1$s ?</string>
+    <string name="confirm_leave_message_named">Vous ne recevrez plus de nouveaux messages de ce groupe.</string>
+    <string name="confirm_leave_sole_admin_title">Vous êtes le seul administrateur</string>
+    <string name="confirm_leave_sole_admin_message">Nommez un autre membre administrateur avant de quitter %1$s, afin que le groupe conserve un administrateur.</string>
+    <string name="confirm_leave_sole_member_title">Quitter %1$s ?</string>
+    <string name="confirm_leave_sole_member_message">Vous êtes le seul membre. Quitter le groupe le supprime entièrement.</string>
+    <string name="toast_left_named">Vous avez quitté %1$s</string>
     <string name="message_deleted">Ce message a été supprimé.</string>
     <string name="toast_original_message_unavailable">Le message d’origine est indisponible.</string>
     <string name="message_reacted">A réagi avec %1$s</string>
