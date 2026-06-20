@@ -64,6 +64,29 @@ class MentionComposerTest {
         assertNull(MentionComposer.activeMentionQuery(text, caret = text.length))
     }
 
+    @Test
+    fun caretInsideInsertedChipDoesNotReopenQuery() {
+        // Caret a few chars into the npub body of an inserted chip must NOT be
+        // treated as a fresh `@np…` query (reviewer: the picker reopened
+        // mid-token).
+        val text = "hey @$aliceNpub "
+        // Just after "@np".
+        assertNull(MentionComposer.activeMentionQuery(text, caret = 7))
+        // Just after "@n".
+        assertNull(MentionComposer.activeMentionQuery(text, caret = 6))
+        // Deeper inside the body.
+        assertNull(MentionComposer.activeMentionQuery(text, caret = 20))
+    }
+
+    @Test
+    fun caretJustPastInsertedChipDoesNotReopenQuery() {
+        // Right edge of the chip (before the trailing space) is still the chip,
+        // not a query.
+        val chip = "@$aliceNpub"
+        val text = "hey $chip "
+        assertNull(MentionComposer.activeMentionQuery(text, caret = ("hey ").length + chip.length))
+    }
+
     // --- filter -------------------------------------------------------------
 
     @Test
@@ -150,6 +173,36 @@ class MentionComposerTest {
     }
 
     @Test
+    fun firstBackspaceAfterInsertionDeletesChipAndTrailingSpace() {
+        // Reviewer's case: immediately after insertMention the caret sits past
+        // the trailing space (`@npub1… ▮`). The first Backspace must delete the
+        // whole chip + the space in one keypress, not just the space.
+        val text = "hey @al"
+        val active = MentionComposer.activeMentionQuery(text, text.length)!!
+        val inserted = MentionComposer.insertMention(text, active, alice)
+        // Sanity: the caret really is past the trailing space.
+        assertEquals("hey @$aliceNpub ", inserted.text)
+        assertEquals(inserted.text.length, inserted.selection)
+        // The IME single-char Backspace removes the trailing space.
+        val oldText = inserted.text
+        val oldCaret = inserted.selection
+        val newText = oldText.dropLast(1)
+        val newCaret = oldCaret - 1
+        val result = MentionComposer.wholeChipBackspace(oldText, oldCaret, newText, newCaret)
+        // Whole chip + space gone in one keypress.
+        assertEquals("hey ", result!!.text)
+        assertEquals("hey ".length, result.selection)
+    }
+
+    @Test
+    fun backspacingTrailingSpaceNotAfterChipIsNotIntercepted() {
+        // A trailing space after plain text (no chip) is deleted verbatim.
+        val oldText = "hello "
+        val result = MentionComposer.wholeChipBackspace(oldText, 6, "hello", 5)
+        assertNull(result)
+    }
+
+    @Test
     fun backspaceInPlainTextIsNotIntercepted() {
         val oldText = "hello"
         val result = MentionComposer.wholeChipBackspace(oldText, 5, "hell", 4)
@@ -192,5 +245,65 @@ class MentionComposerTest {
         // `foo@npub1…` is not a word-boundary chip.
         val text = "foo@$aliceNpub"
         assertTrue(MentionComposer.chipRanges(text).isEmpty())
+    }
+
+    // --- clampSelectionOutOfChips -------------------------------------------
+
+    @Test
+    fun clampPushesCaretOutOfChipInteriorToNearerEdge() {
+        val chip = "@$aliceNpub"
+        val text = "hey $chip rest"
+        val chipStart = "hey ".length
+        val chipEnd = chipStart + chip.length // one-past the chip
+        // A caret 2 chars into the chip snaps back to the left edge.
+        val nearLeft = MentionComposer.clampSelectionOutOfChips(text, chipStart + 2, chipStart + 2)
+        assertEquals(chipStart, nearLeft.start)
+        assertEquals(chipStart, nearLeft.end)
+        // A caret 2 chars before the chip end snaps forward to the right edge.
+        val nearRight = MentionComposer.clampSelectionOutOfChips(text, chipEnd - 2, chipEnd - 2)
+        assertEquals(chipEnd, nearRight.start)
+        assertEquals(chipEnd, nearRight.end)
+    }
+
+    @Test
+    fun clampLeavesChipEdgesUntouched() {
+        val chip = "@$aliceNpub"
+        val text = "hey $chip rest"
+        val chipStart = "hey ".length
+        val chipEnd = chipStart + chip.length
+        // Left edge stays.
+        assertEquals(
+            MentionComposer.Selection(chipStart, chipStart),
+            MentionComposer.clampSelectionOutOfChips(text, chipStart, chipStart),
+        )
+        // Right edge stays.
+        assertEquals(
+            MentionComposer.Selection(chipEnd, chipEnd),
+            MentionComposer.clampSelectionOutOfChips(text, chipEnd, chipEnd),
+        )
+    }
+
+    @Test
+    fun clampLeavesPlainTextCaretsUntouched() {
+        val text = "no chips here"
+        assertEquals(
+            MentionComposer.Selection(3, 7),
+            MentionComposer.clampSelectionOutOfChips(text, 3, 7),
+        )
+    }
+
+    @Test
+    fun clampSnapsBothSelectionEndpointsIndependently() {
+        val chip = "@$aliceNpub"
+        val text = "$chip and $chip"
+        val firstStart = 0
+        val secondStart = "$chip and ".length
+        val secondEnd = secondStart + chip.length
+        // A selection that starts inside the first chip near its left edge and
+        // ends inside the second chip near its right edge: each endpoint snaps
+        // to its own nearer edge.
+        val clamped = MentionComposer.clampSelectionOutOfChips(text, firstStart + 1, secondEnd - 1)
+        assertEquals(firstStart, clamped.start)
+        assertEquals(secondEnd, clamped.end)
     }
 }
