@@ -1044,6 +1044,20 @@ private fun MainShell(
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedChat by remember { mutableStateOf<ChatListItem?>(null) }
+    // The open conversation must survive Activity recreation / process death
+    // (issue #386): the in-app camera foregrounds an external activity that can
+    // get the host process killed on low-memory devices, and on return a null
+    // selection drops the user on the chat list and discards the staged capture
+    // owned by ConversationScreen. Per AGENTS.md we must NOT serialize the
+    // ChatListItem (it wraps FFI records) into the saved bundle — only the
+    // lightweight group id hex is persisted, and selectedChat is re-resolved
+    // from the live ChatsController once its list loads.
+    var savedSelectedGroupIdHex by rememberSaveable { mutableStateOf<String?>(null) }
+    // Reset on each new composition (plain remember, not Saveable): a fresh
+    // composition after process death must be allowed exactly one restore
+    // attempt. Once that attempt runs — or the user explicitly navigates —
+    // the sync effect below owns the saved id and this stays true.
+    var hasRestoredSelectedChat by remember { mutableStateOf(false) }
     // When a conversation is opened from a chat-list message-body search hit
     // (issue #290), this carries the matched message id so ConversationScreen
     // can scroll to and briefly highlight it on open. Null for every other
@@ -1145,6 +1159,46 @@ private fun MainShell(
                 appState.present(R.string.toast_notification_conversation_unavailable)
                 onNotificationTargetHandled(target)
             }
+        }
+    }
+
+    // One-shot restore after process death: once the chat list for the active
+    // account is loaded, re-resolve the saved group id back to a live
+    // ChatListItem (issue #386). Runs before the sync effect can clobber the
+    // saved id, and closes the restore window (hasRestoredSelectedChat) as soon
+    // as the list is ready — whether or not a saved selection was present — so
+    // it never overrides a later explicit user navigation.
+    LaunchedEffect(
+        chatsController,
+        chatsController.boundAccountRef,
+        chatsController.isLoading,
+        chatsController.items,
+    ) {
+        if (hasRestoredSelectedChat) return@LaunchedEffect
+        val chatListReady =
+            chatsController.boundAccountRef == appState.activeAccountRef &&
+                !chatsController.isLoading
+        if (!chatListReady) return@LaunchedEffect
+        val savedGroupId = savedSelectedGroupIdHex
+        if (savedGroupId != null && selectedChat == null) {
+            (chatsController.items + chatsController.archivedItems)
+                .firstOrNull { it.group.groupIdHex == savedGroupId }
+                ?.let {
+                    selectedChatFocusMessageId = null
+                    selectedChat = it
+                }
+        }
+        hasRestoredSelectedChat = true
+    }
+
+    // Keep the saved (Saveable) group id in step with the live selection so a
+    // recreation always restores the right conversation — and so returning to
+    // the chat list (selectedChat == null) clears it, preventing a stale
+    // restore. Gated until the one-shot restore window has closed so it can't
+    // null out the saved id before restore reads it. See issue #386.
+    LaunchedEffect(selectedChat?.group?.groupIdHex, hasRestoredSelectedChat) {
+        if (hasRestoredSelectedChat) {
+            savedSelectedGroupIdHex = selectedChat?.group?.groupIdHex
         }
     }
 
