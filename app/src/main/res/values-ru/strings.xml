@@ -174,7 +174,7 @@
     <string name="local_notifications">Уведомления</string>
     <string name="local_notifications_subtitle">Показывать уведомления о сообщениях и приглашениях во время работы Dark Matter.</string>
     <string name="keep_connected">Оставаться на связи</string>
-    <string name="keep_connected_subtitle">Поддерживайте видимую фоновую службу для оповещений о сообщениях.</string>
+    <string name="keep_connected_subtitle">Получать сообщения, пока Dark Matter работает в фоновом режиме.</string>
     <string name="native_push">Push-уведомления</string>
     <string name="native_push_subtitle">Будит приложение, когда у реле есть новые события для доставки.</string>
     <string name="native_push_unavailable_subtitle">Требуются Google Play и сборка с настроенным push-сервером.</string>

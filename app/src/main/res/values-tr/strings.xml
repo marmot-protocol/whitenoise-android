@@ -172,7 +172,7 @@
     <string name="local_notifications">Bildirimler</string>
     <string name="local_notifications_subtitle">Dark Matter çalışırken mesaj ve davet uyarılarını göster.</string>
     <string name="keep_connected">Bağlı kal</string>
-    <string name="keep_connected_subtitle">Mesaj uyarıları için görünür bir arka plan hizmetinin çalışır durumda kalmasını sağlayın.</string>
+    <string name="keep_connected_subtitle">Dark Matter arka planda çalışırken mesajları al.</string>
     <string name="native_push">Anlık bildirimler</string>
     <string name="native_push_subtitle">Röledeki yeni olayları teslim etmek için uygulamayı uyandırır.</string>
     <string name="native_push_unavailable_subtitle">Google Play hizmetleri ve push sunucusu yapılandırılmış bir derleme gerektirir.</string>
