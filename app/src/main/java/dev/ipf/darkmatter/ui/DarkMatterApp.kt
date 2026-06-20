@@ -1238,6 +1238,13 @@ private fun ChatsScreen(
             searchQuery = ""
         }
     }
+    // Back from chat-list search unwinds the search state — close the field and
+    // restore the normal top bar (which drops focus and the IME) — instead of
+    // exiting the app, matching the Settings/Diagnostics back behavior (#121,
+    // #149). See #320.
+    BackHandler(enabled = searchOpen) {
+        searchOpen = false
+    }
 
     // System voice-input integration for the dictation button. The recognizer
     // is invoked via the standard `ACTION_RECOGNIZE_SPEECH` intent; on a
@@ -11755,6 +11762,7 @@ private fun SettingsHomeScreen(
                 showAccountSelector = false
                 showAddIdentity = true
             },
+            onAccountSwitched = onBackToChats,
         )
     }
     if (showAddIdentity) {
@@ -12205,6 +12213,7 @@ private fun AccountSelectorSheet(
     appState: DarkMatterAppState,
     onDismiss: () -> Unit,
     onAddAccount: () -> Unit,
+    onAccountSwitched: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -12216,6 +12225,9 @@ private fun AccountSelectorSheet(
                             Modifier.clickable {
                                 appState.setActiveAccount(account.label)
                                 onDismiss()
+                                // Land on the newly-active account's chat list
+                                // instead of leaving the user on Settings (#316).
+                                onAccountSwitched()
                             },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         leadingContent = {
