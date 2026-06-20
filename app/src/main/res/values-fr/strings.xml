@@ -159,6 +159,18 @@
     <string name="copy_text">Copier le texte</string>
     <string name="open_emoji_picker">Ouvrir le sélecteur d’émojis</string>
     <string name="reply">Répondre</string>
+    <string name="forward">Transferer</string>
+    <string name="forward_to">Transferer vers</string>
+    <string name="forward_search_chats">Rechercher des discussions</string>
+    <string name="forward_no_chats">Aucune autre discussion vers laquelle transferer.</string>
+    <string name="forward_no_matches">Aucune discussion ne correspond a votre recherche.</string>
+    <plurals name="forward_to_chats_count">
+        <item quantity="one">Transferer vers %1$d discussion</item>
+        <item quantity="other">Transferer vers %1$d discussions</item>
+    </plurals>
+    <string name="toast_forwarded_to_chats">Transfere vers %1$s discussions</string>
+    <string name="toast_forwarded_partial">Transfere vers %1$s discussions ; certaines ont echoue</string>
+    <string name="toast_forward_failed">Impossible de transferer le message</string>
     <string name="delete">Supprimer</string>
     <string name="sent">Envoyé</string>
     <string name="send_failed">Échec de l’envoi du message. Veuillez réessayer.</string>

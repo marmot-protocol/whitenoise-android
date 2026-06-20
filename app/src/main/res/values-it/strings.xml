@@ -159,6 +159,18 @@
     <string name="copy_text">Copia testo</string>
     <string name="open_emoji_picker">Apri selettore emoji</string>
     <string name="reply">Rispondi</string>
+    <string name="forward">Inoltra</string>
+    <string name="forward_to">Inoltra a</string>
+    <string name="forward_search_chats">Cerca chat</string>
+    <string name="forward_no_chats">Nessun\'altra chat a cui inoltrare.</string>
+    <string name="forward_no_matches">Nessuna chat corrisponde alla ricerca.</string>
+    <plurals name="forward_to_chats_count">
+        <item quantity="one">Inoltra a %1$d chat</item>
+        <item quantity="other">Inoltra a %1$d chat</item>
+    </plurals>
+    <string name="toast_forwarded_to_chats">Inoltrato a %1$s chat</string>
+    <string name="toast_forwarded_partial">Inoltrato a %1$s chat; alcune non sono riuscite</string>
+    <string name="toast_forward_failed">Impossibile inoltrare il messaggio</string>
     <string name="delete">Elimina</string>
     <string name="sent">Inviato</string>
     <string name="send_failed">Invio del messaggio fallito. Riprova.</string>
