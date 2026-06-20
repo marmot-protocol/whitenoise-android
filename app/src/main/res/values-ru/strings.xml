@@ -570,4 +570,24 @@
     <string name="conversation_search_no_matches">Совпадений нет</string>
     <string name="message_read_more">Читать далее</string>
     <string name="message_react">Отреагировать</string>
+    <string name="sign_out">Выйти</string>
+    <string name="sign_out_and_wipe">Выйти &amp; стереть</string>
+    <string name="sign_out_and_wipe_confirm_body">Это действие нельзя отменить на этом устройстве. Локальная база данных, состояние MLS, запись в связке ключей и пакеты ключей на реле для этого аккаунта будут удалены.</string>
+    <string name="sign_out_and_wipe_confirm_field_label">Подтверждение</string>
+    <string name="sign_out_and_wipe_confirm_instruction">Введите %1$s для подтверждения.</string>
+    <string name="sign_out_and_wipe_confirm_title">Стереть этот аккаунт?</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_db">Локальная база данных сообщений и состояние группы MLS для этого аккаунта.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_heading">Что будет уничтожено</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_keychain">Запись этой личности в связке ключей на этом устройстве.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_relays">Неиспользованные пакеты ключей, опубликованные для этого аккаунта на реле.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Повторный вход с тем же ключом начинается с чистого листа: группы загружаются заново, а медиафайлы скачиваются повторно.</string>
+    <string name="sign_out_and_wipe_sheet_intro">Это безвозвратно удаляет этот аккаунт с данного устройства.</string>
+    <string name="sign_out_and_wipe_sheet_title">Выйти &amp; стереть</string>
+    <string name="sign_out_sheet_changes_body">Push-уведомления для этого аккаунта отключаются, а кэш в памяти очищается.</string>
+    <string name="sign_out_sheet_changes_heading">Что изменится</string>
+    <string name="sign_out_sheet_stays_body">Ваши группы, история сообщений и черновики сохраняются. Личность остаётся в связке ключей устройства, поэтому вы можете снова войти из списка аккаунтов.</string>
+    <string name="sign_out_sheet_stays_heading">Остаётся на этом устройстве</string>
+    <string name="sign_out_sheet_title">Выйти</string>
+    <string name="toast_signed_out_and_wiped">Аккаунт стёрт с этого устройства</string>
+    <string name="wipe">Стереть</string>
 </resources>

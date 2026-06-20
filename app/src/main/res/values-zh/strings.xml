@@ -552,4 +552,24 @@
     <string name="conversation_search_no_matches">无匹配项</string>
     <string name="message_read_more">阅读更多</string>
     <string name="message_react">回应</string>
+    <string name="sign_out">退出登录</string>
+    <string name="sign_out_and_wipe">退出登录并清除</string>
+    <string name="sign_out_and_wipe_confirm_body">此操作在本设备上无法撤销。该账户的本地数据库、MLS 状态、钥匙串条目以及中继上的密钥包都将被删除。</string>
+    <string name="sign_out_and_wipe_confirm_field_label">确认操作</string>
+    <string name="sign_out_and_wipe_confirm_instruction">输入 %1$s 以确认。</string>
+    <string name="sign_out_and_wipe_confirm_title">要清除此账户吗？</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_db">该账户的本地消息数据库和 MLS 群组状态。</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_heading">将被销毁的内容</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_keychain">该身份在本设备钥匙串中的条目。</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_relays">为该账户在中继上发布的未使用密钥包。</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">使用同一密钥重新登录会从头开始：群组将重新获取，媒体将重新下载。</string>
+    <string name="sign_out_and_wipe_sheet_intro">此操作会将该账户从本设备永久移除。</string>
+    <string name="sign_out_and_wipe_sheet_title">退出登录并清除</string>
+    <string name="sign_out_sheet_changes_body">该账户的推送通知将被关闭，内存中的缓存将被清空。</string>
+    <string name="sign_out_sheet_changes_heading">将发生的变化</string>
+    <string name="sign_out_sheet_stays_body">你的群组、消息记录和草稿都会保留。该身份仍保存在设备钥匙串中，因此你可以从账户选择器重新登录。</string>
+    <string name="sign_out_sheet_stays_heading">保留在本设备上</string>
+    <string name="sign_out_sheet_title">退出登录</string>
+    <string name="toast_signed_out_and_wiped">账户已从本设备清除</string>
+    <string name="wipe">清除</string>
 </resources>

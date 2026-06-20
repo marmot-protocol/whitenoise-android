@@ -561,4 +561,24 @@
     <string name="conversation_search_no_matches">Nenhum resultado</string>
     <string name="message_read_more">Ler mais</string>
     <string name="message_react">Reagir</string>
+    <string name="sign_out">Sair</string>
+    <string name="sign_out_and_wipe">Sair &amp; apagar</string>
+    <string name="sign_out_and_wipe_confirm_body">Isto não pode ser desfeito a partir deste dispositivo. A base de dados local, o estado do MLS, a entrada no chaveiro e os pacotes de chaves nos relays desta conta serão removidos.</string>
+    <string name="sign_out_and_wipe_confirm_field_label">Confirmação necessária</string>
+    <string name="sign_out_and_wipe_confirm_instruction">Digite %1$s para confirmar.</string>
+    <string name="sign_out_and_wipe_confirm_title">Apagar esta conta?</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_db">A base de dados local de mensagens e o estado do grupo MLS desta conta.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_heading">O que é destruído</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_keychain">A entrada da identidade no chaveiro deste dispositivo.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_relays">Pacotes de chaves pendentes publicados para esta conta nos relays.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Entrar novamente com a mesma chave começa do zero: os grupos são obtidos de novo e a mídia é baixada novamente.</string>
+    <string name="sign_out_and_wipe_sheet_intro">Isto remove permanentemente esta conta deste dispositivo.</string>
+    <string name="sign_out_and_wipe_sheet_title">Sair &amp; apagar</string>
+    <string name="sign_out_sheet_changes_body">As notificações push desta conta são desativadas e os caches em memória são limpos.</string>
+    <string name="sign_out_sheet_changes_heading">O que muda</string>
+    <string name="sign_out_sheet_stays_body">Os teus grupos, o histórico de mensagens e os rascunhos são mantidos. A identidade permanece no chaveiro do dispositivo, por isso podes entrar novamente a partir do seletor de contas.</string>
+    <string name="sign_out_sheet_stays_heading">Permanece neste dispositivo</string>
+    <string name="sign_out_sheet_title">Sair</string>
+    <string name="toast_signed_out_and_wiped">Conta apagada deste dispositivo</string>
+    <string name="wipe">Apagar</string>
 </resources>

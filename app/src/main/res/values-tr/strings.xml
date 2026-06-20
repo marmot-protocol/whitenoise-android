@@ -558,4 +558,24 @@
     <string name="conversation_search_no_matches">Eşleşme yok</string>
     <string name="message_read_more">Daha fazla oku</string>
     <string name="message_react">Tepki ver</string>
+    <string name="sign_out">Oturumu kapat</string>
+    <string name="sign_out_and_wipe">Oturumu kapat &amp; sil</string>
+    <string name="sign_out_and_wipe_confirm_body">Bu işlem bu cihazda geri alınamaz. Bu hesaba ait yerel veritabanı, MLS durumu, anahtar zinciri kaydı ve rölelerdeki anahtar paketleri kaldırılacak.</string>
+    <string name="sign_out_and_wipe_confirm_field_label">Doğrulama</string>
+    <string name="sign_out_and_wipe_confirm_instruction">Onaylamak için %1$s yazın.</string>
+    <string name="sign_out_and_wipe_confirm_title">Bu hesap silinsin mi?</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_db">Bu hesaba ait yerel mesaj veritabanı ve MLS grup durumu.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_heading">Neler silinir</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_keychain">Kimliğin bu cihazdaki anahtar zinciri kaydı.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_relays">Bu hesap için rölelerde yayımlanmış bekleyen anahtar paketleri.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Aynı anahtarla tekrar oturum açmak sıfırdan başlar: gruplar yeniden alınır ve medya yeniden indirilir.</string>
+    <string name="sign_out_and_wipe_sheet_intro">Bu, bu hesabı bu cihazdan kalıcı olarak kaldırır.</string>
+    <string name="sign_out_and_wipe_sheet_title">Oturumu kapat &amp; sil</string>
+    <string name="sign_out_sheet_changes_body">Bu hesaba ait anlık bildirimler kapatılır ve bellekteki önbellekler temizlenir.</string>
+    <string name="sign_out_sheet_changes_heading">Neler değişir</string>
+    <string name="sign_out_sheet_stays_body">Gruplarınız, mesaj geçmişiniz ve taslaklarınız korunur. Kimlik cihazın anahtar zincirinde kalır, böylece hesap seçicisinden tekrar oturum açabilirsiniz.</string>
+    <string name="sign_out_sheet_stays_heading">Bu cihazda kalır</string>
+    <string name="sign_out_sheet_title">Oturumu kapat</string>
+    <string name="toast_signed_out_and_wiped">Hesap bu cihazdan silindi</string>
+    <string name="wipe">Sil</string>
 </resources>
