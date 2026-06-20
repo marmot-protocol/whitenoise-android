@@ -337,6 +337,9 @@ class DarkMatterAppState(
     var accounts by mutableStateOf<List<AccountSummaryFfi>>(emptyList())
         private set
 
+    var accountUnreadCounts by mutableStateOf<Map<String, ULong>>(emptyMap())
+        private set
+
     var activeAccountRef by mutableStateOf(preferences.getString(ACTIVE_ACCOUNT_KEY, null))
         private set
 
@@ -805,7 +808,55 @@ class DarkMatterAppState(
     }
 
     suspend fun refreshAccounts() {
-        accounts = marmotIo { listAccounts() }
+        val refreshedAccounts = marmotIo { listAccounts() }
+        accounts = refreshedAccounts
+        refreshAccountUnreadCounts(refreshedAccounts)
+    }
+
+    fun unreadCountForAccount(accountRef: String): ULong = accountUnreadCounts[accountRef] ?: 0uL
+
+    internal fun updateAccountUnreadCount(
+        accountRef: String?,
+        unreadCount: ULong,
+    ) {
+        val ref = accountRef?.takeIf { it.isNotBlank() } ?: return
+        accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
+    }
+
+    private suspend fun refreshAccountUnreadCounts(accountSummaries: List<AccountSummaryFfi> = accounts) {
+        val refs = accountSummaries.map { it.label }.filter { it.isNotBlank() }
+        if (refs.isEmpty()) {
+            accountUnreadCounts = emptyMap()
+            return
+        }
+        val previous = accountUnreadCounts
+        val refreshedCounts =
+            runCatching {
+                marmotIo {
+                    refs.associateWith { ref ->
+                        runCatching { accountUnreadCount(chatList(ref, includeArchived = true)) }
+                            .onFailure {
+                                appStateDebug(it) { "account unread refresh failed account=${ref.take(8)}: ${it.readableMessage()}" }
+                            }.getOrElse { previous[ref] ?: 0uL }
+                    }
+                }
+            }.onFailure {
+                appStateDebug(it) { "account unread refresh failed: ${it.readableMessage()}" }
+            }.getOrNull()
+                ?: return
+        accountUnreadCounts = refreshedCounts
+    }
+
+    private suspend fun refreshAccountUnreadCount(accountRef: String) {
+        val ref = accountRef.takeIf { it.isNotBlank() } ?: return
+        val unreadCount =
+            runCatching {
+                marmotIo { accountUnreadCount(chatList(ref, includeArchived = true)) }
+            }.onFailure {
+                appStateDebug(it) { "account unread refresh failed account=${ref.take(8)}: ${it.readableMessage()}" }
+            }.getOrNull()
+                ?: return
+        updateAccountUnreadCount(ref, unreadCount)
     }
 
     fun setActiveAccount(label: String) {
@@ -2082,6 +2133,7 @@ class DarkMatterAppState(
                                         notificationSenderName(update),
                                     )
                                 }
+                                refreshAccountUnreadCount(update.accountRef)
                             }
                         } finally {
                             runCatching {

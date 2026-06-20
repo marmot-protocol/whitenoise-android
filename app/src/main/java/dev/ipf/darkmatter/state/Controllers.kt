@@ -1226,6 +1226,10 @@ class ChatsController(
     }
 
     private fun recompute() {
+        val unreadAccountRef = accountRef
+        if (unreadAccountRef != null) {
+            appState.updateAccountUnreadCount(unreadAccountRef, accountUnreadCount(chatRows))
+        }
         // Hidden behind an open conversation: keep folding updates into the
         // backing maps (done by the caller) but defer the projection rebuild +
         // member/preview fan-out until the list returns, then run once. See #6.
