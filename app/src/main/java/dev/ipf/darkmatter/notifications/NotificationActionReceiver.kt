@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class NotificationActionReceiver : BroadcastReceiver() {
@@ -45,6 +46,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val application = appContext as? DarkMatterApplication ?: return
         val appState = application.appState
         appState.ensureNotificationRuntimeStarted()
+        // Set when a direct reply was sent, so the cancel below can clear the
+        // system's reply-lifetime-extension (a bare cancel can't dismiss it).
+        var sentReplyText: String? = null
         val handled =
             when (action.kind) {
                 NotificationActionKind.REPLY -> {
@@ -65,6 +69,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                                 text = reply,
                             )
                         if (sent) {
+                            sentReplyText = reply
                             // mark-read is a best-effort UX nicety; a transient
                             // failure (or thrown FFI/network error) must never keep
                             // the notification alive, or its still-active inline
@@ -98,9 +103,35 @@ class NotificationActionReceiver : BroadcastReceiver() {
             }
 
         if (handled) {
-            LocalNotificationPresenter(appContext).cancel(action.notificationTag, action.notificationId)
+            val presenter = LocalNotificationPresenter(appContext)
+            val reply = sentReplyText
+            if (reply != null) {
+                // A sent direct reply leaves the notification lifetime-extended
+                // by the system; a bare cancel() can't dismiss it. Signal
+                // "reply handled" (setRemoteInputHistory) to clear the
+                // extension, then cancel. The extension is applied a beat after
+                // the broadcast fires, so retry the re-post until the live
+                // notification appears, then let NMS settle before cancelling.
+                var resolved = false
+                repeat(REPLY_DISMISS_RETRIES) {
+                    if (!resolved) {
+                        resolved = presenter.markDirectReplyHandled(action.notificationTag, action.notificationId, reply)
+                        if (!resolved) delay(REPLY_DISMISS_RETRY_DELAY_MS)
+                    }
+                }
+                if (resolved) delay(REPLY_DISMISS_SETTLE_MS)
+            }
+            presenter.cancel(action.notificationTag, action.notificationId)
         }
     }
 }
 
 internal fun notificationReplyActionHandled(sent: Boolean): Boolean = sent
+
+// The system applies FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY a beat after the
+// reply broadcast fires, so the live notification may not be in the active set
+// on the first look; retry the "reply handled" re-post a few times, then give
+// NMS a moment to clear the extension before cancelling.
+private const val REPLY_DISMISS_RETRIES = 6
+private const val REPLY_DISMISS_RETRY_DELAY_MS = 100L
+private const val REPLY_DISMISS_SETTLE_MS = 350L
