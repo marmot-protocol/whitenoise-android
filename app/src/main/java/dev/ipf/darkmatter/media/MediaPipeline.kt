@@ -194,6 +194,83 @@ object MediaPipeline {
     }
 
     /**
+     * Decode the image at [uri] downscaled so the longer edge is ≈
+     * [maxEdgePx], preserving the source format and alpha channel. Two-pass
+     * (bounds, then sampled decode) so a 12MP source never inflates to a
+     * ~50 MB ARGB_8888 bitmap, then an exact scale to enforce the cap.
+     *
+     * Unlike [readDownscaledJpeg] this does **no** JPEG re-encode: it returns
+     * a `Bitmap` straight from the decoder. Used by the composer staging
+     * preview, which only needs to *show* the picked image — recompressing to
+     * JPEG first (then re-decoding those bytes at full resolution) both
+     * flattened transparent PNGs onto white and doubled the decode work,
+     * whose silent OOM/encode failures left the tile stuck on a spinner that
+     * never resolved (see #387). Mirrors [decodeSampledBitmap]'s sampling and
+     * OOM guards, sourcing from a `ContentResolver` stream instead of bytes.
+     *
+     * Returns null on any I/O, security, decode, or OOM failure so the caller
+     * can fall back to a placeholder rather than crash.
+     */
+    fun decodeSampledFromUri(
+        contentResolver: ContentResolver,
+        uri: Uri,
+        maxEdgePx: Int = THUMBNAIL_MAX_EDGE_PX,
+    ): Bitmap? =
+        try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            contentResolver.openInputStream(uri).use { stream ->
+                stream ?: return null
+                BitmapFactory.decodeStream(stream, null, bounds)
+            }
+            val srcW = bounds.outWidth
+            val srcH = bounds.outHeight
+            if (srcW <= 0 || srcH <= 0) {
+                null
+            } else {
+                val (targetW, targetH) = targetDimensions(srcW, srcH, maxEdgePx)
+                if (targetW == 0 || targetH == 0) {
+                    null
+                } else {
+                    val opts =
+                        BitmapFactory.Options().apply {
+                            inSampleSize = computeInSampleSize(srcW, srcH, targetW, targetH)
+                        }
+                    val decoded =
+                        contentResolver.openInputStream(uri).use { stream ->
+                            if (stream == null) {
+                                null
+                            } else {
+                                try {
+                                    BitmapFactory.decodeStream(stream, null, opts)
+                                } catch (_: OutOfMemoryError) {
+                                    null
+                                }
+                            }
+                        }
+                    when {
+                        decoded == null -> null
+                        decoded.width == targetW && decoded.height == targetH -> decoded
+                        else ->
+                            try {
+                                Bitmap
+                                    .createScaledBitmap(decoded, targetW, targetH, true)
+                                    .also { if (it !== decoded) decoded.recycle() }
+                            } catch (_: OutOfMemoryError) {
+                                decoded.recycle()
+                                null
+                            }
+                    }
+                }
+            }
+        } catch (_: java.io.IOException) {
+            null
+        } catch (_: SecurityException) {
+            null
+        } catch (_: OutOfMemoryError) {
+            null
+        }
+
+    /**
      * Compute the bitmap dimensions for a downscale that fits inside a
      * square of `maxEdgePx`. Preserves aspect ratio. Returns the source
      * dimensions unchanged when the image is already within bounds — no

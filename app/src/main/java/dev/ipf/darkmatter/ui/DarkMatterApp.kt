@@ -6073,13 +6073,23 @@ private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
                         }
                     }.getOrNull()
                 } else {
+                    // Decode the picked image straight to a sampled bitmap,
+                    // preserving its native format and alpha. Earlier this
+                    // round-tripped through MediaPipeline.readDownscaledJpeg
+                    // (recompress to JPEG) and then re-decoded those bytes at
+                    // full resolution — that flattened transparent PNGs onto
+                    // white and, on large lossless sources (e.g. PNG
+                    // screenshots), the recompress or the un-sampled re-decode
+                    // could silently OOM/fail, leaving the staging tile stuck
+                    // on a spinner that never resolved (#387). Mirrors the
+                    // in-bubble thumbnail path (decodeSampledBitmap).
                     runCatching {
-                        val jpeg = MediaPipeline.readDownscaledJpeg(context.contentResolver, uri)
-                        jpeg?.bytes?.let { bytes ->
-                            android.graphics.BitmapFactory
-                                .decodeByteArray(bytes, 0, bytes.size)
-                                ?.asImageBitmap()
-                        }
+                        MediaPipeline
+                            .decodeSampledFromUri(
+                                context.contentResolver,
+                                uri,
+                                MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                            )?.asImageBitmap()
                     }.getOrNull()
                 }
             }
