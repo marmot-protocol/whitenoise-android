@@ -6,12 +6,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Hold-to-record controller. Slide left to cancel, slide up to lock,
@@ -108,11 +110,28 @@ class VoiceRecordingController(
         verticalOffsetPx = 0f
         willCancel = false
         willLock = false
-        val result = r.stop()
-        if (result == null) {
-            onError(IllegalStateException("voice recording too short"))
-        } else {
-            onRecordingComplete(result.file, result.durationMs)
+        // Finalize off the main thread: MediaRecorder.stop() flushes/finalizes
+        // the MP4 container and can block for tens-to-hundreds of ms (worse on
+        // slow storage), causing jank/ANR exactly as the record bar animates
+        // away. UI state is already reset above; deliver the result on Main once
+        // the container is finalized. See #372.
+        scope.launch(Dispatchers.Main) {
+            try {
+                val result = withContext(Dispatchers.IO) { r.stop() }
+                if (result == null) {
+                    onError(IllegalStateException("voice recording too short"))
+                } else {
+                    onRecordingComplete(result.file, result.durationMs)
+                }
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                // VoiceRecorder.stop() is exception-safe today (returns null on
+                // failure), but route any unexpected finalize error to onError
+                // too — matching start()'s contract — rather than dropping it on
+                // the scope's handler.
+                onError(t)
+            }
         }
     }
 
@@ -127,7 +146,9 @@ class VoiceRecordingController(
         verticalOffsetPx = 0f
         willCancel = false
         willLock = false
-        r.cancel()
+        // Same off-main finalize as stop() (#372); a cancel has nothing to
+        // deliver, so just release the recorder in the background.
+        scope.launch(Dispatchers.IO) { r.cancel() }
     }
 
     fun lock() {

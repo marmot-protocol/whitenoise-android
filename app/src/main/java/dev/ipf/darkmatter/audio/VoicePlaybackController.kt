@@ -16,6 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -203,6 +204,15 @@ object VoicePlaybackController {
                     }
                 }.onFailure { Log.w(TAG, "MediaPlayer prepare failed", it) }
                     .getOrNull()
+                    ?.also {
+                        // If the caller was cancelled while prepare() ran (the
+                        // clip scrolled away, the screen was left, a sign-out
+                        // landed), withContext discards this result on resume and
+                        // releasePlayerInternal can never find it — release here
+                        // so the native player + its file descriptor don't leak.
+                        // See #370.
+                        if (!isActive) it.runCatching { release() }
+                    }?.takeIf { isActive }
             } ?: run {
                 _state.value = PlaybackState()
                 return
