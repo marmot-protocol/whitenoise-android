@@ -12767,6 +12767,7 @@ private fun ProfileEditScreen(
     // not a developer surface. See #286.
     var showPictureSheet by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
 
     LaunchedEffect(active?.accountIdHex) {
         val profile = active?.accountIdHex?.let { appState.loadUserProfile(it) }
@@ -12854,11 +12855,24 @@ private fun ProfileEditScreen(
                             displayName.ifBlank { stringResource(R.string.anonymous) },
                             style = MaterialTheme.typography.titleLarge,
                         )
+                        // Tap to copy the full npub (#287). Same affordance as
+                        // the Identity screen npub row and member rows.
+                        val copyNpubLabel = stringResource(R.string.copy)
                         Text(
                             appState.shortNpub(active.accountIdHex),
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier =
+                                Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .clickable(
+                                        onClickLabel = copyNpubLabel,
+                                        role = Role.Button,
+                                    ) {
+                                        clipboard.setText(AnnotatedString(appState.npub(active.accountIdHex)))
+                                        appState.present(R.string.toast_copied_npub)
+                                    },
                         )
                         // Surface an invalid stored picture URL right on the
                         // avatar control. The inline Picture URL row is gone, so
