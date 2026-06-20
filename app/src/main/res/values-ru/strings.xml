@@ -30,6 +30,10 @@
     <string name="chat_list_filter_unread">Непрочитанные</string>
     <string name="chat_list_no_unread">Всё прочитано</string>
     <string name="chat_list_no_results_for">Нет результатов для «%1$s»</string>
+    <string name="chat_list_search_resolving">Поиск профиля…</string>
+    <string name="chat_list_search_open_profile">Открыть профиль</string>
+    <string name="chat_list_search_nip05_not_found">Профиль для «%1$s» не найден</string>
+    <string name="chat_list_search_invalid_npub">Это не похоже на действительный npub</string>
     <string name="chat_row_swipe_archive">Архивировать</string>
     <string name="chat_row_swipe_unarchive">Восстановить</string>
     <string name="chat_row_action_archive">Архивировать</string>

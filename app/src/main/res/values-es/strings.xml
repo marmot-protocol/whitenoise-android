@@ -30,6 +30,10 @@
     <string name="chat_list_filter_unread">No leídos</string>
     <string name="chat_list_no_unread">Todo al día</string>
     <string name="chat_list_no_results_for">Sin resultados para \"%1$s\"</string>
+    <string name="chat_list_search_resolving">Buscando perfil…</string>
+    <string name="chat_list_search_open_profile">Abrir perfil</string>
+    <string name="chat_list_search_nip05_not_found">No se encontró ningún perfil para \"%1$s\"</string>
+    <string name="chat_list_search_invalid_npub">Eso no parece un npub válido</string>
     <string name="chat_row_swipe_archive">Archivar</string>
     <string name="chat_row_swipe_unarchive">Desarchivar</string>
     <string name="chat_row_action_archive">Archivar</string>
