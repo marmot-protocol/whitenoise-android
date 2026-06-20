@@ -1706,6 +1706,24 @@ class ConversationController(
     val canLeaveGroup: Boolean
         get() = GroupProjector.canLeaveGroup(group, appState.activeAccount?.accountIdHex, members.size)
 
+    /**
+     * True when the active account is the only admin of a group that still has
+     * other members, i.e. trapped: they can't revoke their own admin or leave
+     * until they hand admin to someone else. The group-detail UI uses this to
+     * surface the "Transfer admin" entry point from the blocked revoke / leave
+     * paths (issue #417).
+     */
+    val isSoleAdminWithOtherMembers: Boolean
+        get() = GroupProjector.isSoleAdminWithOtherMembers(group, appState.activeAccount?.accountIdHex, members.size)
+
+    /** Members eligible to receive a transferred admin role from the active account. */
+    fun transferAdminCandidates(): List<AppGroupMemberRecordFfi> =
+        members.filter { GroupProjector.canTransferAdminTo(group, it, appState.activeAccount?.accountIdHex) }
+
+    fun revokeWouldDepleteAdmins(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.revokeWouldDepleteAdmins(group, member, members.size)
+
+    fun canTransferAdminTo(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.canTransferAdminTo(group, member, appState.activeAccount?.accountIdHex)
+
     suspend fun start() {
         val account = conversationAccountRef ?: return
         isLoading = true
@@ -3290,6 +3308,75 @@ class ConversationController(
                 val message = mutationError(it)
                 lastMutationError = message
                 appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message))
+            }.getOrDefault(false)
+        }
+
+    /**
+     * Transfer admin to [member]: grant them admin, then step down ourselves.
+     *
+     * Ordering is enforced — grant first, self-demote second — so the group is
+     * never momentarily left with no admin (which the engine would reject and
+     * which would strand the sole-admin transfer the Leave-group flow depends
+     * on, issue #417). If the grant succeeds but the self-demote fails, the
+     * target keeps the admin rights they were just given and we surface a
+     * partial-failure toast naming the mid-state rather than the generic
+     * "couldn't update admin" copy. The caller (active account) must be an
+     * admin; the target must not already be one.
+     */
+    suspend fun transferAdmin(member: AppGroupMemberRecordFfi): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            val activeAccountIdHex = appState.activeAccount?.accountIdHex
+            // promote_admin / self_demote_admin sign the new admin list onto
+            // the MLS group, so the grant target needs a Nostr pubkey hex, not
+            // a local-account label. memberIdHex is always the hex.
+            val target = member.memberIdHex
+            if (!GroupProjector.canTransferAdminTo(group, member, activeAccountIdHex)) {
+                // Already an admin, the active account isn't an admin, or the
+                // target is the active account itself. Nothing to transfer.
+                appState.present(R.string.toast_couldnt_update_admin, R.string.toast_cant_transfer_admin)
+                return@withMutationLockResult false
+            }
+            // Tracks whether the grant landed before the self-demote attempt so
+            // a self-demote failure reports the partial state honestly.
+            var grantedBeforeDemote = false
+            runCatching {
+                appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
+                grantedBeforeDemote = true
+                val withTarget = group.admins.toMutableList()
+                if (withTarget.none { it.equals(target, ignoreCase = true) }) {
+                    withTarget += target
+                }
+                group = group.copy(admins = withTarget)
+
+                appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
+                // Case-insensitive so admin-list hex casing drift from the
+                // active account id doesn't leave the UI showing us as admin
+                // after a successful self-demote.
+                group =
+                    group.copy(
+                        admins =
+                            group.admins.filterNot {
+                                activeAccountIdHex != null && it.equals(activeAccountIdHex, ignoreCase = true)
+                            },
+                    )
+                refreshMembers()
+                appState.present(R.string.toast_admin_transferred)
+                true
+            }.onFailure {
+                it.rethrowIfCancellation()
+                val message = mutationError(it)
+                lastMutationError = message
+                if (grantedBeforeDemote) {
+                    // Target is now an admin but we couldn't step down. Keep the
+                    // local admin list converged on that fact and tell the user
+                    // so they can retry the step-down (or revoke the grant).
+                    refreshMembers()
+                    appState.present(R.string.toast_granted_but_couldnt_step_down, AppText.Plain(message))
+                } else {
+                    appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message))
+                }
             }.getOrDefault(false)
         }
 

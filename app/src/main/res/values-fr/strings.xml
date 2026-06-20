@@ -393,6 +393,16 @@
     <string name="toast_admin_added">Administrateur ajouté</string>
     <string name="toast_admin_removed">Administrateur supprimé</string>
     <string name="toast_couldnt_update_admin">Impossible de mettre à jour l’admin</string>
+    <string name="transfer_admin">Transférer l’admin</string>
+    <string name="transferring_admin">Transfert de l’admin…</string>
+    <string name="toast_admin_transferred">Admin transféré</string>
+    <string name="toast_cant_transfer_admin">Ce membre ne peut pas devenir admin.</string>
+    <string name="toast_granted_but_couldnt_step_down">Admin accordé, mais impossible de vous retirer. Réessayez.</string>
+    <string name="confirm_transfer_admin_title">Transférer l’admin ?</string>
+    <string name="confirm_transfer_admin_message">%1$s devient admin et vous vous retirez. Vous pourrez redevenir admin plus tard.</string>
+    <string name="sole_admin_transfer_hint">Vous êtes le seul admin. Transférez l’admin pour partir ou vous retirer.</string>
+    <string name="transfer_admin_picker_subtitle">Choisissez un membre à nommer admin. Vous vous retirerez dès qu’il accepte.</string>
+    <string name="transfer_admin_no_candidates">Aucun autre membre à qui transférer l’admin.</string>
     <string name="toast_couldnt_load_mls_state">Impossible de charger l’état MLS</string>
     <string name="toast_security_privacy_updated">Sécurité et confidentialité mises à jour</string>
     <string name="toast_couldnt_update_security_privacy">Impossible de mettre à jour la sécurité et la confidentialité</string>

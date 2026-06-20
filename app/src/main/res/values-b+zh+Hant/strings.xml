@@ -392,6 +392,16 @@
     <string name="toast_admin_added">管理員已新增</string>
     <string name="toast_admin_removed">管理員已刪除</string>
     <string name="toast_couldnt_update_admin">無法更新管理員</string>
+    <string name="transfer_admin">轉讓管理員</string>
+    <string name="transferring_admin">正在轉讓管理員…</string>
+    <string name="toast_admin_transferred">管理員已轉讓</string>
+    <string name="toast_cant_transfer_admin">無法將管理員轉讓給該成員。</string>
+    <string name="toast_granted_but_couldnt_step_down">已授予管理員，但無法卸任。請重試。</string>
+    <string name="confirm_transfer_admin_title">轉讓管理員？</string>
+    <string name="confirm_transfer_admin_message">%1$s 將成為管理員，而你將卸任。你以後可以再次被設為管理員。</string>
+    <string name="sole_admin_transfer_hint">你是唯一的管理員。請先轉讓管理員才能離開或卸任。</string>
+    <string name="transfer_admin_picker_subtitle">選擇一名成員設為管理員。對方接受後你將卸任。</string>
+    <string name="transfer_admin_no_candidates">沒有其他成員可以轉讓管理員。</string>
     <string name="toast_couldnt_load_mls_state">無法載入 MLS 狀態</string>
     <string name="toast_security_privacy_updated">安全與隱私已更新</string>
     <string name="toast_couldnt_update_security_privacy">無法更新安全與隱私</string>

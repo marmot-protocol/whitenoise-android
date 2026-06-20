@@ -8056,6 +8056,10 @@ private fun GroupDetailsScreen(
     var showEditProfile by remember { mutableStateOf(false) }
     var showImageSearch by remember { mutableStateOf(false) }
     var showAddMember by remember { mutableStateOf(false) }
+    // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
+    // leave path and the Admins prompt so a trapped sole admin can hand the
+    // role to another member (issue #417).
+    var showTransferAdmin by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
     var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     // Scoped to the visible group; the controller mutation continues on appState
@@ -8293,6 +8297,17 @@ private fun GroupDetailsScreen(
                     }
                 },
             ) {
+                if (controller.isSelfMember && controller.isSoleAdminWithOtherMembers) {
+                    // Trapped sole admin: they can't leave or step down until
+                    // they hand admin to someone else. Surface the transfer
+                    // entry point right here so the otherwise-blocked leave /
+                    // revoke paths have a way forward (issue #417).
+                    SoleAdminTransferPrompt(
+                        enabled = activeMutation == null && !controller.mutationInFlight,
+                        onTransfer = { showTransferAdmin = true },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                }
                 controller.members.forEach { member ->
                     GroupMemberRow(
                         member = member,
@@ -8319,6 +8334,9 @@ private fun GroupDetailsScreen(
                                 mutation = { controller.stepDownAsAdmin() },
                                 target = member.memberIdHex,
                             )
+                        },
+                        onTransfer = {
+                            pendingConfirm = DetailsConfirm.TransferAdmin(member)
                         },
                         onRemove = {
                             pendingConfirm = DetailsConfirm.RemoveMember(member)
@@ -8616,6 +8634,19 @@ private fun GroupDetailsScreen(
         }
     }
 
+    if (showTransferAdmin) {
+        TransferAdminSheet(
+            controller = controller,
+            appState = appState,
+            busy = activeMutation != null || controller.mutationInFlight,
+            onPick = { member ->
+                showTransferAdmin = false
+                pendingConfirm = DetailsConfirm.TransferAdmin(member)
+            },
+            onDismiss = { showTransferAdmin = false },
+        )
+    }
+
     pendingConfirm?.let { confirm ->
         when (confirm) {
             is DetailsConfirm.RemoveMember ->
@@ -8637,6 +8668,25 @@ private fun GroupDetailsScreen(
                     },
                     onDismiss = { pendingConfirm = null },
                     destructive = true,
+                )
+            is DetailsConfirm.TransferAdmin ->
+                ConfirmDialog(
+                    title = stringResource(R.string.confirm_transfer_admin_title),
+                    message =
+                        stringResource(
+                            R.string.confirm_transfer_admin_message,
+                            controller.memberDisplayName(confirm.member),
+                        ),
+                    confirmLabel = stringResource(R.string.transfer_admin),
+                    onConfirm = {
+                        pendingConfirm = null
+                        runGroupMutation(
+                            action = GroupMutationAction.TransferAdmin,
+                            mutation = { controller.transferAdmin(confirm.member) },
+                            target = confirm.member.memberIdHex,
+                        )
+                    },
+                    onDismiss = { pendingConfirm = null },
                 )
             is DetailsConfirm.Leave ->
                 ConfirmDialog(
@@ -9203,6 +9253,10 @@ private sealed class DetailsConfirm {
         val member: AppGroupMemberRecordFfi,
     ) : DetailsConfirm()
 
+    data class TransferAdmin(
+        val member: AppGroupMemberRecordFfi,
+    ) : DetailsConfirm()
+
     /**
      * Standard leave: the active account is an ordinary member (or an admin
      * with at least one other admin left behind). Confirm → leave.
@@ -9238,6 +9292,7 @@ private enum class GroupMutationAction {
     PromoteAdmin,
     DemoteAdmin,
     SelfDemoteAdmin,
+    TransferAdmin,
     Archive,
     Leave,
 }
@@ -9256,6 +9311,7 @@ private fun GroupMemberRow(
     onPromote: () -> Unit,
     onDemote: () -> Unit,
     onSelfDemote: () -> Unit,
+    onTransfer: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
@@ -9355,6 +9411,12 @@ private fun GroupMemberRow(
                 )
                 if (!isAdmin) {
                     IconButton(
+                        onClick = onTransfer,
+                        enabled = !controller.mutationInFlight,
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = stringResource(R.string.transfer_admin))
+                    }
+                    IconButton(
                         onClick = onRemove,
                         enabled = !controller.mutationInFlight,
                     ) {
@@ -9381,9 +9443,156 @@ private val GroupMutationAction.memberStatusLabelRes: Int
             GroupMutationAction.DemoteAdmin,
             GroupMutationAction.SelfDemoteAdmin,
             -> R.string.removing_admin
+            GroupMutationAction.TransferAdmin -> R.string.transferring_admin
             GroupMutationAction.RemoveMember -> R.string.removing_member
             else -> R.string.member_actions
         }
+
+/**
+ * Inline prompt shown in the Members section when the active account is the
+ * group's only admin while other members remain. Such an admin can't leave or
+ * step down until they hand admin to someone else, so this exposes the
+ * transfer entry point right where the otherwise-blocked actions live
+ * (issue #417).
+ */
+@Composable
+private fun SoleAdminTransferPrompt(
+    enabled: Boolean,
+    onTransfer: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            Icons.Default.Shield,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            stringResource(R.string.sole_admin_transfer_hint),
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = onTransfer, enabled = enabled) {
+            Text(stringResource(R.string.transfer_admin))
+        }
+    }
+}
+
+/**
+ * Bottom sheet listing the non-admin members eligible to receive a transferred
+ * admin role, with a search/filter field. Picking a member hands selection
+ * back to the caller, which confirms before mutating. Mirrors the Add member
+ * sheet's structure (issue #417).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TransferAdminSheet(
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    busy: Boolean,
+    onPick: (AppGroupMemberRecordFfi) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    val candidates = controller.transferAdminCandidates()
+    val filtered =
+        remember(query, candidates) {
+            val needle = query.trim()
+            if (needle.isBlank()) {
+                candidates
+            } else {
+                candidates.filter { member ->
+                    controller.memberDisplayName(member).contains(needle, ignoreCase = true) ||
+                        appState.npub(member.memberIdHex).contains(needle, ignoreCase = true) ||
+                        member.memberIdHex.contains(needle, ignoreCase = true)
+                }
+            }
+        }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(R.string.transfer_admin),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                stringResource(R.string.transfer_admin_picker_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (candidates.isNotEmpty()) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text(stringResource(R.string.conversation_search_open)) },
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            when {
+                candidates.isEmpty() ->
+                    Text(
+                        stringResource(R.string.transfer_admin_no_candidates),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                filtered.isEmpty() ->
+                    Text(
+                        stringResource(R.string.conversation_search_no_matches),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                else ->
+                    Column(
+                        Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                    ) {
+                        filtered.forEach { member ->
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clickable(enabled = !busy, role = Role.Button) { onPick(member) }
+                                        .padding(vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Avatar(
+                                    title = controller.memberDisplayName(member),
+                                    seed = member.memberIdHex,
+                                    size = 40.dp,
+                                    pictureUrl = controller.memberAvatarUrl(member),
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        controller.memberDisplayName(member),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        controller.memberSubtitle(member),
+                                        fontFamily = FontFamily.Monospace,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

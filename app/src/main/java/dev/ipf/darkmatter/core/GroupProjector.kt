@@ -197,6 +197,57 @@ object GroupProjector {
         }
         return LeaveAction.Standard
     }
+
+    /**
+     * True when revoking [member]'s admin rights would leave a group that
+     * still has other members with no admin at all. The engine refuses such a
+     * demote (`WouldRemoveLastAdmin` / `AdminDepletion`); the UI mirrors the
+     * check so it can offer "Transfer admin first" instead of letting the call
+     * fail. A single-member group is exempt: dissolving it orphans no one.
+     */
+    fun revokeWouldDepleteAdmins(
+        group: AppGroupRecordFfi,
+        member: AppGroupMemberRecordFfi,
+        memberCount: Int,
+    ): Boolean {
+        if (!isAdmin(group, member)) return false
+        if (memberCount <= 1) return false
+        // Only this member is left holding admin, so demoting them empties it.
+        return group.admins.size <= 1
+    }
+
+    /**
+     * True when [member] is a valid recipient for a "Transfer admin" (grant +
+     * step down) initiated by the active account. The target must be another
+     * member who is not already an admin, and the active account must itself
+     * be an admin (only admins can change the admin list).
+     */
+    fun canTransferAdminTo(
+        group: AppGroupRecordFfi,
+        member: AppGroupMemberRecordFfi,
+        activeAccountIdHex: String?,
+    ): Boolean {
+        if (!isAdminRef(group, activeAccountIdHex)) return false
+        if (isActiveAccountMember(member, activeAccountIdHex)) return false
+        return !isAdmin(group, member)
+    }
+
+    /**
+     * True when the active account is the *sole* admin of a group that still
+     * has other members. Such an admin is trapped — they cannot revoke their
+     * own admin rights or leave without first handing admin to someone else
+     * (issue #417 / #46). The UI uses this to surface the "Transfer admin"
+     * entry point from the otherwise-blocked revoke and leave paths.
+     */
+    fun isSoleAdminWithOtherMembers(
+        group: AppGroupRecordFfi,
+        activeAccountIdHex: String?,
+        memberCount: Int,
+    ): Boolean {
+        if (!isAdminRef(group, activeAccountIdHex)) return false
+        if (memberCount <= 1) return false
+        return group.admins.size <= 1
+    }
 }
 
 /**

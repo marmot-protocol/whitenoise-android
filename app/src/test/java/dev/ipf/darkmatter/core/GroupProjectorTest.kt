@@ -127,6 +127,51 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun revokingTheLastAdminWouldDepleteAdminsWhileOtherMembersRemain() {
+        val soleAdmin = group(admins = listOf("alice"))
+        // Demoting the only admin in a multi-member group empties the admin set.
+        assertTrue(GroupProjector.revokeWouldDepleteAdmins(soleAdmin, member(memberId = "alice", account = null), memberCount = 3))
+        // Hex casing drift between the admin list and the member id must not hide it.
+        assertTrue(GroupProjector.revokeWouldDepleteAdmins(group(admins = listOf("ALICE")), member(memberId = "alice", account = null), memberCount = 3))
+        // A non-admin member is never an admin-depletion risk.
+        assertFalse(GroupProjector.revokeWouldDepleteAdmins(soleAdmin, member(memberId = "bob", account = null), memberCount = 3))
+        // With a co-admin, demoting one leaves the other — no depletion.
+        assertFalse(
+            GroupProjector.revokeWouldDepleteAdmins(group(admins = listOf("alice", "bob")), member(memberId = "alice", account = null), memberCount = 3),
+        )
+        // A sole admin who is the only member can be demoted/leave freely.
+        assertFalse(GroupProjector.revokeWouldDepleteAdmins(soleAdmin, member(memberId = "alice", account = null), memberCount = 1))
+    }
+
+    @Test
+    fun transferAdminTargetMustBeAnotherNonAdminMemberAndCallerMustBeAdmin() {
+        val group = group(admins = listOf("alice"))
+        // Caller (alice) is admin; bob is a non-admin member → valid target.
+        assertTrue(GroupProjector.canTransferAdminTo(group, member(memberId = "bob", account = null), activeAccountIdHex = "alice"))
+        // The active account itself is never a transfer target.
+        assertFalse(GroupProjector.canTransferAdminTo(group, member(memberId = "alice", account = null), activeAccountIdHex = "alice"))
+        // An existing admin can't receive a transfer (already an admin).
+        assertFalse(
+            GroupProjector.canTransferAdminTo(group(admins = listOf("alice", "bob")), member(memberId = "bob", account = null), activeAccountIdHex = "alice"),
+        )
+        // A non-admin caller can't transfer admin at all.
+        assertFalse(GroupProjector.canTransferAdminTo(group, member(memberId = "bob", account = null), activeAccountIdHex = "carol"))
+    }
+
+    @Test
+    fun soleAdminWithOtherMembersIsTrapped() {
+        // Alice is the only admin and other members remain → trapped.
+        assertTrue(GroupProjector.isSoleAdminWithOtherMembers(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 3))
+        assertTrue(GroupProjector.isSoleAdminWithOtherMembers(group(admins = listOf("ALICE")), activeAccountIdHex = "alice", memberCount = 3))
+        // With a co-admin she's free to leave/step down.
+        assertFalse(GroupProjector.isSoleAdminWithOtherMembers(group(admins = listOf("alice", "bob")), activeAccountIdHex = "alice", memberCount = 3))
+        // The only remaining member isn't trapped — leaving dissolves the group.
+        assertFalse(GroupProjector.isSoleAdminWithOtherMembers(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 1))
+        // A non-admin is never the trapped sole admin.
+        assertFalse(GroupProjector.isSoleAdminWithOtherMembers(group(admins = listOf("alice")), activeAccountIdHex = "carol", memberCount = 3))
+    }
+
+    @Test
     fun unnamedChatTitleUsesOtherMemberDisplayName() {
         val unnamed = group(name = "")
 

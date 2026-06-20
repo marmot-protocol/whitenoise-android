@@ -393,6 +393,16 @@
     <string name="toast_admin_added">Yönetici eklendi</string>
     <string name="toast_admin_removed">Yönetici kaldırıldı</string>
     <string name="toast_couldnt_update_admin">Yönetici güncellenemedi</string>
+    <string name="transfer_admin">Yöneticiliği devret</string>
+    <string name="transferring_admin">Yöneticilik devrediliyor…</string>
+    <string name="toast_admin_transferred">Yöneticilik devredildi</string>
+    <string name="toast_cant_transfer_admin">Bu üye yönetici olamaz.</string>
+    <string name="toast_granted_but_couldnt_step_down">Yöneticilik verildi ama çekilme başarısız oldu. Tekrar deneyin.</string>
+    <string name="confirm_transfer_admin_title">Yöneticiliği devret?</string>
+    <string name="confirm_transfer_admin_message">%1$s yönetici olur ve siz çekilirsiniz. Daha sonra tekrar yönetici olabilirsiniz.</string>
+    <string name="sole_admin_transfer_hint">Tek yönetici sizsiniz. Ayrılmak veya çekilmek için yöneticiliği devredin.</string>
+    <string name="transfer_admin_picker_subtitle">Yönetici yapmak için bir üye seçin. Kabul ettiğinde çekilirsiniz.</string>
+    <string name="transfer_admin_no_candidates">Yöneticiliği devredecek başka üye yok.</string>
     <string name="toast_couldnt_load_mls_state">MLS durumu yüklenemedi</string>
     <string name="toast_security_privacy_updated">Güvenlik ve gizlilik güncellendi</string>
     <string name="toast_couldnt_update_security_privacy">Güvenlik ve gizlilik güncellenemedi</string>

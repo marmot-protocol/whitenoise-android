@@ -395,6 +395,16 @@
     <string name="toast_admin_added">Администратор добавил</string>
     <string name="toast_admin_removed">Администратор удален</string>
     <string name="toast_couldnt_update_admin">Не удалось обновить админа</string>
+    <string name="transfer_admin">Передать админа</string>
+    <string name="transferring_admin">Передача админа…</string>
+    <string name="toast_admin_transferred">Админ передан</string>
+    <string name="toast_cant_transfer_admin">Этот участник не может стать админом.</string>
+    <string name="toast_granted_but_couldnt_step_down">Админ назначен, но не удалось сложить полномочия. Повторите попытку.</string>
+    <string name="confirm_transfer_admin_title">Передать админа?</string>
+    <string name="confirm_transfer_admin_message">%1$s станет админом, а вы сложите полномочия. Позже вас снова могут назначить админом.</string>
+    <string name="sole_admin_transfer_hint">Вы единственный админ. Передайте админа, чтобы выйти или сложить полномочия.</string>
+    <string name="transfer_admin_picker_subtitle">Выберите участника, которого сделать админом. Вы сложите полномочия, когда он примет.</string>
+    <string name="transfer_admin_no_candidates">Нет других участников для передачи админа.</string>
     <string name="toast_couldnt_load_mls_state">Не удалось загрузить состояние MLS</string>
     <string name="toast_security_privacy_updated">Настройки безопасности и конфиденциальности обновлены</string>
     <string name="toast_couldnt_update_security_privacy">Не удалось обновить настройки безопасности и конфиденциальности</string>

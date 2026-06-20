@@ -393,6 +393,16 @@
     <string name="toast_admin_added">Administrator hinzugefügt</string>
     <string name="toast_admin_removed">Administrator entfernt</string>
     <string name="toast_couldnt_update_admin">Admin konnte nicht aktualisiert werden</string>
+    <string name="transfer_admin">Admin übertragen</string>
+    <string name="transferring_admin">Admin wird übertragen…</string>
+    <string name="toast_admin_transferred">Admin übertragen</string>
+    <string name="toast_cant_transfer_admin">Dieses Mitglied kann nicht Admin werden.</string>
+    <string name="toast_granted_but_couldnt_step_down">Admin vergeben, aber Rücktritt fehlgeschlagen. Bitte erneut versuchen.</string>
+    <string name="confirm_transfer_admin_title">Admin übertragen?</string>
+    <string name="confirm_transfer_admin_message">%1$s wird Admin und du trittst zurück. Du kannst später wieder Admin werden.</string>
+    <string name="sole_admin_transfer_hint">Du bist der einzige Admin. Übertrage den Admin, um zu gehen oder zurückzutreten.</string>
+    <string name="transfer_admin_picker_subtitle">Wähle ein Mitglied als Admin. Du trittst zurück, sobald es übernimmt.</string>
+    <string name="transfer_admin_no_candidates">Keine anderen Mitglieder, an die der Admin übertragen werden kann.</string>
     <string name="toast_couldnt_load_mls_state">MLS-Status konnte nicht geladen werden</string>
     <string name="toast_security_privacy_updated">Sicherheits- und Datenschutzeinstellungen aktualisiert</string>
     <string name="toast_couldnt_update_security_privacy">Sicherheits- und Datenschutzeinstellungen konnten nicht aktualisiert werden</string>

@@ -488,6 +488,16 @@
     <string name="toast_admin_added">Admin added</string>
     <string name="toast_admin_removed">Admin removed</string>
     <string name="toast_couldnt_update_admin">Couldn\'t update admin</string>
+    <string name="transfer_admin">Transfer admin</string>
+    <string name="transferring_admin">Transferring admin…</string>
+    <string name="toast_admin_transferred">Admin transferred</string>
+    <string name="toast_cant_transfer_admin">This member can\'t receive admin.</string>
+    <string name="toast_granted_but_couldnt_step_down">Granted admin, but couldn\'t step down. Try again.</string>
+    <string name="confirm_transfer_admin_title">Transfer admin?</string>
+    <string name="confirm_transfer_admin_message">%1$s becomes an admin and you step down. You can be made admin again later.</string>
+    <string name="sole_admin_transfer_hint">You\'re the only admin. Transfer admin to leave or step down.</string>
+    <string name="transfer_admin_picker_subtitle">Pick a member to make admin. You\'ll step down once they accept.</string>
+    <string name="transfer_admin_no_candidates">No other members to transfer admin to.</string>
     <string name="toast_couldnt_load_mls_state">Couldn\'t load MLS state</string>
     <string name="toast_security_privacy_updated">Security &amp; Privacy updated</string>
     <string name="toast_couldnt_update_security_privacy">Couldn\'t update Security &amp; Privacy</string>
