@@ -178,6 +178,8 @@
     <string name="notifications_settings_subtitle">Alertas locales y conexión en segundo plano.</string>
     <string name="security_and_privacy">Seguridad y privacidad</string>
     <string name="security_privacy_settings_subtitle">Telemetría, registros de auditoría y diagnósticos</string>
+    <string name="force_incognito_keyboard">Forzar teclado de incógnito</string>
+    <string name="force_incognito_keyboard_subtitle">Impide que tu teclado aprenda, sugiera o sincronice lo que escribes en esta aplicación. Respetado por la mayoría de los teclados modernos; algunos teclados de terceros pueden ignorar esta indicación.</string>
     <string name="telemetry">Telemetría</string>
     <string name="telemetry_settings_subtitle">Compartir telemetría de conexión de relés.</string>
     <string name="audit_logs">Registros de auditoría</string>

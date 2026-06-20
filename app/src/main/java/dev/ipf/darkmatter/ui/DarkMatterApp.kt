@@ -649,27 +649,32 @@ fun DarkMatterApp(
         }
     }
 
-    CompositionLocalProvider(LocalSnackbarBottomInset provides snackbarBottomInset) {
-        Scaffold(
-            contentWindowInsets = WindowInsets(0.dp),
-            snackbarHost = { DarkMatterSnackbarHost(snackbarHostState) },
-        ) { padding ->
-            Box(Modifier.fillMaxSize().padding(padding)) {
-                when (val phase = appState.phase) {
-                    AppPhase.Bootstrapping -> LoadingScreen()
-                    AppPhase.Onboarding -> OnboardingScreen(appState)
-                    AppPhase.Ready ->
-                        MainShell(
-                            appState = appState,
-                            inboundNotificationTarget = inboundNotificationTarget,
-                            onNotificationTargetHandled = onNotificationTargetHandled,
-                        )
-                    is AppPhase.Failed ->
-                        FailureScreen(
-                            message = phase.message,
-                            onRetry = { appState.present(R.string.toast_restarting) },
-                            onRetryAction = { appState.bootstrap() },
-                        )
+    // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
+    // whole app UI so every descendant text field requests incognito mode from
+    // the IME (no learning / suggestion history / cloud sync of typed content).
+    IncognitoKeyboardScope(enabled = appState.forceIncognitoKeyboard) {
+        CompositionLocalProvider(LocalSnackbarBottomInset provides snackbarBottomInset) {
+            Scaffold(
+                contentWindowInsets = WindowInsets(0.dp),
+                snackbarHost = { DarkMatterSnackbarHost(snackbarHostState) },
+            ) { padding ->
+                Box(Modifier.fillMaxSize().padding(padding)) {
+                    when (val phase = appState.phase) {
+                        AppPhase.Bootstrapping -> LoadingScreen()
+                        AppPhase.Onboarding -> OnboardingScreen(appState)
+                        AppPhase.Ready ->
+                            MainShell(
+                                appState = appState,
+                                inboundNotificationTarget = inboundNotificationTarget,
+                                onNotificationTargetHandled = onNotificationTargetHandled,
+                            )
+                        is AppPhase.Failed ->
+                            FailureScreen(
+                                message = phase.message,
+                                onRetry = { appState.present(R.string.toast_restarting) },
+                                onRetryAction = { appState.bootstrap() },
+                            )
+                    }
                 }
             }
         }
@@ -12900,6 +12905,13 @@ private fun SecurityPrivacyScreen(
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 SectionCard(title = stringResource(R.string.security_and_privacy)) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.force_incognito_keyboard),
+                        subtitle = stringResource(R.string.force_incognito_keyboard_subtitle),
+                        checked = appState.forceIncognitoKeyboard,
+                        onCheckedChange = { appState.updateForceIncognitoKeyboard(it) },
+                    )
+                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
                     SettingsSwitchRow(
                         title = stringResource(R.string.telemetry),
                         subtitle = stringResource(R.string.telemetry_settings_subtitle),

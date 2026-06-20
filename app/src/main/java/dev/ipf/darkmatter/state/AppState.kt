@@ -401,6 +401,16 @@ class DarkMatterAppState(
     var developerMode by mutableStateOf(preferences.getBoolean(DEVELOPER_MODE_KEY, false))
         private set
 
+    /**
+     * Force the IME into incognito mode for every text field in the app (#405).
+     * Default ON to match the app's privacy positioning: messages typed in an
+     * E2EE chat must not leak back out through keyboard learning / cloud sync.
+     * This is an Android platform preference (UI behavior), not Marmot protocol
+     * data, so SharedPreferences is the correct home per AGENTS.md.
+     */
+    var forceIncognitoKeyboard by mutableStateOf(preferences.getBoolean(FORCE_INCOGNITO_KEYBOARD_KEY, true))
+        private set
+
     var themeMode by mutableStateOf(AppThemeMode.fromPreference(preferences.getString(THEME_MODE_KEY, null)))
         private set
 
@@ -1281,6 +1291,11 @@ class DarkMatterAppState(
     fun updateDeveloperMode(enabled: Boolean) {
         developerMode = enabled
         preferences.edit().putBoolean(DEVELOPER_MODE_KEY, enabled).apply()
+    }
+
+    fun updateForceIncognitoKeyboard(enabled: Boolean) {
+        forceIncognitoKeyboard = enabled
+        preferences.edit().putBoolean(FORCE_INCOGNITO_KEYBOARD_KEY, enabled).apply()
     }
 
     suspend fun refreshSecurityPrivacySettings() {
@@ -2412,6 +2427,7 @@ class DarkMatterAppState(
     companion object {
         private const val ACTIVE_ACCOUNT_KEY = "active_account"
         private const val DEVELOPER_MODE_KEY = "developer_mode"
+        private const val FORCE_INCOGNITO_KEYBOARD_KEY = "force_incognito_keyboard"
         private const val THEME_MODE_KEY = "theme_mode"
         private const val MEDIA_AUTO_DOWNLOAD_KEY = "media_auto_download"
         private const val DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY = "default_notifications_enable_attempted"

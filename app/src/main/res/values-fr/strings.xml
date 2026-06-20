@@ -178,6 +178,8 @@
     <string name="notifications_settings_subtitle">Alertes locales et connexion en arrière-plan</string>
     <string name="security_and_privacy">Sécurité et confidentialité</string>
     <string name="security_privacy_settings_subtitle">Télémétrie, journaux d’audit, diagnostics</string>
+    <string name="force_incognito_keyboard">Forcer le clavier en navigation privée</string>
+    <string name="force_incognito_keyboard_subtitle">Empêche votre clavier d’apprendre, de suggérer ou de synchroniser ce que vous tapez dans cette application. Respecté par la plupart des claviers modernes ; certains claviers tiers peuvent ignorer cet indicateur.</string>
     <string name="telemetry">Télémétrie</string>
     <string name="telemetry_settings_subtitle">Partager la télémétrie de connexion aux relais.</string>
     <string name="audit_logs">Journaux d’audit</string>
