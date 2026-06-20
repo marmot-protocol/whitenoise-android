@@ -44,13 +44,11 @@ object MentionComposer {
     )
 
     /**
-     * The npub bech32 grammar (lowercase, no `b`/`i`/`o`/`1` in the body).
-     * A real npub is `npub1` + 58 body chars (length 63), but matching the
-     * full run greedily lets us treat a partially-typed or future-length entity
-     * as one token too.
+     * A composer mention chip: `@` immediately followed by an npub run. A real
+     * npub is `npub1` + 58 body chars (length 63), but matching the full run
+     * greedily lets us treat a partially-typed or future-length entity as one
+     * token too.
      */
-
-    /** A composer mention chip: `@` immediately followed by an npub run. */
     private val MENTION_CHIP = Regex("@npub1[ac-hj-np-z02-9]+")
 
     /**
