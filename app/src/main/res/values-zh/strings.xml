@@ -177,6 +177,8 @@
     <string name="notifications_settings_subtitle">本地警报和后台连接</string>
     <string name="security_and_privacy">安全与隐私</string>
     <string name="security_privacy_settings_subtitle">遥测、审计日志、诊断</string>
+    <string name="force_incognito_keyboard">强制隐身键盘</string>
+    <string name="force_incognito_keyboard_subtitle">阻止键盘学习、建议或同步你在本应用中输入的内容。大多数现代键盘会遵循此设置；某些第三方键盘可能会忽略此提示。</string>
     <string name="telemetry">遥测</string>
     <string name="telemetry_settings_subtitle">共享中继连接遥测。</string>
     <string name="audit_logs">审计日志</string>

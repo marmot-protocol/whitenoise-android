@@ -232,6 +232,8 @@
     <string name="notifications_settings_subtitle">Local alerts and background connection</string>
     <string name="security_and_privacy">Security &amp; Privacy</string>
     <string name="security_privacy_settings_subtitle">Telemetry, audit logs, diagnostics</string>
+    <string name="force_incognito_keyboard">Force incognito keyboard</string>
+    <string name="force_incognito_keyboard_subtitle">Prevents your keyboard from learning, suggesting, or syncing what you type in this app. Honored by most modern keyboards; some third-party keyboards may ignore this hint.</string>
     <string name="telemetry">Share anonymous app telemetry</string>
     <string name="telemetry_settings_subtitle">Share relay connection telemetry.</string>
     <string name="audit_logs">Audit logs</string>

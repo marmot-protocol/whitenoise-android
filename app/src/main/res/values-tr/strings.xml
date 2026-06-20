@@ -178,6 +178,8 @@
     <string name="notifications_settings_subtitle">Yerel uyarılar ve arka plan bağlantısı</string>
     <string name="security_and_privacy">Güvenlik ve gizlilik</string>
     <string name="security_privacy_settings_subtitle">Telemetri, denetim günlükleri, tanılama</string>
+    <string name="force_incognito_keyboard">Gizli klavyeyi zorunlu kıl</string>
+    <string name="force_incognito_keyboard_subtitle">Klavyenizin bu uygulamada yazdıklarınızı öğrenmesini, önermesini veya eşitlemesini engeller. Çoğu modern klavye buna uyar; bazı üçüncü taraf klavyeler bu ipucunu yok sayabilir.</string>
     <string name="telemetry">Telemetri</string>
     <string name="telemetry_settings_subtitle">Röle bağlantı telemetrisini paylaş.</string>
     <string name="audit_logs">Denetim günlükleri</string>

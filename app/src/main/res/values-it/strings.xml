@@ -178,6 +178,8 @@
     <string name="notifications_settings_subtitle">Avvisi locali e connessione in background</string>
     <string name="security_and_privacy">Sicurezza e privacy</string>
     <string name="security_privacy_settings_subtitle">Telemetria, log di audit, diagnostica</string>
+    <string name="force_incognito_keyboard">Forza tastiera in incognito</string>
+    <string name="force_incognito_keyboard_subtitle">Impedisce alla tastiera di apprendere, suggerire o sincronizzare ciò che digiti in questa app. Rispettata dalla maggior parte delle tastiere moderne; alcune tastiere di terze parti potrebbero ignorare questo suggerimento.</string>
     <string name="telemetry">Telemetria</string>
     <string name="telemetry_settings_subtitle">Condividi telemetria della connessione ai relay.</string>
     <string name="audit_logs">Log di audit</string>
