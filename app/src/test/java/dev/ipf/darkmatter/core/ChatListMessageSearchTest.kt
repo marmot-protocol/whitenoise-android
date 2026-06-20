@@ -155,6 +155,50 @@ class ChatListMessageSearchTest {
         assertFalse(ChatListMessageSearch.titleOrPreviewMatches("anything", "anything", ""))
     }
 
+    // ---- description match (issue #388) -------------------------------------
+
+    @Test
+    fun titleOrPreviewMatchesWhenDescriptionContainsNeedle() {
+        // Regression for #388: the chat-list filter must also OR-match on the
+        // group description, and a row whose only synchronous match is in the
+        // description should be classified as title/preview/description so the
+        // UI suppresses the body snippet line (no older message to scroll to).
+        assertTrue(
+            ChatListMessageSearch.titleOrPreviewMatches(
+                displayTitle = "Some chat",
+                previewText = "latest preview line",
+                ciNeedle = "weekend",
+                description = "weekend hike planning",
+            ),
+        )
+    }
+
+    @Test
+    fun descriptionMatchIsCaseInsensitive() {
+        assertTrue(
+            ChatListMessageSearch.titleOrPreviewMatches(
+                displayTitle = "Some chat",
+                previewText = "preview",
+                ciNeedle = "research",
+                description = "RESEARCH WORKGROUP",
+            ),
+        )
+    }
+
+    @Test
+    fun emptyDescriptionDoesNotMatch() {
+        // The default empty description must not match any non-empty needle, so
+        // existing call sites that don't pass the parameter keep their old
+        // behaviour (no false positives just because description defaulted to "").
+        assertFalse(
+            ChatListMessageSearch.titleOrPreviewMatches(
+                displayTitle = "Some chat",
+                previewText = "no needle here",
+                ciNeedle = "marmot",
+            ),
+        )
+    }
+
     // ---- firstEligibleBodyMatch (issue #290, blocking review #2) -------------
 
     private data class Rec(

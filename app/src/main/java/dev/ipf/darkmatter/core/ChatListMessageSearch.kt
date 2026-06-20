@@ -46,23 +46,30 @@ object ChatListMessageSearch {
     ): Boolean = ciNeedle.isNotEmpty() && plaintext.lowercase().contains(ciNeedle)
 
     /**
-     * Whether a row's match is fully explained by its title or last-message
-     * preview (the synchronous match the chat-list filter already performs).
-     * When true, the body-match snippet line and tap-to-message focus must be
-     * suppressed: the issue/PR contract restricts the secondary snippet and
-     * scroll-to-message tap-through to rows that matched *only* on an older
-     * message body, so a chat surfacing on its title/preview keeps the normal
-     * single-line row and a normal conversation open. Tokenized identically to
-     * the title/preview match in `applyChatListSearchAndFilter` (lowercase +
-     * substring containment).
+     * Whether a row's match is fully explained by its title, last-message
+     * preview, or group description (the synchronous match the chat-list
+     * filter already performs). When true, the body-match snippet line and
+     * tap-to-message focus must be suppressed: the issue/PR contract restricts
+     * the secondary snippet and scroll-to-message tap-through to rows that
+     * matched *only* on an older message body, so a chat surfacing on its
+     * title/preview/description keeps the normal single-line row and a normal
+     * conversation open. Tokenized identically to the title/preview/description
+     * match in `applyChatListSearchAndFilter` (lowercase + substring
+     * containment). `description` defaults to empty so existing callers that
+     * predate the description-search extension (#388) keep their behaviour.
      */
     fun titleOrPreviewMatches(
         displayTitle: String,
         previewText: String,
         ciNeedle: String,
+        description: String = "",
     ): Boolean =
         ciNeedle.isNotEmpty() &&
-            (displayTitle.lowercase().contains(ciNeedle) || previewText.lowercase().contains(ciNeedle))
+            (
+                displayTitle.lowercase().contains(ciNeedle) ||
+                    previewText.lowercase().contains(ciNeedle) ||
+                    description.lowercase().contains(ciNeedle)
+            )
 
     /**
      * Build the snippet to show under a matched chat row. Centers a window of

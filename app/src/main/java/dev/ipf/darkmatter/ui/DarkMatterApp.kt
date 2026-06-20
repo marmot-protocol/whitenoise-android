@@ -1431,6 +1431,7 @@ private fun ChatsScreen(
                                             displayTitle = chatListItemDisplayTitle(item, appState, groupTitleCopy),
                                             previewText = item.projectedPreviewText(),
                                             ciNeedle = trimmedQuery.lowercase(),
+                                            description = item.group.description,
                                         )
                                     }
                                 SwipeableChatRow(
@@ -1576,6 +1577,13 @@ private fun applyChatListSearchAndFilter(
         if (title.contains(ciNeedle)) return@filter true
         val preview = item.projectedPreviewText().lowercase()
         if (preview.contains(ciNeedle)) return@filter true
+        // Group description matches (issue #388): descriptions hold the
+        // context users put there to find a group later ("research workgroup",
+        // "family planning"), so they should surface the row even when the
+        // title and preview don't mention the needle. Same lowercase +
+        // substring containment as title/preview.
+        val description = item.group.description.lowercase()
+        if (description.isNotEmpty() && description.contains(ciNeedle)) return@filter true
         // Message-body matches (issue #290): the async per-chat search
         // (ChatsController.searchMessageBodies) found the needle inside this
         // conversation's local timeline even though it isn't in the title or
