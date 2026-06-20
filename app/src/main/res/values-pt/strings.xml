@@ -76,6 +76,7 @@
     <string name="you_are_no_longer_a_member">Você não é mais membro deste grupo.</string>
     <string name="chat_row_draft_prefix">Rascunho: </string>
     <string name="jump_to_newest">Ir para a mais recente</string>
+    <string name="scroll_to_top">Rolar para o topo</string>
     <string name="discard_failed_message">Descartar mensagem com falha</string>
     <string name="invited_to_this_chat">Você foi convidado para este bate-papo.</string>
     <string name="decline">Recusar</string>

@@ -76,6 +76,7 @@
     <string name="you_are_no_longer_a_member">Vous n’êtes plus membre de ce groupe.</string>
     <string name="chat_row_draft_prefix">Brouillon : </string>
     <string name="jump_to_newest">Aller au plus récent</string>
+    <string name="scroll_to_top">Faire défiler vers le haut</string>
     <string name="discard_failed_message">Supprimer le message échoué</string>
     <string name="invited_to_this_chat">Vous avez été invité à ce chat.</string>
     <string name="decline">Refuser</string>

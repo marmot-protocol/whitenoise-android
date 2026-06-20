@@ -76,6 +76,7 @@
     <string name="you_are_no_longer_a_member">Artık bu grubun üyesi değilsiniz.</string>
     <string name="chat_row_draft_prefix">Taslak: </string>
     <string name="jump_to_newest">En yeniye atla</string>
+    <string name="scroll_to_top">Başa kaydır</string>
     <string name="discard_failed_message">Başarısız mesajı sil</string>
     <string name="invited_to_this_chat">Bu sohbete davet edildiniz.</string>
     <string name="decline">Reddet</string>

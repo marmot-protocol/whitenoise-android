@@ -75,6 +75,7 @@
     <string name="you_are_no_longer_a_member">你已不再是此群組的成員。</string>
     <string name="chat_row_draft_prefix">草稿：</string>
     <string name="jump_to_newest">跳至最新</string>
+    <string name="scroll_to_top">捲動到頂部</string>
     <string name="discard_failed_message">捨棄發送失敗的訊息</string>
     <string name="invited_to_this_chat">您被邀請參加此聊天。</string>
     <string name="decline">拒絕</string>
