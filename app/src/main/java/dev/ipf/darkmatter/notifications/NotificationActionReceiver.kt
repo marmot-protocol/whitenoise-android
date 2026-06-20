@@ -75,19 +75,27 @@ class NotificationActionReceiver : BroadcastReceiver() {
                             // the notification alive, or its still-active inline
                             // RemoteInput field would let the user re-send the same
                             // reply and post a duplicate message to the group.
-                            runCatching {
-                                appState.markNotificationMessageRead(
-                                    accountRef = action.target.accountRef,
-                                    groupIdHex = action.target.groupIdHex,
-                                    messageIdHex = action.target.messageIdHex.orEmpty(),
-                                )
-                            }.onFailure { throwable ->
-                                Log.w(
-                                    "DMNotifyAction",
+                            val markReadResult =
+                                runCatching {
+                                    appState.markNotificationMessageRead(
+                                        accountRef = action.target.accountRef,
+                                        groupIdHex = action.target.groupIdHex,
+                                        messageIdHex = action.target.messageIdHex.orEmpty(),
+                                    )
+                                }
+                            // Log a thrown error AND a plain false return; the
+                            // latter (e.g. blank ids) would otherwise fail
+                            // silently and hide best-effort mark-read trouble.
+                            if (markReadResult.getOrNull() != true) {
+                                val message =
                                     "reply sent but mark-read failed group=${action.target.groupIdHex.take(8)} " +
-                                        "message=${action.target.messageIdHex.orEmpty().take(8)}",
-                                    throwable,
-                                )
+                                        "message=${action.target.messageIdHex.orEmpty().take(8)}"
+                                val throwable = markReadResult.exceptionOrNull()
+                                if (throwable != null) {
+                                    Log.w("DMNotifyAction", message, throwable)
+                                } else {
+                                    Log.w("DMNotifyAction", message)
+                                }
                             }
                         }
                         notificationReplyActionHandled(sent = sent)
