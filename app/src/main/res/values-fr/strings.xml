@@ -561,4 +561,24 @@
     <string name="conversation_search_no_matches">Aucun résultat</string>
     <string name="message_read_more">Lire plus</string>
     <string name="message_react">Réagir</string>
+    <string name="sign_out">Se déconnecter</string>
+    <string name="sign_out_and_wipe">Se déconnecter &amp; effacer</string>
+    <string name="sign_out_and_wipe_confirm_body">Cette action est irréversible sur cet appareil. La base de données locale, l\'état MLS, l\'entrée du trousseau et les paquets de clés des relais pour ce compte seront supprimés.</string>
+    <string name="sign_out_and_wipe_confirm_field_label">Validation</string>
+    <string name="sign_out_and_wipe_confirm_instruction">Saisissez %1$s pour confirmer.</string>
+    <string name="sign_out_and_wipe_confirm_title">Effacer ce compte ?</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_db">La base de données locale des messages et l\'état du groupe MLS pour ce compte.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_heading">Ce qui est supprimé</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_keychain">L\'entrée de l\'identité dans le trousseau de cet appareil.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_relays">Paquets de clés en attente publiés pour ce compte sur les relais.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Se reconnecter avec la même clé repart de zéro : les groupes sont récupérés à nouveau et les médias retéléchargés.</string>
+    <string name="sign_out_and_wipe_sheet_intro">Cela supprime définitivement ce compte de cet appareil.</string>
+    <string name="sign_out_and_wipe_sheet_title">Se déconnecter &amp; effacer</string>
+    <string name="sign_out_sheet_changes_body">Les notifications push de ce compte sont désactivées et les caches en mémoire sont vidés.</string>
+    <string name="sign_out_sheet_changes_heading">Ce qui change</string>
+    <string name="sign_out_sheet_stays_body">Vos groupes, l\'historique des messages et les brouillons sont conservés. L\'identité reste dans le trousseau de l\'appareil, vous pouvez donc vous reconnecter depuis le sélecteur de comptes.</string>
+    <string name="sign_out_sheet_stays_heading">Reste sur cet appareil</string>
+    <string name="sign_out_sheet_title">Se déconnecter</string>
+    <string name="toast_signed_out_and_wiped">Compte effacé de cet appareil</string>
+    <string name="wipe">Effacer</string>
 </resources>

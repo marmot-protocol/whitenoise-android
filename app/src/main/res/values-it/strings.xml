@@ -561,4 +561,24 @@
     <string name="conversation_search_no_matches">Nessun risultato</string>
     <string name="message_read_more">Leggi tutto</string>
     <string name="message_react">Reagisci</string>
+    <string name="sign_out">Esci</string>
+    <string name="sign_out_and_wipe">Esci &amp; cancella</string>
+    <string name="sign_out_and_wipe_confirm_body">Questa operazione non può essere annullata da questo dispositivo. Il database locale, lo stato MLS, la voce del portachiavi e i pacchetti di chiavi sui relay per questo account verranno rimossi.</string>
+    <string name="sign_out_and_wipe_confirm_field_label">Conferma richiesta</string>
+    <string name="sign_out_and_wipe_confirm_instruction">Digita %1$s per confermare.</string>
+    <string name="sign_out_and_wipe_confirm_title">Cancellare questo account?</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_db">Il database locale dei messaggi e lo stato del gruppo MLS per questo account.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_heading">Cosa viene eliminato</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_keychain">La voce dell\'identità nel portachiavi di questo dispositivo.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_relays">Pacchetti di chiavi in sospeso pubblicati per questo account sui relay.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Accedere di nuovo con la stessa chiave riparte da zero: i gruppi vengono recuperati di nuovo e i contenuti multimediali riscaricati.</string>
+    <string name="sign_out_and_wipe_sheet_intro">Questo rimuove definitivamente questo account da questo dispositivo.</string>
+    <string name="sign_out_and_wipe_sheet_title">Esci &amp; cancella</string>
+    <string name="sign_out_sheet_changes_body">Le notifiche push per questo account vengono disattivate e le cache in memoria vengono svuotate.</string>
+    <string name="sign_out_sheet_changes_heading">Cosa cambia</string>
+    <string name="sign_out_sheet_stays_body">I tuoi gruppi, la cronologia dei messaggi e le bozze vengono conservati. L\'identità resta nel portachiavi del dispositivo, così puoi accedere di nuovo dal selettore degli account.</string>
+    <string name="sign_out_sheet_stays_heading">Resta su questo dispositivo</string>
+    <string name="sign_out_sheet_title">Esci</string>
+    <string name="toast_signed_out_and_wiped">Account cancellato da questo dispositivo</string>
+    <string name="wipe">Cancella</string>
 </resources>

@@ -558,4 +558,24 @@
     <string name="conversation_search_no_matches">Keine Treffer</string>
     <string name="message_read_more">Mehr lesen</string>
     <string name="message_react">Reagieren</string>
+    <string name="sign_out">Abmelden</string>
+    <string name="sign_out_and_wipe">Abmelden &amp; löschen</string>
+    <string name="sign_out_and_wipe_confirm_body">Dies kann auf diesem Gerät nicht rückgängig gemacht werden. Die lokale Datenbank, der MLS-Status, der Schlüsselbund-Eintrag und die Relay-Key-Packages für dieses Konto werden entfernt.</string>
+    <string name="sign_out_and_wipe_confirm_field_label">Bestätigung</string>
+    <string name="sign_out_and_wipe_confirm_instruction">Gib zur Bestätigung %1$s ein.</string>
+    <string name="sign_out_and_wipe_confirm_title">Dieses Konto löschen?</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_db">Die lokale Nachrichtendatenbank und der MLS-Gruppenstatus für dieses Konto.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_heading">Was gelöscht wird</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_keychain">Der Schlüsselbund-Eintrag der Identität auf diesem Gerät.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_relays">Ausstehende Key-Packages, die für dieses Konto auf Relays veröffentlicht wurden.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Beim erneuten Anmelden mit demselben Schlüssel wird neu begonnen: Gruppen werden erneut abgerufen und Medien erneut heruntergeladen.</string>
+    <string name="sign_out_and_wipe_sheet_intro">Dadurch wird dieses Konto dauerhaft von diesem Gerät entfernt.</string>
+    <string name="sign_out_and_wipe_sheet_title">Abmelden &amp; löschen</string>
+    <string name="sign_out_sheet_changes_body">Push-Benachrichtigungen für dieses Konto werden deaktiviert und Zwischenspeicher im Arbeitsspeicher werden geleert.</string>
+    <string name="sign_out_sheet_changes_heading">Was sich ändert</string>
+    <string name="sign_out_sheet_stays_body">Deine Gruppen, dein Nachrichtenverlauf und deine Entwürfe bleiben erhalten. Die Identität verbleibt im Schlüsselbund des Geräts, sodass du dich über die Kontoauswahl wieder anmelden kannst.</string>
+    <string name="sign_out_sheet_stays_heading">Bleibt auf diesem Gerät</string>
+    <string name="sign_out_sheet_title">Abmelden</string>
+    <string name="toast_signed_out_and_wiped">Konto von diesem Gerät gelöscht</string>
+    <string name="wipe">Löschen</string>
 </resources>

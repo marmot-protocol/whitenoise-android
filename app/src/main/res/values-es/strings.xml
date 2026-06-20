@@ -561,4 +561,24 @@
     <string name="conversation_search_no_matches">Sin coincidencias</string>
     <string name="message_read_more">Leer más</string>
     <string name="message_react">Reaccionar</string>
+    <string name="sign_out">Cerrar sesión</string>
+    <string name="sign_out_and_wipe">Cerrar sesión y borrar</string>
+    <string name="sign_out_and_wipe_confirm_body">Esto no se puede deshacer desde este dispositivo. Se eliminarán la base de datos local, el estado de MLS, la entrada del llavero y los paquetes de claves en los relays para esta cuenta.</string>
+    <string name="sign_out_and_wipe_confirm_field_label">Verificación</string>
+    <string name="sign_out_and_wipe_confirm_instruction">Escribe %1$s para confirmar.</string>
+    <string name="sign_out_and_wipe_confirm_title">¿Borrar esta cuenta?</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_db">La base de datos local de mensajes y el estado del grupo de MLS de esta cuenta.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_heading">Qué se destruye</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_keychain">La entrada de la identidad en el llavero de este dispositivo.</string>
+    <string name="sign_out_and_wipe_sheet_destroyed_relays">Paquetes de claves pendientes publicados para esta cuenta en los relays.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Volver a iniciar sesión con la misma clave empieza de cero: los grupos se vuelven a obtener y los archivos multimedia se descargan de nuevo.</string>
+    <string name="sign_out_and_wipe_sheet_intro">Esto elimina de forma permanente esta cuenta de este dispositivo.</string>
+    <string name="sign_out_and_wipe_sheet_title">Cerrar sesión y borrar</string>
+    <string name="sign_out_sheet_changes_body">Las notificaciones push de esta cuenta se desactivan y las cachés en memoria se vacían.</string>
+    <string name="sign_out_sheet_changes_heading">Qué cambia</string>
+    <string name="sign_out_sheet_stays_body">Tus grupos, el historial de mensajes y los borradores se conservan. La identidad permanece en el llavero del dispositivo, así que puedes volver a iniciar sesión desde el selector de cuentas.</string>
+    <string name="sign_out_sheet_stays_heading">Permanece en este dispositivo</string>
+    <string name="sign_out_sheet_title">Cerrar sesión</string>
+    <string name="toast_signed_out_and_wiped">Cuenta borrada de este dispositivo</string>
+    <string name="wipe">Borrar</string>
 </resources>

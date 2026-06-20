@@ -107,7 +107,7 @@ class MarkdownInlineTextTest {
     }
 
     @Test
-    fun httpLinkCarriesUrlAnnotationAndLinkStyle() {
+    fun httpLinkCarriesConfirmAnnotationAndLinkStyle() {
         val annotated =
             build(
                 listOf(
@@ -119,8 +119,11 @@ class MarkdownInlineTextTest {
                 ),
             )
         assertEquals("example", annotated.text)
+        // An explicit [label](url) link routes the tap through a confirmation
+        // (Clickable + confirm tag) that surfaces the real destination, since
+        // the label is attacker-chosen and may not match the URL (#273).
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
-        assertEquals("https://example.com/page", (link.item as LinkAnnotation.Url).url)
+        assertEquals(CONFIRM_LINK_TAG_PREFIX + "https://example.com/page", (link.item as LinkAnnotation.Clickable).tag)
         assertEquals(0, link.start)
         assertEquals(7, link.end)
     }
@@ -231,9 +234,10 @@ class MarkdownInlineTextTest {
             )
         assertEquals("mail call", annotated.text)
         val links = annotated.getLinkAnnotations(0, annotated.length)
-        // tel: is inert, so only mailto carries an annotation.
+        // tel: is inert, so only mailto carries an annotation — and it routes
+        // through the confirm-on-open path like any explicit link (#273).
         assertEquals(1, links.size)
-        assertEquals("mailto:user@example.com", (links[0].item as LinkAnnotation.Url).url)
+        assertEquals(CONFIRM_LINK_TAG_PREFIX + "mailto:user@example.com", (links[0].item as LinkAnnotation.Clickable).tag)
     }
 
     @Test
@@ -258,7 +262,7 @@ class MarkdownInlineTextTest {
             )
         assertEquals("padded", annotated.text)
         val link = annotated.getLinkAnnotations(0, annotated.length).single()
-        assertEquals("https://example.com", (link.item as LinkAnnotation.Url).url)
+        assertEquals(CONFIRM_LINK_TAG_PREFIX + "https://example.com", (link.item as LinkAnnotation.Clickable).tag)
 
         // A padded javascript: destination stays completely inert.
         val inert =
