@@ -1,16 +1,23 @@
 package dev.ipf.darkmatter.core
 
+import java.net.Inet4Address
+import java.net.Inet6Address
+import java.net.InetAddress
+
 /**
  * First-layer SSRF guard for URLs that arrive from untrusted protocol data —
  * relay hints, imeta media URLs, and profile avatar URLs. Classifies a literal
  * host as private / loopback / link-local purely from the host string (no DNS),
  * so it is cheap and safe to call on any thread, including composition.
  *
- * It deliberately does NOT defend against DNS-rebinding (a public hostname that
- * resolves to a private address) — that needs a resolve-time check on the IO
- * dispatcher. Blocking literal private addresses is the high-value, low-cost
- * layer; the resolve-time check can be layered on later without changing this
- * contract.
+ * The string check ([isPrivateOrLoopbackHost]) deliberately does NOT defend
+ * against DNS-rebinding (a public hostname that resolves to a private address).
+ * Callers that issue a real request to a user-controlled host should ALSO call
+ * the resolve-time check [isPrivateOrLoopbackAddress] on each resolved
+ * [InetAddress] from the IO dispatcher — that closes the public-name →
+ * private-IP gap. (A pinned-IP connection would be needed to fully defeat an
+ * active mid-connection rebind, which `HttpURLConnection` can't express; the
+ * resolve-time check is the high-value layer that blocks the common attack.)
  */
 object HostSafety {
     /**
@@ -48,6 +55,55 @@ object HostSafety {
         // resolve-time guard is the right place to catch DNS rebinding.
         return false
     }
+
+    /**
+     * Resolve-time SSRF guard: true when a DNS-resolved [address] falls in a
+     * private/loopback/link-local range, so a public hostname that resolves to
+     * (or is rebound to) an internal IP is rejected. Reuses the same range
+     * classification as the literal-host check, applied to the actual resolved
+     * bytes.
+     *
+     * Call this from the IO dispatcher on every [InetAddress] returned for the
+     * target host (and on every redirect hop's host) BEFORE opening the
+     * connection. This closes the public-name → private-IP gap that
+     * [isPrivateOrLoopbackHost] documents it does not cover.
+     */
+    fun isPrivateOrLoopbackAddress(address: InetAddress): Boolean {
+        // The JDK helpers cover loopback (127/8, ::1), link-local (169.254/16,
+        // fe80::/10), site-local (RFC-1918, fec0::/10), and the wildcard
+        // (0.0.0.0, ::). They miss CGNAT (100.64/10) and unique-local
+        // fc00::/7, so fall through to the byte classifier for those.
+        if (address.isLoopbackAddress ||
+            address.isLinkLocalAddress ||
+            address.isSiteLocalAddress ||
+            address.isAnyLocalAddress
+        ) {
+            return true
+        }
+        return when (address) {
+            is Inet4Address -> isPrivateIpv4(toUnsignedOctets(address.address))
+            is Inet6Address -> {
+                val bytes = address.address
+                // IPv4-mapped (::ffff:a.b.c.d) carries the embedded IPv4 in the
+                // final four bytes with the preceding two set to 0xffff; follow
+                // it so a mapped private literal is rejected too.
+                if (bytes.size == 16 &&
+                    (0 until 10).all { bytes[it].toInt() == 0 } &&
+                    bytes[10].toInt() and 0xFF == 0xFF &&
+                    bytes[11].toInt() and 0xFF == 0xFF
+                ) {
+                    isPrivateIpv4(toUnsignedOctets(bytes.copyOfRange(12, 16)))
+                } else {
+                    // fc00::/7 unique-local — not covered by the JDK helpers.
+                    (bytes.firstOrNull()?.toInt()?.and(0xFE)) == 0xFC
+                }
+            }
+            else -> false
+        }
+    }
+
+    private fun toUnsignedOctets(raw: ByteArray): IntArray =
+        IntArray(raw.size) { raw[it].toInt() and 0xFF }
 
     /**
      * Strict 4-part decimal IPv4 (the only shape an IPv4-embedded IPv6 literal

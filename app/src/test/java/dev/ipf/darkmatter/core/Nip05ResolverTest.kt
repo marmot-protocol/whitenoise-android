@@ -40,4 +40,17 @@ class Nip05ResolverTest {
             assertNull(Nip05Resolver.resolve("alice@169.254.1.1"))
             assertNull(Nip05Resolver.resolve("alice@foo.localhost"))
         }
+
+    @Test
+    fun rejectsExplicitNonDefaultPortWithoutNetwork() =
+        runBlocking {
+            // NIP-05 well-known is served on the implicit HTTPS port. An
+            // explicit non-443 port is a non-standard authority trick and is
+            // rejected in httpGetString BEFORE any DNS resolution / connection,
+            // so this stays offline. The domain carries a dot (NIP-05 shape) and
+            // is a public name, so the only thing that stops it is the port.
+            assertNull(Nip05Resolver.resolve("alice@example.com:8080"))
+            assertNull(Nip05Resolver.resolve("alice@example.com:80"))
+            assertNull(Nip05Resolver.resolve("alice@example.com:22"))
+        }
 }

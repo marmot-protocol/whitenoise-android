@@ -1435,12 +1435,21 @@ private fun ChatsScreen(
                 )
             }
             // Pasted-identifier resolution result (#344). Sits above the list so
-            // a recognized npub / NIP-05 surfaces an "open profile" affordance
-            // (routing into the shared profile sheet, which already handles the
-            // existing-chat / Start-chat split) while plain-text queries below
-            // keep filtering the list. Hidden for plain-text queries.
+            // a recognized npub / NIP-05 surfaces a tappable result while
+            // plain-text queries below keep filtering the list. When the active
+            // account already has a 1:1 chat with the resolved key, the result
+            // IS that chat row and tapping it opens the conversation directly
+            // (issue #344 step 2); otherwise it's an "open profile" affordance
+            // routing into the shared profile sheet, which handles the
+            // Start-chat path (step 3). Hidden for plain-text queries.
             ChatListIdentifierResult(
                 resolution = identifierResolution,
+                appState = appState,
+                existingDirectChat = { npub -> appState.existingDirectChat(npub) },
+                onOpenChat = { chat ->
+                    searchOpen = false
+                    onOpenGroup(chat, null)
+                },
                 onOpenProfile = { npub ->
                     searchOpen = false
                     appState.presentProfile(npub)
@@ -1619,15 +1628,20 @@ private sealed interface IdentifierResolution {
 
 /**
  * Inline chat-list search result for a pasted Nostr identifier (#344). Renders
- * the resolve lifecycle: a spinner while a NIP-05 lookup is in flight, a
- * tappable "open profile" row once resolved (tapping routes into the shared
- * profile sheet, which already surfaces the existing 1:1 chat or a Start-chat
- * affordance), or an inline error on failure. Plain-text queries never reach
- * here — they keep filtering the list as before.
+ * the resolve lifecycle: a spinner while a NIP-05 lookup is in flight; once
+ * resolved, either the existing 1:1 chat row (when the active account already
+ * has a DM with the resolved key — tapping opens that conversation directly,
+ * issue #344 step 2) or an "open profile" row (no existing chat — tapping
+ * routes into the shared profile sheet, which surfaces the Start-chat
+ * affordance, step 3); or an inline error on failure. Plain-text queries never
+ * reach here — they keep filtering the list as before.
  */
 @Composable
 private fun ChatListIdentifierResult(
     resolution: IdentifierResolution,
+    appState: DarkMatterAppState,
+    existingDirectChat: (String) -> ChatListItem?,
+    onOpenChat: (ChatListItem) -> Unit,
     onOpenProfile: (String) -> Unit,
 ) {
     when (resolution) {
@@ -1644,36 +1658,52 @@ private fun ChatListIdentifierResult(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        is IdentifierResolution.Resolved ->
-            ListItem(
-                modifier =
-                    Modifier.clickable(role = Role.Button) { onOpenProfile(resolution.npub) },
-                leadingContent = {
-                    Avatar(
-                        title = IdentityFormatter.short(resolution.npub),
-                        seed = resolution.npub,
-                        size = 40.dp,
-                        pictureUrl = null,
-                    )
-                },
-                headlineContent = {
-                    Text(
-                        stringResource(R.string.chat_list_search_open_profile),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                supportingContent = {
-                    Text(
-                        IdentityFormatter.short(resolution.npub, prefix = 12, suffix = 8),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                trailingContent = {
-                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
-                },
-            )
+        is IdentifierResolution.Resolved -> {
+            // Surface the existing 1:1 chat as the top result so a single tap
+            // opens the conversation (issue #344 step 2). existingDirectChat
+            // reads snapshot-backed projected items, so this recomposes if the
+            // chat list lands the DM after the npub already resolved. Only when
+            // there is no existing DM do we fall back to the profile preview /
+            // Start-chat path (step 3).
+            val existing = existingDirectChat(resolution.npub)
+            if (existing != null) {
+                ChatRow(
+                    item = existing,
+                    appState = appState,
+                    onClick = { onOpenChat(existing) },
+                )
+            } else {
+                ListItem(
+                    modifier =
+                        Modifier.clickable(role = Role.Button) { onOpenProfile(resolution.npub) },
+                    leadingContent = {
+                        Avatar(
+                            title = IdentityFormatter.short(resolution.npub),
+                            seed = resolution.npub,
+                            size = 40.dp,
+                            pictureUrl = null,
+                        )
+                    },
+                    headlineContent = {
+                        Text(
+                            stringResource(R.string.chat_list_search_open_profile),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            IdentityFormatter.short(resolution.npub, prefix = 12, suffix = 8),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
+                    },
+                )
+            }
+        }
         is IdentifierResolution.Failed ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),

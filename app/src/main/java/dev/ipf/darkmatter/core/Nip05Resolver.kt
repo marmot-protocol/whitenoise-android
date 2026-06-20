@@ -20,8 +20,12 @@ import java.util.Locale
  * domain comes from untrusted, user-pasted input, so this is an SSRF vector.
  * We therefore:
  *  - force HTTPS (a NIP-05 well-known doc is always HTTPS),
+ *  - reject an explicit non-443 port (NIP-05 well-known is served on the
+ *    default HTTPS port; an explicit port is a non-standard authority trick),
  *  - reject private / loopback / link-local hosts via [HostSafety] at the
- *    initial host AND at every redirect hop,
+ *    initial host AND at every redirect hop, checking BOTH the literal host
+ *    string and every DNS-resolved address (so a public hostname that resolves
+ *    to a private IP — DNS rebinding — is rejected before openConnection),
  *  - follow redirects manually with a bounded hop count (the platform's
  *    auto-follow would silently chase an https→http downgrade or a
  *    public→private hop),
@@ -106,7 +110,23 @@ object Nip05Resolver {
             if (parsed.protocol?.lowercase(Locale.ROOT) != "https") return null
             val host = parsed.host ?: return null
             if (!parsed.userInfo.isNullOrEmpty()) return null
+            // NIP-05 well-known docs are served on the default HTTPS port. An
+            // explicit port is a non-standard authority trick (and a way to
+            // reach an unintended internal service), so reject anything but the
+            // implicit default (-1) or an explicit 443.
+            if (parsed.port != -1 && parsed.port != 443) return null
             if (host.isBlank() || HostSafety.isPrivateOrLoopbackHost(host)) return null
+            // Resolve-time SSRF check: a public hostname can still resolve to a
+            // private/loopback/link-local address (DNS rebinding). Resolve the
+            // host here on the IO dispatcher and reject if ANY resolved address
+            // is internal, before we ever openConnection().
+            val resolved =
+                runCatching { java.net.InetAddress.getAllByName(host) }.getOrNull()
+            if (resolved.isNullOrEmpty() ||
+                resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }
+            ) {
+                return null
+            }
 
             val connection = (parsed.openConnection() as? HttpURLConnection) ?: return null
             try {
