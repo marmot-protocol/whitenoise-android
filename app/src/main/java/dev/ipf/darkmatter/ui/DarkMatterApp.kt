@@ -14008,11 +14008,32 @@ private fun Avatar(
                 contentScale = ContentScale.Crop,
             )
         } else {
+            // Derive the font size from the avatar diameter so wide letter
+            // pairs (e.g. "MW", "WW") fit inside the circle (#312). The 0.4
+            // ratio keeps the worst-case 2-letter pair clear of the bounds at
+            // every render size used in the app (36dp..96dp).
+            //
+            // The avatar's outer Modifier.size(...) is in dp and therefore
+            // does NOT scale with the user's accessibility font scale, but a
+            // raw `.sp` value would — pushing wide pairs back outside the
+            // circle for users on large-font settings. Divide the derived
+            // value by `fontScale` so the rendered size is constant in dp
+            // and tracks the avatar's actual size, then cap at titleMedium so
+            // the existing look is preserved on the large profile/group-detail
+            // avatars where titleMedium already fits comfortably. The cap is
+            // taken in the same dp-constant space, so it also resists font
+            // scale.
+            val fontScale = LocalDensity.current.fontScale
+            val titleMediumSp = MaterialTheme.typography.titleMedium.fontSize
+            val fittedFontSize =
+                minOf(size.value * 0.4f, titleMediumSp.value * fontScale).sp / fontScale
             Text(
                 IdentityFormatter.initials(title),
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.titleMedium,
+                fontSize = fittedFontSize,
+                maxLines = 1,
             )
         }
     }
