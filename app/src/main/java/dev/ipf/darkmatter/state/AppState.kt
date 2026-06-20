@@ -55,7 +55,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -1947,61 +1946,6 @@ class DarkMatterAppState(
 
     fun clearToast() {
         toast = null
-    }
-
-    fun shutdown() {
-        notificationJob?.cancel()
-        runCatching { client?.marmot?.close() }
-        profileScope.cancel()
-        mutationsScope.cancel()
-        notificationScope.cancel()
-    }
-
-    private suspend fun restartMarmotRuntime() {
-        val previousNotificationJob = notificationJob
-        notificationJob = null
-        val previousClient = client
-        val accountLabelForRuntime = activeAccountRef
-
-        appStateDebug { "marmot runtime reopening" }
-        previousNotificationJob?.cancelAndJoin()
-        val opened =
-            try {
-                withContext(Dispatchers.IO) {
-                    previousClient?.marmot?.close()
-                    MarmotClient(appContext).also { nextClient ->
-                        nextClient.marmot.configurePrivacyRuntime(accountLabelForRuntime)
-                        nextClient.marmot.start()
-                    }
-                }
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                client = null
-                phase = AppPhase.Failed(error.readableMessage())
-                throw error
-            }
-
-        client = opened
-        runtimeGeneration += 1
-        localNotificationPresenter.ensureChannels()
-        refreshLocalNotificationPermission()
-        startNotificationListener()
-        refreshSecurityPrivacySettings()
-        refreshAccounts()
-        if (accounts.isEmpty()) {
-            localNotificationSettings = null
-            phase = AppPhase.Onboarding
-        } else {
-            if (activeAccountRef == null || accounts.none { it.label == activeAccountRef }) {
-                setActiveAccount(accounts.first().label)
-            }
-            refreshLocalNotificationSettings()
-            phase = AppPhase.Ready
-            activeAccount?.accountIdHex?.let { warmProfile(it) }
-        }
-        appStateDebug {
-            "marmot runtime reopened accounts=${accounts.size} active=${activeAccountRef?.take(8) ?: "<none>"}"
-        }
     }
 
     private suspend fun configurePrivacyRuntime() {
