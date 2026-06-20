@@ -2532,17 +2532,28 @@ private fun ChatRow(
                 if (item.group.pendingConfirmation) {
                     Badge { Text(stringResource(R.string.invite)) }
                 } else if (item.hasUnread) {
-                    // Default Badge is error-red, which reads as an alert not a count.
-                    Badge(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ) {
-                        Text(if (item.unreadCount > 99uL) "99+" else item.unreadCount.toString())
-                    }
+                    UnreadCountBadge(item.unreadCount)
                 }
             }
         },
     )
+}
+
+@Composable
+private fun UnreadCountBadge(
+    unreadCount: ULong,
+    modifier: Modifier = Modifier,
+) {
+    val accessibleCount = unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
+    val description = pluralStringResource(R.plurals.unread_messages_count, accessibleCount, accessibleCount)
+    // Default Badge is error-red, which reads as an alert not a count.
+    Badge(
+        modifier = modifier.semantics { contentDescription = description },
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+    ) {
+        Text(if (unreadCount > 99uL) "99+" else unreadCount.toString())
+    }
 }
 
 @Composable
@@ -12337,11 +12348,15 @@ private fun AccountSelectorSheet(
     onAddAccount: () -> Unit,
     onAccountSwitched: () -> Unit,
 ) {
+    LaunchedEffect(Unit) {
+        appState.refreshAccounts()
+    }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleLarge)
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
                 items(appState.accounts, key = { it.label }) { account ->
+                    val unreadCount = appState.unreadCountForAccount(account.label)
                     ListItem(
                         modifier =
                             Modifier.clickable {
@@ -12371,6 +12386,10 @@ private fun AccountSelectorSheet(
                         },
                         trailingContent = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (unreadCount > 0uL) {
+                                    UnreadCountBadge(unreadCount)
+                                    Spacer(Modifier.width(8.dp))
+                                }
                                 if (!account.localSigning) {
                                     Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)
                                     Spacer(Modifier.width(8.dp))
