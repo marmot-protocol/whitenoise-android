@@ -131,6 +131,14 @@
     <string name="confirm_remove_member_message">%1$s потеряет доступ к этому чату. Уведомление не будет отправлено.</string>
     <string name="confirm_leave_title">Покинуть чат?</string>
     <string name="confirm_leave_message">Вы будете удалены из этой группы. Чтобы вернуться, потребуется новое приглашение.</string>
+    <string name="leave_group">Покинуть группу</string>
+    <string name="confirm_leave_title_named">Покинуть %1$s?</string>
+    <string name="confirm_leave_message_named">Вы больше не будете получать новые сообщения из этой группы.</string>
+    <string name="confirm_leave_sole_admin_title">Вы единственный админ</string>
+    <string name="confirm_leave_sole_admin_message">Назначьте админом другого участника, прежде чем покинуть %1$s, чтобы у группы остался админ.</string>
+    <string name="confirm_leave_sole_member_title">Покинуть %1$s?</string>
+    <string name="confirm_leave_sole_member_message">Вы единственный участник. После выхода эта группа будет полностью удалена.</string>
+    <string name="toast_left_named">Вы покинули %1$s</string>
     <string name="message_deleted">Это сообщение было удалено.</string>
     <string name="toast_original_message_unavailable">Исходное сообщение недоступно.</string>
     <string name="message_reacted">Реакция: %1$s</string>

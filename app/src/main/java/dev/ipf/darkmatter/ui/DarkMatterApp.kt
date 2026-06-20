@@ -7814,13 +7814,26 @@ private fun ConfirmDialog(
     confirmLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    destructive: Boolean = false,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text(confirmLabel) }
+            TextButton(
+                onClick = onConfirm,
+                // Material 3 destructive affordance: error-colored confirm
+                // text for irreversible actions (leave group, remove member).
+                colors =
+                    if (destructive) {
+                        ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        ButtonDefaults.textButtonColors()
+                    },
+            ) { Text(confirmLabel) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
@@ -8432,6 +8445,7 @@ private fun GroupDetailsScreen(
                         )
                     },
                     onDismiss = { pendingConfirm = null },
+                    destructive = true,
                 )
             is DetailsConfirm.Leave ->
                 ConfirmDialog(
@@ -8452,6 +8466,7 @@ private fun GroupDetailsScreen(
                         )
                     },
                     onDismiss = { pendingConfirm = null },
+                    destructive = true,
                 )
             is DetailsConfirm.LeaveSoleMember ->
                 // Sole member: leaving dissolves the group entirely. Same engine
@@ -8472,6 +8487,7 @@ private fun GroupDetailsScreen(
                         )
                     },
                     onDismiss = { pendingConfirm = null },
+                    destructive = true,
                 )
             is DetailsConfirm.LeaveSoleAdmin ->
                 // Sole admin with other members: leaving would strand the group

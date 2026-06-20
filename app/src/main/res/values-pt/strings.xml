@@ -129,6 +129,14 @@
     <string name="confirm_remove_member_message">%1$s perderá o acesso a este bate-papo. Ele não será notificado.</string>
     <string name="confirm_leave_title">Sair do bate-papo?</string>
     <string name="confirm_leave_message">Você será removido deste grupo. Será necessário um novo convite para entrar novamente.</string>
+    <string name="leave_group">Sair do grupo</string>
+    <string name="confirm_leave_title_named">Sair de %1$s?</string>
+    <string name="confirm_leave_message_named">Você não receberá novas mensagens deste grupo.</string>
+    <string name="confirm_leave_sole_admin_title">Você é o único administrador</string>
+    <string name="confirm_leave_sole_admin_message">Torne outro membro administrador antes de sair de %1$s, para que o grupo mantenha um administrador.</string>
+    <string name="confirm_leave_sole_member_title">Sair de %1$s?</string>
+    <string name="confirm_leave_sole_member_message">Você é o único membro. Ao sair, este grupo será excluído completamente.</string>
+    <string name="toast_left_named">Você saiu de %1$s</string>
     <string name="message_deleted">Esta mensagem foi excluída.</string>
     <string name="toast_original_message_unavailable">A mensagem original não está disponível.</string>
     <string name="message_reacted">Reagiu com %1$s</string>
