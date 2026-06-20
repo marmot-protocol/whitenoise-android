@@ -515,6 +515,9 @@ class DarkMatterAppState(
             .AtomicInteger(0)
     private var notificationJob: Job? = null
     private var appInForeground = false
+
+    @Volatile
+    private var isForegroundCatchUpRunning = false
     private var activeConversationGroupIdHex: String? = null
 
     // The account that has the active conversation on screen, captured when the
@@ -741,6 +744,31 @@ class DarkMatterAppState(
                 rethrowIfCancellation(it)
                 appStateDebug(it) { "catchUpAccounts failed: ${it.readableMessage()}" }
             }
+    }
+
+    /**
+     * Best-effort account catch-up when the app returns to the foreground.
+     * Mirrors iOS `catchUpAfterForegroundActivation`: pumps every running worker
+     * so relay-ingested commits and projections converge without requiring an
+     * account switch or process restart. Failures are swallowed; cancellation
+     * propagates.
+     */
+    suspend fun catchUpAfterForegroundActivation() {
+        if (
+            !ForegroundCatchUpPolicy.shouldCatchUp(
+                appPhase = phase,
+                isCatchUpRunning = isForegroundCatchUpRunning,
+                appInForeground = appInForeground,
+            )
+        ) {
+            return
+        }
+        isForegroundCatchUpRunning = true
+        try {
+            catchUpAccounts()
+        } finally {
+            isForegroundCatchUpRunning = false
+        }
     }
 
     /**
@@ -1338,7 +1366,10 @@ class DarkMatterAppState(
 
     fun setAppInForeground(foreground: Boolean) {
         appInForeground = foreground
-        if (foreground) refreshLocalNotificationPermission()
+        if (foreground) {
+            refreshLocalNotificationPermission()
+            notificationScope.launch { catchUpAfterForegroundActivation() }
+        }
         if (foreground && backgroundConnectionEnabled) startBackgroundConnectionService()
         if (foreground) notificationScope.launch { syncNativePushRegistrationIfEnabled() }
     }
