@@ -101,6 +101,57 @@ class ChatListSortingTest {
         assertTrue(item.hasUnread)
     }
 
+    @Test
+    fun freshlyCreatedChatWithNoMessagesSortsAboveOlderMessagedChats() {
+        // A just-created DM/group has a projection (with `updatedAt` ≈ now) but
+        // no last message yet. Its `latestAt` must fall back to `updatedAt` so
+        // it sorts to the TOP of the chat list, matching the "most recent
+        // activity" ordering, rather than collapsing to 0uL and landing at the
+        // bottom (issue #321).
+        val olderMessaged =
+            chatListItemFromProjection(
+                row(
+                    groupId = "older-with-message",
+                    title = "Old Chat",
+                    preview = "an old message",
+                    latestAt = 100uL,
+                    unreadCount = 0uL,
+                ),
+            )
+        val freshlyCreated =
+            chatListItemFromProjection(
+                noMessageRow(
+                    groupId = "fresh-no-message",
+                    title = "New DM",
+                    updatedAt = 200uL,
+                ),
+            )
+
+        assertEquals(200uL, freshlyCreated.latestAt)
+        val sorted = sortChatListItems(listOf(olderMessaged, freshlyCreated))
+        assertEquals(listOf("fresh-no-message", "older-with-message"), sorted.map { it.id })
+    }
+
+    @Test
+    fun lastMessageTimestampStillWinsOverProjectionUpdatedAt() {
+        // The `updatedAt` fallback must NOT override an existing chat's
+        // last-message ordering: a chat with a message keeps sorting on the
+        // message's timeline timestamp even when its projection `updatedAt`
+        // (bumped by e.g. a read-state or avatar change) is more recent.
+        val item =
+            chatListItemFromProjection(
+                row(
+                    groupId = "messaged",
+                    title = "Messaged",
+                    preview = "hello",
+                    latestAt = 50uL,
+                    unreadCount = 0uL,
+                ).copy(updatedAt = 9999uL),
+            )
+
+        assertEquals(50uL, item.latestAt)
+    }
+
     private fun item(
         id: String,
         latestAt: ULong?,
@@ -145,6 +196,27 @@ class ChatListSortingTest {
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
         updatedAt = latestAt,
+    )
+
+    private fun noMessageRow(
+        groupId: String,
+        title: String,
+        updatedAt: ULong,
+    ) = ChatListRowFfi(
+        groupIdHex = groupId,
+        archived = false,
+        pendingConfirmation = false,
+        title = title,
+        groupName = "",
+        avatarUrl = null,
+        avatar = null,
+        lastMessage = null,
+        unreadCount = 0uL,
+        hasUnread = false,
+        firstUnreadMessageIdHex = null,
+        lastReadMessageIdHex = null,
+        lastReadTimelineAt = null,
+        updatedAt = updatedAt,
     )
 
     private fun group(

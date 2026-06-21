@@ -248,6 +248,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -1048,6 +1049,12 @@ private fun MainShell(
     // open path (row tap, notification, new-chat), which lands at the normal
     // unread/newest anchor.
     var selectedChatFocusMessageId by remember { mutableStateOf<String?>(null) }
+    // True only when `selectedChat` was opened straight off a just-completed
+    // New Chat / Create Group flow (issue #321), so ConversationScreen raises
+    // the composer + keyboard once on entry. Plain `remember` (not
+    // rememberSaveable) so it never survives process death. Reset on every
+    // other open path and on back.
+    var selectedChatJustCreated by remember { mutableStateOf(false) }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
@@ -1107,6 +1114,12 @@ private fun MainShell(
             sectionName = MainSection.Chats.name
             settingsDetailName = null
             selectedChat = null
+            // Notification routing never opens a just-created conversation, so
+            // clear any leftover open-time state from a prior New Chat / Create
+            // Group flow; otherwise a stale justCreated flag would auto-raise
+            // the IME on the next opened conversation (issue #321 guard).
+            selectedChatFocusMessageId = null
+            selectedChatJustCreated = false
         }
         when (step) {
             is NotificationNavStep.SwitchAccount -> {
@@ -1117,6 +1130,8 @@ private fun MainShell(
                 // here makes tapping from inside a chat take the same clean path
                 // as tapping after returning to the chat list.
                 selectedChat = null
+                selectedChatFocusMessageId = null
+                selectedChatJustCreated = false
                 appState.setActiveAccount(step.accountRef)
             }
             NotificationNavStep.AwaitChatList -> Unit // re-fires when list state settles
@@ -1129,6 +1144,11 @@ private fun MainShell(
                     .firstOrNull { it.group.groupIdHex == step.groupIdHex }
                     ?.let {
                         selectedChatFocusMessageId = null
+                        // Notification routing is never a just-created open, so
+                        // clear any stale justCreated flag carried over from a
+                        // prior New Chat / Create Group flow before showing the
+                        // target conversation (issue #321 guard).
+                        selectedChatJustCreated = false
                         selectedChat = it
                     }
                 onNotificationTargetHandled(target)
@@ -1157,8 +1177,9 @@ private fun MainShell(
         ProfileSheet(
             appState = appState,
             npub = npub,
-            onOpenGroup = { item ->
+            onOpenGroup = { item, justCreated ->
                 selectedChatFocusMessageId = null
+                selectedChatJustCreated = justCreated
                 selectedChat = item
                 appState.clearPresentedProfile()
             },
@@ -1171,9 +1192,11 @@ private fun MainShell(
             appState = appState,
             chat = selectedChat!!,
             focusMessageId = selectedChatFocusMessageId,
+            justCreated = selectedChatJustCreated,
             onBack = {
                 selectedChat = null
                 selectedChatFocusMessageId = null
+                selectedChatJustCreated = false
             },
         )
         return
@@ -1188,8 +1211,9 @@ private fun MainShell(
                     sectionName = MainSection.Settings.name
                     settingsDetailName = null
                 },
-                onOpenGroup = { item, focusMessageId ->
+                onOpenGroup = { item, focusMessageId, justCreated ->
                     selectedChatFocusMessageId = focusMessageId
+                    selectedChatJustCreated = justCreated
                     selectedChat = item
                 },
             )
@@ -1250,10 +1274,12 @@ private fun ChatsScreen(
     appState: DarkMatterAppState,
     controller: ChatsController,
     onOpenSettings: () -> Unit,
-    // (chat, focusMessageId): focusMessageId is non-null only when the row was
-    // a message-body search hit (issue #290); the conversation then scrolls to
-    // that message on open.
-    onOpenGroup: (ChatListItem, String?) -> Unit,
+    // (chat, focusMessageId, justCreated): focusMessageId is non-null only when
+    // the row was a message-body search hit (issue #290); the conversation then
+    // scrolls to that message on open. justCreated is true only when the chat
+    // was just created by the New Chat / Create Group flow (issue #321), which
+    // opens it with the composer focused + keyboard up.
+    onOpenGroup: (ChatListItem, String?, Boolean) -> Unit,
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChat by remember { mutableStateOf(false) }
@@ -1532,7 +1558,7 @@ private fun ChatsScreen(
                 existingDirectChat = { npub -> appState.existingDirectChat(npub) },
                 onOpenChat = { chat ->
                     searchOpen = false
-                    onOpenGroup(chat, null)
+                    onOpenGroup(chat, null, false)
                 },
                 onOpenProfile = { npub ->
                     searchOpen = false
@@ -1592,7 +1618,7 @@ private fun ChatsScreen(
                                     item = item,
                                     appState = appState,
                                     bodyMatch = bodyMatch,
-                                    onOpen = { onOpenGroup(item, bodyMatch?.messageIdHex) },
+                                    onOpen = { onOpenGroup(item, bodyMatch?.messageIdHex, false) },
                                     onMenuArchiveToggle = {
                                         // Durable process-lifetime scope, not the
                                         // composable's: archiving drops the row out of
@@ -1662,7 +1688,7 @@ private fun ChatsScreen(
             titleRes = newChatTitle,
             directMessage = newChatDirect,
             existingDirectChat = { pubkey -> appState.existingDirectChat(pubkey) },
-            onOpenConversation = { chat -> onOpenGroup(chat, null) },
+            onOpenConversation = { chat, justCreated -> onOpenGroup(chat, null, justCreated) },
             onDismiss = { showNewChat = false },
         )
     }
@@ -2565,7 +2591,11 @@ private fun NewChatSheet(
     @StringRes titleRes: Int = R.string.new_chat,
     directMessage: Boolean = false,
     existingDirectChat: (String) -> ChatListItem? = { null },
-    onOpenConversation: (ChatListItem) -> Unit = {},
+    // (chat, justCreated): justCreated is true when this open follows a
+    // brand-new group/DM create in the same step (issue #321) so the
+    // conversation lands with the composer focused + keyboard up. Reusing an
+    // existing 1:1 passes false.
+    onOpenConversation: (ChatListItem, Boolean) -> Unit = { _, _ -> },
     onDismiss: () -> Unit,
 ) {
     var members by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -2731,7 +2761,7 @@ private fun NewChatSheet(
                     if (directMessage) {
                         val target = recipients.firstOrNull() ?: return@Button
                         existingDirectChat(target)?.let { existing ->
-                            onOpenConversation(existing)
+                            onOpenConversation(existing, false)
                             onDismiss()
                             return@Button
                         }
@@ -2750,9 +2780,21 @@ private fun NewChatSheet(
                                     description.trim().ifBlank { null },
                                 )
                             }
-                        }.onSuccess {
+                        }.onSuccess { groupIdHex ->
                             appState.present(R.string.toast_chat_created)
+                            // #321: navigate straight into the new conversation
+                            // with the composer ready, instead of leaving the
+                            // user on the chat list. Dismiss the sheet first so
+                            // the conversation isn't opened behind the modal,
+                            // then wait for the chat-list projection to surface
+                            // the freshly-created group (it lands a beat after
+                            // createGroup returns). If it doesn't materialize in
+                            // time, fall back to just dismissing — the sort fix
+                            // already floats the new chat to the top of the list.
                             onDismiss()
+                            appState.awaitChatListItem(groupIdHex)?.let { item ->
+                                onOpenConversation(item, true)
+                            }
                         }.onFailure {
                             error = createGroupErrorMessage(it)
                         }
@@ -6305,6 +6347,11 @@ private fun ConversationScreen(
     // matched message id to scroll to and briefly highlight once the timeline
     // has paged it in. Null for every normal open path.
     focusMessageId: String? = null,
+    // True only when this conversation was just created in the same navigation
+    // step (issue #321) — drives a one-shot composer focus + keyboard raise so
+    // the user can type the first message without an extra tap. False for row
+    // taps, notification routing, and search hits.
+    justCreated: Boolean = false,
 ) {
     // Push the global snackbar host above the conversation composer so
     // a toast (e.g. the post-invite-accept confirmation) doesn't
@@ -7649,6 +7696,7 @@ private fun ConversationScreen(
                         appState = appState,
                         mentionCandidates = mentionCandidates,
                         mentionPickerEnabled = mentionPickerEnabled,
+                        autoFocusOnEnter = justCreated,
                     )
                 }
             }
@@ -11735,6 +11783,12 @@ private fun ComposerBar(
     // a 1:1 chat has no one to disambiguate, so typing `@` stays literal).
     mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
     mentionPickerEnabled: Boolean = false,
+    // When the conversation was just created in the same navigation step
+    // (issue #321), request focus on the composer and raise the soft keyboard
+    // once on entry so the user can type the first message without an extra
+    // tap. One-shot: a guard flag stops a revisit / recomposition from
+    // re-opening the IME, and the flag is not persisted across process death.
+    autoFocusOnEnter: Boolean = false,
 ) {
     var attachMenuOpen by remember { mutableStateOf(false) }
     // Field state is a TextFieldValue (not a bare String) so the caret can
@@ -11772,6 +11826,20 @@ private fun ComposerBar(
             // been composing before they tapped Edit (text + original caret).
             textFieldValue = preEditFieldValue ?: TextFieldValue("")
             preEditFieldValue = null
+        }
+    }
+    // #321: a just-created conversation opens directly with the composer ready.
+    // Request focus and raise the soft keyboard exactly once, gated by a
+    // plain-`remember` flag (NOT rememberSaveable) so it fires per composition
+    // and never re-fires on a revisit or after process death. Skipped while
+    // editing — the edit effect above already owns focus then.
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var autoFocusConsumed by remember { mutableStateOf(false) }
+    LaunchedEffect(autoFocusOnEnter, editingMessageId) {
+        if (autoFocusOnEnter && !autoFocusConsumed && editingMessageId == null) {
+            autoFocusConsumed = true
+            runCatching { composerFocus.requestFocus() }
+            keyboardController?.show()
         }
     }
     Column(
@@ -13430,7 +13498,11 @@ private fun ProfileQrSheet(
 private fun ProfileSheet(
     appState: DarkMatterAppState,
     npub: String,
-    onOpenGroup: (ChatListItem) -> Unit,
+    // (chat, justCreated): justCreated is true only on the path that just
+    // created a brand-new DM with this person (issue #321), so the conversation
+    // opens with the composer focused + keyboard up. Opening an existing DM or
+    // a shared group passes false.
+    onOpenGroup: (ChatListItem, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
@@ -13531,7 +13603,7 @@ private fun ProfileSheet(
                             item = group,
                             appState = appState,
                             titleCopy = groupTitleCopy,
-                            onOpen = { onOpenGroup(group) },
+                            onOpen = { onOpenGroup(group, false) },
                         )
                         if (index != sharedGroups.lastIndex) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
@@ -13552,13 +13624,13 @@ private fun ProfileSheet(
                 onClick = {
                     val existing = directMessageGroup
                     if (existing != null) {
-                        onOpenGroup(existing)
+                        onOpenGroup(existing, false)
                     } else {
                         creatingChat = true
                         appState.launchMutation {
                             val groupId = appState.startProfileChat(npub)
                             val item = groupId?.let { appState.awaitChatListItem(it) }
-                            if (item != null) onOpenGroup(item) else creatingChat = false
+                            if (item != null) onOpenGroup(item, true) else creatingChat = false
                         }
                     }
                 },
