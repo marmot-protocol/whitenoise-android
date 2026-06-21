@@ -236,7 +236,7 @@
     <string name="display_name">Nom du profil</string>
     <string name="about">À propos</string>
     <string name="picture_url">Image URL</string>
-    <string name="nip_05">NIP-05</string>
+    <string name="nip_05">Verified address</string>
     <string name="lightning">Foudre</string>
     <string name="publish_to_relays">Publier sur des relais</string>
     <string name="nsec_or_npub">Entrez votre clé privée</string>
@@ -257,7 +257,7 @@
     <string name="no_relays">Aucun relais configuré</string>
     <string name="remove_relay">Supprimer le Relais ?</string>
     <string name="add_relay">Ajouter un Relais</string>
-    <string name="nip_65">NIP-65</string>
+    <string name="nip_65">Read/Write</string>
     <string name="inbox">Relais de Boîte de Réception</string>
     <string name="key_package">Paquet de clés</string>
     <string name="published_relay_lists">Listes de relais publiées</string>
