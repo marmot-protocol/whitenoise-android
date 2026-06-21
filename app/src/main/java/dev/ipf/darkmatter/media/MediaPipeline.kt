@@ -526,14 +526,11 @@ object MediaPipeline {
             else -> "image.jpg"
         }
 
-    private fun isJpeg(bytes: ByteArray): Boolean =
-        bytes.size >= 2 && u8(bytes, 0) == 0xff && u8(bytes, 1) == 0xd8
+    private fun isJpeg(bytes: ByteArray): Boolean = bytes.size >= 2 && u8(bytes, 0) == 0xff && u8(bytes, 1) == 0xd8
 
-    private fun isPng(bytes: ByteArray): Boolean =
-        bytes.size >= PNG_SIGNATURE.size && PNG_SIGNATURE.indices.all { bytes[it] == PNG_SIGNATURE[it] }
+    private fun isPng(bytes: ByteArray): Boolean = bytes.size >= PNG_SIGNATURE.size && PNG_SIGNATURE.indices.all { bytes[it] == PNG_SIGNATURE[it] }
 
-    private fun isWebp(bytes: ByteArray): Boolean =
-        bytes.size >= 12 && asciiEquals(bytes, 0, "RIFF") && asciiEquals(bytes, 8, "WEBP")
+    private fun isWebp(bytes: ByteArray): Boolean = bytes.size >= 12 && asciiEquals(bytes, 0, "RIFF") && asciiEquals(bytes, 8, "WEBP")
 
     private fun stripJpegMetadata(bytes: ByteArray): ByteArray? {
         if (!isJpeg(bytes)) return null
@@ -592,8 +589,10 @@ object MediaPipeline {
     }
 
     private fun isJpegMetadataMarker(marker: Int): Boolean =
-        marker == 0xe1 || // EXIF and XMP APP1 payloads.
-            marker == 0xed || // Photoshop/IPTC APP13 payloads.
+        marker == 0xe1 ||
+            // EXIF and XMP APP1 payloads.
+            marker == 0xed ||
+            // Photoshop/IPTC APP13 payloads.
             marker == 0xfe // User comments can carry device/location notes.
 
     private fun stripPngMetadata(bytes: ByteArray): ByteArray? {

@@ -6812,7 +6812,8 @@ private fun ConversationScreen(
                     )
                 MediaPipeline.OriginalImageReadResult.TooLarge -> return ImageAttachmentReadOutcome(null, overflowed = true)
                 MediaPipeline.OriginalImageReadResult.Failed,
-                MediaPipeline.OriginalImageReadResult.Unsupported -> Unit // Fall back to JPEG re-encode so unsupported containers still strip metadata.
+                MediaPipeline.OriginalImageReadResult.Unsupported,
+                -> Unit // Fall back to JPEG re-encode so unsupported containers still strip metadata.
             }
         }
         val jpeg =
@@ -7656,7 +7657,13 @@ private fun ConversationScreen(
     // stay flush. Keyed on the last rendered message's reaction tally; mutating
     // an earlier (non-last) message leaves this key unchanged, so a react while
     // reading history never hijacks the scroll position.
-    LaunchedEffect(renderedTimeline.lastOrNull()?.record?.messageIdHex?.let { controller.reactions[it] }) {
+    LaunchedEffect(
+        renderedTimeline
+            .lastOrNull()
+            ?.record
+            ?.messageIdHex
+            ?.let { controller.reactions[it] },
+    ) {
         if (initialTimelineAnchored && nearBottom && renderedTimeline.isNotEmpty()) {
             listState.scrollToItem(bottomTimelineIndex)
         }
