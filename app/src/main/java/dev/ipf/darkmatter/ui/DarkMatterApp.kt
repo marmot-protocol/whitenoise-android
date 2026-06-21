@@ -1726,7 +1726,9 @@ private sealed interface IdentifierResolution {
     data object Resolving : IdentifierResolution
 
     /** Resolved to a profile; [npub] is ready to hand to the profile sheet. */
-    data class Resolved(val npub: String) : IdentifierResolution
+    data class Resolved(
+        val npub: String,
+    ) : IdentifierResolution
 
     /** Resolution failed; [messageRes] is the inline error to show. */
     data class Failed(
@@ -9726,10 +9728,14 @@ private fun MessageBubble(
                                 .drawBehind {
                                     val railWidth = 3.dp.toPx()
                                     val inset = 4.dp.toPx()
-                                    val radius = androidx.compose.ui.geometry.CornerRadius(railWidth / 2f, railWidth / 2f)
+                                    val radius =
+                                        androidx.compose.ui.geometry
+                                            .CornerRadius(railWidth / 2f, railWidth / 2f)
                                     drawRoundRect(
                                         color = mentionAccentColor,
-                                        topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+                                        topLeft =
+                                            androidx.compose.ui.geometry
+                                                .Offset(inset, inset),
                                         size =
                                             androidx.compose.ui.geometry.Size(
                                                 railWidth,
@@ -11950,7 +11956,8 @@ private fun ComposerBar(
         // ~50% of the viewport height.
         val mentionQuery =
             if (mentionPickerEnabled && editingMessageId == null) {
-                MentionComposer.activeMentionQuery(textFieldValue.text, textFieldValue.selection.start)
+                MentionComposer
+                    .activeMentionQuery(textFieldValue.text, textFieldValue.selection.start)
                     .takeIf { textFieldValue.selection.collapsed }
             } else {
                 null

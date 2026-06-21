@@ -615,4 +615,9 @@
     <string name="toast_signed_out_and_wiped">Konto von diesem Gerät gelöscht</string>
     <string name="toast_couldnt_wipe_account">Konto konnte nicht gelöscht werden</string>
     <string name="wipe">Löschen</string>
+    <!-- Mention picker (#491). -->
+    <string name="mention_picker_title">Mitglied erwähnen</string>
+    <string name="mention_picker_member">%1$s erwähnen</string>
+    <string name="mention_picker_dismiss">Mitgliederauswahl schließen</string>
+    <string name="mentioned_you">Du wurdest erwähnt</string>
 </resources>

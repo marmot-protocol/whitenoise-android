@@ -615,4 +615,9 @@
     <string name="toast_signed_out_and_wiped">Hesap bu cihazdan silindi</string>
     <string name="toast_couldnt_wipe_account">Hesap silinemedi</string>
     <string name="wipe">Sil</string>
+    <!-- Mention picker (#491). -->
+    <string name="mention_picker_title">Bir üyeden bahset</string>
+    <string name="mention_picker_member">%1$s adlı üyeden bahset</string>
+    <string name="mention_picker_dismiss">Üye seçiciyi kapat</string>
+    <string name="mentioned_you">Sizden bahsedildi</string>
 </resources>

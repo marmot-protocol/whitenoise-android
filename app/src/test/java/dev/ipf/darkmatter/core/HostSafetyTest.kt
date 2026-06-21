@@ -132,11 +132,14 @@ class HostSafetyTest {
     // InetAddress.getByAddress builds an address from raw bytes with NO DNS
     // lookup, so these stay fully offline.
 
-    private fun ipv4(a: Int, b: Int, c: Int, d: Int): InetAddress =
-        InetAddress.getByAddress(byteArrayOf(a.toByte(), b.toByte(), c.toByte(), d.toByte()))
+    private fun ipv4(
+        a: Int,
+        b: Int,
+        c: Int,
+        d: Int,
+    ): InetAddress = InetAddress.getByAddress(byteArrayOf(a.toByte(), b.toByte(), c.toByte(), d.toByte()))
 
-    private fun ipv6(vararg bytes: Int): InetAddress =
-        InetAddress.getByAddress(ByteArray(16) { bytes[it].toByte() })
+    private fun ipv6(vararg bytes: Int): InetAddress = InetAddress.getByAddress(ByteArray(16) { bytes[it].toByte() })
 
     @Test
     fun resolvedLoopbackAndRfc1918AddressesAreFlagged() {

@@ -24,11 +24,9 @@ class DocumentMentionsAccountTest {
         }
     }
 
-    private fun mention(npub: String) =
-        MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub))
+    private fun mention(npub: String) = MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub))
 
-    private fun docOf(vararg inlines: MarkdownInlineFfi) =
-        MarkdownDocumentFfi(listOf(MarkdownBlockFfi.Paragraph(inlines.toList())))
+    private fun docOf(vararg inlines: MarkdownInlineFfi) = MarkdownDocumentFfi(listOf(MarkdownBlockFfi.Paragraph(inlines.toList())))
 
     @Test
     fun mentionOfSelfMatches() {

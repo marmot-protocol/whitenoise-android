@@ -618,4 +618,9 @@
     <string name="toast_signed_out_and_wiped">Cuenta borrada de este dispositivo</string>
     <string name="toast_couldnt_wipe_account">No se pudo borrar la cuenta</string>
     <string name="wipe">Borrar</string>
+    <!-- Mention picker (#491). -->
+    <string name="mention_picker_title">Mencionar a un miembro</string>
+    <string name="mention_picker_member">Mencionar a %1$s</string>
+    <string name="mention_picker_dismiss">Cerrar selector de miembros</string>
+    <string name="mentioned_you">Te han mencionado</string>
 </resources>

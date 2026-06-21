@@ -609,4 +609,9 @@
     <string name="toast_signed_out_and_wiped">帳戶已從本裝置清除</string>
     <string name="toast_couldnt_wipe_account">無法清除帳戶</string>
     <string name="wipe">清除</string>
+    <!-- Mention picker (#491). -->
+    <string name="mention_picker_title">提及成員</string>
+    <string name="mention_picker_member">提及 %1$s</string>
+    <string name="mention_picker_dismiss">關閉成員選擇器</string>
+    <string name="mentioned_you">有人提及了你</string>
 </resources>

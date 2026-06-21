@@ -618,4 +618,9 @@
     <string name="toast_signed_out_and_wiped">Account cancellato da questo dispositivo</string>
     <string name="toast_couldnt_wipe_account">Impossibile cancellare l\'account</string>
     <string name="wipe">Cancella</string>
+    <!-- Mention picker (#491). -->
+    <string name="mention_picker_title">Menziona un membro</string>
+    <string name="mention_picker_member">Menziona %1$s</string>
+    <string name="mention_picker_dismiss">Chiudi selettore membri</string>
+    <string name="mentioned_you">Sei stato menzionato</string>
 </resources>
