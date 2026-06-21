@@ -167,6 +167,22 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun emojiThatSanitizesAwayKeepsTheNormalMessageIdentity() {
+        // Regression for #475: a reactionEmoji of only code points that clean()
+        // strips (a lone supplementary variation selector U+E0100) is non-blank
+        // but empties out under sanitization. It must NOT be treated as a
+        // reaction — it stays on the message (tag, id), matching the channel
+        // router, which now shares this isReaction predicate.
+        val content =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", reactionEmoji = "\uDB40\uDD00"),
+            )
+
+        assertEquals(LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID, content?.notificationId)
+        assertEquals("account|group-a", content?.notificationTag)
+    }
+
+    @Test
     fun nonReactionMessageStillUsesPreviewText() {
         val content =
             LocalNotificationFormatter.content(

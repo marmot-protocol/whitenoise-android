@@ -61,6 +61,31 @@ class NotificationChannelSpecTest {
     }
 
     @Test
+    fun emojiThatSanitizesAwayIsTreatedAsAPlainMessageNotAReaction() {
+        // Regression for #475: an emoji made only of code points that the
+        // formatter's clean() strips (here a lone supplementary variation
+        // selector U+E0100) is non-blank — so the OLD raw isNullOrBlank() check
+        // routed it to the reactions channel — but it empties out for the
+        // formatter, which then handed it the per-conversation message tag/id.
+        // Both sites now share LocalNotificationFormatter.isReaction, so the
+        // channel must agree with the formatter and keep this on the message
+        // channel rather than the reactions channel.
+        val strayVariationSelector = "\uDB40\uDD00" // U+E0100
+        assertEquals(
+            NotificationChannelSpec.GROUP_MESSAGES,
+            NotificationChannelSpec.forUpdate(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, isDm = false, reactionEmoji = strayVariationSelector),
+            ),
+        )
+        assertEquals(
+            NotificationChannelSpec.DIRECT_MESSAGES,
+            NotificationChannelSpec.forUpdate(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, isDm = true, reactionEmoji = strayVariationSelector),
+            ),
+        )
+    }
+
+    @Test
     fun inviteRoutesToTheInvitesChannel() {
         assertEquals(
             NotificationChannelSpec.INVITES,

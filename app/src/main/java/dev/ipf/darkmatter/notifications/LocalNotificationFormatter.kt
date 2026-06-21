@@ -69,8 +69,19 @@ object LocalNotificationFormatter {
             id = REACTION_NOTIFICATION_ID,
         )
 
-    /** True when this update is a kind:7 reaction (a NEW_MESSAGE carrying an emoji). */
-    private fun NotificationUpdateFfi.isReaction(): Boolean = trigger == NotificationTriggerFfi.NEW_MESSAGE && !clean(reactionEmoji).isNullOrEmpty()
+    /**
+     * True when this update is a kind:7 reaction (a NEW_MESSAGE carrying an
+     * emoji). The single source of truth for "is this a reaction?": the channel
+     * router ([NotificationChannelSpec.forUpdate]) and the tag/id + body
+     * selection here both route off this one predicate, so they can never
+     * disagree. It tests the *sanitized* emoji (via [clean], which strips
+     * control/format chars and supplementary variation selectors), so an emoji
+     * that empties out under sanitization is uniformly treated as a plain
+     * message by both sites rather than landing on the reactions channel with a
+     * message identity.
+     */
+    fun isReaction(update: NotificationUpdateFfi): Boolean =
+        update.trigger == NotificationTriggerFfi.NEW_MESSAGE && !clean(update.reactionEmoji).isNullOrEmpty()
 
     fun content(
         update: NotificationUpdateFfi,
@@ -104,14 +115,14 @@ object LocalNotificationFormatter {
             notificationTag =
                 when {
                     update.trigger == NotificationTriggerFfi.GROUP_INVITE -> update.notificationKey
-                    update.isReaction() ->
+                    isReaction(update) ->
                         REACTION_TAG_PREFIX + conversationDismissalKey(update.accountRef, update.groupIdHex).tag
                     else -> conversationDismissalKey(update.accountRef, update.groupIdHex).tag
                 },
             notificationId =
                 when {
                     update.trigger == NotificationTriggerFfi.GROUP_INVITE -> 0
-                    update.isReaction() -> REACTION_NOTIFICATION_ID
+                    isReaction(update) -> REACTION_NOTIFICATION_ID
                     else -> MESSAGE_NOTIFICATION_ID
                 },
             title = title,

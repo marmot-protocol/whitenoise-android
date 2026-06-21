@@ -73,13 +73,22 @@ enum class NotificationChannelSpec(
          *  - NEW_MESSAGE with a reaction emoji  -> reactions
          *  - NEW_MESSAGE, DM                    -> direct messages
          *  - NEW_MESSAGE, group                 -> group messages
+         *
+         * "Is this a reaction?" is decided by the single shared
+         * [LocalNotificationFormatter.isReaction] predicate so the channel a
+         * notification lands on can never disagree with the (tag, id) and body
+         * the formatter gives it. Routing here off the *raw* emoji while the
+         * formatter keyed off the *sanitized* emoji let an emoji that empties
+         * out under sanitization land on the reactions channel yet reuse the
+         * per-conversation message identity — colliding with the message card on
+         * a channel meant to be independent.
          */
         fun forUpdate(update: NotificationUpdateFfi): NotificationChannelSpec =
             when (update.trigger) {
                 NotificationTriggerFfi.GROUP_INVITE -> INVITES
                 NotificationTriggerFfi.NEW_MESSAGE ->
                     when {
-                        !update.reactionEmoji.isNullOrBlank() -> REACTIONS
+                        LocalNotificationFormatter.isReaction(update) -> REACTIONS
                         update.isDm -> DIRECT_MESSAGES
                         else -> GROUP_MESSAGES
                     }
