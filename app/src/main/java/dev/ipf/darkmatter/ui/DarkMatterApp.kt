@@ -8246,8 +8246,13 @@ private fun GroupEditScreen(
     onBack: () -> Unit,
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
-    var name by remember(controller.group.groupIdHex, controller.group.name) { mutableStateOf(controller.group.name) }
-    var description by remember(controller.group.groupIdHex, controller.group.description) { mutableStateOf(controller.group.description) }
+    // Key only on the group id, not on name/description: the group-state
+    // subscription can converge a backend update (another admin's edit, a
+    // kind-1210 row) while this screen is open, and re-keying on those values
+    // would re-init the fields and discard the user's in-progress edit. State
+    // resets only when navigating to a different group. (CodeRabbit, #512.)
+    var name by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.name) }
+    var description by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.description) }
     var showImageSearch by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var imageSaving by remember { mutableStateOf(false) }
@@ -8552,11 +8557,24 @@ private fun GroupDetailsScreen(
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.actions))
                     }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    KeyboardPreservingDropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false },
+                        shape = RoundedCornerShape(20.dp),
+                        // Match the conversation top-bar menu exactly: inset from
+                        // the right edge, roomy iconless body-large rows.
+                        offset = DpOffset(x = (-8).dp, y = 0.dp),
+                        modifier = Modifier.widthIn(min = 232.dp),
+                    ) {
                         if (controller.isSelfMember && controller.isSelfAdmin) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.edit)) },
-                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                text = {
+                                    Text(
+                                        stringResource(R.string.edit),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                },
+                                contentPadding = conversationMenuItemPadding,
                                 enabled = activeMutation == null && !controller.mutationInFlight,
                                 onClick = {
                                     menuOpen = false
@@ -8575,9 +8593,10 @@ private fun GroupDetailsScreen(
                                             else -> R.string.archive_chat
                                         },
                                     ),
+                                    style = MaterialTheme.typography.bodyLarge,
                                 )
                             },
-                            leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                            contentPadding = conversationMenuItemPadding,
                             enabled = activeMutation == null && !controller.mutationInFlight,
                             onClick = {
                                 menuOpen = false
@@ -8600,9 +8619,10 @@ private fun GroupDetailsScreen(
                                                 R.string.leave_chat
                                             },
                                         ),
+                                        style = MaterialTheme.typography.bodyLarge,
                                     )
                                 },
-                                leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
+                                contentPadding = conversationMenuItemPadding,
                                 // Tappable for members (greyed while a mutation is
                                 // in flight). The sole-admin gate is surfaced as an
                                 // explanatory dialog by requestLeave rather than a
