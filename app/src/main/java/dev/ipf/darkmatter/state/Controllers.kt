@@ -1727,12 +1727,17 @@ class ConversationController(
         val account = conversationAccountRef ?: return
         isLoading = true
         error = null
-        // Converge workers before the first timeline snapshot so MLS commits
-        // and kind-1210 rows from peers are in the store (same rationale as
-        // chat-list bind / iOS conversation open).
-        appState.catchUpAccounts()
         try {
-            runConversationSubscriptionLoop(account)
+            coroutineScope {
+                // Converge workers in the background so the first timeline
+                // snapshot is not gated on a global, all-accounts relay
+                // round-trip (#441). Lifecycle-bound to this conversation:
+                // cancelled when start() is cancelled (user leaves). The live
+                // group-state + timeline subscriptions below still fold in
+                // peer commits as they arrive.
+                launch { appState.catchUpAccounts() }
+                runConversationSubscriptionLoop(account)
+            }
         } catch (cancel: CancellationException) {
             // Expected when the conversation screen leaves the composition.
             // Re-throw so cancellation propagates and we don't log it as an
