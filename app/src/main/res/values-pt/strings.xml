@@ -606,7 +606,7 @@
     <string name="sign_out_and_wipe_sheet_destroyed_heading">O que é destruído</string>
     <string name="sign_out_and_wipe_sheet_destroyed_keychain">A entrada da identidade no chaveiro deste dispositivo.</string>
     <string name="sign_out_and_wipe_sheet_destroyed_relays">Pacotes de chaves pendentes publicados para esta conta nos relays.</string>
-    <string name="sign_out_and_wipe_sheet_fresh_start">Entrar novamente com a mesma chave começa do zero: os grupos são obtidos de novo e a mídia é baixada novamente.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Entrar novamente com a mesma chave mantém sua identidade, mas grupos, mensagens e mídia anteriores não podem ser recuperados neste dispositivo. Você precisará ser convidado novamente para qualquer grupo.</string>
     <string name="sign_out_and_wipe_sheet_intro">Isto remove permanentemente esta conta deste dispositivo.</string>
     <string name="sign_out_and_wipe_sheet_title">Sair &amp; apagar</string>
     <string name="sign_out_sheet_changes_body">As notificações push desta conta são desativadas e os caches em memória são limpos.</string>

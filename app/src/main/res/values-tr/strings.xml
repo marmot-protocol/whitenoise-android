@@ -603,7 +603,7 @@
     <string name="sign_out_and_wipe_sheet_destroyed_heading">Neler silinir</string>
     <string name="sign_out_and_wipe_sheet_destroyed_keychain">Kimliğin bu cihazdaki anahtar zinciri kaydı.</string>
     <string name="sign_out_and_wipe_sheet_destroyed_relays">Bu hesap için rölelerde yayımlanmış bekleyen anahtar paketleri.</string>
-    <string name="sign_out_and_wipe_sheet_fresh_start">Aynı anahtarla tekrar oturum açmak sıfırdan başlar: gruplar yeniden alınır ve medya yeniden indirilir.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Aynı anahtarla tekrar oturum açmak kimliğinizi korur, ancak önceki gruplar, mesajlar ve medya bu cihazda kurtarılamaz. Herhangi bir gruba yeniden davet edilmeniz gerekir.</string>
     <string name="sign_out_and_wipe_sheet_intro">Bu, bu hesabı bu cihazdan kalıcı olarak kaldırır.</string>
     <string name="sign_out_and_wipe_sheet_title">Oturumu kapat &amp; sil</string>
     <string name="sign_out_sheet_changes_body">Bu hesaba ait anlık bildirimler kapatılır ve bellekteki önbellekler temizlenir.</string>

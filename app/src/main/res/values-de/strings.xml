@@ -603,7 +603,7 @@
     <string name="sign_out_and_wipe_sheet_destroyed_heading">Was gelöscht wird</string>
     <string name="sign_out_and_wipe_sheet_destroyed_keychain">Der Schlüsselbund-Eintrag der Identität auf diesem Gerät.</string>
     <string name="sign_out_and_wipe_sheet_destroyed_relays">Ausstehende Key-Packages, die für dieses Konto auf Relays veröffentlicht wurden.</string>
-    <string name="sign_out_and_wipe_sheet_fresh_start">Beim erneuten Anmelden mit demselben Schlüssel wird neu begonnen: Gruppen werden erneut abgerufen und Medien erneut heruntergeladen.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Beim erneuten Anmelden mit demselben Schlüssel bleibt deine Identität erhalten, aber bisherige Gruppen, Nachrichten und Medien können auf diesem Gerät nicht wiederhergestellt werden. Du musst für alle Gruppen erneut eingeladen werden.</string>
     <string name="sign_out_and_wipe_sheet_intro">Dadurch wird dieses Konto dauerhaft von diesem Gerät entfernt.</string>
     <string name="sign_out_and_wipe_sheet_title">Abmelden &amp; löschen</string>
     <string name="sign_out_sheet_changes_body">Push-Benachrichtigungen für dieses Konto werden deaktiviert und Zwischenspeicher im Arbeitsspeicher werden geleert.</string>

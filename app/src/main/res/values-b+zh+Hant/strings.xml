@@ -597,7 +597,7 @@
     <string name="sign_out_and_wipe_sheet_destroyed_heading">將被銷毀的內容</string>
     <string name="sign_out_and_wipe_sheet_destroyed_keychain">該身分在本裝置鑰匙圈中的項目。</string>
     <string name="sign_out_and_wipe_sheet_destroyed_relays">為該帳戶在中繼上發布的未使用金鑰包。</string>
-    <string name="sign_out_and_wipe_sheet_fresh_start">使用同一金鑰重新登入會從頭開始：群組將重新取得，媒體將重新下載。</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">使用同一金鑰重新登入會保留您的身分，但此裝置上的過往群組、訊息和媒體無法復原。您需要重新被邀請才能加入任何群組。</string>
     <string name="sign_out_and_wipe_sheet_intro">此操作會將該帳戶從本裝置永久移除。</string>
     <string name="sign_out_and_wipe_sheet_title">登出並清除</string>
     <string name="sign_out_sheet_changes_body">該帳戶的推播通知將被關閉，記憶體中的快取將被清空。</string>

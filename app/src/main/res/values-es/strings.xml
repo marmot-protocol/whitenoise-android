@@ -606,7 +606,7 @@
     <string name="sign_out_and_wipe_sheet_destroyed_heading">Qué se destruye</string>
     <string name="sign_out_and_wipe_sheet_destroyed_keychain">La entrada de la identidad en el llavero de este dispositivo.</string>
     <string name="sign_out_and_wipe_sheet_destroyed_relays">Paquetes de claves pendientes publicados para esta cuenta en los relays.</string>
-    <string name="sign_out_and_wipe_sheet_fresh_start">Volver a iniciar sesión con la misma clave empieza de cero: los grupos se vuelven a obtener y los archivos multimedia se descargan de nuevo.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Volver a iniciar sesión con la misma clave conserva tu identidad, pero los grupos, mensajes y archivos multimedia anteriores no se pueden recuperar en este dispositivo. Necesitarás ser invitado de nuevo a cualquier grupo.</string>
     <string name="sign_out_and_wipe_sheet_intro">Esto elimina de forma permanente esta cuenta de este dispositivo.</string>
     <string name="sign_out_and_wipe_sheet_title">Cerrar sesión y borrar</string>
     <string name="sign_out_sheet_changes_body">Las notificaciones push de esta cuenta se desactivan y las cachés en memoria se vacían.</string>

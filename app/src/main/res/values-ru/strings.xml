@@ -615,7 +615,7 @@
     <string name="sign_out_and_wipe_sheet_destroyed_heading">Что будет уничтожено</string>
     <string name="sign_out_and_wipe_sheet_destroyed_keychain">Запись этой личности в связке ключей на этом устройстве.</string>
     <string name="sign_out_and_wipe_sheet_destroyed_relays">Неиспользованные пакеты ключей, опубликованные для этого аккаунта на реле.</string>
-    <string name="sign_out_and_wipe_sheet_fresh_start">Повторный вход с тем же ключом начинается с чистого листа: группы загружаются заново, а медиафайлы скачиваются повторно.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Повторный вход с тем же ключом сохраняет вашу личность, но прошлые группы, сообщения и медиафайлы невозможно восстановить на этом устройстве. Вам потребуется новое приглашение в любые группы.</string>
     <string name="sign_out_and_wipe_sheet_intro">Это безвозвратно удаляет этот аккаунт с данного устройства.</string>
     <string name="sign_out_and_wipe_sheet_title">Выйти &amp; стереть</string>
     <string name="sign_out_sheet_changes_body">Push-уведомления для этого аккаунта отключаются, а кэш в памяти очищается.</string>

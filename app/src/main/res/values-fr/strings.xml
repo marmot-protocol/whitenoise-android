@@ -606,7 +606,7 @@
     <string name="sign_out_and_wipe_sheet_destroyed_heading">Ce qui est supprimé</string>
     <string name="sign_out_and_wipe_sheet_destroyed_keychain">L\'entrée de l\'identité dans le trousseau de cet appareil.</string>
     <string name="sign_out_and_wipe_sheet_destroyed_relays">Paquets de clés en attente publiés pour ce compte sur les relais.</string>
-    <string name="sign_out_and_wipe_sheet_fresh_start">Se reconnecter avec la même clé repart de zéro : les groupes sont récupérés à nouveau et les médias retéléchargés.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Se reconnecter avec la même clé conserve votre identité, mais les groupes, messages et médias passés ne peuvent pas être récupérés sur cet appareil. Vous devrez être réinvité à tous les groupes.</string>
     <string name="sign_out_and_wipe_sheet_intro">Cela supprime définitivement ce compte de cet appareil.</string>
     <string name="sign_out_and_wipe_sheet_title">Se déconnecter &amp; effacer</string>
     <string name="sign_out_sheet_changes_body">Les notifications push de ce compte sont désactivées et les caches en mémoire sont vidés.</string>

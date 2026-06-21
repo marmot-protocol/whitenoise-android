@@ -606,7 +606,7 @@
     <string name="sign_out_and_wipe_sheet_destroyed_heading">Cosa viene eliminato</string>
     <string name="sign_out_and_wipe_sheet_destroyed_keychain">La voce dell\'identità nel portachiavi di questo dispositivo.</string>
     <string name="sign_out_and_wipe_sheet_destroyed_relays">Pacchetti di chiavi in sospeso pubblicati per questo account sui relay.</string>
-    <string name="sign_out_and_wipe_sheet_fresh_start">Accedere di nuovo con la stessa chiave riparte da zero: i gruppi vengono recuperati di nuovo e i contenuti multimediali riscaricati.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Accedere di nuovo con la stessa chiave mantiene la tua identità, ma i gruppi, i messaggi e i contenuti multimediali precedenti non possono essere recuperati su questo dispositivo. Dovrai essere reinvitato in qualsiasi gruppo.</string>
     <string name="sign_out_and_wipe_sheet_intro">Questo rimuove definitivamente questo account da questo dispositivo.</string>
     <string name="sign_out_and_wipe_sheet_title">Esci &amp; cancella</string>
     <string name="sign_out_sheet_changes_body">Le notifiche push per questo account vengono disattivate e le cache in memoria vengono svuotate.</string>
