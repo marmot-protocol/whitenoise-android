@@ -179,6 +179,27 @@ class OptimisticMessageReconciliationTest {
         assertEquals(optimistic, messageById["temp-id"])
     }
 
+    @Test
+    fun pruneMessageByIdDropsScrolledAwayRecordsButKeepsWindowAndOptimistic() {
+        // Regression for #373: the live Upsert/Projection path adds a full
+        // decrypted record per message and never trims, so messageById grows
+        // unbounded for an actively-watched conversation. Pruning must collapse
+        // it to the loaded window plus in-flight optimistic sends.
+        val messageById = linkedMapOf<String, AppMessageRecordFfi>()
+        repeat(100) { i -> messageById["m$i"] = message("m$i") }
+        messageById["temp-pending"] = message("temp-pending")
+
+        // Only the latest two records are in the loaded window; one optimistic
+        // send is still in flight under its temp id.
+        pruneMessageByIdToWindow(
+            messageById = messageById,
+            windowIds = setOf("m98", "m99"),
+            optimisticMessages = listOf(timelineMessage("temp-pending", MessageStatus.Pending)),
+        )
+
+        assertEquals(setOf("m98", "m99", "temp-pending"), messageById.keys)
+    }
+
     private fun mediaPending(
         id: String,
         filename: String,
