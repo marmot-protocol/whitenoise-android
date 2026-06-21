@@ -1863,12 +1863,31 @@ class ConversationController(
     }
 
     private suspend fun cleanupConversationSubscriptions() {
-        inviteStreamScope.cancel()
+        // Do NOT cancel inviteStreamScope here: it is not owned by a single
+        // start() invocation (see onCleared / #279). start()'s subscription
+        // loops can end while the screen is still composed, and acceptInvite()
+        // — which launches into inviteStreamScope from an independent mutation
+        // scope — may fire afterward.
         val closingSubscription = timelineSubscription
         timelineSubscription = null
         withContext(NonCancellable + Dispatchers.IO) {
             runCatching { closingSubscription?.close() }
         }
+    }
+
+    /**
+     * Cancel controller-owned scopes that outlive a single [start] call. The
+     * conversation screen calls this once when it disposes the controller.
+     *
+     * [inviteStreamScope]'s only launcher is [acceptInvite], invoked from a
+     * separate mutation scope that can fire after [start]'s loops have ended
+     * while the invite screen is still composed. Cancelling it in [start]'s
+     * teardown left a dead scope, so the accepted invite's agent-stream watchers
+     * never launched yet were marked active in [activeStreamIds] and never
+     * retried — the streaming previews stayed stuck (#279).
+     */
+    fun onCleared() {
+        inviteStreamScope.cancel()
     }
 
     private suspend fun CoroutineScope.runTimelineSubscriptionPipeline(
