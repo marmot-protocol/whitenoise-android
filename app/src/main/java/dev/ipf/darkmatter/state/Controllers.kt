@@ -2389,7 +2389,27 @@ class ConversationController(
                 // confirmed id so the sender's own bubble renders instantly — no
                 // Blossom round-trip and no decode spinner. One cache entry per
                 // attachment under `(account, messageId, attachmentIndex)`.
-                if (confirmedId.isNotEmpty()) {
+                //
+                // Re-check the session/account immediately before seeding: the
+                // upload + sendMediaAttachments above are long suspend points, and
+                // a sign-out / account switch in that window runs
+                // `clearInMemoryMediaCaches()` and bumps the upload-session epoch.
+                // Without this guard, the in-memory L1 caches (which are NOT
+                // generation-gated) would be repopulated with the just-signed-out
+                // account's decrypted plaintext, surviving the sign-out clear until
+                // the next `clearInMemoryMediaCaches()`. The L2 disk write below is
+                // already generation-gated, but skipping it too on a stale session
+                // keeps the behaviour consistent (it would no-op anyway). The bridge
+                // insert below is intentionally left running: the publish already
+                // committed, so the timeline state still needs reconciling.
+                val sessionStillValid =
+                    shouldAcceptMediaUploadForAccount(
+                        account,
+                        mediaUploadSessionEpoch,
+                        appState.activeAccountRef,
+                        appState.mediaUploadSessionEpoch(),
+                    )
+                if (confirmedId.isNotEmpty() && sessionStillValid) {
                     retained.attachments.forEachIndexed { index, attachment ->
                         val confirmedKey = mediaCacheKey(account, confirmedId, index)
                         appState.mediaPlaintextCache.put(confirmedKey, attachment.plaintextBytes)
