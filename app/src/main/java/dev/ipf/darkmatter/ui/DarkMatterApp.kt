@@ -1588,12 +1588,16 @@ private fun ChatsScreen(
                                     bodyMatch = bodyMatch,
                                     onOpen = { onOpenGroup(item, bodyMatch?.messageIdHex) },
                                     onMenuArchiveToggle = {
-                                        scope.launch {
+                                        // Durable process-lifetime scope, not the
+                                        // composable's: archiving drops the row out of
+                                        // the active list, and a cancelled mutation would
+                                        // skip the post-await confirmation toast.
+                                        appState.launchMutation {
                                             controller.setArchived(item.group.groupIdHex, !item.group.archived)
                                         }
                                     },
                                     onMarkRead = {
-                                        scope.launch { controller.markAllRead(item) }
+                                        appState.launchMutation { controller.markAllRead(item) }
                                     },
                                 )
                             }
