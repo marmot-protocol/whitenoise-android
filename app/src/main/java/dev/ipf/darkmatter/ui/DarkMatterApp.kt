@@ -7518,8 +7518,12 @@ private fun ConversationScreen(
     // chasing the shrinking viewport to its settled bottom. Gated on
     // nearBottom so reading history isn't interrupted. imeIsOpen is derived
     // once above (boolean edge of WindowInsets.ime) to avoid recomposing the
-    // body on every keyboard-animation frame.
-    LaunchedEffect(imeIsOpen, chat.id) {
+    // body on every keyboard-animation frame. Keyed on initialTimelineAnchored
+    // too so that when you open a chat with the keyboard already up (no
+    // imeIsOpen edge), the chase still fires the moment the first-open anchor
+    // settles — otherwise the anchor lands against the pre-IME viewport and the
+    // newest message sits a few rows above the bottom until the keyboard closes.
+    LaunchedEffect(imeIsOpen, chat.id, initialTimelineAnchored) {
         if (!imeIsOpen || !initialTimelineAnchored || !nearBottom) return@LaunchedEffect
         repeat(24) {
             withFrameNanos { }
@@ -7572,6 +7576,19 @@ private fun ConversationScreen(
                     listState.scrollToItem(bottomTimelineIndex)
                 }
             }
+        }
+    }
+
+    // Reacting to the last message grows its bubble height (a reaction chip) but
+    // doesn't change any timeline id, so the append-follow above never sees it
+    // and the grown bubble pushes its own bottom up off the composer. When the
+    // user is already at the bottom, re-assert the bottom so the bubble + chip
+    // stay flush. Keyed on the last rendered message's reaction tally; mutating
+    // an earlier (non-last) message leaves this key unchanged, so a react while
+    // reading history never hijacks the scroll position.
+    LaunchedEffect(renderedTimeline.lastOrNull()?.record?.messageIdHex?.let { controller.reactions[it] }) {
+        if (initialTimelineAnchored && nearBottom && renderedTimeline.isNotEmpty()) {
+            listState.scrollToItem(bottomTimelineIndex)
         }
     }
 
@@ -8002,7 +8019,13 @@ private fun ConversationScreen(
                                     onReplyPreviewClick = { navigateToReplyTarget(it) },
                                 )
                             }
-                            item(key = "bottom-spacer") { Spacer(Modifier.height(8.dp)) }
+                            // Kept minimal (matches the top-spacer) so the last
+                            // bubble sits a tight breathing-room above the
+                            // composer rather than orphaned in mid-screen; the
+                            // 8dp item spacing + 8dp content padding already
+                            // supply the gap. Retained (not removed) so the
+                            // bottom-anchor index math stays stable.
+                            item(key = "bottom-spacer") { Spacer(Modifier.height(4.dp)) }
                         }
                         // Day of the topmost visible message, shown only while
                         // scrolling — the inline separators carry it at rest.
