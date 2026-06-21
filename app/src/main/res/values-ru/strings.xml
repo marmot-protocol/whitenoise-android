@@ -34,8 +34,6 @@
     <string name="chat_list_search_open_profile">Открыть профиль</string>
     <string name="chat_list_search_nip05_not_found">Профиль для «%1$s» не найден</string>
     <string name="chat_list_search_invalid_npub">Это не похоже на действительный npub</string>
-    <string name="chat_row_swipe_archive">Архивировать</string>
-    <string name="chat_row_swipe_unarchive">Восстановить</string>
     <string name="chat_row_action_archive">Архивировать</string>
     <string name="chat_row_action_unarchive">Восстановить</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
@@ -371,7 +369,6 @@
     <string name="toast_couldnt_decline_invite">Не удалось отклонить приглашение</string>
     <string name="toast_chat_archived">Чат в архиве</string>
     <string name="toast_chat_restored">Чат восстановлен</string>
-    <string name="action_undo">Отменить</string>
     <string name="toast_couldnt_update_chat">Не удалось обновить чат</string>
     <string name="toast_group_updated">Группа обновлена</string>
     <string name="toast_couldnt_update_group">Не удалось обновить группу</string>

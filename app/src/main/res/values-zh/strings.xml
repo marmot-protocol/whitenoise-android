@@ -34,8 +34,6 @@
     <string name="chat_list_search_open_profile">打开资料</string>
     <string name="chat_list_search_nip05_not_found">未找到「%1$s」的资料</string>
     <string name="chat_list_search_invalid_npub">这看起来不是有效的 npub</string>
-    <string name="chat_row_swipe_archive">归档</string>
-    <string name="chat_row_swipe_unarchive">取消归档</string>
     <string name="chat_row_action_archive">归档</string>
     <string name="chat_row_action_unarchive">取消归档</string>
     <string name="chat_row_action_mark_read">标记为已读</string>
@@ -368,7 +366,6 @@
     <string name="toast_couldnt_decline_invite">无法拒绝邀请</string>
     <string name="toast_chat_archived">聊天记录已存档</string>
     <string name="toast_chat_restored">聊天已恢复</string>
-    <string name="action_undo">撤销</string>
     <string name="toast_couldnt_update_chat">无法更新聊天</string>
     <string name="toast_group_updated">群组已更新</string>
     <string name="toast_couldnt_update_group">无法更新群组</string>

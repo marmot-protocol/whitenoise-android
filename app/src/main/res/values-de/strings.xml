@@ -34,8 +34,6 @@
     <string name="chat_list_search_open_profile">Profil öffnen</string>
     <string name="chat_list_search_nip05_not_found">Kein Profil für \"%1$s\" gefunden</string>
     <string name="chat_list_search_invalid_npub">Das sieht nicht nach einem gültigen npub aus</string>
-    <string name="chat_row_swipe_archive">Archivieren</string>
-    <string name="chat_row_swipe_unarchive">Aus dem Archiv</string>
     <string name="chat_row_action_archive">Archivieren</string>
     <string name="chat_row_action_unarchive">Aus dem Archiv</string>
     <string name="chat_row_action_mark_read">Als gelesen markieren</string>
@@ -369,7 +367,6 @@
     <string name="toast_couldnt_decline_invite">Einladung konnte nicht abgelehnt werden</string>
     <string name="toast_chat_archived">Chat archiviert</string>
     <string name="toast_chat_restored">Chat wiederhergestellt</string>
-    <string name="action_undo">Rückgängig</string>
     <string name="toast_couldnt_update_chat">Chat konnte nicht aktualisiert werden</string>
     <string name="toast_group_updated">Gruppe aktualisiert</string>
     <string name="toast_couldnt_update_group">Gruppe konnte nicht aktualisiert werden</string>

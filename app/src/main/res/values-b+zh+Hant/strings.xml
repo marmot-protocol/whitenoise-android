@@ -34,8 +34,6 @@
     <string name="chat_list_search_open_profile">開啟個人檔案</string>
     <string name="chat_list_search_nip05_not_found">找不到「%1$s」的個人檔案</string>
     <string name="chat_list_search_invalid_npub">這看起來不是有效的 npub</string>
-    <string name="chat_row_swipe_archive">封存</string>
-    <string name="chat_row_swipe_unarchive">取消封存</string>
     <string name="chat_row_action_archive">封存</string>
     <string name="chat_row_action_unarchive">取消封存</string>
     <string name="chat_row_action_mark_read">標示為已讀</string>
@@ -368,7 +366,6 @@
     <string name="toast_couldnt_decline_invite">無法拒絕邀請</string>
     <string name="toast_chat_archived">聊天記錄已存檔</string>
     <string name="toast_chat_restored">聊天已恢復</string>
-    <string name="action_undo">復原</string>
     <string name="toast_couldnt_update_chat">無法更新聊天</string>
     <string name="toast_group_updated">群組已更新</string>
     <string name="toast_couldnt_update_group">無法更新群組</string>
