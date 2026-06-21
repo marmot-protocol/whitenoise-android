@@ -6487,7 +6487,17 @@ private fun ConversationScreen(
             }
         }
     }
-    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    // Reading the raw IME inset in the body would re-subscribe and recompose
+    // this (very heavy) screen on every keyboard-animation frame. Capture the
+    // ime WindowInsets (the @Composable read) once, then collapse to the
+    // boolean edge inside derivedStateOf so only the open/close transition
+    // triggers a recomposition. getBottom() reads the inset's snapshot state
+    // inside the derived block. See #374.
+    val imeInsets = WindowInsets.ime
+    val density = LocalDensity.current
+    val imeIsOpen by remember(imeInsets, density) {
+        derivedStateOf { imeInsets.getBottom(density) > 0 }
+    }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val groupTitleCopy = rememberGroupTitleCopy()
@@ -7358,8 +7368,9 @@ private fun ConversationScreen(
     // each tick, so a single snap at frame 0 leaves the bubble below the
     // final viewport. The repeat loop re-snaps every frame for ~24 frames,
     // chasing the shrinking viewport to its settled bottom. Gated on
-    // nearBottom so reading history isn't interrupted.
-    val imeIsOpen = imeBottom > 0
+    // nearBottom so reading history isn't interrupted. imeIsOpen is derived
+    // once above (boolean edge of WindowInsets.ime) to avoid recomposing the
+    // body on every keyboard-animation frame.
     LaunchedEffect(imeIsOpen, chat.id) {
         if (!imeIsOpen || !initialTimelineAnchored || !nearBottom) return@LaunchedEffect
         repeat(24) {
