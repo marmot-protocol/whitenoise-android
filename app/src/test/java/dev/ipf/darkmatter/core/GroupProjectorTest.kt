@@ -169,6 +169,10 @@ class GroupProjectorTest {
         assertFalse(GroupProjector.isSoleAdminWithOtherMembers(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 1))
         // A non-admin is never the trapped sole admin.
         assertFalse(GroupProjector.isSoleAdminWithOtherMembers(group(admins = listOf("alice")), activeAccountIdHex = "carol", memberCount = 3))
+        // The same admin listed twice with casing drift is still one admin, so
+        // she stays trapped — a raw admins.size would read two and free her.
+        assertTrue(GroupProjector.isSoleAdminWithOtherMembers(group(admins = listOf("alice", "ALICE")), activeAccountIdHex = "alice", memberCount = 3))
+        assertTrue(GroupProjector.revokeWouldDepleteAdmins(group(admins = listOf("alice", "ALICE")), member(memberId = "alice", account = null), memberCount = 3))
     }
 
     @Test
