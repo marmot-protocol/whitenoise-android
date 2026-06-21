@@ -418,13 +418,13 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
-private enum class MainSection {
+internal enum class MainSection {
     Chats,
     Settings,
     Diagnostics,
 }
 
-private enum class SettingsDetail {
+internal enum class SettingsDetail {
     Appearance,
     Data,
     Profile,
@@ -434,6 +434,27 @@ private enum class SettingsDetail {
     Notifications,
     SecurityPrivacy,
 }
+
+internal data class MainNavigationDestination(
+    val sectionName: String,
+    val settingsDetailName: String?,
+)
+
+internal fun openDiagnosticsDestination(currentSettingsDetail: SettingsDetail?): MainNavigationDestination =
+    MainNavigationDestination(
+        sectionName = MainSection.Diagnostics.name,
+        settingsDetailName =
+            when (currentSettingsDetail) {
+                SettingsDetail.SecurityPrivacy -> SettingsDetail.SecurityPrivacy.name
+                else -> null
+            },
+    )
+
+internal fun diagnosticsBackDestination(settingsDetailName: String?): MainNavigationDestination =
+    MainNavigationDestination(
+        sectionName = MainSection.Settings.name,
+        settingsDetailName = settingsDetailName?.takeIf { it == SettingsDetail.SecurityPrivacy.name },
+    )
 
 private data class DiagnosticLogEntry(
     val id: String = UUID.randomUUID().toString(),
@@ -1264,8 +1285,9 @@ private fun MainShell(
                     settingsDetailName = null
                 },
                 onOpenDiagnostics = {
-                    sectionName = MainSection.Diagnostics.name
-                    settingsDetailName = null
+                    val destination = openDiagnosticsDestination(settingsDetail)
+                    sectionName = destination.sectionName
+                    settingsDetailName = destination.settingsDetailName
                 },
                 detail = settingsDetail,
                 onDetailChange = { settingsDetailName = it?.name },
@@ -1274,8 +1296,9 @@ private fun MainShell(
             DiagnosticsScreen(
                 appState = appState,
                 onBack = {
-                    sectionName = MainSection.Settings.name
-                    settingsDetailName = null
+                    val destination = diagnosticsBackDestination(settingsDetailName)
+                    sectionName = destination.sectionName
+                    settingsDetailName = destination.settingsDetailName
                 },
             )
     }
