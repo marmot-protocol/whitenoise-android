@@ -646,4 +646,6 @@
     <string name="media_quality_original">Originalgröße</string>
     <string name="media_quality_original_subtitle">Volle Auflösung — größte Dateien</string>
     <string name="media_quality_footer">Standort- und Gerätemetadaten (EXIF-GPS, Hersteller und Modell) werden immer aus Fotos entfernt, auch bei Originalgröße. Videos und ausgewählte Audiodateien werden unverändert gesendet; die Audio-Bitrate gilt für aufgenommene Sprachnachrichten.</string>
+    <string name="profile_is_public">Profil ist öffentlich</string>
+    <string name="profile_public_description">Deine Profilinformationen sind für alle im Netzwerk sichtbar.</string>
 </resources>

@@ -649,4 +649,6 @@
     <string name="media_quality_original">Sem alterações</string>
     <string name="media_quality_original_subtitle">Resolução completa — arquivos maiores</string>
     <string name="media_quality_footer">Metadados de localização e dispositivo (GPS EXIF, marca e modelo) são sempre removidos das fotos, mesmo em Sem alterações. Vídeos e arquivos de áudio escolhidos são enviados como estão; a taxa de bits de áudio se aplica às mensagens de voz gravadas.</string>
+    <string name="profile_is_public">O perfil é público</string>
+    <string name="profile_public_description">As informações do seu perfil serão visíveis para todos na rede.</string>
 </resources>
