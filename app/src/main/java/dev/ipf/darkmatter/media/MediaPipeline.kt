@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.net.Uri
 import java.io.ByteArrayOutputStream
+import java.nio.charset.StandardCharsets
 
 /**
  * Local prep for outgoing image attachments. Two layers:
@@ -309,6 +310,82 @@ object MediaPipeline {
         val thumbhash: String?,
     )
 
+    /** Metadata-stripped source image bytes for "Original" sends. */
+    data class OriginalImage(
+        val bytes: ByteArray,
+        val mediaType: String,
+        val fileName: String,
+        val dim: String,
+        val thumbhash: String?,
+    )
+
+    sealed class OriginalImageReadResult {
+        data class Success(
+            val image: OriginalImage,
+        ) : OriginalImageReadResult()
+
+        data object TooLarge : OriginalImageReadResult()
+
+        /** The container has no lossless metadata-stripper in this client. */
+        data object Unsupported : OriginalImageReadResult()
+
+        data object Failed : OriginalImageReadResult()
+    }
+
+    /**
+     * Read an image for the "Original" quality level: preserve encoded pixel
+     * bytes and strip identifying metadata without decoding/re-encoding. This
+     * supports the containers whose metadata envelopes are safe to edit here
+     * (JPEG APP1/APP13/comment, PNG textual/eXIf chunks, WebP EXIF/XMP chunks).
+     * Unsupported containers return [OriginalImageReadResult.Unsupported] so the
+     * caller can fall back to the JPEG privacy path instead of leaking metadata.
+     */
+    fun readOriginalImageForUpload(
+        contentResolver: ContentResolver,
+        uri: Uri,
+        maxBytes: Int,
+    ): OriginalImageReadResult {
+        if (maxBytes <= 0) return OriginalImageReadResult.TooLarge
+        val sourceBytes =
+            try {
+                val stream = contentResolver.openInputStream(uri) ?: return OriginalImageReadResult.Failed
+                stream.use { readBoundedBytes(it, maxBytes) } ?: return OriginalImageReadResult.TooLarge
+            } catch (_: java.io.IOException) {
+                return OriginalImageReadResult.Failed
+            } catch (_: SecurityException) {
+                return OriginalImageReadResult.Failed
+            }
+        val mediaType = originalImageMediaType(sourceBytes) ?: return OriginalImageReadResult.Unsupported
+        val stripped = stripOriginalImageMetadata(sourceBytes) ?: return OriginalImageReadResult.Unsupported
+        val dim = imageDimOrNull(stripped) ?: return OriginalImageReadResult.Failed
+        val thumbhash =
+            runCatching {
+                val bitmap = decodeSampledBitmap(stripped, THUMBNAIL_MAX_EDGE_PX)
+                try {
+                    bitmap?.let { Thumbhash.encodeFromBitmap(it) }
+                } finally {
+                    bitmap?.recycle()
+                }
+            }.getOrNull()
+        return OriginalImageReadResult.Success(
+            OriginalImage(
+                bytes = stripped,
+                mediaType = mediaType,
+                fileName = queryDisplayNameFromResolver(contentResolver, uri) ?: defaultOriginalImageFileName(mediaType),
+                dim = dim,
+                thumbhash = thumbhash,
+            ),
+        )
+    }
+
+    internal fun stripOriginalImageMetadata(bytes: ByteArray): ByteArray? =
+        when (originalImageKind(bytes)) {
+            OriginalImageKind.Jpeg -> stripJpegMetadata(bytes)
+            OriginalImageKind.Png -> stripPngMetadata(bytes)
+            OriginalImageKind.Webp -> stripWebpMetadata(bytes)
+            null -> null
+        }
+
     /**
      * Decode the image at [uri], downscale so the longer edge ≤ [maxEdgePx],
      * and re-encode as JPEG at [quality]. Returns null when the source can't
@@ -422,6 +499,222 @@ object MediaPipeline {
         val h = bounds.outHeight
         if (w <= 0 || h <= 0) return null
         return "${w}x$h"
+    }
+
+    private enum class OriginalImageKind { Jpeg, Png, Webp }
+
+    private fun originalImageKind(bytes: ByteArray): OriginalImageKind? =
+        when {
+            isJpeg(bytes) -> OriginalImageKind.Jpeg
+            isPng(bytes) -> OriginalImageKind.Png
+            isWebp(bytes) -> OriginalImageKind.Webp
+            else -> null
+        }
+
+    private fun originalImageMediaType(bytes: ByteArray): String? =
+        when (originalImageKind(bytes)) {
+            OriginalImageKind.Jpeg -> "image/jpeg"
+            OriginalImageKind.Png -> "image/png"
+            OriginalImageKind.Webp -> "image/webp"
+            null -> null
+        }
+
+    private fun defaultOriginalImageFileName(mediaType: String): String =
+        when (mediaType) {
+            "image/png" -> "image.png"
+            "image/webp" -> "image.webp"
+            else -> "image.jpg"
+        }
+
+    private fun isJpeg(bytes: ByteArray): Boolean =
+        bytes.size >= 2 && u8(bytes, 0) == 0xff && u8(bytes, 1) == 0xd8
+
+    private fun isPng(bytes: ByteArray): Boolean =
+        bytes.size >= PNG_SIGNATURE.size && PNG_SIGNATURE.indices.all { bytes[it] == PNG_SIGNATURE[it] }
+
+    private fun isWebp(bytes: ByteArray): Boolean =
+        bytes.size >= 12 && asciiEquals(bytes, 0, "RIFF") && asciiEquals(bytes, 8, "WEBP")
+
+    private fun stripJpegMetadata(bytes: ByteArray): ByteArray? {
+        if (!isJpeg(bytes)) return null
+        val out = ByteArrayOutputStream(bytes.size)
+        out.write(bytes, 0, 2)
+        var pos = 2
+        while (pos < bytes.size) {
+            val markerStart = pos
+            if (u8(bytes, pos) != 0xff) return null
+            while (pos < bytes.size && u8(bytes, pos) == 0xff) pos++
+            if (pos >= bytes.size) return null
+            val marker = u8(bytes, pos++)
+            if (marker == 0x00) return null
+            if (marker == 0xd9 || marker in 0xd0..0xd7 || marker == 0x01) {
+                out.write(bytes, markerStart, pos - markerStart)
+                if (marker == 0xd9) return out.toByteArray()
+                continue
+            }
+            if (pos + 2 > bytes.size) return null
+            val length = u16be(bytes, pos)
+            if (length < 2 || pos + length > bytes.size) return null
+            val segmentEnd = pos + length
+            if (marker == 0xda) {
+                out.write(bytes, markerStart, segmentEnd - markerStart)
+                var scanPos = segmentEnd
+                var nextMarkerStart = -1
+                while (scanPos < bytes.size) {
+                    if (u8(bytes, scanPos) != 0xff) {
+                        scanPos++
+                        continue
+                    }
+                    val candidateStart = scanPos
+                    while (scanPos < bytes.size && u8(bytes, scanPos) == 0xff) scanPos++
+                    if (scanPos >= bytes.size) return null
+                    val candidate = u8(bytes, scanPos)
+                    if (candidate == 0x00) {
+                        scanPos++ // Stuffed 0xff byte inside entropy-coded data.
+                    } else if (candidate in 0xd0..0xd7) {
+                        scanPos++ // Restart markers are part of the scan stream.
+                    } else {
+                        nextMarkerStart = candidateStart
+                        break
+                    }
+                }
+                if (nextMarkerStart < 0) return null
+                out.write(bytes, segmentEnd, nextMarkerStart - segmentEnd)
+                pos = nextMarkerStart
+                continue
+            }
+            if (!isJpegMetadataMarker(marker)) {
+                out.write(bytes, markerStart, segmentEnd - markerStart)
+            }
+            pos = segmentEnd
+        }
+        return null
+    }
+
+    private fun isJpegMetadataMarker(marker: Int): Boolean =
+        marker == 0xe1 || // EXIF and XMP APP1 payloads.
+            marker == 0xed || // Photoshop/IPTC APP13 payloads.
+            marker == 0xfe // User comments can carry device/location notes.
+
+    private fun stripPngMetadata(bytes: ByteArray): ByteArray? {
+        if (!isPng(bytes)) return null
+        val out = ByteArrayOutputStream(bytes.size)
+        out.write(bytes, 0, PNG_SIGNATURE.size)
+        var pos = PNG_SIGNATURE.size
+        while (pos + PNG_CHUNK_OVERHEAD <= bytes.size) {
+            val length = u32be(bytes, pos)
+            val dataStart = pos + 8
+            val chunkEndLong = dataStart.toLong() + length + 4L
+            if (chunkEndLong > bytes.size.toLong()) return null
+            val chunkEnd = chunkEndLong.toInt()
+            val type = ascii(bytes, pos + 4, 4)
+            if (!PNG_METADATA_CHUNKS.contains(type)) {
+                out.write(bytes, pos, chunkEnd - pos)
+            }
+            pos = chunkEnd
+            if (type == "IEND") return out.toByteArray()
+        }
+        return null
+    }
+
+    private fun stripWebpMetadata(bytes: ByteArray): ByteArray? {
+        if (!isWebp(bytes)) return null
+        val out = ByteArrayOutputStream(bytes.size)
+        out.write(bytes, 0, 4) // RIFF
+        writeU32le(out, 0) // patched after chunk filtering
+        out.write(bytes, 8, 4) // WEBP
+        var pos = 12
+        while (pos + 8 <= bytes.size) {
+            val chunkType = ascii(bytes, pos, 4)
+            val chunkSize = u32le(bytes, pos + 4)
+            val dataStart = pos + 8
+            val dataEndLong = dataStart.toLong() + chunkSize
+            val paddedEndLong = dataEndLong + (chunkSize and 1L)
+            if (paddedEndLong > bytes.size.toLong()) return null
+            val paddedEnd = paddedEndLong.toInt()
+            when (chunkType) {
+                "EXIF", "XMP " -> Unit
+                "VP8X" -> {
+                    val chunk = bytes.copyOfRange(pos, paddedEnd)
+                    if (chunkSize > 0) {
+                        // Clear the EXIF and XMP presence bits after dropping those chunks.
+                        chunk[8] = (chunk[8].toInt() and 0xf3).toByte()
+                    }
+                    out.write(chunk, 0, chunk.size)
+                }
+                else -> out.write(bytes, pos, paddedEnd - pos)
+            }
+            pos = paddedEnd
+        }
+        if (pos != bytes.size) return null
+        val result = out.toByteArray()
+        writeU32le(result, 4, result.size - 8)
+        return result
+    }
+
+    private val PNG_SIGNATURE = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+    private const val PNG_CHUNK_OVERHEAD = 12
+    private val PNG_METADATA_CHUNKS = setOf("eXIf", "tEXt", "zTXt", "iTXt", "tIME")
+
+    private fun u8(
+        bytes: ByteArray,
+        offset: Int,
+    ): Int = bytes[offset].toInt() and 0xff
+
+    private fun u16be(
+        bytes: ByteArray,
+        offset: Int,
+    ): Int = (u8(bytes, offset) shl 8) or u8(bytes, offset + 1)
+
+    private fun u32be(
+        bytes: ByteArray,
+        offset: Int,
+    ): Long =
+        (u8(bytes, offset).toLong() shl 24) or
+            (u8(bytes, offset + 1).toLong() shl 16) or
+            (u8(bytes, offset + 2).toLong() shl 8) or
+            u8(bytes, offset + 3).toLong()
+
+    private fun u32le(
+        bytes: ByteArray,
+        offset: Int,
+    ): Long =
+        u8(bytes, offset).toLong() or
+            (u8(bytes, offset + 1).toLong() shl 8) or
+            (u8(bytes, offset + 2).toLong() shl 16) or
+            (u8(bytes, offset + 3).toLong() shl 24)
+
+    private fun ascii(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ): String = String(bytes, offset, length, StandardCharsets.US_ASCII)
+
+    private fun asciiEquals(
+        bytes: ByteArray,
+        offset: Int,
+        value: String,
+    ): Boolean = offset + value.length <= bytes.size && ascii(bytes, offset, value.length) == value
+
+    private fun writeU32le(
+        out: ByteArrayOutputStream,
+        value: Int,
+    ) {
+        out.write(value and 0xff)
+        out.write((value ushr 8) and 0xff)
+        out.write((value ushr 16) and 0xff)
+        out.write((value ushr 24) and 0xff)
+    }
+
+    private fun writeU32le(
+        bytes: ByteArray,
+        offset: Int,
+        value: Int,
+    ) {
+        bytes[offset] = (value and 0xff).toByte()
+        bytes[offset + 1] = ((value ushr 8) and 0xff).toByte()
+        bytes[offset + 2] = ((value ushr 16) and 0xff).toByte()
+        bytes[offset + 3] = ((value ushr 24) and 0xff).toByte()
     }
 
     /**

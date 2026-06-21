@@ -635,4 +635,15 @@
     <string name="mention_picker_member">Mencionar %1$s</string>
     <string name="mention_picker_dismiss">Fechar seletor de membros</string>
     <string name="mentioned_you">Você foi mencionado</string>
+    <string name="media_quality_title">Qualidade da mídia</string>
+    <string name="media_quality_settings_subtitle">Compactação para fotos e mensagens de voz que você envia</string>
+    <string name="media_quality_low">Baixa</string>
+    <string name="media_quality_low_subtitle">Cerca de 150 KB por foto — ideal para planos de dados limitados</string>
+    <string name="media_quality_standard">Padrão</string>
+    <string name="media_quality_standard_subtitle">Cerca de 500 KB por foto — padrão sensato</string>
+    <string name="media_quality_high">Alta</string>
+    <string name="media_quality_high_subtitle">Cerca de 1,5 MB por foto — qualidade acima do uso de dados</string>
+    <string name="media_quality_original">Sem alterações</string>
+    <string name="media_quality_original_subtitle">Resolução completa — arquivos maiores</string>
+    <string name="media_quality_footer">Metadados de localização e dispositivo (GPS EXIF, marca e modelo) são sempre removidos das fotos, mesmo em Sem alterações. Vídeos e arquivos de áudio escolhidos são enviados como estão; a taxa de bits de áudio se aplica às mensagens de voz gravadas.</string>
 </resources>

@@ -602,6 +602,17 @@
     <string name="media_type_audio">Audio</string>
     <string name="media_type_video">Video</string>
     <string name="media_type_documents">Documents</string>
+    <string name="media_quality_title">Media quality</string>
+    <string name="media_quality_settings_subtitle">Compression for photos and voice notes you send</string>
+    <string name="media_quality_low">Low</string>
+    <string name="media_quality_low_subtitle">About 150 KB per photo — best for capped data plans</string>
+    <string name="media_quality_standard">Standard</string>
+    <string name="media_quality_standard_subtitle">About 500 KB per photo — a sensible default</string>
+    <string name="media_quality_high">High</string>
+    <string name="media_quality_high_subtitle">About 1.5 MB per photo — quality over data cost</string>
+    <string name="media_quality_original">Original</string>
+    <string name="media_quality_original_subtitle">Full resolution — largest files</string>
+    <string name="media_quality_footer">Location and device metadata (EXIF GPS, make and model) are always removed from photos, even on Original. Videos and picked audio files are sent as-is; the audio bitrate applies to recorded voice notes.</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d image selected</item>
         <item quantity="other">%1$d images selected</item>

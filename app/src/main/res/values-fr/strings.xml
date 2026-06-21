@@ -635,4 +635,15 @@
     <string name="mention_picker_member">Mentionner %1$s</string>
     <string name="mention_picker_dismiss">Fermer le sélecteur de membres</string>
     <string name="mentioned_you">Vous avez été mentionné</string>
+    <string name="media_quality_title">Qualité des médias</string>
+    <string name="media_quality_settings_subtitle">Compression des photos et messages vocaux que vous envoyez</string>
+    <string name="media_quality_low">Faible</string>
+    <string name="media_quality_low_subtitle">Environ 150 Ko par photo — idéal pour les forfaits limités</string>
+    <string name="media_quality_standard">Normale</string>
+    <string name="media_quality_standard_subtitle">Environ 500 Ko par photo — choix par défaut raisonnable</string>
+    <string name="media_quality_high">Élevée</string>
+    <string name="media_quality_high_subtitle">Environ 1,5 Mo par photo — priorité à la qualité</string>
+    <string name="media_quality_original">Originale</string>
+    <string name="media_quality_original_subtitle">Résolution complète — fichiers les plus volumineux</string>
+    <string name="media_quality_footer">Les métadonnées de localisation et d\'appareil (GPS EXIF, marque et modèle) sont toujours retirées des photos, même en Originale. Les vidéos et fichiers audio choisis sont envoyés tels quels ; le débit audio concerne les messages vocaux enregistrés.</string>
 </resources>

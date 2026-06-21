@@ -646,4 +646,15 @@
     <string name="mention_picker_member">Упомянуть %1$s</string>
     <string name="mention_picker_dismiss">Закрыть выбор участников</string>
     <string name="mentioned_you">Вас упомянули</string>
+    <string name="media_quality_title">Качество медиа</string>
+    <string name="media_quality_settings_subtitle">Сжатие отправляемых фото и голосовых сообщений</string>
+    <string name="media_quality_low">Низкое</string>
+    <string name="media_quality_low_subtitle">Около 150 КБ на фото — для ограниченных тарифов</string>
+    <string name="media_quality_standard">Стандартное</string>
+    <string name="media_quality_standard_subtitle">Около 500 КБ на фото — разумное значение по умолчанию</string>
+    <string name="media_quality_high">Высокое</string>
+    <string name="media_quality_high_subtitle">Около 1,5 МБ на фото — качество важнее трафика</string>
+    <string name="media_quality_original">Исходное</string>
+    <string name="media_quality_original_subtitle">Полное разрешение — самые большие файлы</string>
+    <string name="media_quality_footer">Метаданные местоположения и устройства (EXIF GPS, марка и модель) всегда удаляются из фото, даже в исходном качестве. Видео и выбранные аудиофайлы отправляются как есть; битрейт звука применяется к записанным голосовым сообщениям.</string>
 </resources>

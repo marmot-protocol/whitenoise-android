@@ -9,8 +9,10 @@ import java.io.File
 /**
  * Voice-message capture wrapper around `MediaRecorder`.
  *
- * - Encodes mono AAC-LC in an MP4 (`.m4a`) container at 16 kHz / 32 kbps.
- *   That bitrate yields ~4 KB/s, comfortably below the album-byte cap for
+ * - Encodes mono AAC-LC in an MP4 (`.m4a`) container at 16 kHz. The bitrate is
+ *   driven by the user's media-quality setting via [bitrateBps] (default
+ *   [DEFAULT_BITRATE_BPS] = 64 kbps "Standard"). Even the lowest level
+ *   (32 kbps) yields ~4 KB/s, comfortably below the album-byte cap for
  *   anything short of a multi-minute monologue, and AAC-LC is decodable by
  *   the receive-side `MediaPlayer` without any extra dependency.
  * - One recorder per outgoing message — instantiate, [start], then either
@@ -22,6 +24,7 @@ import java.io.File
 class VoiceRecorder(
     private val context: Context,
     private val outputFile: File,
+    private val bitrateBps: Int = DEFAULT_BITRATE_BPS,
 ) {
     private var recorder: MediaRecorder? = null
     private var startedAtNanos: Long = 0L
@@ -52,7 +55,7 @@ class VoiceRecorder(
             r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             r.setAudioSamplingRate(SAMPLE_RATE_HZ)
             r.setAudioChannels(1)
-            r.setAudioEncodingBitRate(BITRATE_BPS)
+            r.setAudioEncodingBitRate(bitrateBps)
             r.setOutputFile(outputFile.absolutePath)
             r.prepare()
             r.start()
@@ -119,7 +122,9 @@ class VoiceRecorder(
 
     companion object {
         const val SAMPLE_RATE_HZ = 16_000
-        const val BITRATE_BPS = 32_000
+
+        /** Default AAC-LC bitrate — 64 kbps matches the "Standard" media-quality level. */
+        const val DEFAULT_BITRATE_BPS = 64_000
         const val MIME_TYPE = "audio/mp4"
         const val FILE_EXTENSION = "m4a"
     }

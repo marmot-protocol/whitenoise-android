@@ -632,4 +632,15 @@
     <string name="mention_picker_member">%1$s adlı üyeden bahset</string>
     <string name="mention_picker_dismiss">Üye seçiciyi kapat</string>
     <string name="mentioned_you">Sizden bahsedildi</string>
+    <string name="media_quality_title">Medya kalitesi</string>
+    <string name="media_quality_settings_subtitle">Gönderdiğin fotoğraflar ve sesli mesajlar için sıkıştırma</string>
+    <string name="media_quality_low">Düşük</string>
+    <string name="media_quality_low_subtitle">Fotoğraf başına yaklaşık 150 KB — sınırlı veri paketleri için</string>
+    <string name="media_quality_standard">Standart</string>
+    <string name="media_quality_standard_subtitle">Fotoğraf başına yaklaşık 500 KB — dengeli varsayılan</string>
+    <string name="media_quality_high">Yüksek</string>
+    <string name="media_quality_high_subtitle">Fotoğraf başına yaklaşık 1,5 MB — kalite öncelikli</string>
+    <string name="media_quality_original">Özgün</string>
+    <string name="media_quality_original_subtitle">Tam çözünürlük — en büyük dosyalar</string>
+    <string name="media_quality_footer">Konum ve cihaz meta verileri (EXIF GPS, marka ve model) fotoğraflardan her zaman kaldırılır, Özgün dahil. Videolar ve seçilen ses dosyaları olduğu gibi gönderilir; ses bit hızı kaydedilen sesli mesajlara uygulanır.</string>
 </resources>

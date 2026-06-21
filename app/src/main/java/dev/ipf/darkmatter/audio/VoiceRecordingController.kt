@@ -26,6 +26,9 @@ class VoiceRecordingController(
     private val onPermissionRequest: () -> Boolean,
     private val onRecordingComplete: (file: File, durationMs: Long) -> Unit,
     private val onError: (Throwable) -> Unit,
+    // Read lazily at record-start so a media-quality change mid-session takes
+    // effect on the next recording without re-creating this controller.
+    private val bitrateProvider: () -> Int = { VoiceRecorder.DEFAULT_BITRATE_BPS },
 ) {
     companion object {
         // Safety cap to prevent runaway recordings if the hold gesture leaks
@@ -66,7 +69,7 @@ class VoiceRecordingController(
                 outputDirectory,
                 "voice-${System.currentTimeMillis()}.${VoiceRecorder.FILE_EXTENSION}",
             )
-        val r = VoiceRecorder(context, file)
+        val r = VoiceRecorder(context, file, bitrateProvider())
         return try {
             r.start()
             recorder = r

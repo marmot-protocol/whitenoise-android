@@ -1,7 +1,11 @@
 package dev.ipf.darkmatter.media
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayOutputStream
+import java.util.zip.CRC32
 
 class MediaPipelineTest {
     // ---- targetDimensions ---------------------------------------------------
@@ -133,4 +137,168 @@ class MediaPipelineTest {
         assertEquals("image.jpg", MediaPipeline.safeDisplayName(".."))
         assertEquals("image.jpg", MediaPipeline.safeDisplayName("foo/.."))
     }
+
+    @Test
+    fun originalJpegStrip_dropsMetadataSegmentsButKeepsScanBytes() {
+        val scan = byteArrayOf(0x11, 0x22, 0xff.toByte(), 0x00, 0x33, 0xff.toByte(), 0xd9.toByte())
+        val jpeg =
+            byteArrayOf(0xff.toByte(), 0xd8.toByte()) +
+                jpegSegment(0xe0, "JFIF".encodeToByteArray()) +
+                jpegSegment(0xe1, "Exif\u0000\u0000gps".encodeToByteArray()) +
+                jpegSegment(0xfe, "camera comment".encodeToByteArray()) +
+                jpegSegment(0xdb, byteArrayOf(1, 2, 3)) +
+                jpegSegment(0xda, byteArrayOf(0, 1, 2, 3)) +
+                scan
+
+        val stripped = MediaPipeline.stripOriginalImageMetadata(jpeg)!!
+
+        assertTrue(stripped.startsWithSubsequence(byteArrayOf(0xff.toByte(), 0xd8.toByte())))
+        assertFalse(stripped.containsAscii("Exif"))
+        assertFalse(stripped.containsAscii("camera comment"))
+        assertTrue(stripped.containsAscii("JFIF"))
+        assertTrue(stripped.endsWithSubsequence(scan))
+    }
+
+    @Test
+    fun originalJpegStrip_continuesFilteringAfterScanAndDropsTrailingBytes() {
+        val scan1 = byteArrayOf(0x11, 0xff.toByte(), 0x00, 0x22)
+        val scan2 = byteArrayOf(0x33, 0xff.toByte(), 0xd9.toByte())
+        val trailingMetadata = jpegSegment(0xe1, "trailing gps".encodeToByteArray())
+        val jpeg =
+            byteArrayOf(0xff.toByte(), 0xd8.toByte()) +
+                jpegSegment(0xda, byteArrayOf(0, 1, 2, 3)) +
+                scan1 +
+                jpegSegment(0xe1, "progressive gps".encodeToByteArray()) +
+                jpegSegment(0xda, byteArrayOf(4, 5, 6, 7)) +
+                scan2 +
+                trailingMetadata
+
+        val stripped = MediaPipeline.stripOriginalImageMetadata(jpeg)!!
+
+        assertFalse(stripped.containsAscii("progressive gps"))
+        assertFalse(stripped.containsAscii("trailing gps"))
+        assertTrue(stripped.containsSubsequence(scan1))
+        assertTrue(stripped.endsWithSubsequence(scan2))
+    }
+
+    @Test
+    fun originalPngStrip_dropsTextAndExifChunksButKeepsImageData() {
+        val idatPayload = byteArrayOf(9, 8, 7, 6)
+        val png =
+            pngSignature +
+                pngChunk("IHDR", ByteArray(13)) +
+                pngChunk("tEXt", "GPS=secret".encodeToByteArray()) +
+                pngChunk("eXIf", "camera".encodeToByteArray()) +
+                pngChunk("IDAT", idatPayload) +
+                pngChunk("IEND", ByteArray(0))
+
+        val stripped = MediaPipeline.stripOriginalImageMetadata(png)!!
+
+        assertFalse(stripped.containsAscii("GPS=secret"))
+        assertFalse(stripped.containsAscii("camera"))
+        assertTrue(stripped.containsAscii("IHDR"))
+        assertTrue(stripped.containsAscii("IDAT"))
+        assertTrue(stripped.containsSubsequence(idatPayload))
+    }
+
+    @Test
+    fun originalWebpStrip_dropsExifAndXmpChunksAndClearsVp8xFlags() {
+        val vp8xPayload = byteArrayOf(0x0c, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        val vp8Payload = byteArrayOf(1, 2, 3, 4)
+        val webpPayload =
+            "WEBP".encodeToByteArray() +
+                webpChunk("VP8X", vp8xPayload) +
+                webpChunk("EXIF", "gps".encodeToByteArray()) +
+                webpChunk("XMP ", "xmp".encodeToByteArray()) +
+                webpChunk("VP8 ", vp8Payload)
+        val webp = "RIFF".encodeToByteArray() + u32le(webpPayload.size) + webpPayload
+
+        val stripped = MediaPipeline.stripOriginalImageMetadata(webp)!!
+
+        assertFalse(stripped.containsAscii("gps"))
+        assertFalse(stripped.containsAscii("xmp"))
+        assertTrue(stripped.containsAscii("VP8 "))
+        assertTrue(stripped.containsSubsequence(vp8Payload))
+        val vp8xOffset = stripped.indexOfAscii("VP8X")
+        assertTrue(vp8xOffset >= 0)
+        assertEquals(0, stripped[vp8xOffset + 8].toInt() and 0x0c)
+    }
+
+    private fun jpegSegment(
+        marker: Int,
+        payload: ByteArray,
+    ): ByteArray {
+        val length = payload.size + 2
+        return byteArrayOf(0xff.toByte(), marker.toByte(), (length ushr 8).toByte(), length.toByte()) + payload
+    }
+
+    private val pngSignature = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+
+    private fun pngChunk(
+        type: String,
+        payload: ByteArray,
+    ): ByteArray {
+        val out = ByteArrayOutputStream()
+        out.write(u32be(payload.size))
+        out.write(type.encodeToByteArray())
+        out.write(payload)
+        val crc = CRC32()
+        crc.update(type.encodeToByteArray())
+        crc.update(payload)
+        out.write(u32be(crc.value.toInt()))
+        return out.toByteArray()
+    }
+
+    private fun webpChunk(
+        type: String,
+        payload: ByteArray,
+    ): ByteArray {
+        val out = ByteArrayOutputStream()
+        out.write(type.encodeToByteArray())
+        out.write(u32le(payload.size))
+        out.write(payload)
+        if (payload.size % 2 == 1) out.write(0)
+        return out.toByteArray()
+    }
+
+    private fun u32be(value: Int): ByteArray =
+        byteArrayOf(
+            (value ushr 24).toByte(),
+            (value ushr 16).toByte(),
+            (value ushr 8).toByte(),
+            value.toByte(),
+        )
+
+    private fun u32le(value: Int): ByteArray =
+        byteArrayOf(
+            value.toByte(),
+            (value ushr 8).toByte(),
+            (value ushr 16).toByte(),
+            (value ushr 24).toByte(),
+        )
+
+    private fun ByteArray.containsAscii(value: String): Boolean = indexOfAscii(value) >= 0
+
+    private fun ByteArray.indexOfAscii(value: String): Int {
+        val needle = value.encodeToByteArray()
+        if (needle.isEmpty() || needle.size > size) return -1
+        for (start in 0..(size - needle.size)) {
+            if (needle.indices.all { this[start + it] == needle[it] }) return start
+        }
+        return -1
+    }
+
+    private fun ByteArray.containsSubsequence(needle: ByteArray): Boolean {
+        if (needle.isEmpty() || needle.size > size) return false
+        for (start in 0..(size - needle.size)) {
+            if (needle.indices.all { this[start + it] == needle[it] }) return true
+        }
+        return false
+    }
+
+    private fun ByteArray.startsWithSubsequence(needle: ByteArray): Boolean =
+        needle.isNotEmpty() && needle.size <= size && needle.indices.all { this[it] == needle[it] }
+
+    private fun ByteArray.endsWithSubsequence(needle: ByteArray): Boolean =
+        needle.isNotEmpty() && needle.size <= size && needle.indices.all { this[size - needle.size + it] == needle[it] }
 }
