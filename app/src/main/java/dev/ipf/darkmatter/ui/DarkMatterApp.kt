@@ -13418,11 +13418,28 @@ private fun NotificationsScreen(
                     // DND bypass) live in the OS notification details — Android's
                     // native per-channel UI. We deep-link there instead of
                     // duplicating those toggles in-app. See #288.
-                    SettingsRow(
-                        title = stringResource(R.string.notification_categories),
-                        subtitle = stringResource(R.string.notification_categories_subtitle),
-                        onClick = { openAppNotificationSettings(context) },
-                    )
+                    //
+                    // Use the same plain Row layout as the toggle rows above (not a
+                    // ListItem-based SettingsRow) so the leading edge lines up with
+                    // them; ListItem injects its own ~16.dp leading inset that left
+                    // the categories row indented further right than the settings
+                    // above it. See #499.
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { openAppNotificationSettings(context) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.notification_categories), style = MaterialTheme.typography.bodyLarge)
+                            Text(stringResource(R.string.notification_categories_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Filled.Forward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
