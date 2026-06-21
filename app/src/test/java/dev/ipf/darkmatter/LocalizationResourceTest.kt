@@ -51,6 +51,17 @@ class LocalizationResourceTest {
             }
     }
 
+    @Test
+    fun relayListLabelsDescribeUserVisibleBehavior() {
+        val resDir =
+            listOf(File("src/main/res"), File("app/src/main/res"))
+                .first { it.exists() }
+        val englishValues = stringValues(File(resDir, "values/strings.xml"))
+
+        assertEquals("Where I post", englishValues["nip_65"])
+        assertEquals("Where I receive", englishValues["inbox"])
+    }
+
     private fun stringKeys(file: File): Set<String> = stringValues(file).keys
 
     private fun stringValues(file: File): Map<String, String> {
@@ -103,7 +114,6 @@ class LocalizationResourceTest {
                 "message_info_status",
                 "mls",
                 "nip_05",
-                "nip_65",
                 "no",
                 "notification_channel_messages",
                 "notification_sender_in_group",

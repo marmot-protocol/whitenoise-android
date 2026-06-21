@@ -263,8 +263,8 @@
     <string name="no_relays">Реле не настроены</string>
     <string name="remove_relay">Удалить Реле?</string>
     <string name="add_relay">Добавить Реле</string>
-    <string name="nip_65">Read/Write</string>
-    <string name="inbox">Входящие Реле</string>
+    <string name="nip_65">Куда я публикую</string>
+    <string name="inbox">Откуда я получаю</string>
     <string name="key_package">Пакет ключей</string>
     <string name="published_relay_lists">Опубликованные списки реле</string>
     <string name="no_relay_projection">Проекция списка реле пока недоступна.</string>

@@ -259,8 +259,8 @@
     <string name="no_relays">Aucun relais configuré</string>
     <string name="remove_relay">Supprimer le Relais ?</string>
     <string name="add_relay">Ajouter un Relais</string>
-    <string name="nip_65">Read/Write</string>
-    <string name="inbox">Relais de Boîte de Réception</string>
+    <string name="nip_65">Où je publie</string>
+    <string name="inbox">Où je reçois</string>
     <string name="key_package">Paquet de clés</string>
     <string name="published_relay_lists">Listes de relais publiées</string>
     <string name="no_relay_projection">Aucune projection de liste de relais n’est encore disponible.</string>

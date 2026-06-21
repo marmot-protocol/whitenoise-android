@@ -258,8 +258,8 @@
     <string name="no_relays">尚未設定中繼站</string>
     <string name="remove_relay">移除中繼站？</string>
     <string name="add_relay">新增中繼站</string>
-    <string name="nip_65">Read/Write</string>
-    <string name="inbox">收件匣中繼站</string>
+    <string name="nip_65">我發布到哪裡</string>
+    <string name="inbox">我在哪裡接收</string>
     <string name="key_package">金鑰套件</string>
     <string name="published_relay_lists">已發布的中繼列表</string>
     <string name="no_relay_projection">目前還沒有可用的中繼清單投影。</string>

@@ -259,8 +259,8 @@
     <string name="no_relays">Yapılandırılmış röle yok</string>
     <string name="remove_relay">Röle Kaldırılsın mı?</string>
     <string name="add_relay">Röle Ekle</string>
-    <string name="nip_65">Read/Write</string>
-    <string name="inbox">Gelen Kutusu Röleleri</string>
+    <string name="nip_65">Nerede paylaşırım</string>
+    <string name="inbox">Nerede alırım</string>
     <string name="key_package">Anahtar paketi</string>
     <string name="published_relay_lists">Yayınlanan Aktarma Listeleri</string>
     <string name="no_relay_projection">Henüz aktarma listesi projeksiyonu mevcut değil.</string>

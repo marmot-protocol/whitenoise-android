@@ -259,8 +259,8 @@
     <string name="no_relays">Keine Relays konfiguriert</string>
     <string name="remove_relay">Relay entfernen?</string>
     <string name="add_relay">Relay hinzufügen</string>
-    <string name="nip_65">Read/Write</string>
-    <string name="inbox">Posteingang-Relays</string>
+    <string name="nip_65">Wo ich poste</string>
+    <string name="inbox">Wo ich empfange</string>
     <string name="key_package">Schlüsselpaket</string>
     <string name="published_relay_lists">Veröffentlichte Relay-Listen</string>
     <string name="no_relay_projection">Es ist noch keine Relay-List-Projektion verfügbar.</string>
