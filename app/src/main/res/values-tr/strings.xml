@@ -34,8 +34,6 @@
     <string name="chat_list_search_open_profile">Profili aç</string>
     <string name="chat_list_search_nip05_not_found">\"%1$s\" için profil bulunamadı</string>
     <string name="chat_list_search_invalid_npub">Bu geçerli bir npub gibi görünmüyor</string>
-    <string name="chat_row_swipe_archive">Arşivle</string>
-    <string name="chat_row_swipe_unarchive">Arşivden çıkar</string>
     <string name="chat_row_action_archive">Arşivle</string>
     <string name="chat_row_action_unarchive">Arşivden çıkar</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
@@ -369,7 +367,6 @@
     <string name="toast_couldnt_decline_invite">Davet reddedilemedi</string>
     <string name="toast_chat_archived">Sohbet arşivlendi</string>
     <string name="toast_chat_restored">Sohbet geri yüklendi</string>
-    <string name="action_undo">Geri al</string>
     <string name="toast_couldnt_update_chat">Sohbet güncellenemedi</string>
     <string name="toast_group_updated">Grup güncellendi</string>
     <string name="toast_couldnt_update_group">Grup güncellenemedi</string>
