@@ -1678,6 +1678,28 @@ private fun ChatsScreen(
                         )
                     }
                 }
+                // Quick-action dismiss scrim (issue #452). While the FAB
+                // quick-action menu is expanded, a full-bleed, transparent
+                // tap-catcher overlays the chat-list region so a tap outside
+                // the menu items dismisses the menu instead of falling through
+                // to the chat row underneath (which would open a chat the user
+                // didn't intend to open). It also sits above the jump-to-top
+                // FAB, so that button is inert while the menu is open. The
+                // menu's own button + items live in the Scaffold FAB slot,
+                // which draws above this content, so they stay tappable.
+                // Mirrors the non-focusable scrim pattern used by
+                // KeyboardPreservingDropdownMenu — transparent, so it absorbs
+                // the tap without dimming. Back is already handled by the
+                // BackHandler inside QuickActionFabMenu.
+                if (quickActionsExpanded) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectTapGestures { quickActionsExpanded = false }
+                            },
+                    )
+                }
             }
         }
     }
