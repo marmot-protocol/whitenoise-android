@@ -334,7 +334,7 @@
     <string name="sign_out_and_wipe_sheet_destroyed_db">The local message database and MLS group state for this account.</string>
     <string name="sign_out_and_wipe_sheet_destroyed_keychain">The identity\'s keychain entry on this device.</string>
     <string name="sign_out_and_wipe_sheet_destroyed_relays">Outstanding key packages published for this account on relays.</string>
-    <string name="sign_out_and_wipe_sheet_fresh_start">Signing back in with the same key starts fresh: groups are re-fetched and media re-downloaded.</string>
+    <string name="sign_out_and_wipe_sheet_fresh_start">Signing back in with the same key keeps your identity, but past groups, messages, and media cannot be recovered on this device. You will need to be re-invited to any groups.</string>
     <string name="sign_out_and_wipe_confirm_title">Wipe this account?</string>
     <string name="sign_out_and_wipe_confirm_body">This cannot be undone from this device. The local database, MLS state, keychain entry, and relay key packages for this account will be removed.</string>
     <!-- Type-to-confirm gate for the destructive wipe (#348). The keyword is matched
