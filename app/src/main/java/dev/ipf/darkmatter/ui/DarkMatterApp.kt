@@ -996,7 +996,7 @@ private fun PublicIdentifierFieldTrailingAction(
             IconButton(
                 onClick = {
                     val pasteValue =
-                        RecipientReference.plausibleClipboardInput(
+                        ClipboardPasteAffordance.pasteValue(
                             clipboardManager?.primaryClipPlainText(context),
                             allowHexPublicKey,
                         )
@@ -1013,7 +1013,7 @@ private fun PublicIdentifierFieldTrailingAction(
 @Composable
 private fun rememberClipboardCanOfferPaste(clipboardManager: android.content.ClipboardManager?): Boolean {
     var canOfferPaste by remember(clipboardManager) {
-        mutableStateOf(clipboardManager.canOfferPlainTextPaste())
+        mutableStateOf(clipboardManager.canOfferTextPaste())
     }
 
     DisposableEffect(clipboardManager) {
@@ -1022,10 +1022,10 @@ private fun rememberClipboardCanOfferPaste(clipboardManager: android.content.Cli
         } else {
             val listener =
                 android.content.ClipboardManager.OnPrimaryClipChangedListener {
-                    canOfferPaste = clipboardManager.canOfferPlainTextPaste()
+                    canOfferPaste = clipboardManager.canOfferTextPaste()
                 }
             clipboardManager.addPrimaryClipChangedListener(listener)
-            canOfferPaste = clipboardManager.canOfferPlainTextPaste()
+            canOfferPaste = clipboardManager.canOfferTextPaste()
             onDispose { clipboardManager.removePrimaryClipChangedListener(listener) }
         }
     }
@@ -1033,15 +1033,8 @@ private fun rememberClipboardCanOfferPaste(clipboardManager: android.content.Cli
     return canOfferPaste
 }
 
-private fun android.content.ClipboardManager?.canOfferPlainTextPaste(): Boolean =
-    this
-        ?.primaryClipDescription
-        ?.let { description ->
-            ClipboardPasteAffordance.canOfferPaste(
-                List(description.mimeTypeCount) { index -> description.getMimeType(index) },
-            )
-        }
-        ?: false
+private fun android.content.ClipboardManager?.canOfferTextPaste(): Boolean =
+    this?.primaryClipDescription?.hasMimeType(ClipboardPasteAffordance.TEXT_MIME_TYPE_PATTERN) ?: false
 
 private fun android.content.ClipboardManager.primaryClipPlainText(context: android.content.Context): String? =
     primaryClip
