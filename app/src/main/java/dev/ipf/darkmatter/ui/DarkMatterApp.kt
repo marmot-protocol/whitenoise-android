@@ -7412,6 +7412,25 @@ private fun ConversationScreen(
                         bottomTimelineIndex
                     }
                 listState.scrollToItem(targetIndex)
+                // When opening a chat with the IME already up (e.g. arriving
+                // from another chat whose keyboard was open), the boolean-edge
+                // IME re-snap effect below never fires — imeIsOpen was already
+                // true, so (imeIsOpen, chat.id) only changes by chat.id while
+                // initialTimelineAnchored is still false, and the effect early
+                // -returns. The lone scrollToItem above then anchors against a
+                // viewport that is still settling under the IME inset, leaving
+                // the newest bubble a few rows above the composer (#443). Only
+                // for the bottom anchor (no unread divider — landing on the
+                // divider must NOT chase the bottom) chase the settling
+                // viewport across frames, mirroring the IME-edge re-snap loop,
+                // so the last message lands flush regardless of IME state.
+                if (renderedUnreadIndex < 0 && imeIsOpen) {
+                    repeat(24) {
+                        withFrameNanos { }
+                        val last = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                        runCatching { listState.scrollToItem(last) }
+                    }
+                }
                 initialTimelineAnchored = true
                 lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
             } else {
