@@ -359,6 +359,27 @@ internal fun retainFailedOptimisticTextSend(
         )
 }
 
+/**
+ * Trim [messageById] to the records still referenced by the loaded window
+ * ([windowIds]) or by in-flight [optimisticMessages], dropping projected records
+ * that have scrolled out of the window.
+ *
+ * [messageById] holds full decrypted records (plaintext + parsed tokens). The
+ * live Projection/Upsert path adds one per delivered message but never trims, so
+ * a long-lived busy conversation accumulates decrypted content far beyond the
+ * rendered window — a memory-growth and privacy-footprint issue (#373). This is
+ * the same retain-set the window-replace path already applies on page load (#68).
+ */
+internal fun pruneMessageByIdToWindow(
+    messageById: MutableMap<String, AppMessageRecordFfi>,
+    windowIds: Set<String>,
+    optimisticMessages: Collection<TimelineMessage>,
+) {
+    val retain = HashSet(windowIds)
+    optimisticMessages.forEach { retain.add(it.record.messageIdHex) }
+    messageById.keys.retainAll(retain)
+}
+
 data class ReactionParticipant(
     val sender: String,
     val emoji: String,
@@ -3561,6 +3582,10 @@ class ConversationController(
         pruneConfirmedOptimisticMessages()
         pruneConfirmedOptimisticReactions()
         recomputeReactions()
+        // A non-replaceWindow page (older-history load once hasLoadedOlderPages
+        // is set) skips the replaceWindow trim above, so prune messageById to the
+        // current window + optimistic records here too (#373).
+        pruneMessageByIdToWindow(messageById, timelineRecords.keys, optimisticMessages.values)
         // The pass above already projected every record into the by-id and
         // order indexes (and reconciled optimistics), exactly like the live
         // update paths do — so publish directly. A second full rebuild here
@@ -3639,6 +3664,10 @@ class ConversationController(
         pruneConfirmedOptimisticMessages()
         pruneConfirmedOptimisticReactions()
         recomputeReactions(reactionTargets)
+        // Live Upsert/Projection batches add to messageById but never trim it;
+        // prune to the window + optimistic records so it doesn't grow unbounded
+        // for an actively-watched conversation (#373).
+        pruneMessageByIdToWindow(messageById, timelineRecords.keys, optimisticMessages.values)
         publishTimelineFromIndexes()
         // Don't relaunch a watcher for a stream finalized in this same batch
         // (start + final records together) — it was just marked removed. See #25.
