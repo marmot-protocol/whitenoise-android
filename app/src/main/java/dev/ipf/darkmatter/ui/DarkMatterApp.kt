@@ -240,6 +240,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -9674,8 +9675,35 @@ private fun MessageBubble(
                         } else {
                             Modifier
                         }
+                    // Resolved before the content column so its presence can pick
+                    // the column's width strategy (#428).
+                    //
+                    // Projected items: the preview is a pure function of
+                    // item.projected, so caching keyed on the item is always
+                    // correct (a reprojection replaces the instance). The
+                    // optimistic fallback instead resolves the target from
+                    // controller.messageById, which can gain the target after
+                    // this bubble composes — resolve those live. Display names
+                    // resolve outside the cache either way so a late profile
+                    // load still updates them. See #131.
+                    val replyPreview =
+                        if (item.projected != null) {
+                            remember(item, messageTextCopy) {
+                                controller.replyPreview(item, messageTextCopy)
+                            }
+                        } else {
+                            controller.replyPreview(item, messageTextCopy)
+                        }
                     Column(
-                        mentionRailModifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        mentionRailModifier
+                            // With a reply quote present, size the column to its
+                            // widest child so the inner quote can fill the bubble
+                            // width instead of hugging its own (possibly short)
+                            // text and leaving a gap on the right (#428). Non-reply
+                            // bubbles keep the wrap-content path untouched, so only
+                            // reply-bubble measurement changes.
+                            .then(if (replyPreview != null) Modifier.width(IntrinsicSize.Max) else Modifier)
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         if (showSenderAvatar) {
@@ -9695,22 +9723,6 @@ private fun MessageBubble(
                                     ),
                             )
                         }
-                        // Projected items: the preview is a pure function of
-                        // item.projected, so caching keyed on the item is always
-                        // correct (a reprojection replaces the instance). The
-                        // optimistic fallback instead resolves the target from
-                        // controller.messageById, which can gain the target after
-                        // this bubble composes — resolve those live. Display names
-                        // resolve outside the cache either way so a late profile
-                        // load still updates them. See #131.
-                        val replyPreview =
-                            if (item.projected != null) {
-                                remember(item, messageTextCopy) {
-                                    controller.replyPreview(item, messageTextCopy)
-                                }
-                            } else {
-                                controller.replyPreview(item, messageTextCopy)
-                            }
                         replyPreview?.let { preview ->
                             ReplyPreviewCard(
                                 senderTitle = senderTitleForReply(preview.sender, appState),
@@ -9719,10 +9731,13 @@ private fun MessageBubble(
                                 mediaKind = preview.mediaKind,
                                 onClick = { onReplyPreviewClick(item) },
                                 onDismiss = null,
-                                // In-bubble quote hugs its content so a short
-                                // quote + short reply don't stretch the bubble
-                                // to full chat width (#208).
-                                fillWidth = false,
+                                // Fill the bubble's content width: the column is
+                                // sized to its widest child (IntrinsicSize.Max above),
+                                // so this matches the quote to the bubble instead of
+                                // hugging its own text (#428). A short quote + short
+                                // reply still keeps a narrow bubble because the
+                                // widest child is then small (#208 preserved).
+                                fillWidth = true,
                             )
                         }
                         // Prefer the controller's listMedia cache — it carries
@@ -10077,7 +10092,14 @@ private fun MessageBubble(
                         if (bodyTextToRender != null) {
                             BubbleFooterLayout(
                                 footer = inlineFooter,
-                                modifier = Modifier.align(if (mine) Alignment.End else Alignment.Start),
+                                // Body text is always start-aligned inside the
+                                // bubble, regardless of which side the bubble sits
+                                // on or how wide a sibling (reply quote, media)
+                                // makes the content column. End-aligning own
+                                // messages left a short reply drifting to the right
+                                // of a wide bubble (#439). The footer still places
+                                // itself at the block's trailing edge internally.
+                                modifier = Modifier.align(Alignment.Start),
                                 lastLineWidth =
                                     lastLineLayout?.let { layout ->
                                         if (layout.lineCount > 0) ceil(layout.getLineRight(layout.lineCount - 1)).toInt() else null
@@ -10360,7 +10382,25 @@ private fun MessageBubble(
                 val tallies = controller.reactions[record.messageIdHex].orEmpty()
                 // Hide reaction tallies on a deleted message — nothing to show.
                 if (tallies.isNotEmpty() && !deleted) {
-                    Box(modifier = Modifier.offset(y = (-14).dp).padding(horizontal = 10.dp)) {
+                    // The chip overlaps the bubble's rounded bottom by 14dp. A
+                    // plain `offset` is draw-only: it still reserves the chip's
+                    // full height in the column, leaving a 14dp gap before the
+                    // next message so reacted rows sit looser than un-reacted
+                    // ones (#455). Shrink the consumed height by the same 14dp
+                    // via `layout` so the overlap costs no extra vertical space.
+                    Box(
+                        modifier =
+                            Modifier
+                                .padding(horizontal = 10.dp)
+                                .layout { measurable, constraints ->
+                                    val placeable = measurable.measure(constraints)
+                                    val shift = 14.dp.roundToPx()
+                                    val height = (placeable.height - shift).coerceAtLeast(0)
+                                    layout(placeable.width, height) {
+                                        placeable.place(0, -shift)
+                                    }
+                                },
+                    ) {
                         ReactionSummaryChip(
                             tallies = tallies,
                             onClick = { reactionSheetOpen = true },
