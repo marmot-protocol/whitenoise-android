@@ -3115,22 +3115,46 @@ private val NullableUriSaver: Saver<android.net.Uri?, String> =
         restore = { s -> s.takeIf { it.isNotEmpty() }?.let(android.net.Uri::parse) },
     )
 
+/**
+ * Saves a nullable [java.io.File] across process death by its absolute path.
+ * Used so the camera capture's temp-file handle survives the round-trip and a
+ * capture cancelled after process death can still delete the empty temp
+ * instead of leaking it (issue #531).
+ */
+private val NullableFileSaver: Saver<java.io.File?, String> =
+    Saver(
+        save = { it?.absolutePath ?: "" },
+        restore = { s -> s.takeIf { it.isNotEmpty() }?.let { path -> java.io.File(path) } },
+    )
+
 // Persist a multi-pick selection across rotation / process death. Empty list
 // encodes "no preview shown" so the parent re-render skips the sheet on
 // restore. Uses '\n' as the separator — content URIs don't contain newlines.
 private val UriListSaver: Saver<List<android.net.Uri>, String> =
     Saver(
-        save = { it.joinToString("\n") { uri -> uri.toString() } },
-        restore = { s ->
-            if (s.isEmpty()) {
-                emptyList()
-            } else {
-                s.split('\n').mapNotNull { token ->
-                    token.takeIf { it.isNotEmpty() }?.let(android.net.Uri::parse)
-                }
-            }
-        },
+        save = { encodeUriListTokens(it.map { uri -> uri.toString() }) },
+        restore = { s -> decodeUriListTokens(s).map(android.net.Uri::parse) },
     )
+
+/**
+ * Pure string codec backing [UriListSaver], split out from the [android.net.Uri]
+ * conversion so the separator and empty-list contract is unit-testable on the
+ * JVM (the Android `Uri` stubs are non-functional in local unit tests). Joins
+ * tokens with '\n'; an empty list encodes to "".
+ */
+internal fun encodeUriListTokens(tokens: List<String>): String = tokens.joinToString("\n")
+
+/**
+ * Inverse of [encodeUriListTokens]. An empty input decodes to an empty list
+ * (the "no preview shown" sentinel); blank tokens are dropped so a trailing or
+ * doubled separator can't yield empty URI strings.
+ */
+internal fun decodeUriListTokens(encoded: String): List<String> =
+    if (encoded.isEmpty()) {
+        emptyList()
+    } else {
+        encoded.split('\n').filter { it.isNotEmpty() }
+    }
 
 private fun senderTitleForReply(
     senderPubkey: String,
@@ -6677,23 +6701,39 @@ private fun ConversationScreen(
     // when this or `pendingDocumentUris` is non-empty; the whole queue
     // ships as one kind:9 album via `controller.sendAttachments(list, caption)`.
     //
-    // Intentionally `remember`, not `rememberSaveable`: Photo Picker and
-    // document URIs carry session-scoped read grants that don't survive
-    // process death, so restoring them from a saved bundle gives us URIs
-    // that fail to open on first read. Lose the staging buffer on
-    // process death rather than keep ghost URIs around.
-    // Keyed on chat.id so a conversation switch flushes the staging shelf —
-    // ConversationScreen is reused when `selectedChat` changes in place, and
-    // an unkeyed remember would otherwise carry URIs from chat A into chat B
-    // (where a Send would attach them to the wrong recipient).
-    var pendingMediaUris by remember(chat.id) { mutableStateOf<List<android.net.Uri>>(emptyList()) }
-    var pendingDocumentUris by remember(chat.id) { mutableStateOf<List<android.net.Uri>>(emptyList()) }
+    // Persist the staging shelf across process death (issue #531): capturing
+    // in landscape foregrounds the external camera app, which on low/medium
+    // memory devices gets the backgrounded host process killed. On return the
+    // activity is recreated and a plain `remember` would have wiped the shelf,
+    // dropping the just-captured image even though `cameraOutputUri` survived.
+    // The camera capture is a FileProvider URI over an app-owned cache file,
+    // so it re-opens fine post-restore. Photo Picker / GET_CONTENT / document
+    // URIs carry session-scoped read grants that DON'T survive process death;
+    // if such a URI was staged when the process died it returns as a ghost
+    // that fails to open — that degrades gracefully through the existing
+    // decode-failure toast path in `sendStagedAttachments`, which is a better
+    // outcome than silently losing the camera capture the user just accepted.
+    // Keyed on chat.id so a conversation switch still flushes the staging
+    // shelf — ConversationScreen is reused when `selectedChat` changes in
+    // place, and an unkeyed state would otherwise carry URIs from chat A into
+    // chat B (where a Send would attach them to the wrong recipient).
+    var pendingMediaUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
+        mutableStateOf<List<android.net.Uri>>(emptyList())
+    }
+    var pendingDocumentUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
+        mutableStateOf<List<android.net.Uri>>(emptyList())
+    }
     // Survives process death while the camera app is foreground (the result
     // callback fires into a recreated activity, otherwise the capture is lost).
     var cameraOutputUri by rememberSaveable(stateSaver = NullableUriSaver) {
         mutableStateOf<android.net.Uri?>(null)
     }
-    var cameraOutputFile by remember { mutableStateOf<java.io.File?>(null) }
+    // Survives process death alongside `cameraOutputUri` so a capture
+    // cancelled after a death-and-restore can still delete the empty temp
+    // file instead of leaking it (issue #531).
+    var cameraOutputFile by rememberSaveable(stateSaver = NullableFileSaver) {
+        mutableStateOf<java.io.File?>(null)
+    }
 
     // PickMultipleVisualMedia uses the system Photo Picker — no READ_MEDIA_IMAGES
     // permission needed (Android 13+ scopes the picker's own grant); on older
