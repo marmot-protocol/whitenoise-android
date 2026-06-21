@@ -991,6 +991,12 @@ class ChatsController(
 
     fun chatItemForGroup(groupIdHex: String): ChatListItem? = currentProjectedItems().firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
 
+    // Lightweight membership probe over the raw rows — no per-row ChatListItem
+    // projection. awaitChatListItem's poll loop uses this to test whether a
+    // freshly created group has surfaced yet without rebuilding the whole
+    // projected list on every 50ms tick.
+    fun containsGroup(groupIdHex: String): Boolean = chatRows.any { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+
     /**
      * Chats the active account can forward a message into, recent first.
      *
@@ -2621,6 +2627,14 @@ class ConversationController(
                 }
             } else {
                 appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
+                // Reacting is unambiguous evidence the user saw this message, so
+                // advance the read marker through it. Without this the chat-list
+                // unread badge can survive a react-then-leave until the next open,
+                // because the scroll-driven mark-read may not have fired (the user
+                // was already at the bottom when the message arrived). This runs on
+                // the caller's durable mutation scope, so it isn't cancelled when
+                // the conversation closes right after the tap.
+                markReadUpTo(target)
             }
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()

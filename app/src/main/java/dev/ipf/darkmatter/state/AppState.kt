@@ -2262,12 +2262,13 @@ class DarkMatterAppState(
         timeoutMs: Long = 5000,
     ): ChatListItem? =
         withTimeoutOrNull(timeoutMs) {
-            var item = chatsController?.chatItemForGroup(groupIdHex)
-            while (item == null) {
+            // Poll the cheap membership probe; only project the row into a
+            // ChatListItem once it's actually present, instead of re-projecting
+            // the entire chat list on every tick.
+            while (chatsController?.containsGroup(groupIdHex) != true) {
                 delay(50)
-                item = chatsController?.chatItemForGroup(groupIdHex)
             }
-            item
+            chatsController?.chatItemForGroup(groupIdHex)
         }
 
     suspend fun publishProfile(profile: UserProfileMetadataFfi) {
