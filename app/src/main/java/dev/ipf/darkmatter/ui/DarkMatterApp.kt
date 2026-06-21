@@ -309,6 +309,8 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.core.content.ContextCompat
 import androidx.core.os.ConfigurationCompat
 import androidx.emoji2.emojipicker.EmojiPickerView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -322,7 +324,9 @@ import dev.ipf.darkmatter.core.ChatListIdentifierSearch
 import dev.ipf.darkmatter.core.ChatListMessageSearch
 import dev.ipf.darkmatter.core.ClipboardPasteAffordance
 import dev.ipf.darkmatter.core.DiagnosticFormatter
+import dev.ipf.darkmatter.core.ENCRYPTED_BACKUP_MIN_PASSPHRASE_LENGTH
 import dev.ipf.darkmatter.core.EditState
+import dev.ipf.darkmatter.core.EncryptedBackupPassphraseStrength
 import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.core.GroupSystemCopy
 import dev.ipf.darkmatter.core.GroupSystemEvents
@@ -345,6 +349,9 @@ import dev.ipf.darkmatter.core.RecipientReference
 import dev.ipf.darkmatter.core.ReplySwipe
 import dev.ipf.darkmatter.core.SnippetHighlight
 import dev.ipf.darkmatter.core.TimelineProjector
+import dev.ipf.darkmatter.core.encryptedBackupPassphraseInputsValid
+import dev.ipf.darkmatter.core.encryptedBackupPassphraseStrength
+import dev.ipf.darkmatter.core.groupedEncryptedBackup
 import dev.ipf.darkmatter.core.replyMediaKindFromMime
 import dev.ipf.darkmatter.media.DuckDuckGoImageSearchClient
 import dev.ipf.darkmatter.media.ImageSearchClient
@@ -15905,8 +15912,7 @@ private fun IdentityScreen(
     var showSignOutSheet by remember { mutableStateOf(false) }
     var showWipeSheet by remember { mutableStateOf(false) }
     var showWipeConfirm by remember { mutableStateOf(false) }
-    var showEncryptedExportDialog by remember { mutableStateOf(false) }
-    var encryptedExportPassphrase by remember { mutableStateOf("") }
+    var showEncryptedBackupSheet by remember { mutableStateOf(false) }
     // Type-to-confirm input for the destructive wipe (#348). Reset whenever the
     // confirm dialog is dismissed so a previous match can't carry over into a
     // later open.
@@ -15981,15 +15987,12 @@ private fun IdentityScreen(
                             Text(stringResource(R.string.export_nsec))
                         }
                         OutlinedButton(
-                            onClick = {
-                                encryptedExportPassphrase = ""
-                                showEncryptedExportDialog = true
-                            },
+                            onClick = { showEncryptedBackupSheet = true },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Default.Lock, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.export_encrypted_secret))
+                            Text(stringResource(R.string.encrypted_backup_create))
                         }
                     }
                 }
@@ -16036,6 +16039,13 @@ private fun IdentityScreen(
         }
     }
 
+    if (showEncryptedBackupSheet) {
+        EncryptedBackupSheet(
+            appState = appState,
+            onDismiss = { showEncryptedBackupSheet = false },
+        )
+    }
+
     if (showSignOutSheet) {
         SignOutSheet(
             onConfirm = {
@@ -16047,59 +16057,6 @@ private fun IdentityScreen(
                 }
             },
             onDismiss = { showSignOutSheet = false },
-        )
-    }
-
-    if (showEncryptedExportDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showEncryptedExportDialog = false
-                encryptedExportPassphrase = ""
-            },
-            title = { Text(stringResource(R.string.export_encrypted_secret_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(stringResource(R.string.export_encrypted_secret_body))
-                    OutlinedTextField(
-                        value = encryptedExportPassphrase,
-                        onValueChange = { encryptedExportPassphrase = it },
-                        label = { Text(stringResource(R.string.export_encrypted_secret_field_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions =
-                            KeyboardOptions(
-                                autoCorrectEnabled = false,
-                                keyboardType = KeyboardType.Password,
-                            ),
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val passphrase = encryptedExportPassphrase
-                        showEncryptedExportDialog = false
-                        encryptedExportPassphrase = ""
-                        scope.launch {
-                            appState.exportActiveAccountEncryptedSecretKey(passphrase)?.let(::shareSecretKey)
-                        }
-                    },
-                    enabled = encryptedExportPassphrase.isNotEmpty(),
-                ) {
-                    Text(stringResource(R.string.export_encrypted_secret))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showEncryptedExportDialog = false
-                        encryptedExportPassphrase = ""
-                    },
-                ) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
         )
     }
 
@@ -16190,6 +16147,270 @@ private fun IdentityScreen(
         )
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EncryptedBackupSheet(
+    appState: DarkMatterAppState,
+    onDismiss: () -> Unit,
+) {
+    WindowSecureFlag()
+    val context = LocalContext.current
+    val lifecycleOwner = context.lifecycleOwner()
+    val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
+    var passphrase by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var revealPassphrase by remember { mutableStateOf(false) }
+    var backup by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+
+    fun clearSensitiveState() {
+        passphrase = ""
+        confirmation = ""
+        backup = null
+        busy = false
+    }
+
+    fun dismissAndClear() {
+        clearSensitiveState()
+        onDismiss()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        if (lifecycleOwner == null) {
+            onDispose { }
+        } else {
+            val observer =
+                LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_STOP) {
+                        dismissAndClear()
+                    }
+                }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+    }
+
+    LaunchedEffect(backup) {
+        if (backup != null) {
+            delay(60_000)
+            backup = null
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = { dismissAndClear() },
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(stringResource(R.string.encrypted_backup_title), style = MaterialTheme.typography.titleLarge)
+            Text(
+                stringResource(R.string.encrypted_backup_explainer),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            val encryptedBackup = backup
+            if (encryptedBackup == null) {
+                EncryptedBackupPassphraseFields(
+                    passphrase = passphrase,
+                    confirmation = confirmation,
+                    revealPassphrase = revealPassphrase,
+                    onPassphraseChange = { passphrase = it },
+                    onConfirmationChange = { confirmation = it },
+                    onRevealToggle = { revealPassphrase = !revealPassphrase },
+                )
+                Text(
+                    stringResource(R.string.encrypted_backup_short_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = {
+                        val chosenPassphrase = passphrase
+                        busy = true
+                        scope.launch {
+                            val exported = appState.exportEncryptedSecretKeyBackup(chosenPassphrase)
+                            if (exported != null) {
+                                passphrase = ""
+                                confirmation = ""
+                                backup = exported
+                            }
+                            busy = false
+                        }
+                    },
+                    enabled = !busy && encryptedBackupPassphraseInputsValid(passphrase, confirmation),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (busy) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                    } else {
+                        Icon(Icons.Default.Lock, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(stringResource(R.string.encrypted_backup_create))
+                }
+            } else {
+                Text(
+                    stringResource(R.string.encrypted_backup_result_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    stringResource(R.string.encrypted_backup_result_help),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        groupedEncryptedBackup(encryptedBackup),
+                        modifier = Modifier.padding(16.dp),
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = {
+                            clipboard.setText(AnnotatedString(encryptedBackup))
+                            appState.present(R.string.toast_encrypted_backup_copied)
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.copy))
+                    }
+                    OutlinedButton(
+                        onClick = { backup = null },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.hide))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EncryptedBackupPassphraseFields(
+    passphrase: String,
+    confirmation: String,
+    revealPassphrase: Boolean,
+    onPassphraseChange: (String) -> Unit,
+    onConfirmationChange: (String) -> Unit,
+    onRevealToggle: () -> Unit,
+) {
+    val strength = encryptedBackupPassphraseStrength(passphrase)
+    val mismatch = confirmation.isNotEmpty() && passphrase != confirmation
+    val visualTransformation = if (revealPassphrase) VisualTransformation.None else PasswordVisualTransformation()
+    val keyboardOptions =
+        KeyboardOptions(
+            capitalization = KeyboardCapitalization.None,
+            autoCorrectEnabled = false,
+            keyboardType = KeyboardType.Password,
+        )
+
+    OutlinedTextField(
+        value = passphrase,
+        onValueChange = onPassphraseChange,
+        label = { Text(stringResource(R.string.encrypted_backup_passphrase_label)) },
+        singleLine = true,
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
+        trailingIcon = {
+            TextButton(onClick = onRevealToggle) {
+                Text(stringResource(if (revealPassphrase) R.string.hide else R.string.show))
+            }
+        },
+        supportingText = {
+            Text(
+                stringResource(
+                    R.string.encrypted_backup_minimum_hint,
+                    ENCRYPTED_BACKUP_MIN_PASSPHRASE_LENGTH,
+                ),
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        EncryptedBackupStrengthMeter(strength)
+        Text(
+            stringResource(strength.labelRes()),
+            style = MaterialTheme.typography.bodySmall,
+            color = strength.color(),
+        )
+    }
+    OutlinedTextField(
+        value = confirmation,
+        onValueChange = onConfirmationChange,
+        label = { Text(stringResource(R.string.encrypted_backup_confirm_label)) },
+        singleLine = true,
+        isError = mismatch,
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
+        supportingText = {
+            if (mismatch) {
+                Text(stringResource(R.string.encrypted_backup_mismatch))
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun EncryptedBackupStrengthMeter(strength: EncryptedBackupPassphraseStrength) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth(strength.progress())
+                    .fillMaxHeight()
+                    .background(strength.color()),
+        )
+    }
+}
+
+@StringRes
+private fun EncryptedBackupPassphraseStrength.labelRes(): Int =
+    when (this) {
+        EncryptedBackupPassphraseStrength.TooShort -> R.string.encrypted_backup_strength_too_short
+        EncryptedBackupPassphraseStrength.Weak -> R.string.encrypted_backup_strength_weak
+        EncryptedBackupPassphraseStrength.Fair -> R.string.encrypted_backup_strength_fair
+        EncryptedBackupPassphraseStrength.Strong -> R.string.encrypted_backup_strength_strong
+    }
+
+private fun EncryptedBackupPassphraseStrength.progress(): Float =
+    when (this) {
+        EncryptedBackupPassphraseStrength.TooShort -> 0.15f
+        EncryptedBackupPassphraseStrength.Weak -> 0.34f
+        EncryptedBackupPassphraseStrength.Fair -> 0.67f
+        EncryptedBackupPassphraseStrength.Strong -> 1f
+    }
+
+@Composable
+private fun EncryptedBackupPassphraseStrength.color(): Color =
+    when (this) {
+        EncryptedBackupPassphraseStrength.TooShort -> MaterialTheme.colorScheme.error
+        EncryptedBackupPassphraseStrength.Weak -> MaterialTheme.colorScheme.error
+        EncryptedBackupPassphraseStrength.Fair -> MaterialTheme.colorScheme.tertiary
+        EncryptedBackupPassphraseStrength.Strong -> MaterialTheme.colorScheme.primary
+    }
 
 /**
  * Non-destructive sign-out sheet (#348). Explains what stays on device and what
