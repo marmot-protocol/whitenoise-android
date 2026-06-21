@@ -1,5 +1,6 @@
 package dev.ipf.darkmatter.core
 
+import java.text.BreakIterator
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -22,39 +23,67 @@ object IdentityFormatter {
     }
 
     fun initials(name: String): String {
-        // Iterate code points so a leading non-BMP grapheme (emoji, CJK
-        // extensions, mathematical alphanumerics) is taken whole and not as
-        // a lone surrogate half.
         val words =
             name
                 .trim()
                 .split(Regex("\\s+"))
                 .filter { it.isNotBlank() }
-        val letters =
+        // Candidate initials, taken as whole grapheme clusters so emoji,
+        // surrogate pairs and ZWJ sequences (👨‍👩‍👧, 🏃‍♂️) are never split into a
+        // lone surrogate half (#112). Two words → the lead grapheme of each;
+        // one word → its first two graphemes.
+        val candidates =
             when {
-                words.size >= 2 -> firstCodePoint(words[0]) + firstCodePoint(words[1])
-                words.size == 1 -> firstTwoCodePoints(words[0])
-                else -> "DM"
+                words.size >= 2 -> listOfNotNull(firstGrapheme(words[0]), firstGrapheme(words[1]))
+                words.size == 1 -> firstGraphemes(words[0], limit = 2)
+                else -> emptyList()
             }
-        return letters.uppercase()
+        if (candidates.isEmpty()) return "DM"
+        // Prefer letters: an emoji or symbol rendered alone in the avatar circle
+        // clips or shows as tofu, so a letter always wins when the name has one
+        // ("Alice 😀" → "A", "😀 Alice" → "A"). Only a name with no letters at
+        // all falls back to its first emoji grapheme ("😀🔥" → "😀"). See #427.
+        val letters = candidates.filter { isLetter(it) }
+        return if (letters.isNotEmpty()) {
+            letters.take(2).joinToString("").uppercase()
+        } else {
+            candidates.first()
+        }
     }
 
-    private fun firstCodePoint(value: String): String {
-        if (value.isEmpty()) return ""
-        val codePoint = value.codePointAt(0)
-        return String(Character.toChars(codePoint))
+    /** First grapheme cluster of [value], or null when empty. */
+    private fun firstGrapheme(value: String): String? = firstGraphemes(value, limit = 1).firstOrNull()
+
+    /** Up to [limit] leading grapheme clusters of [value]. */
+    private fun firstGraphemes(
+        value: String,
+        limit: Int,
+    ): List<String> {
+        if (value.isEmpty()) return emptyList()
+        val boundaries = BreakIterator.getCharacterInstance()
+        boundaries.setText(value)
+        val out = mutableListOf<String>()
+        var start = boundaries.first()
+        var end = boundaries.next()
+        while (end != BreakIterator.DONE && out.size < limit) {
+            out.add(value.substring(start, end))
+            start = end
+            end = boundaries.next()
+        }
+        return out
     }
 
-    private fun firstTwoCodePoints(value: String): String {
-        if (value.isEmpty()) return ""
-        val first = value.codePointAt(0)
-        val firstWidth = Character.charCount(first)
-        if (firstWidth >= value.length) return String(Character.toChars(first))
-        val second = value.codePointAt(firstWidth)
-        return String(Character.toChars(first)) + String(Character.toChars(second))
-    }
+    private fun isLetter(grapheme: String): Boolean = grapheme.isNotEmpty() && Character.isLetter(grapheme.codePointAt(0))
 
     private const val CLOCK_SKEW_TOLERANCE_SECONDS = 60L
+
+    // Upper bound for a displayable timestamp: 9999-12-31T23:59:59Z. `epochSeconds`
+    // is untrusted peer input, and `ULong.toLong()` wraps any high-bit value to a
+    // negative Long, which `Instant.ofEpochSecond` rejects with DateTimeException —
+    // and the localized formatter throws on extreme years too. Clamping to a sane
+    // window (plus the guards below) keeps a crafted timestamp from crashing the
+    // row that renders it (#468).
+    private const val MAX_DISPLAYABLE_EPOCH_SECONDS = 253_402_300_799L
 
     fun relativeTime(
         epochSeconds: ULong,
@@ -62,7 +91,8 @@ object IdentityFormatter {
         locale: Locale = Locale.getDefault(),
     ): String {
         if (epochSeconds == 0uL) return ""
-        val instant = Instant.ofEpochSecond(epochSeconds.toLong())
+        val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
+        val instant = runCatching { Instant.ofEpochSecond(seconds) }.getOrNull() ?: return copy.now
         val now = Instant.now()
         val delta = now.epochSecond - instant.epochSecond
         return when {
@@ -78,11 +108,13 @@ object IdentityFormatter {
             delta < 604_800 -> copy.days((delta / 86_400).toInt())
             else ->
                 // Locale-aware month-day ordering rather than forced "MMM d".
-                DateTimeFormatter
-                    .ofLocalizedDate(FormatStyle.MEDIUM)
-                    .withLocale(locale)
-                    .withZone(ZoneId.systemDefault())
-                    .format(instant)
+                runCatching {
+                    DateTimeFormatter
+                        .ofLocalizedDate(FormatStyle.MEDIUM)
+                        .withLocale(locale)
+                        .withZone(ZoneId.systemDefault())
+                        .format(instant)
+                }.getOrDefault(copy.now)
         }
     }
 }

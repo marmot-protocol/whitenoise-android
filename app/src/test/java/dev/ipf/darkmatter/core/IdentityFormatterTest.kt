@@ -63,13 +63,68 @@ class IdentityFormatterTest {
     }
 
     @Test
-    fun initialsTakeNonBmpEmojiWhole() {
-        // Two-word name whose first word leads with a non-BMP emoji: the
-        // emoji must arrive whole rather than as a lone surrogate half.
+    fun initialsDropEmojiWordInFavorOfLetter() {
+        // #427 supersedes the old "render the emoji whole" behavior: a letter
+        // always wins over an emoji/symbol grapheme, since an emoji alone in the
+        // avatar circle clips or shows as tofu. The #112 concern (never emit a
+        // lone surrogate half) still holds — the emoji is dropped, not split.
         val grinningFace = String(Character.toChars(0x1F600))
-        val expected = "${grinningFace.uppercase()}B"
 
-        assertEquals(expected, IdentityFormatter.initials("$grinningFace bob"))
+        assertEquals("B", IdentityFormatter.initials("$grinningFace bob"))
+        assertEquals("A", IdentityFormatter.initials("Alice $grinningFace"))
+        assertEquals("A", IdentityFormatter.initials("$grinningFace Alice"))
+    }
+
+    @Test
+    fun initialsForEmojiOnlyNameRenderFirstGraphemeWhole() {
+        // No letters anywhere → fall back to the first emoji grapheme, taken
+        // whole (not a split surrogate). #427.
+        val grinningFace = String(Character.toChars(0x1F600))
+        val fire = String(Character.toChars(0x1F525))
+
+        assertEquals(grinningFace, IdentityFormatter.initials("$grinningFace$fire"))
+    }
+
+    @Test
+    fun initialsSingleWordWithTrailingEmojiUsesLetters() {
+        // A single word keeps the two-letter monogram from its letters; the
+        // trailing emoji is simply never reached (#427). Deliberately "BO", not
+        // "B" — single-word names always yield up to two letters, matching the
+        // existing "Xavier"-style behavior.
+        val fire = String(Character.toChars(0x1F525))
+
+        assertEquals("BO", IdentityFormatter.initials("Bob$fire"))
+    }
+
+    @Test
+    fun initialsDropZwjEmojiWordInFavorOfLetter() {
+        // A ZWJ emoji sequence (family) is a multi-codepoint grapheme; whether
+        // or not the break iterator groups it, the letter word still wins. #427.
+        val family = "👨‍👩‍👧"
+
+        assertEquals("F", IdentityFormatter.initials("$family Family"))
+    }
+
+    @Test
+    fun relativeTimeDoesNotCrashOnOutOfRangeTimestamps() {
+        // #468: untrusted epoch values must not throw DateTimeException into the
+        // render path. ULong.MAX_VALUE wraps to -1L and a high-bit value wraps to
+        // Long.MIN_VALUE; both clamp to a safe instant instead of crashing.
+        val epochZeroFormatted =
+            DateTimeFormatter
+                .ofLocalizedDate(FormatStyle.MEDIUM)
+                .withLocale(Locale.US)
+                .withZone(ZoneId.systemDefault())
+                .format(Instant.ofEpochSecond(0))
+
+        assertEquals(epochZeroFormatted, IdentityFormatter.relativeTime(ULong.MAX_VALUE, RelativeTimeCopy.Default, Locale.US))
+        assertEquals(
+            epochZeroFormatted,
+            IdentityFormatter.relativeTime(0x8000000000000000uL, RelativeTimeCopy.Default, Locale.US),
+        )
+        // A positive value far past year 9999 clamps and still formats without throwing.
+        val farFuture = IdentityFormatter.relativeTime(999_999_999_999uL, RelativeTimeCopy.Default, Locale.US)
+        assertTrue(farFuture.isNotBlank())
     }
 
     @Test
