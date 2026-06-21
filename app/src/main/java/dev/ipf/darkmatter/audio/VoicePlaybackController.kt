@@ -177,6 +177,14 @@ object VoicePlaybackController {
         file: File,
     ) {
         if (currentKey == key && player != null) {
+            // Re-acquire focus before resuming: a transient focus loss
+            // auto-paused us (focusListener → pause()) and abandoned focus,
+            // so another app may now own it. Restarting without re-requesting
+            // would let two streams play at once or get our start() clobbered.
+            if (!requestFocus()) {
+                // Focus denied — stay paused rather than playing unfocused.
+                return
+            }
             player?.start()
             _state.value =
                 _state.value.copy(
@@ -308,6 +316,10 @@ object VoicePlaybackController {
                     isPlaying = false,
                     positionMs = mp.currentPosition,
                 )
+            // Release focus while paused so other apps stop being ducked for
+            // the (potentially indefinite) pause. Resuming re-requests focus
+            // in playLocked(). Safe no-op if focus is not currently held.
+            abandonFocus()
         }
         stopTicker()
     }
