@@ -35,6 +35,26 @@ Direct Gradle equivalents:
 
 The debug variant uses an `applicationIdSuffix` of `.debug` (`dev.ipf.darkmatter.debug`), so it installs alongside the release build (`dev.ipf.darkmatter`) without collision.
 
+## Continuous Integration
+
+Every pull request to `master` (and every push to `master`) runs the
+`.github/workflows/android-ci.yml` validation workflow. It fails the build on
+Kotlin compile errors, unit-test failures, ktlint violations, or Android lint
+regressions. The workflow uses the debug variant only and requires no signing
+secrets or `google-services.json`.
+
+Run the same checks locally before pushing:
+
+```bash
+./gradlew :app:compileDebugKotlin   # Kotlin compile
+./gradlew :app:testDebugUnitTest    # unit tests          (also: just test)
+./gradlew :app:ktlintCheck          # style/format check  (also: just lint)
+./gradlew :app:lintDebug            # Android lint
+```
+
+Use `just format` (`./gradlew :app:ktlintFormat`) to auto-fix ktlint findings
+before re-running the check.
+
 ## Release Builds
 
 Release builds use signing values from `local.properties` or matching environment variables:
