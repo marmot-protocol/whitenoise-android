@@ -2723,6 +2723,40 @@ private fun EmptyChats(onCreate: () -> Unit) {
     }
 }
 
+internal fun canSubmitNewChatSheet(
+    directMessage: Boolean,
+    busy: Boolean,
+    pendingRecipient: String,
+    groupName: String,
+): Boolean =
+    !busy &&
+        if (directMessage) {
+            pendingRecipient.isNotBlank()
+        } else {
+            groupName.isNotBlank()
+        }
+
+internal fun newChatMemberRefs(
+    directMessage: Boolean,
+    normalizedPendingRecipients: List<String>,
+): List<String> =
+    if (directMessage) {
+        normalizedPendingRecipients.distinct().take(1)
+    } else {
+        emptyList()
+    }
+
+internal fun canInviteFromEmptyGroup(
+    isSelfMember: Boolean,
+    isSelfAdmin: Boolean,
+    membersLoaded: Boolean,
+    memberCount: Int,
+): Boolean =
+    isSelfMember &&
+        isSelfAdmin &&
+        membersLoaded &&
+        memberCount == 1
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewChatSheet(
@@ -2737,38 +2771,27 @@ private fun NewChatSheet(
     onOpenConversation: (ChatListItem, Boolean) -> Unit = { _, _ -> },
     onDismiss: () -> Unit,
 ) {
-    var members by remember { mutableStateOf<List<String>>(emptyList()) }
     var pending by remember { mutableStateOf("") }
     var groupName by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showScanner by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
     val validRecipientReferenceError = stringResource(R.string.error_valid_recipient_reference)
     val missingKeyPackageError = stringResource(R.string.error_missing_key_package)
     val missingKeyPackageForFormat = stringResource(R.string.error_missing_key_package_for)
     val invalidIdentityReferenceError = stringResource(R.string.error_invalid_identity_reference)
     val groupPublishFailedFormat = stringResource(R.string.error_group_publish_failed)
     val notDarkMatterProfileQrError = stringResource(R.string.error_not_dark_matter_profile_qr)
+    val groupNameFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
-    fun addRecipient(reference: String) {
-        val normalized = RecipientReference.normalize(reference)
-        if (normalized == null) {
-            error = validRecipientReferenceError
-            return
+    LaunchedEffect(directMessage) {
+        if (!directMessage) {
+            withFrameNanos { }
+            groupNameFocusRequester.requestFocus()
+            keyboardController?.show()
         }
-        if (!members.contains(normalized)) {
-            members = members + normalized
-            error = null
-        }
-        pending = ""
-    }
-
-    fun addPending() {
-        val tokens = RecipientReference.tokenize(pending)
-        if (tokens.isEmpty()) return
-        tokens.forEach { addRecipient(it) }
     }
 
     fun createGroupErrorMessage(throwable: Throwable): String =
@@ -2799,68 +2822,44 @@ private fun NewChatSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
-            if (!directMessage && members.isNotEmpty()) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    members.forEach { member ->
-                        AssistChip(
-                            onClick = { members = members - member },
-                            label = { Text(IdentityFormatter.short(member), maxLines = 1) },
-                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove)) },
-                        )
+            if (directMessage) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = pending,
+                        onValueChange = {
+                            pending = it
+                            error = null
+                        },
+                        label = { Text(stringResource(R.string.npub_or_hex_public_key)) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        trailingIcon = {
+                            PublicIdentifierFieldTrailingAction(
+                                value = pending,
+                                enabled = !busy,
+                                onValueChange = {
+                                    pending = it
+                                    error = null
+                                },
+                            )
+                        },
+                        keyboardOptions =
+                            KeyboardOptions(
+                                capitalization = KeyboardCapitalization.None,
+                                autoCorrectEnabled = false,
+                                imeAction = ImeAction.Done,
+                            ),
+                    )
+                    FloatingActionButton(onClick = { showScanner = true }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_recipient_qr_code))
                     }
                 }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = pending,
-                    onValueChange = {
-                        pending = it
-                        error = null
-                    },
-                    label = { Text(stringResource(R.string.npub_or_hex_public_key)) },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    trailingIcon = {
-                        PublicIdentifierFieldTrailingAction(
-                            value = pending,
-                            enabled = !busy,
-                            onValueChange = {
-                                pending = it
-                                error = null
-                            },
-                        )
-                    },
-                    keyboardOptions =
-                        KeyboardOptions(
-                            capitalization = KeyboardCapitalization.None,
-                            autoCorrectEnabled = false,
-                            imeAction = ImeAction.Done,
-                        ),
-                    keyboardActions = KeyboardActions(onDone = { if (!directMessage) addPending() }),
-                )
-                FloatingActionButton(onClick = { showScanner = true }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_recipient_qr_code))
-                }
-                // A new chat has a single recipient typed or scanned into the
-                // field, so the multi-recipient "+" is only for groups.
-                if (!directMessage) {
-                    FloatingActionButton(onClick = { addPending() }, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_recipient))
-                    }
-                }
-            }
-            // A DM is a 1:1, so the group name/description fields are hidden.
-            // A group requires a name; the description stays optional.
-            if (!directMessage) {
+            } else {
                 OutlinedTextField(
                     value = groupName,
                     onValueChange = { groupName = it },
                     label = { Text(stringResource(R.string.group_name)) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(groupNameFocusRequester),
                     singleLine = true,
                 )
                 OutlinedTextField(
@@ -2881,19 +2880,18 @@ private fun NewChatSheet(
             }
             Button(
                 onClick = {
-                    val pendingRecipients = RecipientReference.tokenize(pending)
                     val normalizedPending =
-                        pendingRecipients.map { input ->
-                            RecipientReference.normalize(input) ?: run {
-                                error = validRecipientReferenceError
-                                return@Button
+                        if (directMessage) {
+                            RecipientReference.tokenize(pending).map { input ->
+                                RecipientReference.normalize(input) ?: run {
+                                    error = validRecipientReferenceError
+                                    return@Button
+                                }
                             }
+                        } else {
+                            emptyList()
                         }
-                    val recipients =
-                        (members + normalizedPending)
-                            .distinct()
-                            .let { if (directMessage) it.take(1) else it }
-                    members = recipients
+                    val recipients = newChatMemberRefs(directMessage, normalizedPending)
                     pending = ""
                     val account = appState.activeAccountRef ?: return@Button
                     // Reuse an existing 1:1 instead of creating a duplicate.
@@ -2921,18 +2919,21 @@ private fun NewChatSheet(
                             }
                         }.onSuccess { groupIdHex ->
                             appState.present(R.string.toast_chat_created)
-                            // #321: navigate straight into the new conversation
-                            // with the composer ready, instead of leaving the
-                            // user on the chat list. Dismiss the sheet first so
-                            // the conversation isn't opened behind the modal,
-                            // then wait for the chat-list projection to surface
+                            // #321/#385: navigate straight into the new
+                            // conversation instead of leaving the user on the
+                            // chat list. Direct chats keep the composer-ready
+                            // handoff; groups land unfocused so the empty-state
+                            // Add Members CTA is the next obvious action.
+                            // Dismiss the sheet first so the conversation isn't
+                            // opened behind the modal, then wait for the
+                            // chat-list projection to surface
                             // the freshly-created group (it lands a beat after
                             // createGroup returns). If it doesn't materialize in
                             // time, fall back to just dismissing — the sort fix
                             // already floats the new chat to the top of the list.
                             onDismiss()
                             appState.awaitChatListItem(groupIdHex)?.let { item ->
-                                onOpenConversation(item, true)
+                                onOpenConversation(item, directMessage)
                             }
                         }.onFailure {
                             error = createGroupErrorMessage(it)
@@ -2940,10 +2941,7 @@ private fun NewChatSheet(
                         busy = false
                     }
                 },
-                enabled =
-                    !busy &&
-                        (members.isNotEmpty() || pending.isNotBlank()) &&
-                        (directMessage || groupName.isNotBlank()),
+                enabled = canSubmitNewChatSheet(directMessage, busy, pending, groupName),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (busy) {
@@ -2965,9 +2963,8 @@ private fun NewChatSheet(
                     error = notDarkMatterProfileQrError
                 } else {
                     error = null
-                    // A new chat keeps the single recipient in the field;
-                    // a group accumulates recipients as chips.
-                    if (directMessage) pending = scanned.npub else addRecipient(scanned.npub)
+                    // A new direct chat keeps the scanned recipient in the field.
+                    if (directMessage) pending = scanned.npub
                 }
             },
         )
@@ -6542,6 +6539,9 @@ private fun ConversationScreen(
     // the transfer picker auto-expanded. Keyed on chat.id so it doesn't leak
     // across a conversation switch.
     var openTransferOnDetails by remember(chat.id) { mutableStateOf(false) }
+    // Empty newly-created groups should route users into the existing member
+    // invite flow instead of carrying a duplicate picker in the create sheet.
+    var openAddMemberOnDetails by remember(chat.id) { mutableStateOf(false) }
     val listState = rememberLazyListState()
     // Single conversation-level owner of which message's action menu is open, so
     // only one popover can be open at a time. With the keyboard up the menu is
@@ -7722,9 +7722,12 @@ private fun ConversationScreen(
             onBack = {
                 showDetails = false
                 openTransferOnDetails = false
+                openAddMemberOnDetails = false
             },
             onLeft = onBack,
             autoOpenTransferAdmin = openTransferOnDetails,
+            autoOpenAddMember = openAddMemberOnDetails,
+            onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
         )
         return
     }
@@ -8003,13 +8006,30 @@ private fun ConversationScreen(
                             }
                         },
                     )
-                controller.timeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted ->
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
+                controller.timeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted -> {
+                    if (
+                        canInviteFromEmptyGroup(
+                            isSelfMember = controller.isSelfMember,
+                            isSelfAdmin = controller.isSelfAdmin,
+                            membersLoaded = controller.membersLoaded,
+                            memberCount = controller.members.size,
+                        )
                     ) {
-                        Text(stringResource(R.string.no_messages_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        EmptyGroupConversation(
+                            onAddMembers = {
+                                openAddMemberOnDetails = true
+                                showDetails = true
+                            },
+                        )
+                    } else {
+                        Box(
+                            Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(stringResource(R.string.no_messages_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
+                }
                 else ->
                     Box(Modifier.fillMaxSize()) {
                         LazyColumn(
@@ -8303,6 +8323,30 @@ private fun PendingInviteContent(
     }
 }
 
+@Composable
+private fun EmptyGroupConversation(onAddMembers: () -> Unit) {
+    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(56.dp))
+            Text(
+                stringResource(R.string.group_empty_only_you_title),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                stringResource(R.string.group_empty_invite_members),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Button(onClick = onAddMembers) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.add_member))
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GroupDetailsScreen(
@@ -8314,6 +8358,10 @@ private fun GroupDetailsScreen(
     // open the transfer-admin picker immediately so the trapped admin lands on
     // the action instead of having to hunt for it in the Admins section (#417).
     autoOpenTransferAdmin: Boolean = false,
+    // When true (empty-group CTA), open the shared add-member sheet after the
+    // details screen is mounted so the initial invite path reuses later-add UI.
+    autoOpenAddMember: Boolean = false,
+    onAutoOpenAddMemberConsumed: () -> Unit = {},
 ) {
     var name by remember(controller.group.groupIdHex, controller.group.name) { mutableStateOf(controller.group.name) }
     var description by remember(controller.group.groupIdHex, controller.group.description) { mutableStateOf(controller.group.description) }
@@ -8336,6 +8384,14 @@ private fun GroupDetailsScreen(
     LaunchedEffect(autoOpenTransferAdmin, controller.isSoleAdminWithOtherMembers) {
         if (autoOpenTransferAdmin && controller.isSoleAdminWithOtherMembers) {
             showTransferAdmin = true
+        }
+    }
+    LaunchedEffect(autoOpenAddMember, controller.isSelfMember, controller.isSelfAdmin) {
+        if (autoOpenAddMember && controller.isSelfMember && controller.isSelfAdmin) {
+            pendingMemberError = null
+            pendingMemberAsAdmin = false
+            showAddMember = true
+            onAutoOpenAddMemberConsumed()
         }
     }
     var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }

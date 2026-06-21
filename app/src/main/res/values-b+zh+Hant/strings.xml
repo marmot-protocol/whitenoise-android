@@ -70,6 +70,8 @@
     <string name="leave">離開</string>
     <string name="couldnt_load_conversation">無法載入對話</string>
     <string name="no_messages_yet">尚無訊息</string>
+    <string name="group_empty_only_you_title">這個群組目前只有你</string>
+    <string name="group_empty_invite_members">準備好後邀請其他人。</string>
     <string name="you_are_no_longer_a_member">你已不再是此群組的成員。</string>
     <string name="chat_row_draft_prefix">草稿：</string>
     <string name="jump_to_newest">跳至最新</string>

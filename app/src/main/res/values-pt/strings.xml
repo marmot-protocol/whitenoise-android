@@ -71,6 +71,8 @@
     <string name="leave">Sair</string>
     <string name="couldnt_load_conversation">Não foi possível carregar a conversa</string>
     <string name="no_messages_yet">Ainda não há mensagens</string>
+    <string name="group_empty_only_you_title">Este grupo tem apenas você</string>
+    <string name="group_empty_invite_members">Convide pessoas quando estiver pronto.</string>
     <string name="you_are_no_longer_a_member">Você não é mais membro deste grupo.</string>
     <string name="chat_row_draft_prefix">Rascunho: </string>
     <string name="jump_to_newest">Ir para a mais recente</string>

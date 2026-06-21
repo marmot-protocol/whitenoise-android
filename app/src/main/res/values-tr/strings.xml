@@ -71,6 +71,8 @@
     <string name="leave">Ayrıl</string>
     <string name="couldnt_load_conversation">Konuşma yüklenemedi</string>
     <string name="no_messages_yet">Henüz mesaj yok</string>
+    <string name="group_empty_only_you_title">Bu grupta yalnızca sen varsın</string>
+    <string name="group_empty_invite_members">Hazır olduğunda kişileri davet et.</string>
     <string name="you_are_no_longer_a_member">Artık bu grubun üyesi değilsiniz.</string>
     <string name="chat_row_draft_prefix">Taslak: </string>
     <string name="jump_to_newest">En yeniye atla</string>
@@ -97,7 +99,7 @@
     <string name="npub_or_public_key">npub veya genel anahtar</string>
     <string name="scan_member_qr_code">Üye QR kodunu tara</string>
     <string name="error_one_valid_member_reference">Geçerli bir npub, profil bağlantısı veya ortak anahtar girin.</string>
-    <string name="add_member">Üye ekle</string>
+    <string name="add_member">Üyeler ekle</string>
     <string name="add_as_admin">Yönetici olarak ekle</string>
     <string name="adding_member">Üye ekleniyor...</string>
     <string name="invite_pending">Davet bekliyor: %1$s</string>

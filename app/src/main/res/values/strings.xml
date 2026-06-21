@@ -83,6 +83,8 @@
     <string name="leave">Leave</string>
     <string name="couldnt_load_conversation">Couldn\'t load conversation</string>
     <string name="no_messages_yet">No messages yet</string>
+    <string name="group_empty_only_you_title">This group is only you</string>
+    <string name="group_empty_invite_members">Invite people when you are ready.</string>
     <string name="you_are_no_longer_a_member">You are no longer a member of this group.</string>
     <string name="chat_row_draft_prefix">Draft: </string>
     <string name="jump_to_newest">Jump to newest</string>
@@ -109,7 +111,7 @@
     <string name="npub_or_public_key">npub or public key</string>
     <string name="scan_member_qr_code">Scan member QR code</string>
     <string name="error_one_valid_member_reference">Enter one valid npub, profile link, or public key.</string>
-    <string name="add_member">Add Member</string>
+    <string name="add_member">Add Members</string>
     <string name="add_as_admin">Add as admin</string>
     <string name="adding_member">Adding member...</string>
     <!-- @-mention composer picker (#414) -->
