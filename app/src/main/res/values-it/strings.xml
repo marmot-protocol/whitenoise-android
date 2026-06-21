@@ -508,6 +508,9 @@
     <string name="media_type_audio">Audio</string>
     <string name="media_type_video">Video</string>
     <string name="media_type_documents">Documenti</string>
+    <string name="enter_key_behavior_title">Comportamento del tasto Invio</string>
+    <string name="enter_key_behavior_send">Invia messaggio</string>
+    <string name="enter_key_behavior_newline">Nuova riga</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d immagine selezionata</item>
         <item quantity="other">%1$d immagini selezionate</item>

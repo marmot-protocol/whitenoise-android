@@ -508,6 +508,9 @@
     <string name="media_type_audio">Ses</string>
     <string name="media_type_video">Video</string>
     <string name="media_type_documents">Belgeler</string>
+    <string name="enter_key_behavior_title">Enter tuşu davranışı</string>
+    <string name="enter_key_behavior_send">Mesaj gönder</string>
+    <string name="enter_key_behavior_newline">Yeni satır</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d görüntü seçildi</item>
         <item quantity="other">%1$d görüntü seçildi</item>

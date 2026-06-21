@@ -506,6 +506,9 @@
     <string name="media_type_audio">音频</string>
     <string name="media_type_video">视频</string>
     <string name="media_type_documents">文档</string>
+    <string name="enter_key_behavior_title">回车键行为</string>
+    <string name="enter_key_behavior_send">发送消息</string>
+    <string name="enter_key_behavior_newline">换行</string>
     <plurals name="media_selected_count">
         <item quantity="other">已选择 %1$d 张图片</item>
     </plurals>
