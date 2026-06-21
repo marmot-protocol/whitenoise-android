@@ -108,18 +108,28 @@ fun DarkMatterTheme(
             darkTheme -> DarkColorScheme
             else -> LightColorScheme
         }
+    val amoledActive = darkTheme && amoled
     val amoledAdjusted =
-        if (darkTheme && amoled) {
+        if (amoledActive) {
+            // True-black AMOLED audit (#446): every full-screen and elevated
+            // surface token paints pure #000000 so nothing reads as a lifted
+            // gray panel on the black canvas. The M3 container roles drive the
+            // elevated components directly — ModalBottomSheet/sheets use
+            // surfaceContainerLow, DropdownMenu/menus use surfaceContainer,
+            // AlertDialog uses surfaceContainerHigh — so they must be black too,
+            // not the near-black grays they used to be. Boundaries for elevated
+            // components on the black canvas come from `outline`, not a lifted
+            // fill.
             baseColorScheme.copy(
                 background = Color.Black,
                 surface = Color.Black,
                 surfaceContainerLowest = Color.Black,
-                surfaceContainerLow = Color(0xFF050505),
-                surfaceContainer = Color(0xFF0A0A0A),
-                surfaceContainerHigh = Color(0xFF101010),
-                surfaceContainerHighest = Color(0xFF161616),
-                surfaceVariant = Color(0xFF1A1A1A),
-                surfaceBright = Color(0xFF161616),
+                surfaceContainerLow = Color.Black,
+                surfaceContainer = Color.Black,
+                surfaceContainerHigh = Color.Black,
+                surfaceContainerHighest = Color.Black,
+                surfaceVariant = Color.Black,
+                surfaceBright = Color.Black,
                 surfaceDim = Color.Black,
             )
         } else {
@@ -131,7 +141,14 @@ fun DarkMatterTheme(
             onPrimary = OnHighlight,
             primaryContainer = Highlight,
             onPrimaryContainer = OnHighlight,
-            surfaceTint = Highlight,
+            // M3 tonal elevation tints elevated surfaces toward `surfaceTint`
+            // (the cyan brand color), which lifts dialogs, menus, app bars and
+            // any `Surface(tonalElevation = …)` — e.g. the chat-bubble
+            // long-press reaction/actions popup — off pure black into a
+            // cyan-gray. On AMOLED the tint must be transparent so the
+            // elevation overlay is a no-op and every elevated surface stays
+            // #000000 (#446). Outside AMOLED the brand tint is kept.
+            surfaceTint = if (amoledActive) Color.Transparent else Highlight,
         )
 
     MaterialTheme(
