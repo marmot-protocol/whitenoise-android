@@ -18,14 +18,18 @@ object ChatListIdentifierSearch {
          * key — no network needed, the [npub] is ready to hand to the profile
          * sheet.
          */
-        data class Npub(val npub: String) : Identifier
+        data class Npub(
+            val npub: String,
+        ) : Identifier
 
         /**
          * A NIP-05 internet identifier (`<local>@<domain>`) that must be
          * resolved to a pubkey over the network before the profile sheet can
          * open. [identifier] is the trimmed, original-cased address for display.
          */
-        data class Nip05(val identifier: String) : Identifier
+        data class Nip05(
+            val identifier: String,
+        ) : Identifier
     }
 
     /**

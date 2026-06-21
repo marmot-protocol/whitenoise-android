@@ -20,7 +20,7 @@ class IdentityFormatterTest {
             val input = "a".repeat(length)
             val shortened = IdentityFormatter.short(input)
             assertTrue(
-                "short(${length}-char input) returned ${shortened.length} chars: $shortened",
+                "short($length-char input) returned ${shortened.length} chars: $shortened",
                 shortened.length <= input.length,
             )
         }

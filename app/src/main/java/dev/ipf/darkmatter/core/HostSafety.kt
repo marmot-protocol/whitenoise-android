@@ -102,8 +102,7 @@ object HostSafety {
         }
     }
 
-    private fun toUnsignedOctets(raw: ByteArray): IntArray =
-        IntArray(raw.size) { raw[it].toInt() and 0xFF }
+    private fun toUnsignedOctets(raw: ByteArray): IntArray = IntArray(raw.size) { raw[it].toInt() and 0xFF }
 
     /**
      * Strict 4-part decimal IPv4 (the only shape an IPv4-embedded IPv6 literal

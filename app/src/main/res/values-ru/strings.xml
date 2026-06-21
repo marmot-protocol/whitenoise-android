@@ -166,6 +166,8 @@
     <string name="forward_no_matches">Нет чатов, соответствующих запросу.</string>
     <plurals name="forward_to_chats_count">
         <item quantity="one">Переслать в %1$d чат</item>
+        <item quantity="few">Переслать в %1$d чата</item>
+        <item quantity="many">Переслать в %1$d чатов</item>
         <item quantity="other">Переслать в %1$d чатов</item>
     </plurals>
     <string name="toast_forwarded_to_chats">Переслано в %1$s чатов</string>
@@ -627,4 +629,9 @@
     <string name="toast_signed_out_and_wiped">Аккаунт стёрт с этого устройства</string>
     <string name="toast_couldnt_wipe_account">Не удалось стереть аккаунт</string>
     <string name="wipe">Стереть</string>
+    <!-- Mention picker (#491). -->
+    <string name="mention_picker_title">Упомянуть участника</string>
+    <string name="mention_picker_member">Упомянуть %1$s</string>
+    <string name="mention_picker_dismiss">Закрыть выбор участников</string>
+    <string name="mentioned_you">Вас упомянули</string>
 </resources>

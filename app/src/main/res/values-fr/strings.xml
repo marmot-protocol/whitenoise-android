@@ -618,4 +618,9 @@
     <string name="toast_signed_out_and_wiped">Compte effacé de cet appareil</string>
     <string name="toast_couldnt_wipe_account">Impossible d\'effacer le compte</string>
     <string name="wipe">Effacer</string>
+    <!-- Mention picker (#491). -->
+    <string name="mention_picker_title">Mentionner un membre</string>
+    <string name="mention_picker_member">Mentionner %1$s</string>
+    <string name="mention_picker_dismiss">Fermer le sélecteur de membres</string>
+    <string name="mentioned_you">Vous avez été mentionné</string>
 </resources>
