@@ -7175,6 +7175,28 @@ private fun ConversationScreen(
     val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
     val bottomTimelineIndex = renderedTimeline.size + 1 + olderHeaderCount
 
+    // Day label for the topmost visible message, surfaced by the sticky ribbon
+    // overlay while scrolling. Hoisted into derivedStateOf and held as a State
+    // (not read here) so the scroll-backed firstVisibleItemIndex read happens
+    // inside the small ribbon child — not in the LazyColumn-hosting Box scope,
+    // which would otherwise recompose the timeline container on every scroll
+    // frame. Mirrors the nearBottom / currentHighestVisibleTimelineIndex
+    // derived-state pattern above (#375).
+    val stickyDayLabelState =
+        remember(renderedTimeline, transcriptLocale, olderHeaderCount) {
+            derivedStateOf {
+                val i =
+                    (listState.firstVisibleItemIndex - 1 - olderHeaderCount)
+                        .coerceIn(0, (renderedTimeline.size - 1).coerceAtLeast(0))
+                renderedTimeline
+                    .getOrNull(i)
+                    ?.record
+                    ?.recordedAt
+                    ?.let { messageDayLabel(it, transcriptLocale) }
+                    .orEmpty()
+            }
+        }
+
     // In-chat search match set. Computed over the currently-loaded, rendered
     // (edit-filtered) timeline only — no relay fetch, no full-history preload.
     // Reactions / deletes / group-system / agent-stream rows carry no
@@ -7809,34 +7831,13 @@ private fun ConversationScreen(
                         }
                         // Day of the topmost visible message, shown only while
                         // scrolling — the inline separators carry it at rest.
-                        val stickyTimelineIndex =
-                            (listState.firstVisibleItemIndex - 1 - olderHeaderCount)
-                                .coerceIn(0, (renderedTimeline.size - 1).coerceAtLeast(0))
-                        val stickyDayLabel =
-                            renderedTimeline
-                                .getOrNull(stickyTimelineIndex)
-                                ?.record
-                                ?.recordedAt
-                                ?.let { messageDayLabel(it, transcriptLocale) }
-                                .orEmpty()
-                        val stickyAlpha by animateFloatAsState(
-                            targetValue = if (listState.isScrollInProgress && stickyDayLabel.isNotEmpty()) 1f else 0f,
-                            label = "stickyDayRibbon",
-                        )
-                        if (initialTimelineAnchored && stickyAlpha > 0.01f) {
-                            Text(
-                                text = stickyDayLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.TopCenter)
-                                        .padding(top = 8.dp)
-                                        .alpha(stickyAlpha)
-                                        .background(
-                                            color = MaterialTheme.colorScheme.surfaceVariant,
-                                            shape = RoundedCornerShape(12.dp),
-                                        ).padding(horizontal = 12.dp, vertical = 4.dp),
+                        // Confined to its own child so the scroll-backed reads
+                        // (label + isScrollInProgress) recompose only the ribbon,
+                        // not this LazyColumn-hosting Box scope (#375).
+                        if (initialTimelineAnchored) {
+                            StickyDayRibbon(
+                                listState = listState,
+                                labelState = stickyDayLabelState,
                             )
                         }
                         if (!initialTimelineAnchored) {
@@ -11632,6 +11633,44 @@ private fun MediaScrimFooter(
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         content()
+    }
+}
+
+/**
+ * Sticky day-ribbon overlay: the day label of the topmost visible message,
+ * faded in only while the timeline is actively scrolling (the inline
+ * [DaySeparator]s carry the day at rest).
+ *
+ * Reads the scroll-backed state (`labelState` derived from
+ * `firstVisibleItemIndex`, and `listState.isScrollInProgress`) inside this
+ * small child so per-scroll-frame recomposition is confined here and does not
+ * propagate to the LazyColumn-hosting Box scope (#375).
+ */
+@Composable
+private fun BoxScope.StickyDayRibbon(
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    labelState: State<String>,
+) {
+    val label by labelState
+    val alpha by animateFloatAsState(
+        targetValue = if (listState.isScrollInProgress && label.isNotEmpty()) 1f else 0f,
+        label = "stickyDayRibbon",
+    )
+    if (alpha > 0.01f) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp)
+                    .alpha(alpha)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                    ).padding(horizontal = 12.dp, vertical = 4.dp),
+        )
     }
 }
 
