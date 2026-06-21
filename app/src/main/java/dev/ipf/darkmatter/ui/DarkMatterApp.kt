@@ -12315,8 +12315,14 @@ private fun ComposerBar(
             val sentText = text
             onSend(sentText) {
                 if (!sendingEdit) {
-                    textFieldValue = TextFieldValue("")
-                    onDraftChange("")
+                    // onAccepted can land after the user has started typing the
+                    // next message (Enter-to-send makes that common). Only clear
+                    // if the field still holds exactly what we sent, so newly
+                    // typed text is never wiped.
+                    if (textFieldValue.text == sentText) {
+                        textFieldValue = TextFieldValue("")
+                        onDraftChange("")
+                    }
                     onAfterSend()
                 }
             }
