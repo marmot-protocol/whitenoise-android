@@ -67,11 +67,13 @@ class LocalizationResourceTest {
     // "NIP-44") or the deprecated "NIP-EE" naming. NIP numbers are protocol
     // implementation detail and mean nothing to a non-developer user; group
     // encryption is the "Marmot Protocol", not "NIP-EE". Code identifiers,
-    // log lines and code comments are out of scope — this only inspects the
-    // textContent of <string> resources, not their keys (so the `nip_05` /
-    // `nip_65` resource *keys* are unaffected). If you need to reference a NIP
-    // for power users, keep it in a developer-facing log or comment, not in a
-    // user-visible string. See https://github.com/marmot-protocol/darkmatter-android/issues/381
+    // log lines and code comments are out of scope — this inspects the
+    // textContent of every user-visible resource (<string> plus the <item>
+    // children of <plurals> and <string-array>), not their keys (so the
+    // `nip_05` / `nip_65` resource *keys* are unaffected). If you need to
+    // reference a NIP for power users, keep it in a developer-facing log or
+    // comment, not in a user-visible string.
+    // See https://github.com/marmot-protocol/darkmatter-android/issues/381
     @Test
     fun userVisibleStringsDoNotExposeRawNipIdentifiers() {
         val resDir =
@@ -92,7 +94,7 @@ class LocalizationResourceTest {
 
         val offenders =
             resourceFiles.flatMap { file ->
-                stringValues(file)
+                userVisibleValues(file)
                     .filter { (_, value) -> forbiddenNipPattern.containsMatchIn(value) }
                     .map { (key, value) -> "${file.path}: $key=\"$value\"" }
             }
@@ -127,12 +129,72 @@ class LocalizationResourceTest {
         }
     }
 
+    // Extracts every *user-visible* localized resource value: plain <string>
+    // entries plus the <item> children of <plurals> and <string-array>. Unlike
+    // stringValues (used for the key-parity contract, which intentionally keys
+    // only on <string> names), this powers the NIP guard so a raw NIP token
+    // cannot slip in through a quantity string or array item. translatable=
+    // "false" strings are included here because they are still rendered to the
+    // user; only their absence from locale files is exempt from parity, not
+    // their content from the NIP audit. Keys are made unique per source:
+    // "<name>" for strings, "<name>[<quantity>]" for plurals items, and
+    // "<name>[<index>]" for string-array items.
+    private fun userVisibleValues(file: File): Map<String, String> {
+        val document =
+            DocumentBuilderFactory
+                .newInstance()
+                .newDocumentBuilder()
+                .parse(file)
+        return buildMap {
+            val strings = document.getElementsByTagName("string")
+            for (index in 0 until strings.length) {
+                val item = strings.item(index)
+                put(item.attributes.getNamedItem("name").nodeValue, item.textContent)
+            }
+
+            val plurals = document.getElementsByTagName("plurals")
+            for (index in 0 until plurals.length) {
+                val node = plurals.item(index)
+                val name = node.attributes.getNamedItem("name").nodeValue
+                val items = node.childNodes
+                for (i in 0 until items.length) {
+                    val child = items.item(i)
+                    if (child.nodeName == "item") {
+                        val quantity =
+                            child.attributes?.getNamedItem("quantity")?.nodeValue ?: "unknown"
+                        put("$name[$quantity]", child.textContent)
+                    }
+                }
+            }
+
+            val arrays = document.getElementsByTagName("string-array")
+            for (index in 0 until arrays.length) {
+                val node = arrays.item(index)
+                val name = node.attributes.getNamedItem("name").nodeValue
+                val items = node.childNodes
+                var seen = 0
+                for (i in 0 until items.length) {
+                    val child = items.item(i)
+                    if (child.nodeName == "item") {
+                        put("$name[$seen]", child.textContent)
+                        seen++
+                    }
+                }
+            }
+        }
+    }
+
     private companion object {
         // Matches raw NIP specification identifiers in user-visible copy:
-        // "NIP-05", "NIP_44", "NIP 65", etc., plus the deprecated "NIP-EE"
-        // naming. Case-insensitive and tolerant of the hyphen/underscore/space
-        // separators a translator might introduce.
-        val forbiddenNipPattern = Regex("""NIP[-_ ]?(\d+|EE)""", RegexOption.IGNORE_CASE)
+        // "NIP-05", "NIP_44", "NIP 65", "NIP - 65", "NIP65", etc., plus the
+        // deprecated "NIP-EE" naming. Case-insensitive. The leading `\b` plus
+        // the requirement that "NIP" be followed by a separator/whitespace or
+        // the number avoids false positives inside larger words such as
+        // "SNIP-65" or "NIPSTER 65", while still tolerating the hyphen /
+        // underscore / space (and spaced "NIP - 65") separators a translator
+        // might introduce.
+        val forbiddenNipPattern =
+            Regex("""\bNIP(?:\s*[-_]\s*|\s+)?(?:\d+|EE)\b""", RegexOption.IGNORE_CASE)
 
         val identicalValueAllowedKeys =
             setOf(

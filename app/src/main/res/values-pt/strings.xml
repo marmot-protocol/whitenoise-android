@@ -269,12 +269,12 @@
     <string name="missing_relay_lists">Faltando: %1$s</string>
     <string name="not_published">Não publicado</string>
     <string name="publishing">Publicação</string>
-    <string name="key_package_publishing_help">Republica o pacote de chave atual na lista de relays desta conta, ou alterna para um novo. Pacotes antigos permanecem nos relays até serem excluídos.</string>
+    <string name="key_package_publishing_help">Republica o pacote de chaves atual na lista de relays desta conta, ou alterna para um novo. Pacotes antigos permanecem nos relays até serem excluídos.</string>
     <string name="republish">Atualizar Pacotes de Chaves</string>
     <string name="publish_new">Publicar Novo Pacote de Chaves</string>
     <string name="published">Publicado</string>
     <string name="no_key_packages_found">Nenhum pacote de chaves encontrado</string>
-    <string name="no_key_packages_found_help">Nada está em cache localmente e a lista de relays desta conta não retornou eventos de pacote de chave. Tente &quot;Publicar novo&quot;.</string>
+    <string name="no_key_packages_found_help">Nada está em cache localmente e a lista de relays desta conta não retornou eventos de pacote de chaves. Tente &quot;Publicar novo&quot;.</string>
     <string name="delete_key_package_question">Excluir pacote de chaves?</string>
     <string name="delete_key_package_help">Publica um evento de exclusão para este pacote de chaves e o limpa do cache local.</string>
     <string name="event_value">Evento: %1$s</string>

@@ -276,7 +276,7 @@
     <string name="no_key_packages_found">Aucun paquet de clés trouvé</string>
     <string name="no_key_packages_found_help">Rien n’est en cache localement et la liste de relais de ce compte n’a renvoyé aucun événement de paquet de clés. Essayez &quot;Publier nouveau&quot;.</string>
     <string name="delete_key_package_question">Supprimer le paquet de clés ?</string>
-    <string name="delete_key_package_help">Publie un événement de suppression pour ce package de clés et l’efface du cache local.</string>
+    <string name="delete_key_package_help">Publie un événement de suppression pour ce paquet de clés et l’efface du cache local.</string>
     <string name="event_value">Événement : %1$s</string>
     <string name="delete_key_package">Supprimer le paquet de clés</string>
     <string name="event">Événement</string>
