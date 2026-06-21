@@ -20,9 +20,9 @@ package dev.ipf.darkmatter.state
  * image bytes when this client can strip metadata losslessly; unsupported image
  * containers fall back to the JPEG path rather than leaking metadata.
  *
- * Video has no re-encode path in this client (matching darkmatter-ios /
- * darkmatter-desktop), so video is always sent as-is regardless of this
- * setting — the quality levels apply to images and voice notes only in v1.
+ * Video has no re-encode path in this client, so video is always sent as-is
+ * regardless of this setting — the quality levels apply to images and voice
+ * notes only in v1.
  */
 enum class MediaQuality(
     val preferenceValue: String,
