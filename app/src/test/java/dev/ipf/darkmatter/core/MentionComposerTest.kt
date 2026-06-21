@@ -247,6 +247,47 @@ class MentionComposerTest {
         assertTrue(MentionComposer.chipRanges(text).isEmpty())
     }
 
+    // --- visualText ----------------------------------------------------------
+
+    @Test
+    fun visualTextShowsCandidateDisplayNameButKeepsOriginalOffsets() {
+        val text = "hey @$aliceNpub now"
+        val visual = MentionComposer.visualText(text, candidates)
+
+        assertEquals("hey @Alice now", visual.text)
+        assertEquals(text.length, visual.transformedToOriginal(visual.text.length))
+        assertEquals("hey @Alice".length, visual.originalToTransformed("hey @$aliceNpub".length))
+        assertEquals("hey @$aliceNpub".length, visual.transformedToOriginal("hey @Alice".length))
+    }
+
+    @Test
+    fun visualTextFallsBackToShortNpubForUnresolvedChip() {
+        val text = "hey @$aliceNpub"
+        val visual = MentionComposer.visualText(text, emptyList())
+
+        assertEquals("hey @npub1qqq...", visual.text)
+        assertTrue(visual.text.length < text.length)
+    }
+
+    @Test
+    fun visualTextDoesNotRenderFullNpubAsDisplayName() {
+        val rawNpubCandidate = alice.copy(displayName = aliceNpub)
+        val visual = MentionComposer.visualText("@$aliceNpub", listOf(rawNpubCandidate))
+
+        assertEquals("@npub1qqq...", visual.text)
+    }
+
+    @Test
+    fun visualTextKeepsNpubPrefixedDisplayNameThatIsNotRawNpub() {
+        val npubNamedCandidate = alice.copy(displayName = "npub1_collector_of_things")
+        val visual = MentionComposer.visualText(
+            "@$aliceNpub",
+            MentionComposer.candidatesByNpub(listOf(npubNamedCandidate)),
+        )
+
+        assertEquals("@npub1_collector_of_things", visual.text)
+    }
+
     // --- clampSelectionOutOfChips -------------------------------------------
 
     @Test

@@ -49,7 +49,11 @@ object MentionComposer {
      * greedily lets us treat a partially-typed or future-length entity as one
      * token too.
      */
-    private val MENTION_CHIP = Regex("@npub1[ac-hj-np-z02-9]+")
+    private const val CANONICAL_NPUB_LENGTH = 63
+    private const val NPUB_BODY_CHAR_CLASS = "[ac-hj-np-z02-9]"
+
+    private val MENTION_CHIP = Regex("@npub1$NPUB_BODY_CHAR_CLASS+")
+    private val RAW_NPUB_DISPLAY_NAME = Regex("npub1$NPUB_BODY_CHAR_CLASS{58}", RegexOption.IGNORE_CASE)
 
     /**
      * The active `@`-query at [caret] in [text], or null when the caret is not
@@ -306,4 +310,118 @@ object MentionComposer {
             .map { it.range }
             .filter { it.first == 0 || text[it.first - 1].isWhitespace() }
             .toList()
+
+    data class ChipVisualRange(
+        val original: IntRange,
+        val transformed: IntRange,
+    )
+
+    data class ChipVisualText(
+        val text: String,
+        val ranges: List<ChipVisualRange>,
+        val originalLength: Int,
+    ) {
+        /** Map a cursor/selection offset in the stored `@npub…` text to the visible label text. */
+        fun originalToTransformed(offset: Int): Int {
+            val normalized = offset.coerceIn(0, originalLength)
+            var removedChars = 0
+            for (range in ranges) {
+                val originalStart = range.original.first
+                val originalEnd = range.original.last + 1
+                val transformedStart = range.transformed.first
+                val transformedEnd = range.transformed.last + 1
+                if (normalized <= originalStart) return (normalized - removedChars).coerceIn(0, text.length)
+                if (normalized < originalEnd) {
+                    val leftDistance = normalized - originalStart
+                    val rightDistance = originalEnd - normalized
+                    return if (leftDistance < rightDistance) transformedStart else transformedEnd
+                }
+                removedChars += (originalEnd - originalStart) - (transformedEnd - transformedStart)
+            }
+            return (normalized - removedChars).coerceIn(0, text.length)
+        }
+
+        /** Map a cursor/selection offset in the visible label text back to the stored `@npub…` text. */
+        fun transformedToOriginal(offset: Int): Int {
+            val normalized = offset.coerceIn(0, text.length)
+            var removedChars = 0
+            for (range in ranges) {
+                val originalStart = range.original.first
+                val originalEnd = range.original.last + 1
+                val transformedStart = range.transformed.first
+                val transformedEnd = range.transformed.last + 1
+                if (normalized <= transformedStart) return (normalized + removedChars).coerceIn(0, originalLength)
+                if (normalized < transformedEnd) {
+                    val leftDistance = normalized - transformedStart
+                    val rightDistance = transformedEnd - normalized
+                    return if (leftDistance < rightDistance) originalStart else originalEnd
+                }
+                removedChars += (originalEnd - originalStart) - (transformedEnd - transformedStart)
+            }
+            return (normalized + removedChars).coerceIn(0, originalLength)
+        }
+    }
+
+    /**
+     * Build the composer's visible text for mention chips without changing the
+     * stored text. The backing string remains canonical `@npub…`; only the
+     * visual layer swaps each chip for its resolved display label, or a short
+     * `@npub…` fallback while profile data is still unresolved. The label may
+     * be shorter or longer than the stored chip.
+     */
+    fun visualText(
+        text: String,
+        candidates: List<Candidate>,
+    ): ChipVisualText = visualText(text, candidatesByNpub(candidates))
+
+    fun candidatesByNpub(candidates: List<Candidate>): Map<String, Candidate> =
+        candidates.associateBy { it.npub.lowercase() }
+
+    fun visualText(
+        text: String,
+        candidatesByNpub: Map<String, Candidate>,
+    ): ChipVisualText {
+        val ranges = chipRanges(text)
+        if (ranges.isEmpty()) return ChipVisualText(text = text, ranges = emptyList(), originalLength = text.length)
+
+        val transformed = StringBuilder()
+        val transformedRanges = mutableListOf<ChipVisualRange>()
+        var sourceOffset = 0
+        for (range in ranges) {
+            transformed.append(text.substring(sourceOffset, range.first))
+            val transformedStart = transformed.length
+            val npub = text.substring(range.first + 1, range.last + 1)
+            transformed.append(chipDisplayLabel(npub, candidatesByNpub[npub.lowercase()]))
+            val transformedEnd = transformed.length
+            transformedRanges +=
+                ChipVisualRange(
+                    original = range,
+                    transformed = transformedStart until transformedEnd,
+                )
+            sourceOffset = range.last + 1
+        }
+        transformed.append(text.substring(sourceOffset))
+        return ChipVisualText(
+            text = transformed.toString(),
+            ranges = transformedRanges,
+            originalLength = text.length,
+        )
+    }
+
+    private fun chipDisplayLabel(
+        npub: String,
+        candidate: Candidate?,
+    ): String {
+        val resolvedName = candidate?.displayName?.trim()?.removePrefix("@")
+        if (resolvedName.isNullOrBlank()) return "@${shortChipNpub(npub)}"
+        if (resolvedName.equals(npub, ignoreCase = true)) return "@${shortChipNpub(npub)}"
+        if (looksLikeFullNpub(resolvedName)) return "@${shortChipNpub(npub)}"
+
+        return "@$resolvedName"
+    }
+
+    private fun looksLikeFullNpub(value: String): Boolean =
+        value.length == CANONICAL_NPUB_LENGTH && RAW_NPUB_DISPLAY_NAME.matches(value)
+
+    private fun shortChipNpub(npub: String): String = IdentityFormatter.short(npub, prefix = 8, suffix = 0)
 }
