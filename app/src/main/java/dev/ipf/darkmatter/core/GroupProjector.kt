@@ -129,6 +129,21 @@ object GroupProjector {
     }
 
     /**
+     * Number of distinct admins, compared case-insensitively. The admin list
+     * can carry the same identity twice with hex-casing drift (the same drift
+     * [isAdminRef] already guards against); a raw `admins.size` would then
+     * misread a sole admin as two and unlock leave/transfer gates that should
+     * stay closed.
+     */
+    private fun uniqueAdminCount(group: AppGroupRecordFfi): Int =
+        group.admins
+            .asSequence()
+            .filter { it.isNotBlank() }
+            .map { it.lowercase() }
+            .distinct()
+            .count()
+
+    /**
      * True iff [member] is the currently active account on this device.
      *
      * Distinct from [AppGroupMemberRecordFfi.local], which Marmot sets to true
@@ -154,7 +169,7 @@ object GroupProjector {
         // A sole admin who is also the only remaining member can always leave:
         // dissolving the group orphans no one. Without this they'd be stuck.
         if (memberCount == 1) return true
-        return group.admins.size > 1
+        return uniqueAdminCount(group) > 1
     }
 
     fun requiresSelfDemoteBeforeLeave(
@@ -192,10 +207,61 @@ object GroupProjector {
         // strands no one, so it's always a (destructive) leave, never a
         // transfer-admin block. Mirrors canLeaveGroup's memberCount == 1 branch.
         if (memberCount <= 1) return LeaveAction.SoleMemberDeletesGroup
-        if (isAdminRef(group, activeAccountIdHex) && group.admins.size <= 1) {
+        if (isAdminRef(group, activeAccountIdHex) && uniqueAdminCount(group) <= 1) {
             return LeaveAction.SoleAdminMustTransfer
         }
         return LeaveAction.Standard
+    }
+
+    /**
+     * True when revoking [member]'s admin rights would leave a group that
+     * still has other members with no admin at all. The engine refuses such a
+     * demote (`WouldRemoveLastAdmin` / `AdminDepletion`); the UI mirrors the
+     * check so it can offer "Transfer admin first" instead of letting the call
+     * fail. A single-member group is exempt: dissolving it orphans no one.
+     */
+    fun revokeWouldDepleteAdmins(
+        group: AppGroupRecordFfi,
+        member: AppGroupMemberRecordFfi,
+        memberCount: Int,
+    ): Boolean {
+        if (!isAdmin(group, member)) return false
+        if (memberCount <= 1) return false
+        // Only this member is left holding admin, so demoting them empties it.
+        return uniqueAdminCount(group) <= 1
+    }
+
+    /**
+     * True when [member] is a valid recipient for a "Transfer admin" (grant +
+     * step down) initiated by the active account. The target must be another
+     * member who is not already an admin, and the active account must itself
+     * be an admin (only admins can change the admin list).
+     */
+    fun canTransferAdminTo(
+        group: AppGroupRecordFfi,
+        member: AppGroupMemberRecordFfi,
+        activeAccountIdHex: String?,
+    ): Boolean {
+        if (!isAdminRef(group, activeAccountIdHex)) return false
+        if (isActiveAccountMember(member, activeAccountIdHex)) return false
+        return !isAdmin(group, member)
+    }
+
+    /**
+     * True when the active account is the *sole* admin of a group that still
+     * has other members. Such an admin is trapped — they cannot revoke their
+     * own admin rights or leave without first handing admin to someone else
+     * (issue #417 / #46). The UI uses this to surface the "Transfer admin"
+     * entry point from the otherwise-blocked revoke and leave paths.
+     */
+    fun isSoleAdminWithOtherMembers(
+        group: AppGroupRecordFfi,
+        activeAccountIdHex: String?,
+        memberCount: Int,
+    ): Boolean {
+        if (!isAdminRef(group, activeAccountIdHex)) return false
+        if (memberCount <= 1) return false
+        return uniqueAdminCount(group) <= 1
     }
 }
 
