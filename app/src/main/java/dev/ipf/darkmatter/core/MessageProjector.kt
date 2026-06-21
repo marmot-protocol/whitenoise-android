@@ -201,6 +201,65 @@ object MessageProjector {
 
     fun streamId(message: AppMessageRecordFfi): String? = tagValue(message, StreamTag)
 
+    /**
+     * Normalize a requested forward fan-out target list into the distinct,
+     * non-blank group ids to send into, preserving first-seen order.
+     *
+     * Forwarding the same message twice into one chat (a double-tap in the
+     * picker, or a duplicate id from the caller) must produce exactly one send;
+     * blank ids are dropped defensively. Pure list logic, factored out of
+     * [DarkMatterAppState.forwardText] so the de-dupe/blank rules are unit
+     * testable without the FFI send path.
+     */
+    fun normalizeForwardTargets(targetGroupIds: List<String>): List<String> = targetGroupIds.filter { it.isNotBlank() }.distinct()
+
+    /**
+     * Whether [message] is a plain user-authored text message that v1 forwarding
+     * may carry into another chat (issue #390, scope: text only).
+     *
+     * Forwarding re-sends the raw text body verbatim into the target group, so
+     * the predicate must exclude every record whose user-facing rendering is a
+     * *synthetic surrogate* rather than the original text — otherwise a media,
+     * reaction, delete, agent-stream, or group-system bubble would be forwarded
+     * as misleading fallback copy (e.g. a filename, "Reacted 👍", or a generated
+     * summary) even though those kinds are out of v1 scope.
+     *
+     * Forwardable iff the record is a kind-9 chat message that is NOT media
+     * (no `imeta` attachment), NOT an agent-stream message (no `stream` tag),
+     * and carries non-blank text. Reactions (kind-7), deletes (kind-5),
+     * agent-stream starts (kind-1200), group-system events (kind-1210) and edit
+     * records (kind-1009) are all non-kind-9 and therefore excluded by the
+     * kind check; the tag checks then strip the kind-9 media/stream variants.
+     */
+    fun isForwardableText(message: AppMessageRecordFfi): Boolean =
+        message.kind == KindChat &&
+            !isMedia(message) &&
+            streamId(message) == null &&
+            message.plaintext.isNotBlank()
+
+    /**
+     * The raw text payload to forward for [message], preferring the latest
+     * edited body [editedText] over the original plaintext when an edit overlay
+     * is present (so forwarding a since-edited message carries the current text,
+     * matching what the bubble shows). Returns null when the message is not a
+     * forwardable text record or the resolved body is blank — callers must treat
+     * null as "do not forward".
+     *
+     * The returned string is the verbatim message text: it carries neither the
+     * original sender's pubkey nor any source-group identifier, so a forward
+     * never leaks cross-group attribution (issue #390 privacy notes). Never the
+     * display fallback copy produced by [displayBody]/[previewText], which would
+     * substitute a synthetic surrogate for non-text records.
+     */
+    fun forwardableText(
+        message: AppMessageRecordFfi,
+        editedText: String? = null,
+    ): String? {
+        if (!isForwardableText(message)) return null
+        val body = editedText?.takeIf { it.isNotBlank() } ?: message.plaintext
+        return body.takeIf { it.isNotBlank() }
+    }
+
     fun replyTargetMessageId(message: AppMessageRecordFfi): String? = tagValue(message, QuoteRefTag)
 
     fun deletedTargetMessageIds(message: AppMessageRecordFfi): List<String> {

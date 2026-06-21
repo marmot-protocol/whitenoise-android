@@ -159,6 +159,18 @@
     <string name="copy_text">Metni kopyala</string>
     <string name="open_emoji_picker">Emoji seçiciyi aç</string>
     <string name="reply">Yanıtla</string>
+    <string name="forward">İlet</string>
+    <string name="forward_to">Şuraya ilet</string>
+    <string name="forward_search_chats">Sohbetlerde ara</string>
+    <string name="forward_no_chats">İletilecek başka sohbet yok.</string>
+    <string name="forward_no_matches">Aramanızla eşleşen sohbet yok.</string>
+    <plurals name="forward_to_chats_count">
+        <item quantity="one">%1$d sohbete ilet</item>
+        <item quantity="other">%1$d sohbete ilet</item>
+    </plurals>
+    <string name="toast_forwarded_to_chats">%1$s sohbete iletildi</string>
+    <string name="toast_forwarded_partial">%1$s sohbete iletildi; bazıları başarısız oldu</string>
+    <string name="toast_forward_failed">Mesaj iletilemedi</string>
     <string name="delete">Sil</string>
     <string name="sent">Gönderildi</string>
     <string name="send_failed">Mesaj gönderilemedi. Lütfen tekrar deneyin.</string>

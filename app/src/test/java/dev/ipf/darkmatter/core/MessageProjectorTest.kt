@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -205,6 +206,84 @@ class MessageProjectorTest {
         assertFalse(MessageProjector.isMine(received, myAccountId = "me"))
         assertTrue(MessageProjector.isDeleted("m1", setOf("m1")))
         assertFalse(MessageProjector.isDeleted("m2", setOf("m1")))
+    }
+
+    @Test
+    fun forwardableTextAcceptsPlainTextAndRejectsNonTextRecords() {
+        // Plain user-authored kind-9 text: forwardable.
+        val text = message(id = "t", plaintext = "Meet at 6", kind = 9uL)
+        // Media (kind-9 + imeta) must not be forwarded as a text surrogate.
+        val media =
+            message(
+                id = "media",
+                plaintext = "caption",
+                kind = 9uL,
+                tags = listOf(MessageTagFfi(listOf("imeta", "filename scan.png"))),
+            )
+        // Agent-stream final (kind-9 + stream tag) is not a plain text message.
+        val stream =
+            message(
+                id = "s",
+                plaintext = "partial transcript",
+                kind = 9uL,
+                tags = listOf(MessageProjector.streamTag("abc123")),
+            )
+        val reaction = reaction(id = "r", sender = "alice", target = "m1", emoji = "👍", at = 1u)
+        val deleted = delete(id = "d", sender = "alice", target = "m1", at = 1u)
+        val streamStart = message(id = "ss", plaintext = "", kind = 1200uL)
+        val groupSystem = message(id = "gs", plaintext = "{}", kind = 1210uL)
+        val blank = message(id = "b", plaintext = "   ", kind = 9uL)
+
+        assertTrue(MessageProjector.isForwardableText(text))
+        assertFalse(MessageProjector.isForwardableText(media))
+        assertFalse(MessageProjector.isForwardableText(stream))
+        assertFalse(MessageProjector.isForwardableText(reaction))
+        assertFalse(MessageProjector.isForwardableText(deleted))
+        assertFalse(MessageProjector.isForwardableText(streamStart))
+        assertFalse(MessageProjector.isForwardableText(groupSystem))
+        assertFalse(MessageProjector.isForwardableText(blank))
+    }
+
+    @Test
+    fun forwardableTextReturnsRawBodyAndPrefersEdit() {
+        val text = message(id = "t", plaintext = "original", kind = 9uL)
+
+        // No edit overlay: forward the original plaintext verbatim.
+        assertEquals("original", MessageProjector.forwardableText(text))
+        // Edit overlay present: forward the latest edited text instead.
+        assertEquals("edited later", MessageProjector.forwardableText(text, editedText = "edited later"))
+        // A blank edit is ignored; fall back to the original body.
+        assertEquals("original", MessageProjector.forwardableText(text, editedText = "  "))
+    }
+
+    @Test
+    fun forwardableTextIsNullForNonTextAndBlankRecords() {
+        val media =
+            message(
+                id = "media",
+                plaintext = "",
+                kind = 9uL,
+                tags = listOf(MessageTagFfi(listOf("imeta", "filename scan.png"))),
+            )
+        val blank = message(id = "b", plaintext = "", kind = 9uL)
+
+        // Media never forwards (would leak a filename/placeholder surrogate),
+        // even when an edit string is supplied.
+        assertNull(MessageProjector.forwardableText(media, editedText = "ignored"))
+        assertNull(MessageProjector.forwardableText(blank))
+    }
+
+    @Test
+    fun normalizeForwardTargetsDeDupesDropsBlanksAndKeepsOrder() {
+        val targets =
+            MessageProjector.normalizeForwardTargets(
+                listOf("g1", "g2", "g1", "  ", "", "g3", "g2"),
+            )
+
+        // First-seen order preserved, duplicates collapsed to one send each,
+        // blank/empty ids dropped.
+        assertEquals(listOf("g1", "g2", "g3"), targets)
+        assertEquals(emptyList<String>(), MessageProjector.normalizeForwardTargets(listOf("", "   ")))
     }
 
     private fun reaction(

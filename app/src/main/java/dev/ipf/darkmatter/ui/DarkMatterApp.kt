@@ -99,6 +99,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -149,6 +150,7 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -205,6 +207,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -9721,6 +9724,24 @@ private fun MessageBubble(
                 else -> MessageProjector.displayBody(record, messageTextCopy)
             }
         }
+    // Issue #390 v1 forwards text only. Forward must be hidden for any record
+    // whose displayed body is a synthetic surrogate (media filename/placeholder,
+    // "Reacted …", delete/system summaries, agent-stream copy) — forwarding
+    // `displayedBody` there would send misleading text into other groups. The
+    // raw text to forward is the edit-aware verbatim body, never the display
+    // fallback; `forwardBody` is null exactly when the message is not a
+    // forwardable text record, which also drives the menu gate below.
+    val forwardBody: String? =
+        remember(record, editState, deleted, invalidated) {
+            if (deleted || invalidated) {
+                null
+            } else {
+                MessageProjector.forwardableText(
+                    record,
+                    editedText = editState?.latestText?.takeIf { record.kind == 9uL },
+                )
+            }
+        }
     val showSenderAvatar =
         GroupProjector.shouldShowTranscriptSenderAvatar(
             memberCount = controller.members.size,
@@ -9742,6 +9763,7 @@ private fun MessageBubble(
     // by keying on the message id (#325).
     var expandedFullView by remember(record.messageIdHex) { mutableStateOf(false) }
     var infoSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    var forwardSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var editHistoryOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var reactionSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     val quickReactionEmojis = RecentEmojiList.quickChoices(recentReactionEmojis)
@@ -9779,6 +9801,15 @@ private fun MessageBubble(
         clipboard.setText(AnnotatedString(displayedBody))
         appState.present(R.string.copied)
         onActionMenuOpenChange(false)
+    }
+
+    fun beginForward() {
+        // Defensive: the menu only renders Forward when forwardBody != null, but
+        // gate here too so a stale tap can never open the picker for a non-text
+        // record (issue #390 is text-only).
+        if (forwardBody == null) return
+        onActionMenuOpenChange(false)
+        forwardSheetOpen = true
     }
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -10535,6 +10566,7 @@ private fun MessageBubble(
                             alignEnd = mine,
                             canDelete = mine && record.messageIdHex.isNotBlank() && !deleted,
                             canEdit = mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
+                            canForward = forwardBody != null,
                             quickReactionEmojis = quickReactionEmojis,
                             onDismissRequest = { onActionMenuOpenChange(false) },
                             onReact = { emoji ->
@@ -10555,6 +10587,7 @@ private fun MessageBubble(
                                 controller.editingMessageId = record.messageIdHex
                             },
                             onCopyText = ::copyMessageText,
+                            onForward = ::beginForward,
                             onInfo = ::openInfoSheet,
                             onDelete = {
                                 onActionMenuOpenChange(false)
@@ -10622,6 +10655,17 @@ private fun MessageBubble(
                         onCopy = { value ->
                             clipboard.setText(AnnotatedString(value))
                             appState.present(R.string.copied)
+                        },
+                    )
+                }
+                if (forwardSheetOpen && forwardBody != null) {
+                    ForwardMessageSheet(
+                        appState = appState,
+                        body = forwardBody,
+                        originGroupIdHex = record.groupIdHex,
+                        onDismiss = { forwardSheetOpen = false },
+                        onForward = { targetGroupIds ->
+                            appState.forwardText(targetGroupIds, forwardBody)
                         },
                     )
                 }
@@ -11171,12 +11215,14 @@ private fun MessageActionMenu(
     alignEnd: Boolean,
     canDelete: Boolean,
     canEdit: Boolean,
+    canForward: Boolean,
     quickReactionEmojis: List<String>,
     onDismissRequest: () -> Unit,
     onReact: (String) -> Unit,
     onOpenEmojiPicker: () -> Unit,
     onReply: () -> Unit,
     onEdit: () -> Unit,
+    onForward: () -> Unit,
     onCopyText: () -> Unit,
     onInfo: () -> Unit,
     onDelete: () -> Unit,
@@ -11347,6 +11393,13 @@ private fun MessageActionMenu(
                             icon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             onClick = onCopyText,
                         )
+                        if (canForward) {
+                            MessageActionButton(
+                                label = stringResource(R.string.forward),
+                                icon = { Icon(Icons.AutoMirrored.Filled.Forward, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                onClick = onForward,
+                            )
+                        }
                         MessageActionButton(
                             label = stringResource(R.string.message_info),
                             icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
@@ -11361,6 +11414,164 @@ private fun MessageActionMenu(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Chat-picker sheet for forwarding a message into one or more other chats
+ * (issue #390). Multi-select, searchable, recent-first. Confirming fans the
+ * message out to every selected chat as an independent fresh send (see
+ * [DarkMatterAppState.forwardText]) — each target is re-encrypted under its own
+ * group state, with no source-group key reuse and no original-sender / source
+ * attribution carried across the boundary.
+ *
+ * The picker deliberately omits the chat the message came from
+ * ([originGroupIdHex]): forwarding a message back into its own conversation is
+ * never the intent and would just duplicate it.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ForwardMessageSheet(
+    appState: DarkMatterAppState,
+    body: String,
+    originGroupIdHex: String,
+    onDismiss: () -> Unit,
+    onForward: (List<String>) -> Unit,
+) {
+    val groupTitleCopy = rememberGroupTitleCopy()
+    var query by remember { mutableStateOf("") }
+    val selected = remember { mutableStateListOf<String>() }
+    // Snapshot the forward targets once when the sheet opens. The chat list is
+    // a live projection, but a picker that re-sorts under the user's finger as
+    // a background send confirms would shuffle rows mid-selection; a stable
+    // snapshot keeps the selection anchored to the rows the user actually saw.
+    val targets =
+        remember {
+            appState.forwardTargets().filterNot { it.group.groupIdHex.equals(originGroupIdHex, ignoreCase = true) }
+        }
+    val titledTargets =
+        remember(targets, groupTitleCopy) {
+            targets.map { it to chatListItemDisplayTitle(it, appState, groupTitleCopy) }
+        }
+    val filtered =
+        remember(titledTargets, query) {
+            val needle = query.trim()
+            if (needle.isEmpty()) {
+                titledTargets
+            } else {
+                titledTargets.filter { (_, title) -> title.contains(needle, ignoreCase = true) }
+            }
+        }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(R.string.forward_to),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            // Preview of what is being forwarded, so the user can confirm the
+            // content before fanning it out to several chats.
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            }
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                placeholder = { Text(stringResource(R.string.forward_search_chats)) },
+            )
+            if (targets.isEmpty()) {
+                Text(
+                    stringResource(R.string.forward_no_chats),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else if (filtered.isEmpty()) {
+                Text(
+                    stringResource(R.string.forward_no_matches),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                ) {
+                    items(filtered, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
+                        val groupId = item.group.groupIdHex
+                        val isSelected = selected.contains(groupId)
+                        ListItem(
+                            modifier =
+                                Modifier.clickable {
+                                    if (isSelected) selected.remove(groupId) else selected.add(groupId)
+                                },
+                            leadingContent = {
+                                val avatarAccount =
+                                    item.otherMemberAccount
+                                        ?.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
+                                Avatar(
+                                    title = title,
+                                    seed = avatarAccount ?: item.group.groupIdHex,
+                                    size = 40.dp,
+                                    pictureUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
+                                )
+                            },
+                            headlineContent = {
+                                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            },
+                            trailingContent = {
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = {
+                                        if (isSelected) selected.remove(groupId) else selected.add(groupId)
+                                    },
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+            Button(
+                onClick = {
+                    onForward(selected.toList())
+                    onDismiss()
+                },
+                enabled = selected.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Forward,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (selected.isEmpty()) {
+                        stringResource(R.string.forward)
+                    } else {
+                        pluralStringResource(
+                            R.plurals.forward_to_chats_count,
+                            selected.size,
+                            selected.size,
+                        )
+                    },
+                )
             }
         }
     }

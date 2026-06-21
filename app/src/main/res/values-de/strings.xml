@@ -159,6 +159,18 @@
     <string name="copy_text">Text kopieren</string>
     <string name="open_emoji_picker">Emoji-Auswahl öffnen</string>
     <string name="reply">Antworten</string>
+    <string name="forward">Weiterleiten</string>
+    <string name="forward_to">Weiterleiten an</string>
+    <string name="forward_search_chats">Chats durchsuchen</string>
+    <string name="forward_no_chats">Keine anderen Chats zum Weiterleiten.</string>
+    <string name="forward_no_matches">Keine Chats stimmen mit der Suche uberein.</string>
+    <plurals name="forward_to_chats_count">
+        <item quantity="one">An %1$d Chat weiterleiten</item>
+        <item quantity="other">An %1$d Chats weiterleiten</item>
+    </plurals>
+    <string name="toast_forwarded_to_chats">An %1$s Chats weitergeleitet</string>
+    <string name="toast_forwarded_partial">An %1$s Chats weitergeleitet; einige fehlgeschlagen</string>
+    <string name="toast_forward_failed">Nachricht konnte nicht weitergeleitet werden</string>
     <string name="delete">Löschen</string>
     <string name="sent">Gesendet</string>
     <string name="send_failed">Nachricht konnte nicht gesendet werden. Bitte erneut versuchen.</string>
