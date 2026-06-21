@@ -92,7 +92,18 @@ object NotificationChannels {
             when (spec) {
                 NotificationChannelSpec.DIRECT_MESSAGES,
                 NotificationChannelSpec.GROUP_MESSAGES,
-                -> enableVibration(true)
+                -> {
+                    enableVibration(true)
+                    // Single ~150ms pulse instead of the OS-default double-buzz:
+                    // a chat message is one event, not two. Applies only to
+                    // fresh installs and legacy-channel migrants who did not
+                    // customise vibration (copyUserSettings preserves any
+                    // user-set vibrationPattern); Android freezes channel
+                    // settings after creation, so existing users keep whatever
+                    // they have. The leading 0 is the wait-before-buzz, 150 is
+                    // the buzz length in ms — see #449.
+                    vibrationPattern = longArrayOf(0L, 150L)
+                }
 
                 NotificationChannelSpec.REACTIONS,
                 NotificationChannelSpec.INVITES,
