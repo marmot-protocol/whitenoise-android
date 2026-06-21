@@ -11885,12 +11885,31 @@ private fun MessageActionMenu(
         // the menu top AT touchY on frame 1, then flip/clamp once the real tall
         // height arrives — a visible above-then-below jump (#389). Decide the side
         // deterministically from frame 1 by feeding a non-zero height into the
-        // provider: the last measured height once known, else a conservative
-        // estimate large enough that a near-top message is treated as "below".
+        // provider: the real measured height once known, else a per-variant
+        // estimate derived from the menu's own layout so frame 1 already matches
+        // the height the side decision will settle on.
         var measuredPopupHeightPx by remember { mutableStateOf(0) }
-        val conservativeEstimatePx = with(density) { 240.dp.roundToPx() }
+        // First-frame fallback only. A flat constant (the previous 240.dp) both
+        // overestimated short menus — flipping them above even when they fit
+        // below — and underestimated tall menus, so the measured height could
+        // still flip the side on frame 2 (the same jump #389 set out to remove,
+        // see #517). Instead, predict the height from the exact menu layout:
+        //   - one emoji/quick-reaction Row (36.dp)
+        //   - a HorizontalDivider (1.dp)
+        //   - the action buttons (each 48.dp min) in a spacedBy(2.dp) Column:
+        //       Reply, Copy, Info always; +Edit when canEdit; +Delete when canDelete
+        //   - the outer Column's 8.dp padding (top + bottom) and its two
+        //     spacedBy(8.dp) gaps between the three sections.
+        // Keep this in sync with the menu Column below if its layout changes.
+        val estimatedPopupHeightPx =
+            with(density) {
+                val actionButtonCount = 3 + (if (canEdit) 1 else 0) + (if (canDelete) 1 else 0)
+                val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1) * 2).dp
+                val totalHeight = (8.dp + 8.dp) + (8.dp + 8.dp) + 36.dp + 1.dp + actionsColumnHeight
+                totalHeight.roundToPx()
+            }
         val positionProvider =
-            remember(anchorWindowYPx, alignEnd, edgeInsetPx, measuredPopupHeightPx, conservativeEstimatePx) {
+            remember(anchorWindowYPx, alignEnd, edgeInsetPx, measuredPopupHeightPx, estimatedPopupHeightPx) {
                 object : PopupPositionProvider {
                     override fun calculatePosition(
                         anchorBounds: IntRect,
@@ -11907,12 +11926,14 @@ private fun MessageActionMenu(
                                 edgeInsetPx
                             }.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
                         // Decide vertical placement against a non-zero height so the
-                        // chosen side is stable from the first frame. Once measured,
-                        // effectiveHeight == popupContentSize.height, so the settled
-                        // placement is identical to before — only the frame-1
-                        // transient is fixed.
+                        // chosen side is stable from the first frame. Once the popup
+                        // has any real measurement (content or onSizeChanged), use it
+                        // directly so the *settled* placement reflects the true menu
+                        // height; the per-variant estimate is consulted only on the
+                        // first frame before either is known (#517).
+                        val measuredHeight = maxOf(popupContentSize.height, measuredPopupHeightPx)
                         val effectiveHeight =
-                            maxOf(popupContentSize.height, measuredPopupHeightPx, conservativeEstimatePx)
+                            if (measuredHeight > 0) measuredHeight else estimatedPopupHeightPx
                         // Vertical: top at the touch y; flip upward if it would spill
                         // past the bottom inset; if it still doesn't fit, clamp to top.
                         val bottomLimit = windowSize.height - edgeInsetPx
