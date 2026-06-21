@@ -8848,14 +8848,12 @@ private fun GroupDetailsScreen(
                             )
                         },
                         onSelfDemote = {
-                            runGroupMutation(
-                                action = GroupMutationAction.SelfDemoteAdmin,
-                                mutation = { controller.stepDownAsAdmin() },
-                                target = member.memberIdHex,
-                            )
-                        },
-                        onTransfer = {
-                            pendingConfirm = DetailsConfirm.TransferAdmin(member)
+                            pendingConfirm =
+                                if (controller.isSoleAdminWithOtherMembers) {
+                                    DetailsConfirm.StepDownSoleAdmin
+                                } else {
+                                    DetailsConfirm.StepDownAdmin(member)
+                                }
                         },
                         onRemove = {
                             pendingConfirm = DetailsConfirm.RemoveMember(member)
@@ -9132,6 +9130,43 @@ private fun GroupDetailsScreen(
                         )
                     },
                     onDismiss = { pendingConfirm = null },
+                )
+            is DetailsConfirm.StepDownAdmin ->
+                ConfirmDialog(
+                    title = stringResource(R.string.step_down_as_admin),
+                    message = stringResource(R.string.confirm_step_down_admin_message),
+                    confirmLabel = stringResource(R.string.step_down_as_admin),
+                    onConfirm = {
+                        pendingConfirm = null
+                        runGroupMutation(
+                            action = GroupMutationAction.SelfDemoteAdmin,
+                            mutation = { controller.stepDownAsAdmin() },
+                            target = confirm.member.memberIdHex,
+                        )
+                    },
+                    onDismiss = { pendingConfirm = null },
+                    destructive = true,
+                )
+            DetailsConfirm.StepDownSoleAdmin ->
+                AlertDialog(
+                    onDismissRequest = { pendingConfirm = null },
+                    title = { Text(stringResource(R.string.sole_admin_leave_blocked_title)) },
+                    text = { Text(stringResource(R.string.sole_admin_transfer_hint)) },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                pendingConfirm = null
+                                showTransferAdmin = true
+                            },
+                        ) {
+                            Text(stringResource(R.string.transfer_admin))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { pendingConfirm = null }) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    },
                 )
             is DetailsConfirm.Leave ->
                 ConfirmDialog(
@@ -9744,6 +9779,12 @@ private sealed class DetailsConfirm {
         val member: AppGroupMemberRecordFfi,
     ) : DetailsConfirm()
 
+    data class StepDownAdmin(
+        val member: AppGroupMemberRecordFfi,
+    ) : DetailsConfirm()
+
+    data object StepDownSoleAdmin : DetailsConfirm()
+
     /**
      * Standard leave: the active account is an ordinary member (or an admin
      * with at least one other admin left behind). Confirm → leave.
@@ -9789,6 +9830,26 @@ private data class ActiveGroupMutation(
     val target: String? = null,
 )
 
+internal enum class GroupMemberMenuAction {
+    GrantAdmin,
+    RevokeAdmin,
+    RemoveMember,
+    StepDownAsAdmin,
+}
+
+internal fun groupMemberMenuActions(
+    viewerIsMember: Boolean,
+    viewerIsAdmin: Boolean,
+    targetIsSelf: Boolean,
+    targetIsAdmin: Boolean,
+): List<GroupMemberMenuAction> =
+    when {
+        !viewerIsMember || !viewerIsAdmin -> emptyList()
+        targetIsSelf -> if (targetIsAdmin) listOf(GroupMemberMenuAction.StepDownAsAdmin) else emptyList()
+        targetIsAdmin -> listOf(GroupMemberMenuAction.RevokeAdmin, GroupMemberMenuAction.RemoveMember)
+        else -> listOf(GroupMemberMenuAction.GrantAdmin, GroupMemberMenuAction.RemoveMember)
+    }
+
 @Composable
 private fun GroupMemberRow(
     member: AppGroupMemberRecordFfi,
@@ -9798,20 +9859,23 @@ private fun GroupMemberRow(
     onPromote: () -> Unit,
     onDemote: () -> Unit,
     onSelfDemote: () -> Unit,
-    onTransfer: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    val clipboard = LocalClipboardManager.current
-    val copyNpubLabel = stringResource(R.string.copy)
     val isAdmin = controller.isAdmin(member)
     val isSelfRow =
         GroupProjector.isActiveAccountMember(
             member,
             appState.activeAccount?.accountIdHex,
         )
-    val canManageOtherMember = controller.isSelfMember && controller.isSelfAdmin && !isSelfRow
-    val canStepDown = controller.isSelfMember && controller.isSelfAdmin && isSelfRow && isAdmin
+    val memberActions =
+        groupMemberMenuActions(
+            viewerIsMember = controller.isSelfMember,
+            viewerIsAdmin = controller.isSelfAdmin,
+            targetIsSelf = isSelfRow,
+            targetIsAdmin = isAdmin,
+        )
     val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
+    var menuOpen by remember(member.memberIdHex) { mutableStateOf(false) }
 
     Row(
         modifier =
@@ -9833,21 +9897,6 @@ private fun GroupMemberRow(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(controller.memberDisplayName(member), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            // Tap the shortened npub to copy the full untruncated value.
-            Text(
-                controller.memberSubtitle(member),
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier =
-                    Modifier.clickable(
-                        onClickLabel = copyNpubLabel,
-                        role = Role.Button,
-                    ) {
-                        clipboard.setText(AnnotatedString(appState.npub(member.memberIdHex)))
-                        appState.present(R.string.toast_copied_npub)
-                    },
-            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (isSelfRow) {
                     Text(
@@ -9877,46 +9926,73 @@ private fun GroupMemberRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        } else if (canManageOtherMember) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.admin),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Switch(
-                    checked = isAdmin,
+        } else if (memberActions.isNotEmpty()) {
+            Box {
+                IconButton(
+                    onClick = { menuOpen = true },
                     enabled = !controller.mutationInFlight,
-                    onCheckedChange = { checked ->
-                        if (checked != isAdmin) {
-                            if (checked) onPromote() else onDemote()
+                ) {
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.member_actions))
+                }
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                ) {
+                    memberActions.forEach { action ->
+                        when (action) {
+                            GroupMemberMenuAction.GrantAdmin ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.make_admin)) },
+                                    leadingIcon = { Icon(Icons.Default.Shield, contentDescription = null) },
+                                    enabled = !controller.mutationInFlight,
+                                    onClick = {
+                                        menuOpen = false
+                                        onPromote()
+                                    },
+                                )
+                            GroupMemberMenuAction.RevokeAdmin ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.remove_admin)) },
+                                    leadingIcon = { Icon(Icons.Default.Shield, contentDescription = null) },
+                                    enabled = !controller.mutationInFlight,
+                                    onClick = {
+                                        menuOpen = false
+                                        onDemote()
+                                    },
+                                )
+                            GroupMemberMenuAction.RemoveMember ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.remove_member)) },
+                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                    enabled = !controller.mutationInFlight,
+                                    colors =
+                                        MenuDefaults.itemColors(
+                                            textColor = MaterialTheme.colorScheme.error,
+                                            leadingIconColor = MaterialTheme.colorScheme.error,
+                                        ),
+                                    onClick = {
+                                        menuOpen = false
+                                        onRemove()
+                                    },
+                                )
+                            GroupMemberMenuAction.StepDownAsAdmin ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.step_down_as_admin)) },
+                                    leadingIcon = { Icon(Icons.Default.Shield, contentDescription = null) },
+                                    enabled = !controller.mutationInFlight,
+                                    colors =
+                                        MenuDefaults.itemColors(
+                                            textColor = MaterialTheme.colorScheme.error,
+                                            leadingIconColor = MaterialTheme.colorScheme.error,
+                                        ),
+                                    onClick = {
+                                        menuOpen = false
+                                        onSelfDemote()
+                                    },
+                                )
                         }
-                    },
-                )
-                if (!isAdmin) {
-                    IconButton(
-                        onClick = onTransfer,
-                        enabled = !controller.mutationInFlight,
-                    ) {
-                        Icon(Icons.Default.Shield, contentDescription = stringResource(R.string.transfer_admin))
-                    }
-                    IconButton(
-                        onClick = onRemove,
-                        enabled = !controller.mutationInFlight,
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.remove_member))
                     }
                 }
-            }
-        } else if (canStepDown) {
-            TextButton(
-                onClick = onSelfDemote,
-                enabled = !controller.mutationInFlight,
-            ) {
-                Text(stringResource(R.string.step_down_as_admin))
             }
         }
     }
