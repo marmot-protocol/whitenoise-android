@@ -119,7 +119,10 @@ fun DarkMatterTheme(
             // AlertDialog uses surfaceContainerHigh — so they must be black too,
             // not the near-black grays they used to be. Boundaries for elevated
             // components on the black canvas come from `outline`, not a lifted
-            // fill.
+            // fill. Snackbars are the odd M3 case: their container uses
+            // `inverseSurface` and their text/action colors use inverse tokens,
+            // so keep those black/readable here instead of inheriting the
+            // light inverse surface from the regular dark scheme.
             baseColorScheme.copy(
                 background = Color.Black,
                 surface = Color.Black,
@@ -131,6 +134,9 @@ fun DarkMatterTheme(
                 surfaceVariant = Color.Black,
                 surfaceBright = Color.Black,
                 surfaceDim = Color.Black,
+                inverseSurface = Color.Black,
+                inverseOnSurface = baseColorScheme.onSurface,
+                inversePrimary = Highlight,
             )
         } else {
             baseColorScheme

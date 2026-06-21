@@ -80,6 +80,13 @@ class DarkMatterThemeTest {
             assertEquals(Color.Black, s.surfaceVariant)
             assertEquals(Color.Black, s.surfaceBright)
             assertEquals(Color.Black, s.surfaceDim)
+            // Snackbars use inverse tokens in Material 3: container from
+            // inverseSurface, text from inverseOnSurface, action from
+            // inversePrimary. AMOLED snackbars must stay black with readable
+            // text/action content.
+            assertEquals(Color.Black, s.inverseSurface)
+            assertEquals(s.onSurface, s.inverseOnSurface)
+            assertEquals(Color(0xFF06B6D4), s.inversePrimary)
             // Tonal-elevation overlay must be a no-op on AMOLED.
             assertEquals(Color.Transparent, s.surfaceTint)
         }
