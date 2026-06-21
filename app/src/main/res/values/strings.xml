@@ -354,8 +354,8 @@
     <string name="no_relays">No relays</string>
     <string name="remove_relay">Remove relay</string>
     <string name="add_relay">Add relay</string>
-    <string name="nip_65">Read/Write</string>
-    <string name="inbox">Inbox</string>
+    <string name="nip_65">Where I post</string>
+    <string name="inbox">Where I receive</string>
     <string name="key_package">Key Package</string>
     <string name="published_relay_lists">Published Relay Lists</string>
     <string name="no_relay_projection">No relay-list projection is available yet.</string>

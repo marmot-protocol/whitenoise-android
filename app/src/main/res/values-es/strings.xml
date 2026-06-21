@@ -259,8 +259,8 @@
     <string name="no_relays">No hay relés configurados</string>
     <string name="remove_relay">¿Eliminar Relé?</string>
     <string name="add_relay">Añadir Relé</string>
-    <string name="nip_65">Read/Write</string>
-    <string name="inbox">Relés de Bandeja de Entrada</string>
+    <string name="nip_65">Dónde publico</string>
+    <string name="inbox">Dónde recibo</string>
     <string name="key_package">Paquete de claves</string>
     <string name="published_relay_lists">Listas de retransmisión publicadas</string>
     <string name="no_relay_projection">Aún no hay ninguna proyección de la lista de retransmisiones disponible.</string>

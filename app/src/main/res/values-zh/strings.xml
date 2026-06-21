@@ -258,8 +258,8 @@
     <string name="no_relays">未配置中继器</string>
     <string name="remove_relay">移除中继器？</string>
     <string name="add_relay">添加中继器</string>
-    <string name="nip_65">Read/Write</string>
-    <string name="inbox">收件箱中继器</string>
+    <string name="nip_65">我发布到哪里</string>
+    <string name="inbox">我在哪里接收</string>
     <string name="key_package">密钥包</string>
     <string name="published_relay_lists">已发布的中继列表</string>
     <string name="no_relay_projection">目前还没有可用的中继列表投影。</string>

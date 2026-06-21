@@ -259,8 +259,8 @@
     <string name="no_relays">Nessun relay configurato</string>
     <string name="remove_relay">Rimuovere il Relay?</string>
     <string name="add_relay">Aggiungi Relay</string>
-    <string name="nip_65">Read/Write</string>
-    <string name="inbox">Relay Posta in Arrivo</string>
+    <string name="nip_65">Dove pubblico</string>
+    <string name="inbox">Dove ricevo</string>
     <string name="key_package">Pacchetto chiavi</string>
     <string name="published_relay_lists">Elenchi di inoltro pubblicati</string>
     <string name="no_relay_projection">Non è ancora disponibile alcuna proiezione dell’elenco di rilancio.</string>
