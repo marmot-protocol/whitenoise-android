@@ -122,7 +122,9 @@ fun DarkMatterTheme(
             // fill. Snackbars are the odd M3 case: their container uses
             // `inverseSurface` and their text/action colors use inverse tokens,
             // so keep those black/readable here instead of inheriting the
-            // light inverse surface from the regular dark scheme.
+            // light inverse surface from the regular dark scheme. Text follows
+            // the selected scheme's `onSurface` (including dynamic opt-ins),
+            // while snackbar actions keep the fixed brand highlight.
             baseColorScheme.copy(
                 background = Color.Black,
                 surface = Color.Black,

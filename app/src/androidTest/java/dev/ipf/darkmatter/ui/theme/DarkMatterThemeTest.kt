@@ -86,7 +86,7 @@ class DarkMatterThemeTest {
             // text/action content.
             assertEquals(Color.Black, s.inverseSurface)
             assertEquals(s.onSurface, s.inverseOnSurface)
-            assertEquals(Color(0xFF06B6D4), s.inversePrimary)
+            assertEquals(Highlight, s.inversePrimary)
             // Tonal-elevation overlay must be a no-op on AMOLED.
             assertEquals(Color.Transparent, s.surfaceTint)
         }
