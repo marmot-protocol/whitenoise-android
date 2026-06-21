@@ -11519,8 +11519,18 @@ private fun MessageActionMenu(
         // could send the menu above the finger even with room below (#326). This
         // provider clamps/flips against the window directly.
         val edgeInsetPx = with(density) { 8.dp.roundToPx() }
+        // Compose runs calculatePosition on the FIRST layout pass with
+        // popupContentSize == (0,0) (content not yet measured). With height 0 the
+        // "fits below" branch is always true, so a near-top message would place
+        // the menu top AT touchY on frame 1, then flip/clamp once the real tall
+        // height arrives — a visible above-then-below jump (#389). Decide the side
+        // deterministically from frame 1 by feeding a non-zero height into the
+        // provider: the last measured height once known, else a conservative
+        // estimate large enough that a near-top message is treated as "below".
+        var measuredPopupHeightPx by remember { mutableStateOf(0) }
+        val conservativeEstimatePx = with(density) { 240.dp.roundToPx() }
         val positionProvider =
-            remember(anchorWindowYPx, alignEnd, edgeInsetPx) {
+            remember(anchorWindowYPx, alignEnd, edgeInsetPx, measuredPopupHeightPx, conservativeEstimatePx) {
                 object : PopupPositionProvider {
                     override fun calculatePosition(
                         anchorBounds: IntRect,
@@ -11536,15 +11546,22 @@ private fun MessageActionMenu(
                             } else {
                                 edgeInsetPx
                             }.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                        // Decide vertical placement against a non-zero height so the
+                        // chosen side is stable from the first frame. Once measured,
+                        // effectiveHeight == popupContentSize.height, so the settled
+                        // placement is identical to before — only the frame-1
+                        // transient is fixed.
+                        val effectiveHeight =
+                            maxOf(popupContentSize.height, measuredPopupHeightPx, conservativeEstimatePx)
                         // Vertical: top at the touch y; flip upward if it would spill
                         // past the bottom inset; if it still doesn't fit, clamp to top.
                         val bottomLimit = windowSize.height - edgeInsetPx
                         val y =
                             when {
-                                touchY + popupContentSize.height <= bottomLimit -> touchY
-                                popupContentSize.height <= touchY - edgeInsetPx -> touchY - popupContentSize.height
+                                touchY + effectiveHeight <= bottomLimit -> touchY
+                                effectiveHeight <= touchY - edgeInsetPx -> touchY - effectiveHeight
                                 else -> edgeInsetPx
-                            }.coerceIn(edgeInsetPx, (windowSize.height - popupContentSize.height).coerceAtLeast(0))
+                            }.coerceIn(edgeInsetPx, (windowSize.height - effectiveHeight).coerceAtLeast(0))
                         return IntOffset(x, y)
                     }
                 }
@@ -11564,6 +11581,7 @@ private fun MessageActionMenu(
             // Surface restores the menu chrome (rounded shape + elevation) that
             // DropdownMenu provided.
             Surface(
+                modifier = Modifier.onSizeChanged { measuredPopupHeightPx = it.height },
                 shape = RoundedCornerShape(12.dp),
                 tonalElevation = 3.dp,
                 shadowElevation = 6.dp,
