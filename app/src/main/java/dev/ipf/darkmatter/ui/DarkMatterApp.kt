@@ -235,6 +235,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -1655,7 +1656,11 @@ private fun ChatsScreen(
                         Modifier
                             .align(Alignment.BottomEnd)
                             .navigationBarsPadding()
-                            .padding(end = 16.dp, bottom = FAB_SNACKBAR_INSET),
+                            // end = 24dp (not 16) so this 40dp small FAB's centre
+                            // lines up with the 56dp quick-action FAB above it,
+                            // which the Scaffold insets 16dp from the edge:
+                            // 24 + 40/2 == 16 + 56/2 (#451).
+                            .padding(end = 24.dp, bottom = FAB_SNACKBAR_INSET),
                 ) {
                     SmallFloatingActionButton(
                         onClick = {
@@ -1677,6 +1682,30 @@ private fun ChatsScreen(
                             contentDescription = stringResource(R.string.scroll_to_top),
                         )
                     }
+                }
+                // Tap-absorbing backdrop while the quick-action FAB menu is open:
+                // without it a tap outside the menu falls through to the chat row
+                // beneath and opens the wrong chat (#452). Transparent (no dim) —
+                // it only consumes the gesture and collapses the menu. The menu
+                // sits in the Scaffold FAB slot above this Box, so its items stay
+                // tappable; this also blocks the jump-to-top FAB while open.
+                if (quickActionsExpanded) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                // Consume the press in the Initial pass so the
+                                // chat row's clickable (Main pass) never sees an
+                                // unconsumed down — a Main-pass detectTapGestures
+                                // here loses the arbitration to the row and the
+                                // tap falls through. Collapsing on down also makes
+                                // the dismissal feel immediate.
+                                awaitEachGesture {
+                                    awaitFirstDown(pass = PointerEventPass.Initial).consume()
+                                    quickActionsExpanded = false
+                                }
+                            },
+                    )
                 }
             }
         }
