@@ -1035,8 +1035,29 @@ class DarkMatterAppState(
         accountUnreadCounts = refreshedCounts
     }
 
+    /**
+     * Refresh the unread count for a single account, merging the result into
+     * [accountUnreadCounts] without disturbing the other accounts' counts.
+     *
+     * On a per-notification hot path we only ever need the one account that
+     * changed, so we read that account's durable chat-list rows directly via
+     * [Marmot.chatList] and fold them with [accountUnreadCount] (which excludes
+     * archived chats, matching `account_unread_total`). This avoids fanning out
+     * an all-account [Marmot.accountUnreadSummary] scan on every update (#473).
+     */
     private suspend fun refreshAccountUnreadCount(accountRef: String) {
-        refreshAccountUnreadCounts(accounts)
+        val ref = accountRef.takeIf { it.isNotBlank() } ?: return
+        // Only local-signing accounts are tracked in accountUnreadCounts; skip
+        // refs we don't know about (matches refreshAccountUnreadCounts' filter).
+        if (accounts.none { it.localSigning && it.label == ref }) return
+        val unreadCount =
+            runCatching {
+                marmotIo { accountUnreadCount(chatList(ref, includeArchived = true)) }
+            }.onFailure {
+                appStateDebug(it) { "account unread refresh failed for ${ref.take(8)}: ${it.readableMessage()}" }
+            }.getOrNull()
+                ?: return
+        accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
     }
 
     fun setActiveAccount(label: String) {
