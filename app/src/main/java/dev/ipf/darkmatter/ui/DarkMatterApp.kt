@@ -8349,6 +8349,192 @@ private fun EmptyGroupConversation(onAddMembers: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun GroupEditScreen(
+    appState: DarkMatterAppState,
+    controller: ConversationController,
+    onBack: () -> Unit,
+) {
+    val groupTitleCopy = rememberGroupTitleCopy()
+    // Key only on the group id, not on name/description: the group-state
+    // subscription can converge a backend update (another admin's edit, a
+    // kind-1210 row) while this screen is open, and re-keying on those values
+    // would re-init the fields and discard the user's in-progress edit. State
+    // resets only when navigating to a different group. (CodeRabbit, #512.)
+    var name by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.name) }
+    var description by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.description) }
+    var showImageSearch by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var imageSaving by remember { mutableStateOf(false) }
+    val canEdit = controller.isSelfMember && controller.isSelfAdmin
+
+    // System back returns to Group Details, not all the way out to the
+    // conversation. This composes after the details screen's own BackHandler
+    // (rendered just before the early return that shows this screen), so it
+    // wins the back event while the editor is open.
+    BackHandler { onBack() }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.edit)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .imePadding()
+                .padding(Dimens.spaceLg),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+        ) {
+            item {
+                Column(
+                    Modifier.fillMaxWidth().padding(top = Dimens.spaceSm),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+                ) {
+                    val editImageLabel =
+                        stringResource(
+                            if (controller.group.avatarUrl.isNullOrBlank()) {
+                                R.string.group_image_search_set
+                            } else {
+                                R.string.group_image_search_edit
+                            },
+                        )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier =
+                            if (canEdit) {
+                                Modifier
+                                    .clip(CircleShape)
+                                    .clickable(
+                                        onClickLabel = editImageLabel,
+                                        role = Role.Button,
+                                    ) { showImageSearch = true }
+                            } else {
+                                Modifier.clip(CircleShape)
+                            },
+                    ) {
+                        Avatar(
+                            title = controller.title(groupTitleCopy),
+                            seed = controller.group.groupIdHex,
+                            size = 96.dp,
+                            pictureUrl = controller.group.avatarUrl,
+                        )
+                        if (canEdit) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(96.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.Black.copy(alpha = 0.32f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.PhotoCamera,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                SectionCard(title = stringResource(R.string.edit)) {
+                    val profileFieldColors =
+                        TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            errorContainerColor = Color.Transparent,
+                        )
+                    TextField(
+                        colors = profileFieldColors,
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text(stringResource(R.string.group_name)) },
+                        singleLine = true,
+                        enabled = canEdit,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    TextField(
+                        colors = profileFieldColors,
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text(stringResource(R.string.description)) },
+                        minLines = 3,
+                        enabled = canEdit,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            if (canEdit) {
+                item {
+                    Button(
+                        onClick = {
+                            saving = true
+                            controller.clearLastMutationError()
+                            appState.launchMutation {
+                                try {
+                                    if (controller.updateGroupProfile(name, description)) onBack()
+                                } finally {
+                                    saving = false
+                                }
+                            }
+                        },
+                        enabled =
+                            !saving &&
+                                !controller.mutationInFlight &&
+                                (name != controller.group.name || description != controller.group.description),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (saving) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(if (saving) R.string.saving_group else R.string.save_group))
+                    }
+                }
+            }
+        }
+    }
+
+    if (showImageSearch) {
+        ImageSearchSheet(
+            initialUrl = controller.group.avatarUrl.orEmpty(),
+            header = stringResource(R.string.group_image_search_title),
+            title = controller.title(groupTitleCopy),
+            seed = controller.group.groupIdHex,
+            urlLabel = stringResource(R.string.group_avatar_url),
+            applyInFlight = imageSaving || controller.mutationInFlight,
+            onApply = { picked ->
+                imageSaving = true
+                controller.clearLastMutationError()
+                appState.launchMutation {
+                    try {
+                        if (controller.updateGroupAvatarUrl(picked)) showImageSearch = false
+                    } finally {
+                        imageSaving = false
+                    }
+                }
+            },
+            onDismiss = { showImageSearch = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun GroupDetailsScreen(
     appState: DarkMatterAppState,
     controller: ConversationController,
@@ -8363,15 +8549,12 @@ private fun GroupDetailsScreen(
     autoOpenAddMember: Boolean = false,
     onAutoOpenAddMemberConsumed: () -> Unit = {},
 ) {
-    var name by remember(controller.group.groupIdHex, controller.group.name) { mutableStateOf(controller.group.name) }
-    var description by remember(controller.group.groupIdHex, controller.group.description) { mutableStateOf(controller.group.description) }
     var pendingMember by remember { mutableStateOf("") }
     var pendingMemberAsAdmin by remember { mutableStateOf(false) }
     var pendingMemberError by remember { mutableStateOf<String?>(null) }
     var showMemberScanner by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
-    var showEditProfile by remember { mutableStateOf(false) }
-    var showImageSearch by remember { mutableStateOf(false) }
+    var showEditGroup by remember { mutableStateOf(false) }
     var showAddMember by remember { mutableStateOf(false) }
     // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
     // leave path and the Admins prompt so a trapped sole admin can hand the
@@ -8477,6 +8660,11 @@ private fun GroupDetailsScreen(
 
     BackHandler { onBack() }
 
+    if (showEditGroup) {
+        GroupEditScreen(appState = appState, controller = controller, onBack = { showEditGroup = false })
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -8490,36 +8678,28 @@ private fun GroupDetailsScreen(
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.actions))
                     }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    KeyboardPreservingDropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false },
+                        shape = RoundedCornerShape(20.dp),
+                        // Match the conversation top-bar menu exactly: inset from
+                        // the right edge, roomy iconless body-large rows.
+                        offset = DpOffset(x = (-8).dp, y = 0.dp),
+                        modifier = Modifier.widthIn(min = 232.dp),
+                    ) {
                         if (controller.isSelfMember && controller.isSelfAdmin) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.edit)) },
-                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                                enabled = activeMutation == null && !controller.mutationInFlight,
-                                onClick = {
-                                    menuOpen = false
-                                    name = controller.group.name
-                                    description = controller.group.description
-                                    showEditProfile = true
-                                },
-                            )
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        stringResource(
-                                            if (controller.group.avatarUrl.isNullOrBlank()) {
-                                                R.string.group_image_search_set
-                                            } else {
-                                                R.string.group_image_search_edit
-                                            },
-                                        ),
+                                        stringResource(R.string.edit),
+                                        style = MaterialTheme.typography.bodyLarge,
                                     )
                                 },
-                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                contentPadding = conversationMenuItemPadding,
                                 enabled = activeMutation == null && !controller.mutationInFlight,
                                 onClick = {
                                     menuOpen = false
-                                    showImageSearch = true
+                                    showEditGroup = true
                                 },
                             )
                         }
@@ -8534,9 +8714,10 @@ private fun GroupDetailsScreen(
                                             else -> R.string.archive_chat
                                         },
                                     ),
+                                    style = MaterialTheme.typography.bodyLarge,
                                 )
                             },
-                            leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                            contentPadding = conversationMenuItemPadding,
                             enabled = activeMutation == null && !controller.mutationInFlight,
                             onClick = {
                                 menuOpen = false
@@ -8559,9 +8740,10 @@ private fun GroupDetailsScreen(
                                                 R.string.leave_chat
                                             },
                                         ),
+                                        style = MaterialTheme.typography.bodyLarge,
                                     )
                                 },
-                                leadingIcon = { Icon(Icons.Default.Close, contentDescription = null) },
+                                contentPadding = conversationMenuItemPadding,
                                 // Tappable for members (greyed while a mutation is
                                 // in flight). The sole-admin gate is surfaced as an
                                 // explanatory dialog by requestLeave rather than a
@@ -8803,80 +8985,6 @@ private fun GroupDetailsScreen(
                     pendingMemberError = null
                 }
             },
-        )
-    }
-
-    if (showEditProfile) {
-        ModalBottomSheet(onDismissRequest = { showEditProfile = false }) {
-            Column(
-                Modifier.fillMaxWidth().padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(stringResource(R.string.edit), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.group_name)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.description)) },
-                    minLines = 3,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Button(
-                    onClick = {
-                        runGroupMutation(
-                            action = GroupMutationAction.SaveProfile,
-                            mutation = { controller.updateGroupProfile(name, description) },
-                            onSuccess = { showEditProfile = false },
-                        )
-                    },
-                    enabled =
-                        activeMutation == null &&
-                            !controller.mutationInFlight &&
-                            (name != controller.group.name || description != controller.group.description),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (activeMutation?.action == GroupMutationAction.SaveProfile) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Default.Check, contentDescription = null)
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(if (activeMutation?.action == GroupMutationAction.SaveProfile) R.string.saving_group else R.string.save_group))
-                }
-            }
-        }
-    }
-
-    if (showImageSearch) {
-        ImageSearchSheet(
-            initialUrl = controller.group.avatarUrl.orEmpty(),
-            header = stringResource(R.string.group_image_search_title),
-            title = controller.title(groupTitleCopy),
-            seed = controller.group.groupIdHex,
-            urlLabel = stringResource(R.string.group_avatar_url),
-            // True whenever ANY mutation is running on this controller — not
-            // just one started by this sheet. Prevents queuing a second
-            // avatar update on top of an in-flight one and prevents
-            // racing Remove against Apply if the user double-taps.
-            applyInFlight = activeMutation != null || controller.mutationInFlight,
-            onApply = { picked ->
-                // Controller handles success/failure toasts via its standard
-                // mutation-lock path (toast_group_updated /
-                // toast_couldnt_update_group); the sheet only owns its own
-                // lifecycle here.
-                runGroupMutation(
-                    action = GroupMutationAction.SaveProfile,
-                    mutation = { controller.updateGroupAvatarUrl(picked) },
-                    onSuccess = { showImageSearch = false },
-                )
-            },
-            onDismiss = { showImageSearch = false },
         )
     }
 
