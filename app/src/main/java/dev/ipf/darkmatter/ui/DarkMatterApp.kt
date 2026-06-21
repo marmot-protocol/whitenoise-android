@@ -6011,7 +6011,7 @@ private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
     LaunchedEffect(uri) {
         bitmap =
             withContext(Dispatchers.Default) {
-                val mime = context.contentResolver.getType(uri).orEmpty()
+                val mime = safeGetType(context.contentResolver, uri)
                 if (mime.startsWith("video/", ignoreCase = true)) {
                     // Video URI: extract the first frame as the staging thumbnail
                     // instead of trying to decode the bytes as JPEG (which spins
@@ -6467,19 +6467,29 @@ private fun isNearBottom(
 }
 
 /** Read the user-visible filename a content Uri exposes via OpenableColumns,
- *  falling back to the Uri's path segment. Null when neither is available. */
+ *  falling back to the Uri's path segment. Null when neither is available.
+ *
+ *  Guarded against a revoked grant: a Photo Picker / SAF Uri staged before
+ *  process death (issue #531) comes back as a ghost whose session-scoped read
+ *  permission is gone, so `query()` throws `SecurityException` (or the backing
+ *  provider may be dead — `IllegalArgumentException` / `NullPointerException`).
+ *  We swallow it and fall through to the path-segment fallback so the staging
+ *  preview renders a placeholder name instead of crashing; the actual decode
+ *  still fails gracefully into the existing toast path. */
 private fun queryDisplayName(
     contentResolver: android.content.ContentResolver,
     uri: android.net.Uri,
 ): String? {
-    contentResolver
-        .query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
-        ?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val name = cursor.getString(0)
-                if (!name.isNullOrBlank()) return name
+    runCatching {
+        contentResolver
+            .query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val name = cursor.getString(0)
+                    if (!name.isNullOrBlank()) return name
+                }
             }
-        }
+    }
     return uri.lastPathSegment
 }
 
@@ -6487,20 +6497,47 @@ private fun queryDisplayName(
  * Best-effort byte size of a content Uri, queried via `OpenableColumns.SIZE`.
  * Returns -1 when the provider doesn't report a size (some virtual / streamed
  * providers omit it); callers must then enforce a cap via the bounded read.
+ *
+ * Also returns -1 when the Uri's grant has been revoked (a ghost Uri restored
+ * after process death — see [queryDisplayName] / issue #531): the bounded read
+ * downstream is itself `SecurityException`-guarded and will reject the file, so
+ * treating a revoked grant as "size unknown" routes it into the same graceful
+ * rejection rather than crashing the send coroutine.
  */
 private fun queryContentSize(
     contentResolver: android.content.ContentResolver,
     uri: android.net.Uri,
 ): Long {
-    contentResolver
-        .query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)
-        ?.use { cursor ->
-            if (cursor.moveToFirst() && !cursor.isNull(0)) {
-                return cursor.getLong(0)
+    runCatching {
+        contentResolver
+            .query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                    return cursor.getLong(0)
+                }
             }
-        }
+    }
     return -1L
 }
+
+/** `ContentResolver.getType` for a content Uri whose read grant may have been
+ *  revoked (a ghost staging Uri restored after process death — issue #531).
+ *  The platform docs say `getType` can throw `SecurityException` for a Uri the
+ *  caller can no longer access; an unguarded call on a ghost Uri crashes the
+ *  preview composition or the send coroutine before the already-guarded decode
+ *  gets a chance to degrade. Returns "" on any failure so callers treat the
+ *  ghost as an unknown / non-video type and let the guarded decode reject it
+ *  into the existing decode-failure toast. */
+private fun safeGetType(
+    contentResolver: android.content.ContentResolver,
+    uri: android.net.Uri,
+): String = coerceResolvedMime { contentResolver.getType(uri) }
+
+/** Pure swallow-and-default kernel behind [safeGetType], split out so the
+ *  ghost-Uri contract (issue #531) — a throwing or null resolver lookup must
+ *  collapse to "" rather than propagate — is unit-testable on the JVM without
+ *  Robolectric, mirroring the `UriListSaver` codec split. */
+internal inline fun coerceResolvedMime(getType: () -> String?): String = runCatching(getType).getOrNull().orEmpty()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -6992,7 +7029,7 @@ private fun ConversationScreen(
                             overflowed = true
                             break
                         }
-                        val mime = context.contentResolver.getType(uri).orEmpty()
+                        val mime = safeGetType(context.contentResolver, uri)
                         val attachment =
                             if (mime.startsWith("video/", ignoreCase = true)) {
                                 when (val r = MediaPipeline.readVideoForUpload(context, uri, remaining)) {
@@ -7028,9 +7065,7 @@ private fun ConversationScreen(
             if (attachments.size < uris.size) {
                 val anyVideoPicked =
                     uris.any {
-                        context.contentResolver
-                            .getType(it)
-                            .orEmpty()
+                        safeGetType(context.contentResolver, it)
                             .startsWith("video/", ignoreCase = true)
                     }
                 appState.present(
@@ -7083,9 +7118,7 @@ private fun ConversationScreen(
             var albumOverflowed = false
             for (uri in uris) {
                 val resolvedMime =
-                    context.contentResolver
-                        .getType(uri)
-                        .orEmpty()
+                    safeGetType(context.contentResolver, uri)
                         .takeIf { it.isNotBlank() }
                         ?: "application/octet-stream"
                 val remainingAlbumBudget = (bytesBudget - albumBytes).coerceAtLeast(0L)
@@ -7167,7 +7200,7 @@ private fun ConversationScreen(
                     overflowed = true
                     break
                 }
-                val mime = context.contentResolver.getType(uri).orEmpty()
+                val mime = safeGetType(context.contentResolver, uri)
                 val attachment =
                     if (mime.startsWith("video/", ignoreCase = true)) {
                         // Thread the remaining album budget into the video read so a
@@ -7242,9 +7275,7 @@ private fun ConversationScreen(
             val merged = acceptedImages + docOutcome.attachments
             val pickHasVideo =
                 imageUris.any {
-                    context.contentResolver
-                        .getType(it)
-                        .orEmpty()
+                    safeGetType(context.contentResolver, it)
                         .startsWith("video/", ignoreCase = true)
                 }
             val visualFailureToast =
