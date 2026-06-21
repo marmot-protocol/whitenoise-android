@@ -7927,7 +7927,7 @@ private fun ConversationScreen(
                                         MentionComposer.Candidate(
                                             accountIdHex = member.memberIdHex,
                                             npub = appState.npub(member.memberIdHex),
-                                            displayName = appState.displayName(member.memberIdHex),
+                                            displayName = appState.chatMemberTitle(member.memberIdHex),
                                             nip05 = appState.userProfile(member.memberIdHex)?.nip05,
                                         )
                                     }
@@ -12871,6 +12871,7 @@ private fun ComposerBar(
                     // single styled token while composing. Only when the picker
                     // is enabled (groups) — DMs never insert chips.
                     highlightMentionChips = mentionPickerEnabled,
+                    mentionCandidates = mentionCandidates,
                     enterKeyBehavior = enterKeyBehavior,
                     onImeSend = submitMessage,
                     modifier =
@@ -13335,35 +13336,47 @@ private fun ComposerPill(
     onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
     highlightMentionChips: Boolean = false,
+    mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
     onImeSend: () -> Unit = {},
 ) {
-    // #414: paint `@npub1…` chip runs with the accent color + slight background
-    // tint so a mention reads as one styled token while composing. The mapping
-    // is identity (visible text == stored text) so caret math is untouched.
+    // #414/#442: paint stored `@npub1…` chip runs as friendly visible labels
+    // (`@alice` when the profile is resolved, short `@npub1…` otherwise)
+    // while keeping the backing TextFieldValue canonical for send/markdown.
     val chipColor = MaterialTheme.colorScheme.primary
+    val mentionCandidateLookup =
+        remember(highlightMentionChips, mentionCandidates) {
+            if (highlightMentionChips) MentionComposer.candidatesByNpub(mentionCandidates) else emptyMap()
+        }
     val mentionVisualTransformation =
-        remember(highlightMentionChips, chipColor) {
+        remember(highlightMentionChips, chipColor, mentionCandidateLookup) {
             if (!highlightMentionChips) {
                 VisualTransformation.None
             } else {
                 VisualTransformation { text ->
+                    val visual = MentionComposer.visualText(text.text, mentionCandidateLookup)
                     val styled =
                         buildAnnotatedString {
-                            append(text.text)
-                            MentionComposer.chipRanges(text.text).forEach { range ->
+                            append(visual.text)
+                            visual.ranges.forEach { range ->
                                 addStyle(
                                     SpanStyle(
                                         color = chipColor,
                                         fontWeight = FontWeight.Medium,
                                         background = chipColor.copy(alpha = 0.12f),
                                     ),
-                                    range.first,
-                                    range.last + 1,
+                                    range.transformed.first,
+                                    range.transformed.last + 1,
                                 )
                             }
                         }
-                    TransformedText(styled, OffsetMapping.Identity)
+                    val offsetMapping =
+                        object : OffsetMapping {
+                            override fun originalToTransformed(offset: Int): Int = visual.originalToTransformed(offset)
+
+                            override fun transformedToOriginal(offset: Int): Int = visual.transformedToOriginal(offset)
+                        }
+                    TransformedText(styled, offsetMapping)
                 }
             }
         }
