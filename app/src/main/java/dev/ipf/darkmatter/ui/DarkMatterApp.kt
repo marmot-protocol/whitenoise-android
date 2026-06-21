@@ -170,6 +170,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
@@ -230,6 +231,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -7795,7 +7797,7 @@ private fun ConversationScreen(
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.chat_actions))
                         }
-                        DropdownMenu(
+                        KeyboardPreservingDropdownMenu(
                             expanded = menuOpen,
                             onDismissRequest = { menuOpen = false },
                             shape = RoundedCornerShape(20.dp),
@@ -12585,6 +12587,87 @@ private fun LockHintAbove(
     }
 }
 
+// Anchored dropdown that does NOT collapse the soft keyboard while it is open.
+//
+// A default DropdownMenu opens a *focusable* popup window; Android dismisses the
+// IME the moment the window holding the focused composer loses focus. That
+// collapse strips the composer's imePadding and reflows the transcript down by
+// the keyboard height — so a menu/picker launched from the composer toolbar
+// (the attach clip, the conversation overflow) animates in over a shifted
+// layout, and dismissing it leaves the composer unfocused with the keyboard
+// down (#323). Same "modal UI launched from the composer toolbar steals IME
+// state instead of overlaying it" family as the voice-record bar (#207) and the
+// long-press popover (#284).
+//
+// focusable = false keeps the keyboard up but opens two gaps versus a focusable
+// menu, restored here exactly as ConversationLongPressMenu does for #284:
+//   1. Back dismissal — Popup's dismissOnBackPress is a no-op while the popup is
+//      non-focusable, so Back would fall through to the IME/activity instead of
+//      closing the menu. A host-window BackHandler closes it without touching
+//      IME focus.
+//   2. Outside-tap click-through — taps outside a non-focusable popup are
+//      delivered to the windows beneath it, so a dismiss tap would also activate
+//      the underlying content. A full-window, non-focusable scrim Popup placed
+//      below the menu consumes those taps: tapping it dismisses the menu and the
+//      press is consumed so it never reaches the content. The scrim is itself
+//      non-focusable, so it too preserves the open keyboard.
+//
+// Positioning, anchoring and the menu chrome stay DropdownMenu's — only its
+// focus behavior and dismissal plumbing change.
+@Composable
+private fun KeyboardPreservingDropdownMenu(
+    expanded: Boolean,
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+    offset: DpOffset = DpOffset(0.dp, 0.dp),
+    shape: Shape = MenuDefaults.shape,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    // BackHandler + scrim only exist while the menu is open. They render in
+    // their own popup windows, so they never disturb the anchor's layout.
+    if (expanded) {
+        BackHandler(enabled = true) { onDismissRequest() }
+        // Scrim: composed before the menu so the menu renders on top of it.
+        // Fills the window and swallows any tap as a pure dismissal.
+        Popup(
+            properties =
+                PopupProperties(
+                    focusable = false,
+                    // The scrim owns outside-tap dismissal; the menu's own
+                    // outside-tap detection is disabled below so a single tap is
+                    // handled exactly once, here, and consumed.
+                    dismissOnClickOutside = false,
+                ),
+            onDismissRequest = onDismissRequest,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTapGestures { onDismissRequest() }
+                        },
+            )
+        }
+    }
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+        modifier = modifier,
+        offset = offset,
+        shape = shape,
+        properties =
+            PopupProperties(
+                focusable = false,
+                // Outside taps are handled by the scrim above (which also blocks
+                // click-through); disabling the menu's own outside-dismiss keeps
+                // a single tap from being processed twice.
+                dismissOnClickOutside = false,
+            ),
+        content = content,
+    )
+}
+
 // BasicTextField (not Material3 TextField) so the pill height isn't pinned
 // to the 56dp filled-textfield minimum.
 @Composable
@@ -12691,7 +12774,7 @@ private fun ComposerPill(
                             modifier = Modifier.size(22.dp),
                         )
                     }
-                    DropdownMenu(
+                    KeyboardPreservingDropdownMenu(
                         expanded = attachMenuOpen,
                         onDismissRequest = onAttachMenuDismiss,
                     ) {
