@@ -61,6 +61,22 @@ class NotificationChannelSpecTest {
     }
 
     @Test
+    fun emojiThatSanitizesToEmptyIsNotRoutedToReactions() {
+        // A reactionEmoji of only sanitizer-stripped code points (here a lone
+        // zero-width space) is non-blank to a raw isNullOrBlank() check but
+        // empties under clean(). It must NOT land on the REACTIONS channel,
+        // else it collides with the conversation's message card identity that
+        // the formatter (which uses the sanitized predicate) assigns it.
+        val zeroWidthSpace = String(Character.toChars(0x200B))
+        assertEquals(
+            NotificationChannelSpec.GROUP_MESSAGES,
+            NotificationChannelSpec.forUpdate(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, isDm = false, reactionEmoji = zeroWidthSpace),
+            ),
+        )
+    }
+
+    @Test
     fun inviteRoutesToTheInvitesChannel() {
         assertEquals(
             NotificationChannelSpec.INVITES,

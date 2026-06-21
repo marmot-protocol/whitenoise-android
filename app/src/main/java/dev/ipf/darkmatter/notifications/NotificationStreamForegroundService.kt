@@ -122,11 +122,18 @@ private object BackgroundConnectionNotification {
                 },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
+        val text = context.getString(R.string.background_connection_notification_text)
+        val hint = context.getString(R.string.background_connection_notification_hint)
         return NotificationCompat
             .Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_darkmatter)
             .setContentTitle(context.getString(R.string.background_connection_notification_title))
-            .setContentText(context.getString(R.string.background_connection_notification_text))
+            .setContentText(text)
+            // Collapsed view stays the compact one-liner; expanding reveals the
+            // hint teaching users they can long-press to hide this ongoing
+            // notification without killing the connection (per-channel disable
+            // is allowed on a LOW-importance channel).
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$text\n$hint"))
             .setContentIntent(pendingIntent)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setOngoing(true)
