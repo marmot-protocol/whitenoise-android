@@ -269,14 +269,14 @@
     <string name="missing_relay_lists">Manquant : %1$s</string>
     <string name="not_published">Non publié</string>
     <string name="publishing">Publication</string>
-    <string name="key_package_publishing_help">Republie le paquet de clés actuel vers les relais NIP-65 de ce compte, ou effectue une rotation vers un nouveau paquet. Les anciens paquets restent sur les relais jusqu’à leur suppression.</string>
+    <string name="key_package_publishing_help">Republie le paquet de clés actuel vers la liste de relais de ce compte, ou effectue une rotation vers un nouveau paquet. Les anciens paquets restent sur les relais jusqu’à leur suppression.</string>
     <string name="republish">Actualiser les Paquets de Clés</string>
     <string name="publish_new">Publier un Nouveau Paquet de Clés</string>
     <string name="published">Publié</string>
     <string name="no_key_packages_found">Aucun paquet de clés trouvé</string>
-    <string name="no_key_packages_found_help">Rien n’est en cache localement et les relais NIP-65 de ce compte n’ont renvoyé aucun événement de paquet de clés. Essayez &quot;Publier nouveau&quot;.</string>
+    <string name="no_key_packages_found_help">Rien n’est en cache localement et la liste de relais de ce compte n’a renvoyé aucun événement de paquet de clés. Essayez &quot;Publier nouveau&quot;.</string>
     <string name="delete_key_package_question">Supprimer le paquet de clés ?</string>
-    <string name="delete_key_package_help">Publie une suppression NIP-09 pour ce package de clés et l’efface du cache local.</string>
+    <string name="delete_key_package_help">Publie un événement de suppression pour ce package de clés et l’efface du cache local.</string>
     <string name="event_value">Événement : %1$s</string>
     <string name="delete_key_package">Supprimer le paquet de clés</string>
     <string name="event">Événement</string>

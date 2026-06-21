@@ -269,14 +269,14 @@
     <string name="missing_relay_lists">Mancante: %1$s</string>
     <string name="not_published">Non pubblicato</string>
     <string name="publishing">Editoria</string>
-    <string name="key_package_publishing_help">Ripubblica il pacchetto chiave corrente sui relay NIP-65 di questo account, oppure passa a uno nuovo. I vecchi pacchetti restano sui relay finché non vengono eliminati.</string>
+    <string name="key_package_publishing_help">Ripubblica il pacchetto chiave corrente sulla lista di relay di questo account, oppure passa a uno nuovo. I vecchi pacchetti restano sui relay finché non vengono eliminati.</string>
     <string name="republish">Aggiorna Pacchetti Chiavi</string>
     <string name="publish_new">Pubblica Nuovo Pacchetto Chiavi</string>
     <string name="published">Pubblicato</string>
     <string name="no_key_packages_found">Nessun pacchetto chiavi trovato</string>
-    <string name="no_key_packages_found_help">Niente è memorizzato localmente e i relay NIP-65 di questo account non hanno restituito eventi di pacchetti chiave. Prova &quot;Pubblica nuovo&quot;.</string>
+    <string name="no_key_packages_found_help">Niente è memorizzato localmente e la lista di relay di questo account non ha restituito eventi di pacchetti chiave. Prova &quot;Pubblica nuovo&quot;.</string>
     <string name="delete_key_package_question">Eliminare il pacchetto chiavi?</string>
-    <string name="delete_key_package_help">Pubblica un’eliminazione NIP-09 per questo pacchetto di chiavi e lo cancella dalla cache locale.</string>
+    <string name="delete_key_package_help">Pubblica un evento di eliminazione per questo pacchetto di chiavi e lo cancella dalla cache locale.</string>
     <string name="event_value">Evento: %1$s</string>
     <string name="delete_key_package">Elimina il pacchetto chiavi</string>
     <string name="event">Evento</string>

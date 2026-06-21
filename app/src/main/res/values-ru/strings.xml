@@ -273,14 +273,14 @@
     <string name="missing_relay_lists">Отсутствует: %1$s</string>
     <string name="not_published">Не опубликовано</string>
     <string name="publishing">Публикация</string>
-    <string name="key_package_publishing_help">Повторно опубликуйте текущий пакет ключей на реле NIP-65 этого аккаунта или замените его новым. Старые пакеты остаются на реле, пока не будут удалены.</string>
+    <string name="key_package_publishing_help">Повторно опубликуйте текущий пакет ключей в списке реле этого аккаунта или замените его новым. Старые пакеты остаются на реле, пока не будут удалены.</string>
     <string name="republish">Обновить Пакеты Ключей</string>
     <string name="publish_new">Опубликовать Новый Пакет Ключей</string>
     <string name="published">Опубликовано</string>
     <string name="no_key_packages_found">Пакеты ключей не найдены</string>
-    <string name="no_key_packages_found_help">Локально ничего не кэшировано, и реле NIP-65 этого аккаунта не вернули события пакетов ключей. Попробуйте &quot;Опубликовать новый&quot;.</string>
+    <string name="no_key_packages_found_help">Локально ничего не кэшировано, и список реле этого аккаунта не вернул события пакетов ключей. Попробуйте &quot;Опубликовать новый&quot;.</string>
     <string name="delete_key_package_question">Удалить пакет ключей?</string>
-    <string name="delete_key_package_help">Публикует удаление NIP-09 для этого пакета ключей и удаляет его из локального кэша.</string>
+    <string name="delete_key_package_help">Публикует событие удаления для этого пакета ключей и удаляет его из локального кэша.</string>
     <string name="event_value">Событие: %1$s</string>
     <string name="delete_key_package">Удалить пакет ключей</string>
     <string name="event">Событие</string>

@@ -62,6 +62,50 @@ class LocalizationResourceTest {
         assertEquals("Where I receive", englishValues["inbox"])
     }
 
+    // Guards the umbrella sweep from #381: user-visible string values must not
+    // expose raw NIP specification identifiers (e.g. "NIP-05", "NIP-65",
+    // "NIP-44") or the deprecated "NIP-EE" naming. NIP numbers are protocol
+    // implementation detail and mean nothing to a non-developer user; group
+    // encryption is the "Marmot Protocol", not "NIP-EE". Code identifiers,
+    // log lines and code comments are out of scope — this only inspects the
+    // textContent of <string> resources, not their keys (so the `nip_05` /
+    // `nip_65` resource *keys* are unaffected). If you need to reference a NIP
+    // for power users, keep it in a developer-facing log or comment, not in a
+    // user-visible string. See https://github.com/marmot-protocol/darkmatter-android/issues/381
+    @Test
+    fun userVisibleStringsDoNotExposeRawNipIdentifiers() {
+        val resDir =
+            listOf(File("src/main/res"), File("app/src/main/res"))
+                .first { it.exists() }
+
+        val resourceFiles =
+            buildList {
+                add(File(resDir, "values/strings.xml"))
+                resDir
+                    .listFiles()
+                    .orEmpty()
+                    .filter { it.isDirectory && it.name.startsWith("values-") }
+                    .map { File(it, "strings.xml") }
+                    .filter { it.exists() }
+                    .forEach { add(it) }
+            }
+
+        val offenders =
+            resourceFiles.flatMap { file ->
+                stringValues(file)
+                    .filter { (_, value) -> forbiddenNipPattern.containsMatchIn(value) }
+                    .map { (key, value) -> "${file.path}: $key=\"$value\"" }
+            }
+
+        assertTrue(
+            "User-visible string values must not expose raw NIP identifiers " +
+                "(NIP-<number> or the deprecated NIP-EE). Replace them with a " +
+                "human-readable description (see #381). Offenders:\n" +
+                offenders.joinToString("\n"),
+            offenders.isEmpty(),
+        )
+    }
+
     private fun stringKeys(file: File): Set<String> = stringValues(file).keys
 
     private fun stringValues(file: File): Map<String, String> {
@@ -84,6 +128,12 @@ class LocalizationResourceTest {
     }
 
     private companion object {
+        // Matches raw NIP specification identifiers in user-visible copy:
+        // "NIP-05", "NIP_44", "NIP 65", etc., plus the deprecated "NIP-EE"
+        // naming. Case-insensitive and tolerant of the hyphen/underscore/space
+        // separators a translator might introduce.
+        val forbiddenNipPattern = Regex("""NIP[-_ ]?(\d+|EE)""", RegexOption.IGNORE_CASE)
+
         val identicalValueAllowedKeys =
             setOf(
                 // Pure positional-format string ("current/total"); no
