@@ -374,8 +374,7 @@ object MentionComposer {
         candidates: List<Candidate>,
     ): ChipVisualText = visualText(text, candidatesByNpub(candidates))
 
-    fun candidatesByNpub(candidates: List<Candidate>): Map<String, Candidate> =
-        candidates.associateBy { it.npub.lowercase() }
+    fun candidatesByNpub(candidates: List<Candidate>): Map<String, Candidate> = candidates.associateBy { it.npub.lowercase() }
 
     fun visualText(
         text: String,
@@ -420,8 +419,7 @@ object MentionComposer {
         return "@$resolvedName"
     }
 
-    private fun looksLikeFullNpub(value: String): Boolean =
-        value.length == CANONICAL_NPUB_LENGTH && RAW_NPUB_DISPLAY_NAME.matches(value)
+    private fun looksLikeFullNpub(value: String): Boolean = value.length == CANONICAL_NPUB_LENGTH && RAW_NPUB_DISPLAY_NAME.matches(value)
 
     private fun shortChipNpub(npub: String): String = IdentityFormatter.short(npub, prefix = 8, suffix = 0)
 }
