@@ -236,7 +236,7 @@
     <string name="display_name">Profil adı</string>
     <string name="about">Hakkında</string>
     <string name="picture_url">Resim URL</string>
-    <string name="nip_05">NIP-05</string>
+    <string name="nip_05">Verified address</string>
     <string name="lightning">Yıldırım</string>
     <string name="publish_to_relays">Rölelere Yayınla</string>
     <string name="nsec_or_npub">Özel anahtarınızı girin</string>
@@ -257,7 +257,7 @@
     <string name="no_relays">Yapılandırılmış röle yok</string>
     <string name="remove_relay">Röle Kaldırılsın mı?</string>
     <string name="add_relay">Röle Ekle</string>
-    <string name="nip_65">NIP-65</string>
+    <string name="nip_65">Read/Write</string>
     <string name="inbox">Gelen Kutusu Röleleri</string>
     <string name="key_package">Anahtar paketi</string>
     <string name="published_relay_lists">Yayınlanan Aktarma Listeleri</string>

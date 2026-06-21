@@ -240,7 +240,7 @@
     <string name="display_name">Имя профиля</string>
     <string name="about">Описание</string>
     <string name="picture_url">Изображение URL</string>
-    <string name="nip_05">NIP-05</string>
+    <string name="nip_05">Verified address</string>
     <string name="lightning">Молния</string>
     <string name="publish_to_relays">Публикация в реле</string>
     <string name="nsec_or_npub">Введите ваш приватный ключ</string>
@@ -261,7 +261,7 @@
     <string name="no_relays">Реле не настроены</string>
     <string name="remove_relay">Удалить Реле?</string>
     <string name="add_relay">Добавить Реле</string>
-    <string name="nip_65">NIP-65</string>
+    <string name="nip_65">Read/Write</string>
     <string name="inbox">Входящие Реле</string>
     <string name="key_package">Пакет ключей</string>
     <string name="published_relay_lists">Опубликованные списки реле</string>

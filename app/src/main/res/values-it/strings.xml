@@ -236,7 +236,7 @@
     <string name="display_name">Nome profilo</string>
     <string name="about">Informazioni</string>
     <string name="picture_url">Immagine URL</string>
-    <string name="nip_05">NIP-05</string>
+    <string name="nip_05">Verified address</string>
     <string name="lightning">Fulmine</string>
     <string name="publish_to_relays">Pubblica su Relay</string>
     <string name="nsec_or_npub">Inserisci la tua chiave privata</string>
@@ -257,7 +257,7 @@
     <string name="no_relays">Nessun relay configurato</string>
     <string name="remove_relay">Rimuovere il Relay?</string>
     <string name="add_relay">Aggiungi Relay</string>
-    <string name="nip_65">NIP-65</string>
+    <string name="nip_65">Read/Write</string>
     <string name="inbox">Relay Posta in Arrivo</string>
     <string name="key_package">Pacchetto chiavi</string>
     <string name="published_relay_lists">Elenchi di inoltro pubblicati</string>

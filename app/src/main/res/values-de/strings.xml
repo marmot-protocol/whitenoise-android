@@ -236,7 +236,7 @@
     <string name="display_name">Profilname</string>
     <string name="about">Über</string>
     <string name="picture_url">Bild URL</string>
-    <string name="nip_05">NIP-05</string>
+    <string name="nip_05">Verified address</string>
     <string name="lightning">Blitz</string>
     <string name="publish_to_relays">Auf Relays veröffentlichen</string>
     <string name="nsec_or_npub">Privaten Schlüssel eingeben</string>
@@ -257,7 +257,7 @@
     <string name="no_relays">Keine Relays konfiguriert</string>
     <string name="remove_relay">Relay entfernen?</string>
     <string name="add_relay">Relay hinzufügen</string>
-    <string name="nip_65">NIP-65</string>
+    <string name="nip_65">Read/Write</string>
     <string name="inbox">Posteingang-Relays</string>
     <string name="key_package">Schlüsselpaket</string>
     <string name="published_relay_lists">Veröffentlichte Relay-Listen</string>

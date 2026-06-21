@@ -235,7 +235,7 @@
     <string name="display_name">名称</string>
     <string name="about">关于</string>
     <string name="picture_url">图片URL</string>
-    <string name="nip_05">NIP-05</string>
+    <string name="nip_05">Verified address</string>
     <string name="lightning">闪电</string>
     <string name="publish_to_relays">发布到中继</string>
     <string name="nsec_or_npub">输入您的私钥</string>
@@ -256,7 +256,7 @@
     <string name="no_relays">未配置中继器</string>
     <string name="remove_relay">移除中继器？</string>
     <string name="add_relay">添加中继器</string>
-    <string name="nip_65">NIP-65</string>
+    <string name="nip_65">Read/Write</string>
     <string name="inbox">收件箱中继器</string>
     <string name="key_package">密钥包</string>
     <string name="published_relay_lists">已发布的中继列表</string>
