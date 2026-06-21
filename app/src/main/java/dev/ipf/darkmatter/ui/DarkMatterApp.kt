@@ -7927,9 +7927,15 @@ private fun ConversationScreen(
                     val mentionCandidates =
                         if (mentionPickerEnabled) {
                             val revision = appState.profileRevisionForCompose
-                            remember(controller.members, revision) {
+                            val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                            remember(controller.members, revision, activeAccountIdHex) {
                                 controller.members
-                                    .filterNot { it.local }
+                                    // Exclude only the active account, not every member
+                                    // flagged `local`. Marmot sets `local` for any identity
+                                    // present on the device, which on some rosters marks all
+                                    // members local and would empty the mention list entirely.
+                                    // Mirrors the isActiveAccountMember gate used for admin actions.
+                                    .filterNot { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
                                     .map { member ->
                                         MentionComposer.Candidate(
                                             accountIdHex = member.memberIdHex,
