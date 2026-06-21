@@ -419,6 +419,7 @@
     <string name="notification_reacted">reacted %1$s</string>
     <string name="background_connection_notification_title">Dark Matter is connected</string>
     <string name="background_connection_notification_text">Listening for messages and invites</string>
+    <string name="background_connection_notification_hint">Long-press to hide this notification. The connection stays on.</string>
     <string name="notification_channel_background_connection">Background connection</string>
     <string name="notification_channel_background_connection_description">Keeps Dark Matter connected for local notifications</string>
     <string name="toast_restarting">Restarting</string>

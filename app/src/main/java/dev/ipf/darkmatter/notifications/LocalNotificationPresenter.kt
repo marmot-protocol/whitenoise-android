@@ -201,7 +201,14 @@ class LocalNotificationPresenter(
      * before cancelling. Returns true once the live notification was found and
      * re-posted; false if it isn't in the active set yet (caller should retry —
      * the extension is applied a beat after the reply broadcast fires).
+     *
+     * The re-post is rebuilt FROM the live notification (recovering its content
+     * intent, MessagingStyle, category, and reply/mark-read actions) with only
+     * the RemoteInput history added on top — so if the follow-up cancel is
+     * dropped or delayed, the card that survives is still the functional
+     * conversation card, not a blank tap-dead one.
      */
+    @SuppressLint("MissingPermission")
     fun markDirectReplyHandled(
         notificationTag: String,
         notificationId: Int,
@@ -217,8 +224,7 @@ class LocalNotificationPresenter(
         return runCatching {
             val resolved =
                 NotificationCompat
-                    .Builder(context, active.notification.channelId)
-                    .setSmallIcon(R.drawable.ic_stat_darkmatter)
+                    .Builder(context, active.notification)
                     .setRemoteInputHistory(arrayOf(replyText))
                     .setSilent(true)
                     .setOnlyAlertOnce(true)

@@ -79,7 +79,11 @@ enum class NotificationChannelSpec(
                 NotificationTriggerFfi.GROUP_INVITE -> INVITES
                 NotificationTriggerFfi.NEW_MESSAGE ->
                     when {
-                        !update.reactionEmoji.isNullOrBlank() -> REACTIONS
+                        // Route off the same sanitized-emoji predicate the
+                        // formatter uses for tag/id/body, so the two sites can't
+                        // disagree and post a reaction on the REACTIONS channel
+                        // while it reuses the message card's identity.
+                        LocalNotificationFormatter.isReaction(update) -> REACTIONS
                         update.isDm -> DIRECT_MESSAGES
                         else -> GROUP_MESSAGES
                     }
