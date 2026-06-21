@@ -221,19 +221,30 @@ object VoicePlaybackController {
         // callbacks fire on an internal MediaPlayer thread. State that we
         // also touch from Main (player, currentKey, _state) must only be
         // mutated on Main; hop through scope.launch.
-        mp.setOnCompletionListener {
+        mp.setOnCompletionListener { p ->
             scope.launch {
+                // Bind to this player instance. These callbacks fire on the
+                // MediaPlayer thread and hop to Main, so a completion for a clip
+                // whose player was already torn down by a newer play() can land
+                // mid-transition. Without this guard it would reset state or
+                // auto-advance the wrong clip (onCompletion of the old key). See #470.
+                if (player !== p) return@launch
                 val completed = currentKey
                 releasePlayerInternal()
                 _state.value = PlaybackState()
                 if (completed != null) onCompletion?.invoke(completed)
             }
         }
-        mp.setOnErrorListener { _, what, extra ->
+        mp.setOnErrorListener { p, what, extra ->
             scope.launch {
                 Log.w(TAG, "MediaPlayer error what=$what extra=$extra")
-                releasePlayerInternal()
-                _state.value = PlaybackState()
+                // Same stale-callback guard as completion (#470): only the active
+                // player's error tears playback down; a superseded player has
+                // already been released by the play() that replaced it.
+                if (player === p) {
+                    releasePlayerInternal()
+                    _state.value = PlaybackState()
+                }
             }
             true
         }
@@ -347,11 +358,14 @@ object VoicePlaybackController {
                 while (true) {
                     val mp = player ?: break
                     if (!mp.isPlaying) break
+                    // Only positionMs advances per tick. durationMs is constant
+                    // for a clip and was set (with the >0 guard) at start(); re-reading
+                    // mp.duration each tick is a needless JNI call and a non-positive
+                    // mid-stream report would clobber the cached value (#275 family, #470).
                     _state.value =
                         _state.value.copy(
                             isPlaying = true,
                             positionMs = mp.currentPosition,
-                            durationMs = mp.duration,
                         )
                     delay(TICK_INTERVAL_MS)
                 }
