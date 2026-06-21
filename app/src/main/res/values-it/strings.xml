@@ -649,4 +649,6 @@
     <string name="media_quality_original">Originale</string>
     <string name="media_quality_original_subtitle">Risoluzione completa — file più grandi</string>
     <string name="media_quality_footer">I metadati di posizione e dispositivo (GPS EXIF, marca e modello) vengono sempre rimossi dalle foto, anche in Originale. Video e file audio selezionati vengono inviati così come sono; il bitrate audio si applica ai messaggi vocali registrati.</string>
+    <string name="profile_is_public">Il profilo è pubblico</string>
+    <string name="profile_public_description">Le informazioni del tuo profilo saranno visibili a tutti sulla rete.</string>
 </resources>

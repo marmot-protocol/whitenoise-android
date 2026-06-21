@@ -640,4 +640,6 @@
     <string name="media_quality_original">原始</string>
     <string name="media_quality_original_subtitle">完整分辨率 — 文件最大</string>
     <string name="media_quality_footer">照片中的位置和设备元数据（EXIF GPS、品牌和型号）始终会被移除，即使选择原始。视频和已选择的音频文件会按原样发送；音频码率适用于录制的语音消息。</string>
+    <string name="profile_is_public">个人资料是公开的</string>
+    <string name="profile_public_description">您的个人资料信息将对网络上的所有人可见。</string>
 </resources>

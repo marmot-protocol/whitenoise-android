@@ -137,6 +137,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
@@ -9498,6 +9499,48 @@ private fun GroupMutationErrorBanner(
     }
 }
 
+/**
+ * Static notice shown at the top of the Edit Profile screen warning the user
+ * that their kind:0 metadata is broadcast unencrypted to relays. Copy mirrors
+ * Whitenoise Flutter (`profileIsPublic` / `profilePublicDescription`) for
+ * cross-client parity. See #380. Informational (tonal secondary container),
+ * not an error — it's expected behaviour the user should simply be aware of.
+ */
+@Composable
+private fun ProfilePublicWarning() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                Icons.Default.Public,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    stringResource(R.string.profile_is_public),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    stringResource(R.string.profile_public_description),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun GroupActionRow(
     icon: @Composable () -> Unit,
@@ -14875,6 +14918,16 @@ private fun ProfileEditScreen(
                             )
                         }
                     }
+                }
+            }
+            if (active != null) {
+                item {
+                    // Public-profile notice (#380): kind:0 metadata is broadcast
+                    // unencrypted to relays, so warn before the editable fields
+                    // that everything here is visible to the whole network. Copy
+                    // mirrors Whitenoise Flutter (profileIsPublic /
+                    // profilePublicDescription) for cross-client parity.
+                    ProfilePublicWarning()
                 }
             }
             item {

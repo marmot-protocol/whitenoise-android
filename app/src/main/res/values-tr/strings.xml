@@ -646,4 +646,6 @@
     <string name="media_quality_original">Özgün</string>
     <string name="media_quality_original_subtitle">Tam çözünürlük — en büyük dosyalar</string>
     <string name="media_quality_footer">Konum ve cihaz meta verileri (EXIF GPS, marka ve model) fotoğraflardan her zaman kaldırılır, Özgün dahil. Videolar ve seçilen ses dosyaları olduğu gibi gönderilir; ses bit hızı kaydedilen sesli mesajlara uygulanır.</string>
+    <string name="profile_is_public">Profil herkese açık</string>
+    <string name="profile_public_description">Profil bilgileriniz ağdaki herkes tarafından görülebilir.</string>
 </resources>

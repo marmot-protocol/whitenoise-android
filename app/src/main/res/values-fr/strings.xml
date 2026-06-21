@@ -649,4 +649,6 @@
     <string name="media_quality_original">Originale</string>
     <string name="media_quality_original_subtitle">Résolution complète — fichiers les plus volumineux</string>
     <string name="media_quality_footer">Les métadonnées de localisation et d\'appareil (GPS EXIF, marque et modèle) sont toujours retirées des photos, même en Originale. Les vidéos et fichiers audio choisis sont envoyés tels quels ; le débit audio concerne les messages vocaux enregistrés.</string>
+    <string name="profile_is_public">Le profil est public</string>
+    <string name="profile_public_description">Les informations de votre profil seront visibles par tous sur le réseau.</string>
 </resources>

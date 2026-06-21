@@ -640,4 +640,6 @@
     <string name="media_quality_original">原始</string>
     <string name="media_quality_original_subtitle">完整解析度 — 檔案最大</string>
     <string name="media_quality_footer">照片中的位置與裝置中繼資料（EXIF GPS、品牌和型號）一律會移除，即使選擇原始。影片和已選取的音訊檔會原樣傳送；音訊位元率套用於錄製的語音訊息。</string>
+    <string name="profile_is_public">個人檔案是公開的</string>
+    <string name="profile_public_description">您的個人檔案資訊會讓網路上的所有人看見。</string>
 </resources>

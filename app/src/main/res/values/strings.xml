@@ -306,6 +306,8 @@
     <string name="profile_nip05_invalid">Enter an address like name@example.com.</string>
     <string name="profile_lightning_hint">Lightning address, e.g. you@walletprovider.com</string>
     <string name="profile_lightning_invalid">Enter a Lightning address like name@example.com.</string>
+    <string name="profile_is_public">Profile is public</string>
+    <string name="profile_public_description">Your profile information will be visible to everyone on the network.</string>
     <string name="publish_to_relays">Publish to Relays</string>
     <string name="nsec_or_npub">nsec or npub</string>
     <string name="import_existing_identity">Import Existing Identity</string>
