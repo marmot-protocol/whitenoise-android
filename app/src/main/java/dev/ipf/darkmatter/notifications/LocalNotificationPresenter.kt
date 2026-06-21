@@ -202,11 +202,20 @@ class LocalNotificationPresenter(
      * re-posted; false if it isn't in the active set yet (caller should retry —
      * the extension is applied a beat after the reply broadcast fires).
      */
+    @SuppressLint("MissingPermission")
     fun markDirectReplyHandled(
         notificationTag: String,
         notificationId: Int,
         replyText: String,
     ): Boolean {
+        // Same POST_NOTIFICATIONS runtime gate as show(): without the
+        // permission the re-post can't land (and the card couldn't have been
+        // lifetime-extended in the first place), so the caller falls through to
+        // cancel(). The @SuppressLint above is honest because of this guard.
+        if (!canPostNotifications()) {
+            notificationDebug { "skip reply-handled tag=${notificationTag.take(16)} reason=permission" }
+            return false
+        }
         val active =
             runCatching {
                 context
