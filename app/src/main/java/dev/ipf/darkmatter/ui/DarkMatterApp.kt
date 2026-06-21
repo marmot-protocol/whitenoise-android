@@ -237,6 +237,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -356,6 +362,7 @@ import dev.ipf.darkmatter.state.ChatsController
 import dev.ipf.darkmatter.state.ConversationController
 import dev.ipf.darkmatter.state.ConversationControllerCopy
 import dev.ipf.darkmatter.state.DarkMatterAppState
+import dev.ipf.darkmatter.state.EnterKeyBehavior
 import dev.ipf.darkmatter.state.MediaAutoDownloadNetwork
 import dev.ipf.darkmatter.state.MediaAutoDownloadType
 import dev.ipf.darkmatter.state.MediaQuality
@@ -597,6 +604,14 @@ private val MediaQuality.subtitleRes: Int
             MediaQuality.Standard -> R.string.media_quality_standard_subtitle
             MediaQuality.High -> R.string.media_quality_high_subtitle
             MediaQuality.Original -> R.string.media_quality_original_subtitle
+        }
+
+private val EnterKeyBehavior.labelRes: Int
+    @StringRes
+    get() =
+        when (this) {
+            EnterKeyBehavior.SendMessage -> R.string.enter_key_behavior_send
+            EnterKeyBehavior.NewLine -> R.string.enter_key_behavior_newline
         }
 
 @Composable
@@ -7878,6 +7893,7 @@ private fun ConversationScreen(
                         mentionCandidates = mentionCandidates,
                         mentionPickerEnabled = mentionPickerEnabled,
                         autoFocusOnEnter = justCreated,
+                        enterKeyBehavior = appState.enterKeyBehavior,
                     )
                 }
             }
@@ -12230,6 +12246,7 @@ private fun ComposerBar(
     // tap. One-shot: a guard flag stops a revisit / recomposition from
     // re-opening the IME, and the flag is not persisted across process death.
     autoFocusOnEnter: Boolean = false,
+    enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
 ) {
     var attachMenuOpen by remember { mutableStateOf(false) }
     // Field state is a TextFieldValue (not a bare String) so the caret can
@@ -12281,6 +12298,34 @@ private fun ComposerBar(
             autoFocusConsumed = true
             runCatching { composerFocus.requestFocus() }
             keyboardController?.show()
+        }
+    }
+    // Single send path shared by the FAB and the Enter key (#404). Clears the
+    // input/draft and scroll-to-newest ONLY after the controller confirms the
+    // optimistic bubble is committed (it invokes onAccepted then). If a guard
+    // rejects the send the callback never runs, so the user's text stays in
+    // the field instead of vanishing silently (issue #264). For an in-place
+    // edit the controller short-circuits and never calls onAccepted; the
+    // LaunchedEffect that watches `editingMessageId` restores the pre-edit
+    // composer once edit state clears — so we pass a no-op and don't blank
+    // the field here.
+    val submitMessage: () -> Unit = {
+        if (text.isNotBlank()) {
+            val sendingEdit = editingMessageId != null
+            val sentText = text
+            onSend(sentText) {
+                if (!sendingEdit) {
+                    // onAccepted can land after the user has started typing the
+                    // next message (Enter-to-send makes that common). Only clear
+                    // if the field still holds exactly what we sent, so newly
+                    // typed text is never wiped.
+                    if (textFieldValue.text == sentText) {
+                        textFieldValue = TextFieldValue("")
+                        onDraftChange("")
+                    }
+                    onAfterSend()
+                }
+            }
         }
     }
     Column(
@@ -12433,6 +12478,8 @@ private fun ComposerBar(
                     // single styled token while composing. Only when the picker
                     // is enabled (groups) — DMs never insert chips.
                     highlightMentionChips = mentionPickerEnabled,
+                    enterKeyBehavior = enterKeyBehavior,
+                    onImeSend = submitMessage,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -12498,31 +12545,7 @@ private fun ComposerBar(
                 }
             } else {
                 FloatingActionButton(
-                    onClick = {
-                        if (text.isNotBlank()) {
-                            val sendingEdit = editingMessageId != null
-                            val sentText = text
-                            // Clear the input/draft and scroll-to-newest ONLY
-                            // after the controller confirms the optimistic
-                            // bubble is committed (it invokes onAccepted then).
-                            // If a guard rejects the send the callback never
-                            // runs, so the user's text stays in the field
-                            // instead of vanishing silently (issue #264).
-                            //
-                            // For an in-place edit the controller short-circuits
-                            // and never calls onAccepted; the LaunchedEffect that
-                            // watches `editingMessageId` restores the pre-edit
-                            // composer (text + caret) once edit state clears — so
-                            // we pass a no-op and don't blank the field here.
-                            onSend(sentText) {
-                                if (!sendingEdit) {
-                                    textFieldValue = TextFieldValue("")
-                                    onDraftChange("")
-                                    onAfterSend()
-                                }
-                            }
-                        }
-                    },
+                    onClick = { submitMessage() },
                     modifier = Modifier.size(44.dp),
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -12919,6 +12942,8 @@ private fun ComposerPill(
     onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
     highlightMentionChips: Boolean = false,
+    enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
+    onImeSend: () -> Unit = {},
 ) {
     // #414: paint `@npub1…` chip runs with the accent color + slight background
     // tint so a mention reads as one styled token while composing. The mapping
@@ -12973,7 +12998,28 @@ private fun ComposerPill(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .focusRequester(composerFocus),
+                            .focusRequester(composerFocus)
+                            // #404: honor the Enter-key toggle for hardware
+                            // keyboards (Bluetooth/foldable/ChromeOS). Shift+Enter
+                            // always inserts a line break as an escape hatch; in
+                            // NewLine mode a bare Enter falls through to the normal
+                            // newline insertion.
+                            .onPreviewKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown &&
+                                    (event.key == Key.Enter || event.key == Key.NumPadEnter)
+                                ) {
+                                    when {
+                                        event.isShiftPressed -> false
+                                        enterKeyBehavior == EnterKeyBehavior.SendMessage -> {
+                                            onImeSend()
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                } else {
+                                    false
+                                }
+                            },
                     textStyle =
                         LocalTextStyle.current.copy(
                             color = MaterialTheme.colorScheme.onSurface,
@@ -12981,12 +13027,21 @@ private fun ComposerPill(
                         ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     visualTransformation = mentionVisualTransformation,
+                    // #404: in SendMessage mode the soft-keyboard action sends;
+                    // in NewLine mode the IME shows an Enter/newline key that
+                    // inserts `\n`.
                     keyboardOptions =
                         KeyboardOptions(
                             capitalization = KeyboardCapitalization.Sentences,
                             keyboardType = KeyboardType.Text,
-                            imeAction = ImeAction.Default,
+                            imeAction =
+                                if (enterKeyBehavior == EnterKeyBehavior.SendMessage) {
+                                    ImeAction.Send
+                                } else {
+                                    ImeAction.Default
+                                },
                         ),
+                    keyboardActions = KeyboardActions(onSend = { onImeSend() }),
                     maxLines = 5,
                 )
                 if (textFieldValue.text.isEmpty()) {
@@ -13282,6 +13337,17 @@ private fun AppearanceScreen(
                             title = stringResource(option.labelRes),
                             selected = appState.languageTag == option.tag,
                             onClick = { appState.updateLanguageTag(option.tag) },
+                        )
+                    }
+                }
+            }
+            item {
+                SectionCard(title = stringResource(R.string.enter_key_behavior_title)) {
+                    EnterKeyBehavior.entries.forEach { behavior ->
+                        SelectableSettingsRow(
+                            title = stringResource(behavior.labelRes),
+                            selected = appState.enterKeyBehavior == behavior,
+                            onClick = { appState.updateEnterKeyBehavior(behavior) },
                         )
                     }
                 }

@@ -514,6 +514,9 @@
     <string name="media_type_audio">Аудио</string>
     <string name="media_type_video">Видео</string>
     <string name="media_type_documents">Документы</string>
+    <string name="enter_key_behavior_title">Поведение клавиши Enter</string>
+    <string name="enter_key_behavior_send">Отправить сообщение</string>
+    <string name="enter_key_behavior_newline">Новая строка</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d изображение выбрано</item>
         <item quantity="few">%1$d изображения выбрано</item>

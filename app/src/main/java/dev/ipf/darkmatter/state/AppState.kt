@@ -429,6 +429,11 @@ class DarkMatterAppState(
     )
         private set
 
+    var enterKeyBehavior by mutableStateOf(
+        EnterKeyBehavior.fromPreference(preferences.getString(ENTER_KEY_BEHAVIOR_KEY, null)),
+    )
+        private set
+
     var languageTag by mutableStateOf(preferences.getString(LANGUAGE_TAG_KEY, null).orEmpty())
         private set
 
@@ -1472,6 +1477,11 @@ class DarkMatterAppState(
         if (updated == mediaAutoDownloadMatrix) return
         mediaAutoDownloadMatrix = updated
         preferences.edit().putString(mediaAutoDownloadPrefKey(activeAccountRef), updated.toPreference()).apply()
+    }
+
+    fun updateEnterKeyBehavior(behavior: EnterKeyBehavior) {
+        enterKeyBehavior = behavior
+        preferences.edit().putString(ENTER_KEY_BEHAVIOR_KEY, behavior.preferenceValue).apply()
     }
 
     /**
@@ -2610,6 +2620,7 @@ class DarkMatterAppState(
         // 3-state key, which this migrates from on first per-account load.
         private const val MEDIA_AUTO_DOWNLOAD_MATRIX_KEY_PREFIX = "media_auto_download_matrix:"
         private const val MEDIA_QUALITY_KEY = "media_quality"
+        private const val ENTER_KEY_BEHAVIOR_KEY = "enter_key_behavior"
         private const val DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY = "default_notifications_enable_attempted"
 
         // 24 MiB cap on decrypted attachment bytes resident in memory —

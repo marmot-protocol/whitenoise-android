@@ -506,6 +506,9 @@
     <string name="media_type_audio">音訊</string>
     <string name="media_type_video">影片</string>
     <string name="media_type_documents">文件</string>
+    <string name="enter_key_behavior_title">輸入鍵行為</string>
+    <string name="enter_key_behavior_send">傳送訊息</string>
+    <string name="enter_key_behavior_newline">換行</string>
     <plurals name="media_selected_count">
         <item quantity="other">已選擇 %1$d 張圖片</item>
     </plurals>

@@ -613,6 +613,9 @@
     <string name="media_quality_original">Original</string>
     <string name="media_quality_original_subtitle">Full resolution — largest files</string>
     <string name="media_quality_footer">Location and device metadata (EXIF GPS, make and model) are always removed from photos, even on Original. Videos and picked audio files are sent as-is; the audio bitrate applies to recorded voice notes.</string>
+    <string name="enter_key_behavior_title">Enter key behavior</string>
+    <string name="enter_key_behavior_send">Send message</string>
+    <string name="enter_key_behavior_newline">New line</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d image selected</item>
         <item quantity="other">%1$d images selected</item>
