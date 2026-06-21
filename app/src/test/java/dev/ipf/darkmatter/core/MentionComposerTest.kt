@@ -277,6 +277,17 @@ class MentionComposerTest {
         assertEquals("@npub1qqq...", visual.text)
     }
 
+    @Test
+    fun visualTextKeepsNpubPrefixedDisplayNameThatIsNotRawNpub() {
+        val npubNamedCandidate = alice.copy(displayName = "npub1_collector_of_things")
+        val visual = MentionComposer.visualText(
+            "@$aliceNpub",
+            MentionComposer.candidatesByNpub(listOf(npubNamedCandidate)),
+        )
+
+        assertEquals("@npub1_collector_of_things", visual.text)
+    }
+
     // --- clampSelectionOutOfChips -------------------------------------------
 
     @Test
