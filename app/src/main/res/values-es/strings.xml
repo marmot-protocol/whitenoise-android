@@ -159,6 +159,18 @@
     <string name="copy_text">Copiar texto</string>
     <string name="open_emoji_picker">Abrir selector de emojis</string>
     <string name="reply">Responder</string>
+    <string name="forward">Reenviar</string>
+    <string name="forward_to">Reenviar a</string>
+    <string name="forward_search_chats">Buscar chats</string>
+    <string name="forward_no_chats">No hay otros chats a los que reenviar.</string>
+    <string name="forward_no_matches">Ningun chat coincide con tu busqueda.</string>
+    <plurals name="forward_to_chats_count">
+        <item quantity="one">Reenviar a %1$d chat</item>
+        <item quantity="other">Reenviar a %1$d chats</item>
+    </plurals>
+    <string name="toast_forwarded_to_chats">Reenviado a %1$s chats</string>
+    <string name="toast_forwarded_partial">Reenviado a %1$s chats; algunos fallaron</string>
+    <string name="toast_forward_failed">No se pudo reenviar el mensaje</string>
     <string name="delete">Eliminar</string>
     <string name="sent">Enviado</string>
     <string name="send_failed">Error al enviar el mensaje. Por favor, inténtalo de nuevo.</string>
