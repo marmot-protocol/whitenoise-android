@@ -13160,13 +13160,17 @@ private fun ComposerPill(
     // (`@alice` when the profile is resolved, short `@npub1…` otherwise)
     // while keeping the backing TextFieldValue canonical for send/markdown.
     val chipColor = MaterialTheme.colorScheme.primary
+    val mentionCandidateLookup =
+        remember(highlightMentionChips, mentionCandidates) {
+            if (highlightMentionChips) MentionComposer.candidatesByNpub(mentionCandidates) else emptyMap()
+        }
     val mentionVisualTransformation =
-        remember(highlightMentionChips, chipColor, mentionCandidates) {
+        remember(highlightMentionChips, chipColor, mentionCandidateLookup) {
             if (!highlightMentionChips) {
                 VisualTransformation.None
             } else {
                 VisualTransformation { text ->
-                    val visual = MentionComposer.visualText(text.text, mentionCandidates)
+                    val visual = MentionComposer.visualText(text.text, mentionCandidateLookup)
                     val styled =
                         buildAnnotatedString {
                             append(visual.text)

@@ -49,7 +49,11 @@ object MentionComposer {
      * greedily lets us treat a partially-typed or future-length entity as one
      * token too.
      */
-    private val MENTION_CHIP = Regex("@npub1[ac-hj-np-z02-9]+")
+    private const val CANONICAL_NPUB_LENGTH = 63
+    private const val NPUB_BODY_CHAR_CLASS = "[ac-hj-np-z02-9]"
+
+    private val MENTION_CHIP = Regex("@npub1$NPUB_BODY_CHAR_CLASS+")
+    private val RAW_NPUB_DISPLAY_NAME = Regex("npub1$NPUB_BODY_CHAR_CLASS{58}", RegexOption.IGNORE_CASE)
 
     /**
      * The active `@`-query at [caret] in [text], or null when the caret is not
@@ -361,17 +365,25 @@ object MentionComposer {
     /**
      * Build the composer's visible text for mention chips without changing the
      * stored text. The backing string remains canonical `@npub…`; only the
-     * visual layer swaps each chip for `@displayName`, or a short `@npub…`
-     * fallback while profile data is still unresolved.
+     * visual layer swaps each chip for its resolved display label, or a short
+     * `@npub…` fallback while profile data is still unresolved. The label may
+     * be shorter or longer than the stored chip.
      */
     fun visualText(
         text: String,
         candidates: List<Candidate>,
+    ): ChipVisualText = visualText(text, candidatesByNpub(candidates))
+
+    fun candidatesByNpub(candidates: List<Candidate>): Map<String, Candidate> =
+        candidates.associateBy { it.npub.lowercase() }
+
+    fun visualText(
+        text: String,
+        candidatesByNpub: Map<String, Candidate>,
     ): ChipVisualText {
         val ranges = chipRanges(text)
         if (ranges.isEmpty()) return ChipVisualText(text = text, ranges = emptyList(), originalLength = text.length)
 
-        val candidatesByNpub = candidates.associateBy { it.npub.lowercase() }
         val transformed = StringBuilder()
         val transformedRanges = mutableListOf<ChipVisualRange>()
         var sourceOffset = 0
@@ -400,16 +412,16 @@ object MentionComposer {
         npub: String,
         candidate: Candidate?,
     ): String {
-        val resolvedName =
-            candidate
-                ?.displayName
-                ?.trim()
-                ?.removePrefix("@")
-                ?.takeIf { it.isNotBlank() }
-                ?.takeUnless { it.equals(npub, ignoreCase = true) }
-                ?.takeUnless { it.startsWith("npub1", ignoreCase = true) && it.length > 20 }
-        return "@${resolvedName ?: shortChipNpub(npub)}"
+        val resolvedName = candidate?.displayName?.trim()?.removePrefix("@")
+        if (resolvedName.isNullOrBlank()) return "@${shortChipNpub(npub)}"
+        if (resolvedName.equals(npub, ignoreCase = true)) return "@${shortChipNpub(npub)}"
+        if (looksLikeFullNpub(resolvedName)) return "@${shortChipNpub(npub)}"
+
+        return "@$resolvedName"
     }
+
+    private fun looksLikeFullNpub(value: String): Boolean =
+        value.length == CANONICAL_NPUB_LENGTH && RAW_NPUB_DISPLAY_NAME.matches(value)
 
     private fun shortChipNpub(npub: String): String = IdentityFormatter.short(npub, prefix = 8, suffix = 0)
 }
