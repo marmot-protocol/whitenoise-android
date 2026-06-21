@@ -317,6 +317,7 @@ import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.AvatarImageLoader
 import dev.ipf.darkmatter.core.ChatListIdentifierSearch
 import dev.ipf.darkmatter.core.ChatListMessageSearch
+import dev.ipf.darkmatter.core.ClipboardPasteAffordance
 import dev.ipf.darkmatter.core.DiagnosticFormatter
 import dev.ipf.darkmatter.core.EditState
 import dev.ipf.darkmatter.core.GroupProjector
@@ -1017,11 +1018,12 @@ private fun PublicIdentifierFieldTrailingAction(
     allowHexPublicKey: Boolean = true,
     onValueChange: (String) -> Unit,
 ) {
-    val clipboardText = rememberClipboardPlainText()
-    val pasteValue =
-        remember(clipboardText, allowHexPublicKey) {
-            RecipientReference.plausibleClipboardInput(clipboardText, allowHexPublicKey)
+    val context = LocalContext.current
+    val clipboardManager =
+        remember(context) {
+            ContextCompat.getSystemService(context, android.content.ClipboardManager::class.java)
         }
+    val canOfferPaste = rememberClipboardCanOfferPaste(clipboardManager)
 
     when {
         value.isNotEmpty() -> {
@@ -1029,8 +1031,18 @@ private fun PublicIdentifierFieldTrailingAction(
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear))
             }
         }
-        pasteValue != null -> {
-            IconButton(onClick = { onValueChange(pasteValue) }, enabled = enabled) {
+        canOfferPaste -> {
+            IconButton(
+                onClick = {
+                    val pasteValue =
+                        ClipboardPasteAffordance.pasteValue(
+                            clipboardManager?.primaryClipPlainText(context),
+                            allowHexPublicKey,
+                        )
+                    if (pasteValue != null) onValueChange(pasteValue)
+                },
+                enabled = enabled,
+            ) {
                 Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
             }
         }
@@ -1038,32 +1050,30 @@ private fun PublicIdentifierFieldTrailingAction(
 }
 
 @Composable
-private fun rememberClipboardPlainText(): String? {
-    val context = LocalContext.current
-    val clipboardManager =
-        remember(context) {
-            ContextCompat.getSystemService(context, android.content.ClipboardManager::class.java)
-        }
-    var clipboardText by remember(clipboardManager, context) {
-        mutableStateOf(clipboardManager?.primaryClipPlainText(context))
+private fun rememberClipboardCanOfferPaste(clipboardManager: android.content.ClipboardManager?): Boolean {
+    var canOfferPaste by remember(clipboardManager) {
+        mutableStateOf(clipboardManager.canOfferTextPaste())
     }
 
-    DisposableEffect(clipboardManager, context) {
+    DisposableEffect(clipboardManager) {
         if (clipboardManager == null) {
             onDispose { }
         } else {
             val listener =
                 android.content.ClipboardManager.OnPrimaryClipChangedListener {
-                    clipboardText = clipboardManager.primaryClipPlainText(context)
+                    canOfferPaste = clipboardManager.canOfferTextPaste()
                 }
             clipboardManager.addPrimaryClipChangedListener(listener)
-            clipboardText = clipboardManager.primaryClipPlainText(context)
+            canOfferPaste = clipboardManager.canOfferTextPaste()
             onDispose { clipboardManager.removePrimaryClipChangedListener(listener) }
         }
     }
 
-    return clipboardText
+    return canOfferPaste
 }
+
+private fun android.content.ClipboardManager?.canOfferTextPaste(): Boolean =
+    this?.primaryClipDescription?.hasMimeType(ClipboardPasteAffordance.TEXT_MIME_TYPE_PATTERN) ?: false
 
 private fun android.content.ClipboardManager.primaryClipPlainText(context: android.content.Context): String? =
     primaryClip
