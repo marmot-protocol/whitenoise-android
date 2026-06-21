@@ -89,6 +89,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -356,6 +358,7 @@ import dev.ipf.darkmatter.state.ConversationControllerCopy
 import dev.ipf.darkmatter.state.DarkMatterAppState
 import dev.ipf.darkmatter.state.MediaAutoDownloadNetwork
 import dev.ipf.darkmatter.state.MediaAutoDownloadType
+import dev.ipf.darkmatter.state.MediaQuality
 import dev.ipf.darkmatter.state.MessageStatus
 import dev.ipf.darkmatter.state.MessageStatusLabels
 import dev.ipf.darkmatter.state.OutgoingMessageIndicator
@@ -574,6 +577,26 @@ private val AppThemeMode.labelRes: Int
             AppThemeMode.Light -> R.string.theme_light
             AppThemeMode.Dark -> R.string.theme_dark
             AppThemeMode.Amoled -> R.string.theme_amoled
+        }
+
+private val MediaQuality.labelRes: Int
+    @StringRes
+    get() =
+        when (this) {
+            MediaQuality.Low -> R.string.media_quality_low
+            MediaQuality.Standard -> R.string.media_quality_standard
+            MediaQuality.High -> R.string.media_quality_high
+            MediaQuality.Original -> R.string.media_quality_original
+        }
+
+private val MediaQuality.subtitleRes: Int
+    @StringRes
+    get() =
+        when (this) {
+            MediaQuality.Low -> R.string.media_quality_low_subtitle
+            MediaQuality.Standard -> R.string.media_quality_standard_subtitle
+            MediaQuality.High -> R.string.media_quality_high_subtitle
+            MediaQuality.Original -> R.string.media_quality_original_subtitle
         }
 
 @Composable
@@ -2917,6 +2940,11 @@ private const val MEDIA_ATTACHMENT_MAX_BYTES = ConversationController.MEDIA_RETA
 // the actual heap budget rather than letting the user pick more than the
 // controller can ever hold.
 private const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
+
+private data class ImageAttachmentReadOutcome(
+    val attachment: PendingAttachment?,
+    val overflowed: Boolean = false,
+)
 
 /** Fixed height of an in-timeline image bubble — constant across load states
  *  so async decode never reflows the list (would break the open-time anchor). */
@@ -6679,6 +6707,52 @@ private fun ConversationScreen(
         }
     }
 
+    fun readImageAttachment(
+        uri: android.net.Uri,
+        remainingBytes: Long,
+    ): ImageAttachmentReadOutcome {
+        val quality = appState.mediaQuality
+        if (quality.preservesOriginalImageBytes) {
+            val cap = remainingBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            when (val original = MediaPipeline.readOriginalImageForUpload(context.contentResolver, uri, cap)) {
+                is MediaPipeline.OriginalImageReadResult.Success ->
+                    return ImageAttachmentReadOutcome(
+                        PendingAttachment(
+                            plaintextBytes = original.image.bytes,
+                            mediaType = original.image.mediaType,
+                            fileName = original.image.fileName,
+                            dim = original.image.dim,
+                            thumbhash = original.image.thumbhash,
+                        ),
+                    )
+                MediaPipeline.OriginalImageReadResult.TooLarge -> return ImageAttachmentReadOutcome(null, overflowed = true)
+                MediaPipeline.OriginalImageReadResult.Failed,
+                MediaPipeline.OriginalImageReadResult.Unsupported -> Unit // Fall back to JPEG re-encode so unsupported containers still strip metadata.
+            }
+        }
+        val jpeg =
+            MediaPipeline.readDownscaledJpeg(
+                context.contentResolver,
+                uri,
+                maxEdgePx = quality.imageMaxEdgePx,
+                quality = quality.imageJpegQuality,
+            ) ?: return ImageAttachmentReadOutcome(null)
+        if (jpeg.bytes.size.toLong() > remainingBytes) {
+            return ImageAttachmentReadOutcome(null, overflowed = true)
+        }
+        val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
+        val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
+        return ImageAttachmentReadOutcome(
+            PendingAttachment(
+                plaintextBytes = jpeg.bytes,
+                mediaType = MediaPipeline.RECOMPRESSED_MIME,
+                fileName = fileName,
+                dim = "${jpeg.width}x${jpeg.height}",
+                thumbhash = jpeg.thumbhash,
+            ),
+        )
+    }
+
     val voiceRecordingController =
         // Re-key on every captured dependency: chat.id (basic), controller
         // (avoids dispatching through a stale ConversationController when
@@ -6706,6 +6780,10 @@ private fun ConversationScreen(
                         appState.present(voiceTooShortMsg)
                     }
                 },
+                // Honor the user's media-quality ceiling for voice notes.
+                // Read at record-start (the controller is not re-keyed on the
+                // quality state) so a setting change applies to the next clip.
+                bitrateProvider = { appState.mediaQuality.audioBitrateBps },
             )
         }
     DisposableEffect(voiceRecordingController) {
@@ -6807,17 +6885,12 @@ private fun ConversationScreen(
                                     MediaPipeline.VideoReadResult.Failed -> continue
                                 }
                             } else {
-                                val jpeg =
-                                    MediaPipeline.readDownscaledJpeg(context.contentResolver, uri) ?: continue
-                                val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
-                                val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
-                                PendingAttachment(
-                                    plaintextBytes = jpeg.bytes,
-                                    mediaType = MediaPipeline.RECOMPRESSED_MIME,
-                                    fileName = fileName,
-                                    dim = "${jpeg.width}x${jpeg.height}",
-                                    thumbhash = jpeg.thumbhash,
-                                )
+                                val image = readImageAttachment(uri, remaining)
+                                if (image.overflowed) {
+                                    overflowed = true
+                                    continue
+                                }
+                                image.attachment ?: continue
                             }
                         consumed += attachment.plaintextBytes.size.toLong()
                         out += attachment
@@ -6847,10 +6920,11 @@ private fun ConversationScreen(
         }
     }
 
-    // Read each picked document URI as raw bytes (no recompression — PDFs,
-    // archives, audio etc. travel through the same kind:9 album path as
-    // images via `sendAttachments`). MIME comes from the content resolver;
-    // filename from `OpenableColumns.DISPLAY_NAME`.
+    // Read picked document URIs into attachments. Non-image documents are kept
+    // as raw bytes; image/* picks from Files use the same media-quality and
+    // metadata-stripping path as visual image picks before joining the document
+    // send path. MIME comes from the content resolver; filename from
+    // `OpenableColumns.DISPLAY_NAME`.
     //
     // Two-layer size guard:
     //   1. Per-attachment ceiling: skip any single pick that already declares
@@ -6882,15 +6956,42 @@ private fun ConversationScreen(
             var rejected = false
             var albumOverflowed = false
             for (uri in uris) {
-                val declaredSize = queryContentSize(context.contentResolver, uri)
-                if (declaredSize > 0L && declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
-                    rejected = true
-                    continue
-                }
+                val resolvedMime =
+                    context.contentResolver
+                        .getType(uri)
+                        .orEmpty()
+                        .takeIf { it.isNotBlank() }
+                        ?: "application/octet-stream"
                 val remainingAlbumBudget = (bytesBudget - albumBytes).coerceAtLeast(0L)
                 if (remainingAlbumBudget <= 0L) {
                     albumOverflowed = true
                     break
+                }
+                if (resolvedMime.startsWith("image/", ignoreCase = true)) {
+                    val image = readImageAttachment(uri, remainingAlbumBudget)
+                    if (image.overflowed) {
+                        albumOverflowed = true
+                        continue
+                    }
+                    val attachment = image.attachment
+                    if (attachment == null) {
+                        rejected = true
+                        continue
+                    }
+                    if (attachment.plaintextBytes.isEmpty()) continue
+                    val nextAlbumBytes = albumBytes + attachment.plaintextBytes.size.toLong()
+                    if (nextAlbumBytes > bytesBudget) {
+                        albumOverflowed = true
+                        continue
+                    }
+                    albumBytes = nextAlbumBytes
+                    accepted += attachment
+                    continue
+                }
+                val declaredSize = queryContentSize(context.contentResolver, uri)
+                if (declaredSize > 0L && declaredSize > MEDIA_ATTACHMENT_MAX_BYTES) {
+                    rejected = true
+                    continue
                 }
                 val perFileCap =
                     minOf(MEDIA_ATTACHMENT_MAX_BYTES, remainingAlbumBudget)
@@ -6912,25 +7013,13 @@ private fun ConversationScreen(
                     continue
                 }
                 albumBytes += bytes.size
-                val resolvedMime =
-                    context.contentResolver
-                        .getType(uri)
-                        .orEmpty()
-                        .takeIf { it.isNotBlank() }
-                        ?: "application/octet-stream"
                 val name = queryDisplayName(context.contentResolver, uri) ?: "file"
-                val dim =
-                    if (resolvedMime.startsWith("image/", ignoreCase = true)) {
-                        MediaPipeline.imageDimOrNull(bytes)
-                    } else {
-                        null
-                    }
                 accepted +=
                     PendingAttachment(
                         plaintextBytes = bytes,
                         mediaType = resolvedMime,
                         fileName = name,
-                        dim = dim,
+                        dim = null,
                     )
             }
             DocumentReadOutcome(accepted, rejected, albumOverflowed, albumBytes)
@@ -6974,16 +7063,12 @@ private fun ConversationScreen(
                             MediaPipeline.VideoReadResult.Failed -> continue
                         }
                     } else {
-                        val jpeg = MediaPipeline.readDownscaledJpeg(context.contentResolver, uri) ?: continue
-                        val sourceName = queryDisplayName(context.contentResolver, uri) ?: "image.jpg"
-                        val fileName = MediaPipeline.swapExtensionToJpg(sourceName)
-                        PendingAttachment(
-                            plaintextBytes = jpeg.bytes,
-                            mediaType = MediaPipeline.RECOMPRESSED_MIME,
-                            fileName = fileName,
-                            dim = "${jpeg.width}x${jpeg.height}",
-                            thumbhash = jpeg.thumbhash,
-                        )
+                        val image = readImageAttachment(uri, remaining)
+                        if (image.overflowed) {
+                            overflowed = true
+                            continue
+                        }
+                        image.attachment ?: continue
                     }
                 consumed += attachment.plaintextBytes.size.toLong()
                 out += attachment
@@ -7073,11 +7158,12 @@ private fun ConversationScreen(
             // filename/MIME metadata that doesn't benefit from grid
             // composition. Caption sticks with images when present;
             // otherwise it attaches to the first file send.
-            // Pre-compute thumbhash for any image-typed doc-picker attachments
-            // so receivers get the same blurred placeholder as the
-            // image-picker path. Bytes and MIME stay as-picked — only the
-            // hash field is filled in. Runs off-main so the staging-shelf
-            // dismiss animation doesn't stutter on a multi-image pick.
+            // Backfill thumbhash for any image-typed doc-picker attachments that
+            // lack one. image/* document picks usually arrive here already
+            // processed by the image privacy pipeline; this keeps the renderer
+            // defensive for legacy/raw sources while staying off-main so the
+            // staging-shelf dismiss animation doesn't stutter on multi-image
+            // picks.
             val readyDocAttachments =
                 if (docOutcome.attachments.isEmpty()) {
                     emptyList()
@@ -7138,8 +7224,9 @@ private fun ConversationScreen(
     // Picked URIs accumulate in `pendingDocumentUris` so they can ride the
     // same staging shelf as image picks; one Send dispatches both sides
     // through one kind:9 album. Bytes pass through without recompression —
-    // the bytes ride the same `sendAttachments(list, caption)` path since
-    // the FFI is MIME-agnostic.
+    // including picked/forwarded audio files. The send-quality audio bitrate
+    // is intentionally scoped to recorded voice notes until this client grows
+    // a general audio transcode path.
     val documentPickerLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.OpenMultipleDocuments(),
@@ -13236,6 +13323,9 @@ private fun AutoDownloadDataScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            item {
+                MediaQualitySettingsCard(appState)
+            }
             MediaAutoDownloadNetwork.entries.forEach { network ->
                 item {
                     SectionCard(title = stringResource(network.labelRes)) {
@@ -13294,6 +13384,61 @@ private fun SelectableSettingsRow(
             }
         },
     )
+}
+
+// A selectable row that also shows a supporting line (e.g. the approximate
+// per-photo size delta) under the title. Mirrors [SelectableSettingsRow] but
+// with a subtitle slot.
+@Composable
+private fun SelectableSettingsRowWithSubtitle(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    ListItem(
+        modifier = Modifier.selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        headlineContent = { Text(title) },
+        supportingContent = {
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
+        trailingContent = {
+            if (selected) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = stringResource(R.string.selected),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun MediaQualitySettingsCard(appState: DarkMatterAppState) {
+    SectionCard(title = stringResource(R.string.media_quality_title)) {
+        Column(Modifier.selectableGroup()) {
+            MediaQuality.entries.forEach { quality ->
+                SelectableSettingsRowWithSubtitle(
+                    title = stringResource(quality.labelRes),
+                    subtitle = stringResource(quality.subtitleRes),
+                    selected = appState.mediaQuality == quality,
+                    onClick = { appState.updateMediaQuality(quality) },
+                )
+            }
+        }
+        // Privacy floor + video/audio carve-out. The size knob and metadata
+        // strip are orthogonal: photos never send location/device metadata,
+        // including Original's source-byte path. Video and picked audio
+        // currently send as-is.
+        Text(
+            text = stringResource(R.string.media_quality_footer),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

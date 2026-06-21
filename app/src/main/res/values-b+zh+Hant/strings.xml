@@ -626,4 +626,15 @@
     <string name="mention_picker_member">提及 %1$s</string>
     <string name="mention_picker_dismiss">關閉成員選擇器</string>
     <string name="mentioned_you">有人提及了你</string>
+    <string name="media_quality_title">媒體品質</string>
+    <string name="media_quality_settings_subtitle">你傳送的照片和語音訊息壓縮設定</string>
+    <string name="media_quality_low">低</string>
+    <string name="media_quality_low_subtitle">每張照片約 150 KB — 適合流量受限方案</string>
+    <string name="media_quality_standard">標準</string>
+    <string name="media_quality_standard_subtitle">每張照片約 500 KB — 合理的預設值</string>
+    <string name="media_quality_high">高</string>
+    <string name="media_quality_high_subtitle">每張照片約 1.5 MB — 優先保留品質</string>
+    <string name="media_quality_original">原始</string>
+    <string name="media_quality_original_subtitle">完整解析度 — 檔案最大</string>
+    <string name="media_quality_footer">照片中的位置與裝置中繼資料（EXIF GPS、品牌和型號）一律會移除，即使選擇原始。影片和已選取的音訊檔會原樣傳送；音訊位元率套用於錄製的語音訊息。</string>
 </resources>

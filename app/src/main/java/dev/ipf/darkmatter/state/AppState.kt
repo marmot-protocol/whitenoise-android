@@ -424,6 +424,11 @@ class DarkMatterAppState(
     var mediaAutoDownloadMatrix by mutableStateOf(loadMediaAutoDownloadMatrix(activeAccountRef))
         private set
 
+    var mediaQuality by mutableStateOf(
+        MediaQuality.fromPreference(preferences.getString(MEDIA_QUALITY_KEY, null)),
+    )
+        private set
+
     var languageTag by mutableStateOf(preferences.getString(LANGUAGE_TAG_KEY, null).orEmpty())
         private set
 
@@ -1467,6 +1472,16 @@ class DarkMatterAppState(
         if (updated == mediaAutoDownloadMatrix) return
         mediaAutoDownloadMatrix = updated
         preferences.edit().putString(mediaAutoDownloadPrefKey(activeAccountRef), updated.toPreference()).apply()
+    }
+
+    /**
+     * Update the outgoing-media quality ceiling (image downscale/JPEG quality
+     * and voice-note bitrate). Persists immediately so the selection survives
+     * process death; the next send reads [mediaQuality] directly.
+     */
+    fun updateMediaQuality(quality: MediaQuality) {
+        mediaQuality = quality
+        preferences.edit().putString(MEDIA_QUALITY_KEY, quality.preferenceValue).apply()
     }
 
     /**
@@ -2594,6 +2609,7 @@ class DarkMatterAppState(
         // "default" bucket when no account is bound). Distinct from the legacy
         // 3-state key, which this migrates from on first per-account load.
         private const val MEDIA_AUTO_DOWNLOAD_MATRIX_KEY_PREFIX = "media_auto_download_matrix:"
+        private const val MEDIA_QUALITY_KEY = "media_quality"
         private const val DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY = "default_notifications_enable_attempted"
 
         // 24 MiB cap on decrypted attachment bytes resident in memory —

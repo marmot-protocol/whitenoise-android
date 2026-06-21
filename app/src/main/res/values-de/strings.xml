@@ -632,4 +632,15 @@
     <string name="mention_picker_member">%1$s erwähnen</string>
     <string name="mention_picker_dismiss">Mitgliederauswahl schließen</string>
     <string name="mentioned_you">Du wurdest erwähnt</string>
+    <string name="media_quality_title">Medienqualität</string>
+    <string name="media_quality_settings_subtitle">Komprimierung für Fotos und Sprachnachrichten, die du sendest</string>
+    <string name="media_quality_low">Niedrig</string>
+    <string name="media_quality_low_subtitle">Etwa 150 KB pro Foto — gut für begrenzte Datentarife</string>
+    <string name="media_quality_standard">Normal</string>
+    <string name="media_quality_standard_subtitle">Etwa 500 KB pro Foto — eine sinnvolle Vorgabe</string>
+    <string name="media_quality_high">Hoch</string>
+    <string name="media_quality_high_subtitle">Etwa 1,5 MB pro Foto — Qualität vor Datenverbrauch</string>
+    <string name="media_quality_original">Originalgröße</string>
+    <string name="media_quality_original_subtitle">Volle Auflösung — größte Dateien</string>
+    <string name="media_quality_footer">Standort- und Gerätemetadaten (EXIF-GPS, Hersteller und Modell) werden immer aus Fotos entfernt, auch bei Originalgröße. Videos und ausgewählte Audiodateien werden unverändert gesendet; die Audio-Bitrate gilt für aufgenommene Sprachnachrichten.</string>
 </resources>
