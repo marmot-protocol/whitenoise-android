@@ -580,6 +580,32 @@ internal fun optimisticMessageIdForProjection(
         ?.messageIdHex
 }
 
+/**
+ * Find a projected timeline row that matches [optimistic] and is committed locally
+ * but not yet published (`sourceMessageIdHex == null`). Used when retrying a failed
+ * optimistic send so we drive `retryGroupConvergence` instead of minting a duplicate.
+ */
+internal fun committedButUnpublishedProjectionForOptimistic(
+    timelineRecords: Map<String, TimelineMessageRecordFfi>,
+    optimistic: AppMessageRecordFfi,
+    activeAccountIdHex: String?,
+): TimelineMessageRecordFfi? {
+    val optimisticIsMediaPending = optimistic.tags.any { it.values.firstOrNull() == "_media_pending" }
+    return timelineRecords.values.firstOrNull { projected ->
+        if (projected.deleted || projected.sourceMessageIdHex != null) return@firstOrNull false
+        if (projected.direction != "sent") return@firstOrNull false
+        val projectedAction = TimelineProjector.toAppMessageRecord(projected)
+        if (!MessageProjector.isMine(projectedAction, activeAccountIdHex)) return@firstOrNull false
+        if (optimistic.groupIdHex != projectedAction.groupIdHex) return@firstOrNull false
+        val projectedIsMedia = projectedAction.tags.any { it.values.firstOrNull() == "imeta" }
+        if (optimisticIsMediaPending && projectedIsMedia) {
+            timestampsAreNear(optimistic.recordedAt, projectedAction.recordedAt)
+        } else {
+            optimistic.plaintext == projectedAction.plaintext && optimistic.tags == projectedAction.tags
+        }
+    }
+}
+
 private fun timestampsAreNear(
     left: ULong,
     right: ULong,
@@ -1286,11 +1312,10 @@ class ChatsController(
     ): Boolean {
         val account = accountRef ?: return false
         return runCatching {
-            val updated =
-                appState.withGroupCommitLock(account, groupIdHex) {
-                    appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
-                }
-            appState.applyLocalGroupUpdate(updated)
+            appState.withGroupCommitLock(account, groupIdHex) {
+                appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
+                    .also(appState::applyLocalGroupUpdate)
+            }
             if (notify) {
                 appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
             }
@@ -2351,7 +2376,9 @@ class ConversationController(
             // exhausted — keeps the hard failure. The optimistic bubble stays
             // Pending across retries, so the user sees "sending", not "failed".
             val summary =
-                publishTextWithRetry(replyTarget, account, trimmed)
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    publishTextWithRetry(replyTarget, account, trimmed)
+                }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = optimistic.copy(messageIdHex = confirmedId)
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
@@ -2659,8 +2686,10 @@ class ConversationController(
                     return
                 }
                 val summary =
-                    appState.marmotIo {
-                        sendMediaAttachments(account, group.groupIdHex, references, retained.caption)
+                    appState.withGroupCommitLock(account, group.groupIdHex) {
+                        appState.marmotIo {
+                            sendMediaAttachments(account, group.groupIdHex, references, retained.caption)
+                        }
                     }
                 val confirmedId = summary.messageIds.firstOrNull() ?: tempId
                 optimisticMessages.remove(key)
@@ -2834,48 +2863,50 @@ class ConversationController(
             )
         recomputeReactions()
         try {
-            if (alreadyMine) {
-                // Retract just the tapped emoji by deleting its own reaction
-                // event; the FFI unreact is target-only and clears the latest
-                // reaction, so it would drop the wrong emoji when a user holds
-                // more than one on the same message.
-                // activeAccountRef can be set while the account row hasn't loaded
-                // into `accounts` yet; surface that distinctly from an ambiguous
-                // reaction so the failure reason isn't misleading.
-                val me =
-                    appState.activeAccount?.accountIdHex
-                        ?: error("no active account to retract reaction")
-                val ownReactions =
-                    timelineRecords[target]
-                        ?.reactions
-                        ?.userReactions
-                        .orEmpty()
-                        .filter { it.sender.equals(me, ignoreCase = true) }
-                val reactionEventId =
-                    ownReactions
-                        .firstOrNull { it.emoji == emoji && it.reactionMessageIdHex.isNotBlank() }
-                        ?.reactionMessageIdHex
-                when {
-                    reactionEventId != null ->
-                        appState.marmotIo { deleteMessage(account, group.groupIdHex, reactionEventId) }
-                    // Target-only unreact is safe only when this is the single
-                    // reaction to clear; with several it could drop another emoji.
-                    ownReactions.size == 1 && ownReactions.first().emoji == emoji ->
-                        appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
-                    // No event id yet (optimistic/unsynced) and ambiguous — fail so
-                    // the optimistic toggle reverts instead of retracting the wrong one.
-                    else -> error("no reaction event to retract for $emoji")
+            appState.withGroupCommitLock(account, group.groupIdHex) {
+                if (alreadyMine) {
+                    // Retract just the tapped emoji by deleting its own reaction
+                    // event; the FFI unreact is target-only and clears the latest
+                    // reaction, so it would drop the wrong emoji when a user holds
+                    // more than one on the same message.
+                    // activeAccountRef can be set while the account row hasn't loaded
+                    // into `accounts` yet; surface that distinctly from an ambiguous
+                    // reaction so the failure reason isn't misleading.
+                    val me =
+                        appState.activeAccount?.accountIdHex
+                            ?: error("no active account to retract reaction")
+                    val ownReactions =
+                        timelineRecords[target]
+                            ?.reactions
+                            ?.userReactions
+                            .orEmpty()
+                            .filter { it.sender.equals(me, ignoreCase = true) }
+                    val reactionEventId =
+                        ownReactions
+                            .firstOrNull { it.emoji == emoji && it.reactionMessageIdHex.isNotBlank() }
+                            ?.reactionMessageIdHex
+                    when {
+                        reactionEventId != null ->
+                            appState.marmotIo { deleteMessage(account, group.groupIdHex, reactionEventId) }
+                        // Target-only unreact is safe only when this is the single
+                        // reaction to clear; with several it could drop another emoji.
+                        ownReactions.size == 1 && ownReactions.first().emoji == emoji ->
+                            appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
+                        // No event id yet (optimistic/unsynced) and ambiguous — fail so
+                        // the optimistic toggle reverts instead of retracting the wrong one.
+                        else -> error("no reaction event to retract for $emoji")
+                    }
+                } else {
+                    appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
+                    // Reacting is unambiguous evidence the user saw this message, so
+                    // advance the read marker through it. Without this the chat-list
+                    // unread badge can survive a react-then-leave until the next open,
+                    // because the scroll-driven mark-read may not have fired (the user
+                    // was already at the bottom when the message arrived). This runs on
+                    // the caller's durable mutation scope, so it isn't cancelled when
+                    // the conversation closes right after the tap.
+                    markReadUpTo(target)
                 }
-            } else {
-                appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
-                // Reacting is unambiguous evidence the user saw this message, so
-                // advance the read marker through it. Without this the chat-list
-                // unread badge can survive a react-then-leave until the next open,
-                // because the scroll-driven mark-read may not have fired (the user
-                // was already at the bottom when the message arrived). This runs on
-                // the caller's durable mutation scope, so it isn't cancelled when
-                // the conversation closes right after the tap.
-                markReadUpTo(target)
             }
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
@@ -2891,7 +2922,9 @@ class ConversationController(
         val target = message.messageIdHex.takeIf { it.isNotBlank() } ?: return
         deletedMessageIds = deletedMessageIds + target
         try {
-            appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
+            appState.withGroupCommitLock(account, group.groupIdHex) {
+                appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
+            }
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
             deletedMessageIds = deletedMessageIds - target
@@ -2916,7 +2949,9 @@ class ConversationController(
         val trimmed = content.trim()
         if (trimmed.isEmpty()) return
         try {
-            appState.marmotIo { editMessage(account, group.groupIdHex, target, trimmed) }
+            appState.withGroupCommitLock(account, group.groupIdHex) {
+                appState.marmotIo { editMessage(account, group.groupIdHex, target, trimmed) }
+            }
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
             appState.present(R.string.toast_couldnt_edit_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
@@ -3211,12 +3246,20 @@ class ConversationController(
         publishTimelineFromIndexes()
         try {
             val activeAccountIdHex = appState.activeAccount?.accountIdHex
-            if (isCommittedButUnpublishedOwnMessage(tempId, activeAccountIdHex)) {
+            val committedProjection =
+                committedButUnpublishedProjectionForOptimistic(
+                    timelineRecords,
+                    refreshedRecord,
+                    activeAccountIdHex,
+                )
+            if (committedProjection != null) {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
                 }
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
+                messageById[committedProjection.messageIdHex] =
+                    TimelineProjector.toAppMessageRecord(committedProjection)
                 if (discardedDuringRetry.remove(key)) {
                     publishTimelineFromIndexes()
                     return
@@ -3414,12 +3457,13 @@ class ConversationController(
             lastMutationError = null
             val account = appState.activeAccountRef ?: return@withMutationLockResult false
             runCatching {
-                val updated =
-                    appState.withGroupCommitLock(account, group.groupIdHex) {
-                        appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
-                    }
-                group = updated
-                appState.applyLocalGroupUpdate(updated)
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
+                        .also {
+                            group = it
+                            appState.applyLocalGroupUpdate(it)
+                        }
+                }
                 appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
                 true
             }.onFailure {
@@ -4519,16 +4563,6 @@ class ConversationController(
     ) {
         applyGroupDetails(account, details)
         appState.applyLocalGroupUpdate(details.group)
-    }
-
-    private fun isCommittedButUnpublishedOwnMessage(
-        messageIdHex: String,
-        activeAccountIdHex: String?,
-    ): Boolean {
-        val projected = timelineRecords[messageIdHex] ?: return false
-        if (projected.deleted || projected.sourceMessageIdHex != null) return false
-        return projected.direction == "sent" &&
-            MessageProjector.isMine(TimelineProjector.toAppMessageRecord(projected), activeAccountIdHex)
     }
 
     private suspend fun watchAgentTextStream(
