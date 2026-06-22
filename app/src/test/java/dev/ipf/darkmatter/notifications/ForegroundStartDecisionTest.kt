@@ -5,11 +5,20 @@ import org.junit.Test
 
 /**
  * Pins the pure [decideForegroundStart] truth table that
- * [NotificationStreamForegroundService.onStartCommand] routes through. The two contracts under test:
+ * [NotificationStreamForegroundService.onStartCommand] routes through.
+ *
+ * Scope: these tests pin only the *decision mapping* (the two input booleans -> the
+ * [ForegroundStartDecision] variant). They do NOT exercise the Android-bound side effects in
+ * `onStartCommand` (calling `onBackgroundConnectionStartRejected()`, `stopSelf`, launching the
+ * bootstrap, or the `runCatching` around `startForeground`); that wiring is verified by reviewer
+ * inspection and is out of scope here (would need an instrumented test). What these tests guarantee
+ * is that the decision branch a refactor selects cannot drift from the original truth table.
+ *
+ * The two contracts pinned at the decision layer:
  *
  * - **Rejection-notification contract (#164):** a failed `startForeground` MUST map to
- *   [ForegroundStartDecision.RejectAndStop] so AppState is told the start failed and the toggle
- *   stops lying. A refactor that narrows the catch or drops the callback fails this test.
+ *   [ForegroundStartDecision.RejectAndStop] — the precondition for AppState being told the start
+ *   failed so the toggle stops lying.
  * - **Bootstrap-dedupe idempotency contract:** a successful start with a bootstrap already in flight
  *   MUST map to [ForegroundStartDecision.KeepRunningExistingBootstrap] so repeated `onStartCommand`
  *   calls (which Android does) do not stack notification-runtime bootstraps.
