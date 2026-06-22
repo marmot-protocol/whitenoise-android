@@ -230,6 +230,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -259,6 +260,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
@@ -2910,6 +2912,50 @@ internal fun shouldShowComposer(
     isSelfMember: Boolean,
     seededSelfMember: Boolean,
 ): Boolean = isSelfMember || (!membersLoaded && seededSelfMember)
+
+/**
+ * Decide whether to restore composer focus (and thus re-raise the soft
+ * keyboard) when the conversation returns to the foreground (issue #589).
+ *
+ * Case B of #589: switching away with the keyboard CLOSED and then returning
+ * must NOT pop the keyboard open — Android/Compose otherwise restores the
+ * `BasicTextField` focus and IME visibility on its own. We only re-request
+ * focus on resume when the composer actually held focus when we were paused,
+ * so the post-resume keyboard state matches the pre-switch state exactly.
+ *
+ * An active edit or reply session is treated as focus-owning even if the raw
+ * focus flag briefly lagged behind on pause: those sessions deliberately raise
+ * the keyboard (see the edit/reply focus effects), so returning to them with
+ * the keyboard down would be just as surprising as Case A. The caller still
+ * gates the actual `requestFocus()` on this predicate so the decision stays in
+ * one pure, unit-tested place.
+ */
+internal fun shouldRestoreComposerFocusOnResume(
+    wasComposerFocusedOnPause: Boolean,
+    hasActiveEditOrReplySession: Boolean = false,
+): Boolean = wasComposerFocusedOnPause || hasActiveEditOrReplySession
+
+/**
+ * Whether the resume observer should actively clear focus and hide the keyboard
+ * (issue #589, Case B "keyboard was closed on leave").
+ *
+ * This is NOT the inverse of [shouldRestoreComposerFocusOnResume]. The clear/hide
+ * branch uses the screen-wide [androidx.compose.ui.focus.FocusManager], so it must
+ * not fire whenever *some other* text field legitimately owns focus and the
+ * keyboard. In-chat search (#292) is exactly that case: while the search bar is
+ * open the composer is not focused (so [shouldRestoreComposerFocusOnResume] is
+ * false), but the search field holds focus and the IME is up on purpose. Clearing
+ * focus here would drop the search field's focus and hide its keyboard, and
+ * `LaunchedEffect(searchOpen)` would not re-fire on resume to restore it —
+ * regressing the search UX after an app-switch.
+ *
+ * So: clear focus only when we are not restoring composer focus AND no other
+ * text field (currently just in-chat search) owns the focus/IME.
+ */
+internal fun shouldClearFocusOnResume(
+    restoringComposerFocus: Boolean,
+    searchOpen: Boolean,
+): Boolean = !restoringComposerFocus && !searchOpen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -6954,6 +7000,21 @@ private fun ConversationScreen(
     val imeIsOpen by remember(imeInsets, density) {
         derivedStateOf { imeInsets.getBottom(density) > 0 }
     }
+    // #589: composer focus is hoisted here so the resume lifecycle observer
+    // below can drive it. `composerFocus` is the requester wired into the
+    // composer's BasicTextField; `composerFocused` mirrors the live focus
+    // edge reported by `onFocusChanged`; `wasComposerFocusedOnPause` snapshots
+    // that edge on ON_PAUSE so resume can restore the exact keyboard state the
+    // user left with (Case B). Keyed on chat.id so a conversation switch
+    // doesn't carry the previous chat's keyboard state across.
+    val composerFocus = remember(chat.id) { FocusRequester() }
+    var composerFocused by remember(chat.id) { mutableStateOf(false) }
+    var wasComposerFocusedOnPause by remember(chat.id) { mutableStateOf(false) }
+    // #589: used by the resume observer to clear focus and drop the keyboard
+    // when the composer was NOT focused on pause (Case B), without poking the
+    // composer's own focus requester.
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val groupTitleCopy = rememberGroupTitleCopy()
@@ -7915,6 +7976,120 @@ private fun ConversationScreen(
             runCatching { listState.scrollToItem(last) }
         }
     }
+    // #589: app-switch resume handling. Two bugs surfaced when returning to a
+    // chat after backgrounding the app:
+    //
+    //   Case A (keyboard was OPEN on leave): the bottom scroll anchor was
+    //   computed against the pre-resume viewport before the keyboard inset
+    //   re-applied, so the latest bubble landed clipped behind the keyboard.
+    //   The existing imeIsOpen chase above does NOT re-fire here because
+    //   imeIsOpen never transitions (it was already true), so we add a
+    //   resume-triggered re-anchor that waits for the IME inset to settle and
+    //   then re-snaps to the newest row — reusing the 24-frame chase idiom.
+    //
+    //   Case B (keyboard was CLOSED on leave): Android/Compose restores the
+    //   BasicTextField focus and IME visibility on its own, popping a keyboard
+    //   the user never asked for. We snapshot the composer focus on ON_PAUSE
+    //   and, on ON_RESUME, gate restoration through the pure
+    //   [shouldRestoreComposerFocusOnResume] predicate: restore focus only if
+    //   it was held on pause (or an edit/reply session is active); otherwise
+    //   actively clear focus and hide the keyboard so it does not pop.
+    //
+    // Keyed on chat.id so a conversation switch rebinds the observer; resolved
+    // through the existing Context.lifecycleOwner() idiom (no new Local import).
+    val resumeLifecycleOwner = context.lifecycleOwner()
+    DisposableEffect(chat.id, resumeLifecycleOwner) {
+        if (resumeLifecycleOwner == null) {
+            onDispose { }
+        } else {
+            val observer =
+                LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_PAUSE -> {
+                            // Snapshot the keyboard state we're leaving with so
+                            // resume can faithfully restore it (Case B).
+                            wasComposerFocusedOnPause = composerFocused
+                        }
+                        Lifecycle.Event.ON_RESUME -> {
+                            val restoreFocus =
+                                shouldRestoreComposerFocusOnResume(
+                                    wasComposerFocusedOnPause = wasComposerFocusedOnPause,
+                                    hasActiveEditOrReplySession =
+                                        controller.editingMessageId != null ||
+                                            controller.replyingTo != null,
+                                )
+                            scope.launch {
+                                if (restoreFocus) {
+                                    // Case B (was focused): re-raise the keyboard
+                                    // exactly as it was before the switch.
+                                    runCatching { composerFocus.requestFocus() }
+                                    keyboardController?.show()
+                                } else if (shouldClearFocusOnResume(
+                                        restoringComposerFocus = restoreFocus,
+                                        searchOpen = searchOpen,
+                                    )
+                                ) {
+                                    // Case B (was NOT focused): the system tried
+                                    // to restore focus/IME — undo it so the
+                                    // keyboard does not pop unrequested.
+                                    //
+                                    // Guarded on !searchOpen: in-chat search
+                                    // (#292) legitimately owns focus + IME while
+                                    // open, and clearFocus(force = true) is
+                                    // screen-wide. Clearing here would drop the
+                                    // search field's focus and hide its keyboard,
+                                    // and LaunchedEffect(searchOpen) does not
+                                    // re-fire on resume to restore it — so we
+                                    // leave focus untouched while search is open.
+                                    focusManager.clearFocus(force = true)
+                                    keyboardController?.hide()
+                                }
+                                // Case A: re-anchor to the newest row AFTER the
+                                // IME inset has settled, so the latest bubble
+                                // sits above (not behind) the keyboard. Gated on
+                                // nearBottom so a reader scrolled up into history
+                                // is never yanked down. Poll the ime bottom inset
+                                // across frames until it stops changing, then
+                                // run the same 24-frame chase the IME-open path
+                                // uses so the snap tracks the settling viewport.
+                                if (initialTimelineAnchored && nearBottom) {
+                                    var lastInset = -1
+                                    var stableFrames = 0
+                                    // Cap the settle wait so a keyboard that
+                                    // never animates (Case B, staying closed)
+                                    // can't spin here forever. Bail out early
+                                    // once the inset holds steady for two frames.
+                                    var settleFrame = 0
+                                    while (settleFrame < 24 && stableFrames < 2) {
+                                        withFrameNanos { }
+                                        val current = imeInsets.getBottom(density)
+                                        if (current == lastInset) {
+                                            stableFrames++
+                                        } else {
+                                            stableFrames = 0
+                                            lastInset = current
+                                        }
+                                        settleFrame++
+                                    }
+                                    if (nearBottom) {
+                                        repeat(24) {
+                                            withFrameNanos { }
+                                            val last =
+                                                (listState.layoutInfo.totalItemsCount - 1)
+                                                    .coerceAtLeast(0)
+                                            runCatching { listState.scrollToItem(last) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
+            resumeLifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { resumeLifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+    }
     LaunchedEffect(latestTimelineItemId) {
         if (renderedTimeline.isNotEmpty()) {
             if (!initialTimelineAnchored) {
@@ -8324,6 +8499,11 @@ private fun ConversationScreen(
                         mentionPickerEnabled = mentionPickerEnabled,
                         autoFocusOnEnter = justCreated,
                         enterKeyBehavior = appState.enterKeyBehavior,
+                        // #589: hoisted focus plumbing — the requester lets the
+                        // resume observer restore focus, and the callback keeps
+                        // `composerFocused` tracking the live keyboard state.
+                        composerFocus = composerFocus,
+                        onComposerFocusChanged = { composerFocused = it },
                     )
                 }
             }
@@ -13138,6 +13318,14 @@ private fun ComposerBar(
     // re-opening the IME, and the flag is not persisted across process death.
     autoFocusOnEnter: Boolean = false,
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
+    // #589: the composer FocusRequester is hoisted from the conversation screen
+    // so its resume lifecycle observer can restore focus after an app-switch.
+    // Defaulted to a locally-remembered requester so other call sites keep the
+    // previous self-contained behavior.
+    composerFocus: FocusRequester = remember { FocusRequester() },
+    // #589: surfaces the live focus state up to the conversation screen so the
+    // resume observer can tell whether the keyboard was up when we were paused.
+    onComposerFocusChanged: (Boolean) -> Unit = {},
 ) {
     var attachMenuOpen by remember { mutableStateOf(false) }
     // Field state is a TextFieldValue (not a bare String) so the caret can
@@ -13154,7 +13342,8 @@ private fun ComposerBar(
     var preEditFieldValue by remember(draftKey) { mutableStateOf<TextFieldValue?>(null) }
     // Claim focus on edit-entry so the IME opens with the caret at the end
     // of the prefill, without making the user tap the field a second time.
-    val composerFocus = remember { FocusRequester() }
+    // `composerFocus` is now hoisted in via a parameter (#589) so the
+    // conversation screen's resume observer can drive focus too.
     // Keyed on editingMessageId only: prefill once when an edit session starts,
     // not on every reprojection of editingInitialText — otherwise a background
     // timeline update would overwrite the user's in-progress edit.
@@ -13318,6 +13507,7 @@ private fun ComposerBar(
                 ComposerPill(
                     textFieldValue = textFieldValue,
                     composerFocus = composerFocus,
+                    onComposerFocusChanged = onComposerFocusChanged,
                     onValueChange = { value ->
                         if (!isRecordingVoice) {
                             // #414: a single Backspace at the right edge of an
@@ -13849,6 +14039,9 @@ private fun ComposerPill(
     mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
     onImeSend: () -> Unit = {},
+    // #589: report the BasicTextField's focus edge up so the conversation
+    // screen can record whether the keyboard was up when the app was paused.
+    onComposerFocusChanged: (Boolean) -> Unit = {},
 ) {
     // #414/#442: paint stored `@npub1…` chip runs as friendly visible labels
     // (`@alice` when the profile is resolved, short `@npub1…` otherwise)
@@ -13915,6 +14108,10 @@ private fun ComposerPill(
                         Modifier
                             .fillMaxWidth()
                             .focusRequester(composerFocus)
+                            // #589: track focus so the conversation screen's
+                            // resume observer knows whether the keyboard was up
+                            // when the app was backgrounded (Case B gate).
+                            .onFocusChanged { onComposerFocusChanged(it.isFocused) }
                             // #404: honor the Enter-key toggle for hardware
                             // keyboards (Bluetooth/foldable/ChromeOS). Shift+Enter
                             // always inserts a line break as an escape hatch; in
