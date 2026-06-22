@@ -33,7 +33,7 @@ firebaseBom = "33.5.1"
 googleServices = "4.4.2"
 playServicesBase = "18.5.0"
 media3 = "1.4.1"
-securityCrypto = "1.1.0-alpha06"
+securityCrypto = "1.1.0"
 roborazzi = "1.64.0"
 robolectric = "4.16.1"
 
