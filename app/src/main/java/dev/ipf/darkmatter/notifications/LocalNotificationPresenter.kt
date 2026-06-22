@@ -18,7 +18,6 @@ import androidx.core.content.ContextCompat
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.MainActivity
 import dev.ipf.darkmatter.R
-import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 
 class LocalNotificationPresenter(
@@ -68,8 +67,12 @@ class LocalNotificationPresenter(
             .getOrNull()
             ?.filter {
                 val extras = it.notification.extras ?: return@filter false
-                extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID) == groupIdHex &&
-                    extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF) == accountRef
+                shouldDismissInvite(
+                    extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
+                    extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
+                    accountRef = accountRef,
+                    groupIdHex = groupIdHex,
+                )
             }?.forEach { NotificationManagerCompat.from(context).cancel(it.tag, it.id) }
     }
 
@@ -91,14 +94,9 @@ class LocalNotificationPresenter(
                 reactedToPreviewOverride = reactedToPreviewOverride,
                 groupInviteAutoAccepted = groupInviteAutoAccepted,
                 conversationTitleOverride = conversationTitleOverride,
-            ) ?: run {
-                notificationDebug { "skip key=${update.notificationKey.take(16)} reason=formatter" }
-                return false
-            }
-        if (!canPostNotifications()) {
-            notificationDebug { "skip key=${update.notificationKey.take(16)} reason=permission" }
-            return false
-        }
+            )
+        val formatterReturnedContent = content != null
+        val canPost = formatterReturnedContent && canPostNotifications()
         // Channels are created during AppState bootstrap / runtime start
         // (AppState.bootstrap() and ensureNotificationRuntimeStarted() both
         // call ensureChannels()); we deliberately don't recreate them on
@@ -107,74 +105,81 @@ class LocalNotificationPresenter(
 
         // Route each notification to its per-type channel so the user's OS-level
         // sound / vibration / importance / mute choices apply per type.
-        val channelId = NotificationChannelSpec.forUpdate(update).id
-        val isReaction = NotificationChannelSpec.forUpdate(update) == NotificationChannelSpec.REACTIONS
-        val category =
-            when (update.trigger) {
-                NotificationTriggerFfi.NEW_MESSAGE -> NotificationCompat.CATEGORY_MESSAGE
-                NotificationTriggerFfi.GROUP_INVITE -> NotificationCompat.CATEGORY_EVENT
+        val decision =
+            decideNotificationPost(
+                update = update,
+                canPost = canPost,
+                formatterReturnedContent = formatterReturnedContent,
+                spec = NotificationChannelSpec.forUpdate(update),
+            ) ?: run {
+                val reason = if (!formatterReturnedContent) "formatter" else "permission"
+                notificationDebug { "skip key=${update.notificationKey.take(16)} reason=$reason" }
+                return false
             }
+        val notificationContent = content ?: return false
         val builder =
             NotificationCompat
-                .Builder(context, channelId)
+                .Builder(context, decision.channelId)
                 .setSmallIcon(R.drawable.ic_stat_darkmatter)
-                .setContentIntent(conversationPendingIntent(update, content.notificationTag))
-                .setCategory(category)
+                .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))
+                .setCategory(decision.category)
                 .setWhen(update.timestampMs)
                 .setShowWhen(true)
                 .setAutoCancel(true)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                .setPublicVersion(redactedPublicVersion(channelId, category))
+                .setPublicVersion(redactedPublicVersion(decision.channelId, decision.category))
                 .setSilent(false)
 
-        when {
+        when (val style = decision.style) {
             // Reactions get their own self-contained card (own tag/id on the
             // reactions channel, see LocalNotificationFormatter) so they're muted
             // independently of messages. They aren't repliable, so no
             // MessagingStyle / reply / mark-read — just a plain expandable card.
-            isReaction ->
+            NotificationStyleChoice.Plain ->
                 builder
-                    .setContentTitle(content.title)
-                    .setContentText(content.body)
-                    .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
+                    .setContentTitle(notificationContent.title)
+                    .setContentText(notificationContent.body)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
 
             // Messages stack into one per-conversation card; invites are
             // one-off events, so keep them as a plain expandable notification.
-            update.trigger == NotificationTriggerFfi.NEW_MESSAGE -> {
-                builder.setStyle(messagingStyle(update, content, conversationTitleOverride))
+            NotificationStyleChoice.Messaging -> {
+                builder.setStyle(messagingStyle(update, notificationContent, conversationTitleOverride, decision.historyCap))
                 NotificationActions
-                    .targetFromUpdate(update, content.notificationTag, content.notificationId)
+                    .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                     ?.let { actionTarget ->
-                        builder.addAction(replyNotificationAction(actionTarget))
-                        builder.addAction(markReadNotificationAction(actionTarget))
+                        decision.actions.forEach { action ->
+                            when (action) {
+                                NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget))
+                                NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
+                            }
+                        }
                     }
             }
 
-            else -> {
+            is NotificationStyleChoice.InviteWithExtras -> {
                 builder
-                    .setContentTitle(content.title)
-                    .setContentText(content.body)
-                    .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
+                    .setContentTitle(notificationContent.title)
+                    .setContentText(notificationContent.body)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
                 // Stamp the invited-to account + group so accepting/declining or
                 // opening that conversation can find and dismiss this card (its
                 // tag is the opaque key).
-                if (update.trigger == NotificationTriggerFfi.GROUP_INVITE && update.groupIdHex.isNotBlank()) {
-                    builder.addExtras(
-                        Bundle().apply {
-                            putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, update.accountRef)
-                            putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, update.groupIdHex)
-                        },
-                    )
-                }
+                builder.addExtras(
+                    Bundle().apply {
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF, style.accountRef)
+                        putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, style.groupIdHex)
+                    },
+                )
             }
         }
 
-        NotificationManagerCompat.from(context).notify(content.notificationTag, content.notificationId, builder.build())
+        NotificationManagerCompat.from(context).notify(notificationContent.notificationTag, notificationContent.notificationId, builder.build())
         notificationDebug {
             // Never log the title/body — they carry sender / group names (PII).
-            "posted tag=${content.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
+            "posted tag=${notificationContent.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
         }
         return true
     }
@@ -254,6 +259,7 @@ class LocalNotificationPresenter(
         update: NotificationUpdateFfi,
         content: LocalNotificationContent,
         conversationTitleOverride: String?,
+        historyCap: Int,
     ): NotificationCompat.MessagingStyle {
         val self =
             Person
@@ -265,7 +271,7 @@ class LocalNotificationPresenter(
         val style = NotificationCompat.MessagingStyle(self)
         existingMessagingStyle(content.notificationTag)
             ?.messages
-            ?.takeLast(MAX_MESSAGE_HISTORY - 1)
+            ?.let { capNotificationHistory(it, historyCap) }
             ?.forEach { style.addMessage(it) }
         style.isGroupConversation = content.isGroupConversation
         // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
@@ -363,12 +369,6 @@ class LocalNotificationPresenter(
             tapIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-    }
-
-    companion object {
-        // Per-conversation cards share id 0; the per-conversation tag keeps them
-        // distinct, so reusing (tag, 0) updates the right conversation's card.
-        private const val MAX_MESSAGE_HISTORY = 25
     }
 }
 
