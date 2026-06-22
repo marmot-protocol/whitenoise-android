@@ -47,6 +47,7 @@ import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
+import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import kotlinx.coroutines.CancellationException
@@ -936,11 +937,10 @@ class DarkMatterAppState(
                 if (activeAccountRef == null || accounts.none { it.label == activeAccountRef }) {
                     setActiveAccount(accounts.first().label)
                 } else {
-                    // Active ref survived from a prior launch and wasn't routed
-                    // through setActiveAccount; the matrix was seeded against the
-                    // "default" bucket before accounts loaded, so re-key it on the
-                    // real account now.
-                    reloadMediaAutoDownloadMatrix()
+                    // Reconcile the persisted active ref with the engine — e.g.
+                    // sign in if the account was non-destructively signed out, and
+                    // re-key the media matrix that was seeded before accounts loaded.
+                    setActiveAccount(activeAccountRef!!)
                 }
                 refreshLocalNotificationSettings()
                 phase = AppPhase.Ready
@@ -1060,7 +1060,7 @@ class DarkMatterAppState(
         accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
     }
 
-    fun setActiveAccount(label: String) {
+    suspend fun setActiveAccount(label: String) {
         // Account switch: drop in-process plaintext so account A's bytes
         // aren't reachable from account B's UI loops, but keep L2 (disk)
         // intact. The disk cache key is `mediaCacheKey(account, msg)`, so
@@ -1074,15 +1074,24 @@ class DarkMatterAppState(
             clearInMemoryMediaCaches()
             clearCrossAccountCaches()
         }
+        val target = accounts.firstOrNull { it.label == label }
+        if (target?.signedOut == true) {
+            runCatching {
+                marmotIo { signInAccount(label) }
+            }.onFailure {
+                rethrowIfCancellation(it)
+                present(R.string.toast_couldnt_sign_in_account, AppText.Plain(it.readableMessage()))
+                return
+            }
+            refreshAccounts()
+        }
         activeAccountRef = label
         preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
         reloadMediaAutoDownloadMatrix()
         accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
-        notificationScope.launch {
-            configurePrivacyRuntime()
-            refreshLocalNotificationSettings()
-            syncNativePushRegistrationIfEnabled()
-        }
+        configurePrivacyRuntime()
+        refreshLocalNotificationSettings()
+        syncNativePushRegistrationIfEnabled()
     }
 
     /**
@@ -1194,7 +1203,7 @@ class DarkMatterAppState(
         profileRevision += 1
     }
 
-    fun signOutActiveAccount() {
+    suspend fun signOutActiveAccount(): SignOutOutcomeFfi? {
         // Sign-out is a non-destructive session switch: the identity stays in
         // the device keychain and the user can switch back to it. Per-account
         // state that the user would expect to find on return (drafts, recent
@@ -1208,56 +1217,74 @@ class DarkMatterAppState(
         // so re-entry into the same account doesn't re-download every image.
         //
         // In-memory plaintext is dropped synchronously here; the on-disk wipe
-        // is awaited inside the sign-out coroutine below so it isn't an
-        // orphaned, unsequenced background task.
+        // is awaited in this suspend path so it isn't an orphaned background task.
+        val signedOutRef = activeAccountRef ?: return null
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
-        val signedOutRef = activeAccountRef
-        val outcome = signOutOutcome(accounts.map { it.label }, activeAccountRef)
+        val engineOutcome =
+            runCatching {
+                marmotIo { signOut(signedOutRef, deleteKeyPackages = true) }
+            }.onFailure {
+                rethrowIfCancellation(it)
+                appStateDebug(it) { "signOut failed account=${signedOutRef.take(8)}: ${it.readableMessage()}" }
+                present(R.string.toast_couldnt_sign_out, AppText.Plain(it.readableMessage()))
+            }.getOrNull()
+                ?: return null
+        refreshAccounts()
+        val outcome = signOutOutcome(accounts.map { it.label }, signedOutRef)
         val next = outcome.nextActiveRef
-        activeAccountRef = next
-        preferences
-            .edit()
-            .apply {
-                if (next == null) remove(ACTIVE_ACCOUNT_KEY) else putString(ACTIVE_ACCOUNT_KEY, next)
-            }.apply()
-        reloadMediaAutoDownloadMatrix()
+        if (next != null) {
+            setActiveAccount(next)
+        } else {
+            activeAccountRef = null
+            preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
+            reloadMediaAutoDownloadMatrix()
+        }
         // Signing out the last active account must leave a usable state, not a
         // MainShell with no active account. See issue #11.
         phase = outcome.phase
-        next?.let { label ->
-            accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
-        }
-        notificationScope.launch {
-            // Wipe the on-disk decrypted-media footprint before the rest of the
-            // work in THIS coroutine (push-deregistration, settings refresh), and
-            // as a tracked task rather than an orphaned launch. Note: sign-out's
-            // callers do not await this launch, so a fast re-sign-in can still
-            // race the wipe — fully closing that window is a larger change.
-            wipeDecryptedMediaFromDisk()
-            // Tell the runtime to forget the signed-out account's push
-            // registration before refreshing visible settings. Otherwise the
-            // MIP-05 server keeps wrapping wake messages for an account that
-            // can no longer decrypt them on this device. Best-effort: a
-            // failure here doesn't block sign-out, the next foreground sync
-            // will retry.
-            if (signedOutRef != null) {
-                runCatching { marmotIo { setNativePushEnabled(signedOutRef, false) } }
-                    .onSuccess { pushTokenStore.clearPendingDisable(signedOutRef) }
-                    .onFailure {
-                        rethrowIfCancellation(it)
-                        // Runtime flag stays enabled; queue the disable so the sync skips this account and retries it.
-                        pushTokenStore.recordPendingDisable(signedOutRef)
-                        appStateDebug { "setNativePushEnabled(false) failed on sign-out; queued disable retry: ${it.readableMessage()}" }
-                    }
-                clearPushRegistrationForAccount(signedOutRef)
+        wipeDecryptedMediaFromDisk()
+        // Tell the runtime to forget the signed-out account's push
+        // registration before refreshing visible settings. Otherwise the
+        // MIP-05 server keeps wrapping wake messages for an account that
+        // can no longer decrypt them on this device. Best-effort: a
+        // failure here doesn't block sign-out, the next foreground sync
+        // will retry.
+        runCatching { marmotIo { setNativePushEnabled(signedOutRef, false) } }
+            .onSuccess { pushTokenStore.clearPendingDisable(signedOutRef) }
+            .onFailure {
+                rethrowIfCancellation(it)
+                // Runtime flag stays enabled; queue the disable so the sync skips this account and retries it.
+                pushTokenStore.recordPendingDisable(signedOutRef)
+                appStateDebug { "setNativePushEnabled(false) failed on sign-out; queued disable retry: ${it.readableMessage()}" }
             }
-            // Drop the cached FCM token only when no accounts remain on the
-            // device — other identities still need it on multi-account switch.
-            if (next == null) pushTokenStore.clear()
-            refreshLocalNotificationSettings()
-        }
+        clearPushRegistrationForAccount(signedOutRef)
+        // Drop the cached FCM token only when no accounts remain on the
+        // device — other identities still need it on multi-account switch.
+        if (next == null) pushTokenStore.clear()
+        refreshLocalNotificationSettings()
+        return engineOutcome
+    }
+
+    suspend fun exportActiveAccountNsec(): String? {
+        val accountRef = activeAccountRef ?: return null
+        return runCatching {
+            marmotIo { revealNsec(accountRef) }
+        }.onFailure {
+            rethrowIfCancellation(it)
+            present(R.string.toast_couldnt_export_nsec, AppText.Plain(it.readableMessage()))
+        }.getOrNull()
+    }
+
+    suspend fun exportActiveAccountEncryptedSecretKey(passphrase: String): String? {
+        val accountRef = activeAccountRef ?: return null
+        return runCatching {
+            marmotIo { exportEncryptedSecretKey(accountRef, passphrase) }
+        }.onFailure {
+            rethrowIfCancellation(it)
+            present(R.string.toast_couldnt_export_encrypted_secret, AppText.Plain(it.readableMessage()))
+        }.getOrNull()
     }
 
     /**

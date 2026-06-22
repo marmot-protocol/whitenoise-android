@@ -332,7 +332,7 @@
     <string name="sign_out_sheet_stays_heading">Stays on this device</string>
     <string name="sign_out_sheet_stays_body">Your groups, message history, and drafts are kept. The identity stays in the device keychain, so you can sign back in from the account picker.</string>
     <string name="sign_out_sheet_changes_heading">What changes</string>
-    <string name="sign_out_sheet_changes_body">Push notifications for this account are turned off and in-memory caches are cleared.</string>
+    <string name="sign_out_sheet_changes_body">Push notifications for this account are turned off, relay key packages are deleted so strangers cannot invite you to new groups while signed out, and in-memory caches are cleared.</string>
     <string name="sign_out_and_wipe_sheet_title">Sign Out &amp; Wipe</string>
     <string name="sign_out_and_wipe_sheet_intro">This permanently removes this account from this device.</string>
     <string name="sign_out_and_wipe_sheet_destroyed_heading">What gets destroyed</string>
@@ -347,6 +347,19 @@
     <string name="sign_out_and_wipe_confirm_keyword" translatable="false">WIPE</string>
     <string name="sign_out_and_wipe_confirm_instruction">Type %1$s to confirm.</string>
     <string name="sign_out_and_wipe_confirm_field_label">Confirmation</string>
+    <string name="secret_key_backup">Secret Key Backup</string>
+    <string name="secret_key_backup_help">Export your signing key for backup. Anyone with the raw nsec can control your identity. The encrypted export (ncryptsec) requires a passphrase to decrypt.</string>
+    <string name="export_nsec">Export nsec</string>
+    <string name="export_encrypted_secret">Export encrypted key</string>
+    <string name="export_encrypted_secret_title">Encrypt for export</string>
+    <string name="export_encrypted_secret_body">Choose a passphrase. You will need it to decrypt the exported ncryptsec key.</string>
+    <string name="export_encrypted_secret_field_label">Passphrase</string>
+    <string name="share_secret_key">Share secret key</string>
+    <string name="signed_out">Signed out</string>
+    <string name="toast_couldnt_sign_out">Couldn\'t sign out</string>
+    <string name="toast_couldnt_sign_in_account">Couldn\'t sign in to account</string>
+    <string name="toast_couldnt_export_nsec">Couldn\'t export secret key</string>
+    <string name="toast_couldnt_export_encrypted_secret">Couldn\'t export encrypted secret key</string>
     <string name="wipe">Wipe</string>
     <string name="toast_signed_out_and_wiped">Account wiped from this device</string>
     <string name="toast_couldnt_wipe_account">Couldn\'t wipe account</string>

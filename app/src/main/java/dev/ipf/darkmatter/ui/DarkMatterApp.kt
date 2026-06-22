@@ -14340,6 +14340,7 @@ private fun AccountSelectorSheet(
     onAddAccount: () -> Unit,
     onAccountSwitched: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         appState.refreshAccounts()
     }
@@ -14352,11 +14353,13 @@ private fun AccountSelectorSheet(
                     ListItem(
                         modifier =
                             Modifier.clickable {
-                                appState.setActiveAccount(account.label)
-                                onDismiss()
-                                // Land on the newly-active account's chat list
-                                // instead of leaving the user on Settings (#316).
-                                onAccountSwitched()
+                                scope.launch {
+                                    appState.setActiveAccount(account.label)
+                                    onDismiss()
+                                    // Land on the newly-active account's chat list
+                                    // instead of leaving the user on Settings (#316).
+                                    onAccountSwitched()
+                                }
                             },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         leadingContent = {
@@ -14384,6 +14387,10 @@ private fun AccountSelectorSheet(
                                 }
                                 if (!account.localSigning) {
                                     Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                if (account.signedOut) {
+                                    Text(stringResource(R.string.signed_out), style = MaterialTheme.typography.labelSmall)
                                     Spacer(Modifier.width(8.dp))
                                 }
                                 if (account.label == appState.activeAccountRef) {
@@ -15477,16 +15484,30 @@ private fun IdentityScreen(
     appState: DarkMatterAppState,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     val active = appState.activeAccount
     var showSignOutSheet by remember { mutableStateOf(false) }
     var showWipeSheet by remember { mutableStateOf(false) }
     var showWipeConfirm by remember { mutableStateOf(false) }
+    var showEncryptedExportDialog by remember { mutableStateOf(false) }
+    var encryptedExportPassphrase by remember { mutableStateOf("") }
     // Type-to-confirm input for the destructive wipe (#348). Reset whenever the
     // confirm dialog is dismissed so a previous match can't carry over into a
     // later open.
     var wipeConfirmInput by remember { mutableStateOf("") }
+    val shareSecretKeyTitle = stringResource(R.string.share_secret_key)
+
+    fun shareSecretKey(text: String) {
+        val sendIntent =
+            Intent(Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_TEXT, text)
+        context.startActivity(
+            Intent.createChooser(sendIntent, shareSecretKeyTitle),
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -15523,6 +15544,39 @@ private fun IdentityScreen(
                         )
                         DiagnosticRow(stringResource(R.string.local_signing), stringResource(if (active.localSigning) R.string.yes else R.string.no))
                         DiagnosticRow(stringResource(R.string.status), stringResource(if (active.running) R.string.online else R.string.idle))
+                    }
+                }
+            }
+            if (active?.localSigning == true) {
+                item {
+                    SectionCard(title = stringResource(R.string.secret_key_backup)) {
+                        Text(
+                            stringResource(R.string.secret_key_backup_help),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    appState.exportActiveAccountNsec()?.let(::shareSecretKey)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Default.Key, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.export_nsec))
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                encryptedExportPassphrase = ""
+                                showEncryptedExportDialog = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.export_encrypted_secret))
+                        }
                     }
                 }
             }
@@ -15572,10 +15626,66 @@ private fun IdentityScreen(
         SignOutSheet(
             onConfirm = {
                 showSignOutSheet = false
-                appState.signOutActiveAccount()
-                appState.present(R.string.toast_signed_out)
+                scope.launch {
+                    if (appState.signOutActiveAccount() != null) {
+                        appState.present(R.string.toast_signed_out)
+                    }
+                }
             },
             onDismiss = { showSignOutSheet = false },
+        )
+    }
+
+    if (showEncryptedExportDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showEncryptedExportDialog = false
+                encryptedExportPassphrase = ""
+            },
+            title = { Text(stringResource(R.string.export_encrypted_secret_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(stringResource(R.string.export_encrypted_secret_body))
+                    OutlinedTextField(
+                        value = encryptedExportPassphrase,
+                        onValueChange = { encryptedExportPassphrase = it },
+                        label = { Text(stringResource(R.string.export_encrypted_secret_field_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                autoCorrectEnabled = false,
+                                keyboardType = KeyboardType.Password,
+                            ),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val passphrase = encryptedExportPassphrase
+                        showEncryptedExportDialog = false
+                        encryptedExportPassphrase = ""
+                        scope.launch {
+                            appState.exportActiveAccountEncryptedSecretKey(passphrase)?.let(::shareSecretKey)
+                        }
+                    },
+                    enabled = encryptedExportPassphrase.isNotEmpty(),
+                ) {
+                    Text(stringResource(R.string.export_encrypted_secret))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showEncryptedExportDialog = false
+                        encryptedExportPassphrase = ""
+                    },
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
         )
     }
 
@@ -15671,8 +15781,7 @@ private fun IdentityScreen(
  * Non-destructive sign-out sheet (#348). Explains what stays on device and what
  * changes, then performs the actual sign-out via [onConfirm]. Copy is
  * intentionally limited to what the current sign-out path actually does (push
- * off, in-memory caches cleared, identity retained) — relay-side KeyPackage
- * deletion is an engine sub-issue of #347 and is not promised here.
+ * off, relay KeyPackage deletion, in-memory caches cleared, identity retained).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
