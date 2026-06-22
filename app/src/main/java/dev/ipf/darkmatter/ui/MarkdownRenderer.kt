@@ -655,6 +655,28 @@ internal fun shortenedBech32(bech32: String): String {
     return trimmed.take(12) + "…" + trimmed.takeLast(6)
 }
 
+// `@npub1…` (and `nostr:npub1…`) runs as the composer stores them in plaintext.
+// Body is bech32's 58 data chars; the prefix is captured separately so the bare
+// npub can be handed to the resolver, which normalizes the npub form only.
+private val PLAINTEXT_NPUB_MENTION =
+    Regex("(@|nostr:)(npub1[ac-hj-np-z02-9]{58})", RegexOption.IGNORE_CASE)
+
+/**
+ * Resolves `@npub1…` / `nostr:npub1…` mentions in raw engine plaintext to
+ * `@<display name>`, falling back to `@<shortened bech32>` when [resolver]
+ * returns null — matching the message bubble's mention rendering exactly. Used
+ * by surfaces that show plaintext without the markdown renderer (reply preview,
+ * forward preview). Non-mention text is left untouched.
+ */
+internal fun resolveMentionsInPlaintext(
+    text: String,
+    resolver: ((String) -> String?)?,
+): String =
+    PLAINTEXT_NPUB_MENTION.replace(text) { match ->
+        val bech32 = match.groupValues[2]
+        "@" + (resolver?.invoke(bech32) ?: shortenedBech32(bech32))
+    }
+
 private fun AnnotatedString.Builder.appendMarkdownLink(
     dest: String,
     children: List<MarkdownInlineFfi>,
