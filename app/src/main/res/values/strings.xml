@@ -291,6 +291,7 @@
     <string name="no_active_account_period">No active account.</string>
     <string name="anonymous">Anonymous</string>
     <string name="display_name">Display name</string>
+    <string name="regenerate_display_name">Regenerate display name</string>
     <string name="about">About</string>
     <string name="picture_url">Picture URL</string>
     <string name="nip_05">Verified address</string>

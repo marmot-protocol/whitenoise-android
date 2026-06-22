@@ -237,6 +237,7 @@
     <string name="no_active_account_period">Aucun compte actif.</string>
     <string name="anonymous">Anonyme</string>
     <string name="display_name">Nom du profil</string>
+    <string name="regenerate_display_name">Régénérer le nom du profil</string>
     <string name="about">À propos</string>
     <string name="picture_url">Image URL</string>
     <string name="nip_05">Verified address</string>
