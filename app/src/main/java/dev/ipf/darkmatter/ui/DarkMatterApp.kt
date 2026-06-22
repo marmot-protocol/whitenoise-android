@@ -1151,6 +1151,11 @@ private fun MainShell(
     // rememberSaveable) so it never survives process death. Reset on every
     // other open path and on back.
     var selectedChatJustCreated by remember { mutableStateOf(false) }
+    // True while a tapped notification for a non-active account is mid-resolution
+    // (switching account / awaiting its chat list). Holds a single stable loading
+    // state over the multi-step route so the chat list never paints as an
+    // intermediate stop between the account switch and the opened conversation.
+    var routingNotification by remember { mutableStateOf(false) }
     val chatsController = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatsController(appState) }
     val section = runCatching { MainSection.valueOf(sectionName) }.getOrDefault(MainSection.Chats)
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
@@ -1219,6 +1224,9 @@ private fun MainShell(
         }
         when (step) {
             is NotificationNavStep.SwitchAccount -> {
+                // Hold a single loading state over the whole switch→open route so
+                // the chat list never paints between them.
+                routingNotification = true
                 // Close any conversation open under the previous account before
                 // switching. Otherwise the destination conversation is built
                 // mid-switch against a not-yet-settled chat-list projection and
@@ -1247,14 +1255,17 @@ private fun MainShell(
                         selectedChatJustCreated = false
                         selectedChat = it
                     }
+                routingNotification = false
                 onNotificationTargetHandled(target)
             }
             NotificationNavStep.MissingAccount -> {
+                routingNotification = false
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_account_unavailable)
                 onNotificationTargetHandled(target)
             }
             NotificationNavStep.MissingConversation -> {
+                routingNotification = false
                 fallBackToChatList()
                 appState.present(R.string.toast_notification_conversation_unavailable)
                 onNotificationTargetHandled(target)
@@ -1335,6 +1346,15 @@ private fun MainShell(
                 selectedChatJustCreated = false
             },
         )
+        return
+    }
+
+    // A notification tap on a non-active account resolves in steps (switch
+    // account → await its chat list → open conversation). Render one stable
+    // loading state for that whole window so the chat list doesn't flash as an
+    // intermediate stop before the conversation appears.
+    if (routingNotification) {
+        LoadingScreen()
         return
     }
 
@@ -6281,17 +6301,17 @@ private fun StagingTile(
                 Modifier
                     .align(Alignment.TopEnd)
                     .padding(4.dp)
-                    .size(24.dp),
+                    .size(40.dp),
             colors =
                 IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f),
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = Color.Black.copy(alpha = 0.6f),
+                    contentColor = Color.White,
                 ),
         ) {
             Icon(
                 Icons.Default.Close,
                 contentDescription = stringResource(R.string.media_attachment_remove),
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(24.dp),
             )
         }
     }
@@ -12861,7 +12881,7 @@ private val BubbleFooterGap = 8.dp
 
 // A body longer than this many rendered lines collapses to a Read More that
 // opens the full-screen view rather than spilling down the transcript (#325).
-private const val MESSAGE_COLLAPSE_LINE_LIMIT = 12
+private const val MESSAGE_COLLAPSE_LINE_LIMIT = 18
 
 // Distinct emojis shown in the consolidated reaction pill; the total count
 // still reflects every reaction beyond them.

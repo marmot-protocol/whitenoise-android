@@ -2,6 +2,7 @@ package dev.ipf.darkmatter.ui
 
 import android.view.inputmethod.EditorInfo
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.PlatformTextInputInterceptor
 import androidx.compose.ui.platform.PlatformTextInputMethodRequest
@@ -27,11 +28,16 @@ import androidx.compose.ui.platform.PlatformTextInputSession
  * which means the composer, search, settings fields, modal inputs, and the
  * profile editor all inherit the flag without per-field wiring.
  */
-internal object IncognitoKeyboardInterceptor : PlatformTextInputInterceptor {
+internal class IncognitoKeyboardInterceptor(
+    private val enabled: Boolean,
+) : PlatformTextInputInterceptor {
     override suspend fun interceptStartInputMethod(
         request: PlatformTextInputMethodRequest,
         nextHandler: PlatformTextInputSession,
     ): Nothing {
+        if (!enabled) {
+            nextHandler.startInputMethod(request)
+        }
         val wrapped =
             PlatformTextInputMethodRequest { editorInfo ->
                 val connection = request.createInputConnection(editorInfo)
@@ -52,21 +58,21 @@ private fun EditorInfo.applyNoPersonalizedLearning() {
 }
 
 /**
- * Conditionally wraps [content] so that, when [enabled] is true, every
- * descendant text field requests incognito mode from the IME. When disabled the
- * content is emitted unchanged so there is no behavioral or recomposition cost.
+ * Wraps [content] so that, when [enabled] is true, every descendant text field
+ * requests incognito mode from the IME. The interceptor is installed from a
+ * single, stable call site regardless of [enabled] so toggling the flag at
+ * runtime only swaps the interceptor's behavior — it does not move [content] to
+ * a different position in the composition, which would tear down and recreate
+ * the whole UI subtree (losing navigation state, flashing a reload).
  */
 @Composable
 fun IncognitoKeyboardScope(
     enabled: Boolean,
     content: @Composable () -> Unit,
 ) {
-    if (enabled) {
-        InterceptPlatformTextInput(
-            interceptor = IncognitoKeyboardInterceptor,
-            content = content,
-        )
-    } else {
-        content()
-    }
+    val interceptor = remember(enabled) { IncognitoKeyboardInterceptor(enabled) }
+    InterceptPlatformTextInput(
+        interceptor = interceptor,
+        content = content,
+    )
 }
