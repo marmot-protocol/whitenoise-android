@@ -153,6 +153,18 @@ class MediaPipelineTest {
     }
 
     @Test
+    fun jpegExifOrientation_readsOrientationFromHeaderPrefix() {
+        // ContentResolver fallback reads only the bounded header prefix after
+        // ExifInterface throws. The hand parser must return as soon as it has
+        // the APP1 orientation tag instead of requiring the later scan bytes.
+        val prefixOnly =
+            byteArrayOf(0xff.toByte(), 0xd8.toByte()) +
+                exifOrientationSegment(MediaPipeline.EXIF_ORIENTATION_ROTATE_90)
+
+        assertEquals(MediaPipeline.EXIF_ORIENTATION_ROTATE_90, MediaPipeline.jpegExifOrientation(prefixOnly))
+    }
+
+    @Test
     fun targetDimensionsForExifOrientation_usesDisplayOrientationForRotatedSources() {
         // Android camera captures often store a landscape sensor buffer plus
         // EXIF Orientation=Rotate90. The display/downscale box must treat that

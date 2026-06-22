@@ -157,16 +157,25 @@ object MediaPipeline {
      * Decode [bytes] downscaled so the longer edge is ≈ [maxEdgePx], using a
      * power-of-two `inSampleSize`. Used for in-bubble thumbnails so a full
      * 1920px image isn't held as a ~14 MB ARGB_8888 bitmap per visible row.
-     * Returns null when the bytes can't be decoded. JPEG EXIF orientation is
-     * applied to the returned pixels so locally-staged / optimistic previews
-     * match the upright image users captured.
+     * Returns null when the bytes can't be decoded. By default this treats the
+     * bytes as display-ready pixels and ignores EXIF orientation, because most
+     * callers use it for received attachment payloads whose senders may already
+     * have baked rotation into pixels while leaving a stale Orientation tag.
+     * Set [honorExifOrientation] only for trusted local source bytes whose EXIF
+     * metadata should drive the preview.
      */
     fun decodeSampledBitmap(
         bytes: ByteArray,
         maxEdgePx: Int,
+        honorExifOrientation: Boolean = false,
     ): Bitmap? {
         if (bytes.isEmpty()) return null
-        val orientation = readExifOrientation(bytes)
+        val orientation =
+            if (honorExifOrientation) {
+                readExifOrientation(bytes)
+            } else {
+                EXIF_ORIENTATION_NORMAL
+            }
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         val target = orientedDecodeTarget(bounds.outWidth, bounds.outHeight, maxEdgePx, orientation) ?: return null
@@ -403,12 +412,49 @@ object MediaPipeline {
                 )
             }
         } catch (_: java.io.IOException) {
+            readExifOrientationFromUriPrefix(contentResolver, uri)
+        } catch (_: SecurityException) {
+            EXIF_ORIENTATION_NORMAL
+        } catch (_: RuntimeException) {
+            readExifOrientationFromUriPrefix(contentResolver, uri)
+        }
+
+    private fun readExifOrientationFromUriPrefix(
+        contentResolver: ContentResolver,
+        uri: Uri,
+    ): Int =
+        try {
+            contentResolver.openInputStream(uri).use { stream ->
+                stream ?: return EXIF_ORIENTATION_NORMAL
+                normalizeExifOrientation(
+                    jpegExifOrientation(readPrefixBytes(stream, EXIF_FALLBACK_PREFIX_BYTES)),
+                )
+            }
+        } catch (_: java.io.IOException) {
             EXIF_ORIENTATION_NORMAL
         } catch (_: SecurityException) {
             EXIF_ORIENTATION_NORMAL
         } catch (_: RuntimeException) {
             EXIF_ORIENTATION_NORMAL
         }
+
+    private fun readPrefixBytes(
+        stream: java.io.InputStream,
+        cap: Int,
+    ): ByteArray {
+        require(cap >= 0) { "cap must be non-negative" }
+        if (cap == 0) return ByteArray(0)
+        val buffer = ByteArrayOutputStream()
+        val chunk = ByteArray(minOf(8 * 1024, cap))
+        var remaining = cap
+        while (remaining > 0) {
+            val read = stream.read(chunk, 0, minOf(chunk.size, remaining))
+            if (read <= 0) break
+            buffer.write(chunk, 0, read)
+            remaining -= read
+        }
+        return buffer.toByteArray()
+    }
 
     private fun readExifOrientation(bytes: ByteArray): Int =
         try {
@@ -880,6 +926,7 @@ object MediaPipeline {
     private const val PNG_CHUNK_OVERHEAD = 12
     private val PNG_METADATA_CHUNKS = setOf("eXIf", "tEXt", "zTXt", "iTXt", "tIME")
     private val EXIF_PREAMBLE = byteArrayOf(0x45, 0x78, 0x69, 0x66, 0x00, 0x00) // "Exif\u0000\u0000"
+    private const val EXIF_FALLBACK_PREFIX_BYTES = 256 * 1024
     private const val EXIF_ORIENTATION_TAG = 0x0112
     private const val TIFF_IFD_ENTRY_SIZE = 12
     private const val TIFF_TYPE_SHORT = 3
