@@ -1366,18 +1366,31 @@ private fun MainShell(
         previousActiveAccountRef = current
     }
 
-    appState.pendingProfileNpub?.let { npub ->
-        ProfileSheet(
-            appState = appState,
-            npub = npub,
-            onOpenGroup = { item, justCreated ->
-                selectedChatFocusMessageId = null
-                selectedChatJustCreated = justCreated
-                selectedChat = item
-                appState.clearPresentedProfile()
-            },
-            onDismiss = { appState.clearPresentedProfile() },
-        )
+    // Navigate the shell to a (possibly different) group when a profile sheet's
+    // shared-group / Message action fires. Shared by the shell-level sheet and,
+    // threaded through ConversationScreen, by the in-conversation sheet (#635) so
+    // both surfaces behave identically.
+    val openGroupFromProfile: (ChatListItem, Boolean) -> Unit = { item, justCreated ->
+        selectedChatFocusMessageId = null
+        selectedChatJustCreated = justCreated
+        selectedChat = item
+        appState.clearPresentedProfile()
+    }
+
+    // The shell-level profile sheet covers every non-conversation entry point
+    // (chat list, search, settings, QR, reaction list). While a conversation is
+    // active the in-conversation copy inside ConversationScreen renders it
+    // instead — with group-admin context (#635) — so gate this one off to avoid
+    // double-rendering the same sheet.
+    if (selectedChat == null) {
+        appState.pendingProfileNpub?.let { npub ->
+            ProfileSheet(
+                appState = appState,
+                npub = npub,
+                onOpenGroup = openGroupFromProfile,
+                onDismiss = { appState.clearPresentedProfile() },
+            )
+        }
     }
 
     if (selectedChat != null) {
@@ -1391,6 +1404,7 @@ private fun MainShell(
                 selectedChatFocusMessageId = null
                 selectedChatJustCreated = false
             },
+            onOpenProfileGroup = openGroupFromProfile,
         )
         return
     }
@@ -6852,6 +6866,11 @@ private fun ConversationScreen(
     // the user can type the first message without an extra tap. False for row
     // taps, notification routing, and search hits.
     justCreated: Boolean = false,
+    // (chat, justCreated): navigate to another shared group when the user taps a
+    // shared group / Message in the in-conversation profile sheet (issue #635).
+    // Reuses the shell's existing open-group lambda so this path matches the
+    // shell-level sheet's onOpenGroup exactly.
+    onOpenProfileGroup: (ChatListItem, Boolean) -> Unit = { _, _ -> },
 ) {
     // Push the global snackbar host above the conversation composer so
     // a toast (e.g. the post-invite-accept confirmation) doesn't
@@ -8289,6 +8308,25 @@ private fun ConversationScreen(
                 }
             }
     }
+    // In-conversation profile sheet (issue #635). Driven by the same
+    // appState.pendingProfileNpub the shell-level sheet uses, but passed the live
+    // ConversationController so it can offer group-admin actions. The shell-level
+    // sheet is suppressed while a conversation is active (selectedChat != null in
+    // the app shell), so the sheet renders exactly once here. Placed before the
+    // showDetails early-return so it also overlays the members-list row profile
+    // tap inside GroupDetailsScreen, which keeps the group context too.
+    appState.pendingProfileNpub?.let { profileNpub ->
+        ProfileSheet(
+            appState = appState,
+            npub = profileNpub,
+            onOpenGroup = { item, justCreatedChat ->
+                onOpenProfileGroup(item, justCreatedChat)
+            },
+            onDismiss = { appState.clearPresentedProfile() },
+            adminController = controller,
+        )
+    }
+
     if (showDetails) {
         GroupDetailsScreen(
             appState = appState,
@@ -10510,6 +10548,37 @@ internal fun groupMemberMenuActions(
         targetIsAdmin -> listOf(GroupMemberMenuAction.RevokeAdmin, GroupMemberMenuAction.RemoveMember)
         else -> listOf(GroupMemberMenuAction.GrantAdmin, GroupMemberMenuAction.RemoveMember)
     }
+
+/**
+ * The group-admin actions to show in the in-conversation profile sheet
+ * (issue #635) when an admin taps another member's avatar next to a message
+ * bubble. Reuses [groupMemberMenuActions] verbatim so the scope rules stay in
+ * lockstep with the Group Info members list (issue #444): actions appear only
+ * when the viewer is an admin member of this group and the viewed user is a
+ * member who is not the active account.
+ *
+ * The sheet surface never targets self (the avatar tap that opens it with admin
+ * context is on someone else's bubble, and self is excluded by the issue), so
+ * [GroupMemberMenuAction.StepDownAsAdmin] can never legitimately apply here; it
+ * is filtered out defensively. [targetIsMember] is false when the viewed user
+ * has no member record in this group, which fails scope and yields an empty
+ * list regardless of the other inputs.
+ */
+internal fun profileSheetAdminActions(
+    viewerIsMember: Boolean,
+    viewerIsAdmin: Boolean,
+    targetIsMember: Boolean,
+    targetIsSelf: Boolean,
+    targetIsAdmin: Boolean,
+): List<GroupMemberMenuAction> {
+    if (!targetIsMember) return emptyList()
+    return groupMemberMenuActions(
+        viewerIsMember = viewerIsMember,
+        viewerIsAdmin = viewerIsAdmin,
+        targetIsSelf = targetIsSelf,
+        targetIsAdmin = targetIsAdmin,
+    ).filter { it != GroupMemberMenuAction.StepDownAsAdmin }
+}
 
 @Composable
 private fun GroupMemberRow(
@@ -15327,6 +15396,14 @@ private fun ProfileSheet(
     // a shared group passes false.
     onOpenGroup: (ChatListItem, Boolean) -> Unit,
     onDismiss: () -> Unit,
+    // Non-null only when the sheet is opened from inside a group conversation
+    // by tapping a member's bubble avatar (issue #635). Supplies the live
+    // ConversationController for that group so the sheet can show group-admin
+    // moderation actions (grant/revoke admin, remove member) with the same
+    // scope rules and engine calls the Group Info members list uses (#444).
+    // Null for every other entry point (mentions, QR, reaction list, shell
+    // members-list row), which keeps those sheets byte-identical to before.
+    adminController: ConversationController? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     var hex by remember(npub) { mutableStateOf<String?>(null) }
@@ -15485,6 +15562,20 @@ private fun ProfileSheet(
                     Text(stringResource(R.string.message))
                 }
             }
+            // Group-admin moderation actions (issue #635). Only rendered when the
+            // sheet was opened from inside a conversation (adminController != null)
+            // AND the resolved user is a member of that group. The action set is
+            // derived from profileSheetAdminActions, which reuses the members-list
+            // scope rules (#444) verbatim, so an empty list (viewer not an admin
+            // member, or the viewed user is self / not a member) renders nothing
+            // and the sheet stays exactly as it is for every other entry point.
+            if (adminController != null && hex != null) {
+                ProfileSheetAdminActions(
+                    controller = adminController,
+                    appState = appState,
+                    targetHex = hex!!,
+                )
+            }
         }
     }
 
@@ -15493,6 +15584,147 @@ private fun ProfileSheet(
             title = title,
             pictureUrl = pictureUrl,
             onDismiss = { fullPictureOpen = false },
+        )
+    }
+}
+
+/**
+ * Group-admin moderation block shown inside the in-conversation profile sheet
+ * (issue #635). Resolves the viewed user's member record in [controller] by a
+ * case-insensitive hex match (consistent with the rest of the file), then asks
+ * [profileSheetAdminActions] which actions are in scope — the same rules and
+ * engine calls the Group Info members list uses (#444). Renders nothing when
+ * scope fails (viewer not an admin member, viewed user is self or not a member
+ * of this group), so the sheet is unchanged for those cases.
+ *
+ * Mutations run through [DarkMatterAppState.launchMutation] (process-lifetime
+ * scope) — the same approach as GroupDetailsScreen's local runGroupMutation — so
+ * the MLS commit + Nostr publish and the controller's own refreshMembers/toast
+ * finish even if the sheet dismisses mid-flight. A local in-flight flag plus the
+ * controller's [ConversationController.mutationInFlight] disable the buttons and
+ * show a spinner while a mutation is running.
+ */
+@Composable
+private fun ProfileSheetAdminActions(
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    targetHex: String,
+) {
+    val targetMember =
+        remember(controller.members, targetHex) {
+            controller.members.firstOrNull { it.memberIdHex.equals(targetHex, ignoreCase = true) }
+        }
+    val targetIsAdmin = targetMember?.let { controller.isAdmin(it) } == true
+    val targetIsSelf =
+        targetMember?.let {
+            GroupProjector.isActiveAccountMember(it, appState.activeAccount?.accountIdHex)
+        } == true
+    val actions =
+        profileSheetAdminActions(
+            viewerIsMember = controller.isSelfMember,
+            viewerIsAdmin = controller.isSelfAdmin,
+            targetIsMember = targetMember != null,
+            targetIsSelf = targetIsSelf,
+            targetIsAdmin = targetIsAdmin,
+        )
+    if (targetMember == null || actions.isEmpty()) return
+
+    // Local in-flight guard so the buttons disable immediately on tap; the
+    // controller's mutationInFlight covers mutations started elsewhere (e.g.
+    // the group details screen) for the same conversation.
+    var localMutating by remember(targetHex) { mutableStateOf(false) }
+    var confirmRemove by remember(targetHex) { mutableStateOf(false) }
+    val busy = localMutating || controller.mutationInFlight
+
+    fun runMutation(mutation: suspend () -> Boolean) {
+        localMutating = true
+        controller.clearLastMutationError()
+        appState.launchMutation {
+            try {
+                mutation()
+            } finally {
+                localMutating = false
+            }
+        }
+    }
+
+    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Reuses the same "Admin" badge the members list shows so the action
+        // labels (Grant/Revoke admin) read naturally. Uses an existing string
+        // (R.string.admin) only — no new copy to translate.
+        if (targetIsAdmin) {
+            Text(
+                stringResource(R.string.admin),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        actions.forEach { action ->
+            when (action) {
+                GroupMemberMenuAction.GrantAdmin ->
+                    OutlinedButton(
+                        onClick = { runMutation { controller.setMemberAdmin(targetMember, admin = true) } },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.make_admin))
+                    }
+                GroupMemberMenuAction.RevokeAdmin ->
+                    OutlinedButton(
+                        onClick = { runMutation { controller.setMemberAdmin(targetMember, admin = false) } },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.remove_admin))
+                    }
+                GroupMemberMenuAction.RemoveMember ->
+                    OutlinedButton(
+                        onClick = { confirmRemove = true },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors =
+                            ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error,
+                            ),
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.remove_member))
+                    }
+                // Self is excluded on this surface, so StepDownAsAdmin never
+                // appears (it is filtered out by profileSheetAdminActions).
+                GroupMemberMenuAction.StepDownAsAdmin -> Unit
+            }
+        }
+        if (busy) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        }
+    }
+
+    if (confirmRemove) {
+        ConfirmDialog(
+            title = stringResource(R.string.confirm_remove_member_title),
+            message =
+                stringResource(
+                    R.string.confirm_remove_member_message,
+                    controller.memberDisplayName(targetMember),
+                ),
+            confirmLabel = stringResource(R.string.remove_member),
+            onConfirm = {
+                confirmRemove = false
+                runMutation { controller.removeMember(targetMember) }
+            },
+            onDismiss = { confirmRemove = false },
+            destructive = true,
         )
     }
 }
