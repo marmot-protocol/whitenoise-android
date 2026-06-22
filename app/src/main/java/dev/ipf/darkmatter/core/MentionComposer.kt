@@ -230,6 +230,91 @@ object MentionComposer {
     }
 
     /**
+     * Repair a deletion that would leave a mention chip in a partial state
+     * (issue #607).
+     *
+     * [wholeChipBackspace] only intercepts the *single-char* backspace at a
+     * chip's right edge. But IME swipe-to-delete (hold-backspace-and-swipe on
+     * Gboard, SwiftKey, and others) fires per-character or multi-character
+     * delete events that can land *inside* an `@npub1…` token, chopping it into
+     * a truncated `@npub1abc…` run. A truncated run still matches the greedy
+     * chip regex, so it keeps being treated as a chip — but at a different
+     * length than the canonical token, which corrupts the underlying npub
+     * reference and drives the composer's [VisualTransformation]/offset mapping
+     * into an inconsistent state that crashes the field.
+     *
+     * This function makes that partial state impossible. Given the user's
+     * [oldText] and the proposed post-edit [newText], when the edit is a
+     * contiguous deletion whose removed range *partially* overlaps one or more
+     * chips (intersects a chip's interior without removing the whole chip), it
+     * widens the deletion to also remove every partially-hit chip in full,
+     * returning the repaired [Insertion]. A chip that the edit already removes
+     * entirely, or doesn't touch at all, is left as-is.
+     *
+     * Returns null when the edit is not a contiguous deletion, or when no chip
+     * is partially deleted (the caller then applies the IME edit verbatim).
+     *
+     * Unlike [wholeChipBackspace] this handles deletions of any length (and a
+     * selected-text-replaced-by-delete), because swipe-delete is not a clean
+     * one-char backspace. The deleted range is derived from the old/new text
+     * diff rather than the IME-reported caret, which is transient and sometimes
+     * inconsistent mid-swipe.
+     */
+    fun repairChipDeletion(
+        oldText: String,
+        newText: String,
+    ): Insertion? {
+        // Must be a net deletion: the new text is strictly shorter.
+        if (newText.length >= oldText.length) return null
+        // Identify the contiguous deleted range in oldText by matching the
+        // common prefix and suffix of old/new. This handles single-char
+        // backspace, multi-char swipe-delete, and selection-replaced-by-delete
+        // uniformly.
+        var prefix = 0
+        val maxPrefix = minOf(oldText.length, newText.length)
+        while (prefix < maxPrefix && oldText[prefix] == newText[prefix]) prefix++
+        var suffix = 0
+        val maxSuffix = minOf(oldText.length, newText.length) - prefix
+        while (suffix < maxSuffix &&
+            oldText[oldText.length - 1 - suffix] == newText[newText.length - 1 - suffix]
+        ) {
+            suffix++
+        }
+        val delStart = prefix
+        val delEnd = oldText.length - suffix
+        // A pure contiguous deletion: removing oldText[delStart, delEnd) and
+        // keeping both ends must reproduce newText exactly. If it doesn't, the
+        // edit also inserted characters (e.g. autocorrect) — not our concern.
+        if (oldText.substring(0, delStart) + oldText.substring(delEnd) != newText) return null
+        if (delStart >= delEnd) return null
+
+        // Find chips in the ORIGINAL text that the deletion only partially
+        // covers. "Partial" = the deleted range overlaps the chip's interior
+        // but the chip is not entirely contained in the deleted range.
+        val chips = chipRanges(oldText)
+        var widenedStart = delStart
+        var widenedEnd = delEnd
+        var touchedPartial = false
+        for (chip in chips) {
+            val chipStart = chip.first
+            val chipEnd = chip.last + 1 // exclusive
+            // No overlap with the deleted range at all → untouched chip.
+            if (delEnd <= chipStart || delStart >= chipEnd) continue
+            // Whole chip already inside the deleted range → cleanly removed.
+            if (delStart <= chipStart && delEnd >= chipEnd) continue
+            // Otherwise the deletion cuts into the chip: widen to swallow it.
+            touchedPartial = true
+            if (chipStart < widenedStart) widenedStart = chipStart
+            if (chipEnd > widenedEnd) widenedEnd = chipEnd
+        }
+        if (!touchedPartial) return null
+
+        val before = oldText.substring(0, widenedStart)
+        val after = oldText.substring(widenedEnd)
+        return Insertion(text = before + after, selection = before.length)
+    }
+
+    /**
      * Clamp a (possibly ranged) selection so neither endpoint rests *inside* a
      * mention chip. A chip is atomic: the caret may sit at its left or right
      * edge but never between its characters, and a selection edge inside a chip

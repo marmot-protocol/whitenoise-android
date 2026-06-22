@@ -228,6 +228,116 @@ class MentionComposerTest {
         assertNull(result)
     }
 
+    // --- repairChipDeletion (#607: swipe-delete partial-chip repair) --------
+
+    @Test
+    fun repairSingleCharInteriorDeleteRemovesWholeChip() {
+        // Swipe-delete fires a per-char delete that lands INSIDE the chip (not
+        // at its right edge), which wholeChipBackspace's chipEndingAt misses.
+        val chip = "@$aliceNpub"
+        val oldText = "hey $chip rest"
+        // Remove one char from the middle of the npub body.
+        val cut = "hey ".length + 10
+        val newText = oldText.removeRange(cut, cut + 1)
+        val result = MentionComposer.repairChipDeletion(oldText, newText)
+        assertEquals("hey  rest", result!!.text)
+        assertEquals("hey ".length, result.selection)
+    }
+
+    @Test
+    fun repairMultiCharSwipeDeleteRemovesWholeChip() {
+        // The classic swipe-delete: several chars removed from the chip tail in
+        // one onValueChange. Falls through wholeChipBackspace entirely.
+        val chip = "@$aliceNpub"
+        val oldText = "hey $chip"
+        // Drop the last 12 chars (chops the chip into a truncated @npub1… run).
+        val newText = oldText.dropLast(12)
+        val result = MentionComposer.repairChipDeletion(oldText, newText)
+        // The whole chip is gone, leaving only the leading text.
+        assertEquals("hey ", result!!.text)
+        assertEquals("hey ".length, result.selection)
+    }
+
+    @Test
+    fun repairDeleteSpanningChipAndAdjacentTextRemovesChipAndSpan() {
+        val chip = "@$aliceNpub"
+        val oldText = "hi $chip there"
+        // Delete from inside the chip body through into " the" of "there".
+        val delStart = "hi ".length + 8 // inside the chip
+        val delEnd = "hi $chip th".length // a few chars into "there"
+        val newText = oldText.removeRange(delStart, delEnd)
+        val result = MentionComposer.repairChipDeletion(oldText, newText)
+        // The whole chip is swallowed; the deletion's tail past the chip stays.
+        assertEquals("hi ere", result!!.text)
+        assertEquals("hi ".length, result.selection)
+    }
+
+    @Test
+    fun repairLeavesFullyDeletedChipAlone() {
+        // Selecting the whole chip and deleting it is already clean — no repair.
+        val chip = "@$aliceNpub"
+        val oldText = "hey $chip rest"
+        val newText = "hey  rest" // chip removed in full
+        assertNull(MentionComposer.repairChipDeletion(oldText, newText))
+    }
+
+    @Test
+    fun repairLeavesPlainTextDeletionAlone() {
+        // A delete in plain text (no chip touched) is not intercepted.
+        val oldText = "hello world"
+        val newText = "hello orld" // dropped the 'w'
+        assertNull(MentionComposer.repairChipDeletion(oldText, newText))
+    }
+
+    @Test
+    fun repairLeavesIntactChipAlone() {
+        // Deleting trailing plain text after a chip leaves the chip whole.
+        val chip = "@$aliceNpub"
+        val oldText = "$chip world"
+        val newText = oldText.dropLast(1) // drop the 'd'
+        assertNull(MentionComposer.repairChipDeletion(oldText, newText))
+    }
+
+    @Test
+    fun repairIgnoresInsertions() {
+        // An edit that grows the text (typing) is never a deletion repair.
+        val chip = "@$aliceNpub"
+        val oldText = "hey $chip"
+        val newText = "${oldText}x"
+        assertNull(MentionComposer.repairChipDeletion(oldText, newText))
+    }
+
+    @Test
+    fun repairRemovesAllPartiallyHitChipsInRange() {
+        // A swipe-delete that cuts across two adjacent chips removes both whole.
+        val chip = "@$aliceNpub"
+        val oldText = "$chip $chip"
+        // Delete from inside the first chip through inside the second chip.
+        val delStart = 8 // inside first chip
+        val delEnd = oldText.length - 8 // inside second chip
+        val newText = oldText.removeRange(delStart, delEnd)
+        val result = MentionComposer.repairChipDeletion(oldText, newText)
+        // Everything from the first chip's start to the second chip's end goes;
+        // the single space between them is interior to the widened range.
+        assertEquals("", result!!.text)
+        assertEquals(0, result.selection)
+    }
+
+    @Test
+    fun repairResultIsNeverItselfAPartialChip() {
+        // The repaired text must not contain a truncated chip run: after repair,
+        // every `@npub1…` run is either gone or full-length.
+        val chip = "@$aliceNpub"
+        val oldText = "ping $chip pong"
+        // Truncate the chip mid-body.
+        val cut = "ping $chip".length - 5
+        val newText = oldText.removeRange(cut, "ping $chip".length)
+        val result = MentionComposer.repairChipDeletion(oldText, newText)!!
+        // No chip ranges remain (the only chip was partially hit → fully removed).
+        assertTrue(MentionComposer.chipRanges(result.text).isEmpty())
+        assertEquals("ping  pong", result.text)
+    }
+
     // --- chipRanges ---------------------------------------------------------
 
     @Test
