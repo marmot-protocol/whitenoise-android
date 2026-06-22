@@ -1577,6 +1577,28 @@ private fun ChatsScreen(
             jumpToTopVisible = false
         }
     }
+    // Snap the list flush to the top whenever a different chat reorders into
+    // position 0 (issue #541). A send bumps the messaged conversation to the
+    // head via the live subscription; with keyed `items`, LazyColumn pins the
+    // previously-anchored row at its old pixel offset, so the new head lands
+    // one row down / clipped instead of flush. When the head row's identity
+    // changes we reset to offset 0 so the freshest chat is fully visible.
+    //
+    // Guards: only the active (non-archived) list, and never while the user is
+    // dragging — `isScrollInProgress` is false on a settled list after a
+    // back-navigation return, but true mid-scroll, so an incoming reorder can't
+    // yank the list out from under an active scroll. Keyed on `showArchived` so
+    // the tracked head resets alongside `chatListState` on a view swap; the
+    // first established head is seeded without snapping (only *changes* fire).
+    val activeHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
+    var lastActiveHeadId by remember(showArchived) { mutableStateOf(activeHeadId) }
+    LaunchedEffect(activeHeadId) {
+        val previous = lastActiveHeadId
+        lastActiveHeadId = activeHeadId
+        if (activeHeadId == null || previous == null || activeHeadId == previous) return@LaunchedEffect
+        if (chatListState.isScrollInProgress) return@LaunchedEffect
+        chatListState.scrollToItem(0)
+    }
     val archivedUnreadCount =
         remember(controller.archivedItems) {
             controller.archivedItems.count { it.hasUnread }
