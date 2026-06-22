@@ -269,14 +269,14 @@
     <string name="missing_relay_lists">Desaparecido: %1$s</string>
     <string name="not_published">No publicado</string>
     <string name="publishing">Publicación</string>
-    <string name="key_package_publishing_help">Vuelve a publicar el paquete de claves actual en los relés NIP-65 de esta cuenta, o rota a uno nuevo. Los paquetes antiguos permanecen en los relés hasta que se eliminen.</string>
+    <string name="key_package_publishing_help">Vuelve a publicar el paquete de claves actual en la lista de relés de esta cuenta, o rota a uno nuevo. Los paquetes antiguos permanecen en los relés hasta que se eliminen.</string>
     <string name="republish">Actualizar paquetes de llaves</string>
     <string name="publish_new">Publicar nuevo paquete de llaves</string>
     <string name="published">Publicado</string>
     <string name="no_key_packages_found">No se encontraron paquetes de llaves</string>
-    <string name="no_key_packages_found_help">No hay nada en caché local y los relés NIP-65 de esta cuenta no devolvieron eventos de paquetes de claves. Prueba &quot;Publicar nuevo&quot;.</string>
+    <string name="no_key_packages_found_help">No hay nada en caché local y la lista de relés de esta cuenta no devolvió eventos de paquetes de claves. Prueba &quot;Publicar nuevo&quot;.</string>
     <string name="delete_key_package_question">¿Eliminar paquete de claves?</string>
-    <string name="delete_key_package_help">Publica una eliminación NIP-09 para este paquete de claves y lo borra del caché local.</string>
+    <string name="delete_key_package_help">Publica un evento de eliminación para este paquete de claves y lo borra del caché local.</string>
     <string name="event_value">Evento: %1$s</string>
     <string name="delete_key_package">Eliminar paquete de claves</string>
     <string name="event">Evento</string>

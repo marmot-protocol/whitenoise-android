@@ -268,14 +268,14 @@
     <string name="missing_relay_lists">缺失：%1$s</string>
     <string name="not_published">未發表</string>
     <string name="publishing">出版</string>
-    <string name="key_package_publishing_help">將目前金鑰包重新發布到此帳戶的 NIP-65 中繼集，或輪換為新的金鑰包。舊包會保留在中繼上，直到被刪除。</string>
+    <string name="key_package_publishing_help">將目前金鑰包重新發布到此帳戶的中繼清單，或輪換為新的金鑰包。舊包會保留在中繼上，直到被刪除。</string>
     <string name="republish">重新整理金鑰套件</string>
     <string name="publish_new">發布新金鑰套件</string>
     <string name="published">已發表</string>
     <string name="no_key_packages_found">找不到金鑰套件</string>
-    <string name="no_key_packages_found_help">本機沒有快取內容，此帳戶的 NIP-65 中繼集也沒有傳回金鑰包事件。請嘗試「發布新的」。</string>
+    <string name="no_key_packages_found_help">本機沒有快取內容，此帳戶的中繼清單也沒有傳回金鑰包事件。請嘗試「發布新的」。</string>
     <string name="delete_key_package_question">刪除密鑰包？</string>
-    <string name="delete_key_package_help">發布此密鑰包的 NIP-09 刪除，並將其從本機快取中清除。</string>
+    <string name="delete_key_package_help">發布此密鑰包的刪除事件，並將其從本機快取中清除。</string>
     <string name="event_value">事件：%1$s</string>
     <string name="delete_key_package">刪除密鑰包</string>
     <string name="event">活動</string>

@@ -269,14 +269,14 @@
     <string name="missing_relay_lists">Fehlt: %1$s</string>
     <string name="not_published">Nicht veröffentlicht</string>
     <string name="publishing">Veröffentlichung</string>
-    <string name="key_package_publishing_help">Veröffentlicht das aktuelle Schlüsselpaket erneut auf den NIP-65-Relays dieses Kontos oder rotiert zu einem neuen. Alte Pakete bleiben auf Relays, bis sie gelöscht werden.</string>
+    <string name="key_package_publishing_help">Veröffentlicht das aktuelle Schlüsselpaket erneut auf der Relay-Liste dieses Kontos oder rotiert zu einem neuen. Alte Pakete bleiben auf Relays, bis sie gelöscht werden.</string>
     <string name="republish">Schlüsselpakete aktualisieren</string>
     <string name="publish_new">Neues Schlüsselpaket veröffentlichen</string>
     <string name="published">Veröffentlicht</string>
     <string name="no_key_packages_found">Keine Schlüsselpakete gefunden</string>
-    <string name="no_key_packages_found_help">Lokal ist nichts zwischengespeichert und von den NIP-65-Relays dieses Kontos wurden keine Schlüsselpaket-Ereignisse zurückgegeben. Versuchen Sie &quot;Neu veröffentlichen&quot;.</string>
+    <string name="no_key_packages_found_help">Lokal ist nichts zwischengespeichert und von der Relay-Liste dieses Kontos wurden keine Schlüsselpaket-Ereignisse zurückgegeben. Versuchen Sie &quot;Neu veröffentlichen&quot;.</string>
     <string name="delete_key_package_question">Schlüsselpaket löschen?</string>
-    <string name="delete_key_package_help">Veröffentlicht eine NIP-09-Löschung für dieses Schlüsselpaket und löscht es aus dem lokalen Cache.</string>
+    <string name="delete_key_package_help">Veröffentlicht ein Löschereignis für dieses Schlüsselpaket und löscht es aus dem lokalen Cache.</string>
     <string name="event_value">Ereignis: %1$s</string>
     <string name="delete_key_package">Schlüsselpaket löschen</string>
     <string name="event">Veranstaltung</string>

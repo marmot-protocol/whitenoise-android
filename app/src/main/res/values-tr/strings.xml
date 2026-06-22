@@ -269,14 +269,14 @@
     <string name="missing_relay_lists">Eksik: %1$s</string>
     <string name="not_published">Yayınlanmadı</string>
     <string name="publishing">Yayınlama</string>
-    <string name="key_package_publishing_help">Geçerli anahtar paketini bu hesabın NIP-65 rölelerine yeniden yayınlayın veya yeni bir pakete döndürün. Eski paketler silinene kadar rölelerde kalır.</string>
+    <string name="key_package_publishing_help">Geçerli anahtar paketini bu hesabın röle listesine yeniden yayınlayın veya yeni bir pakete döndürün. Eski paketler silinene kadar rölelerde kalır.</string>
     <string name="republish">Anahtar Paketlerini Yenile</string>
     <string name="publish_new">Yeni Anahtar Paketi Yayınla</string>
     <string name="published">Yayınlandı</string>
     <string name="no_key_packages_found">Anahtar paketi bulunamadı</string>
-    <string name="no_key_packages_found_help">Yerelde hiçbir şey önbelleğe alınmadı ve bu hesabın NIP-65 rölelerinden anahtar paketi olayı dönmedi. &quot;Yeni yayınla&quot;yı deneyin.</string>
+    <string name="no_key_packages_found_help">Yerelde hiçbir şey önbelleğe alınmadı ve bu hesabın röle listesinden anahtar paketi olayı dönmedi. &quot;Yeni yayınla&quot;yı deneyin.</string>
     <string name="delete_key_package_question">Anahtar paketi silinsin mi?</string>
-    <string name="delete_key_package_help">Bu anahtar paketi için bir NIP-09 silme işlemi yayınlar ve bunu yerel önbellekten temizler.</string>
+    <string name="delete_key_package_help">Bu anahtar paketi için bir silme olayı yayınlar ve bunu yerel önbellekten temizler.</string>
     <string name="event_value">Etkinlik: %1$s</string>
     <string name="delete_key_package">Anahtar paketini sil</string>
     <string name="event">Etkinlik</string>
