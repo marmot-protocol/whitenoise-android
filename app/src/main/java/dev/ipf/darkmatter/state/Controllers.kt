@@ -1550,6 +1550,18 @@ class ConversationController(
     var membersLoaded by mutableStateOf(initialMemberSnapshot?.members?.isNotEmpty() == true)
         private set
 
+    // True when the seeding snapshot positively places the active account in
+    // the roster. Lets the bottom bar show the active composer immediately for
+    // a known member while refreshMembers() verifies, without flashing the
+    // active composer for a group the user has already left (whose cached
+    // snapshot has self removed). Captured synchronously at construction — the
+    // only membership signal available before the first refresh round-trips
+    // (issue #545).
+    val seededSelfMember: Boolean =
+        initialMemberSnapshot?.members?.any {
+            GroupProjector.isActiveAccountMember(it, appState.activeAccount?.accountIdHex)
+        } == true
+
     // Typed media references keyed by `messageIdHex`. Populated from Rust's
     // `listMedia` FFI — the only place the receive-side `source_epoch` is
     // surfaced (TimelineMessageRecordFfi / AppMessageRecordFfi don't expose

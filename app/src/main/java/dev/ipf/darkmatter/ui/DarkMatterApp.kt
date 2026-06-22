@@ -2757,6 +2757,30 @@ internal fun canInviteFromEmptyGroup(
         membersLoaded &&
         memberCount == 1
 
+/**
+ * Whether the conversation bottom bar should render the active composer (true)
+ * or the "no longer a member" notice (false). Pulled out as a pure predicate so
+ * the gate decision can be unit-tested without Compose and pinned against
+ * regression (issue #545).
+ *
+ * - Confirmed member (`isSelfMember`) → composer.
+ * - Confirmed not-member (`membersLoaded && !isSelfMember`) → notice.
+ * - Still loading (`!membersLoaded`): show the composer only when the seeding
+ *   snapshot positively placed self in the roster (`seededSelfMember`). For a
+ *   cold/unknown snapshot, or one that has self removed (the group the user
+ *   left), default to the disabled notice and upgrade to the composer only once
+ *   `refreshMembers()` confirms membership — this is what removes the
+ *   active-composer flash for a left group.
+ *
+ * This drives only the INITIAL VISUAL state; it does not affect send-gating,
+ * which stays guarded by `canSendMessages` / [canAcceptTextSend] (issue #264).
+ */
+internal fun shouldShowComposer(
+    membersLoaded: Boolean,
+    isSelfMember: Boolean,
+    seededSelfMember: Boolean,
+): Boolean = isSelfMember || (!membersLoaded && seededSelfMember)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewChatSheet(
@@ -7974,14 +7998,23 @@ private fun ConversationScreen(
                         onNext = { navigateToSearchMatch(forward = true) },
                     )
                 controller.error != null || controller.group.pendingConfirmation -> Unit
-                // Only suppress the composer when we've *confirmed* the user
-                // is no longer a member. The kicked-notice branch must lose
-                // to the composer during the load window (`membersLoaded`
-                // still false) so the user isn't staring at a blank bottom
-                // bar while `refreshMembers()` round-trips. The controller's
-                // `canSendMessages` guard in send/upload/react/delete keeps
-                // any actual mutation safe until membership is confirmed.
-                controller.membersLoaded && !controller.isSelfMember -> RemovedMemberComposerNotice()
+                // Render the disabled "no longer a member" notice by default
+                // during the membership-load window, and upgrade to the active
+                // composer only once we believe self is a member (#545). A
+                // confirmed member, or a known member from the seeding snapshot
+                // (`seededSelfMember`), shows the composer immediately — the
+                // latter preserves the #264 intent of not staring at a blank
+                // bottom bar during `refreshMembers()`. A group the user has
+                // left (whose cached snapshot has self removed) seeds
+                // `seededSelfMember = false`, so its notice renders at once
+                // instead of flashing the active composer. The controller's
+                // `canSendMessages` guard still keeps any actual mutation safe
+                // until membership is verified.
+                !shouldShowComposer(
+                    membersLoaded = controller.membersLoaded,
+                    isSelfMember = controller.isSelfMember,
+                    seededSelfMember = controller.seededSelfMember,
+                ) -> RemovedMemberComposerNotice()
                 else -> {
                     val groupIdHex = controller.group.groupIdHex
                     val editingRecord =
