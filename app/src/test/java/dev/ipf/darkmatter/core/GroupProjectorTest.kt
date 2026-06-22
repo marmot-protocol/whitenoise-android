@@ -341,6 +341,41 @@ class GroupProjectorTest {
         assertFalse(GroupProjector.isActiveAccountMember(self, activeAccountIdHex = ""))
     }
 
+    @Test
+    fun membersWithoutActiveAccountDropsSelfOnly() {
+        // #545: on a successful leave the cached snapshot is rewritten with self
+        // removed so the next ConversationController seeds seededSelfMember=false.
+        val self = member(memberId = "alice", account = "alice", local = true)
+        val other = member(memberId = "bob", account = "bob", local = false)
+
+        val remaining = GroupProjector.membersWithoutActiveAccount(listOf(self, other), activeAccountIdHex = "alice")
+
+        assertEquals(listOf(other), remaining)
+        assertFalse(remaining.any { GroupProjector.isActiveAccountMember(it, activeAccountIdHex = "alice") })
+    }
+
+    @Test
+    fun membersWithoutActiveAccountIgnoresHexCase() {
+        val self = member(memberId = "ALICE", account = null, local = true)
+        val other = member(memberId = "bob", account = "bob", local = false)
+
+        val remaining = GroupProjector.membersWithoutActiveAccount(listOf(self, other), activeAccountIdHex = "alice")
+
+        assertEquals(listOf(other), remaining)
+    }
+
+    @Test
+    fun membersWithoutActiveAccountLeavesRosterUntouchedForBlankActiveId() {
+        // No active account → nothing matches self, roster is returned as-is
+        // (mirrors isActiveAccountMember's blank-id contract).
+        val self = member(memberId = "alice", account = "alice", local = true)
+        val other = member(memberId = "bob", account = "bob", local = false)
+        val roster = listOf(self, other)
+
+        assertEquals(roster, GroupProjector.membersWithoutActiveAccount(roster, activeAccountIdHex = null))
+        assertEquals(roster, GroupProjector.membersWithoutActiveAccount(roster, activeAccountIdHex = ""))
+    }
+
     private fun member(
         memberId: String,
         account: String?,
