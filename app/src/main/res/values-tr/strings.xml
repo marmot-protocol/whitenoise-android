@@ -47,6 +47,7 @@
     <string name="scan_qr_code">QR kodu tara</string>
     <string name="new_group">Yeni grup</string>
     <string name="invitation">Davet</string>
+    <string name="invited">Davet edildi</string>
     <string name="invite">Davet etmek</string>
     <string name="no_chats_yet">Henüz sohbet yok</string>
     <string name="empty_chats_invite_npub">Birisini npub ile davet ederek bir sohbet başlatın.</string>
@@ -78,6 +79,9 @@
     <string name="jump_to_newest">En yeniye atla</string>
     <string name="scroll_to_top">Başa kaydır</string>
     <string name="discard_failed_message">Başarısız mesajı sil</string>
+    <string name="auto_invite_banner_with_inviter">%1$s sizi davet etti. Burada olmak istemiyorsanız gruptan ayrılın.</string>
+    <string name="auto_invite_banner_unknown">Bu gruba davet edildiniz. Burada olmak istemiyorsanız gruptan ayrılın.</string>
+    <string name="auto_invite_banner_dismiss">Davet bandını kapat</string>
     <string name="invited_to_this_chat">Bu sohbete davet edildiniz.</string>
     <string name="decline">Reddet</string>
     <string name="accept">Kabul et</string>
@@ -342,6 +346,9 @@
     <string name="notification_channel_reactions_description">Mesajlarınıza verilen tepkiler</string>
     <string name="notification_channel_invites">Davetler</string>
     <string name="notification_channel_invites_description">Grup davetleri ve karşılamalar</string>
+    <string name="notification_joined_group">%1$s grubuna katıldınız</string>
+    <string name="notification_joined_new_group">Yeni bir gruba katıldınız</string>
+    <string name="notification_joined_group_from_sender">%1$s sizi davet etti</string>
     <string name="notification_group_invite">Güvenli bir sohbete davet edildiniz</string>
     <string name="notification_new_message">Yeni mesaj</string>
     <string name="notification_sender_in_group">%1$s, %2$s içinde</string>

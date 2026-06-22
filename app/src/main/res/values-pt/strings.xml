@@ -47,6 +47,7 @@
     <string name="scan_qr_code">Escanear código QR</string>
     <string name="new_group">Novo grupo</string>
     <string name="invitation">Convite</string>
+    <string name="invited">Convidado</string>
     <string name="invite">Convidar</string>
     <string name="no_chats_yet">Ainda não há conversas</string>
     <string name="empty_chats_invite_npub">Inicie uma conversa convidando alguém com seu npub.</string>
@@ -78,6 +79,9 @@
     <string name="jump_to_newest">Ir para a mais recente</string>
     <string name="scroll_to_top">Rolar para o topo</string>
     <string name="discard_failed_message">Descartar mensagem com falha</string>
+    <string name="auto_invite_banner_with_inviter">Você foi convidado por %1$s. Saia do grupo se não quiser estar aqui.</string>
+    <string name="auto_invite_banner_unknown">Você foi convidado para este grupo. Saia do grupo se não quiser estar aqui.</string>
+    <string name="auto_invite_banner_dismiss">Dispensar banner de convite</string>
     <string name="invited_to_this_chat">Você foi convidado para este bate-papo.</string>
     <string name="decline">Recusar</string>
     <string name="accept">Aceitar</string>
@@ -342,6 +346,9 @@
     <string name="notification_channel_reactions_description">Reações às suas mensagens</string>
     <string name="notification_channel_invites">Convites</string>
     <string name="notification_channel_invites_description">Convites de grupo e boas-vindas</string>
+    <string name="notification_joined_group">Entrou em %1$s</string>
+    <string name="notification_joined_new_group">Entrou em um novo grupo</string>
+    <string name="notification_joined_group_from_sender">Você foi convidado por %1$s</string>
     <string name="notification_group_invite">Você foi convidado para uma conversa segura</string>
     <string name="notification_new_message">Nova mensagem</string>
     <string name="notification_sender_in_group">%1$s em %2$s</string>

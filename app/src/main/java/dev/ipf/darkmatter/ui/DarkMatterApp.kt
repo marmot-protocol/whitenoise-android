@@ -2702,6 +2702,10 @@ private fun ChatRow(
     val openableDmAvatarAccount =
         avatarAccount
             ?.takeIf { GroupProjector.isDm(memberCount = item.memberCount, name = item.group.name) }
+    val autoInviteBadgeVisible =
+        remember(item.group.groupIdHex, appState.activeAccountRef, appState.autoAcceptedInviteRevisionForCompose) {
+            appState.autoAcceptedInviteBadgeVisible(item.group.groupIdHex)
+        }
     val rowModifier =
         if (onLongClick != null) {
             Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
@@ -2810,7 +2814,9 @@ private fun ChatRow(
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
                 )
-                if (item.group.pendingConfirmation) {
+                if (autoInviteBadgeVisible) {
+                    Badge { Text(stringResource(R.string.invited)) }
+                } else if (item.group.pendingConfirmation) {
                     Badge { Text(stringResource(R.string.invite)) }
                 } else if (item.hasUnread) {
                     UnreadCountBadge(item.unreadCount)
@@ -7020,6 +7026,22 @@ private fun ConversationScreen(
     val context = LocalContext.current
     val groupTitleCopy = rememberGroupTitleCopy()
     val messageTextCopy = rememberMessageTextCopy()
+    // Keep the banner hidden immediately after the user dismisses it. The
+    // persisted marker update is asynchronous with Compose's next revision.
+    var inviteBannerDismissedThisSession by remember(chat.id) { mutableStateOf(false) }
+    val autoInviteBanner =
+        remember(
+            chat.id,
+            controller.group.pendingConfirmation,
+            inviteBannerDismissedThisSession,
+            appState.autoAcceptedInviteRevisionForCompose,
+        ) {
+            if (inviteBannerDismissedThisSession || controller.group.pendingConfirmation) {
+                null
+            } else {
+                appState.autoAcceptedInviteBanner(controller.group.groupIdHex)
+            }
+        }
     // Seeded empty and populated off the Main thread: the first access to a
     // SharedPreferences file blocks on disk, and doing that inside composition
     // stalls the conversation screen's first frame. See #147.
@@ -7757,6 +7779,11 @@ private fun ConversationScreen(
     LaunchedEffect(controller) {
         initialTimelineLoadStarted = true
         controller.start()
+    }
+    LaunchedEffect(controller.group.pendingConfirmation, controller.group.groupIdHex) {
+        if (controller.group.pendingConfirmation) {
+            controller.acceptInvite(notify = false, autoAccepted = true)
+        }
     }
     // inviteStreamScope outlives a single start() — acceptInvite() launches into
     // it from a separate mutation scope — so it's cancelled on controller
@@ -8561,20 +8588,7 @@ private fun ConversationScreen(
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
                 controller.error != null -> ErrorContent(stringResource(R.string.couldnt_load_conversation), controller.error.orEmpty())
-                controller.group.pendingConfirmation ->
-                    PendingInviteContent(
-                        title = controller.title(groupTitleCopy),
-                        pictureUrl = controller.inviteAccount?.let { appState.avatarUrl(it) },
-                        avatarSeed = controller.inviteAccount ?: controller.group.groupIdHex,
-                        onAccept = {
-                            appState.launchMutation { controller.acceptInvite() }
-                        },
-                        onDecline = {
-                            appState.launchMutation {
-                                if (controller.declineInvite()) onBack()
-                            }
-                        },
-                    )
+                controller.group.pendingConfirmation -> LoadingScreen()
                 controller.timeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted -> {
                     if (
                         canInviteFromEmptyGroup(
@@ -8612,6 +8626,24 @@ private fun ConversationScreen(
                             contentPadding = PaddingValues(bottom = 8.dp),
                         ) {
                             item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
+                            if (autoInviteBanner != null) {
+                                item(key = "auto-invite-banner") {
+                                    AutoAcceptedInviteBanner(
+                                        inviterName = autoInviteBanner.inviterAccountIdHex?.let { appState.chatMemberTitle(it) },
+                                        onLeave = {
+                                            if (controller.isSoleAdminWithOtherMembers) {
+                                                showTransferAdminFirst = true
+                                            } else {
+                                                confirmLeaveFromTopBar = true
+                                            }
+                                        },
+                                        onDismiss = {
+                                            appState.dismissAutoAcceptedInviteBanner(controller.group.groupIdHex)
+                                            inviteBannerDismissedThisSession = true
+                                        },
+                                    )
+                                }
+                            }
                             if (controller.hasMoreBefore || controller.isLoadingOlder) {
                                 item(key = "older-messages-loading") {
                                     Box(
@@ -8860,33 +8892,41 @@ private fun ConfirmDialog(
 }
 
 @Composable
-private fun PendingInviteContent(
-    title: String,
-    pictureUrl: String?,
-    avatarSeed: String,
-    onAccept: () -> Unit,
-    onDecline: () -> Unit,
+private fun AutoAcceptedInviteBanner(
+    inviterName: String?,
+    onLeave: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Avatar(title = title, seed = avatarSeed, size = 64.dp, pictureUrl = pictureUrl)
-            Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(20.dp))
             Text(
-                stringResource(R.string.invited_to_this_chat),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+                text =
+                    if (inviterName != null) {
+                        stringResource(R.string.auto_invite_banner_with_inviter, inviterName)
+                    } else {
+                        stringResource(R.string.auto_invite_banner_unknown)
+                    },
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = onDecline) {
-                    Icon(Icons.Default.Close, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.decline))
-                }
-                Button(onClick = onAccept) {
-                    Icon(Icons.Default.Check, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.accept))
-                }
+            TextButton(onClick = onLeave) {
+                Text(stringResource(R.string.leave_group))
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = stringResource(R.string.auto_invite_banner_dismiss),
+                )
             }
         }
     }

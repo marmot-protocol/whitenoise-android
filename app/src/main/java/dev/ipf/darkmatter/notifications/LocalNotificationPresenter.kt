@@ -80,6 +80,7 @@ class LocalNotificationPresenter(
         senderNameOverride: String? = null,
         previewTextOverride: String? = null,
         reactedToPreviewOverride: String? = null,
+        groupInviteAutoAccepted: Boolean = false,
     ): Boolean {
         val content =
             LocalNotificationFormatter.content(
@@ -88,6 +89,8 @@ class LocalNotificationPresenter(
                 senderNameOverride = senderNameOverride,
                 previewTextOverride = previewTextOverride,
                 reactedToPreviewOverride = reactedToPreviewOverride,
+                groupInviteAutoAccepted = groupInviteAutoAccepted,
+                conversationTitleOverride = conversationTitleOverride,
             ) ?: run {
                 notificationDebug { "skip key=${update.notificationKey.take(16)} reason=formatter" }
                 return false
