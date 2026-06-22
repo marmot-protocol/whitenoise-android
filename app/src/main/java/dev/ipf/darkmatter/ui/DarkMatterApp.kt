@@ -1608,6 +1608,41 @@ private fun ChatsScreen(
             jumpToTopVisible = false
         }
     }
+    // Snap the list flush to the top when a different chat reorders into
+    // position 0 *and the head row is sitting clipped* (issue #541). A send
+    // bumps the messaged conversation to the head via the live subscription;
+    // with keyed `items`, LazyColumn pins the previously-anchored row at its
+    // old pixel offset, so the new head lands one row down / clipped instead of
+    // flush. We snap to offset 0 so the freshest chat is fully visible.
+    //
+    // The snap is deliberately constrained to the clipped-head case so a plain
+    // background/incoming reorder can't yank an idle reader to the top (issue
+    // #541 review). It fires only when ALL hold:
+    //   - active (non-archived) list,
+    //   - the head row's identity actually changed (a different chat reordered
+    //     in; the first established head is seeded without snapping),
+    //   - the user is not mid-scroll (`isScrollInProgress`),
+    //   - the viewport is anchored at item 0 (`firstVisibleItemIndex == 0`) —
+    //     i.e. the user was at/near the top, the send/back-return case — and
+    //   - that item-0 anchor is clipped (`firstVisibleItemScrollOffset > 0`),
+    //     the symptom we're correcting.
+    // A reader scrolled deeper has `firstVisibleItemIndex > 0`, so an unrelated
+    // reorder to data-index-0 leaves their position untouched.
+    // Keyed on `showArchived` so the tracked head resets alongside
+    // `chatListState` on a view swap.
+    val activeHeadId = if (showArchived) null else visibleItems.firstOrNull()?.id
+    var lastActiveHeadId by remember(showArchived) { mutableStateOf(activeHeadId) }
+    LaunchedEffect(activeHeadId) {
+        val previous = lastActiveHeadId
+        lastActiveHeadId = activeHeadId
+        if (activeHeadId == null || previous == null || activeHeadId == previous) return@LaunchedEffect
+        if (chatListState.isScrollInProgress) return@LaunchedEffect
+        // Only correct the clipped head at the top of the list; leave a reader
+        // scrolled further down (firstVisibleItemIndex > 0) where they are.
+        if (chatListState.firstVisibleItemIndex != 0) return@LaunchedEffect
+        if (chatListState.firstVisibleItemScrollOffset == 0) return@LaunchedEffect
+        chatListState.scrollToItem(0)
+    }
     val archivedUnreadCount =
         remember(controller.archivedItems) {
             controller.archivedItems.count { it.hasUnread }
