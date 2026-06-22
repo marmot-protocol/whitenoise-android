@@ -406,6 +406,7 @@ import dev.ipf.darkmatter.ui.theme.Dimens
 import dev.ipf.darkmatter.ui.theme.amoledSurfaceBorder
 import dev.ipf.darkmatter.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.darkmatter.ui.theme.isAmoledSurfaceTheme
+import dev.ipf.darkmatter.updates.AppUpdateInfo
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
@@ -645,6 +646,8 @@ fun DarkMatterApp(
     onProfilePayloadHandled: (String) -> Unit = {},
     inboundNotificationTarget: NotificationTarget? = null,
     onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
+    inboundAppUpdateTap: Int = 0,
+    onAppUpdateTapHandled: (Int) -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     // Mutable bottom-chrome inset so screens further down the tree
@@ -725,6 +728,8 @@ fun DarkMatterApp(
                                 appState = appState,
                                 inboundNotificationTarget = inboundNotificationTarget,
                                 onNotificationTargetHandled = onNotificationTargetHandled,
+                                inboundAppUpdateTap = inboundAppUpdateTap,
+                                onAppUpdateTapHandled = onAppUpdateTapHandled,
                             )
                         is AppPhase.Failed ->
                             FailureScreen(
@@ -1141,6 +1146,8 @@ private fun MainShell(
     appState: DarkMatterAppState,
     inboundNotificationTarget: NotificationTarget? = null,
     onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
+    inboundAppUpdateTap: Int = 0,
+    onAppUpdateTapHandled: (Int) -> Unit = {},
 ) {
     var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
     var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
@@ -1301,6 +1308,19 @@ private fun MainShell(
                 onNotificationTargetHandled(target)
             }
         }
+    }
+
+    LaunchedEffect(inboundAppUpdateTap, appState.phase) {
+        val tap = inboundAppUpdateTap
+        if (tap == 0 || appState.phase != AppPhase.Ready) return@LaunchedEffect
+        sectionName = MainSection.Chats.name
+        settingsDetailName = null
+        selectedChat = null
+        selectedChatFocusMessageId = null
+        selectedChatJustCreated = false
+        routingNotification = false
+        appState.showAppUpdateBannerFromNotification()
+        onAppUpdateTapHandled(tap)
     }
 
     // One-shot restore after process death: once the chat list for the active
@@ -1570,6 +1590,7 @@ private fun ChatsScreen(
     val showArchived = filter == ChatListFilter.Archived
     val searchFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     // Lift the app-level toast host (it flows through DarkMatterSnackbarHost,
     // which reads LocalSnackbarBottomInset) above the quick-action FAB so a
@@ -1824,6 +1845,13 @@ private fun ChatsScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            if (appState.appUpdateInfo.shouldShowBanner) {
+                AppUpdateBanner(
+                    info = appState.appUpdateInfo,
+                    onUpdateNow = { appState.openZapstoreListing(context) },
+                    onDismiss = { appState.dismissAppUpdateBanner() },
+                )
+            }
             // Filter chips visible whenever there's content to filter — both
             // in the active and archived lists. They're sticky above the
             // list rather than sticky inside the LazyColumn so they survive
@@ -2027,6 +2055,58 @@ private fun ChatsScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun AppUpdateBanner(
+    info: AppUpdateInfo,
+    onUpdateNow: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val latest = info.latestVersion ?: return
+    val description = stringResource(R.string.app_update_available_description, latest)
+    val releasesBehind = info.releasesBehind
+    ElevatedCard(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Dimens.spaceMd, vertical = Dimens.spaceSm),
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceMd),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
+        ) {
+            Icon(Icons.Default.Download, contentDescription = null)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(if (info.isFarBehind) R.string.app_update_persistent_title else R.string.app_update_available_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(description, style = MaterialTheme.typography.bodyMedium)
+                if (releasesBehind != null && releasesBehind > 0) {
+                    Text(
+                        pluralStringResource(R.plurals.app_update_releases_behind, releasesBehind, releasesBehind),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Button(onClick = onUpdateNow) {
+                    Text(stringResource(R.string.app_update_now))
+                }
+            }
+            if (!info.isFarBehind) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+                }
+            }
+        }
     }
 }
 
@@ -15159,6 +15239,8 @@ private fun SettingsHomeScreen(
     var qrAccountId by remember { mutableStateOf<String?>(null) }
     var showAccountSelector by remember { mutableStateOf(false) }
     var showAddIdentity by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(appState.accounts.size) {
         if (showAddIdentity) showAddIdentity = false
@@ -15211,6 +15293,20 @@ private fun SettingsHomeScreen(
                     SettingsRow(stringResource(R.string.security_and_privacy), stringResource(R.string.security_privacy_settings_subtitle)) {
                         onOpenDetail(SettingsDetail.SecurityPrivacy)
                     }
+                }
+            }
+            item {
+                SectionCard(title = stringResource(R.string.app_updates)) {
+                    AppUpdateSettingsRow(
+                        info = appState.appUpdateInfo,
+                        onClick = {
+                            if (appState.appUpdateInfo.latestVersion == null) {
+                                scope.launch { appState.refreshAppUpdate(force = true, notifyIfNewer = false) }
+                            } else {
+                                appState.openZapstoreListing(context)
+                            }
+                        },
+                    )
                 }
             }
             item {
@@ -15798,6 +15894,32 @@ private fun SecurityPrivacyScreen(
             }
         }
     }
+}
+
+@Composable
+private fun AppUpdateSettingsRow(
+    info: AppUpdateInfo,
+    onClick: () -> Unit,
+) {
+    val latest = info.latestVersion
+    val subtitle =
+        when {
+            latest == null -> stringResource(R.string.app_update_settings_unknown, info.installedVersion)
+            !info.isUpdateAvailable -> stringResource(R.string.app_update_settings_current, info.installedVersion)
+            info.releasesBehind != null ->
+                stringResource(
+                    R.string.app_update_settings_available_with_count,
+                    info.installedVersion,
+                    latest,
+                    info.releasesBehind,
+                )
+            else -> stringResource(R.string.app_update_settings_available, info.installedVersion, latest)
+        }
+    SettingsRow(
+        title = stringResource(R.string.app_update_settings_title),
+        subtitle = subtitle,
+        onClick = onClick,
+    )
 }
 
 @Composable

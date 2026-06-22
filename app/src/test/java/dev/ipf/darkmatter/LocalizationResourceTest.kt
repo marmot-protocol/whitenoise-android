@@ -265,6 +265,21 @@ class LocalizationResourceTest {
                 // in some locales ("Images" in French, "Videos" in German).
                 "shared_media_tab_images",
                 "shared_media_tab_videos",
+                // Issue #410 explicitly allows placeholder English until the
+                // update UX copy gets real translations.
+                "app_updates",
+                "app_update_settings_title",
+                "app_update_settings_unknown",
+                "app_update_settings_current",
+                "app_update_settings_available",
+                "app_update_settings_available_with_count",
+                "app_update_available_title",
+                "app_update_persistent_title",
+                "app_update_available_description",
+                "app_update_now",
+                "toast_zapstore_unavailable",
+                "notification_channel_app_updates",
+                "notification_channel_app_updates_description",
             )
     }
 }

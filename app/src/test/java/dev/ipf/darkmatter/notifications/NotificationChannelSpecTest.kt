@@ -97,6 +97,7 @@ class NotificationChannelSpecTest {
         // heads-up; the old IDs are retired on the OS side.
         assertEquals("reactions_v2", NotificationChannelSpec.REACTIONS.id)
         assertEquals("invites_v2", NotificationChannelSpec.INVITES.id)
+        assertEquals("app_updates_v1", NotificationChannelSpec.APP_UPDATES.id)
         assertEquals("darkmatter.messages.v2", NotificationChannelSpec.LEGACY_MESSAGES_CHANNEL_ID)
         assertEquals("reactions", NotificationChannelSpec.LEGACY_REACTIONS_CHANNEL_ID)
         assertEquals("invites", NotificationChannelSpec.LEGACY_INVITES_CHANNEL_ID)

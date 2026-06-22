@@ -266,6 +266,8 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.play.services.base)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.okhttp)
     testImplementation(libs.junit)
     // Real org.json for JVM unit tests — the android.jar stubs throw on use.
     testImplementation(libs.org.json)

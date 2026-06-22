@@ -19,10 +19,12 @@ import dev.ipf.darkmatter.notifications.routeInboundIntent
 import dev.ipf.darkmatter.state.DarkMatterAppState
 import dev.ipf.darkmatter.ui.DarkMatterApp
 import dev.ipf.darkmatter.ui.theme.DarkMatterTheme
+import dev.ipf.darkmatter.updates.AppUpdateNavigation
 
 class MainActivity : ComponentActivity() {
     private var inboundProfilePayload by mutableStateOf<String?>(null)
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
+    private var inboundAppUpdateTap by mutableStateOf(0)
     private lateinit var appState: DarkMatterAppState
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +59,10 @@ class MainActivity : ComponentActivity() {
                     onNotificationTargetHandled = { handled ->
                         if (inboundNotificationTarget == handled) inboundNotificationTarget = null
                     },
+                    inboundAppUpdateTap = inboundAppUpdateTap,
+                    onAppUpdateTapHandled = { handled ->
+                        if (inboundAppUpdateTap == handled) inboundAppUpdateTap = 0
+                    },
                 )
             }
         }
@@ -69,6 +75,10 @@ class MainActivity : ComponentActivity() {
      * already-queued target/link intact (see [routeInboundIntent]).
      */
     private fun consumeIntent(intent: Intent?) {
+        if (AppUpdateNavigation.isUpdateTap(intent)) {
+            inboundAppUpdateTap += 1
+            return
+        }
         val routing =
             routeInboundIntent(
                 parsedTarget = NotificationNavigation.parse(intent),

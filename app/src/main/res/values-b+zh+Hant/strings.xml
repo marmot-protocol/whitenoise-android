@@ -198,6 +198,21 @@
     <string name="key_packages_settings_subtitle">已發布的密鑰包和輪換</string>
     <string name="notifications">通知</string>
     <string name="notifications_settings_subtitle">本地警報和後台連接</string>
+    <string name="app_updates">App updates</string>
+    <string name="app_update_settings_title">Zapstore release</string>
+    <string name="app_update_settings_unknown">Installed: %1$s — Latest: unknown — tap to check</string>
+    <string name="app_update_settings_current">Installed: %1$s — Up to date</string>
+    <string name="app_update_settings_available">Installed: %1$s — Latest: %2$s — update available</string>
+    <string name="app_update_settings_available_with_count">Installed: %1$s — Latest: %2$s — %3$d releases behind</string>
+    <string name="app_update_available_title">Update available</string>
+    <string name="app_update_persistent_title">Important update available</string>
+    <string name="app_update_available_description">Version %1$s is available on Zapstore.</string>
+    <string name="app_update_now">Update now</string>
+    <plurals name="app_update_releases_behind">
+        <item quantity="one">%1$d release behind</item>
+        <item quantity="other">%1$d releases behind</item>
+    </plurals>
+    <string name="toast_zapstore_unavailable">Couldn\'t open Zapstore</string>
     <string name="security_and_privacy">安全與隱私</string>
     <string name="security_privacy_settings_subtitle">遙測、稽核日誌、診斷</string>
     <string name="force_incognito_keyboard">強制無痕鍵盤</string>
@@ -354,6 +369,8 @@
     <string name="notification_joined_group">已加入 %1$s</string>
     <string name="notification_joined_new_group">已加入新群組</string>
     <string name="notification_joined_group_from_sender">你由 %1$s 邀請加入</string>
+    <string name="notification_channel_app_updates">App updates</string>
+    <string name="notification_channel_app_updates_description">Zapstore release alerts</string>
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新訊息</string>
     <string name="notification_sender_in_group">%1$s 在 %2$s 中</string>

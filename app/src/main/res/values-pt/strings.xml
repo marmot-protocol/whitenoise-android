@@ -199,6 +199,21 @@
     <string name="key_packages_settings_subtitle">Pacotes de chaves publicados e rotação</string>
     <string name="notifications">Notificações</string>
     <string name="notifications_settings_subtitle">Alertas locais e conexão em segundo plano</string>
+    <string name="app_updates">App updates</string>
+    <string name="app_update_settings_title">Zapstore release</string>
+    <string name="app_update_settings_unknown">Installed: %1$s — Latest: unknown — tap to check</string>
+    <string name="app_update_settings_current">Installed: %1$s — Up to date</string>
+    <string name="app_update_settings_available">Installed: %1$s — Latest: %2$s — update available</string>
+    <string name="app_update_settings_available_with_count">Installed: %1$s — Latest: %2$s — %3$d releases behind</string>
+    <string name="app_update_available_title">Update available</string>
+    <string name="app_update_persistent_title">Important update available</string>
+    <string name="app_update_available_description">Version %1$s is available on Zapstore.</string>
+    <string name="app_update_now">Update now</string>
+    <plurals name="app_update_releases_behind">
+        <item quantity="one">%1$d release behind</item>
+        <item quantity="other">%1$d releases behind</item>
+    </plurals>
+    <string name="toast_zapstore_unavailable">Couldn\'t open Zapstore</string>
     <string name="security_and_privacy">Segurança e privacidade</string>
     <string name="security_privacy_settings_subtitle">Telemetria, logs de auditoria, diagnósticos</string>
     <string name="force_incognito_keyboard">Forçar teclado anônimo</string>
@@ -355,6 +370,8 @@
     <string name="notification_joined_group">Entrou em %1$s</string>
     <string name="notification_joined_new_group">Entrou em um novo grupo</string>
     <string name="notification_joined_group_from_sender">Você foi convidado por %1$s</string>
+    <string name="notification_channel_app_updates">App updates</string>
+    <string name="notification_channel_app_updates_description">Zapstore release alerts</string>
     <string name="notification_group_invite">Você foi convidado para uma conversa segura</string>
     <string name="notification_new_message">Nova mensagem</string>
     <string name="notification_sender_in_group">%1$s em %2$s</string>

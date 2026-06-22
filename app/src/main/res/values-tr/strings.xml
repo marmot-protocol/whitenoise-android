@@ -199,6 +199,21 @@
     <string name="key_packages_settings_subtitle">Yayınlanan anahtar paketler ve rotasyon</string>
     <string name="notifications">Bildirimler</string>
     <string name="notifications_settings_subtitle">Yerel uyarılar ve arka plan bağlantısı</string>
+    <string name="app_updates">App updates</string>
+    <string name="app_update_settings_title">Zapstore release</string>
+    <string name="app_update_settings_unknown">Installed: %1$s — Latest: unknown — tap to check</string>
+    <string name="app_update_settings_current">Installed: %1$s — Up to date</string>
+    <string name="app_update_settings_available">Installed: %1$s — Latest: %2$s — update available</string>
+    <string name="app_update_settings_available_with_count">Installed: %1$s — Latest: %2$s — %3$d releases behind</string>
+    <string name="app_update_available_title">Update available</string>
+    <string name="app_update_persistent_title">Important update available</string>
+    <string name="app_update_available_description">Version %1$s is available on Zapstore.</string>
+    <string name="app_update_now">Update now</string>
+    <plurals name="app_update_releases_behind">
+        <item quantity="one">%1$d release behind</item>
+        <item quantity="other">%1$d releases behind</item>
+    </plurals>
+    <string name="toast_zapstore_unavailable">Couldn\'t open Zapstore</string>
     <string name="security_and_privacy">Güvenlik ve gizlilik</string>
     <string name="security_privacy_settings_subtitle">Telemetri, denetim günlükleri, tanılama</string>
     <string name="force_incognito_keyboard">Gizli klavyeyi zorunlu kıl</string>
@@ -355,6 +370,8 @@
     <string name="notification_joined_group">%1$s grubuna katıldınız</string>
     <string name="notification_joined_new_group">Yeni bir gruba katıldınız</string>
     <string name="notification_joined_group_from_sender">%1$s sizi davet etti</string>
+    <string name="notification_channel_app_updates">App updates</string>
+    <string name="notification_channel_app_updates_description">Zapstore release alerts</string>
     <string name="notification_group_invite">Güvenli bir sohbete davet edildiniz</string>
     <string name="notification_new_message">Yeni mesaj</string>
     <string name="notification_sender_in_group">%1$s, %2$s içinde</string>

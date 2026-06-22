@@ -1,7 +1,10 @@
 package dev.ipf.darkmatter.state
 
 import android.app.LocaleManager
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.LocaleList
 import android.util.Log
@@ -36,6 +39,10 @@ import dev.ipf.darkmatter.notifications.PushServerConfig
 import dev.ipf.darkmatter.notifications.PushTokenStore
 import dev.ipf.darkmatter.ui.markdownDocumentMentionBech32s
 import dev.ipf.darkmatter.ui.markdownDocumentToPreviewAnnotatedString
+import dev.ipf.darkmatter.updates.AppUpdateConstants
+import dev.ipf.darkmatter.updates.AppUpdateInfo
+import dev.ipf.darkmatter.updates.AppUpdateNotifier
+import dev.ipf.darkmatter.updates.AppUpdateRepository
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -434,6 +441,8 @@ class DarkMatterAppState(
     private val bootstrapMutex = Mutex()
     private val nativePushSyncMutex = Mutex()
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
+    private val appUpdateRepository = AppUpdateRepository(appContext)
+    private val appUpdateNotifier = AppUpdateNotifier(appContext)
     private val pushTokenStore = PushTokenStore.create(appContext)
 
     // Per-account (platform, token, server-pubkey, relay-hint) fingerprint
@@ -551,6 +560,8 @@ class DarkMatterAppState(
     private var autoAcceptedInviteRevision by mutableStateOf(0)
 
     private val autoAcceptingInviteJobs = ConcurrentHashMap<String, Deferred<AppGroupRecordFfi?>>()
+    var appUpdateInfo by mutableStateOf(appUpdateRepository.loadInfo())
+        private set
 
     private var defaultNotificationsEnableAttempted by mutableStateOf(
         preferences.getBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, false),
@@ -648,6 +659,7 @@ class DarkMatterAppState(
 
     init {
         applyLanguageTag(languageTag)
+        notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
     }
 
     val activeAccount: AccountSummaryFfi?
@@ -1959,6 +1971,7 @@ class DarkMatterAppState(
         }
         if (foreground && backgroundConnectionEnabled) startBackgroundConnectionService()
         if (foreground) notificationScope.launch { syncNativePushRegistrationIfEnabled() }
+        if (foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
     }
 
     fun setActiveConversation(groupIdHex: String?) {
@@ -1990,6 +2003,51 @@ class DarkMatterAppState(
 
     fun refreshLocalNotificationPermission() {
         localNotificationPermissionGranted = localNotificationPresenter.canPostNotifications()
+    }
+
+    suspend fun refreshAppUpdate(
+        force: Boolean = false,
+        notifyIfNewer: Boolean = false,
+    ): AppUpdateInfo {
+        if (!force && !appUpdateRepository.shouldCheck()) {
+            appUpdateInfo = appUpdateRepository.loadInfo()
+            return appUpdateInfo
+        }
+        val info =
+            runCatching { appUpdateRepository.refresh() }
+                .onFailure {
+                    rethrowIfCancellation(it)
+                    appStateDebug(it) { "app update check failed: ${it.readableMessage()}" }
+                }.getOrElse {
+                    appUpdateRepository.loadInfo()
+                }
+        appUpdateInfo = info
+        if (notifyIfNewer && !appInForeground && info.shouldShowBanner) {
+            appUpdateNotifier.show(info)
+        }
+        return info
+    }
+
+    suspend fun refreshAppUpdateIfStale(notifyIfNewer: Boolean = false): AppUpdateInfo = refreshAppUpdate(force = false, notifyIfNewer = notifyIfNewer)
+
+    fun dismissAppUpdateBanner() {
+        appUpdateInfo = appUpdateRepository.dismissLatest()
+    }
+
+    fun showAppUpdateBannerFromNotification() {
+        appUpdateInfo = appUpdateRepository.loadInfo()
+    }
+
+    fun openZapstoreListing(context: Context = appContext) {
+        val intent =
+            Intent(Intent.ACTION_VIEW, Uri.parse(AppUpdateConstants.ZAPSTORE_LISTING_URL)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        try {
+            context.startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            present(R.string.toast_zapstore_unavailable)
+        }
     }
 
     suspend fun refreshLocalNotificationSettings() {

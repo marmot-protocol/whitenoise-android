@@ -107,6 +107,7 @@ object NotificationChannels {
 
                 NotificationChannelSpec.REACTIONS,
                 NotificationChannelSpec.INVITES,
+                NotificationChannelSpec.APP_UPDATES,
                 -> Unit
             }
         }
@@ -117,6 +118,7 @@ object NotificationChannels {
             NotificationChannelSpec.GROUP_MESSAGES -> R.string.notification_channel_group_messages
             NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions
             NotificationChannelSpec.INVITES -> R.string.notification_channel_invites
+            NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates
         }
 
     private fun NotificationChannelSpec.descriptionRes(): Int =
@@ -125,6 +127,7 @@ object NotificationChannels {
             NotificationChannelSpec.GROUP_MESSAGES -> R.string.notification_channel_group_messages_description
             NotificationChannelSpec.REACTIONS -> R.string.notification_channel_reactions_description
             NotificationChannelSpec.INVITES -> R.string.notification_channel_invites_description
+            NotificationChannelSpec.APP_UPDATES -> R.string.notification_channel_app_updates_description
         }
 
     private fun ChannelImportance.toAndroidImportance(): Int =

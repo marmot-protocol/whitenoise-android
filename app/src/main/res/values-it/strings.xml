@@ -199,6 +199,21 @@
     <string name="key_packages_settings_subtitle">Pacchetti chiave pubblicati e rotazione</string>
     <string name="notifications">Notifiche</string>
     <string name="notifications_settings_subtitle">Avvisi locali e connessione in background</string>
+    <string name="app_updates">App updates</string>
+    <string name="app_update_settings_title">Zapstore release</string>
+    <string name="app_update_settings_unknown">Installed: %1$s — Latest: unknown — tap to check</string>
+    <string name="app_update_settings_current">Installed: %1$s — Up to date</string>
+    <string name="app_update_settings_available">Installed: %1$s — Latest: %2$s — update available</string>
+    <string name="app_update_settings_available_with_count">Installed: %1$s — Latest: %2$s — %3$d releases behind</string>
+    <string name="app_update_available_title">Update available</string>
+    <string name="app_update_persistent_title">Important update available</string>
+    <string name="app_update_available_description">Version %1$s is available on Zapstore.</string>
+    <string name="app_update_now">Update now</string>
+    <plurals name="app_update_releases_behind">
+        <item quantity="one">%1$d release behind</item>
+        <item quantity="other">%1$d releases behind</item>
+    </plurals>
+    <string name="toast_zapstore_unavailable">Couldn\'t open Zapstore</string>
     <string name="security_and_privacy">Sicurezza e privacy</string>
     <string name="security_privacy_settings_subtitle">Telemetria, log di audit, diagnostica</string>
     <string name="force_incognito_keyboard">Forza tastiera in incognito</string>
@@ -355,6 +370,8 @@
     <string name="notification_joined_group">Hai partecipato a %1$s</string>
     <string name="notification_joined_new_group">Hai partecipato a un nuovo gruppo</string>
     <string name="notification_joined_group_from_sender">Sei stato invitato da %1$s</string>
+    <string name="notification_channel_app_updates">App updates</string>
+    <string name="notification_channel_app_updates_description">Zapstore release alerts</string>
     <string name="notification_group_invite">Sei stato invitato a una chat sicura</string>
     <string name="notification_new_message">Nuovo messaggio</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>

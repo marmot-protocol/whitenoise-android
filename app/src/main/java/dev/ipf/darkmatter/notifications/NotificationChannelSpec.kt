@@ -49,6 +49,9 @@ enum class NotificationChannelSpec(
      * [NotificationChannels.ensureChannels].
      */
     INVITES("invites_v2", ChannelImportance.HIGH),
+
+    /** Zapstore app-update availability notices. Low importance: visible, no buzz. */
+    APP_UPDATES("app_updates_v1", ChannelImportance.LOW),
     ;
 
     companion object {
