@@ -797,6 +797,22 @@ class DarkMatterAppState(
 
     fun sharedGroupsWith(accountIdHex: String): List<ChatListItem> = chatsController?.sharedGroupsWith(accountIdHex, activeAccount?.accountIdHex).orEmpty()
 
+    /**
+     * Compose-tracked snapshot of the active account's projected chat list.
+     * Reads the controller's observable `items`, which is reassigned by every
+     * projection rebuild ([ChatsController.recompute]) — i.e. whenever the
+     * group set, per-group membership snapshots, or group names change.
+     *
+     * Intended as a `remember(...)` invalidation key for derivations of the
+     * group set (e.g. the profile sheet's shared-groups list): subscribing to
+     * it re-fires the derivation exactly when the underlying groups change, and
+     * — because it does *not* bump on peer-profile (avatar/display-name)
+     * resolution — leaves those unrelated recompositions memoized. Empty when no
+     * chats controller is attached yet (the chat-list stream hasn't bound).
+     */
+    val chatListItems: List<ChatListItem>
+        get() = chatsController?.items.orEmpty()
+
     fun existingDirectChat(reference: String): ChatListItem? = chatsController?.existingDirectChat(reference)
 
     suspend fun <T> marmotIo(block: suspend Marmot.() -> T): T =

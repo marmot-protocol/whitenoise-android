@@ -14790,19 +14790,26 @@ private fun ProfileSheet(
             ?.nip05
             ?.trim()
             ?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
-    // Subscribing read of the account's group set, kept in the composable body
-    // so the list refreshes when groups, membership, or names change. Only the
-    // filter + list allocation is memoized, keyed on that source list, mirroring
-    // the sibling sheets (TransferAdminSheet, ReactionDetailsSheet, ForwardSheet)
-    // so it doesn't re-scan/re-allocate on every unrelated recomposition (e.g.
-    // the profile name/avatar resolving).
-    val candidateSharedGroups = hex?.let { appState.sharedGroupsWith(it) }.orEmpty()
+    // The named, multi-member groups this account shares with the active user.
+    // The whole derivation — the O(groups) `sharedGroupsWith` projection/scan
+    // and the filter + list allocation — is memoized, keyed on `hex` and the
+    // controller's observable chat-list projection (`appState.chatListItems`),
+    // so it runs only when the underlying group set / membership / names
+    // actually change and is skipped on unrelated recompositions (e.g. the
+    // profile name/avatar resolving). Reading `chatListItems` as a key also
+    // subscribes the sheet so the list still refreshes when the groups change
+    // while it's open. This mirrors the keyed-remember memoization used by the
+    // sibling sheets in this file (TransferAdminSheet, ReactionDetailsSheet,
+    // ForwardSheet).
     val sharedGroups =
-        remember(candidateSharedGroups) {
+        remember(hex, appState.chatListItems) {
             // Only named, multi-member groups belong in this list: the 1:1 DM is
             // reached via the Message button, and an unnamed group would just
             // read as "Group of N people".
-            candidateSharedGroups.filter { it.memberCount > 2 && it.group.name.isNotBlank() }
+            hex
+                ?.let { appState.sharedGroupsWith(it) }
+                .orEmpty()
+                .filter { it.memberCount > 2 && it.group.name.isNotBlank() }
         }
     // The existing 1:1 DM with this person, if any — the confirmed two-member
     // group with them. Drives the Message button: open it when present,
