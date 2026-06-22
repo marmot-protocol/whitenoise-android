@@ -1388,8 +1388,8 @@ class ChatsController(
         val account = accountRef ?: return false
         return runCatching {
             appState.withGroupCommitLock(account, groupIdHex) {
-                appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
-                    .also(appState::applyLocalGroupUpdate)
+                val updated = appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
+                appState.applyLocalGroupUpdate(updated)
             }
             if (notify) {
                 appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
@@ -3445,9 +3445,12 @@ class ConversationController(
                 }
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
-                messageById[committedProjection.messageIdHex] =
-                    TimelineProjector.toAppMessageRecord(committedProjection)
-                        .withRecordedAtOverride(localTimelineTimestampOverrides[committedProjection.messageIdHex])
+                val projectedAction = TimelineProjector.toAppMessageRecord(committedProjection)
+                val projectedRecord =
+                    projectedAction.withRecordedAtOverride(
+                        localTimelineTimestampOverrides[committedProjection.messageIdHex],
+                    )
+                messageById[committedProjection.messageIdHex] = projectedRecord
                 if (discardedDuringRetry.remove(key)) {
                     publishTimelineFromIndexes()
                     return
@@ -3660,11 +3663,9 @@ class ConversationController(
             val account = appState.activeAccountRef ?: return@withMutationLockResult false
             runCatching {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
-                        .also {
-                            group = it
-                            appState.applyLocalGroupUpdate(it)
-                        }
+                    val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
+                    group = updated
+                    appState.applyLocalGroupUpdate(updated)
                 }
                 appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
                 true
