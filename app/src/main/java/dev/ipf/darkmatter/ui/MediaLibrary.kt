@@ -91,6 +91,7 @@ internal data class SharedMediaTile(
     val reference: MediaAttachmentReferenceFfi,
     val mine: Boolean,
     val recordedAt: ULong,
+    val sender: String,
     val isVideo: Boolean,
 )
 
@@ -153,11 +154,11 @@ internal fun rememberSharedMediaTiles(
                 when {
                     MediaReferenceParser.isImageMedia(reference) ->
                         images.add(
-                            SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, isVideo = false),
+                            SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender, isVideo = false),
                         )
                     MediaReferenceParser.isVideoMedia(reference) ->
                         videos.add(
-                            SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, isVideo = true),
+                            SharedMediaTile(record.messageIdHex, index, reference, mine, record.recordedAt, record.sender, isVideo = true),
                         )
                     MediaReferenceParser.isAudioMedia(reference) ->
                         voice.add(
@@ -234,6 +235,22 @@ internal fun SharedMediaSection(
         return
     }
 
+    // Cross-image gallery for the strip: tapping any thumbnail opens the
+    // full-screen swipeable viewer spanning every shared image (newest first,
+    // matching the strip order), starting at the tapped one. Each page carries
+    // its own message context so save/share/decrypt act on the visible page.
+    val imagePages = remember(tiles.images) { tiles.images.toViewerPages() }
+    var viewerStartIndex by remember(tiles.images) { mutableStateOf<Int?>(null) }
+    viewerStartIndex?.let { start ->
+        FullScreenMediaViewer(
+            controller = controller,
+            appState = appState,
+            pages = imagePages,
+            startIndex = start,
+            onDismiss = { viewerStartIndex = null },
+        )
+    }
+
     SectionCardWithAction(
         title = stringResource(R.string.shared_media),
         action = {
@@ -258,7 +275,13 @@ internal fun SharedMediaSection(
                         controller = controller,
                         appState = appState,
                         mine = tile.mine,
-                        onTap = { onJumpToMessage(tile.messageIdHex) },
+                        onTap = {
+                            val index =
+                                imagePages.indexOfFirst {
+                                    it.messageIdHex == tile.messageIdHex && it.attachmentIndex == tile.attachmentIndex
+                                }
+                            viewerStartIndex = index.coerceAtLeast(0)
+                        },
                         overflowCount = 0,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -267,6 +290,12 @@ internal fun SharedMediaSection(
         }
     }
 }
+
+// Project resolved image/video tiles onto the per-page descriptors the
+// full-screen viewer pages over. Order is preserved (the tiles are already
+// newest-first), so the gallery swipes newest → oldest matching the grid.
+private fun List<SharedMediaTile>.toViewerPages(): List<MediaViewerPage> =
+    map { MediaViewerPage(it.messageIdHex, it.attachmentIndex, it.reference, it.mine, it.sender, it.recordedAt) }
 
 private enum class MediaTab(val labelRes: Int) {
     Images(R.string.shared_media_tab_images),
@@ -280,8 +309,9 @@ private enum class MediaTab(val labelRes: Int) {
  * Full media library reachable from the "See all" affordance. A sticky tab bar
  * switches between Images, Videos, Voice, Files, and URLs. Images and Videos are
  * month-grouped grids; Voice, Files, and URLs are month-grouped vertical lists.
- * Tapping an image/video tile or a voice/file row jumps back to that message in
- * the conversation; a URL row opens in the browser.
+ * Tapping an image/video tile opens the full-screen swipeable viewer spanning
+ * the whole tab; a voice/file row jumps back to that message in the
+ * conversation; a URL row opens in the browser.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -293,6 +323,29 @@ internal fun MediaLibraryRoute(
     onJumpToMessage: (String) -> Unit,
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(MediaTab.Images.ordinal) }
+    // Cross-message viewer state. Pages span the whole tapped tab (images or
+    // videos), so swiping crosses message boundaries; each page carries its own
+    // message context. Keyed null when closed.
+    var viewerPages by remember { mutableStateOf<List<MediaViewerPage>>(emptyList()) }
+    var viewerStartIndex by remember { mutableStateOf<Int?>(null) }
+    viewerStartIndex?.let { start ->
+        FullScreenMediaViewer(
+            controller = controller,
+            appState = appState,
+            pages = viewerPages,
+            startIndex = start,
+            onDismiss = { viewerStartIndex = null },
+        )
+    }
+    val openGallery: (List<SharedMediaTile>, SharedMediaTile) -> Unit = { tabTiles, tapped ->
+        val pages = tabTiles.toViewerPages()
+        val index =
+            pages.indexOfFirst {
+                it.messageIdHex == tapped.messageIdHex && it.attachmentIndex == tapped.attachmentIndex
+            }
+        viewerPages = pages
+        viewerStartIndex = index.coerceAtLeast(0)
+    }
     // One grid state per visual tab so scroll position is preserved when
     // switching back and forth.
     val imagesGridState = rememberLazyGridState()
@@ -339,7 +392,7 @@ internal fun MediaLibraryRoute(
                         controller = controller,
                         appState = appState,
                         emptyLabel = stringResource(R.string.shared_media_empty_images),
-                        onJumpToMessage = onJumpToMessage,
+                        onTapTile = { tapped -> openGallery(tiles.images, tapped) },
                     )
                 MediaTab.Videos ->
                     MediaTileGrid(
@@ -348,7 +401,7 @@ internal fun MediaLibraryRoute(
                         controller = controller,
                         appState = appState,
                         emptyLabel = stringResource(R.string.shared_media_empty_videos),
-                        onJumpToMessage = onJumpToMessage,
+                        onTapTile = { tapped -> openGallery(tiles.videos, tapped) },
                     )
                 MediaTab.Voice ->
                     VoiceLibraryTab(
@@ -383,7 +436,7 @@ private fun MediaTileGrid(
     controller: ConversationController,
     appState: DarkMatterAppState,
     emptyLabel: String,
-    onJumpToMessage: (String) -> Unit,
+    onTapTile: (SharedMediaTile) -> Unit,
 ) {
     if (tiles.isEmpty()) {
         EmptyPlaceholder(emptyLabel)
@@ -426,7 +479,7 @@ private fun MediaTileGrid(
                             controller = controller,
                             appState = appState,
                             mine = tile.mine,
-                            onTap = { onJumpToMessage(tile.messageIdHex) },
+                            onTap = { onTapTile(tile) },
                             overflowCount = 0,
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -438,7 +491,7 @@ private fun MediaTileGrid(
                             controller = controller,
                             appState = appState,
                             mine = tile.mine,
-                            onTap = { onJumpToMessage(tile.messageIdHex) },
+                            onTap = { onTapTile(tile) },
                             overflowCount = 0,
                             modifier = Modifier.fillMaxSize(),
                         )

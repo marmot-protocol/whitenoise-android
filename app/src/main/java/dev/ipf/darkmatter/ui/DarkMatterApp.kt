@@ -230,6 +230,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
@@ -3447,6 +3448,8 @@ private fun MediaImageBubble(
             attachments = listOf(IndexedValue(attachmentIndex, reference)),
             startIndex = 0,
             onDismiss = { viewerOpen = false },
+            sender = record.sender,
+            recordedAt = record.recordedAt,
             mine = mine,
         )
     }
@@ -3602,6 +3605,8 @@ private fun MediaImageGridBubble(
             attachments = attachments,
             startIndex = index,
             onDismiss = { viewerOpenAt = null },
+            sender = record.sender,
+            recordedAt = record.recordedAt,
             mine = mine,
         )
     }
@@ -3679,6 +3684,8 @@ private fun MediaVisualGridBubble(
             attachments = attachments,
             startIndex = tileIndex,
             onDismiss = { viewerOpenAt = null },
+            sender = record.sender,
+            recordedAt = record.recordedAt,
             mine = mine,
         )
     }
@@ -5419,6 +5426,23 @@ private suspend fun attachmentBytes(
     return controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
 }
 
+// One page of the full-screen media viewer. Unlike the original single-album
+// viewer (one fixed messageIdHex + mine for the whole pager), each page now
+// carries its own message context so the pager can span attachments from
+// different messages — the cross-message gallery the shared-media grids open.
+// The save/share/decrypt paths read the CURRENT page's descriptor.
+internal data class MediaViewerPage(
+    val messageIdHex: String,
+    val attachmentIndex: Int,
+    val reference: MediaAttachmentReferenceFfi,
+    val mine: Boolean,
+    val sender: String,
+    val recordedAt: ULong,
+)
+
+// Album wrapper preserving the original call shape: a single message's
+// attachments, one `mine` flag. The three conversation bubble callsites use
+// this; it just projects the album onto per-page descriptors.
 @Composable
 private fun FullScreenImageViewer(
     controller: ConversationController,
@@ -5427,9 +5451,34 @@ private fun FullScreenImageViewer(
     attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
     startIndex: Int,
     onDismiss: () -> Unit,
+    sender: String,
+    recordedAt: ULong,
     mine: Boolean = false,
 ) {
-    if (attachments.isEmpty()) {
+    val pages =
+        remember(messageIdHex, attachments, mine, sender, recordedAt) {
+            attachments.map { entry ->
+                MediaViewerPage(messageIdHex, entry.index, entry.value, mine, sender, recordedAt)
+            }
+        }
+    FullScreenMediaViewer(
+        controller = controller,
+        appState = appState,
+        pages = pages,
+        startIndex = startIndex,
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+internal fun FullScreenMediaViewer(
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    pages: List<MediaViewerPage>,
+    startIndex: Int,
+    onDismiss: () -> Unit,
+) {
+    if (pages.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
         // pager doesn't NPE on a vanished album.
         onDismiss()
@@ -5442,12 +5491,14 @@ private fun FullScreenImageViewer(
     val saveFailedMessage = stringResource(R.string.media_save_failed)
     val pagerState =
         rememberPagerState(
-            initialPage = startIndex.coerceIn(0, attachments.lastIndex),
-            pageCount = { attachments.size },
+            initialPage = startIndex.coerceIn(0, pages.lastIndex),
+            pageCount = { pages.size },
         )
-    val currentEntry = attachments[pagerState.currentPage]
-    val currentReference = currentEntry.value
-    val currentAttachmentIndex = currentEntry.index
+    val currentPage = pages[pagerState.currentPage]
+    val currentReference = currentPage.reference
+    val currentAttachmentIndex = currentPage.attachmentIndex
+    val currentMessageIdHex = currentPage.messageIdHex
+    val currentMine = currentPage.mine
     // Zoom state is hoisted to the viewer scope (not per-page) so the pager
     // can read it to gate horizontal swipe. Without this gate, the page's
     // `detectTransformGestures` claims every horizontal drag and the pager
@@ -5477,27 +5528,27 @@ private fun FullScreenImageViewer(
                 // the horizontal drag. At scale 1× the pager wins.
                 userScrollEnabled = scale <= 1f,
             ) { page ->
-                val pageEntry = attachments[page]
-                if (MediaReferenceParser.isVideoMedia(pageEntry.value)) {
+                val pageDescriptor = pages[page]
+                if (MediaReferenceParser.isVideoMedia(pageDescriptor.reference)) {
                     VideoViewerPage(
                         controller = controller,
-                        messageIdHex = messageIdHex,
-                        attachmentIndex = pageEntry.index,
-                        reference = pageEntry.value,
+                        messageIdHex = pageDescriptor.messageIdHex,
+                        attachmentIndex = pageDescriptor.attachmentIndex,
+                        reference = pageDescriptor.reference,
                         isCurrent = page == pagerState.currentPage,
-                        mine = mine,
+                        mine = pageDescriptor.mine,
                     )
                 } else {
                     ViewerPage(
                         controller = controller,
-                        messageIdHex = messageIdHex,
-                        attachmentIndex = pageEntry.index,
-                        reference = pageEntry.value,
+                        messageIdHex = pageDescriptor.messageIdHex,
+                        attachmentIndex = pageDescriptor.attachmentIndex,
+                        reference = pageDescriptor.reference,
                         scale = if (page == pagerState.currentPage) scale else 1f,
                         offset = if (page == pagerState.currentPage) offset else Offset.Zero,
                         onScaleChange = { if (page == pagerState.currentPage) scale = it },
                         onOffsetChange = { if (page == pagerState.currentPage) offset = it },
-                        mine = mine,
+                        mine = pageDescriptor.mine,
                     )
                 }
             }
@@ -5514,9 +5565,9 @@ private fun FullScreenImageViewer(
                 IconButton(onClick = onDismiss) {
                     Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
                 }
-                if (attachments.size > 1) {
+                if (pages.size > 1) {
                     Text(
-                        text = "${pagerState.currentPage + 1} / ${attachments.size}",
+                        text = "${pagerState.currentPage + 1} / ${pages.size}",
                         color = Color.White,
                         style = MaterialTheme.typography.labelLarge,
                     )
@@ -5526,10 +5577,12 @@ private fun FullScreenImageViewer(
                         onClick = {
                             val ref = currentReference
                             val attachmentIndex = currentAttachmentIndex
+                            val msgId = currentMessageIdHex
+                            val owned = currentMine
                             scope.launch {
                                 val data =
                                     runCatching {
-                                        attachmentBytes(controller, messageIdHex, attachmentIndex, ref, mine)
+                                        attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
                                     }.getOrNull()
                                 val ok =
                                     data != null &&
@@ -5550,9 +5603,11 @@ private fun FullScreenImageViewer(
                         onClick = {
                             val ref = currentReference
                             val attachmentIndex = currentAttachmentIndex
+                            val msgId = currentMessageIdHex
+                            val owned = currentMine
                             scope.launch {
                                 runCatching {
-                                    attachmentBytes(controller, messageIdHex, attachmentIndex, ref, mine)
+                                    attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
                                 }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType) }
                             }
                         },
@@ -5560,6 +5615,41 @@ private fun FullScreenImageViewer(
                         Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
                     }
                 }
+            }
+            // Sender + send-time caption for the visible page, over a bottom
+            // scrim so it stays readable on bright photos. Reads the current
+            // page so it tracks swipes.
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
+                            ),
+                        )
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                Text(
+                    text = appState.displayName(currentPage.sender),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text =
+                        DateUtils.formatDateTime(
+                            context,
+                            currentPage.recordedAt.toLong() * 1000L,
+                            DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_ALL,
+                        ),
+                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.labelMedium,
+                )
             }
             SnackbarHost(
                 hostState = snackbarHostState,
@@ -8900,6 +8990,14 @@ private fun GroupDetailsScreen(
                 )
             }
 
+            SharedMediaSection(
+                tiles = sharedMediaTiles,
+                controller = controller,
+                appState = appState,
+                onSeeAll = { showMediaLibrary = true },
+                onJumpToMessage = onJumpToMessage,
+            )
+
             SectionCardWithAction(
                 title = "${stringResource(R.string.members)} · ${controller.members.size}",
                 action = {
@@ -8992,14 +9090,6 @@ private fun GroupDetailsScreen(
                     }
                 }
             }
-
-            SharedMediaSection(
-                tiles = sharedMediaTiles,
-                controller = controller,
-                appState = appState,
-                onSeeAll = { showMediaLibrary = true },
-                onJumpToMessage = onJumpToMessage,
-            )
 
             SectionCard(title = stringResource(R.string.info)) {
                 CopyableValueRow(
