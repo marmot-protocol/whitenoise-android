@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.roborazzi)
 }
 
 // Apply the Firebase plugin only when its expected config file is present.
@@ -157,6 +158,14 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        // Robolectric-backed screenshot tests render real composables that call
+        // stringResource(), so the JVM unit-test classpath must carry the
+        // app's merged Android resources.
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
     packaging {
         jniLibs {
             excludes +=
@@ -242,6 +251,14 @@ dependencies {
     testImplementation(libs.junit)
     // Real org.json for JVM unit tests — the android.jar stubs throw on use.
     testImplementation(libs.org.json)
+    // Roborazzi Compose screenshot tests run on the JVM via Robolectric, so the
+    // Compose tooling + Roborazzi artifacts live on the unit-test classpath.
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
