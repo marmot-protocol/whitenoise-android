@@ -9451,17 +9451,6 @@ private fun GroupDetailsScreen(
                     }
                 },
             ) {
-                if (controller.isSelfMember && controller.isSoleAdminWithOtherMembers) {
-                    // Trapped sole admin: they can't leave or step down until
-                    // they hand admin to someone else. Surface the transfer
-                    // entry point right here so the otherwise-blocked leave /
-                    // revoke paths have a way forward (issue #417).
-                    SoleAdminTransferPrompt(
-                        enabled = activeMutation == null && !controller.mutationInFlight,
-                        onTransfer = { showTransferAdmin = true },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                }
                 // #612: render members in a deterministic order — you first,
                 // then other admins alpha by display name, then non-admins
                 // alpha by display name, with memberIdHex as a stable
@@ -10679,40 +10668,6 @@ private val GroupMutationAction.memberStatusLabelRes: Int
             GroupMutationAction.RemoveMember -> R.string.removing_member
             else -> R.string.member_actions
         }
-
-/**
- * Inline prompt shown in the Members section when the active account is the
- * group's only admin while other members remain. Such an admin can't leave or
- * step down until they hand admin to someone else, so this exposes the
- * transfer entry point right where the otherwise-blocked actions live
- * (issue #417).
- */
-@Composable
-private fun SoleAdminTransferPrompt(
-    enabled: Boolean,
-    onTransfer: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(
-            Icons.Default.Shield,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            stringResource(R.string.sole_admin_transfer_hint),
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        TextButton(onClick = onTransfer, enabled = enabled) {
-            Text(stringResource(R.string.transfer_admin))
-        }
-    }
-}
 
 /**
  * Bottom sheet listing the non-admin members eligible to receive a transferred
