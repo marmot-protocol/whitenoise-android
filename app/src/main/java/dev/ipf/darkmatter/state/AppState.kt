@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.text.SpanStyle
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.firebase.FirebaseApp
@@ -32,6 +33,8 @@ import dev.ipf.darkmatter.notifications.LocalNotificationPresenter
 import dev.ipf.darkmatter.notifications.NotificationStreamForegroundService
 import dev.ipf.darkmatter.notifications.PushServerConfig
 import dev.ipf.darkmatter.notifications.PushTokenStore
+import dev.ipf.darkmatter.ui.markdownDocumentMentionBech32s
+import dev.ipf.darkmatter.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -2455,6 +2458,38 @@ class DarkMatterAppState(
         return runCatching { chatMemberTitle(senderIdHex) }.getOrNull()
     }
 
+    // Resolve a mention for a one-shot notification. Unlike the Compose bubble
+    // path, a notification will not recompose after requestProfile() finishes,
+    // so do one local display-name read before falling back to shortened bech32.
+    private suspend fun notificationMentionDisplayName(bech32: String): String? {
+        val accountIdHex = accountIdHex(bech32) ?: return null
+        profileDisplayName(accountIdHex)?.let { return it }
+        val displayName =
+            marmotIo { runCatching { marmot().displayName(accountIdHex) }.getOrNull() }
+                ?.let { ProfileSanitizer.displayName(it) }
+        if (displayName == null) requestProfile(accountIdHex)
+        return displayName
+    }
+
+    // Flatten notification body text through the same Markdown mention path used
+    // by in-app bubbles/previews. A parser failure (empty document) deliberately
+    // returns null so LocalNotificationFormatter falls back to the raw FFI
+    // preview instead of dropping the message body.
+    private suspend fun notificationPreviewText(raw: String?): String? {
+        val text = raw?.takeIf { it.isNotBlank() } ?: return null
+        val document = parseMarkdownOrEmpty(text)
+        if (document.blocks.isEmpty()) return null
+        val mentionNames = mutableMapOf<String, String?>()
+        for (bech32 in markdownDocumentMentionBech32s(document)) {
+            mentionNames[bech32] = notificationMentionDisplayName(bech32)
+        }
+        return markdownDocumentToPreviewAnnotatedString(
+            document = document,
+            codeStyle = SpanStyle(),
+            mentionDisplayName = mentionNames::get,
+        ).text.takeIf { it.isNotBlank() }
+    }
+
     // Resolve the conversation title for a notification the same way the chat
     // list does, since the runtime payload's group name is empty for unnamed
     // groups. Returns null for DMs (MessagingStyle shows the sender instead).
@@ -2524,6 +2559,8 @@ class DarkMatterAppState(
                                         update,
                                         notificationConversationTitle(update),
                                         notificationSenderName(update),
+                                        notificationPreviewText(update.previewText),
+                                        notificationPreviewText(update.reactedToPreview),
                                     )
                                 }
                                 refreshAccountUnreadCount(update.accountRef)

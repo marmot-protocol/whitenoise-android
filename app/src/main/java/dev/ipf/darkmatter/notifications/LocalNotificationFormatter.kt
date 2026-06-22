@@ -88,6 +88,11 @@ object LocalNotificationFormatter {
         // already has a name for that pubkey, so the override is what keeps the
         // notification from falling back to a raw hex key.
         senderNameOverride: String? = null,
+        // Caller-resolved message previews. AppState flattens the same Markdown
+        // AST path the chat UI uses so @npub mentions become @display-name before
+        // the text reaches NotificationManager.
+        previewTextOverride: String? = null,
+        reactedToPreviewOverride: String? = null,
     ): LocalNotificationContent? {
         if (update.isFromSelf) return null
         val senderName = senderName(update.sender, senderNameOverride)
@@ -98,7 +103,7 @@ object LocalNotificationFormatter {
             }
         val body =
             when (update.trigger) {
-                NotificationTriggerFfi.NEW_MESSAGE -> messageBody(update, context)
+                NotificationTriggerFfi.NEW_MESSAGE -> messageBody(update, context, previewTextOverride, reactedToPreviewOverride)
                 NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context, senderName)
             }
         return LocalNotificationContent(
@@ -147,17 +152,19 @@ object LocalNotificationFormatter {
     private fun messageBody(
         update: NotificationUpdateFfi,
         context: Context?,
+        previewTextOverride: String?,
+        reactedToPreviewOverride: String?,
     ): String {
         val emoji = clean(update.reactionEmoji)
         if (emoji != null) {
-            val reactedTo = clean(update.reactedToPreview)
+            val reactedTo = clean(reactedToPreviewOverride) ?: clean(update.reactedToPreview)
             return if (reactedTo != null) {
                 text(context, R.string.notification_reacted_to_message, "reacted %1\$s to: \"%2\$s\"", emoji, reactedTo)
             } else {
                 text(context, R.string.notification_reacted, "reacted %1\$s", emoji)
             }
         }
-        return clean(update.previewText) ?: text(context, R.string.notification_new_message, "New message")
+        return clean(previewTextOverride) ?: clean(update.previewText) ?: text(context, R.string.notification_new_message, "New message")
     }
 
     private fun inviteBody(

@@ -180,6 +180,49 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun messageBodyUsesCallerResolvedPreviewText() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    previewText = "hello @npub1rawmention",
+                ),
+                previewTextOverride = "hello @Alice",
+            )
+
+        assertEquals("hello @Alice", content?.body)
+    }
+
+    @Test
+    fun reactionBodyUsesCallerResolvedReactedToPreview() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    reactionEmoji = "👍",
+                    reactedToPreview = "thanks @npub1rawmention",
+                ),
+                reactedToPreviewOverride = "thanks @Alice",
+            )
+
+        assertEquals("reacted 👍 to: \"thanks @Alice\"", content?.body)
+    }
+
+    @Test
+    fun blankPreviewOverrideFallsBackToPayloadPreviewText() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    previewText = "We are go",
+                ),
+                previewTextOverride = "   ",
+            )
+
+        assertEquals("We are go", content?.body)
+    }
+
+    @Test
     fun selfAuthoredNotificationsAreSuppressed() {
         assertNull(
             LocalNotificationFormatter.content(
