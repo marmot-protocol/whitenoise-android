@@ -6,7 +6,7 @@ junitVersion = "1.3.0"
 orgJson = "20240303"
 espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.6.1"
-activityCompose = "1.8.0"
+activityCompose = "1.13.0"
 kotlin = "2.4.0"
 composeBom = "2026.05.01"
 # material3 is deliberately pinned ABOVE the version the Compose BOM supplies
