@@ -661,6 +661,21 @@ class DarkMatterAppState(
         mutationsScope.launch { block() }
     }
 
+    // Serializes commit-producing FFI calls for the same (account, group) across
+    // ChatsController and ConversationController so concurrent mutations don't race
+    // the per-account actor and surface PendingPublish as a generic toast.
+    private val groupCommitLocks = ConcurrentHashMap<String, Mutex>()
+
+    suspend fun <T> withGroupCommitLock(
+        accountRef: String,
+        groupIdHex: String,
+        block: suspend () -> T,
+    ): T {
+        val key = "$accountRef|$groupIdHex"
+        val mutex = groupCommitLocks.computeIfAbsent(key) { Mutex() }
+        return mutex.withLock { block() }
+    }
+
     internal fun optimisticMessages(
         accountRef: String?,
         groupIdHex: String,
