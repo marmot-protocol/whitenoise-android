@@ -96,6 +96,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -792,7 +793,35 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
         state = dismissState,
         backgroundContent = {},
     ) {
-        Snackbar(snackbarData = data)
+        if (data.visuals.actionLabel != null) {
+            // Actionable snackbars (e.g. the chat-list "Undo") keep their
+            // existing action slot untouched — we only make the message text
+            // selectable. Replacing the action with a copy button here would
+            // break the action gesture and SnackbarResult.ActionPerformed.
+            SelectionContainer {
+                Snackbar(snackbarData = data)
+            }
+        } else {
+            // Error/toast snackbars never set an action label, so the action
+            // slot is free for a discoverable Copy affordance. The message is
+            // wrapped in a SelectionContainer for long-press copy (issue #543).
+            val clipboard = LocalClipboardManager.current
+            val message = data.visuals.message
+            Snackbar(
+                action = {
+                    IconButton(onClick = { clipboard.setText(AnnotatedString(message)) }) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = stringResource(R.string.copy),
+                        )
+                    }
+                },
+            ) {
+                SelectionContainer {
+                    Text(message)
+                }
+            }
+        }
     }
 }
 
@@ -814,7 +843,9 @@ private fun FailureScreen(
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(44.dp))
             Text(stringResource(R.string.dark_matter_couldnt_start), style = MaterialTheme.typography.titleLarge)
-            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SelectionContainer {
+                Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Button(
                 onClick = {
                     onRetry()
