@@ -6281,17 +6281,21 @@ private fun StagingTile(
                 Modifier
                     .align(Alignment.TopEnd)
                     .padding(4.dp)
-                    .size(24.dp),
+                    .size(32.dp),
             colors =
                 IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.55f),
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    // `onPrimary` is the app's dark brand-on-cyan color, so on
+                    // this black scrim it looked like an empty tiny circle. Pin
+                    // the overlay to a white glyph on a dark backing so the
+                    // remove affordance is visible on every staged image.
+                    containerColor = Color.Black.copy(alpha = 0.68f),
+                    contentColor = Color.White,
                 ),
         ) {
             Icon(
                 Icons.Default.Close,
                 contentDescription = stringResource(R.string.media_attachment_remove),
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
     }
