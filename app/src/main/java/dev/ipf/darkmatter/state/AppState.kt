@@ -1382,6 +1382,18 @@ class DarkMatterAppState(
         return outcome
     }
 
+    suspend fun exportEncryptedSecretKeyBackup(passphrase: String): String? {
+        val account = activeAccountRef ?: return null
+        return runCatching {
+            marmotIo { exportEncryptedSecretKey(account, passphrase) }
+        }.onSuccess {
+            present(R.string.toast_encrypted_backup_created)
+        }.onFailure {
+            rethrowIfCancellation(it)
+            present(R.string.toast_couldnt_create_encrypted_backup, AppText.Plain(it.readableMessage()))
+        }.getOrNull()
+    }
+
     suspend fun accountRelayLists(): AccountRelayListsFfi? {
         val account = activeAccountRef ?: return null
         return runCatching { marmotIo { accountRelayLists(account) } }.getOrNull()
