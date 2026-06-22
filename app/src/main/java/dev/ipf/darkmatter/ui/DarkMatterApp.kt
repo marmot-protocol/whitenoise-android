@@ -3115,22 +3115,46 @@ private val NullableUriSaver: Saver<android.net.Uri?, String> =
         restore = { s -> s.takeIf { it.isNotEmpty() }?.let(android.net.Uri::parse) },
     )
 
+/**
+ * Saves a nullable [java.io.File] across process death by its absolute path.
+ * Used so the camera capture's temp-file handle survives the round-trip and a
+ * capture cancelled after process death can still delete the empty temp
+ * instead of leaking it (issue #531).
+ */
+private val NullableFileSaver: Saver<java.io.File?, String> =
+    Saver(
+        save = { it?.absolutePath ?: "" },
+        restore = { s -> s.takeIf { it.isNotEmpty() }?.let { path -> java.io.File(path) } },
+    )
+
 // Persist a multi-pick selection across rotation / process death. Empty list
 // encodes "no preview shown" so the parent re-render skips the sheet on
 // restore. Uses '\n' as the separator — content URIs don't contain newlines.
 private val UriListSaver: Saver<List<android.net.Uri>, String> =
     Saver(
-        save = { it.joinToString("\n") { uri -> uri.toString() } },
-        restore = { s ->
-            if (s.isEmpty()) {
-                emptyList()
-            } else {
-                s.split('\n').mapNotNull { token ->
-                    token.takeIf { it.isNotEmpty() }?.let(android.net.Uri::parse)
-                }
-            }
-        },
+        save = { encodeUriListTokens(it.map { uri -> uri.toString() }) },
+        restore = { s -> decodeUriListTokens(s).map(android.net.Uri::parse) },
     )
+
+/**
+ * Pure string codec backing [UriListSaver], split out from the [android.net.Uri]
+ * conversion so the separator and empty-list contract is unit-testable on the
+ * JVM (the Android `Uri` stubs are non-functional in local unit tests). Joins
+ * tokens with '\n'; an empty list encodes to "".
+ */
+internal fun encodeUriListTokens(tokens: List<String>): String = tokens.joinToString("\n")
+
+/**
+ * Inverse of [encodeUriListTokens]. An empty input decodes to an empty list
+ * (the "no preview shown" sentinel); blank tokens are dropped so a trailing or
+ * doubled separator can't yield empty URI strings.
+ */
+internal fun decodeUriListTokens(encoded: String): List<String> =
+    if (encoded.isEmpty()) {
+        emptyList()
+    } else {
+        encoded.split('\n').filter { it.isNotEmpty() }
+    }
 
 private fun senderTitleForReply(
     senderPubkey: String,
@@ -5987,7 +6011,7 @@ private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
     LaunchedEffect(uri) {
         bitmap =
             withContext(Dispatchers.Default) {
-                val mime = context.contentResolver.getType(uri).orEmpty()
+                val mime = safeGetType(context.contentResolver, uri)
                 if (mime.startsWith("video/", ignoreCase = true)) {
                     // Video URI: extract the first frame as the staging thumbnail
                     // instead of trying to decode the bytes as JPEG (which spins
@@ -6443,19 +6467,29 @@ private fun isNearBottom(
 }
 
 /** Read the user-visible filename a content Uri exposes via OpenableColumns,
- *  falling back to the Uri's path segment. Null when neither is available. */
+ *  falling back to the Uri's path segment. Null when neither is available.
+ *
+ *  Guarded against a revoked grant: a Photo Picker / SAF Uri staged before
+ *  process death (issue #531) comes back as a ghost whose session-scoped read
+ *  permission is gone, so `query()` throws `SecurityException` (or the backing
+ *  provider may be dead — `IllegalArgumentException` / `NullPointerException`).
+ *  We swallow it and fall through to the path-segment fallback so the staging
+ *  preview renders a placeholder name instead of crashing; the actual decode
+ *  still fails gracefully into the existing toast path. */
 private fun queryDisplayName(
     contentResolver: android.content.ContentResolver,
     uri: android.net.Uri,
 ): String? {
-    contentResolver
-        .query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
-        ?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val name = cursor.getString(0)
-                if (!name.isNullOrBlank()) return name
+    runCatching {
+        contentResolver
+            .query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val name = cursor.getString(0)
+                    if (!name.isNullOrBlank()) return name
+                }
             }
-        }
+    }
     return uri.lastPathSegment
 }
 
@@ -6463,20 +6497,47 @@ private fun queryDisplayName(
  * Best-effort byte size of a content Uri, queried via `OpenableColumns.SIZE`.
  * Returns -1 when the provider doesn't report a size (some virtual / streamed
  * providers omit it); callers must then enforce a cap via the bounded read.
+ *
+ * Also returns -1 when the Uri's grant has been revoked (a ghost Uri restored
+ * after process death — see [queryDisplayName] / issue #531): the bounded read
+ * downstream is itself `SecurityException`-guarded and will reject the file, so
+ * treating a revoked grant as "size unknown" routes it into the same graceful
+ * rejection rather than crashing the send coroutine.
  */
 private fun queryContentSize(
     contentResolver: android.content.ContentResolver,
     uri: android.net.Uri,
 ): Long {
-    contentResolver
-        .query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)
-        ?.use { cursor ->
-            if (cursor.moveToFirst() && !cursor.isNull(0)) {
-                return cursor.getLong(0)
+    runCatching {
+        contentResolver
+            .query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                    return cursor.getLong(0)
+                }
             }
-        }
+    }
     return -1L
 }
+
+/** `ContentResolver.getType` for a content Uri whose read grant may have been
+ *  revoked (a ghost staging Uri restored after process death — issue #531).
+ *  The platform docs say `getType` can throw `SecurityException` for a Uri the
+ *  caller can no longer access; an unguarded call on a ghost Uri crashes the
+ *  preview composition or the send coroutine before the already-guarded decode
+ *  gets a chance to degrade. Returns "" on any failure so callers treat the
+ *  ghost as an unknown / non-video type and let the guarded decode reject it
+ *  into the existing decode-failure toast. */
+private fun safeGetType(
+    contentResolver: android.content.ContentResolver,
+    uri: android.net.Uri,
+): String = coerceResolvedMime { contentResolver.getType(uri) }
+
+/** Pure swallow-and-default kernel behind [safeGetType], split out so the
+ *  ghost-Uri contract (issue #531) — a throwing or null resolver lookup must
+ *  collapse to "" rather than propagate — is unit-testable on the JVM without
+ *  Robolectric, mirroring the `UriListSaver` codec split. */
+internal inline fun coerceResolvedMime(getType: () -> String?): String = runCatching(getType).getOrNull().orEmpty()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -6677,23 +6738,39 @@ private fun ConversationScreen(
     // when this or `pendingDocumentUris` is non-empty; the whole queue
     // ships as one kind:9 album via `controller.sendAttachments(list, caption)`.
     //
-    // Intentionally `remember`, not `rememberSaveable`: Photo Picker and
-    // document URIs carry session-scoped read grants that don't survive
-    // process death, so restoring them from a saved bundle gives us URIs
-    // that fail to open on first read. Lose the staging buffer on
-    // process death rather than keep ghost URIs around.
-    // Keyed on chat.id so a conversation switch flushes the staging shelf —
-    // ConversationScreen is reused when `selectedChat` changes in place, and
-    // an unkeyed remember would otherwise carry URIs from chat A into chat B
-    // (where a Send would attach them to the wrong recipient).
-    var pendingMediaUris by remember(chat.id) { mutableStateOf<List<android.net.Uri>>(emptyList()) }
-    var pendingDocumentUris by remember(chat.id) { mutableStateOf<List<android.net.Uri>>(emptyList()) }
+    // Persist the staging shelf across process death (issue #531): capturing
+    // in landscape foregrounds the external camera app, which on low/medium
+    // memory devices gets the backgrounded host process killed. On return the
+    // activity is recreated and a plain `remember` would have wiped the shelf,
+    // dropping the just-captured image even though `cameraOutputUri` survived.
+    // The camera capture is a FileProvider URI over an app-owned cache file,
+    // so it re-opens fine post-restore. Photo Picker / GET_CONTENT / document
+    // URIs carry session-scoped read grants that DON'T survive process death;
+    // if such a URI was staged when the process died it returns as a ghost
+    // that fails to open — that degrades gracefully through the existing
+    // decode-failure toast path in `sendStagedAttachments`, which is a better
+    // outcome than silently losing the camera capture the user just accepted.
+    // Keyed on chat.id so a conversation switch still flushes the staging
+    // shelf — ConversationScreen is reused when `selectedChat` changes in
+    // place, and an unkeyed state would otherwise carry URIs from chat A into
+    // chat B (where a Send would attach them to the wrong recipient).
+    var pendingMediaUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
+        mutableStateOf<List<android.net.Uri>>(emptyList())
+    }
+    var pendingDocumentUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
+        mutableStateOf<List<android.net.Uri>>(emptyList())
+    }
     // Survives process death while the camera app is foreground (the result
     // callback fires into a recreated activity, otherwise the capture is lost).
     var cameraOutputUri by rememberSaveable(stateSaver = NullableUriSaver) {
         mutableStateOf<android.net.Uri?>(null)
     }
-    var cameraOutputFile by remember { mutableStateOf<java.io.File?>(null) }
+    // Survives process death alongside `cameraOutputUri` so a capture
+    // cancelled after a death-and-restore can still delete the empty temp
+    // file instead of leaking it (issue #531).
+    var cameraOutputFile by rememberSaveable(stateSaver = NullableFileSaver) {
+        mutableStateOf<java.io.File?>(null)
+    }
 
     // PickMultipleVisualMedia uses the system Photo Picker — no READ_MEDIA_IMAGES
     // permission needed (Android 13+ scopes the picker's own grant); on older
@@ -6952,7 +7029,7 @@ private fun ConversationScreen(
                             overflowed = true
                             break
                         }
-                        val mime = context.contentResolver.getType(uri).orEmpty()
+                        val mime = safeGetType(context.contentResolver, uri)
                         val attachment =
                             if (mime.startsWith("video/", ignoreCase = true)) {
                                 when (val r = MediaPipeline.readVideoForUpload(context, uri, remaining)) {
@@ -6988,9 +7065,7 @@ private fun ConversationScreen(
             if (attachments.size < uris.size) {
                 val anyVideoPicked =
                     uris.any {
-                        context.contentResolver
-                            .getType(it)
-                            .orEmpty()
+                        safeGetType(context.contentResolver, it)
                             .startsWith("video/", ignoreCase = true)
                     }
                 appState.present(
@@ -7043,9 +7118,7 @@ private fun ConversationScreen(
             var albumOverflowed = false
             for (uri in uris) {
                 val resolvedMime =
-                    context.contentResolver
-                        .getType(uri)
-                        .orEmpty()
+                    safeGetType(context.contentResolver, uri)
                         .takeIf { it.isNotBlank() }
                         ?: "application/octet-stream"
                 val remainingAlbumBudget = (bytesBudget - albumBytes).coerceAtLeast(0L)
@@ -7127,7 +7200,7 @@ private fun ConversationScreen(
                     overflowed = true
                     break
                 }
-                val mime = context.contentResolver.getType(uri).orEmpty()
+                val mime = safeGetType(context.contentResolver, uri)
                 val attachment =
                     if (mime.startsWith("video/", ignoreCase = true)) {
                         // Thread the remaining album budget into the video read so a
@@ -7202,9 +7275,7 @@ private fun ConversationScreen(
             val merged = acceptedImages + docOutcome.attachments
             val pickHasVideo =
                 imageUris.any {
-                    context.contentResolver
-                        .getType(it)
-                        .orEmpty()
+                    safeGetType(context.contentResolver, it)
                         .startsWith("video/", ignoreCase = true)
                 }
             val visualFailureToast =
