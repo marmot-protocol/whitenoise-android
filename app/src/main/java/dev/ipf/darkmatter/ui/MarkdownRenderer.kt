@@ -436,13 +436,17 @@ private fun collectBlockMentionBech32s(
             is MarkdownBlockFfi.ListBlock ->
                 block.items.forEach { collectBlockMentionBech32s(it.blocks, out, depth + 1) }
             is MarkdownBlockFfi.Table -> {
-                block.header.forEach { collectMentionBech32s(it.inlines, out, depth = 0) }
-                block.rows.forEach { row -> row.forEach { collectMentionBech32s(it.inlines, out, depth = 0) } }
+                block.header.forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) }
+                block.rows.forEach { row -> row.forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) } }
             }
             else -> Unit
         }
     }
 }
+
+internal fun markdownDocumentMentionBech32s(document: MarkdownDocumentFfi): Set<String> =
+    mutableSetOf<String>()
+        .also { collectBlockMentionBech32s(document.blocks, it, depth = 0) }
 
 /**
  * True when [document] contains a `NostrMention` that resolves to

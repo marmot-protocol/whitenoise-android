@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.text.SpanStyle
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.firebase.FirebaseApp
@@ -27,11 +28,14 @@ import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.ProfileLink
 import dev.ipf.darkmatter.core.ProfileSanitizer
 import dev.ipf.darkmatter.notifications.BackgroundConnectionPreferences
+import dev.ipf.darkmatter.notifications.LocalNotificationFormatter
 import dev.ipf.darkmatter.notifications.LocalNotificationPolicy
 import dev.ipf.darkmatter.notifications.LocalNotificationPresenter
 import dev.ipf.darkmatter.notifications.NotificationStreamForegroundService
 import dev.ipf.darkmatter.notifications.PushServerConfig
 import dev.ipf.darkmatter.notifications.PushTokenStore
+import dev.ipf.darkmatter.ui.markdownDocumentMentionBech32s
+import dev.ipf.darkmatter.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -40,6 +44,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
 import dev.ipf.marmotkit.AuditLogUploadSourceFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -84,6 +89,39 @@ sealed interface AppPhase {
     data class Failed(
         val message: String,
     ) : AppPhase
+}
+
+internal suspend fun resolveNotificationMentionDisplayName(
+    bech32: String,
+    accountIdHex: suspend (String) -> String?,
+    profileDisplayName: (String) -> String?,
+    readDisplayName: suspend (String) -> String?,
+    requestProfile: (String) -> Unit,
+): String? {
+    val id = accountIdHex(bech32) ?: return null
+    profileDisplayName(id)?.let { return it }
+    val displayName = readDisplayName(id)?.let { ProfileSanitizer.displayName(it) }
+    if (displayName == null) requestProfile(id)
+    return displayName
+}
+
+internal suspend fun resolveNotificationPreviewText(
+    raw: String?,
+    parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
+    mentionDisplayName: suspend (String) -> String?,
+): String? {
+    val text = raw?.takeIf { it.isNotBlank() } ?: return null
+    val document = parseMarkdown(text)
+    if (document.blocks.isEmpty()) return null
+    val mentionNames = mutableMapOf<String, String?>()
+    for (bech32 in markdownDocumentMentionBech32s(document)) {
+        mentionNames[bech32] = mentionDisplayName(bech32)
+    }
+    return markdownDocumentToPreviewAnnotatedString(
+        document = document,
+        codeStyle = SpanStyle(),
+        mentionDisplayName = mentionNames::get,
+    ).text.takeIf { it.isNotBlank() }
 }
 
 internal data class SignOutOutcome(
@@ -2478,6 +2516,31 @@ class DarkMatterAppState(
         return runCatching { chatMemberTitle(senderIdHex) }.getOrNull()
     }
 
+    // Resolve a mention for a one-shot notification. Unlike the Compose bubble
+    // path, a notification will not recompose after requestProfile() finishes,
+    // so do one local display-name read before falling back to shortened bech32.
+    private suspend fun notificationMentionDisplayName(bech32: String): String? =
+        resolveNotificationMentionDisplayName(
+            bech32 = bech32,
+            accountIdHex = { accountIdHex(it) },
+            profileDisplayName = { profileDisplayName(it) },
+            readDisplayName = { accountIdHex ->
+                marmotIo { runCatching { marmot().displayName(accountIdHex) }.getOrNull() }
+            },
+            requestProfile = { requestProfile(it) },
+        )
+
+    // Flatten notification body text through the same Markdown mention path used
+    // by in-app bubbles/previews. A parser failure or legitimately empty document
+    // deliberately returns null so LocalNotificationFormatter falls back to the
+    // raw FFI preview instead of dropping the message body.
+    private suspend fun notificationPreviewText(raw: String?): String? =
+        resolveNotificationPreviewText(
+            raw = raw,
+            parseMarkdown = { parseMarkdownOrEmpty(it) },
+            mentionDisplayName = { notificationMentionDisplayName(it) },
+        )
+
     // Resolve the conversation title for a notification the same way the chat
     // list does, since the runtime payload's group name is empty for unnamed
     // groups. Returns null for DMs (MessagingStyle shows the sender instead).
@@ -2543,10 +2606,24 @@ class DarkMatterAppState(
                                         "updateAccount=${update.accountRef.take(8)} post=$shouldPost"
                                 }
                                 if (shouldPost) {
+                                    val previewTextOverride =
+                                        if (LocalNotificationFormatter.needsPreviewTextResolution(update)) {
+                                            notificationPreviewText(update.previewText)
+                                        } else {
+                                            null
+                                        }
+                                    val reactedToPreviewOverride =
+                                        if (LocalNotificationFormatter.needsReactedToPreviewResolution(update)) {
+                                            notificationPreviewText(update.reactedToPreview)
+                                        } else {
+                                            null
+                                        }
                                     localNotificationPresenter.show(
                                         update,
                                         notificationConversationTitle(update),
                                         notificationSenderName(update),
+                                        previewTextOverride,
+                                        reactedToPreviewOverride,
                                     )
                                 }
                                 refreshAccountUnreadCount(update.accountRef)

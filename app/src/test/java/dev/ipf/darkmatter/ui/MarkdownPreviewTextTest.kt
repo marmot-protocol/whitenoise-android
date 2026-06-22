@@ -281,6 +281,37 @@ class MarkdownPreviewTextTest {
     }
 
     @Test
+    fun documentMentionCollectorFindsNestedMentionsOnly() {
+        val npub = "npub1" + "q".repeat(58)
+        val note = "note1" + "q".repeat(58)
+        val document =
+            MarkdownDocumentFfi(
+                listOf(
+                    MarkdownBlockFfi.BlockQuote(
+                        listOf(
+                            MarkdownBlockFfi.Paragraph(
+                                listOf(
+                                    MarkdownInlineFfi.Emph(
+                                        listOf(
+                                            MarkdownInlineFfi.NostrMention(
+                                                MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub),
+                                            ),
+                                        ),
+                                    ),
+                                    MarkdownInlineFfi.NostrUri(
+                                        MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NOTE, note),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+
+        assertEquals(setOf(npub), markdownDocumentMentionBech32s(document))
+    }
+
+    @Test
     fun outputIsCappedAtMaxLength() {
         val annotated = build(listOf(paragraph("x".repeat(500))), maxLength = 200)
         assertEquals(200, annotated.length)
