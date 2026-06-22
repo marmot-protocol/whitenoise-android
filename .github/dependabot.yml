@@ -13,6 +13,9 @@ updates:
   # (actions/checkout, actions/setup-java, gradle/actions/setup-gradle,
   # actions/upload-artifact). Grouped into one PR so a multi-action bump does
   # not fan out into several PRs.
+  #
+  # Note: open-pull-requests-limit is per ecosystem, not repo-wide. Actions are
+  # grouped into a single PR, so this ecosystem contributes at most one PR.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -38,9 +41,13 @@ updates:
       # Media3 artifacts share a single version.ref (media3) -> one PR.
       media3:
         patterns: ["androidx.media3:*"]
-      # Firebase + Google Services plugin move together.
+      # Firebase, the Google Services plugin, and Play Services move together.
+      # "com.google.gms*" matches the google-services plugin id; the explicit
+      # "com.google.android.gms:*" pattern is needed for play-services-base
+      # (the plugin-id glob does not cover the gms artifact group).
       firebase:
-        patterns: ["com.google.firebase:*", "com.google.gms*"]
+        patterns:
+          ["com.google.firebase:*", "com.google.gms*", "com.google.android.gms:*"]
     ignore:
       # Intentional alpha pin documented in gradle/libs.versions.toml — see the
       # comment on `material3 = "1.5.0-alpha20"`. The QuickActionFabMenu uses
