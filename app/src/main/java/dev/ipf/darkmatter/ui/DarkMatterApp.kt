@@ -687,9 +687,11 @@ fun DarkMatterApp(
         }
     }
 
-    // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
-    // whole app UI so every descendant text field requests incognito mode from
-    // the IME (no learning / suggestion history / cloud sync of typed content).
+    // Privacy hardening (#405): when "Force incognito keyboard" is on, every
+    // descendant text field requests incognito mode from the IME (no learning /
+    // suggestion history / cloud sync of typed content). The scope is always
+    // mounted and applies the flag per input session, so toggling the setting
+    // does not rebuild the app or pop navigation (#561).
     IncognitoKeyboardScope(enabled = appState.forceIncognitoKeyboard) {
         CompositionLocalProvider(LocalSnackbarBottomInset provides snackbarBottomInset) {
             Scaffold(
