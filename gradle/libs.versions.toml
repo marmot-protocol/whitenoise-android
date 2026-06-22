@@ -7,7 +7,7 @@ orgJson = "20240303"
 espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.6.1"
 activityCompose = "1.8.0"
-kotlin = "2.2.10"
+kotlin = "2.4.0"
 composeBom = "2026.05.01"
 # material3 is deliberately pinned ABOVE the version the Compose BOM supplies
 # (compose-bom 2026.05.01 -> material3 1.4.0 stable). The QuickActionFabMenu in
