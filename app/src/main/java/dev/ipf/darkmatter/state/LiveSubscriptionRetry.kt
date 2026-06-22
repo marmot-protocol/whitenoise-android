@@ -21,6 +21,17 @@ internal const val LIVE_SUBSCRIPTION_MAX_RETRY_DELAY_MS: Long = 8_000L
 internal fun nextLiveSubscriptionRetryDelayMillis(current: Long): Long = nextRetryBackoffMillis(current, LIVE_SUBSCRIPTION_MAX_RETRY_DELAY_MS)
 
 /**
+ * Whether an account-scoped live subscription loop should reconnect after one
+ * iteration ends. A destructive account teardown clears the controller's bound
+ * account before closing its active handles; the old loop must not immediately
+ * reconnect to the account that is being wiped.
+ */
+internal fun shouldRetryLiveSubscriptionForAccount(
+    requestedAccountRef: String,
+    currentBoundAccountRef: String?,
+): Boolean = currentBoundAccountRef == requestedAccountRef
+
+/**
  * Run two live subscription consumers in parallel until either finishes
  * (normally or with failure). Cancels the sibling, then rethrows the first
  * recorded failure so callers can handle it in their retry loop.

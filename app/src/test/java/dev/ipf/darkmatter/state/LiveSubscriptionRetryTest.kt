@@ -17,4 +17,11 @@ class LiveSubscriptionRetryTest {
         assertEquals(8_000L, nextLiveSubscriptionRetryDelayMillis(8_000L))
         assertEquals(8_000L, nextLiveSubscriptionRetryDelayMillis(16_000L))
     }
+
+    @Test
+    fun accountScopedRetryStopsWhenControllerUnbinds() {
+        assertEquals(true, shouldRetryLiveSubscriptionForAccount("alice", "alice"))
+        assertEquals(false, shouldRetryLiveSubscriptionForAccount("alice", null))
+        assertEquals(false, shouldRetryLiveSubscriptionForAccount("alice", "bob"))
+    }
 }

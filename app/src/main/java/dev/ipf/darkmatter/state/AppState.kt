@@ -60,9 +60,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -73,6 +75,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.yield
 import java.net.IDN
 import java.net.URI
 import java.util.Locale
@@ -429,6 +432,7 @@ class DarkMatterAppState(
     // Serializes bootstrap so two concurrent callers can't both pass the
     // null-client check and each construct a MarmotClient (TOCTOU). See #33.
     private val bootstrapMutex = Mutex()
+    private val nativePushSyncMutex = Mutex()
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
     private val pushTokenStore = PushTokenStore.create(appContext)
 
@@ -787,6 +791,40 @@ class DarkMatterAppState(
 
     fun attachChatsController(controller: ChatsController?) {
         chatsController = controller
+    }
+
+    private suspend fun prepareForDestructiveAccountWipe(accountRef: String): Boolean {
+        val restartNotifications = notificationJob?.isActive == true
+        activeAccountRef = null
+        activeConversationAccountRef = null
+        activeConversationGroupIdHex = null
+        runtimeGeneration += 1
+        reloadMediaAutoDownloadMatrix()
+        chatsController?.closeLiveSubscriptionsForAccountTeardown(accountRef)
+        stopNotificationListenerForAccountTeardown()
+        // Give Compose-owned conversation controllers a chance to observe the
+        // active-account/runtime-generation change and run their NonCancellable
+        // subscription cleanup before the engine account is deleted.
+        yield()
+        return restartNotifications
+    }
+
+    private suspend fun restoreAfterFailedDestructiveAccountWipe(
+        accountRef: String,
+        restartNotifications: Boolean,
+    ) {
+        activeAccountRef = accountRef
+        runtimeGeneration += 1
+        reloadMediaAutoDownloadMatrix()
+        configurePrivacyRuntime()
+        refreshLocalNotificationSettings()
+        if (restartNotifications) startNotificationListener()
+    }
+
+    private suspend fun stopNotificationListenerForAccountTeardown() {
+        val job = notificationJob ?: return
+        notificationJob = null
+        job.cancelAndJoin()
     }
 
     // TODO(marmot): remove this UI-controller backchannel once Marmot emits a
@@ -1376,14 +1414,23 @@ class DarkMatterAppState(
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
+        val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
+        val wipeResult =
+            nativePushSyncMutex.withLock {
+                runCatching { marmotIo { signOutAndWipe(wipedRef) } }
+            }
+        val failure = wipeResult.exceptionOrNull()
+        if (failure != null) {
+            rethrowIfCancellation(failure)
+            appStateDebug(failure) { "signOutAndWipe failed account=${wipedRef.take(8)}: ${failure.readableMessage()}" }
+            restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+            return null
+        }
         val outcome =
-            runCatching {
-                marmotIo { signOutAndWipe(wipedRef) }
-            }.onFailure {
-                rethrowIfCancellation(it)
-                appStateDebug(it) { "signOutAndWipe failed account=${wipedRef.take(8)}: ${it.readableMessage()}" }
-            }.getOrNull()
-                ?: return null
+            wipeResult.getOrNull() ?: run {
+                restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                return null
+            }
         wipeDecryptedMediaFromDisk()
         pushTokenStore.clearPendingDisable(wipedRef)
         pushTokenStore.clear()
@@ -1402,6 +1449,7 @@ class DarkMatterAppState(
         next?.let { label ->
             refreshedAccounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
         }
+        if (restartNotifications) startNotificationListener()
         refreshLocalNotificationSettings()
         return outcome
     }
@@ -1946,6 +1994,10 @@ class DarkMatterAppState(
      * something changes.
      */
     suspend fun syncNativePushRegistrationIfEnabled() {
+        nativePushSyncMutex.withLock { syncNativePushRegistrationIfEnabledLocked() }
+    }
+
+    private suspend fun syncNativePushRegistrationIfEnabledLocked() {
         // Drain before resolving the push-server config so a clear that
         // failed earlier still retries even if the config is later blanked
         // or GMS is uninstalled — otherwise a stale server-side registration
@@ -2682,7 +2734,7 @@ class DarkMatterAppState(
                             }
                         } finally {
                             runCatching {
-                                withContext(Dispatchers.IO) {
+                                withContext(NonCancellable + Dispatchers.IO) {
                                     subscription.close()
                                 }
                             }
