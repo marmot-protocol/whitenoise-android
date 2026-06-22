@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
@@ -155,20 +157,22 @@ object MediaPipeline {
      * Decode [bytes] downscaled so the longer edge is ≈ [maxEdgePx], using a
      * power-of-two `inSampleSize`. Used for in-bubble thumbnails so a full
      * 1920px image isn't held as a ~14 MB ARGB_8888 bitmap per visible row.
-     * Returns null when the bytes can't be decoded.
+     * Returns null when the bytes can't be decoded. JPEG EXIF orientation is
+     * applied to the returned pixels so locally-staged / optimistic previews
+     * match the upright image users captured.
      */
     fun decodeSampledBitmap(
         bytes: ByteArray,
         maxEdgePx: Int,
     ): Bitmap? {
         if (bytes.isEmpty()) return null
+        val orientation = readExifOrientation(bytes)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-        val (targetW, targetH) = targetDimensions(bounds.outWidth, bounds.outHeight, maxEdgePx)
-        if (targetW == 0 || targetH == 0) return null
+        val target = orientedDecodeTarget(bounds.outWidth, bounds.outHeight, maxEdgePx, orientation) ?: return null
         val opts =
             BitmapFactory.Options().apply {
-                inSampleSize = computeInSampleSize(bounds.outWidth, bounds.outHeight, targetW, targetH)
+                inSampleSize = target.sampleSize
             }
         // The power-of-two sample only lands the decode in [target, 2×target),
         // so a source just under 2× the cap decodes at up to ~4× the intended
@@ -181,17 +185,7 @@ object MediaPipeline {
             } catch (_: OutOfMemoryError) {
                 null
             } ?: return null
-        if (decoded.width == targetW && decoded.height == targetH) return decoded
-        return try {
-            Bitmap
-                .createScaledBitmap(decoded, targetW, targetH, true)
-                .also { if (it !== decoded) decoded.recycle() }
-        } catch (_: OutOfMemoryError) {
-            // The scale itself OOM'd — free the intermediate so a large native
-            // allocation isn't retained right when memory is already tight.
-            decoded.recycle()
-            null
-        }
+        return scaleAndOrientBitmap(decoded, target.rawWidth, target.rawHeight, orientation)
     }
 
     /**
@@ -209,8 +203,10 @@ object MediaPipeline {
      * never resolved (see #387). Mirrors [decodeSampledBitmap]'s sampling and
      * OOM guards, sourcing from a `ContentResolver` stream instead of bytes.
      *
-     * Returns null on any I/O, security, decode, or OOM failure so the caller
-     * can fall back to a placeholder rather than crash.
+     * JPEG EXIF orientation is applied to the returned pixels so the staging
+     * sheet shows portrait camera captures upright instead of following the raw
+     * sensor buffer. Returns null on any I/O, security, decode, or OOM failure
+     * so the caller can fall back to a placeholder rather than crash.
      */
     fun decodeSampledFromUri(
         contentResolver: ContentResolver,
@@ -218,6 +214,7 @@ object MediaPipeline {
         maxEdgePx: Int = THUMBNAIL_MAX_EDGE_PX,
     ): Bitmap? =
         try {
+            val orientation = readExifOrientation(contentResolver, uri)
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             contentResolver.openInputStream(uri).use { stream ->
                 stream ?: return null
@@ -228,13 +225,13 @@ object MediaPipeline {
             if (srcW <= 0 || srcH <= 0) {
                 null
             } else {
-                val (targetW, targetH) = targetDimensions(srcW, srcH, maxEdgePx)
-                if (targetW == 0 || targetH == 0) {
+                val target = orientedDecodeTarget(srcW, srcH, maxEdgePx, orientation)
+                if (target == null) {
                     null
                 } else {
                     val opts =
                         BitmapFactory.Options().apply {
-                            inSampleSize = computeInSampleSize(srcW, srcH, targetW, targetH)
+                            inSampleSize = target.sampleSize
                         }
                     val decoded =
                         contentResolver.openInputStream(uri).use { stream ->
@@ -248,19 +245,7 @@ object MediaPipeline {
                                 }
                             }
                         }
-                    when {
-                        decoded == null -> null
-                        decoded.width == targetW && decoded.height == targetH -> decoded
-                        else ->
-                            try {
-                                Bitmap
-                                    .createScaledBitmap(decoded, targetW, targetH, true)
-                                    .also { if (it !== decoded) decoded.recycle() }
-                            } catch (_: OutOfMemoryError) {
-                                decoded.recycle()
-                                null
-                            }
-                    }
+                    decoded?.let { scaleAndOrientBitmap(it, target.rawWidth, target.rawHeight, orientation) }
                 }
             }
         } catch (_: java.io.IOException) {
@@ -269,6 +254,176 @@ object MediaPipeline {
             null
         } catch (_: OutOfMemoryError) {
             null
+        }
+
+    private data class OrientedDecodeTarget(
+        val rawWidth: Int,
+        val rawHeight: Int,
+        val sampleSize: Int,
+    )
+
+    internal const val EXIF_ORIENTATION_NORMAL = 1
+    internal const val EXIF_ORIENTATION_FLIP_HORIZONTAL = 2
+    internal const val EXIF_ORIENTATION_ROTATE_180 = 3
+    internal const val EXIF_ORIENTATION_FLIP_VERTICAL = 4
+    internal const val EXIF_ORIENTATION_TRANSPOSE = 5
+    internal const val EXIF_ORIENTATION_ROTATE_90 = 6
+    internal const val EXIF_ORIENTATION_TRANSVERSE = 7
+    internal const val EXIF_ORIENTATION_ROTATE_270 = 8
+
+    internal fun normalizeExifOrientation(orientation: Int?): Int =
+        when (orientation) {
+            EXIF_ORIENTATION_FLIP_HORIZONTAL,
+            EXIF_ORIENTATION_ROTATE_180,
+            EXIF_ORIENTATION_FLIP_VERTICAL,
+            EXIF_ORIENTATION_TRANSPOSE,
+            EXIF_ORIENTATION_ROTATE_90,
+            EXIF_ORIENTATION_TRANSVERSE,
+            EXIF_ORIENTATION_ROTATE_270,
+            -> orientation
+            else -> EXIF_ORIENTATION_NORMAL
+        }
+
+    internal fun exifOrientationRequiresPixelTransform(orientation: Int?): Boolean = normalizeExifOrientation(orientation) != EXIF_ORIENTATION_NORMAL
+
+    internal fun exifOrientationSwapsDimensions(orientation: Int?): Boolean =
+        when (normalizeExifOrientation(orientation)) {
+            EXIF_ORIENTATION_TRANSPOSE,
+            EXIF_ORIENTATION_ROTATE_90,
+            EXIF_ORIENTATION_TRANSVERSE,
+            EXIF_ORIENTATION_ROTATE_270,
+            -> true
+            else -> false
+        }
+
+    internal fun orientedSourceDimensions(
+        srcWidth: Int,
+        srcHeight: Int,
+        orientation: Int?,
+    ): Pair<Int, Int> =
+        if (exifOrientationSwapsDimensions(orientation)) {
+            srcHeight to srcWidth
+        } else {
+            srcWidth to srcHeight
+        }
+
+    internal fun targetDimensionsForExifOrientation(
+        srcWidth: Int,
+        srcHeight: Int,
+        maxEdgePx: Int,
+        orientation: Int?,
+    ): Pair<Int, Int> {
+        val (displaySrcW, displaySrcH) = orientedSourceDimensions(srcWidth, srcHeight, orientation)
+        return targetDimensions(displaySrcW, displaySrcH, maxEdgePx)
+    }
+
+    private fun orientedDecodeTarget(
+        srcWidth: Int,
+        srcHeight: Int,
+        maxEdgePx: Int,
+        orientation: Int,
+    ): OrientedDecodeTarget? {
+        val (displayTargetW, displayTargetH) = targetDimensionsForExifOrientation(srcWidth, srcHeight, maxEdgePx, orientation)
+        if (displayTargetW == 0 || displayTargetH == 0) return null
+        val (rawTargetW, rawTargetH) =
+            if (exifOrientationSwapsDimensions(orientation)) {
+                displayTargetH to displayTargetW
+            } else {
+                displayTargetW to displayTargetH
+            }
+        return OrientedDecodeTarget(
+            rawWidth = rawTargetW,
+            rawHeight = rawTargetH,
+            sampleSize = computeInSampleSize(srcWidth, srcHeight, rawTargetW, rawTargetH),
+        )
+    }
+
+    private fun scaleAndOrientBitmap(
+        decoded: Bitmap,
+        rawTargetW: Int,
+        rawTargetH: Int,
+        orientation: Int,
+    ): Bitmap? {
+        var current = decoded
+        try {
+            if (decoded.width != rawTargetW || decoded.height != rawTargetH) {
+                current = Bitmap.createScaledBitmap(decoded, rawTargetW, rawTargetH, true)
+                if (current !== decoded) decoded.recycle()
+            }
+            val oriented = applyExifOrientation(current, orientation)
+            if (oriented !== current) current.recycle()
+            return oriented
+        } catch (_: OutOfMemoryError) {
+            if (!decoded.isRecycled) decoded.recycle()
+            if (current !== decoded && !current.isRecycled) current.recycle()
+            return null
+        } catch (_: RuntimeException) {
+            if (!decoded.isRecycled) decoded.recycle()
+            if (current !== decoded && !current.isRecycled) current.recycle()
+            return null
+        }
+    }
+
+    private fun applyExifOrientation(
+        bitmap: Bitmap,
+        orientation: Int,
+    ): Bitmap {
+        val matrix = Matrix()
+        when (normalizeExifOrientation(orientation)) {
+            EXIF_ORIENTATION_FLIP_HORIZONTAL -> matrix.setScale(-1f, 1f)
+            EXIF_ORIENTATION_ROTATE_180 -> matrix.setRotate(180f)
+            EXIF_ORIENTATION_FLIP_VERTICAL -> matrix.setScale(1f, -1f)
+            EXIF_ORIENTATION_TRANSPOSE -> {
+                matrix.setRotate(90f)
+                matrix.preScale(-1f, 1f)
+            }
+            EXIF_ORIENTATION_ROTATE_90 -> matrix.setRotate(90f)
+            EXIF_ORIENTATION_TRANSVERSE -> {
+                matrix.setRotate(-90f)
+                matrix.preScale(-1f, 1f)
+            }
+            EXIF_ORIENTATION_ROTATE_270 -> matrix.setRotate(-90f)
+            else -> return bitmap
+        }
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
+
+    private fun readExifOrientation(
+        contentResolver: ContentResolver,
+        uri: Uri,
+    ): Int =
+        try {
+            contentResolver.openInputStream(uri).use { stream ->
+                stream ?: return EXIF_ORIENTATION_NORMAL
+                normalizeExifOrientation(
+                    ExifInterface(stream).getAttributeInt(
+                        ExifInterface.TAG_ORIENTATION,
+                        EXIF_ORIENTATION_NORMAL,
+                    ),
+                )
+            }
+        } catch (_: java.io.IOException) {
+            EXIF_ORIENTATION_NORMAL
+        } catch (_: SecurityException) {
+            EXIF_ORIENTATION_NORMAL
+        } catch (_: RuntimeException) {
+            EXIF_ORIENTATION_NORMAL
+        }
+
+    private fun readExifOrientation(bytes: ByteArray): Int =
+        try {
+            bytes.inputStream().use { stream ->
+                normalizeExifOrientation(
+                    ExifInterface(stream).getAttributeInt(
+                        ExifInterface.TAG_ORIENTATION,
+                        EXIF_ORIENTATION_NORMAL,
+                    ),
+                )
+            }
+        } catch (_: java.io.IOException) {
+            normalizeExifOrientation(jpegExifOrientation(bytes))
+        } catch (_: RuntimeException) {
+            normalizeExifOrientation(jpegExifOrientation(bytes))
         }
 
     /**
@@ -356,6 +511,13 @@ object MediaPipeline {
                 return OriginalImageReadResult.Failed
             }
         val mediaType = originalImageMediaType(sourceBytes) ?: return OriginalImageReadResult.Unsupported
+        // If the camera stored a raw landscape sensor buffer plus EXIF
+        // Orientation=Rotate90/270, stripping APP1 would make "Original"
+        // sends display sideways. Fall back to the JPEG privacy path so the
+        // orientation is baked into pixels while still dropping metadata.
+        if (exifOrientationRequiresPixelTransform(readExifOrientation(sourceBytes))) {
+            return OriginalImageReadResult.Unsupported
+        }
         val stripped = stripOriginalImageMetadata(sourceBytes) ?: return OriginalImageReadResult.Unsupported
         val dim = imageDimOrNull(stripped) ?: return OriginalImageReadResult.Failed
         val thumbhash =
@@ -388,8 +550,9 @@ object MediaPipeline {
 
     /**
      * Decode the image at [uri], downscale so the longer edge ≤ [maxEdgePx],
-     * and re-encode as JPEG at [quality]. Returns null when the source can't
-     * be decoded (corrupt file, unsupported format, unreadable Uri).
+     * apply JPEG EXIF orientation to the pixels, and re-encode as JPEG at
+     * [quality]. Returns null when the source can't be decoded (corrupt file,
+     * unsupported format, unreadable Uri).
      */
     fun readDownscaledJpeg(
         contentResolver: ContentResolver,
@@ -403,6 +566,7 @@ object MediaPipeline {
         // surfaces as null (see the catch) so callers never crash or ship
         // partial bytes.
         return try {
+            val orientation = readExifOrientation(contentResolver, uri)
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             contentResolver.openInputStream(uri).use { stream ->
                 stream ?: return null
@@ -412,29 +576,15 @@ object MediaPipeline {
             val srcH = bounds.outHeight
             if (srcW <= 0 || srcH <= 0) return null
 
-            val (targetW, targetH) = targetDimensions(srcW, srcH, maxEdgePx)
-            if (targetW == 0 || targetH == 0) return null
-            val sampleSize = computeInSampleSize(srcW, srcH, targetW, targetH)
+            val target = orientedDecodeTarget(srcW, srcH, maxEdgePx, orientation) ?: return null
 
             val decoded: Bitmap =
                 contentResolver.openInputStream(uri).use { stream ->
                     stream ?: return null
-                    val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                    val opts = BitmapFactory.Options().apply { inSampleSize = target.sampleSize }
                     BitmapFactory.decodeStream(stream, null, opts) ?: return null
                 }
-            val scaled =
-                if (decoded.width != targetW || decoded.height != targetH) {
-                    try {
-                        Bitmap.createScaledBitmap(decoded, targetW, targetH, true).also {
-                            if (it !== decoded) decoded.recycle()
-                        }
-                    } catch (t: Throwable) {
-                        decoded.recycle() // don't leak the source bitmap on scale failure
-                        throw t
-                    }
-                } else {
-                    decoded
-                }
+            val scaled = scaleAndOrientBitmap(decoded, target.rawWidth, target.rawHeight, orientation) ?: return null
 
             // Flatten alpha onto opaque white before hashing AND compressing
             // so the thumbhash describes the exact pixels we ship. JPEG drops
@@ -531,6 +681,81 @@ object MediaPipeline {
     private fun isPng(bytes: ByteArray): Boolean = bytes.size >= PNG_SIGNATURE.size && PNG_SIGNATURE.indices.all { bytes[it] == PNG_SIGNATURE[it] }
 
     private fun isWebp(bytes: ByteArray): Boolean = bytes.size >= 12 && asciiEquals(bytes, 0, "RIFF") && asciiEquals(bytes, 8, "WEBP")
+
+    internal fun jpegExifOrientation(bytes: ByteArray): Int? {
+        if (!isJpeg(bytes)) return null
+        var pos = 2
+        while (pos + 4 <= bytes.size) {
+            if (u8(bytes, pos) != 0xff) return null
+            while (pos < bytes.size && u8(bytes, pos) == 0xff) pos++
+            if (pos >= bytes.size) return null
+            val marker = u8(bytes, pos++)
+            if (marker == 0xda || marker == 0xd9) return null
+            if (marker == 0x00 || marker == 0x01 || marker in 0xd0..0xd7) continue
+            if (pos + 2 > bytes.size) return null
+            val length = u16be(bytes, pos)
+            if (length < 2 || pos + length > bytes.size) return null
+            val payloadStart = pos + 2
+            val payloadLength = length - 2
+            if (marker == 0xe1 && payloadLength >= EXIF_PREAMBLE.size) {
+                val isExif = EXIF_PREAMBLE.indices.all { bytes[payloadStart + it] == EXIF_PREAMBLE[it] }
+                if (isExif) {
+                    parseTiffOrientation(
+                        bytes = bytes,
+                        tiffStart = payloadStart + EXIF_PREAMBLE.size,
+                        tiffLength = payloadLength - EXIF_PREAMBLE.size,
+                    )?.let { return it }
+                }
+            }
+            pos += length
+        }
+        return null
+    }
+
+    private fun parseTiffOrientation(
+        bytes: ByteArray,
+        tiffStart: Int,
+        tiffLength: Int,
+    ): Int? {
+        if (tiffLength < 8) return null
+        val tiffEnd = tiffStart + tiffLength
+        if (tiffStart < 0 || tiffEnd > bytes.size) return null
+        val littleEndian =
+            when {
+                bytes[tiffStart] == 'I'.code.toByte() && bytes[tiffStart + 1] == 'I'.code.toByte() -> true
+                bytes[tiffStart] == 'M'.code.toByte() && bytes[tiffStart + 1] == 'M'.code.toByte() -> false
+                else -> return null
+            }
+        if (u16(bytes, tiffStart + 2, littleEndian) != 42) return null
+        val ifdOffset = u32(bytes, tiffStart + 4, littleEndian)
+        if (ifdOffset > Int.MAX_VALUE) return null
+        val ifdStart = tiffStart + ifdOffset.toInt()
+        if (ifdStart < tiffStart || ifdStart + 2 > tiffEnd) return null
+        val entryCount = u16(bytes, ifdStart, littleEndian)
+        val entriesStart = ifdStart + 2
+        val entriesBytes = entryCount.toLong() * TIFF_IFD_ENTRY_SIZE.toLong()
+        if (entriesBytes > Int.MAX_VALUE || entriesStart + entriesBytes.toInt() > tiffEnd) return null
+        repeat(entryCount) { index ->
+            val entry = entriesStart + index * TIFF_IFD_ENTRY_SIZE
+            val tag = u16(bytes, entry, littleEndian)
+            if (tag != EXIF_ORIENTATION_TAG) return@repeat
+            val type = u16(bytes, entry + 2, littleEndian)
+            val count = u32(bytes, entry + 4, littleEndian)
+            if (type != TIFF_TYPE_SHORT || count < 1L) return null
+            val value =
+                if (count == 1L) {
+                    u16(bytes, entry + 8, littleEndian)
+                } else {
+                    val valueOffset = u32(bytes, entry + 8, littleEndian)
+                    if (valueOffset > Int.MAX_VALUE) return null
+                    val valuePos = tiffStart + valueOffset.toInt()
+                    if (valuePos < tiffStart || valuePos + 2 > tiffEnd) return null
+                    u16(bytes, valuePos, littleEndian)
+                }
+            return normalizeExifOrientation(value).takeIf { it == value }
+        }
+        return null
+    }
 
     private fun stripJpegMetadata(bytes: ByteArray): ByteArray? {
         if (!isJpeg(bytes)) return null
@@ -654,6 +879,10 @@ object MediaPipeline {
     private val PNG_SIGNATURE = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
     private const val PNG_CHUNK_OVERHEAD = 12
     private val PNG_METADATA_CHUNKS = setOf("eXIf", "tEXt", "zTXt", "iTXt", "tIME")
+    private val EXIF_PREAMBLE = byteArrayOf(0x45, 0x78, 0x69, 0x66, 0x00, 0x00) // "Exif\u0000\u0000"
+    private const val EXIF_ORIENTATION_TAG = 0x0112
+    private const val TIFF_IFD_ENTRY_SIZE = 12
+    private const val TIFF_TYPE_SHORT = 3
 
     private fun u8(
         bytes: ByteArray,
@@ -664,6 +893,17 @@ object MediaPipeline {
         bytes: ByteArray,
         offset: Int,
     ): Int = (u8(bytes, offset) shl 8) or u8(bytes, offset + 1)
+
+    private fun u16le(
+        bytes: ByteArray,
+        offset: Int,
+    ): Int = u8(bytes, offset) or (u8(bytes, offset + 1) shl 8)
+
+    private fun u16(
+        bytes: ByteArray,
+        offset: Int,
+        littleEndian: Boolean,
+    ): Int = if (littleEndian) u16le(bytes, offset) else u16be(bytes, offset)
 
     private fun u32be(
         bytes: ByteArray,
@@ -682,6 +922,12 @@ object MediaPipeline {
             (u8(bytes, offset + 1).toLong() shl 8) or
             (u8(bytes, offset + 2).toLong() shl 16) or
             (u8(bytes, offset + 3).toLong() shl 24)
+
+    private fun u32(
+        bytes: ByteArray,
+        offset: Int,
+        littleEndian: Boolean,
+    ): Long = if (littleEndian) u32le(bytes, offset) else u32be(bytes, offset)
 
     private fun ascii(
         bytes: ByteArray,

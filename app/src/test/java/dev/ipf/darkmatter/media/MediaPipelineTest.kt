@@ -139,6 +139,43 @@ class MediaPipelineTest {
     }
 
     @Test
+    fun jpegExifOrientation_readsBigEndianOrientationTag() {
+        val jpeg = minimalJpegWith(exifOrientationSegment(MediaPipeline.EXIF_ORIENTATION_ROTATE_90))
+
+        assertEquals(MediaPipeline.EXIF_ORIENTATION_ROTATE_90, MediaPipeline.jpegExifOrientation(jpeg))
+    }
+
+    @Test
+    fun jpegExifOrientation_readsLittleEndianOrientationTag() {
+        val jpeg = minimalJpegWith(exifOrientationSegment(MediaPipeline.EXIF_ORIENTATION_ROTATE_270, littleEndian = true))
+
+        assertEquals(MediaPipeline.EXIF_ORIENTATION_ROTATE_270, MediaPipeline.jpegExifOrientation(jpeg))
+    }
+
+    @Test
+    fun targetDimensionsForExifOrientation_usesDisplayOrientationForRotatedSources() {
+        // Android camera captures often store a landscape sensor buffer plus
+        // EXIF Orientation=Rotate90. The display/downscale box must treat that
+        // as a portrait source or the encoded dimensions and thumbhash drift.
+        assertEquals(
+            1440 to 1920,
+            MediaPipeline.targetDimensionsForExifOrientation(
+                srcWidth = 4032,
+                srcHeight = 3024,
+                maxEdgePx = 1920,
+                orientation = MediaPipeline.EXIF_ORIENTATION_ROTATE_90,
+            ),
+        )
+    }
+
+    @Test
+    fun exifOrientationRequiresPixelTransform_flagsRotationsAndMirrors() {
+        assertFalse(MediaPipeline.exifOrientationRequiresPixelTransform(MediaPipeline.EXIF_ORIENTATION_NORMAL))
+        assertTrue(MediaPipeline.exifOrientationRequiresPixelTransform(MediaPipeline.EXIF_ORIENTATION_ROTATE_90))
+        assertTrue(MediaPipeline.exifOrientationRequiresPixelTransform(MediaPipeline.EXIF_ORIENTATION_FLIP_HORIZONTAL))
+    }
+
+    @Test
     fun originalJpegStrip_dropsMetadataSegmentsButKeepsScanBytes() {
         val scan = byteArrayOf(0x11, 0x22, 0xff.toByte(), 0x00, 0x33, 0xff.toByte(), 0xd9.toByte())
         val jpeg =
@@ -230,6 +267,79 @@ class MediaPipelineTest {
     ): ByteArray {
         val length = payload.size + 2
         return byteArrayOf(0xff.toByte(), marker.toByte(), (length ushr 8).toByte(), length.toByte()) + payload
+    }
+
+    private fun minimalJpegWith(vararg segments: ByteArray): ByteArray =
+        byteArrayOf(0xff.toByte(), 0xd8.toByte()) +
+            segments.fold(ByteArray(0)) { acc, segment -> acc + segment } +
+            jpegSegment(0xda, byteArrayOf(0, 1, 2, 3)) +
+            byteArrayOf(0x11, 0x22, 0xff.toByte(), 0xd9.toByte())
+
+    private fun exifOrientationSegment(
+        orientation: Int,
+        littleEndian: Boolean = false,
+    ): ByteArray {
+        val tiff =
+            if (littleEndian) {
+                byteArrayOf(
+                    'I'.code.toByte(),
+                    'I'.code.toByte(),
+                    42,
+                    0,
+                    8,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0x12,
+                    0x01,
+                    3,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    orientation.toByte(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                )
+            } else {
+                byteArrayOf(
+                    'M'.code.toByte(),
+                    'M'.code.toByte(),
+                    0,
+                    42,
+                    0,
+                    0,
+                    0,
+                    8,
+                    0,
+                    1,
+                    0x01,
+                    0x12,
+                    0,
+                    3,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    orientation.toByte(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                )
+            }
+        return jpegSegment(0xe1, "Exif\u0000\u0000".encodeToByteArray() + tiff)
     }
 
     private val pngSignature = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
