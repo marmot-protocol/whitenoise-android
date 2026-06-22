@@ -347,8 +347,8 @@
     <string name="notification_invite_from_sender">Invitación de %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s te invitó a %2$s</string>
     <string name="background_connection_notification_title">Dark Matter está conectado</string>
-    <string name="background_connection_notification_text">Escuchando mensajes e invitaciones</string>
-    <string name="background_connection_notification_hint">Mantén pulsada esta notificación para ocultarla. La conexión permanece activa.</string>
+    <string name="background_connection_notification_text">Escuchando mensajes</string>
+    <string name="background_connection_notification_hint">Mantén pulsada esta notificación para ocultarla</string>
     <string name="notification_channel_background_connection">Conexión en segundo plano</string>
     <string name="notification_channel_background_connection_description">Mantiene a Dark Matter conectado para notificaciones locales</string>
     <string name="toast_restarting">Reiniciando</string>

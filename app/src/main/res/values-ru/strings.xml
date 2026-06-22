@@ -351,8 +351,8 @@
     <string name="notification_invite_from_sender">Приглашение от %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s пригласил(а) вас в %2$s</string>
     <string name="background_connection_notification_title">Dark Matter подключен</string>
-    <string name="background_connection_notification_text">Ожидание сообщений и приглашений</string>
-    <string name="background_connection_notification_hint">Нажмите и удерживайте, чтобы скрыть это уведомление. Соединение останется активным.</string>
+    <string name="background_connection_notification_text">Ожидание сообщений</string>
+    <string name="background_connection_notification_hint">Нажмите и удерживайте, чтобы скрыть это уведомление</string>
     <string name="notification_channel_background_connection">Фоновое подключение</string>
     <string name="notification_channel_background_connection_description">Поддерживает Dark Matter на связи для локальных уведомлений.</string>
     <string name="toast_restarting">Перезапуск</string>

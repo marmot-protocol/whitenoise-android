@@ -346,8 +346,8 @@
     <string name="notification_invite_from_sender">来自 %1$s 的邀请</string>
     <string name="notification_sender_invited_you_to_group">%1$s 邀请你加入 %2$s</string>
     <string name="background_connection_notification_title">Dark Matter 已连接</string>
-    <string name="background_connection_notification_text">正在监听消息和邀请</string>
-    <string name="background_connection_notification_hint">长按以隐藏此通知。连接将保持开启。</string>
+    <string name="background_connection_notification_text">正在监听消息</string>
+    <string name="background_connection_notification_hint">长按以隐藏此通知</string>
     <string name="notification_channel_background_connection">后台连接</string>
     <string name="notification_channel_background_connection_description">保持 Dark Matter 连接以获取本地通知</string>
     <string name="toast_restarting">正在重启</string>
