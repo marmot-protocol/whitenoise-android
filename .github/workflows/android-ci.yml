@@ -51,13 +51,27 @@ jobs:
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
+      # Roborazzi Compose screenshot pilot (issue #551). Verifies the committed
+      # baselines under app/src/test/snapshots/ against freshly rendered output
+      # so visual regressions (e.g. the AMOLED true-black class, #446/#495) fail
+      # the build instead of shipping. Runs on the JVM via Robolectric — no
+      # emulator, so it adds no device-test runtime. Re-baseline after an
+      # intentional UI change with `./gradlew :app:recordRoborazziDebug` (see
+      # README "Screenshot tests").
+      - name: Screenshot tests (Roborazzi)
+        run: ./gradlew :app:verifyRoborazziDebug --no-daemon --stacktrace
+
       - name: ktlint
         run: ./gradlew :app:ktlintCheck --no-daemon --stacktrace
 
       - name: Android lint
         run: ./gradlew :app:lintDebug --no-daemon --stacktrace
 
-      # Surface failure details (unit-test HTML/XML, lint reports) on red runs.
+      # Surface failure details (unit-test HTML/XML, lint reports, and Roborazzi
+      # screenshot diff/compare/actual images) on red runs. The roborazzi output
+      # dir holds *_compare.png / *_actual.png for any screenshot that diverged
+      # from its committed baseline, so a UI regression is inspectable from the
+      # workflow artifacts without re-running locally.
       - name: Upload reports
         if: failure()
         uses: actions/upload-artifact@v4
@@ -66,5 +80,6 @@ jobs:
           path: |
             app/build/reports/
             app/build/test-results/
+            app/build/outputs/roborazzi/
           if-no-files-found: ignore
           retention-days: 7
