@@ -2,7 +2,7 @@ package dev.ipf.darkmatter
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -17,6 +17,8 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("dev.ipf.darkmatter", appContext.packageName)
+        // The debug build under test carries the `.debug` applicationIdSuffix, so
+        // match the base id rather than asserting the exact package name.
+        assertTrue(appContext.packageName.startsWith("dev.ipf.darkmatter"))
     }
 }

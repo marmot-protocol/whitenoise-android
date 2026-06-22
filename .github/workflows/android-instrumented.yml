@@ -2,15 +2,14 @@ name: Android Instrumented Tests
 
 # Runs app/src/androidTest on an emulator (connectedDebugAndroidTest). These
 # tests are slow and need a booted emulator + KVM, so they live in their own
-# workflow off the fast unit/ktlint path (see android-ci.yml). This is NOT a
-# required check gating that workflow — it runs alongside it.
+# workflow off the fast unit/ktlint path (see android-ci.yml). It runs on
+# pushes to master ONLY — never on pull requests — so a slow emulator boot can
+# never gate a PR merge.
 #
 # Debug variant only: no signing secrets, no Firebase config, matching the
 # unit-test workflow's no-credentials posture.
 
 on:
-  pull_request:
-    branches: [master]
   push:
     branches: [master]
 

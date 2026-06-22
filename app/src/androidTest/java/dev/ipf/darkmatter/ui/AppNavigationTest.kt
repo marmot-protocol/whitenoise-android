@@ -58,14 +58,17 @@ class AppNavigationTest {
     }
 
     @Test
-    fun loadingScreenUsesDarkMatterBranding() {
+    fun loadingScreenHasNoBrandingText() {
+        // LoadingScreen is a bare centered spinner — no branding text. Its visual
+        // rendering is covered by the Roborazzi screenshot pilot; this just guards
+        // that stray branding copy doesn't creep back onto it.
         composeRule.setContent {
             DarkMatterTheme {
                 LoadingScreen()
             }
         }
 
-        composeRule.onNodeWithText("Loading Dark Matter").assertIsDisplayed()
+        composeRule.onNodeWithText("Loading Dark Matter").assertDoesNotExist()
         composeRule.onNodeWithText("Starting Marmot").assertDoesNotExist()
     }
 
@@ -87,10 +90,10 @@ class AppNavigationTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Switch account").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Switch Account").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("My QR code").assertIsDisplayed()
 
-        composeRule.onNodeWithContentDescription("Switch account").performClick()
+        composeRule.onNodeWithContentDescription("Switch Account").performClick()
         composeRule.runOnIdle {
             assertEquals(1, selectorClicks)
             assertEquals(0, qrClicks)
