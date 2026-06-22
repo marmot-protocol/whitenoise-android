@@ -47,24 +47,34 @@ class NotificationStreamForegroundService : Service() {
             }.onFailure {
                 foregroundServiceDebug(it) { "startForeground rejected" }
             }.isSuccess
-        if (!startedForeground) {
-            // The enable path already optimistically persisted "background
-            // connection on" and got a `true` from start() (the intent was
-            // merely queued). Tell AppState the start actually failed so the
-            // toggle doesn't lie and the user sees why. See #164.
-            (application as? DarkMatterApplication)?.appState?.onBackgroundConnectionStartRejected()
-            stopSelf(startId)
-            return START_NOT_STICKY
-        }
-        if (bootstrapJob?.isActive != true) {
-            bootstrapJob =
-                serviceScope.launch {
-                    runCatching {
-                        (application as DarkMatterApplication).appState.ensureNotificationRuntimeStarted()
-                    }.onFailure {
-                        foregroundServiceDebug(it) { "notification runtime failed" }
+        when (
+            decideForegroundStart(
+                startForegroundSucceeded = startedForeground,
+                bootstrapInFlight = bootstrapJob?.isActive == true,
+            )
+        ) {
+            ForegroundStartDecision.RejectAndStop -> {
+                // The enable path already optimistically persisted "background
+                // connection on" and got a `true` from start() (the intent was
+                // merely queued). Tell AppState the start actually failed so the
+                // toggle doesn't lie and the user sees why. See #164.
+                (application as? DarkMatterApplication)?.appState?.onBackgroundConnectionStartRejected()
+                stopSelf(startId)
+                return START_NOT_STICKY
+            }
+            ForegroundStartDecision.BootstrapAndKeep -> {
+                bootstrapJob =
+                    serviceScope.launch {
+                        runCatching {
+                            (application as DarkMatterApplication).appState.ensureNotificationRuntimeStarted()
+                        }.onFailure {
+                            foregroundServiceDebug(it) { "notification runtime failed" }
+                        }
                     }
-                }
+            }
+            // Repeated onStartCommand calls (Android may redeliver) must not
+            // stack notification-runtime bootstraps — an idempotency contract.
+            ForegroundStartDecision.KeepRunningExistingBootstrap -> Unit
         }
         foregroundServiceDebug { "started" }
         return START_STICKY
@@ -107,6 +117,38 @@ class NotificationStreamForegroundService : Service() {
             }
     }
 }
+
+/**
+ * The pure decision about how [NotificationStreamForegroundService.onStartCommand] should proceed,
+ * derived only from whether the foreground start succeeded and whether a bootstrap is already in
+ * flight. Each value maps 1:1 to an action in onStartCommand; keeping this side-effect-free makes
+ * the truth table testable without an Android context. See #164 and #158.
+ */
+internal sealed interface ForegroundStartDecision {
+    /** start-foreground succeeded, no bootstrap in flight → launch a new bootstrap, START_STICKY. */
+    data object BootstrapAndKeep : ForegroundStartDecision
+
+    /** start-foreground succeeded, bootstrap already active → do nothing extra, START_STICKY. */
+    data object KeepRunningExistingBootstrap : ForegroundStartDecision
+
+    /** start-foreground rejected → notify AppState, stopSelf, START_NOT_STICKY. */
+    data object RejectAndStop : ForegroundStartDecision
+}
+
+/**
+ * Pure mapping from the two observable booleans to a [ForegroundStartDecision]. Extracted from
+ * onStartCommand so the rejection-notification contract (#164) and the bootstrap-dedupe idempotency
+ * contract are pinned by [ForegroundStartDecisionTest] and cannot silently regress in a refactor.
+ */
+internal fun decideForegroundStart(
+    startForegroundSucceeded: Boolean,
+    bootstrapInFlight: Boolean,
+): ForegroundStartDecision =
+    when {
+        !startForegroundSucceeded -> ForegroundStartDecision.RejectAndStop
+        bootstrapInFlight -> ForegroundStartDecision.KeepRunningExistingBootstrap
+        else -> ForegroundStartDecision.BootstrapAndKeep
+    }
 
 private object BackgroundConnectionNotification {
     private const val CHANNEL_ID = "darkmatter.background_connection.v1"
