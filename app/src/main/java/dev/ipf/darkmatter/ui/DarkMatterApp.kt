@@ -2875,6 +2875,28 @@ internal fun shouldShowComposer(
     seededSelfMember: Boolean,
 ): Boolean = isSelfMember || (!membersLoaded && seededSelfMember)
 
+internal data class ComposerReplyFocusUpdate(
+    val shouldFocusComposer: Boolean,
+    val focusedReplyMessageId: String?,
+)
+
+/**
+ * One-shot focus gate for reply entry. A non-null reply target should focus the
+ * composer and raise the IME exactly once per selected message; dismissing the
+ * reply clears the marker so choosing the same message later fires again.
+ */
+internal fun nextComposerReplyFocusUpdate(
+    replyMessageId: String?,
+    focusedReplyMessageId: String?,
+    editingMessageId: String?,
+): ComposerReplyFocusUpdate =
+    when {
+        replyMessageId == null -> ComposerReplyFocusUpdate(false, null)
+        editingMessageId != null -> ComposerReplyFocusUpdate(false, focusedReplyMessageId)
+        replyMessageId != focusedReplyMessageId -> ComposerReplyFocusUpdate(true, replyMessageId)
+        else -> ComposerReplyFocusUpdate(false, focusedReplyMessageId)
+    }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewChatSheet(
@@ -13147,12 +13169,30 @@ private fun ComposerBar(
     // and never re-fires on a revisit or after process death. Skipped while
     // editing — the edit effect above already owns focus then.
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    fun focusComposerAndShowKeyboard() {
+        runCatching { composerFocus.requestFocus() }
+        keyboardController?.show()
+    }
+
     var autoFocusConsumed by remember { mutableStateOf(false) }
     LaunchedEffect(autoFocusOnEnter, editingMessageId) {
         if (autoFocusOnEnter && !autoFocusConsumed && editingMessageId == null) {
             autoFocusConsumed = true
-            runCatching { composerFocus.requestFocus() }
-            keyboardController?.show()
+            focusComposerAndShowKeyboard()
+        }
+    }
+    var focusedReplyMessageId by remember(draftKey) { mutableStateOf<String?>(null) }
+    LaunchedEffect(replyingTo?.messageIdHex, editingMessageId) {
+        val update =
+            nextComposerReplyFocusUpdate(
+                replyMessageId = replyingTo?.messageIdHex,
+                focusedReplyMessageId = focusedReplyMessageId,
+                editingMessageId = editingMessageId,
+            )
+        focusedReplyMessageId = update.focusedReplyMessageId
+        if (update.shouldFocusComposer) {
+            focusComposerAndShowKeyboard()
         }
     }
     // Single send path shared by the FAB and the Enter key (#404). Clears the
