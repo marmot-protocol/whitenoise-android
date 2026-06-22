@@ -7786,6 +7786,48 @@ private fun ConversationScreen(
         }
     }
 
+    // Scroll the lazy list so the item at [targetIndex] sits roughly in the
+    // vertical center of the message-list viewport, leaving context above and
+    // below the target visible (#595). Search jumps land on context, not just
+    // the literal match, so a centered anchor beats the top-aligned default
+    // (which hides everything that came before the match until the user
+    // scrolls up).
+    //
+    // `animateScrollToItem(index, scrollOffset)` places the item's top edge at
+    // `scrollOffset` px from the viewport start; a negative value pushes the
+    // item down toward the center. Compose clamps the resulting scroll at the
+    // list's bounds, so this degrades exactly as the issue's edge cases ask:
+    // a match near the top of loaded history can't scroll up past the first
+    // row (falls back to top-aligned) and a match near the bottom can't scroll
+    // down past the last row (falls back to bottom-aligned). Only the
+    // otherwise-case is truly centered.
+    //
+    // Two passes: the first centers on the item's top edge (a safe estimate
+    // when the target isn't laid out yet); once it's measured we know its real
+    // height and nudge by half of it so short bubbles land on their own center
+    // rather than with their top at center. The correction is skipped when it
+    // would be a no-op so a near-edge target doesn't get a second animation.
+    suspend fun centerTimelineItemAt(targetIndex: Int) {
+        val viewportHeight = listState.layoutInfo.viewportSize.height
+        if (viewportHeight <= 0) {
+            // Layout not measured yet (rare on a fresh open): fall back to the
+            // plain top-aligned jump rather than guessing an offset.
+            listState.animateScrollToItem(targetIndex)
+            return
+        }
+        listState.animateScrollToItem(targetIndex, -viewportHeight / 2)
+        val itemHeight =
+            listState.layoutInfo.visibleItemsInfo
+                .firstOrNull { it.index == targetIndex }
+                ?.size
+                ?: return
+        // Now true-center the measured bubble: top at (viewport - item) / 2.
+        val centeredOffset = -((viewportHeight - itemHeight).coerceAtLeast(0) / 2)
+        if (centeredOffset != -viewportHeight / 2) {
+            listState.animateScrollToItem(targetIndex, centeredOffset)
+        }
+    }
+
     fun scrollToSearchMatch(messageIdHex: String) {
         searchJob?.cancel()
         searchJob =
@@ -7798,7 +7840,8 @@ private fun ConversationScreen(
                 val timelineIndex =
                     renderedTimeline.indexOfFirst { it.record.messageIdHex == messageIdHex }
                 if (timelineIndex < 0) return@launch
-                listState.animateScrollToItem(1 + olderHeaderCount + timelineIndex)
+                // Center the match so prior + subsequent context is visible (#595).
+                centerTimelineItemAt(1 + olderHeaderCount + timelineIndex)
                 highlightedMessageId = messageIdHex
                 delay(1_500L)
                 if (highlightedMessageId == messageIdHex) {
@@ -8008,7 +8051,8 @@ private fun ConversationScreen(
             return@LaunchedEffect
         }
         val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-        listState.animateScrollToItem(1 + olderMessagesHeaderCount + timelineIndex)
+        // Center the match so prior + subsequent context is visible (#595).
+        centerTimelineItemAt(1 + olderMessagesHeaderCount + timelineIndex)
         highlightedMessageId = target
         delay(1_500L)
         if (highlightedMessageId == target) {
