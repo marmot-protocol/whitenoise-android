@@ -217,13 +217,19 @@ internal fun chatListItemFromProjection(
 /**
  * The last-message text a chat row should run through the markdown parser,
  * or null when the row's preview line will show fallback copy instead of
- * the message body (no last message, deleted, or blank plaintext). Keeping
- * this predicate beside [chatListItemFromProjection] ties the parse gate to
- * the same plaintext `projectedPreviewText` would surface.
+ * the message body. Mirrors [ChatListItem.projectedPreviewText]'s message-body
+ * branch: only a regular chat message (kind 9) that is non-deleted with
+ * non-blank plaintext is rendered verbatim. Edit (1009), agent-stream-start
+ * (1200), and group-system (1210) rows — plus deleted/blank rows — surface
+ * derived copy, so their payloads must never be parsed into preview tokens
+ * and styled in their place (issue #577). Keeping this predicate beside
+ * [chatListItemFromProjection] ties the parse gate to the same plaintext
+ * `projectedPreviewText` would surface.
  */
 internal fun chatRowPreviewMarkdownSource(row: ChatListRowFfi): String? {
     val preview = row.lastMessage ?: return null
     if (preview.deleted) return null
+    if (!MessageProjector.isChatKind(preview.kind)) return null
     return preview.plaintext.takeIf { it.isNotBlank() }
 }
 

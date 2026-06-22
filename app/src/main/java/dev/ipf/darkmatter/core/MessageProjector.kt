@@ -178,6 +178,15 @@ object MessageProjector {
 
     fun isGroupSystemKind(kind: ULong): Boolean = kind == KindGroupSystem
 
+    /**
+     * True for a regular chat-message kind (kind 9) — the only kind whose
+     * chat-list preview line is the message body itself. Synthetic/fallback
+     * rows (edits, agent-stream starts, group-system events, deletes) render
+     * derived copy instead, so callers gating "is the displayed preview the
+     * raw plaintext?" must mirror this. See [Controllers.chatRowPreviewMarkdownSource].
+     */
+    fun isChatKind(kind: ULong): Boolean = kind == KindChat
+
     fun isReaction(message: AppMessageRecordFfi): Boolean = message.kind == KindReaction
 
     fun isDelete(message: AppMessageRecordFfi): Boolean = message.kind == KindDelete
