@@ -13155,6 +13155,18 @@ private fun ComposerBar(
             keyboardController?.show()
         }
     }
+    // Starting a reply (swipe-to-reply or long-press → Reply both set the
+    // controller's replyingTo) focuses the composer and raises the IME. Fire
+    // only on the null → non-null edge so a recomposition mid-reply doesn't
+    // re-toggle the keyboard while the user is already typing.
+    var hadReplyTarget by remember { mutableStateOf(replyingTo != null) }
+    LaunchedEffect(replyingTo) {
+        if (replyingTo != null && !hadReplyTarget) {
+            runCatching { composerFocus.requestFocus() }
+            keyboardController?.show()
+        }
+        hadReplyTarget = replyingTo != null
+    }
     // Single send path shared by the FAB and the Enter key (#404). Clears the
     // input/draft and scroll-to-newest ONLY after the controller confirms the
     // optimistic bubble is committed (it invokes onAccepted then). If a guard
