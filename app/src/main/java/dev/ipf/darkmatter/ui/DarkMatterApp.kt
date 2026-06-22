@@ -3211,15 +3211,21 @@ private fun aspectRatioFromDim(dim: String?): Float? {
  * "open viewer" and "show actions". Keep both branches in one detector so a
  * completed long-press never also becomes a tap, while still reporting the
  * window-space y used by the message action popover.
+ *
+ * [onPressStateChange] lets the parent row suppress its fallback long-press
+ * detector while media owns the same pointer stream, avoiding duplicate menu
+ * opens for the same hold.
  */
 @Composable
 internal fun Modifier.mediaTapOrActionLongPress(
     gestureKey: Any?,
     onTap: () -> Unit,
     onLongPressWindowY: (Float) -> Unit,
+    onPressStateChange: (Boolean) -> Unit = {},
 ): Modifier {
     val latestOnTap by rememberUpdatedState(onTap)
     val latestOnLongPressWindowY by rememberUpdatedState(onLongPressWindowY)
+    val latestOnPressStateChange by rememberUpdatedState(onPressStateChange)
     var boundsTopPx by remember(gestureKey) { mutableStateOf(0f) }
     return this
         .onGloballyPositioned { coordinates ->
@@ -3235,6 +3241,14 @@ internal fun Modifier.mediaTapOrActionLongPress(
             }
         }.pointerInput(gestureKey) {
             detectTapGestures(
+                onPress = {
+                    latestOnPressStateChange(true)
+                    try {
+                        tryAwaitRelease()
+                    } finally {
+                        latestOnPressStateChange(false)
+                    }
+                },
                 onTap = { latestOnTap() },
                 onLongPress = { offset -> latestOnLongPressWindowY(boundsTopPx + offset.y) },
             )
@@ -3422,6 +3436,7 @@ private fun MediaImageBubble(
     mine: Boolean,
     uploading: Boolean = false,
     onLongPressWindowY: (Float) -> Unit,
+    onMediaPressStateChange: (Boolean) -> Unit,
 ) {
     val record = item.record
     val key = record.messageIdHex
@@ -3535,6 +3550,7 @@ private fun MediaImageBubble(
                                     gestureKey = "$key#$attachmentIndex",
                                     onTap = { viewerOpen = true },
                                     onLongPressWindowY = onLongPressWindowY,
+                                    onPressStateChange = onMediaPressStateChange,
                                 ),
                     )
                 failed ->
@@ -3661,6 +3677,7 @@ private fun MediaImageGridBubble(
     appState: DarkMatterAppState,
     mine: Boolean,
     onLongPressWindowY: (Float) -> Unit,
+    onMediaPressStateChange: (Boolean) -> Unit,
 ) {
     val record = item.record
     // Show up to four tiles before collapsing the remainder into a "+N"
@@ -3682,6 +3699,7 @@ private fun MediaImageGridBubble(
             mine = mine,
             onTap = { viewerOpenAt = tileIndex },
             onLongPressWindowY = onLongPressWindowY,
+            onMediaPressStateChange = onMediaPressStateChange,
             overflowCount = if (showOverflow) overflow else 0,
             modifier = tileModifier,
         )
@@ -3722,6 +3740,7 @@ private fun MediaVisualGridBubble(
     mine: Boolean,
     uploading: Boolean = false,
     onLongPressWindowY: (Float) -> Unit,
+    onMediaPressStateChange: (Boolean) -> Unit,
 ) {
     val record = item.record
     // Show up to four tiles before collapsing the remainder into a "+N"
@@ -3756,6 +3775,7 @@ private fun MediaVisualGridBubble(
                 mine = mine,
                 onTap = { viewerOpenAt = tileIndex },
                 onLongPressWindowY = onLongPressWindowY,
+                onMediaPressStateChange = onMediaPressStateChange,
                 overflowCount = if (showOverflow) overflow else 0,
                 modifier = tileModifier,
                 uploading = uploading,
@@ -3977,6 +3997,7 @@ private fun MediaImageGridTile(
     mine: Boolean,
     onTap: () -> Unit,
     onLongPressWindowY: (Float) -> Unit,
+    onMediaPressStateChange: (Boolean) -> Unit,
     overflowCount: Int,
     modifier: Modifier = Modifier,
     uploading: Boolean = false,
@@ -4057,6 +4078,7 @@ private fun MediaImageGridTile(
                     }
                 },
                 onLongPressWindowY = onLongPressWindowY,
+                onPressStateChange = onMediaPressStateChange,
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -10422,6 +10444,11 @@ private fun MessageBubble(
     // where in the transcript the bubble sits.
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
     var rowBoundsTopPx by remember { mutableStateOf(0f) }
+    // Media image children install their own tap/long-press detector so a hold
+    // cannot also open the full-screen viewer. While such a child owns the
+    // pointer stream, suppress the row fallback detector to avoid double haptics
+    // and competing popover anchors for the same physical hold.
+    val mediaPressActive = remember(record.messageIdHex) { mutableStateOf(false) }
     var swipeDrag by remember(record.messageIdHex) { mutableStateOf(0f) }
     val animatedSwipeOffset by animateFloatAsState(targetValue = swipeDrag, label = "replySwipeOffset")
     val clipboard = LocalClipboardManager.current
@@ -10627,7 +10654,7 @@ private fun MessageBubble(
                                 awaitEachGesture {
                                     val down = awaitFirstDown(requireUnconsumed = false)
                                     val longPress = awaitLongPressOrCancellation(down.id)
-                                    if (longPress != null) {
+                                    if (longPress != null && !mediaPressActive.value) {
                                         longPress.consume()
                                         // Capture the press y in window space before
                                         // opening so the popover anchors at the
@@ -10924,6 +10951,7 @@ private fun MessageBubble(
                                         appState = appState,
                                         mine = mine,
                                         onLongPressWindowY = { openActionMenuAt(it) },
+                                        onMediaPressStateChange = { mediaPressActive.value = it },
                                     )
                                 }
                                 if (footerOnVisualMedia) {
@@ -10942,6 +10970,7 @@ private fun MessageBubble(
                                 appState = appState,
                                 mine = mine,
                                 onLongPressWindowY = { openActionMenuAt(it) },
+                                onMediaPressStateChange = { mediaPressActive.value = it },
                             )
                         }
                     }
@@ -11025,6 +11054,7 @@ private fun MessageBubble(
                                         mine = true,
                                         uploading = !uploadFailed,
                                         onLongPressWindowY = { openActionMenuAt(it) },
+                                        onMediaPressStateChange = { mediaPressActive.value = it },
                                     )
                                 }
                                 MediaFooterOverlay(
@@ -11042,6 +11072,7 @@ private fun MessageBubble(
                                 mine = true,
                                 uploading = !uploadFailed,
                                 onLongPressWindowY = { openActionMenuAt(it) },
+                                onMediaPressStateChange = { mediaPressActive.value = it },
                             )
                         }
                     }

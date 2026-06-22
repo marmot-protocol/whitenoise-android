@@ -1,8 +1,14 @@
 package dev.ipf.darkmatter.ui
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -65,6 +71,56 @@ class MediaTapGestureTest {
         composeRule.runOnIdle {
             assertEquals(0, taps)
             assertEquals(1, longPresses)
+        }
+    }
+
+    @Test
+    fun mediaLongPressInsideRowSuppressesParentLongPress() {
+        var taps = 0
+        var mediaLongPresses = 0
+        var parentLongPresses = 0
+        var actionMenuOpens = 0
+
+        composeRule.setContent {
+            val mediaPressActive = remember { mutableStateOf(false) }
+            Box(
+                Modifier
+                    .size(128.dp)
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val longPress = awaitLongPressOrCancellation(down.id)
+                            if (longPress != null && !mediaPressActive.value) {
+                                longPress.consume()
+                                parentLongPresses++
+                                actionMenuOpens++
+                            }
+                        }
+                    },
+            ) {
+                Box(
+                    Modifier
+                        .size(96.dp)
+                        .testTag(MEDIA_TILE_TAG)
+                        .mediaTapOrActionLongPress(
+                            gestureKey = "nested-long-press-test",
+                            onTap = { taps++ },
+                            onLongPressWindowY = {
+                                mediaLongPresses++
+                                actionMenuOpens++
+                            },
+                            onPressStateChange = { mediaPressActive.value = it },
+                        ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(MEDIA_TILE_TAG).performTouchInput { longClick() }
+        composeRule.runOnIdle {
+            assertEquals(0, taps)
+            assertEquals(1, mediaLongPresses)
+            assertEquals(0, parentLongPresses)
+            assertEquals(1, actionMenuOpens)
         }
     }
 
