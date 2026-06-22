@@ -57,6 +57,16 @@ Run the same checks locally before pushing:
 Use `just format` (`./gradlew :app:ktlintFormat`) to auto-fix ktlint findings
 before re-running the check.
 
+Dependency freshness is automated via [Dependabot](.github/dependabot.yml),
+which opens grouped pull requests **weekly** for GitHub Actions and the
+hand-pinned gradle dependencies in `gradle/libs.versions.toml`. Each ecosystem
+caps its own open Dependabot PRs at five (the limit is per ecosystem, not
+repo-wide), and GitHub Actions bumps are grouped into a single PR. Those PRs run
+through the same `android-ci.yml` validation as any other change, so a bump
+cannot merge without a green build. Compose-BOM- and Firebase-BOM-managed
+artifacts (and the intentional `material3` alpha pin) are excluded so Dependabot
+does not fight the BOMs.
+
 ## Screenshot tests
 
 A small [Roborazzi](https://github.com/takahirom/roborazzi) pilot guards Compose
