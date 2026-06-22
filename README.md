@@ -39,21 +39,52 @@ The debug variant uses an `applicationIdSuffix` of `.debug` (`dev.ipf.darkmatter
 
 Every pull request to `master` (and every push to `master`) runs the
 `.github/workflows/android-ci.yml` validation workflow. It fails the build on
-Kotlin compile errors, unit-test failures, ktlint violations, or Android lint
-regressions. The workflow uses the debug variant only and requires no signing
-secrets or `google-services.json`.
+Kotlin compile errors, unit-test failures, Compose screenshot regressions
+(Roborazzi — see [Screenshot tests](#screenshot-tests)), ktlint violations, or
+Android lint regressions. The workflow uses the debug variant only and requires
+no signing secrets or `google-services.json`.
 
 Run the same checks locally before pushing:
 
 ```bash
 ./gradlew :app:compileDebugKotlin   # Kotlin compile
 ./gradlew :app:testDebugUnitTest    # unit tests          (also: just test)
+./gradlew :app:verifyRoborazziDebug # screenshot tests    (compares baselines)
 ./gradlew :app:ktlintCheck          # style/format check  (also: just lint)
 ./gradlew :app:lintDebug            # Android lint
 ```
 
 Use `just format` (`./gradlew :app:ktlintFormat`) to auto-fix ktlint findings
 before re-running the check.
+
+## Screenshot tests
+
+A small [Roborazzi](https://github.com/takahirom/roborazzi) pilot guards Compose
+UI against visual regressions that compile cleanly and pass unit tests but ship
+a broken layout (issue #551). The tests render real composables on the JVM via
+Robolectric — no emulator — so they add no device-test runtime. The pilot
+covers two surfaces:
+
+- `DarkMatterThemeScreenshotTest` — a representative swatch through
+  `DarkMatterTheme` in light, dark, and AMOLED, guarding the theme color roles
+  (e.g. the AMOLED true-black audit, #446/#495).
+- `OnboardingContentScreenshotTest` — the onboarding entry screen, light theme.
+
+Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
+runs `:app:verifyRoborazziDebug`; on a mismatch the build fails and the
+diff/compare images are uploaded as workflow artifacts (`android-ci-reports`).
+
+**Re-baseline after an intentional UI change.** When you deliberately change a
+covered composable, regenerate the baselines and commit the updated PNGs:
+
+```bash
+./gradlew :app:recordRoborazziDebug   # rewrite baselines under app/src/test/snapshots/
+git add app/src/test/snapshots/        # review the image diff, then commit
+```
+
+Always eyeball the regenerated PNGs before committing — that review is the point
+of the check. If `verifyRoborazziDebug` fails on a change you did *not* intend,
+that is a caught regression: fix the UI, don't re-record.
 
 ## Release Builds
 
