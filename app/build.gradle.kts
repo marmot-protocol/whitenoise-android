@@ -65,8 +65,8 @@ android {
         applicationId = "dev.ipf.darkmatter"
         minSdk = 34
         targetSdk = 36
-        versionCode = 5
-        versionName = "2026.6.20"
+        versionCode = 6
+        versionName = "2026.6.21"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
