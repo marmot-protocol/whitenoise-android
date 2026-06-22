@@ -1,5 +1,6 @@
 package dev.ipf.darkmatter.notifications
 
+import dev.ipf.darkmatter.core.ReplyMediaKind
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
@@ -256,6 +257,45 @@ class LocalNotificationFormatterTest {
             )
 
         assertEquals("We are go", content?.body)
+    }
+
+    @Test
+    fun captionlessAttachmentsNameTheirMediaTypeInsteadOfNewMessage() {
+        fun body(kind: ReplyMediaKind) =
+            LocalNotificationFormatter
+                .content(
+                    update(trigger = NotificationTriggerFfi.NEW_MESSAGE, previewText = null),
+                    mediaKind = kind,
+                )?.body
+
+        assertEquals("sent a picture", body(ReplyMediaKind.Photo))
+        assertEquals("sent a video", body(ReplyMediaKind.Video))
+        assertEquals("sent a voice message", body(ReplyMediaKind.Voice))
+        assertEquals("sent a file", body(ReplyMediaKind.Document))
+    }
+
+    @Test
+    fun captionedAttachmentShowsTheCaptionNotTheMediaTypeLabel() {
+        // A media message with text resolves to its caption; the type-aware
+        // label is only for the captionless case.
+        val content =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, previewText = "on the beach 🏖️"),
+                mediaKind = ReplyMediaKind.Photo,
+            )
+
+        assertEquals("on the beach 🏖️", content?.body)
+    }
+
+    @Test
+    fun unclassifiedEmptyMessageStillFallsBackToNewMessage() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, previewText = null),
+                mediaKind = ReplyMediaKind.None,
+            )
+
+        assertEquals("New message", content?.body)
     }
 
     @Test

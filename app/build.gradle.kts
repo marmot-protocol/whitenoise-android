@@ -203,6 +203,23 @@ tasks.matching { it.name.startsWith("package") && it.name.contains("Release") }.
     }
 }
 
+kover {
+    reports {
+        filters {
+            excludes {
+                // Keep coverage focused on app-owned code. These mirror the ktlint
+                // excludes below: generated UniFFI bindings, the vendored keyring
+                // stub, and Android's generated BuildConfig class.
+                classes(
+                    "dev.ipf.marmotkit.*",
+                    "io.crates.keyring.*",
+                    "*.BuildConfig",
+                )
+            }
+        }
+    }
+}
+
 ktlint {
     // Pin the ktlint engine from the version catalog so rule behavior is
     // stable across plugin upgrades.
@@ -236,7 +253,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.emoji2.emojipicker)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation("net.java.dev.jna:jna:5.18.1@aar")
+    implementation("net.java.dev.jna:jna:5.19.1@aar")
     implementation(libs.zxing.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)

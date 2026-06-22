@@ -10,6 +10,8 @@ import android.graphics.Bitmap
 import android.provider.Settings
 import android.text.format.DateUtils
 import android.util.Log
+import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -177,6 +179,7 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -247,6 +250,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -263,6 +267,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -310,6 +315,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.core.content.ContextCompat
 import androidx.core.os.ConfigurationCompat
+import androidx.core.view.ViewCompat
 import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -397,6 +403,9 @@ import dev.ipf.darkmatter.state.shortHex
 import dev.ipf.darkmatter.state.shouldResetNavOnAccountChange
 import dev.ipf.darkmatter.state.shouldShowOriginalTimestamp
 import dev.ipf.darkmatter.ui.theme.Dimens
+import dev.ipf.darkmatter.ui.theme.amoledSurfaceBorder
+import dev.ipf.darkmatter.ui.theme.amoledSurfaceBorderStroke
+import dev.ipf.darkmatter.ui.theme.isAmoledSurfaceTheme
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
@@ -1366,18 +1375,31 @@ private fun MainShell(
         previousActiveAccountRef = current
     }
 
-    appState.pendingProfileNpub?.let { npub ->
-        ProfileSheet(
-            appState = appState,
-            npub = npub,
-            onOpenGroup = { item, justCreated ->
-                selectedChatFocusMessageId = null
-                selectedChatJustCreated = justCreated
-                selectedChat = item
-                appState.clearPresentedProfile()
-            },
-            onDismiss = { appState.clearPresentedProfile() },
-        )
+    // Navigate the shell to a (possibly different) group when a profile sheet's
+    // shared-group / Message action fires. Shared by the shell-level sheet and,
+    // threaded through ConversationScreen, by the in-conversation sheet (#635) so
+    // both surfaces behave identically.
+    val openGroupFromProfile: (ChatListItem, Boolean) -> Unit = { item, justCreated ->
+        selectedChatFocusMessageId = null
+        selectedChatJustCreated = justCreated
+        selectedChat = item
+        appState.clearPresentedProfile()
+    }
+
+    // The shell-level profile sheet covers every non-conversation entry point
+    // (chat list, search, settings, QR, reaction list). While a conversation is
+    // active the in-conversation copy inside ConversationScreen renders it
+    // instead — with group-admin context (#635) — so gate this one off to avoid
+    // double-rendering the same sheet.
+    if (selectedChat == null) {
+        appState.pendingProfileNpub?.let { npub ->
+            ProfileSheet(
+                appState = appState,
+                npub = npub,
+                onOpenGroup = openGroupFromProfile,
+                onDismiss = { appState.clearPresentedProfile() },
+            )
+        }
     }
 
     if (selectedChat != null) {
@@ -1391,6 +1413,7 @@ private fun MainShell(
                 selectedChatFocusMessageId = null
                 selectedChatJustCreated = false
             },
+            onOpenProfileGroup = openGroupFromProfile,
         )
         return
     }
@@ -1457,21 +1480,49 @@ fun AccountAvatarButton(
     size: Dp = 40.dp,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    // Cross-account unread dot (#592): a small accent dot on the active
+    // account's avatar when another signed-in account has unread. Hidden on
+    // single-account devices (the caller passes false).
+    showUnreadDot: Boolean = false,
 ) {
     val openSettingsDescription = stringResource(R.string.open_settings)
+    val otherAccountUnreadDescription =
+        stringResource(R.string.other_account_unread_indicator)
+    val avatarContentDescription =
+        if (showUnreadDot) {
+            "$openSettingsDescription, $otherAccountUnreadDescription"
+        } else {
+            openSettingsDescription
+        }
     IconButton(
         onClick = onClick,
         modifier =
             modifier
                 .size(56.dp)
-                .semantics { contentDescription = openSettingsDescription },
+                .semantics { contentDescription = avatarContentDescription },
     ) {
-        Avatar(
-            title = title,
-            seed = seed,
-            size = size,
-            pictureUrl = pictureUrl,
-        )
+        Box {
+            Avatar(
+                title = title,
+                seed = seed,
+                size = size,
+                pictureUrl = pictureUrl,
+            )
+            if (showUnreadDot) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 1.dp, y = (-1).dp)
+                            .size(11.dp)
+                            // Border in the bar background so the dot reads as
+                            // a separate marker against a busy avatar.
+                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                )
+            }
+        }
     }
 }
 
@@ -2107,6 +2158,247 @@ private fun ChatListIdentifierResult(
     }
 }
 
+/**
+ * Profile-preview card shown below the recipient input in NewChatSheet (DM
+ * branch) and the Add-member sheet (issue #631). After the user pastes/enters
+ * an `npub1…`, a hex pubkey, or a NIP-05 `name@domain`, this resolves the
+ * identifier and renders one of four states (resolving / loaded / resolved-but-
+ * no-profile / invalid) so the user can confirm "this is the right person"
+ * before inviting them. Empty input renders nothing.
+ *
+ * Resolution reuses the existing ProfileSheet + chat-list-search pattern:
+ * [ChatListIdentifierSearch.classify] sorts npub vs NIP-05, an npub/hex
+ * resolves synchronously through `appState.accountIdHex`, and a NIP-05 goes
+ * through [Nip05Resolver] (debounced, so a half-typed address doesn't fire a
+ * lookup on every keystroke). The kind:0 fields are read back through the same
+ * `appState` accessors the profile sheet uses, so a name that lands a beat
+ * after the key resolves repaints via the profile-revision recomposition.
+ *
+ * The resolved display state is hoisted to the parent via [onResolutionChanged]
+ * so the surface can keep its action button disabled while the card is
+ * invalid/resolving (but enabled for the loaded AND no-profile states).
+ *
+ * No contact/follow status is shown: the UniFFI surface exposes no kind:3
+ * contacts API, and the issue says to omit it gracefully rather than block the
+ * card on it.
+ */
+@Composable
+private fun RecipientPreviewCard(
+    input: String,
+    appState: DarkMatterAppState,
+    onResolutionChanged: (RecipientResolution) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val trimmed = input.trim()
+    // Re-key on the trimmed input so each edit cancels the prior in-flight
+    // resolve (npub validation, NIP-05 lookup) and starts fresh.
+    var resolving by remember(trimmed) { mutableStateOf(trimmed.isNotEmpty()) }
+    var resolvedHex by remember(trimmed) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(trimmed) {
+        if (trimmed.isEmpty()) {
+            resolving = false
+            resolvedHex = null
+            return@LaunchedEffect
+        }
+        resolving = true
+        resolvedHex = null
+        val hex =
+            when (val id = ChatListIdentifierSearch.classify(trimmed)) {
+                // An npub / nostr: / darkmatter link carries the key; accountIdHex
+                // validates the bech32 (rejecting a bad checksum) and yields hex.
+                is ChatListIdentifierSearch.Identifier.Npub -> appState.accountIdHex(id.npub)
+                // A NIP-05 address needs a network /.well-known lookup. Debounce
+                // so a mid-typed domain doesn't fire a request every keystroke;
+                // the effect re-keys and cancels the prior attempt as typing
+                // continues.
+                is ChatListIdentifierSearch.Identifier.Nip05 -> {
+                    delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
+                    Nip05Resolver.resolve(id.identifier)
+                }
+                // Not an npub/NIP-05: still try a bare hex pubkey — accountIdHex
+                // accepts it and ProfileSheet relies on the same call.
+                null -> appState.accountIdHex(trimmed)
+            }
+        resolvedHex = hex
+        if (hex != null) appState.refreshProfile(hex)
+        resolving = false
+    }
+
+    // Read the kind:0 fields through the same accessors ProfileSheet uses, so a
+    // name/avatar that resolves a beat after the key repaints via the profile
+    // cache's revision recomposition.
+    val profile = resolvedHex?.let { appState.userProfile(it) }
+    val npub = resolvedHex?.let { appState.npub(it) }
+    val resolvedDisplayName = resolvedHex?.let { appState.displayName(it) }
+    val pictureUrl =
+        resolvedHex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
+    val about = ProfileSanitizer.about(profile?.about)
+    val nip05 =
+        profile
+            ?.nip05
+            ?.trim()
+            ?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
+    // A kind:0 nip05 is a self-assertion until proven: re-resolve it via the
+    // same /.well-known lookup and only trust it if it maps back to the pubkey
+    // the card resolved. Showing a check on an unverified address would weaken
+    // the very wrong-key / NIP-05-hijack signal this card exists to surface
+    // (#631). Re-keys on (nip05, resolvedHex) so an edit cancels the prior probe.
+    var nip05ResolvedHex by remember(nip05, resolvedHex) { mutableStateOf<String?>(null) }
+    LaunchedEffect(nip05, resolvedHex) {
+        nip05ResolvedHex = null
+        val declared = nip05
+        if (declared == null || resolvedHex == null) return@LaunchedEffect
+        nip05ResolvedHex = Nip05Resolver.resolve(declared)
+    }
+    val nip05Verified = recipientNip05Verified(nip05, nip05ResolvedHex, resolvedHex)
+    val shortNpub = npub?.let { IdentityFormatter.short(it, prefix = 12, suffix = 8) }
+    // A published profile is one carrying at least one usable kind:0 field. We
+    // read the raw metadata (not the displayName accessor, which falls back to
+    // a short-npub string when no name is published) so a key with no metadata
+    // lands on the NoProfile fallback rather than masquerading as Loaded.
+    val hasProfile =
+        profile != null &&
+            (
+                !ProfileSanitizer.displayName(profile.displayName ?: profile.name).isNullOrBlank() ||
+                    about != null ||
+                    pictureUrl != null ||
+                    nip05 != null
+            )
+
+    val state = recipientPreviewState(trimmed.isNotEmpty(), resolving, resolvedHex, hasProfile)
+    LaunchedEffect(state, resolvedHex) {
+        onResolutionChanged(RecipientResolution(state, resolvedHex))
+    }
+
+    when (state) {
+        RecipientPreviewState.Empty -> Unit
+        RecipientPreviewState.Resolving ->
+            OutlinedCard(modifier = modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Text(
+                        stringResource(R.string.recipient_preview_resolving),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        RecipientPreviewState.Invalid ->
+            OutlinedCard(modifier = modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(
+                        Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(
+                        stringResource(R.string.recipient_preview_unresolved),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        RecipientPreviewState.Loaded, RecipientPreviewState.NoProfile -> {
+            val title = resolvedDisplayName?.takeUnless { it.isBlank() } ?: IdentityFormatter.short(npub.orEmpty())
+            OutlinedCard(modifier = modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Avatar(
+                        title = title,
+                        seed = resolvedHex ?: trimmed,
+                        size = 56.dp,
+                        pictureUrl = pictureUrl,
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (nip05 != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                // Only a NIP-05 that resolves back to THIS pubkey
+                                // earns a verified check; a self-asserted kind:0
+                                // nip05 that hasn't been verified shows no check
+                                // (and an "unverified" a11y label), so the card
+                                // never paints a false trust signal at the
+                                // wrong-key / hijack checkpoint (#631).
+                                if (nip05Verified) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription =
+                                            stringResource(R.string.recipient_preview_nip05_verified),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.ErrorOutline,
+                                        contentDescription =
+                                            stringResource(R.string.recipient_preview_nip05_unverified),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
+                                Text(
+                                    nip05,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        shortNpub?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (state == RecipientPreviewState.NoProfile) {
+                            Text(
+                                stringResource(R.string.recipient_preview_no_profile),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else if (about != null) {
+                            Text(
+                                about,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,
     rawQuery: String,
@@ -2251,6 +2543,7 @@ private fun ChatListTopBar(
                         seed = active?.accountIdHex ?: "darkmatter",
                         pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
                         onClick = onOpenSettings,
+                        showUnreadDot = appState.hasUnreadOnOtherAccounts,
                     )
                 }
             }
@@ -2370,7 +2663,10 @@ private fun ConversationSearchNavBar(
     onNext: () -> Unit,
 ) {
     val navEnabled = matchCount > 0
-    Surface(tonalElevation = 3.dp) {
+    Surface(
+        border = amoledSurfaceBorderStroke(),
+        tonalElevation = 3.dp,
+    ) {
         Row(
             modifier =
                 Modifier
@@ -2552,6 +2848,8 @@ private fun ChatRowWithMenu(
         DropdownMenu(
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
+            shape = MenuDefaults.shape,
+            border = amoledSurfaceBorderStroke(),
         ) {
             DropdownMenuItem(
                 text = {
@@ -2695,6 +2993,17 @@ private fun ChatRow(
     val title by remember(item, groupTitleCopy) {
         derivedStateOf { chatListItemDisplayTitle(item, appState, groupTitleCopy) }
     }
+    // Membership-aware unread state (#625): a group the local user has been
+    // removed from keeps a frozen unread badge in the projection. Suppress it
+    // once the cached roster confirms self is no longer a member.
+    val activeAccountIdHex = appState.activeAccount?.accountIdHex
+    val rowHasUnread = item.effectiveHasUnread(activeAccountIdHex)
+    val rowUnreadCount = item.effectiveUnreadCount(activeAccountIdHex)
+    // On a message-body search hit (#594) the row's timestamp points at the
+    // matched message, which may be far older than the conversation's last
+    // activity. A title/preview-only hit (bodyMatch null) keeps the chat's
+    // last-message time.
+    val timestampAt = bodyMatch?.timelineAt ?: item.latestAt ?: 0uL
     val inviteAccount = GroupProjector.inviteAccount(item.group, item.otherMemberAccount)
     val avatarAccount =
         inviteAccount
@@ -2771,44 +3080,42 @@ private fun ChatRow(
                         },
                     )
                 }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // A body-content hit makes the matched message itself the subtitle:
+            // the highlighted snippet replaces the last-message preview (its
+            // timestamp already rides `timestampAt` above), so the line the user
+            // reads is the one that actually matched. Title/preview-only hits
+            // (bodyMatch null) keep the normal last-message preview.
+            if (bodyMatch != null) {
+                val highlightStyle =
+                    SpanStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                val snippetText =
+                    remember(bodyMatch.snippet, highlightStyle) {
+                        highlightedSnippet(bodyMatch.snippet, highlightStyle)
+                    }
+                Text(
+                    text = snippetText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
                 Text(
                     text = preview,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
                 )
-                // Search snippet line: only for rows matched on a message body
-                // (not title/preview), so a normal chat list and title/preview
-                // hits keep the single-line layout. The matched needle is
-                // emphasized so the reason the chat surfaced is obvious.
-                if (bodyMatch != null) {
-                    val highlightStyle =
-                        SpanStyle(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    val snippetText =
-                        remember(bodyMatch.snippet, highlightStyle) {
-                            highlightedSnippet(bodyMatch.snippet, highlightStyle)
-                        }
-                    Text(
-                        text = snippetText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         },
         trailingContent = {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    rememberedRelativeTime(item.latestAt ?: 0uL),
+                    rememberedRelativeTime(timestampAt),
                     style = MaterialTheme.typography.labelSmall,
                     color =
-                        if (item.hasUnread) {
+                        if (rowHasUnread) {
                             MaterialTheme.colorScheme.primary
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
@@ -2818,8 +3125,8 @@ private fun ChatRow(
                     Badge { Text(stringResource(R.string.invited)) }
                 } else if (item.group.pendingConfirmation) {
                     Badge { Text(stringResource(R.string.invite)) }
-                } else if (item.hasUnread) {
-                    UnreadCountBadge(item.unreadCount)
+                } else if (rowHasUnread) {
+                    UnreadCountBadge(rowUnreadCount)
                 }
             }
         },
@@ -2885,6 +3192,161 @@ internal fun newChatMemberRefs(
         emptyList()
     }
 
+/**
+ * Display state for the recipient profile-preview card shown below the
+ * new-chat / add-member input (issue #631). The card lets the user visually
+ * confirm "this is the right person" before inviting them — a wrong invite can
+ * leak group history to a stranger.
+ *
+ * Pulled out as a pure sealed enum + mapper (no Compose deps) so the
+ * input→state decision is unit-testable and pinned against regression, the
+ * same way [canSubmitNewChatSheet] / [canInviteFromEmptyGroup] are.
+ */
+internal sealed interface RecipientPreviewState {
+    /** No input yet — render nothing. */
+    data object Empty : RecipientPreviewState
+
+    /**
+     * The identifier is being resolved (a NIP-05 `/.well-known` lookup is in
+     * flight, or the resolved key's kind:0 is still being fetched). Show a
+     * spinner + "Resolving…" text.
+     */
+    data object Resolving : RecipientPreviewState
+
+    /**
+     * Resolved to a real pubkey with published kind:0 metadata — render the
+     * full card (avatar, name, NIP-05, bio, npub fragment).
+     */
+    data object Loaded : RecipientPreviewState
+
+    /**
+     * Resolved to a real pubkey but no kind:0 metadata published. Show the npub
+     * fragment + a "No profile published" note. The action stays ENABLED — the
+     * user may legitimately know an npub without a profile.
+     */
+    data object NoProfile : RecipientPreviewState
+
+    /** The identifier does not resolve to a pubkey at all. Block the action. */
+    data object Invalid : RecipientPreviewState
+}
+
+/**
+ * Whether [RecipientPreviewState] permits the surrounding action button to be
+ * enabled. Loaded and NoProfile are confirmable; Empty/Resolving/Invalid are
+ * not. The card's gate is AND-ed into the existing per-surface enable
+ * predicates so the button can never fire on an unresolved/invalid identifier
+ * (issue #631), while an unparsed plain-text input (Empty) still defers to the
+ * surface's own validation.
+ */
+internal fun recipientPreviewAllowsSubmit(state: RecipientPreviewState): Boolean =
+    when (state) {
+        RecipientPreviewState.Loaded, RecipientPreviewState.NoProfile -> true
+        RecipientPreviewState.Empty -> true
+        RecipientPreviewState.Resolving, RecipientPreviewState.Invalid -> false
+    }
+
+/**
+ * Pure mapper from the raw resolution signals to a [RecipientPreviewState]
+ * (issue #631):
+ *  - blank input → [RecipientPreviewState.Empty];
+ *  - still resolving (NIP-05 lookup / kind:0 fetch in flight) → [RecipientPreviewState.Resolving];
+ *  - resolution settled with no pubkey → [RecipientPreviewState.Invalid];
+ *  - resolved to a pubkey with metadata → [RecipientPreviewState.Loaded];
+ *  - resolved to a pubkey but no metadata → [RecipientPreviewState.NoProfile].
+ *
+ * @param hasInput whether the trimmed input is non-blank.
+ * @param resolving whether an async resolve/fetch is still in flight.
+ * @param resolvedHex the resolved 64-char hex pubkey, or null when resolution
+ *   has settled without a key (invalid) or hasn't produced one yet.
+ * @param hasProfile whether kind:0 metadata with any usable field is present.
+ */
+internal fun recipientPreviewState(
+    hasInput: Boolean,
+    resolving: Boolean,
+    resolvedHex: String?,
+    hasProfile: Boolean,
+): RecipientPreviewState =
+    when {
+        !hasInput -> RecipientPreviewState.Empty
+        resolving -> RecipientPreviewState.Resolving
+        resolvedHex == null -> RecipientPreviewState.Invalid
+        hasProfile -> RecipientPreviewState.Loaded
+        else -> RecipientPreviewState.NoProfile
+    }
+
+/**
+ * What [RecipientPreviewCard] hoists to its host (issue #631): the display
+ * [state] AND the resolved hex pubkey the card actually settled on.
+ *
+ * Hoisting [resolvedHex] (not just the state) is what makes a NIP-05 entry
+ * actually submittable: the card resolves `alice@example.com` to a hex pubkey
+ * over the network, but the submit path's [RecipientReference.normalize] only
+ * accepts npub/profile-link/64-char-hex and CANNOT re-do that lookup. Without
+ * the resolved key, a resolved NIP-05 preview enables the button and then the
+ * create/invite fails with "valid npub/profile link/hex". The host submits
+ * [resolvedHex] directly (the engine accepts a bare hex recipient ref, the
+ * same way the card's own resolve calls `accountIdHex(hex)`).
+ */
+internal data class RecipientResolution(
+    val state: RecipientPreviewState,
+    val resolvedHex: String?,
+) {
+    companion object {
+        val Empty = RecipientResolution(RecipientPreviewState.Empty, null)
+    }
+}
+
+/**
+ * The recipient ref(s) to actually submit for a new chat / add-member action
+ * (issue #631 blocking fix). When the preview card resolved the input to a hex
+ * pubkey ([resolvedHex] non-null), submit THAT — it is the authoritative key
+ * the user just visually confirmed, and is the only way a NIP-05 entry (which
+ * [RecipientReference.normalize] cannot parse) reaches the engine. Otherwise
+ * fall back to the caller-supplied [normalizedFallback] (npub/hex tokens the
+ * normalize path already produced), preserving the prior multi-token behavior.
+ *
+ * Returns null when nothing resolvable is available, so the caller surfaces its
+ * "valid recipient reference" error instead of submitting a bad ref.
+ */
+internal fun resolvedRecipientRefs(
+    resolvedHex: String?,
+    normalizedFallback: List<String>,
+): List<String>? =
+    when {
+        resolvedHex != null -> listOf(resolvedHex)
+        normalizedFallback.isNotEmpty() -> normalizedFallback
+        else -> null
+    }
+
+/**
+ * Whether a kind:0-declared NIP-05 ([declaredNip05]) may be rendered with a
+ * VERIFIED check next to it (issue #631 blocking fix).
+ *
+ * A profile can self-assert any `nip05` string in its kind:0 metadata; passing
+ * [ProfileFieldValidation.isAcceptableNip05] only proves the string is
+ * well-formed, NOT that the domain's `/.well-known/nostr.json` actually maps
+ * that name to this pubkey. Showing a check on an unverified self-assertion is
+ * actively harmful for this safety checkpoint — it makes the wrong-key /
+ * NIP-05-hijack case the card exists to catch HARDER to spot. We only show the
+ * check when the declared NIP-05 has been independently resolved (via
+ * [Nip05Resolver]) back to the SAME pubkey the card resolved
+ * ([resolvedHex]); otherwise the address renders plainly, with no check.
+ *
+ * @param declaredNip05 the (already syntax-validated) kind:0 `nip05`, or null.
+ * @param nip05ResolvedHex the hex the declared NIP-05 resolved to over the
+ *   network, or null when that lookup hasn't completed / failed.
+ * @param resolvedHex the hex pubkey the card resolved the input to.
+ */
+internal fun recipientNip05Verified(
+    declaredNip05: String?,
+    nip05ResolvedHex: String?,
+    resolvedHex: String?,
+): Boolean =
+    declaredNip05 != null &&
+        resolvedHex != null &&
+        nip05ResolvedHex != null &&
+        nip05ResolvedHex.equals(resolvedHex, ignoreCase = true)
+
 internal fun canInviteFromEmptyGroup(
     isSelfMember: Boolean,
     isSelfAdmin: Boolean,
@@ -2897,28 +3359,71 @@ internal fun canInviteFromEmptyGroup(
         memberCount == 1
 
 /**
- * Whether the conversation bottom bar should render the active composer (true)
- * or the "no longer a member" notice (false). Pulled out as a pure predicate so
- * the gate decision can be unit-tested without Compose and pinned against
- * regression (issue #545).
+ * The three things the conversation bottom bar can render for the membership
+ * gate. Pulled out of Compose as a pure decision so [conversationComposerGate]
+ * can be unit-tested and pinned against regression (issues #545 and #623).
+ */
+internal enum class ComposerGate {
+    /** Active composer — self is (believed to be) a member. */
+    COMPOSER,
+
+    /** "You are no longer a member of this group" notice. */
+    NOTICE,
+
+    /**
+     * Membership is not yet known locally: render NOTHING this frame and wait
+     * for `refreshMembers()` rather than flash a wrong state. See [PENDING] use
+     * in [conversationComposerGate].
+     */
+    PENDING,
+}
+
+/**
+ * Decide what the conversation bottom bar renders for the membership gate,
+ * given only what is known synchronously at (and shortly after) first paint.
  *
- * - Confirmed member (`isSelfMember`) → composer.
- * - Confirmed not-member (`membersLoaded && !isSelfMember`) → notice.
- * - Still loading (`!membersLoaded`): show the composer only when the seeding
- *   snapshot positively placed self in the roster (`seededSelfMember`). For a
- *   cold/unknown snapshot, or one that has self removed (the group the user
- *   left), default to the disabled notice and upgrade to the composer only once
- *   `refreshMembers()` confirms membership — this is what removes the
- *   active-composer flash for a left group.
+ * The two prior bugs were symmetric flashes during the brief window before
+ * `refreshMembers()` confirms the roster:
+ *
+ * - #545: a group the user LEFT opened showing the active composer for ~1s
+ *   before flipping to the notice (the old gate defaulted to the composer while
+ *   loading).
+ * - #623 (inverse): a group the user IS a member of — especially an admin
+ *   re-entering their own group — opened showing the notice for ~1s before
+ *   flipping to the composer (the #545 fix overcorrected to defaulting to the
+ *   notice while loading).
+ *
+ * The fix for both is to never paint a state we don't actually know:
+ *
+ * - Confirmed member (`isSelfMember`) → [ComposerGate.COMPOSER].
+ * - Confirmed not-member (`membersLoaded && !isSelfMember`) → [ComposerGate.NOTICE].
+ * - Still loading (`!membersLoaded`):
+ *   - The seeding snapshot was present (`seededMembershipKnown`) → it is an
+ *     authoritative local signal: self is in it (`seededSelfMember`) →
+ *     [ComposerGate.COMPOSER] (warm member, no blank-bar flash, preserving the
+ *     #264 intent); self was removed from it (the left group) →
+ *     [ComposerGate.NOTICE] immediately (the #545 fix).
+ *   - No seeding snapshot at all (genuinely cold open) → membership is unknown,
+ *     so [ComposerGate.PENDING]: render neither the composer nor the notice
+ *     until `refreshMembers()` confirms. This removes the #623 notice-flash for
+ *     a member opening cold without reintroducing the #545 composer-flash for a
+ *     left group.
  *
  * This drives only the INITIAL VISUAL state; it does not affect send-gating,
  * which stays guarded by `canSendMessages` / [canAcceptTextSend] (issue #264).
  */
-internal fun shouldShowComposer(
+internal fun conversationComposerGate(
     membersLoaded: Boolean,
     isSelfMember: Boolean,
     seededSelfMember: Boolean,
-): Boolean = isSelfMember || (!membersLoaded && seededSelfMember)
+    seededMembershipKnown: Boolean,
+): ComposerGate =
+    when {
+        isSelfMember -> ComposerGate.COMPOSER
+        membersLoaded -> ComposerGate.NOTICE
+        seededMembershipKnown -> if (seededSelfMember) ComposerGate.COMPOSER else ComposerGate.NOTICE
+        else -> ComposerGate.PENDING
+    }
 
 /**
  * Decide whether to restore composer focus (and thus re-raise the soft
@@ -2984,6 +3489,10 @@ private fun NewChatSheet(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showScanner by remember { mutableStateOf(false) }
+    // Resolution state of the recipient preview card (#631), hoisted so the
+    // Create button can stay disabled while the pasted identifier is
+    // invalid/resolving (but enabled for the loaded AND no-profile states).
+    var recipientPreview by remember { mutableStateOf(RecipientResolution.Empty) }
     val validRecipientReferenceError = stringResource(R.string.error_valid_recipient_reference)
     val missingKeyPackageError = stringResource(R.string.error_missing_key_package)
     val missingKeyPackageForFormat = stringResource(R.string.error_missing_key_package_for)
@@ -2993,10 +3502,20 @@ private fun NewChatSheet(
     val groupNameFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    // Focus the name field and raise the IME as the sheet settles, exactly once
+    // per open. The consumed flag is rememberSaveable so it survives Activity
+    // recreation: a plain `remember` resets on a config change (rotation), which
+    // would re-fire the focus + keyboard mid-session. Requesting focus then
+    // `show()` synchronously — without first waiting a frame — lets the keyboard
+    // rise while the panel is still settling, so the first composed frame already
+    // reserves the IME inset and the input arrives in its keyboard-adjusted
+    // position in one motion instead of jumping up after a rest-position layout
+    // (mirrors the conversation composer auto-focus).
+    var autoFocusConsumed by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(directMessage) {
-        if (!directMessage) {
-            withFrameNanos { }
-            groupNameFocusRequester.requestFocus()
+        if (!directMessage && !autoFocusConsumed) {
+            autoFocusConsumed = true
+            runCatching { groupNameFocusRequester.requestFocus() }
             keyboardController?.show()
         }
     }
@@ -3023,7 +3542,10 @@ private fun NewChatSheet(
             else -> throwable.message ?: throwable.javaClass.simpleName
         }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -3061,6 +3583,13 @@ private fun NewChatSheet(
                         Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_recipient_qr_code))
                     }
                 }
+                // Resolved profile preview so the user can confirm "this is the
+                // right person" before starting the DM (#631).
+                RecipientPreviewCard(
+                    input = pending,
+                    appState = appState,
+                    onResolutionChanged = { recipientPreview = it },
+                )
             } else {
                 OutlinedTextField(
                     value = groupName,
@@ -3093,10 +3622,21 @@ private fun NewChatSheet(
                 onClick = {
                     val normalizedPending =
                         if (directMessage) {
-                            RecipientReference.tokenize(pending).map { input ->
-                                RecipientReference.normalize(input) ?: run {
-                                    error = validRecipientReferenceError
-                                    return@Button
+                            // Prefer the key the preview card already resolved
+                            // (#631): it's the pubkey the user just visually
+                            // confirmed, and is the ONLY thing that carries a
+                            // resolved NIP-05 — RecipientReference.normalize
+                            // can't parse name@domain. Fall back to tokenize +
+                            // normalize for the npub/hex direct-entry path.
+                            val resolved = recipientPreview.resolvedHex
+                            if (resolved != null) {
+                                listOf(resolved)
+                            } else {
+                                RecipientReference.tokenize(pending).map { input ->
+                                    RecipientReference.normalize(input) ?: run {
+                                        error = validRecipientReferenceError
+                                        return@Button
+                                    }
                                 }
                             }
                         } else {
@@ -3152,7 +3692,14 @@ private fun NewChatSheet(
                         busy = false
                     }
                 },
-                enabled = canSubmitNewChatSheet(directMessage, busy, pending, groupName),
+                // Gate on the preview resolution too (#631): never let the
+                // create fire on an unresolved/invalid identifier. The card
+                // stays Empty in group mode (no recipient field), where
+                // recipientPreviewAllowsSubmit is true, so group create is
+                // unaffected.
+                enabled =
+                    canSubmitNewChatSheet(directMessage, busy, pending, groupName) &&
+                        recipientPreviewAllowsSubmit(recipientPreview.state),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (busy) {
@@ -3425,6 +3972,7 @@ private fun ReplyPreviewCard(
     Surface(
         color = container,
         shape = RoundedCornerShape(10.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier =
             Modifier
                 .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
@@ -3582,6 +4130,7 @@ private fun MediaImageBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         // Single source of truth for image-bubble shape: portraits become
         // uniform-width cards (capped height), landscapes fill the bubble
         // width. Used by both the confirmed bubble and the optimistic
@@ -3773,6 +4322,7 @@ private fun MediaImageGridBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         MasonryImageLayout(visibleCount = visible.size, onLongPress = onLongPress, tile = tileAt)
@@ -3852,6 +4402,7 @@ private fun MediaVisualGridBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         MasonryImageLayout(visibleCount = visible.size, onLongPress = onLongPress, tile = tileAt)
@@ -4290,6 +4841,7 @@ private fun MediaFileBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -4501,6 +5053,7 @@ private fun MediaVideoBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = imageBubbleSizing(aspectRatioFromDim(reference.dim)),
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -4869,6 +5422,7 @@ private fun MediaVoiceBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(18.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -5370,6 +5924,7 @@ private fun MediaPendingPlaceholder(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -5455,6 +6010,7 @@ private fun PendingFilePill(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -6424,6 +6980,7 @@ private fun StagingDocumentTile(uri: android.net.Uri) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxSize(),
     ) {
         Column(
@@ -6468,6 +7025,7 @@ private fun MediaPreviewSheet(
     var sending by remember { mutableStateOf(false) }
     var addMoreMenuOpen by remember { mutableStateOf(false) }
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -6540,6 +7098,8 @@ private fun MediaPreviewSheet(
                         DropdownMenu(
                             expanded = addMoreMenuOpen,
                             onDismissRequest = { addMoreMenuOpen = false },
+                            shape = MenuDefaults.shape,
+                            border = amoledSurfaceBorderStroke(),
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.attach_photo_library)) },
@@ -6852,6 +7412,11 @@ private fun ConversationScreen(
     // the user can type the first message without an extra tap. False for row
     // taps, notification routing, and search hits.
     justCreated: Boolean = false,
+    // (chat, justCreated): navigate to another shared group when the user taps a
+    // shared group / Message in the in-conversation profile sheet (issue #635).
+    // Reuses the shell's existing open-group lambda so this path matches the
+    // shell-level sheet's onOpenGroup exactly.
+    onOpenProfileGroup: (ChatListItem, Boolean) -> Unit = { _, _ -> },
 ) {
     // Push the global snackbar host above the conversation composer so
     // a toast (e.g. the post-invite-accept confirmation) doesn't
@@ -8289,6 +8854,25 @@ private fun ConversationScreen(
                 }
             }
     }
+    // In-conversation profile sheet (issue #635). Driven by the same
+    // appState.pendingProfileNpub the shell-level sheet uses, but passed the live
+    // ConversationController so it can offer group-admin actions. The shell-level
+    // sheet is suppressed while a conversation is active (selectedChat != null in
+    // the app shell), so the sheet renders exactly once here. Placed before the
+    // showDetails early-return so it also overlays the members-list row profile
+    // tap inside GroupDetailsScreen, which keeps the group context too.
+    appState.pendingProfileNpub?.let { profileNpub ->
+        ProfileSheet(
+            appState = appState,
+            npub = profileNpub,
+            onOpenGroup = { item, justCreatedChat ->
+                onOpenProfileGroup(item, justCreatedChat)
+            },
+            onDismiss = { appState.clearPresentedProfile() },
+            adminController = controller,
+        )
+    }
+
     if (showDetails) {
         GroupDetailsScreen(
             appState = appState,
@@ -8475,116 +9059,123 @@ private fun ConversationScreen(
                         onNext = { navigateToSearchMatch(forward = true) },
                     )
                 controller.error != null || controller.group.pendingConfirmation -> Unit
-                // Render the disabled "no longer a member" notice by default
-                // during the membership-load window, and upgrade to the active
-                // composer only once we believe self is a member (#545). A
-                // confirmed member, or a known member from the seeding snapshot
-                // (`seededSelfMember`), shows the composer immediately — the
-                // latter preserves the #264 intent of not staring at a blank
-                // bottom bar during `refreshMembers()`. A group the user has
-                // left (whose cached snapshot has self removed) seeds
-                // `seededSelfMember = false`, so its notice renders at once
-                // instead of flashing the active composer. The controller's
+                // Membership-display gate (issues #545 and #623). During the
+                // brief window before refreshMembers() confirms the roster we
+                // must not flash a state we don't actually know: a left group
+                // flashing the active composer (#545) OR a member's group —
+                // especially an admin re-entering their own group — flashing the
+                // "no longer a member" notice (#623, the inverse). The gate
+                // paints the composer only for a (believed) member, the notice
+                // only for a known not-member, and NOTHING while membership is
+                // genuinely unknown (cold open with no seeding snapshot), where
+                // it upgrades on the confirmed result. The controller's
                 // `canSendMessages` guard still keeps any actual mutation safe
                 // until membership is verified.
-                !shouldShowComposer(
-                    membersLoaded = controller.membersLoaded,
-                    isSelfMember = controller.isSelfMember,
-                    seededSelfMember = controller.seededSelfMember,
-                ) -> RemovedMemberComposerNotice()
-                else -> {
-                    val groupIdHex = controller.group.groupIdHex
-                    val editingRecord =
-                        controller.editingMessageId?.let { id ->
-                            controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
-                        }
-                    // #414: candidates for the @-mention picker — the group's
-                    // own roster minus the local account (you can't mention
-                    // yourself). Keyed on the roster + profile revision so a
-                    // late-arriving display name / nip05 re-derives the list.
-                    // The list already arrives most-recently-active first from
-                    // the roster, and MentionComposer.filter preserves order.
-                    val mentionPickerEnabled = !controller.isDm
-                    val mentionCandidates =
-                        if (mentionPickerEnabled) {
-                            val revision = appState.profileRevisionForCompose
-                            val activeAccountIdHex = appState.activeAccount?.accountIdHex
-                            remember(controller.members, revision, activeAccountIdHex) {
-                                controller.members
-                                    // Exclude only the active account, not every member
-                                    // flagged `local`. Marmot sets `local` for any identity
-                                    // present on the device, which on some rosters marks all
-                                    // members local and would empty the mention list entirely.
-                                    // Mirrors the isActiveAccountMember gate used for admin actions.
-                                    .filterNot { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                                    .map { member ->
-                                        MentionComposer.Candidate(
-                                            accountIdHex = member.memberIdHex,
-                                            npub = appState.npub(member.memberIdHex),
-                                            displayName = appState.chatMemberTitle(member.memberIdHex),
-                                            nip05 = appState.userProfile(member.memberIdHex)?.nip05,
-                                        )
+                else ->
+                    when (
+                        conversationComposerGate(
+                            membersLoaded = controller.membersLoaded,
+                            isSelfMember = controller.isSelfMember,
+                            seededSelfMember = controller.seededSelfMember,
+                            seededMembershipKnown = controller.seededMembershipKnown,
+                        )
+                    ) {
+                        ComposerGate.PENDING -> Unit
+                        ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                        ComposerGate.COMPOSER -> {
+                            val groupIdHex = controller.group.groupIdHex
+                            val editingRecord =
+                                controller.editingMessageId?.let { id ->
+                                    controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
+                                }
+                            // #414: candidates for the @-mention picker — the group's
+                            // own roster minus the local account (you can't mention
+                            // yourself). Keyed on the roster + profile revision so a
+                            // late-arriving display name / nip05 re-derives the list.
+                            // The list already arrives most-recently-active first from
+                            // the roster, and MentionComposer.filter preserves order.
+                            val mentionPickerEnabled = !controller.isDm
+                            val mentionCandidates =
+                                if (mentionPickerEnabled) {
+                                    val revision = appState.profileRevisionForCompose
+                                    val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                                    remember(controller.members, revision, activeAccountIdHex) {
+                                        controller.members
+                                            // Exclude only the active account, not every member
+                                            // flagged `local`. Marmot sets `local` for any identity
+                                            // present on the device, which on some rosters marks all
+                                            // members local and would empty the mention list entirely.
+                                            // Mirrors the isActiveAccountMember gate used for admin actions.
+                                            .filterNot { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                                            .map { member ->
+                                                MentionComposer.Candidate(
+                                                    accountIdHex = member.memberIdHex,
+                                                    npub = appState.npub(member.memberIdHex),
+                                                    displayName = appState.chatMemberTitle(member.memberIdHex),
+                                                    nip05 = appState.userProfile(member.memberIdHex)?.nip05,
+                                                )
+                                            }
                                     }
-                            }
-                        } else {
-                            emptyList()
-                        }
-                    ComposerBar(
-                        replyingTo = controller.replyingTo,
-                        messageTextCopy = messageTextCopy,
-                        onCancelReply = { controller.replyingTo = null },
-                        onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
-                        initialDraft = appState.draftFor(groupIdHex).orEmpty(),
-                        onDraftChange = { appState.setDraft(groupIdHex, it) },
-                        draftKey = groupIdHex,
-                        editingMessageId = controller.editingMessageId,
-                        editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                        onCancelEdit = { controller.editingMessageId = null },
-                        onAfterSend = {
-                            // Always pull the user down to see their just-sent
-                            // bubble, even if they were reading older history.
-                            // Matches standard chat-app behavior.
-                            scope.launch {
-                                val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                                listState.animateScrollToItem(lastIndex)
-                            }
-                        },
-                        onPickFromGallery = {
-                            imagePickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                                } else {
+                                    emptyList()
+                                }
+                            ComposerBar(
+                                replyingTo = controller.replyingTo,
+                                messageTextCopy = messageTextCopy,
+                                onCancelReply = { controller.replyingTo = null },
+                                onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
+                                initialDraft = appState.draftFor(groupIdHex).orEmpty(),
+                                onDraftChange = { appState.setDraft(groupIdHex, it) },
+                                draftKey = groupIdHex,
+                                editingMessageId = controller.editingMessageId,
+                                editingInitialText = editingRecord?.let { controller.displayedText(it) },
+                                onCancelEdit = { controller.editingMessageId = null },
+                                onAfterSend = {
+                                    // Always pull the user down to see their just-sent
+                                    // bubble, even if they were reading older history.
+                                    // Matches standard chat-app behavior.
+                                    scope.launch {
+                                        val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                                        listState.animateScrollToItem(lastIndex)
+                                    }
+                                },
+                                onPickFromGallery = {
+                                    imagePickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                                    )
+                                },
+                                onCaptureFromCamera = {
+                                    val granted =
+                                        ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.CAMERA,
+                                        ) == PackageManager.PERMISSION_GRANTED
+                                    if (granted) {
+                                        launchCameraCapture()
+                                    } else {
+                                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                    }
+                                },
+                                onPickDocument = {
+                                    // `*/*` lets the system file picker surface every
+                                    // installed provider (Drive, Downloads, Files…)
+                                    // without restricting by MIME. Bytes upload as-is.
+                                    documentPickerLauncher.launch(arrayOf("*/*"))
+                                },
+                                voiceRecordingController = voiceRecordingController,
+                                appState = appState,
+                                mentionCandidates = mentionCandidates,
+                                mentionPickerEnabled = mentionPickerEnabled,
+                                autoFocusOnEnter = justCreated,
+                                enterKeyBehavior = appState.enterKeyBehavior,
+                                // #589: hoisted focus plumbing — the requester lets the
+                                // resume observer restore focus, and the callback keeps
+                                // `composerFocused` tracking the live keyboard state.
+                                composerFocus = composerFocus,
+                                onComposerFocusChanged = { composerFocused = it },
                             )
-                        },
-                        onCaptureFromCamera = {
-                            val granted =
-                                ContextCompat.checkSelfPermission(
-                                    context,
-                                    Manifest.permission.CAMERA,
-                                ) == PackageManager.PERMISSION_GRANTED
-                            if (granted) {
-                                launchCameraCapture()
-                            } else {
-                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                            }
-                        },
-                        onPickDocument = {
-                            // `*/*` lets the system file picker surface every
-                            // installed provider (Drive, Downloads, Files…)
-                            // without restricting by MIME. Bytes upload as-is.
-                            documentPickerLauncher.launch(arrayOf("*/*"))
-                        },
-                        voiceRecordingController = voiceRecordingController,
-                        appState = appState,
-                        mentionCandidates = mentionCandidates,
-                        mentionPickerEnabled = mentionPickerEnabled,
-                        autoFocusOnEnter = justCreated,
-                        enterKeyBehavior = appState.enterKeyBehavior,
-                        // #589: hoisted focus plumbing — the requester lets the
-                        // resume observer restore focus, and the callback keeps
-                        // `composerFocused` tracking the live keyboard state.
-                        composerFocus = composerFocus,
-                        onComposerFocusChanged = { composerFocused = it },
-                    )
-                }
+                        }
+                    }
             }
         },
     ) { padding ->
@@ -8904,6 +9495,7 @@ private fun AutoAcceptedInviteBanner(
         modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
+        border = amoledSurfaceBorderStroke(),
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
         Row(
@@ -9167,6 +9759,10 @@ private fun GroupDetailsScreen(
     var pendingMember by remember { mutableStateOf("") }
     var pendingMemberAsAdmin by remember { mutableStateOf(false) }
     var pendingMemberError by remember { mutableStateOf<String?>(null) }
+    // Resolution state of the add-member preview card (#631), hoisted so the
+    // Add button stays disabled while the pasted identifier is invalid or
+    // resolving (but enabled for the loaded AND no-profile states).
+    var pendingMemberPreview by remember { mutableStateOf(RecipientResolution.Empty) }
     var showMemberScanner by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember { mutableStateOf(false) }
@@ -9642,6 +10238,7 @@ private fun GroupDetailsScreen(
 
     if (showAddMember) {
         ModalBottomSheet(
+            modifier = amoledModalSheetModifier(),
             onDismissRequest = {
                 showAddMember = false
                 pendingMemberAsAdmin = false
@@ -9683,6 +10280,14 @@ private fun GroupDetailsScreen(
                     },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                 )
+                // Resolved profile preview so the admin can confirm they're
+                // inviting the right person before history is shared with them
+                // (#631).
+                RecipientPreviewCard(
+                    input = pendingMember,
+                    appState = appState,
+                    onResolutionChanged = { pendingMemberPreview = it },
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -9697,11 +10302,17 @@ private fun GroupDetailsScreen(
                 }
                 Button(
                     onClick = {
+                        // Prefer the key the preview card resolved (#631): it
+                        // carries a resolved NIP-05, which RecipientReference
+                        // .normalize can't parse. Fall back to normalize for
+                        // the npub/hex direct-entry path.
                         val ref =
-                            RecipientReference.normalize(pendingMember) ?: run {
-                                pendingMemberError = oneValidMemberReferenceError
-                                return@Button
-                            }
+                            pendingMemberPreview.resolvedHex
+                                ?: RecipientReference.normalize(pendingMember)
+                        if (ref == null) {
+                            pendingMemberError = oneValidMemberReferenceError
+                            return@Button
+                        }
                         pendingMemberError = null
                         runGroupMutation(
                             action = GroupMutationAction.InviteMember,
@@ -9716,7 +10327,14 @@ private fun GroupDetailsScreen(
                             },
                         )
                     },
-                    enabled = pendingMember.isNotBlank() && activeMutation == null && !controller.mutationInFlight,
+                    // Gate on the preview resolution too (#631): keep the invite
+                    // from firing on an unresolved/invalid identifier, while
+                    // still allowing the loaded AND no-profile states through.
+                    enabled =
+                        pendingMember.isNotBlank() &&
+                            activeMutation == null &&
+                            !controller.mutationInFlight &&
+                            recipientPreviewAllowsSubmit(pendingMemberPreview.state),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (activeMutation?.action == GroupMutationAction.InviteMember) {
@@ -9990,6 +10608,7 @@ private fun ImageSearchSheet(
     }
 
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -10334,6 +10953,7 @@ private fun GroupMutationErrorBanner(
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
     ) {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
@@ -10373,6 +10993,7 @@ private fun ProfilePublicWarning() {
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
     ) {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
@@ -10417,6 +11038,7 @@ private fun GroupActionRow(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (enabled) 0.5f else 0.28f),
         contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
     ) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 14.dp, vertical = 10.dp),
@@ -10511,6 +11133,37 @@ internal fun groupMemberMenuActions(
         else -> listOf(GroupMemberMenuAction.GrantAdmin, GroupMemberMenuAction.RemoveMember)
     }
 
+/**
+ * The group-admin actions to show in the in-conversation profile sheet
+ * (issue #635) when an admin taps another member's avatar next to a message
+ * bubble. Reuses [groupMemberMenuActions] verbatim so the scope rules stay in
+ * lockstep with the Group Info members list (issue #444): actions appear only
+ * when the viewer is an admin member of this group and the viewed user is a
+ * member who is not the active account.
+ *
+ * The sheet surface never targets self (the avatar tap that opens it with admin
+ * context is on someone else's bubble, and self is excluded by the issue), so
+ * [GroupMemberMenuAction.StepDownAsAdmin] can never legitimately apply here; it
+ * is filtered out defensively. [targetIsMember] is false when the viewed user
+ * has no member record in this group, which fails scope and yields an empty
+ * list regardless of the other inputs.
+ */
+internal fun profileSheetAdminActions(
+    viewerIsMember: Boolean,
+    viewerIsAdmin: Boolean,
+    targetIsMember: Boolean,
+    targetIsSelf: Boolean,
+    targetIsAdmin: Boolean,
+): List<GroupMemberMenuAction> {
+    if (!targetIsMember) return emptyList()
+    return groupMemberMenuActions(
+        viewerIsMember = viewerIsMember,
+        viewerIsAdmin = viewerIsAdmin,
+        targetIsSelf = targetIsSelf,
+        targetIsAdmin = targetIsAdmin,
+    ).filter { it != GroupMemberMenuAction.StepDownAsAdmin }
+}
+
 @Composable
 private fun GroupMemberRow(
     member: AppGroupMemberRecordFfi,
@@ -10598,6 +11251,8 @@ private fun GroupMemberRow(
                 DropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
+                    shape = MenuDefaults.shape,
+                    border = amoledSurfaceBorderStroke(),
                 ) {
                     memberActions.forEach { action ->
                         when (action) {
@@ -10703,7 +11358,10 @@ private fun TransferAdminSheet(
             }
         }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -10784,6 +11442,20 @@ private fun TransferAdminSheet(
     }
 }
 
+@Composable
+private fun amoledModalSheetModifier(): Modifier = Modifier.amoledSurfaceBorder(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+
+@Composable
+private fun messageBubbleBorder(
+    highlighted: Boolean,
+    mine: Boolean,
+): BorderStroke? =
+    when {
+        highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
+        mine && isAmoledSurfaceTheme() -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        else -> amoledSurfaceBorderStroke()
+    }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageBubble(
@@ -10797,6 +11469,7 @@ private fun MessageBubble(
     onReactionEmojiPicked: (String) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
 ) {
+    val amoledSurfaceTheme = isAmoledSurfaceTheme()
     val record = item.record
     val mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex)
     val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
@@ -10806,8 +11479,9 @@ private fun MessageBubble(
     val invalidated = !deleted && item.projected?.invalidationStatus != null
     val bubbleColor =
         when {
-            deleted -> MaterialTheme.colorScheme.surfaceVariant
             invalidated -> MaterialTheme.colorScheme.errorContainer
+            amoledSurfaceTheme -> Color.Black
+            deleted -> MaterialTheme.colorScheme.surfaceVariant
             mine -> MaterialTheme.colorScheme.primaryContainer
             else -> MaterialTheme.colorScheme.surfaceVariant
         }
@@ -10907,6 +11581,7 @@ private fun MessageBubble(
     val timestampColor =
         when {
             invalidated -> MaterialTheme.colorScheme.onErrorContainer
+            amoledSurfaceTheme -> MaterialTheme.colorScheme.onSurfaceVariant
             mine && !deleted -> MaterialTheme.colorScheme.onPrimaryContainer
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
@@ -11794,7 +12469,7 @@ private fun MessageBubble(
                             Surface(
                                 color = bubbleColor,
                                 shape = RoundedCornerShape(18.dp),
-                                border = if (highlighted) BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary) else null,
+                                border = messageBubbleBorder(highlighted, mine),
                                 tonalElevation = if (mine) 1.dp else 0.dp,
                             ) {
                                 Column(
@@ -11823,7 +12498,7 @@ private fun MessageBubble(
                                 .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
                         color = bubbleColor,
                         shape = RoundedCornerShape(18.dp),
-                        border = if (highlighted) BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary) else null,
+                        border = messageBubbleBorder(highlighted, mine),
                         tonalElevation = if (mine) 1.dp else 0.dp,
                     ) {
                         Column(
@@ -12083,7 +12758,12 @@ private fun MessageFullScreenView(
                         IconButton(onClick = { overflowOpen = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.message_actions))
                         }
-                        DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
+                        DropdownMenu(
+                            expanded = overflowOpen,
+                            onDismissRequest = { overflowOpen = false },
+                            shape = MenuDefaults.shape,
+                            border = amoledSurfaceBorderStroke(),
+                        ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.reply)) },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null) },
@@ -12139,6 +12819,7 @@ private fun MessageFullScreenView(
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(18.dp),
+                    border = amoledSurfaceBorderStroke(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
@@ -12168,6 +12849,12 @@ private fun ReactionSummaryChip(
     val total = tallies.sumOf { it.count }
     val emojis = tallies.take(MAX_VISIBLE_REACTIONS).joinToString(separator = "") { it.emoji }
     val viewReactorsLabel = stringResource(R.string.view_reactors)
+    val border =
+        if (isAmoledSurfaceTheme()) {
+            BorderStroke(1.dp, colorScheme.outlineVariant)
+        } else {
+            BorderStroke(1.5.dp, colorScheme.surface)
+        }
     Surface(
         modifier =
             Modifier
@@ -12179,7 +12866,7 @@ private fun ReactionSummaryChip(
         shape = RoundedCornerShape(percent = 50),
         color = if (mine) colorScheme.secondaryContainer else colorScheme.surfaceContainerHigh,
         contentColor = if (mine) colorScheme.onSecondaryContainer else colorScheme.onSurface,
-        border = BorderStroke(1.5.dp, colorScheme.surface),
+        border = border,
         tonalElevation = 1.dp,
     ) {
         Row(
@@ -12218,7 +12905,10 @@ private fun ReactionDetailsSheet(
             selectedEmoji?.let { emoji -> participants.filter { it.emoji == emoji } } ?: participants
         }
 
-    ModalBottomSheet(onDismissRequest = onDismissRequest) {
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -12355,7 +13045,11 @@ private fun EditHistorySheet(
                 )
             }
         }
-    ModalBottomSheet(onDismissRequest = onDismissRequest, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
+        modifier = amoledModalSheetModifier(),
+    ) {
         // The header is anchored above the scroll region so the title and
         // count chip remain visible while the user pages through a long edit
         // chain. The rail keeps its visual continuity because every row is
@@ -12381,6 +13075,7 @@ private fun EditHistorySheet(
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     shape = RoundedCornerShape(999.dp),
+                    border = amoledSurfaceBorderStroke(),
                 ) {
                     Text(
                         text = stringResource(R.string.edited_count, editState.versions.size),
@@ -12493,6 +13188,7 @@ private fun EditHistoryVersionRow(
                         MaterialTheme.colorScheme.surfaceContainerHigh
                     },
                 shape = RoundedCornerShape(14.dp),
+                border = amoledSurfaceBorderStroke(),
             ) {
                 Text(
                     text = row.text,
@@ -12616,13 +13312,15 @@ private fun MessageActionMenu(
         //   - one emoji/quick-reaction Row (36.dp)
         //   - a HorizontalDivider (1.dp)
         //   - the action buttons (each 48.dp min) in a spacedBy(2.dp) Column:
-        //       Reply, Copy, Info always; +Edit when canEdit; +Delete when canDelete
+        //       Reply, Copy, Info always; +Edit when canEdit; +Forward when
+        //       canForward; +Delete when canDelete
         //   - the outer Column's 8.dp padding (top + bottom) and its two
         //     spacedBy(8.dp) gaps between the three sections.
         // Keep this in sync with the menu Column below if its layout changes.
         val estimatedPopupHeightPx =
             with(density) {
-                val actionButtonCount = 3 + (if (canEdit) 1 else 0) + (if (canDelete) 1 else 0)
+                val actionButtonCount =
+                    3 + (if (canEdit) 1 else 0) + (if (canForward) 1 else 0) + (if (canDelete) 1 else 0)
                 val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1) * 2).dp
                 val totalHeight = (8.dp + 8.dp) + (8.dp + 8.dp) + 36.dp + 1.dp + actionsColumnHeight
                 totalHeight.roundToPx()
@@ -12683,6 +13381,7 @@ private fun MessageActionMenu(
             Surface(
                 modifier = Modifier.onSizeChanged { measuredPopupHeightPx = it.height },
                 shape = RoundedCornerShape(12.dp),
+                border = amoledSurfaceBorderStroke(),
                 tonalElevation = 3.dp,
                 shadowElevation = 6.dp,
             ) {
@@ -12806,7 +13505,11 @@ private fun ForwardMessageSheet(
             }
         }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -12820,6 +13523,7 @@ private fun ForwardMessageSheet(
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(12.dp),
+                border = amoledSurfaceBorderStroke(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 // Preview only: resolve `@npub1…` runs to display names so the
@@ -12862,9 +13566,12 @@ private fun ForwardMessageSheet(
                         val isSelected = selected.contains(groupId)
                         ListItem(
                             modifier =
-                                Modifier.clickable {
-                                    if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                                },
+                                Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        if (isSelected) selected.remove(groupId) else selected.add(groupId)
+                                    },
                             leadingContent = {
                                 val avatarAccount =
                                     item.otherMemberAccount
@@ -12974,6 +13681,7 @@ private fun MessageInfoSheet(
     val copyActionLabel = stringResource(R.string.copy_text)
 
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismissRequest,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -13084,19 +13792,43 @@ private fun EmojiPickerSheet(
     onEmojiPicked: (String) -> Unit,
 ) {
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismissRequest,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
-        AndroidView(
-            modifier = Modifier.fillMaxWidth().height(384.dp).navigationBarsPadding(),
-            factory = { context ->
-                EmojiPickerView(context).apply {
-                    emojiGridColumns = 8
-                    emojiGridRows = 5.25f
-                    setOnEmojiPickedListener { item -> onEmojiPicked(item.emoji) }
-                }
-            },
-        )
+        // EmojiPickerView hosts an Android RecyclerView (a NestedScrollingChild) that
+        // competes with the ModalBottomSheet's Compose nested-scroll handler for vertical
+        // drags. rememberNestedScrollInteropConnection() bridges the two systems: the
+        // RecyclerView consumes the drag while it can scroll and only forwards the leftover
+        // distance (at the top/bottom of the grid) to the sheet's drag/dismiss handler.
+        val nestedScrollInterop = rememberNestedScrollInteropConnection()
+        Box(modifier = Modifier.nestedScroll(nestedScrollInterop)) {
+            AndroidView(
+                modifier = Modifier.fillMaxWidth().height(384.dp).navigationBarsPadding(),
+                factory = { context ->
+                    EmojiPickerView(context).apply {
+                        emojiGridColumns = 8
+                        emojiGridRows = 5.25f
+                        setOnEmojiPickedListener { item -> onEmojiPicked(item.emoji) }
+                        // The body grid RecyclerView is built asynchronously once emoji data
+                        // loads, so enable nested scrolling on every descendant after layout to
+                        // guarantee the scrolling child dispatches deltas to the interop parent.
+                        // setNestedScrollingEnabled is a no-op on Views that are not a
+                        // NestedScrollingChild, so this safely targets only the RecyclerViews.
+                        post { enableNestedScrollingOnDescendants(this) }
+                    }
+                },
+            )
+        }
+    }
+}
+
+private fun enableNestedScrollingOnDescendants(view: View) {
+    ViewCompat.setNestedScrollingEnabled(view, true)
+    if (view is ViewGroup) {
+        for (index in 0 until view.childCount) {
+            enableNestedScrollingOnDescendants(view.getChildAt(index))
+        }
     }
 }
 
@@ -13110,6 +13842,7 @@ private fun EmojiActionButton(
         modifier = modifier.height(36.dp).clip(CircleShape).clickable(onClick = onClick),
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = CircleShape,
+        border = amoledSurfaceBorderStroke(),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(emoji, style = MaterialTheme.typography.titleMedium)
@@ -13350,6 +14083,7 @@ private fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .navigationBarsPadding(),
         color = MaterialTheme.colorScheme.surface,
+        border = amoledSurfaceBorderStroke(),
         tonalElevation = 3.dp,
     ) {
         Text(
@@ -13363,6 +14097,32 @@ private fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
             textAlign = TextAlign.Center,
         )
     }
+}
+
+/**
+ * Inserts an emoji at the composer's current selection, replacing any selected
+ * range and moving the caret just after the inserted glyph. Kept pure so the
+ * cursor math is pinned by local unit tests instead of only by Compose wiring.
+ */
+internal fun insertComposerEmoji(
+    value: TextFieldValue,
+    emoji: String,
+): TextFieldValue {
+    val text = value.text
+    val start =
+        minOf(value.selection.start, value.selection.end)
+            .coerceIn(0, text.length)
+    val end =
+        maxOf(value.selection.start, value.selection.end)
+            .coerceIn(start, text.length)
+    val updatedText =
+        buildString {
+            append(text, 0, start)
+            append(emoji)
+            append(text, end, text.length)
+        }
+    val caret = start + emoji.length
+    return value.copy(text = updatedText, selection = TextRange(caret), composition = null)
 }
 
 @Composable
@@ -13406,6 +14166,7 @@ private fun ComposerBar(
     onComposerFocusChanged: (Boolean) -> Unit = {},
 ) {
     var attachMenuOpen by remember { mutableStateOf(false) }
+    var composerEmojiPickerOpen by remember { mutableStateOf(false) }
     // Field state is a TextFieldValue (not a bare String) so the caret can
     // be positioned at the end of the prefilled body on edit-entry, and so
     // a re-tap on a different message rebases the caret too. Keyed on
@@ -13497,6 +14258,19 @@ private fun ComposerBar(
                 }
             }
         }
+    }
+    if (composerEmojiPickerOpen) {
+        EmojiPickerSheet(
+            onDismissRequest = { composerEmojiPickerOpen = false },
+            onEmojiPicked = { emoji ->
+                composerEmojiPickerOpen = false
+                val updated = insertComposerEmoji(textFieldValue, emoji)
+                textFieldValue = updated
+                if (editingMessageId == null) onDraftChange(updated.text)
+                runCatching { composerFocus.requestFocus() }
+                keyboardController?.show()
+            },
+        )
     }
     Column(
         modifier
@@ -13654,6 +14428,12 @@ private fun ComposerBar(
                             if (editingMessageId == null) onDraftChange(applied.text)
                         }
                     },
+                    onEmojiPickerOpen = {
+                        attachMenuOpen = false
+                        composerEmojiPickerOpen = true
+                        runCatching { composerFocus.requestFocus() }
+                        keyboardController?.show()
+                    },
                     onAttachMenuToggle = { attachMenuOpen = !attachMenuOpen },
                     attachMenuOpen = attachMenuOpen,
                     onAttachMenuDismiss = { attachMenuOpen = false },
@@ -13764,6 +14544,7 @@ private fun MentionPicker(
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
+        border = amoledSurfaceBorderStroke(),
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,
         modifier = Modifier.fillMaxWidth(),
@@ -14102,6 +14883,7 @@ private fun KeyboardPreservingDropdownMenu(
         modifier = modifier,
         offset = offset,
         shape = shape,
+        border = amoledSurfaceBorderStroke(),
         properties =
             PopupProperties(
                 focusable = false,
@@ -14121,6 +14903,7 @@ private fun ComposerPill(
     textFieldValue: TextFieldValue,
     composerFocus: FocusRequester,
     onValueChange: (TextFieldValue) -> Unit,
+    onEmojiPickerOpen: () -> Unit,
     onAttachMenuToggle: () -> Unit,
     attachMenuOpen: Boolean,
     onAttachMenuDismiss: () -> Unit,
@@ -14198,6 +14981,7 @@ private fun ComposerPill(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(22.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = modifier,
     ) {
         Row(
@@ -14205,8 +14989,19 @@ private fun ComposerPill(
             modifier =
                 Modifier
                     .heightIn(min = 44.dp)
-                    .padding(start = 16.dp, end = 4.dp),
+                    .padding(start = 4.dp, end = 4.dp),
         ) {
+            IconButton(
+                onClick = onEmojiPickerOpen,
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    Icons.Default.EmojiEmotions,
+                    contentDescription = stringResource(R.string.open_emoji_picker),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
             Box(
                 modifier =
                     Modifier
@@ -14655,6 +15450,16 @@ private val MediaAutoDownloadType.labelRes: Int
             MediaAutoDownloadType.Document -> R.string.media_type_documents
         }
 
+private val LocalSettingsRowsInsideSectionCard = staticCompositionLocalOf { false }
+
+@Composable
+private fun Modifier.settingsRowAmoledSurfaceBorder(shape: Shape = RoundedCornerShape(12.dp)): Modifier =
+    if (LocalSettingsRowsInsideSectionCard.current) {
+        this
+    } else {
+        clip(shape).amoledSurfaceBorder(shape)
+    }
+
 @Composable
 private fun SelectableSettingsRow(
     title: String,
@@ -14662,7 +15467,10 @@ private fun SelectableSettingsRow(
     onClick: () -> Unit,
 ) {
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .settingsRowAmoledSurfaceBorder()
+                .clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
         trailingContent = {
@@ -14688,7 +15496,10 @@ private fun SelectableSettingsRowWithSubtitle(
     onClick: () -> Unit,
 ) {
     ListItem(
-        modifier = Modifier.selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
+        modifier =
+            Modifier
+                .settingsRowAmoledSurfaceBorder()
+                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
         supportingContent = {
@@ -15058,7 +15869,12 @@ private fun SettingsSwitchRow(
     busy: Boolean = false,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .settingsRowAmoledSurfaceBorder(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             if (subtitle != null) {
@@ -15093,6 +15909,7 @@ fun SettingsAccountHeader(
     ListItem(
         modifier =
             Modifier
+                .settingsRowAmoledSurfaceBorder()
                 .clickable(onClick = onOpenAccountSelector)
                 .semantics { contentDescription = switchAccountDescription },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -15128,7 +15945,10 @@ private fun AccountSelectorSheet(
     LaunchedEffect(Unit) {
         appState.refreshAccounts()
     }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleLarge)
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
@@ -15136,24 +15956,27 @@ private fun AccountSelectorSheet(
                     val unreadCount = appState.unreadCountForAccount(account.label)
                     ListItem(
                         modifier =
-                            Modifier.clickable {
-                                // Run on the process-lifetime mutation scope, not this
-                                // sheet's rememberCoroutineScope. setActiveAccount flips
-                                // activeAccountRef partway through and keeps suspending
-                                // (profile warm, notification refresh, push sync); the
-                                // account-change nav reset in MainShell then disposes this
-                                // sheet, which would cancel a sheet-scoped coroutine before
-                                // the switch cleanup finishes (#547). onDismiss /
-                                // onAccountSwitched only set parent composition state, so
-                                // they are safe to run from the mutation scope.
-                                appState.launchMutation {
-                                    appState.setActiveAccount(account.label)
-                                    onDismiss()
-                                    // Land on the newly-active account's chat list
-                                    // instead of leaving the user on Settings (#316).
-                                    onAccountSwitched()
-                                }
-                            },
+                            Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    // Run on the process-lifetime mutation scope, not this
+                                    // sheet's rememberCoroutineScope. setActiveAccount flips
+                                    // activeAccountRef partway through and keeps suspending
+                                    // (profile warm, notification refresh, push sync); the
+                                    // account-change nav reset in MainShell then disposes this
+                                    // sheet, which would cancel a sheet-scoped coroutine before
+                                    // the switch cleanup finishes (#547). onDismiss /
+                                    // onAccountSwitched only set parent composition state, so
+                                    // they are safe to run from the mutation scope.
+                                    appState.launchMutation {
+                                        appState.setActiveAccount(account.label)
+                                        onDismiss()
+                                        // Land on the newly-active account's chat list
+                                        // instead of leaving the user on Settings (#316).
+                                        onAccountSwitched()
+                                    }
+                                },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         leadingContent = {
                             Avatar(
@@ -15218,7 +16041,10 @@ private fun SettingsRow(
     onClick: () -> Unit,
 ) {
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .settingsRowAmoledSurfaceBorder()
+                .clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
         supportingContent = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -15243,7 +16069,11 @@ private fun ProfileQrSheet(
     val shareProfileTitle = stringResource(R.string.share_profile)
     val notDarkMatterProfileQrError = stringResource(R.string.error_not_dark_matter_profile_qr)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -15327,6 +16157,14 @@ private fun ProfileSheet(
     // a shared group passes false.
     onOpenGroup: (ChatListItem, Boolean) -> Unit,
     onDismiss: () -> Unit,
+    // Non-null only when the sheet is opened from inside a group conversation
+    // by tapping a member's bubble avatar (issue #635). Supplies the live
+    // ConversationController for that group so the sheet can show group-admin
+    // moderation actions (grant/revoke admin, remove member) with the same
+    // scope rules and engine calls the Group Info members list uses (#444).
+    // Null for every other entry point (mentions, QR, reaction list, shell
+    // members-list row), which keeps those sheets byte-identical to before.
+    adminController: ConversationController? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     var hex by remember(npub) { mutableStateOf<String?>(null) }
@@ -15379,7 +16217,11 @@ private fun ProfileSheet(
     // conversation opens.
     var creatingChat by remember(npub) { mutableStateOf(false) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -15485,6 +16327,20 @@ private fun ProfileSheet(
                     Text(stringResource(R.string.message))
                 }
             }
+            // Group-admin moderation actions (issue #635). Only rendered when the
+            // sheet was opened from inside a conversation (adminController != null)
+            // AND the resolved user is a member of that group. The action set is
+            // derived from profileSheetAdminActions, which reuses the members-list
+            // scope rules (#444) verbatim, so an empty list (viewer not an admin
+            // member, or the viewed user is self / not a member) renders nothing
+            // and the sheet stays exactly as it is for every other entry point.
+            if (adminController != null && hex != null) {
+                ProfileSheetAdminActions(
+                    controller = adminController,
+                    appState = appState,
+                    targetHex = hex!!,
+                )
+            }
         }
     }
 
@@ -15493,6 +16349,147 @@ private fun ProfileSheet(
             title = title,
             pictureUrl = pictureUrl,
             onDismiss = { fullPictureOpen = false },
+        )
+    }
+}
+
+/**
+ * Group-admin moderation block shown inside the in-conversation profile sheet
+ * (issue #635). Resolves the viewed user's member record in [controller] by a
+ * case-insensitive hex match (consistent with the rest of the file), then asks
+ * [profileSheetAdminActions] which actions are in scope — the same rules and
+ * engine calls the Group Info members list uses (#444). Renders nothing when
+ * scope fails (viewer not an admin member, viewed user is self or not a member
+ * of this group), so the sheet is unchanged for those cases.
+ *
+ * Mutations run through [DarkMatterAppState.launchMutation] (process-lifetime
+ * scope) — the same approach as GroupDetailsScreen's local runGroupMutation — so
+ * the MLS commit + Nostr publish and the controller's own refreshMembers/toast
+ * finish even if the sheet dismisses mid-flight. A local in-flight flag plus the
+ * controller's [ConversationController.mutationInFlight] disable the buttons and
+ * show a spinner while a mutation is running.
+ */
+@Composable
+private fun ProfileSheetAdminActions(
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    targetHex: String,
+) {
+    val targetMember =
+        remember(controller.members, targetHex) {
+            controller.members.firstOrNull { it.memberIdHex.equals(targetHex, ignoreCase = true) }
+        }
+    val targetIsAdmin = targetMember?.let { controller.isAdmin(it) } == true
+    val targetIsSelf =
+        targetMember?.let {
+            GroupProjector.isActiveAccountMember(it, appState.activeAccount?.accountIdHex)
+        } == true
+    val actions =
+        profileSheetAdminActions(
+            viewerIsMember = controller.isSelfMember,
+            viewerIsAdmin = controller.isSelfAdmin,
+            targetIsMember = targetMember != null,
+            targetIsSelf = targetIsSelf,
+            targetIsAdmin = targetIsAdmin,
+        )
+    if (targetMember == null || actions.isEmpty()) return
+
+    // Local in-flight guard so the buttons disable immediately on tap; the
+    // controller's mutationInFlight covers mutations started elsewhere (e.g.
+    // the group details screen) for the same conversation.
+    var localMutating by remember(targetHex) { mutableStateOf(false) }
+    var confirmRemove by remember(targetHex) { mutableStateOf(false) }
+    val busy = localMutating || controller.mutationInFlight
+
+    fun runMutation(mutation: suspend () -> Boolean) {
+        localMutating = true
+        controller.clearLastMutationError()
+        appState.launchMutation {
+            try {
+                mutation()
+            } finally {
+                localMutating = false
+            }
+        }
+    }
+
+    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Reuses the same "Admin" badge the members list shows so the action
+        // labels (Grant/Revoke admin) read naturally. Uses an existing string
+        // (R.string.admin) only — no new copy to translate.
+        if (targetIsAdmin) {
+            Text(
+                stringResource(R.string.admin),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        actions.forEach { action ->
+            when (action) {
+                GroupMemberMenuAction.GrantAdmin ->
+                    OutlinedButton(
+                        onClick = { runMutation { controller.setMemberAdmin(targetMember, admin = true) } },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.make_admin))
+                    }
+                GroupMemberMenuAction.RevokeAdmin ->
+                    OutlinedButton(
+                        onClick = { runMutation { controller.setMemberAdmin(targetMember, admin = false) } },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.remove_admin))
+                    }
+                GroupMemberMenuAction.RemoveMember ->
+                    OutlinedButton(
+                        onClick = { confirmRemove = true },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors =
+                            ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error,
+                            ),
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.remove_member))
+                    }
+                // Self is excluded on this surface, so StepDownAsAdmin never
+                // appears (it is filtered out by profileSheetAdminActions).
+                GroupMemberMenuAction.StepDownAsAdmin -> Unit
+            }
+        }
+        if (busy) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        }
+    }
+
+    if (confirmRemove) {
+        ConfirmDialog(
+            title = stringResource(R.string.confirm_remove_member_title),
+            message =
+                stringResource(
+                    R.string.confirm_remove_member_message,
+                    controller.memberDisplayName(targetMember),
+                ),
+            confirmLabel = stringResource(R.string.remove_member),
+            onConfirm = {
+                confirmRemove = false
+                runMutation { controller.removeMember(targetMember) }
+            },
+            onDismiss = { confirmRemove = false },
+            destructive = true,
         )
     }
 }
@@ -15513,7 +16510,11 @@ private fun ProfileSharedGroupRow(
             else -> stringResource(R.string.members)
         }
     ListItem(
-        modifier = Modifier.clickable(role = Role.Button, onClick = onOpen),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                .clickable(role = Role.Button, onClick = onOpen),
         leadingContent = {
             Avatar(
                 title = title,
@@ -15648,7 +16649,11 @@ private fun QrScannerSheet(
         if (!permissionGranted) launcher.launch(Manifest.permission.CAMERA)
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -16207,6 +17212,7 @@ private fun AddIdentitySheet(
     // so the nsec field inside is also protected from Recents/screenshot
     // capture.
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismiss,
         properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
     ) {
@@ -16605,6 +17611,7 @@ private fun EncryptedBackupSheet(
     }
 
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = { dismissAndClear() },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
@@ -16672,6 +17679,7 @@ private fun EncryptedBackupSheet(
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = amoledSurfaceBorderStroke(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
@@ -16830,6 +17838,7 @@ private fun SignOutSheet(
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -16881,6 +17890,7 @@ private fun SignOutAndWipeSheet(
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -17315,7 +18325,7 @@ private fun KeyPackageCard(
     val copyKeyPackageLabel = stringResource(R.string.copy)
     val keyPackageLabelText = stringResource(R.string.key_package)
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
         colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -17667,12 +18677,14 @@ internal fun SectionCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
         colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
     ) {
         Column(Modifier.fillMaxWidth().padding(Dimens.spaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            content()
+            CompositionLocalProvider(LocalSettingsRowsInsideSectionCard provides true) {
+                content()
+            }
         }
     }
 }
@@ -17684,7 +18696,7 @@ internal fun SectionCardWithAction(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
         colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
     ) {
         Column(Modifier.fillMaxWidth().padding(Dimens.spaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
@@ -17701,7 +18713,9 @@ internal fun SectionCardWithAction(
                 )
                 action()
             }
-            content()
+            CompositionLocalProvider(LocalSettingsRowsInsideSectionCard provides true) {
+                content()
+            }
         }
     }
 }

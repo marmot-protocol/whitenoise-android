@@ -40,6 +40,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
@@ -74,6 +75,8 @@ import dev.ipf.darkmatter.media.MediaInventory
 import dev.ipf.darkmatter.media.MediaReferenceParser
 import dev.ipf.darkmatter.state.ConversationController
 import dev.ipf.darkmatter.state.DarkMatterAppState
+import dev.ipf.darkmatter.ui.theme.amoledSurfaceBorder
+import dev.ipf.darkmatter.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -246,6 +249,7 @@ internal fun SharedMediaSection(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .amoledSurfaceBorder(RoundedCornerShape(8.dp))
                         .clip(RoundedCornerShape(8.dp))
                         .clickable { onSeeAll() }
                         .padding(vertical = 4.dp),
@@ -636,6 +640,8 @@ private fun VoiceLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
                 .clickable { onJumpToMessage(row.messageIdHex) }
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -776,6 +782,8 @@ private fun FileLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
                 .clickable(enabled = !inFlight) {
                     inFlight = true
                     scope.launch {
@@ -848,6 +856,8 @@ private fun FileLibraryRow(
                 DropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
+                    shape = MenuDefaults.shape,
+                    border = amoledSurfaceBorderStroke(),
                 ) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.shared_media_save)) },
@@ -973,6 +983,8 @@ private fun UrlLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
                 .combinedClickable(onClick = onOpen, onLongClick = onCopy)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -983,7 +995,8 @@ private fun UrlLibraryRow(
                 Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .amoledSurfaceBorder(RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

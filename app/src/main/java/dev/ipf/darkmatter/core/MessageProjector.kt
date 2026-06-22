@@ -308,6 +308,13 @@ object MessageProjector {
 
     private fun isMedia(message: AppMessageRecordFfi): Boolean = message.kind == KindChat && message.tags.any { it.values.firstOrNull() == ImetaTag }
 
+    // Coarse media classification for a captionless record, so a surface that
+    // shows a type-aware label (e.g. a notification body) can say "sent a
+    // picture" rather than a generic placeholder. Reads the NIP-92 `m <mime>`
+    // imeta field. Returns None for non-media messages.
+    fun mediaKind(message: AppMessageRecordFfi): ReplyMediaKind =
+        if (isMedia(message)) replyMediaKindFromMime(imetaField(message, "m")) else ReplyMediaKind.None
+
     private fun firstEventRef(message: AppMessageRecordFfi): String? = tagValue(message, EventRefTag)
 
     private fun tagValue(

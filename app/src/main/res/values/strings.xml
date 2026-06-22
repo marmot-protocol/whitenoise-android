@@ -16,6 +16,7 @@
     <string name="back">Back</string>
     <string name="back_to_chats">Back to chats</string>
     <string name="open_settings">Open settings</string>
+    <string name="other_account_unread_indicator">Another account has unread messages</string>
     <string name="archived">Archived</string>
     <string name="chats_count">%1$d chats</string>
     <string name="couldnt_load_chats">Couldn\'t load chats</string>
@@ -35,6 +36,11 @@
     <string name="chat_list_search_open_profile">Open profile</string>
     <string name="chat_list_search_nip05_not_found">No profile found for \"%1$s\"</string>
     <string name="chat_list_search_invalid_npub">That doesn\'t look like a valid npub</string>
+    <string name="recipient_preview_resolving">Resolving…</string>
+    <string name="recipient_preview_no_profile">No profile published</string>
+    <string name="recipient_preview_unresolved">Couldn\'t resolve this identifier</string>
+    <string name="recipient_preview_nip05_verified">Verified address</string>
+    <string name="recipient_preview_nip05_unverified">Unverified address</string>
     <string name="chat_row_action_archive">Archive</string>
     <string name="chat_row_action_unarchive">Unarchive</string>
     <string name="chat_row_action_mark_read">Mark as read</string>
@@ -459,6 +465,10 @@
     <string name="notification_joined_group_from_sender">You were invited by %1$s</string>
     <string name="notification_group_invite">Group invite</string>
     <string name="notification_new_message">New message</string>
+    <string name="notification_sent_picture">sent a picture</string>
+    <string name="notification_sent_video">sent a video</string>
+    <string name="notification_sent_voice_message">sent a voice message</string>
+    <string name="notification_sent_file">sent a file</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>
     <string name="notification_invite_from_sender">Invite from %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s invited you to %2$s</string>

@@ -197,6 +197,25 @@ class OptimisticMessageReconciliationTest {
     }
 
     @Test
+    fun sameBodyDifferentTimestampIsNotMatchedForConvergenceRetry() {
+        val failedOptimistic = message("uuid-temp", plaintext = "retry me", recordedAt = 1uL)
+        val projected =
+            timelineRecord(
+                messageIdHex = "engine-id",
+                plaintext = "retry me",
+                sourceMessageIdHex = null,
+                recordedAt = 10uL,
+            )
+        assertNull(
+            committedButUnpublishedProjectionForOptimistic(
+                mapOf(projected.messageIdHex to projected),
+                failedOptimistic,
+                "alice",
+            ),
+        )
+    }
+
+    @Test
     fun failedTextSendRetainsOptimisticBubbleForRetryAndCopy() {
         val optimistic = message("temp-id", plaintext = "copy me later")
         val optimisticMessages = linkedMapOf<String, TimelineMessage>()

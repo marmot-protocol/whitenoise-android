@@ -16,6 +16,7 @@
     <string name="back">返回</string>
     <string name="back_to_chats">返回聊天</string>
     <string name="open_settings">打开设置</string>
+    <string name="other_account_unread_indicator">另一个账号有未读消息</string>
     <string name="archived">已存档</string>
     <string name="chats_count">%1$d 聊天</string>
     <string name="couldnt_load_chats">无法加载聊天</string>
@@ -34,6 +35,11 @@
     <string name="chat_list_search_open_profile">打开资料</string>
     <string name="chat_list_search_nip05_not_found">未找到「%1$s」的资料</string>
     <string name="chat_list_search_invalid_npub">这看起来不是有效的 npub</string>
+    <string name="recipient_preview_resolving">正在解析…</string>
+    <string name="recipient_preview_no_profile">未发布资料</string>
+    <string name="recipient_preview_unresolved">无法解析此标识符</string>
+    <string name="recipient_preview_nip05_verified">已验证的地址</string>
+    <string name="recipient_preview_nip05_unverified">未验证的地址</string>
     <string name="chat_row_action_archive">归档</string>
     <string name="chat_row_action_unarchive">取消归档</string>
     <string name="chat_row_action_mark_read">标记为已读</string>
@@ -350,6 +356,10 @@
     <string name="notification_joined_group_from_sender">你由 %1$s 邀请加入</string>
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新消息</string>
+    <string name="notification_sent_picture">发送了一张图片</string>
+    <string name="notification_sent_video">发送了一段视频</string>
+    <string name="notification_sent_voice_message">发送了一条语音消息</string>
+    <string name="notification_sent_file">发送了一个文件</string>
     <string name="notification_sender_in_group">%1$s 在 %2$s 中</string>
     <string name="notification_invite_from_sender">来自 %1$s 的邀请</string>
     <string name="notification_sender_invited_you_to_group">%1$s 邀请你加入 %2$s</string>
