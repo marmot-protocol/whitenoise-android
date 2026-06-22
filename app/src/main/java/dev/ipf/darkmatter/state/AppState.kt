@@ -845,13 +845,15 @@ class DarkMatterAppState(
             val delivered = targets.size - failures
             when {
                 failures == 0 ->
-                    present(R.string.toast_forwarded_to_chats, AppText.Plain(delivered.toString()))
+                    presentText(AppText.Resource(R.string.toast_forwarded_to_chats, listOf(delivered)))
                 delivered == 0 ->
                     present(R.string.toast_forward_failed)
                 else ->
-                    present(
-                        R.string.toast_forwarded_partial,
-                        AppText.Plain("$delivered/${targets.size}"),
+                    presentText(
+                        AppText.Resource(
+                            R.string.toast_forwarded_partial,
+                            listOf("$delivered/${targets.size}"),
+                        ),
                     )
             }
         }
