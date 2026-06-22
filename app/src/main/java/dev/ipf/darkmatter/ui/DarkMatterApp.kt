@@ -391,6 +391,7 @@ import dev.ipf.darkmatter.state.labelFor
 import dev.ipf.darkmatter.state.nextReadAnchor
 import dev.ipf.darkmatter.state.outgoingIndicator
 import dev.ipf.darkmatter.state.shortHex
+import dev.ipf.darkmatter.state.shouldResetNavOnAccountChange
 import dev.ipf.darkmatter.state.shouldShowOriginalTimestamp
 import dev.ipf.darkmatter.ui.theme.Dimens
 import dev.ipf.marmotkit.AccountKeyPackageFfi
@@ -1325,6 +1326,31 @@ private fun MainShell(
         onDispose {
             if (selectedChat != null) appState.setActiveConversation(null)
         }
+    }
+
+    // Pop in-shell navigation back to the chat-list root when the active
+    // account changes while the shell stays mounted (AppPhase.Ready preserved).
+    // Without this, Sign Out & Wipe of the active account while another remains
+    // leaves the shell painted on the now-deleted account's Identity & Keys
+    // screen (issue #547), since the deep Settings/conversation nav state lives
+    // in this shell's rememberSaveable and survives the account switch. The
+    // no-accounts case drops to AppPhase.Onboarding and tears the shell down at
+    // the top-level router, so it isn't handled here. Plain `remember` (not
+    // Saveable) for the previous-ref tracker: a fresh composition after process
+    // death must report `previous == null` so the saved screen/conversation is
+    // restored, not popped (issue #386 guard, encoded in
+    // shouldResetNavOnAccountChange).
+    var previousActiveAccountRef by remember { mutableStateOf(appState.activeAccountRef) }
+    LaunchedEffect(appState.activeAccountRef) {
+        val current = appState.activeAccountRef
+        if (shouldResetNavOnAccountChange(previousActiveAccountRef, current)) {
+            selectedChat = null
+            selectedChatFocusMessageId = null
+            selectedChatJustCreated = false
+            sectionName = MainSection.Chats.name
+            settingsDetailName = null
+        }
+        previousActiveAccountRef = current
     }
 
     appState.pendingProfileNpub?.let { npub ->
@@ -14780,7 +14806,6 @@ private fun AccountSelectorSheet(
     onAddAccount: () -> Unit,
     onAccountSwitched: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         appState.refreshAccounts()
     }
@@ -14793,7 +14818,16 @@ private fun AccountSelectorSheet(
                     ListItem(
                         modifier =
                             Modifier.clickable {
-                                scope.launch {
+                                // Run on the process-lifetime mutation scope, not this
+                                // sheet's rememberCoroutineScope. setActiveAccount flips
+                                // activeAccountRef partway through and keeps suspending
+                                // (profile warm, notification refresh, push sync); the
+                                // account-change nav reset in MainShell then disposes this
+                                // sheet, which would cancel a sheet-scoped coroutine before
+                                // the switch cleanup finishes (#547). onDismiss /
+                                // onAccountSwitched only set parent composition state, so
+                                // they are safe to run from the mutation scope.
+                                appState.launchMutation {
                                     appState.setActiveAccount(account.label)
                                     onDismiss()
                                     // Land on the newly-active account's chat list
@@ -16144,7 +16178,14 @@ private fun IdentityScreen(
                     onClick = {
                         showWipeConfirm = false
                         wipeConfirmInput = ""
-                        scope.launch {
+                        // Run on the process-lifetime mutation scope, not this
+                        // screen's rememberCoroutineScope. signOutAndWipeActiveAccount
+                        // flips activeAccountRef partway through and keeps suspending
+                        // (push teardown, notification refresh); the account-change nav
+                        // reset in MainShell then pops IdentityScreen out of composition,
+                        // which would cancel a screen-scoped coroutine before the wipe
+                        // finishes and before the success toast is presented (#547).
+                        appState.launchMutation {
                             val outcome = appState.signOutAndWipeActiveAccount()
                             if (outcome != null) {
                                 appState.present(R.string.toast_signed_out_and_wiped)

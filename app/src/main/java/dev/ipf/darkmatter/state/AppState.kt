@@ -208,6 +208,30 @@ internal fun signOutOutcome(
 }
 
 /**
+ * Whether the main shell should pop its in-shell navigation (Settings, an open
+ * conversation, a Settings detail like Identity & Keys) back to the chat-list
+ * root because the active account changed underneath it.
+ *
+ * The shell stays mounted whenever [AppPhase.Ready] is preserved across an
+ * account change — e.g. Sign Out & Wipe of the active account while another
+ * remains (issue #547), or the manual account switcher (#316). In those cases
+ * the previously-rendered screen references an account that is no longer
+ * active (or no longer exists), so it must be popped.
+ *
+ * Returns true only on a transition between two distinct non-null accounts.
+ * The initial composition (and the recomposition after process death, where
+ * the shell is being rebuilt from saved nav state) reports a null [previous],
+ * so this returns false and the saved screen/conversation is preserved
+ * (issue #386). A transition to null is the no-accounts case, which the
+ * top-level phase router (AppPhase.Onboarding) already handles by tearing the
+ * shell down, so it needs no in-shell reset here.
+ */
+internal fun shouldResetNavOnAccountChange(
+    previous: String?,
+    current: String?,
+): Boolean = previous != null && current != null && previous != current
+
+/**
  * Next exponential-backoff delay: double [current], clamped to [maxMillis].
  * Guards the multiply so a near-`Long.MAX_VALUE` input can't overflow to a
  * negative value below the clamp (returns [maxMillis] once at/over the cap).
