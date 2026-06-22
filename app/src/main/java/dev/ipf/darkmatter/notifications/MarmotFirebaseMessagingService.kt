@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.DarkMatterApplication
 
 /**
@@ -22,7 +23,7 @@ import dev.ipf.darkmatter.DarkMatterApplication
  */
 class MarmotFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
-        Log.d(TAG, "FCM token rotated (${token.length} chars)")
+        fcmDebug { "FCM token rotated (${token.length} chars)" }
         PushTokenStore.create(applicationContext).setToken(token)
         val app = applicationContext as? DarkMatterApplication ?: return
         app.appState.onPushTokenRotated(token)
@@ -35,14 +36,14 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
         // must always happen — an early return here would cause a missed
         // foreground-stream resync for the rest of the payload.
         if (message.notification != null) {
-            Log.d(TAG, "Ignoring notification body on MIP-05 push")
+            fcmDebug { "Ignoring notification body on MIP-05 push" }
         }
         // A wake only reaches us because native push is registered, and native
         // push is independent of the "Keep connected" toggle — gating the wake
         // on the background-connection preference would silently drop every
         // fetch for a user who runs native push without a persistent
         // connection (the whole point of native push).
-        Log.d(TAG, "MIP-05 wake push received; starting foreground stream")
+        fcmDebug { "MIP-05 wake push received; starting foreground stream" }
         wakeForegroundStream()
     }
 
@@ -58,4 +59,9 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
     companion object {
         private const val TAG = "MarmotFcmService"
     }
+}
+
+private inline fun fcmDebug(message: () -> String) {
+    // Debug-only so operational push logs don't ship in release logcat. See #39.
+    if (BuildConfig.DEBUG) Log.d("MarmotFcmService", message())
 }
