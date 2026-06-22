@@ -2,6 +2,8 @@ package dev.ipf.darkmatter.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -159,6 +161,42 @@ class OptimisticMessageReconciliationTest {
     }
 
     @Test
+    fun failedOptimisticMatchesCommittedUnpublishedProjectionByShapeNotTempId() {
+        val failedOptimistic = message("uuid-temp", plaintext = "retry me")
+        val projected =
+            timelineRecord(
+                messageIdHex = "engine-id",
+                plaintext = "retry me",
+                sourceMessageIdHex = null,
+            )
+        val match =
+            committedButUnpublishedProjectionForOptimistic(
+                mapOf(projected.messageIdHex to projected),
+                failedOptimistic,
+                "alice",
+            )
+        assertEquals(projected, match)
+    }
+
+    @Test
+    fun publishedProjectionIsNotMatchedForConvergenceRetry() {
+        val failedOptimistic = message("uuid-temp", plaintext = "retry me")
+        val projected =
+            timelineRecord(
+                messageIdHex = "engine-id",
+                plaintext = "retry me",
+                sourceMessageIdHex = "published-event-id",
+            )
+        assertNull(
+            committedButUnpublishedProjectionForOptimistic(
+                mapOf(projected.messageIdHex to projected),
+                failedOptimistic,
+                "alice",
+            ),
+        )
+    }
+
+    @Test
     fun failedTextSendRetainsOptimisticBubbleForRetryAndCopy() {
         val optimistic = message("temp-id", plaintext = "copy me later")
         val optimisticMessages = linkedMapOf<String, TimelineMessage>()
@@ -273,6 +311,35 @@ class OptimisticMessageReconciliationTest {
                 ),
             recordedAt = 1uL,
             receivedAt = 1uL,
+        )
+
+    private fun timelineRecord(
+        messageIdHex: String,
+        plaintext: String,
+        sourceMessageIdHex: String? = null,
+        recordedAt: ULong = 1uL,
+    ): TimelineMessageRecordFfi =
+        TimelineMessageRecordFfi(
+            messageIdHex = messageIdHex,
+            sourceMessageIdHex = sourceMessageIdHex,
+            direction = "sent",
+            groupIdHex = "group",
+            sender = "alice",
+            plaintext = plaintext,
+            contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+            kind = 9uL,
+            tags = emptyList(),
+            timelineAt = recordedAt,
+            receivedAt = recordedAt,
+            replyToMessageIdHex = null,
+            replyPreview = null,
+            mediaJson = null,
+            agentTextStreamJson = null,
+            groupSystem = null,
+            reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
+            deleted = false,
+            deletedByMessageIdHex = null,
+            invalidationStatus = null,
         )
 
     private fun timelineMessage(

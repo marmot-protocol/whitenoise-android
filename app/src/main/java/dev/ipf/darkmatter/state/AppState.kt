@@ -664,6 +664,7 @@ class DarkMatterAppState(
     // Serializes commit-producing FFI calls for the same (account, group) across
     // ChatsController and ConversationController so concurrent mutations don't race
     // the per-account actor and surface PendingPublish as a generic toast.
+    // Mutex entries are not evicted — bounded by distinct groups touched in-process.
     private val groupCommitLocks = ConcurrentHashMap<String, Mutex>()
 
     suspend fun <T> withGroupCommitLock(
