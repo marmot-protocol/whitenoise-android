@@ -2195,6 +2195,29 @@ class DarkMatterAppState(
         return snapshot
     }
 
+    /**
+     * Synchronously drop the active account from the cached member snapshot for
+     * [groupIdHex] after a successful leave (issue #545). The snapshot seeds the
+     * next [ConversationController]'s `seededSelfMember`; without this, a stale
+     * positive snapshot would still place self in the group and flash the active
+     * composer when the just-left conversation is re-opened. No-op when there is
+     * no cached entry — the seed then falls back to a fresh roster fetch.
+     */
+    fun removeActiveAccountFromGroupMemberSnapshot(
+        accountRef: String?,
+        groupIdHex: String,
+    ) {
+        val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
+        val activeAccountIdHex = activeAccount?.accountIdHex
+        synchronized(groupMemberSnapshotLock) {
+            val current = groupMemberSnapshots[key] ?: return
+            groupMemberSnapshots[key] =
+                GroupMemberSnapshot(
+                    GroupProjector.membersWithoutActiveAccount(current.members, activeAccountIdHex),
+                )
+        }
+    }
+
     suspend fun refreshProfile(
         accountIdHex: String,
         epoch: Int = profileCacheEpoch.get(),

@@ -160,6 +160,19 @@ object GroupProjector {
         return member.memberIdHex.equals(active, ignoreCase = true)
     }
 
+    /**
+     * The roster with the active account dropped. Used on a successful leave
+     * to rewrite the cached member snapshot synchronously, so re-opening the
+     * just-left group seeds a snapshot that no longer places self in the group
+     * (issue #545). A blank [activeAccountIdHex] leaves the roster untouched —
+     * [isActiveAccountMember] never matches a blank id, so there is nothing to
+     * remove.
+     */
+    fun membersWithoutActiveAccount(
+        members: List<AppGroupMemberRecordFfi>,
+        activeAccountIdHex: String?,
+    ): List<AppGroupMemberRecordFfi> = members.filterNot { isActiveAccountMember(it, activeAccountIdHex) }
+
     fun canLeaveGroup(
         group: AppGroupRecordFfi,
         activeAccountIdHex: String?,

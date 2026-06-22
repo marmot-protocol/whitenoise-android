@@ -1,5 +1,7 @@
 package dev.ipf.darkmatter.ui
 
+import dev.ipf.darkmatter.core.GroupProjector
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -79,4 +81,59 @@ class ConversationComposerGateTest {
             ),
         )
     }
+
+    /**
+     * Regression for the adversarial-review blocking finding (#545): the pure
+     * predicate above only checks the gate given a `seededSelfMember` value —
+     * it does not prove the leave path actually produces a self-free seed.
+     *
+     * Before the fix, the successful-leave paths did not invalidate the cached
+     * member snapshot, so re-opening the just-left group seeded a roster that
+     * still contained self (`seededSelfMember == true`) and
+     * `shouldShowComposer(false, false, true)` flashed the active composer.
+     *
+     * This pins the end-to-end invariant: a snapshot that DID contain self,
+     * after the leave transform [GroupProjector.membersWithoutActiveAccount],
+     * seeds `seededSelfMember == false`, so the gate renders the notice
+     * immediately during the membership-load window.
+     */
+    @Test
+    fun snapshotInvalidatedOnLeaveSeedsNoSelfMember() {
+        val self = "aa11"
+        val other = "bb22"
+        val rosterBeforeLeave =
+            listOf(
+                member(self),
+                member(other),
+            )
+
+        // Sanity: pre-leave the seed would (correctly) place self in the group.
+        val seededBeforeLeave =
+            rosterBeforeLeave.any { GroupProjector.isActiveAccountMember(it, self) }
+        assertTrue(seededBeforeLeave)
+
+        // The successful-leave transform the cache-invalidation now applies.
+        val rosterAfterLeave =
+            GroupProjector.membersWithoutActiveAccount(rosterBeforeLeave, self)
+        val seededAfterLeave =
+            rosterAfterLeave.any { GroupProjector.isActiveAccountMember(it, self) }
+
+        assertFalse(seededAfterLeave)
+        // The seed the next ConversationController computes is now false, so
+        // the bottom bar shows the notice without an active-composer flash.
+        assertFalse(
+            shouldShowComposer(
+                membersLoaded = false,
+                isSelfMember = false,
+                seededSelfMember = seededAfterLeave,
+            ),
+        )
+    }
+
+    private fun member(memberId: String) =
+        AppGroupMemberRecordFfi(
+            memberIdHex = memberId,
+            account = memberId,
+            local = false,
+        )
 }

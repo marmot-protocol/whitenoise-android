@@ -1252,6 +1252,21 @@ class ChatsController(
                 }
             }
             appState.marmotIo { leaveGroup(account, groupIdHex) }
+            // Invalidate both snapshot sources that seed the next
+            // ConversationController so re-opening the just-left group renders
+            // the disabled notice immediately instead of flashing the active
+            // composer (issue #545): the shared AppState snapshot (the
+            // cachedGroupMemberSnapshot fallback) and this controller's own
+            // memberCacheByGroup entry (which builds ChatListItem.memberSnapshot).
+            // schedulePendingMemberFetches() skips groups already cached, so a
+            // stale positive entry would otherwise survive until the next bind.
+            appState.removeActiveAccountFromGroupMemberSnapshot(account, groupIdHex)
+            if (activeAccountIdHex != null) {
+                memberCacheByGroup =
+                    memberCacheByGroup +
+                    (groupIdHex to GroupProjector.membersWithoutActiveAccount(members, activeAccountIdHex))
+                recompute()
+            }
             appState.present(R.string.toast_left_chat)
             true
         }.onFailure {
@@ -3116,6 +3131,14 @@ class ConversationController(
                         )
                 }
                 appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+                // Drop self from the cached member snapshot synchronously so
+                // re-opening the just-left group seeds a roster without self
+                // and renders the disabled notice immediately, instead of
+                // flashing the active composer (issue #545). The subscription's
+                // markActiveAccountRemovedFromMembers() may not fire before the
+                // UI navigates back and disposes this controller, so this is the
+                // authoritative invalidation.
+                appState.removeActiveAccountFromGroupMemberSnapshot(account, group.groupIdHex)
                 val name = displayName?.takeIf { it.isNotBlank() }
                 if (name != null) {
                     appState.presentText(AppText.Resource(R.string.toast_left_named, listOf(name)))
