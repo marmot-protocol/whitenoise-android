@@ -46,6 +46,7 @@
     <string name="scan_qr_code">掃描 QR 碼</string>
     <string name="new_group">新增群組</string>
     <string name="invitation">邀請函</string>
+    <string name="invited">已受邀</string>
     <string name="invite">邀請</string>
     <string name="no_chats_yet">尚無聊天</string>
     <string name="empty_chats_invite_npub">透過邀請某人及其 npub 來開始對話。</string>
@@ -77,6 +78,9 @@
     <string name="jump_to_newest">跳至最新</string>
     <string name="scroll_to_top">捲動到頂部</string>
     <string name="discard_failed_message">捨棄發送失敗的訊息</string>
+    <string name="auto_invite_banner_with_inviter">你由 %1$s 邀請加入。如果不想留在這裡，可以離開群組。</string>
+    <string name="auto_invite_banner_unknown">你已受邀加入這個群組。如果不想留在這裡，可以離開群組。</string>
+    <string name="auto_invite_banner_dismiss">關閉邀請橫幅</string>
     <string name="invited_to_this_chat">您被邀請參加此聊天。</string>
     <string name="decline">拒絕</string>
     <string name="accept">接受</string>
@@ -341,6 +345,9 @@
     <string name="notification_channel_reactions_description">對你訊息的回應</string>
     <string name="notification_channel_invites">邀請</string>
     <string name="notification_channel_invites_description">群組邀請和歡迎</string>
+    <string name="notification_joined_group">已加入 %1$s</string>
+    <string name="notification_joined_new_group">已加入新群組</string>
+    <string name="notification_joined_group_from_sender">你由 %1$s 邀請加入</string>
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新訊息</string>
     <string name="notification_sender_in_group">%1$s 在 %2$s 中</string>

@@ -47,6 +47,7 @@
     <string name="scan_qr_code">QR-Code scannen</string>
     <string name="new_group">Neue Gruppe</string>
     <string name="invitation">Einladung</string>
+    <string name="invited">Eingeladen</string>
     <string name="invite">Einladen</string>
     <string name="no_chats_yet">Noch keine Chats</string>
     <string name="empty_chats_invite_npub">Beginnen Sie ein Gespräch, indem Sie jemanden mit seinem npub einladen.</string>
@@ -78,6 +79,9 @@
     <string name="jump_to_newest">Zum Neuesten springen</string>
     <string name="scroll_to_top">Nach oben scrollen</string>
     <string name="discard_failed_message">Fehlgeschlagene Nachricht verwerfen</string>
+    <string name="auto_invite_banner_with_inviter">Du wurdest von %1$s eingeladen. Verlasse die Gruppe, wenn du nicht hier sein möchtest.</string>
+    <string name="auto_invite_banner_unknown">Du wurdest zu dieser Gruppe eingeladen. Verlasse die Gruppe, wenn du nicht hier sein möchtest.</string>
+    <string name="auto_invite_banner_dismiss">Einladungsbanner schließen</string>
     <string name="invited_to_this_chat">Sie wurden zu diesem Chat eingeladen.</string>
     <string name="decline">Ablehnen</string>
     <string name="accept">Annehmen</string>
@@ -342,6 +346,9 @@
     <string name="notification_channel_reactions_description">Reaktionen auf deine Nachrichten</string>
     <string name="notification_channel_invites">Einladungen</string>
     <string name="notification_channel_invites_description">Gruppeneinladungen und Willkommensnachrichten</string>
+    <string name="notification_joined_group">%1$s beigetreten</string>
+    <string name="notification_joined_new_group">Einer neuen Gruppe beigetreten</string>
+    <string name="notification_joined_group_from_sender">Du wurdest von %1$s eingeladen</string>
     <string name="notification_group_invite">Du wurdest zu einem sicheren Chat eingeladen</string>
     <string name="notification_new_message">Neue Nachricht</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>

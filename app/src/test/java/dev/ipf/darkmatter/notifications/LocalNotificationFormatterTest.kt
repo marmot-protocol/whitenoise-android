@@ -61,6 +61,41 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun autoAcceptedInviteNotificationUsesJoinedCopy() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.GROUP_INVITE,
+                    groupName = null,
+                    previewText = null,
+                    sender = user(displayName = "Bob"),
+                ),
+                conversationTitleOverride = "Launch",
+                groupInviteAutoAccepted = true,
+            )
+
+        assertEquals("Joined Launch", content?.title)
+        assertEquals("You were invited by Bob", content?.body)
+        assertEquals("Launch", content?.conversationTitle)
+    }
+
+    @Test
+    fun autoAcceptedUnnamedInviteNotificationFallsBackToNewGroupCopy() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.GROUP_INVITE,
+                    groupName = null,
+                    previewText = null,
+                    sender = user(displayName = "Bob"),
+                ),
+                groupInviteAutoAccepted = true,
+            )
+
+        assertEquals("Joined a new group", content?.title)
+    }
+
+    @Test
     fun reactionWithPreviewReadsAsAReactionLine() {
         val content =
             LocalNotificationFormatter.content(

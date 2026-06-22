@@ -49,6 +49,7 @@
     <string name="scan_qr_code">Сканировать QR-код</string>
     <string name="new_group">Новая группа</string>
     <string name="invitation">Приглашение</string>
+    <string name="invited">Приглашение</string>
     <string name="invite">Пригласить</string>
     <string name="no_chats_yet">Пока нет чатов</string>
     <string name="empty_chats_invite_npub">Начните разговор, пригласив кого-нибудь с помощью npub.</string>
@@ -80,6 +81,9 @@
     <string name="jump_to_newest">К новым</string>
     <string name="scroll_to_top">Прокрутить вверх</string>
     <string name="discard_failed_message">Удалить неотправленное сообщение</string>
+    <string name="auto_invite_banner_with_inviter">Вас пригласил(а) %1$s. Покиньте группу, если не хотите здесь быть.</string>
+    <string name="auto_invite_banner_unknown">Вас пригласили в эту группу. Покиньте группу, если не хотите здесь быть.</string>
+    <string name="auto_invite_banner_dismiss">Закрыть баннер приглашения</string>
     <string name="invited_to_this_chat">Вас пригласили в этот чат.</string>
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>
@@ -346,6 +350,9 @@
     <string name="notification_channel_reactions_description">Реакции на ваши сообщения</string>
     <string name="notification_channel_invites">Приглашения</string>
     <string name="notification_channel_invites_description">Приглашения в группы и приветствия</string>
+    <string name="notification_joined_group">Вы присоединились к %1$s</string>
+    <string name="notification_joined_new_group">Вы присоединились к новой группе</string>
+    <string name="notification_joined_group_from_sender">Вас пригласил(а) %1$s</string>
     <string name="notification_group_invite">Вы были приглашены в безопасный чат</string>
     <string name="notification_new_message">Новое сообщение</string>
     <string name="notification_sender_in_group">%1$s в %2$s</string>

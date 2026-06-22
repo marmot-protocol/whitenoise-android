@@ -795,6 +795,8 @@ class ChatsController(
     // preview plaintext: pending → in flight (here) → cached.
     private val inFlightPreviewParses = mutableSetOf<String>()
 
+    private val inFlightInviteAutoAccepts = mutableSetOf<String>()
+
     // Monotonically increments on every `bind()`. Captured by each
     // [schedulePendingMemberFetches] job; once a later bind has happened
     // (account switch, sign-out, or re-bind), the captured epoch no
@@ -843,6 +845,7 @@ class ChatsController(
         inFlightMemberFetches.clear()
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
+        inFlightInviteAutoAccepts.clear()
         bindEpoch += 1L
         recompute()
         error = null
@@ -1009,12 +1012,21 @@ class ChatsController(
     // here via AppState so the chat list reflects the new archived flag.
     fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
         if (accountRef == null) return
-        if (groupRecordsById[record.groupIdHex] == null) return
-        // chatListItemFromProjection reads row.archived (not group.archived), so
-        // patch both the chat row and the group record to keep them consistent.
+        if (groupRecordsById[record.groupIdHex] == null && chatRows.none { it.groupIdHex == record.groupIdHex }) return
+        // chatListItemFromProjection reads row.archived / row.pendingConfirmation
+        // (not just the group record), so patch both the chat row and the group
+        // record to keep them consistent.
         chatRows =
             chatRows.map { row ->
-                if (row.groupIdHex == record.groupIdHex) row.copy(archived = record.archived) else row
+                if (row.groupIdHex == record.groupIdHex) {
+                    row.copy(
+                        archived = record.archived,
+                        pendingConfirmation = record.pendingConfirmation,
+                        groupName = record.name.ifBlank { row.groupName },
+                    )
+                } else {
+                    row
+                }
             }
         foldGroup(record)
     }
@@ -1434,6 +1446,7 @@ class ChatsController(
         // Likewise, fan out off-main markdown parses for any preview text we
         // haven't tokenized yet; each completion folds back via recompute().
         schedulePendingPreviewParses()
+        schedulePendingInviteAutoAccepts()
     }
 
     /**
@@ -1521,6 +1534,33 @@ class ChatsController(
                     // bind() already cleared the set, so only the owning
                     // epoch may mutate it.
                     if (bindEpoch == epoch) inFlightPreviewParses.remove(text)
+                }
+            }
+        }
+    }
+
+    private fun schedulePendingInviteAutoAccepts() {
+        val account = accountRef ?: return
+        val epoch = bindEpoch
+        val pending =
+            (
+                chatRows.filter { it.pendingConfirmation }.map { it.groupIdHex } +
+                    groupRecordsById.values.filter { it.pendingConfirmation }.map { it.groupIdHex }
+            ).distinct()
+                .filterNot { it in inFlightInviteAutoAccepts }
+        if (pending.isEmpty()) return
+        inFlightInviteAutoAccepts.addAll(pending)
+        pending.forEach { groupIdHex ->
+            val inviter = groupRecordsById[groupIdHex]?.welcomerAccountIdHex
+            appState.launchMutation {
+                try {
+                    appState.autoAcceptGroupInvite(
+                        accountRef = account,
+                        groupIdHex = groupIdHex,
+                        inviterAccountIdHex = inviter,
+                    )
+                } finally {
+                    if (bindEpoch == epoch) inFlightInviteAutoAccepts.remove(groupIdHex)
                 }
             }
         }
@@ -3272,6 +3312,7 @@ class ConversationController(
                         )
                 }
                 appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+                appState.forgetAutoAcceptedInvite(group.groupIdHex)
                 // Drop self from the cached member snapshot synchronously so
                 // re-opening the just-left group seeds a roster without self
                 // and renders the disabled notice immediately, instead of
@@ -3296,10 +3337,23 @@ class ConversationController(
             }
         }
 
-    suspend fun acceptInvite(): Boolean {
+    suspend fun acceptInvite(
+        notify: Boolean = true,
+        autoAccepted: Boolean = false,
+    ): Boolean {
         val account = appState.activeAccountRef ?: return false
         return runCatching {
-            group = appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) }
+            group =
+                if (autoAccepted) {
+                    appState.autoAcceptGroupInvite(
+                        accountRef = account,
+                        groupIdHex = group.groupIdHex,
+                        inviterAccountIdHex = group.welcomerAccountIdHex,
+                    ) ?: return false
+                } else {
+                    appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) }
+                }
+            appState.applyLocalGroupUpdate(group)
             appState.dismissConversationNotifications(account, group.groupIdHex)
             refreshMembers()
             refreshCurrentTimeline(account).forEach { streamId ->
@@ -3308,7 +3362,7 @@ class ConversationController(
                 }
             }
             initializeReadState(account)
-            appState.present(R.string.toast_invite_accepted)
+            if (notify) appState.present(R.string.toast_invite_accepted)
             true
         }.getOrElse {
             it.rethrowIfCancellation()
@@ -3323,6 +3377,7 @@ class ConversationController(
             appState.marmotIo { declineGroupInvite(account, group.groupIdHex) }
             appState.dismissConversationNotifications(account, group.groupIdHex)
             group = group.copy(pendingConfirmation = false, archived = true)
+            appState.forgetAutoAcceptedInvite(group.groupIdHex)
             appState.applyLocalGroupUpdate(group)
             appState.present(R.string.toast_invite_declined)
             true
