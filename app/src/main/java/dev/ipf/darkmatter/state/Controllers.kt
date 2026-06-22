@@ -186,6 +186,18 @@ internal fun chatListItemFromProjection(
     val otherMember =
         members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) }
     val memberCount = members?.size ?: 0
+    // The engine never zeros a removed group's unread count, and the row has no
+    // membership flag, so a group the account has left keeps a frozen unread
+    // badge. The unread getters read straight from `projection`, so zero that
+    // row when the loaded roster proves the account is gone — a derived,
+    // cache-free fix (issue #625).
+    val selfRemoved = activeAccountRemovedFromRoster(members, activeAccountIdHex)
+    val projectionRow =
+        if (selfRemoved) {
+            row.copy(unreadCount = 0uL, hasUnread = false, firstUnreadMessageIdHex = null)
+        } else {
+            row
+        }
     return ChatListItem(
         group = displayGroup,
         latest =
@@ -211,10 +223,58 @@ internal fun chatListItemFromProjection(
         otherMemberAccount = otherMember,
         memberCount = memberCount,
         memberSnapshot = members?.let(::GroupMemberSnapshot),
-        projection = row,
+        projection = projectionRow,
         previewTokens = previewTokens,
     )
 }
+
+/**
+ * Whether the active account is DEFINITIVELY no longer a member of this
+ * group, judged purely from the locally-held roster (no new cache; see
+ * AGENTS.md). True ONLY when the roster has actually been loaded
+ * ([members] non-null) and a real active account is known
+ * ([activeAccountIdHex] non-null/non-blank) and that account is absent from
+ * the loaded roster. A null/not-yet-fetched roster must NOT report removal,
+ * or every chat row would flash a zeroed unread badge before the async
+ * members fetch lands. Drives [chatListItemFromProjection]'s decision to zero
+ * the per-row unread badge for a group the account was removed from
+ * (removed-by-admin or self-leave) — the engine's `ChatListRowFfi` carries no
+ * membership flag and never zeros `unreadCount` on self-removal (issue #625).
+ */
+internal fun activeAccountRemovedFromRoster(
+    members: List<AppGroupMemberRecordFfi>?,
+    activeAccountIdHex: String?,
+): Boolean {
+    if (members == null) return false
+    val active = activeAccountIdHex?.takeIf { it.isNotBlank() } ?: return false
+    return members.none { GroupProjector.isActiveAccountMember(it, active) }
+}
+
+/**
+ * The member cache to keep after a chat-list row update with the given
+ * [trigger]. On [ChatListUpdateTriggerFfi.MEMBERSHIP_CHANGED] — the engine's
+ * signal that a group's roster changed (admin removal, self-leave, or a
+ * peer join/leave; see `chat_list_trigger_from_event` in marmot-app) — the
+ * cached roster for [groupIdHex] is stale and must be dropped so the next
+ * `schedulePendingMemberFetches()` re-fetches the authoritative roster from
+ * SQLite. `schedulePendingMemberFetches()` skips groups already present in the
+ * cache, so without this drop a stale POSITIVE roster (one still listing the
+ * active account) would survive an admin removal and keep the phantom unread
+ * badge alive (issue #625). Every other trigger (new last message, unread
+ * change, archive flip, …) leaves the roster untouched — the cache only goes
+ * stale on a membership commit. Pure so the invalidation policy is unit-tested
+ * without standing up the whole controller.
+ */
+internal fun memberCacheAfterChatRowTrigger(
+    cache: Map<String, List<AppGroupMemberRecordFfi>>,
+    groupIdHex: String,
+    trigger: ChatListUpdateTriggerFfi?,
+): Map<String, List<AppGroupMemberRecordFfi>> =
+    if (trigger == ChatListUpdateTriggerFfi.MEMBERSHIP_CHANGED) {
+        cache - groupIdHex
+    } else {
+        cache
+    }
 
 /**
  * The last-message text a chat row should run through the markdown parser,
@@ -946,7 +1006,7 @@ class ChatsController(
                                             chatsDebug {
                                                 "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
                                             }
-                                            foldChatRow(row)
+                                            foldChatRow(row, update.trigger)
                                         }
                                         is ChatListSubscriptionUpdateFfi.RemoveRow -> {
                                             chatsDebug {
@@ -1119,7 +1179,22 @@ class ChatsController(
             currentProjectedItems().filterNot { it.group.pendingConfirmation },
         )
 
-    private fun foldChatRow(row: ChatListRowFfi) {
+    private fun foldChatRow(
+        row: ChatListRowFfi,
+        trigger: ChatListUpdateTriggerFfi? = null,
+    ) {
+        // A membership commit (admin removal, self-leave, or someone else
+        // joining/leaving) makes any roster we cached for this group stale. The
+        // engine's ChatListRowFfi carries no membership flag and never zeros a
+        // removed group's unread (issue #625), so the per-row unread gate in
+        // chatListItemFromProjection() relies on a CURRENT roster. Without this
+        // invalidation, schedulePendingMemberFetches() skips the group (it's
+        // already cached) and the stale positive roster keeps the phantom unread
+        // badge after an admin removes the active account. Dropping the entry
+        // lets the next recompute() re-fetch the authoritative roster from
+        // SQLite (the source of truth) — a refresh of an existing lazy snapshot,
+        // not a new Android-owned cache (AGENTS.md).
+        memberCacheByGroup = memberCacheAfterChatRowTrigger(memberCacheByGroup, row.groupIdHex, trigger)
         chatRows =
             if (chatRows.any { it.groupIdHex == row.groupIdHex }) {
                 chatRows.map { if (it.groupIdHex == row.groupIdHex) row else it }
@@ -1445,9 +1520,15 @@ class ChatsController(
     }
 
     private fun recompute() {
+        // Project once and reuse: the account total must agree with the
+        // membership-aware per-row badges (a group the account was removed from
+        // reports a zero badge — issue #625), so fold the projected items, not
+        // the raw rows. currentProjectedItems() reads chatRows + the member
+        // cache, so it honors the gate regardless of list visibility.
+        val projected = currentProjectedItems()
         val unreadAccountRef = accountRef
         if (unreadAccountRef != null) {
-            appState.updateAccountUnreadCount(unreadAccountRef, accountUnreadCount(chatRows))
+            appState.updateAccountUnreadCount(unreadAccountRef, accountUnreadCountFromItems(projected))
         }
         // Hidden behind an open conversation: keep folding updates into the
         // backing maps (done by the caller) but defer the projection rebuild +
@@ -1457,7 +1538,7 @@ class ChatsController(
             return
         }
         pendingRecompute = false
-        val all = sortChatListItems(currentProjectedItems())
+        val all = sortChatListItems(projected)
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
         chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }

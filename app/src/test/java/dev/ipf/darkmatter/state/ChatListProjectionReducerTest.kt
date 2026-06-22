@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
@@ -266,6 +267,176 @@ class ChatListProjectionReducerTest {
         )
     }
 
+    // ---- self-removal unread gate (#625) ------------------------------------
+
+    @Test
+    fun loadedRosterWithoutActiveAccountZerosTheUnreadBadge() {
+        // Removed-by-admin or self-leave: the engine still reports the
+        // last-known unread on the row, but the loaded roster proves the
+        // active account is gone, so the projected badge must read zero.
+        val item =
+            chatListItemFromProjection(
+                row(
+                    groupId = "g1",
+                    rawTitle = "Left Group",
+                    unreadCount = 7uL,
+                    hasUnread = true,
+                    firstUnreadMessageIdHex = "m-unread",
+                ),
+                activeAccountIdHex = "me-acc",
+                members = listOf(member("peer-acc", local = false)),
+            )
+
+        assertEquals(0uL, item.unreadCount)
+        assertEquals(false, item.hasUnread)
+        assertNull(item.projection?.firstUnreadMessageIdHex)
+    }
+
+    @Test
+    fun loadedRosterWithActiveAccountPreservesUnread() {
+        val item =
+            chatListItemFromProjection(
+                row(
+                    groupId = "g1",
+                    rawTitle = "Joined Group",
+                    unreadCount = 7uL,
+                    hasUnread = true,
+                    firstUnreadMessageIdHex = "m-unread",
+                ),
+                activeAccountIdHex = "me-acc",
+                members = listOf(member("me-acc", local = true), member("peer-acc", local = false)),
+            )
+
+        assertEquals(7uL, item.unreadCount)
+        assertTrue(item.hasUnread)
+        assertEquals("m-unread", item.projection?.firstUnreadMessageIdHex)
+    }
+
+    @Test
+    fun nullRosterDoesNotZeroUnreadPrematurely() {
+        // The roster hasn't been fetched yet; zeroing here would flash an empty
+        // badge on every row before the async members fetch lands.
+        val item =
+            chatListItemFromProjection(
+                row(groupId = "g1", rawTitle = "Pending Roster", unreadCount = 3uL, hasUnread = true),
+                activeAccountIdHex = "me-acc",
+                members = null,
+            )
+
+        assertEquals(3uL, item.unreadCount)
+        assertTrue(item.hasUnread)
+    }
+
+    @Test
+    fun blankActiveAccountPreservesUnread() {
+        // No known active account: we can't prove removal, so leave the badge.
+        val item =
+            chatListItemFromProjection(
+                row(groupId = "g1", rawTitle = "Unknown Self", unreadCount = 4uL, hasUnread = true),
+                activeAccountIdHex = "",
+                members = listOf(member("peer-acc", local = false)),
+            )
+
+        assertEquals(4uL, item.unreadCount)
+        assertTrue(item.hasUnread)
+    }
+
+    @Test
+    fun activeAccountRemovedFromRoster_predicate() {
+        val active = "me-acc"
+        val rosterWithMe = listOf(member(active, local = true), member("peer", local = false))
+        val rosterWithoutMe = listOf(member("peer", local = false))
+
+        // Loaded roster excluding self → removed.
+        assertTrue(activeAccountRemovedFromRoster(rosterWithoutMe, active))
+        // Loaded roster including self → not removed.
+        assertEquals(false, activeAccountRemovedFromRoster(rosterWithMe, active))
+        // Not-yet-fetched roster → not removed (must not zero prematurely).
+        assertEquals(false, activeAccountRemovedFromRoster(null, active))
+        // No known active account → not removed.
+        assertEquals(false, activeAccountRemovedFromRoster(rosterWithoutMe, null))
+        assertEquals(false, activeAccountRemovedFromRoster(rosterWithoutMe, "  "))
+    }
+
+    @Test
+    fun membershipChangedTriggerDropsCachedRosterSoItRefetches() {
+        // The stale-positive-cache path: the user viewed the chat list before
+        // an admin removed them, so memberCacheByGroup holds the OLD roster
+        // (still listing the active account). A MEMBERSHIP_CHANGED row update
+        // must evict that entry so schedulePendingMemberFetches() — which skips
+        // already-cached groups — re-fetches the current (self-excluded) roster
+        // and the gate can zero the badge (issue #625).
+        val me = "me-acc"
+        val stalePositive = listOf(member(me, local = true), member("peer", local = false))
+        val cache = mapOf("g1" to stalePositive, "g2" to stalePositive)
+
+        val after = memberCacheAfterChatRowTrigger(cache, "g1", ChatListUpdateTriggerFfi.MEMBERSHIP_CHANGED)
+
+        assertEquals(false, after.containsKey("g1"))
+        // Other groups' rosters are untouched.
+        assertEquals(stalePositive, after["g2"])
+    }
+
+    @Test
+    fun nonMembershipTriggersKeepCachedRoster() {
+        // A new message / unread bump / archive flip doesn't change the roster,
+        // so re-fetching on every such update would be wasteful churn.
+        val me = "me-acc"
+        val roster = listOf(member(me, local = true))
+        val cache = mapOf("g1" to roster)
+
+        val nonMembershipTriggers =
+            listOf(
+                ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+                ChatListUpdateTriggerFfi.UNREAD_CHANGED,
+                ChatListUpdateTriggerFfi.ARCHIVE_CHANGED,
+                ChatListUpdateTriggerFfi.PENDING_CONFIRMATION_CHANGED,
+                ChatListUpdateTriggerFfi.NEW_GROUP,
+                ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
+                ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH,
+                ChatListUpdateTriggerFfi.REMOVED,
+            )
+        for (trigger in nonMembershipTriggers) {
+            assertEquals(cache, memberCacheAfterChatRowTrigger(cache, "g1", trigger))
+        }
+        // A null trigger (snapshot fold, no membership signal) also preserves.
+        assertEquals(cache, memberCacheAfterChatRowTrigger(cache, "g1", null))
+    }
+
+    @Test
+    fun staleCacheInvalidationThenRefetchZerosBadgeEndToEnd() {
+        // Wire the two halves together: BEFORE invalidation the stale positive
+        // roster keeps the badge; AFTER a MEMBERSHIP_CHANGED eviction the
+        // re-fetched self-excluded roster zeros it.
+        val me = "me-acc"
+        val row =
+            row(
+                groupId = "g1",
+                rawTitle = "Removed By Admin",
+                unreadCount = 9uL,
+                hasUnread = true,
+                firstUnreadMessageIdHex = "m-unread",
+            )
+        val stalePositive = listOf(member(me, local = true), member("peer", local = false))
+        var cache = mapOf("g1" to stalePositive)
+
+        // Stale positive roster → badge survives (the reported bug).
+        val before = chatListItemFromProjection(row, activeAccountIdHex = me, members = cache["g1"])
+        assertEquals(9uL, before.unreadCount)
+        assertTrue(before.hasUnread)
+
+        // Membership commit observed → cache evicted.
+        cache = memberCacheAfterChatRowTrigger(cache, "g1", ChatListUpdateTriggerFfi.MEMBERSHIP_CHANGED)
+        assertEquals(false, cache.containsKey("g1"))
+
+        // Re-fetch lands with the current self-excluded roster → badge zeroed.
+        val refetched = listOf(member("peer", local = false))
+        val after = chatListItemFromProjection(row, activeAccountIdHex = me, members = refetched)
+        assertEquals(0uL, after.unreadCount)
+        assertEquals(false, after.hasUnread)
+        assertNull(after.projection?.firstUnreadMessageIdHex)
+    }
+
     // ---- fixtures -----------------------------------------------------------
 
     private fun preview(
@@ -294,6 +465,9 @@ class ChatListProjectionReducerTest {
         pendingConfirmation: Boolean = false,
         preview: ChatListMessagePreviewFfi? = preview(),
         updatedAt: ULong = 1uL,
+        unreadCount: ULong = 0uL,
+        hasUnread: Boolean = false,
+        firstUnreadMessageIdHex: String? = null,
     ) = ChatListRowFfi(
         groupIdHex = groupId,
         archived = archived,
@@ -303,9 +477,9 @@ class ChatListProjectionReducerTest {
         avatarUrl = null,
         avatar = null,
         lastMessage = preview,
-        unreadCount = 0uL,
-        hasUnread = false,
-        firstUnreadMessageIdHex = null,
+        unreadCount = unreadCount,
+        hasUnread = hasUnread,
+        firstUnreadMessageIdHex = firstUnreadMessageIdHex,
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
         updatedAt = updatedAt,

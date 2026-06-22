@@ -1288,9 +1288,27 @@ class DarkMatterAppState(
         val refreshedCounts =
             runCatching {
                 marmotIo {
-                    val byHex = accountUnreadSummary().associateBy { it.accountIdHex }
+                    // accountUnreadSummary() aggregates the engine's chat-list
+                    // rows, which never zero a removed group's unread (#625), so
+                    // it reintroduces the phantom account total here. Fold each
+                    // account's durable rows through the membership gate instead:
+                    // a group whose current roster proves the account is gone is
+                    // excluded. This is the all-account (startup / account-list)
+                    // path, not a hot path; rosters are fetched only for
+                    // genuinely-unread groups (local SQLite reads). On a
+                    // per-account read failure, fall back to the prior count
+                    // rather than dropping it to zero.
                     localSigning.associate { summary ->
-                        summary.label to (byHex[summary.accountIdHex]?.unreadCount ?: previous[summary.label] ?: 0uL)
+                        val count =
+                            runCatching {
+                                membershipAwareAccountUnreadCount(
+                                    rows = chatList(summary.label, includeArchived = true),
+                                    activeAccountIdHex = summary.accountIdHex,
+                                ) { groupIdHex ->
+                                    runCatching { groupMembers(summary.label, groupIdHex) }.getOrNull()
+                                }
+                            }.getOrNull() ?: previous[summary.label] ?: 0uL
+                        summary.label to count
                     }
                 }
             }.onFailure {
@@ -1306,8 +1324,9 @@ class DarkMatterAppState(
      *
      * On a per-notification hot path we only ever need the one account that
      * changed, so we read that account's durable chat-list rows directly via
-     * [Marmot.chatList] and fold them with [accountUnreadCount] (which excludes
-     * archived chats, matching `account_unread_total`). This avoids fanning out
+     * [Marmot.chatList] and fold them with [membershipAwareAccountUnreadCount]
+     * (which excludes archived chats, matching `account_unread_total`, and
+     * zeros groups the account was removed from — #625). This avoids fanning out
      * an all-account [Marmot.accountUnreadSummary] scan on every update (#473).
      */
     private suspend fun refreshAccountUnreadCount(accountRef: String) {
@@ -1315,9 +1334,23 @@ class DarkMatterAppState(
         // Only local-signing accounts are tracked in accountUnreadCounts; skip
         // refs we don't know about (matches refreshAccountUnreadCounts' filter).
         if (accounts.none { it.localSigning && it.label == ref }) return
+        val activeAccountIdHex = accounts.firstOrNull { it.label == ref }?.accountIdHex
         val unreadCount =
             runCatching {
-                marmotIo { accountUnreadCount(chatList(ref, includeArchived = true)) }
+                marmotIo {
+                    // The engine never zeros a removed group's unread row (#625),
+                    // so fold the durable rows through the membership gate: any
+                    // group whose current roster proves this account is gone is
+                    // excluded. Rosters are fetched only for genuinely-unread
+                    // groups (local SQLite reads), keeping the per-notification
+                    // hot path light (#473).
+                    membershipAwareAccountUnreadCount(
+                        rows = chatList(ref, includeArchived = true),
+                        activeAccountIdHex = activeAccountIdHex,
+                    ) { groupIdHex ->
+                        runCatching { groupMembers(ref, groupIdHex) }.getOrNull()
+                    }
+                }
             }.onFailure {
                 appStateDebug(it) { "account unread refresh failed for ${ref.take(8)}: ${it.readableMessage()}" }
             }.getOrNull()
