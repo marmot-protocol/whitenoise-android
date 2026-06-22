@@ -16,6 +16,7 @@
     <string name="back">Назад</string>
     <string name="back_to_chats">Вернуться к чатам</string>
     <string name="open_settings">Открыть настройки</string>
+    <string name="other_account_unread_indicator">В другом аккаунте есть непрочитанные сообщения</string>
     <string name="archived">В архиве</string>
     <string name="chats_count">%1$d чаты</string>
     <string name="couldnt_load_chats">Не удалось загрузить чаты</string>
@@ -34,6 +35,11 @@
     <string name="chat_list_search_open_profile">Открыть профиль</string>
     <string name="chat_list_search_nip05_not_found">Профиль для «%1$s» не найден</string>
     <string name="chat_list_search_invalid_npub">Это не похоже на действительный npub</string>
+    <string name="recipient_preview_resolving">Разрешение…</string>
+    <string name="recipient_preview_no_profile">Профиль не опубликован</string>
+    <string name="recipient_preview_unresolved">Не удалось разрешить этот идентификатор</string>
+    <string name="recipient_preview_nip05_verified">Подтверждённый адрес</string>
+    <string name="recipient_preview_nip05_unverified">Неподтверждённый адрес</string>
     <string name="chat_row_action_archive">Архивировать</string>
     <string name="chat_row_action_unarchive">Восстановить</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
@@ -355,6 +361,10 @@
     <string name="notification_joined_group_from_sender">Вас пригласил(а) %1$s</string>
     <string name="notification_group_invite">Вы были приглашены в безопасный чат</string>
     <string name="notification_new_message">Новое сообщение</string>
+    <string name="notification_sent_picture">Отправлено изображение</string>
+    <string name="notification_sent_video">Отправлено видео</string>
+    <string name="notification_sent_voice_message">Отправлено голосовое сообщение</string>
+    <string name="notification_sent_file">Отправлен файл</string>
     <string name="notification_sender_in_group">%1$s в %2$s</string>
     <string name="notification_invite_from_sender">Приглашение от %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s пригласил(а) вас в %2$s</string>

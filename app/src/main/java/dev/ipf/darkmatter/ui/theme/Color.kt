@@ -8,3 +8,8 @@ import androidx.compose.ui.graphics.Color
 // than following the system wallpaper.
 val Highlight = Color(0xFF06B6D4)
 val OnHighlight = Color(0xFF001F28)
+
+// AMOLED surfaces keep a pure-black fill; this dim neutral stroke restores
+// object boundaries without lifting the surface color off #000000.
+internal val AmoledSurfaceBorder = Color(0xFF242424)
+internal val AmoledEmphasizedSurfaceBorder = Color(0xFF2A2A2A)

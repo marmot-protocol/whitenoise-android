@@ -16,6 +16,7 @@
     <string name="back">Torna indietro</string>
     <string name="back_to_chats">Torniamo alle chat</string>
     <string name="open_settings">Apri impostazioni</string>
+    <string name="other_account_unread_indicator">Un altro account ha messaggi non letti</string>
     <string name="archived">Archiviato</string>
     <string name="chats_count">%1$d chatta</string>
     <string name="couldnt_load_chats">Impossibile caricare le chat</string>
@@ -34,6 +35,11 @@
     <string name="chat_list_search_open_profile">Apri profilo</string>
     <string name="chat_list_search_nip05_not_found">Nessun profilo trovato per \"%1$s\"</string>
     <string name="chat_list_search_invalid_npub">Non sembra un npub valido</string>
+    <string name="recipient_preview_resolving">Risoluzione in corso…</string>
+    <string name="recipient_preview_no_profile">Nessun profilo pubblicato</string>
+    <string name="recipient_preview_unresolved">Impossibile risolvere questo identificatore</string>
+    <string name="recipient_preview_nip05_verified">Indirizzo verificato</string>
+    <string name="recipient_preview_nip05_unverified">Indirizzo non verificato</string>
     <string name="chat_row_action_archive">Archivia</string>
     <string name="chat_row_action_unarchive">Ripristina</string>
     <string name="chat_row_action_mark_read">Segna come letto</string>
@@ -351,6 +357,10 @@
     <string name="notification_joined_group_from_sender">Sei stato invitato da %1$s</string>
     <string name="notification_group_invite">Sei stato invitato a una chat sicura</string>
     <string name="notification_new_message">Nuovo messaggio</string>
+    <string name="notification_sent_picture">ha inviato una foto</string>
+    <string name="notification_sent_video">ha inviato un video</string>
+    <string name="notification_sent_voice_message">ha inviato un messaggio vocale</string>
+    <string name="notification_sent_file">ha inviato un file</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>
     <string name="notification_invite_from_sender">Invito da %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s ti ha invitato a %2$s</string>

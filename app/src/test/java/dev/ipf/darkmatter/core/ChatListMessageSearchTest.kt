@@ -206,6 +206,7 @@ class ChatListMessageSearchTest {
         override val deleted: Boolean,
         override val plaintext: String,
         override val messageIdHex: String,
+        override val timelineAt: ULong = 0uL,
     ) : ChatListMessageSearch.SearchableRecord
 
     @Test

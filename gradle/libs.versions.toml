@@ -1,14 +1,14 @@
 [versions]
 agp = "9.2.1"
-coreKtx = "1.10.1"
+coreKtx = "1.19.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 orgJson = "20240303"
 espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.6.1"
-activityCompose = "1.8.0"
+activityCompose = "1.13.0"
 kotlin = "2.4.0"
-composeBom = "2026.05.01"
+composeBom = "2026.06.00"
 # material3 is deliberately pinned ABOVE the version the Compose BOM supplies
 # (compose-bom 2026.05.01 -> material3 1.4.0 stable). The QuickActionFabMenu in
 # DarkMatterApp.kt uses the Material 3 expressive FAB-menu APIs
@@ -23,15 +23,15 @@ composeBom = "2026.05.01"
 material3 = "1.5.0-alpha20"
 emoji2 = "1.6.0"
 coroutines = "1.11.0"
-jna = "5.18.1"
+jna = "5.19.1"
 zxing = "3.5.4"
 cameraX = "1.6.1"
 mlkitBarcode = "17.3.0"
 ktlint = "1.5.0"
 ktlintGradle = "14.2.0"
-firebaseBom = "33.5.1"
-googleServices = "4.4.2"
-playServicesBase = "18.5.0"
+firebaseBom = "34.15.0"
+googleServices = "4.5.0"
+playServicesBase = "18.10.0"
 media3 = "1.10.1"
 securityCrypto = "1.1.0"
 roborazzi = "1.64.0"
@@ -64,7 +64,7 @@ androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycl
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraX" }
 mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
-firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServicesBase" }
 androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }

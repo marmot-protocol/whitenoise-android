@@ -16,6 +16,7 @@
     <string name="back">Zurück</string>
     <string name="back_to_chats">Zurück zu den Chats</string>
     <string name="open_settings">Einstellungen öffnen</string>
+    <string name="other_account_unread_indicator">Ein anderes Konto hat ungelesene Nachrichten</string>
     <string name="archived">Archiviert</string>
     <string name="chats_count">%1$d Chats</string>
     <string name="couldnt_load_chats">Chats konnten nicht geladen werden</string>
@@ -34,6 +35,11 @@
     <string name="chat_list_search_open_profile">Profil öffnen</string>
     <string name="chat_list_search_nip05_not_found">Kein Profil für \"%1$s\" gefunden</string>
     <string name="chat_list_search_invalid_npub">Das sieht nicht nach einem gültigen npub aus</string>
+    <string name="recipient_preview_resolving">Wird aufgelöst…</string>
+    <string name="recipient_preview_no_profile">Kein Profil veröffentlicht</string>
+    <string name="recipient_preview_unresolved">Diese Kennung konnte nicht aufgelöst werden</string>
+    <string name="recipient_preview_nip05_verified">Verifizierte Adresse</string>
+    <string name="recipient_preview_nip05_unverified">Nicht verifizierte Adresse</string>
     <string name="chat_row_action_archive">Archivieren</string>
     <string name="chat_row_action_unarchive">Aus dem Archiv</string>
     <string name="chat_row_action_mark_read">Als gelesen markieren</string>
@@ -351,6 +357,10 @@
     <string name="notification_joined_group_from_sender">Du wurdest von %1$s eingeladen</string>
     <string name="notification_group_invite">Du wurdest zu einem sicheren Chat eingeladen</string>
     <string name="notification_new_message">Neue Nachricht</string>
+    <string name="notification_sent_picture">hat ein Foto gesendet</string>
+    <string name="notification_sent_video">hat ein Video gesendet</string>
+    <string name="notification_sent_voice_message">hat eine Sprachnachricht gesendet</string>
+    <string name="notification_sent_file">hat eine Datei gesendet</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>
     <string name="notification_invite_from_sender">Einladung von %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s hat dich zu %2$s eingeladen</string>

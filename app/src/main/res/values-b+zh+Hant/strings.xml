@@ -16,6 +16,7 @@
     <string name="back">返回</string>
     <string name="back_to_chats">返回聊天</string>
     <string name="open_settings">開啟設定</string>
+    <string name="other_account_unread_indicator">另一個帳號有未讀訊息</string>
     <string name="archived">已存檔</string>
     <string name="chats_count">%1$d 聊天</string>
     <string name="couldnt_load_chats">無法載入聊天</string>
@@ -34,6 +35,11 @@
     <string name="chat_list_search_open_profile">開啟個人檔案</string>
     <string name="chat_list_search_nip05_not_found">找不到「%1$s」的個人檔案</string>
     <string name="chat_list_search_invalid_npub">這看起來不是有效的 npub</string>
+    <string name="recipient_preview_resolving">正在解析…</string>
+    <string name="recipient_preview_no_profile">未發佈個人檔案</string>
+    <string name="recipient_preview_unresolved">無法解析此識別碼</string>
+    <string name="recipient_preview_nip05_verified">已驗證的地址</string>
+    <string name="recipient_preview_nip05_unverified">未驗證的地址</string>
     <string name="chat_row_action_archive">封存</string>
     <string name="chat_row_action_unarchive">取消封存</string>
     <string name="chat_row_action_mark_read">標示為已讀</string>
@@ -350,6 +356,10 @@
     <string name="notification_joined_group_from_sender">你由 %1$s 邀請加入</string>
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新訊息</string>
+    <string name="notification_sent_picture">傳送了一張圖片</string>
+    <string name="notification_sent_video">傳送了一段影片</string>
+    <string name="notification_sent_voice_message">傳送了一則語音訊息</string>
+    <string name="notification_sent_file">傳送了一個檔案</string>
     <string name="notification_sender_in_group">%1$s 在 %2$s 中</string>
     <string name="notification_invite_from_sender">來自 %1$s 的邀請</string>
     <string name="notification_sender_invited_you_to_group">%1$s 邀請你加入 %2$s</string>

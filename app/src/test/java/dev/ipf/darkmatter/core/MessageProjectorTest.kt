@@ -286,6 +286,26 @@ class MessageProjectorTest {
         assertEquals(emptyList<String>(), MessageProjector.normalizeForwardTargets(listOf("", "   ")))
     }
 
+    @Test
+    fun mediaKindClassifiesByImetaMimePrefix() {
+        fun media(mime: String) = message(id = "m", plaintext = "", tags = listOf(MessageTagFfi(listOf("imeta", "m $mime"))))
+
+        assertEquals(ReplyMediaKind.Photo, MessageProjector.mediaKind(media("image/png")))
+        assertEquals(ReplyMediaKind.Video, MessageProjector.mediaKind(media("video/mp4")))
+        assertEquals(ReplyMediaKind.Voice, MessageProjector.mediaKind(media("audio/mp4")))
+        assertEquals(ReplyMediaKind.Document, MessageProjector.mediaKind(media("application/pdf")))
+    }
+
+    @Test
+    fun mediaKindIsNoneForTextAndForMediaMissingItsMime() {
+        assertEquals(ReplyMediaKind.None, MessageProjector.mediaKind(message(id = "t", plaintext = "hi")))
+        // imeta present but no `m` field — the type is unknowable, so don't guess.
+        assertEquals(
+            ReplyMediaKind.None,
+            MessageProjector.mediaKind(message(id = "m", tags = listOf(MessageTagFfi(listOf("imeta", "filename x.bin"))))),
+        )
+    }
+
     private fun reaction(
         id: String,
         sender: String,

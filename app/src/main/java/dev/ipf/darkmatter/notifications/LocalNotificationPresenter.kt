@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.MainActivity
 import dev.ipf.darkmatter.R
+import dev.ipf.darkmatter.core.ReplyMediaKind
 import dev.ipf.marmotkit.NotificationUpdateFfi
 
 class LocalNotificationPresenter(
@@ -83,6 +84,7 @@ class LocalNotificationPresenter(
         senderNameOverride: String? = null,
         previewTextOverride: String? = null,
         reactedToPreviewOverride: String? = null,
+        mediaKind: ReplyMediaKind = ReplyMediaKind.None,
         groupInviteAutoAccepted: Boolean = false,
     ): Boolean {
         val content =
@@ -92,6 +94,7 @@ class LocalNotificationPresenter(
                 senderNameOverride = senderNameOverride,
                 previewTextOverride = previewTextOverride,
                 reactedToPreviewOverride = reactedToPreviewOverride,
+                mediaKind = mediaKind,
                 groupInviteAutoAccepted = groupInviteAutoAccepted,
                 conversationTitleOverride = conversationTitleOverride,
             )

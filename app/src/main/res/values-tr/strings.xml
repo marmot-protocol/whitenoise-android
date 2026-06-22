@@ -16,6 +16,7 @@
     <string name="back">Geri dön</string>
     <string name="back_to_chats">Sohbetlere geri dön</string>
     <string name="open_settings">Ayarları aç</string>
+    <string name="other_account_unread_indicator">Başka bir hesapta okunmamış mesajlar var</string>
     <string name="archived">Arşivlendi</string>
     <string name="chats_count">%1$d sohbetleri</string>
     <string name="couldnt_load_chats">Sohbetler yüklenemedi</string>
@@ -34,6 +35,11 @@
     <string name="chat_list_search_open_profile">Profili aç</string>
     <string name="chat_list_search_nip05_not_found">\"%1$s\" için profil bulunamadı</string>
     <string name="chat_list_search_invalid_npub">Bu geçerli bir npub gibi görünmüyor</string>
+    <string name="recipient_preview_resolving">Çözümleniyor…</string>
+    <string name="recipient_preview_no_profile">Yayınlanmış profil yok</string>
+    <string name="recipient_preview_unresolved">Bu tanımlayıcı çözümlenemedi</string>
+    <string name="recipient_preview_nip05_verified">Doğrulanmış adres</string>
+    <string name="recipient_preview_nip05_unverified">Doğrulanmamış adres</string>
     <string name="chat_row_action_archive">Arşivle</string>
     <string name="chat_row_action_unarchive">Arşivden çıkar</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
@@ -351,6 +357,10 @@
     <string name="notification_joined_group_from_sender">%1$s sizi davet etti</string>
     <string name="notification_group_invite">Güvenli bir sohbete davet edildiniz</string>
     <string name="notification_new_message">Yeni mesaj</string>
+    <string name="notification_sent_picture">bir fotoğraf gönderdi</string>
+    <string name="notification_sent_video">bir video gönderdi</string>
+    <string name="notification_sent_voice_message">bir sesli mesaj gönderdi</string>
+    <string name="notification_sent_file">bir dosya gönderdi</string>
     <string name="notification_sender_in_group">%1$s, %2$s içinde</string>
     <string name="notification_invite_from_sender">%1$s tarafından davet</string>
     <string name="notification_sender_invited_you_to_group">%1$s sizi %2$s grubuna davet etti</string>

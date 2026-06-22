@@ -3,6 +3,7 @@ package dev.ipf.darkmatter.state
 import android.util.Log
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.darkmatter.BuildConfig
@@ -87,6 +88,15 @@ data class ChatListItem(
      * (non-deleted, non-blank), so fallback copy is never styled.
      */
     val previewTokens: MarkdownDocumentFfi? = null,
+    /**
+     * Known removal evidence that the [memberSnapshot] roster alone can't
+     * carry: a successful self-leave (including leaving as the sole member,
+     * which caches an *empty* roster) or a loaded roster that omits self.
+     * Set by [ChatsController] when removal is established; lets
+     * [removedFromGroup] treat a known-empty-post-removal roster as real
+     * removal while a null/failed-fetch empty roster stays non-removed.
+     */
+    val removed: Boolean = false,
 ) {
     val id: String = group.groupIdHex
 
@@ -108,6 +118,42 @@ data class ChatListItem(
 
     val hasUnread: Boolean
         get() = projection?.hasUnread ?: false
+
+    /**
+     * Whether the active account is no longer a member of this group. Two
+     * independent signals establish this:
+     *
+     *  - [removed]: an explicit marker [ChatsController] sets once removal is
+     *    *known* — a self-leave (including leaving as the sole member, which
+     *    caches an empty roster) or a roster fetch that loaded and omits self.
+     *    This is what lets a genuinely-empty post-removal roster suppress the
+     *    badge, since an empty [memberSnapshot] alone is ambiguous.
+     *  - a *loaded, non-empty* [memberSnapshot] that omits self — the engine's
+     *    `groupMembers` roster landed and self isn't in it.
+     *
+     * A null snapshot (fetch hasn't landed) and an empty snapshot *without* the
+     * [removed] marker (a best-effort fetch failure) are both treated as "not
+     * yet known", so neither suppresses the row's badge. Returns false with a
+     * blank/absent active account, matching [GroupProjector] semantics.
+     */
+    fun removedFromGroup(activeAccountIdHex: String?): Boolean {
+        val active = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() } ?: return false
+        if (removed) return true
+        val snapshot = memberSnapshot?.takeIf { it.members.isNotEmpty() } ?: return false
+        return !snapshot.containsAccount(active)
+    }
+
+    /**
+     * The unread badge to render for this row given the active account. A group
+     * the user has been removed from keeps a frozen [unreadCount] in the
+     * projection (the engine stops advancing reads once self is evicted), which
+     * reads as a stale alert; suppress it to zero so a removed group shows no
+     * badge (#625).
+     */
+    fun effectiveUnreadCount(activeAccountIdHex: String?): ULong = if (removedFromGroup(activeAccountIdHex)) 0uL else unreadCount
+
+    /** [hasUnread] with the removed-group suppression applied (#625). */
+    fun effectiveHasUnread(activeAccountIdHex: String?): Boolean = hasUnread && !removedFromGroup(activeAccountIdHex)
 
     fun projectedPreviewText(
         copy: MessageTextCopy = MessageTextCopy.Default,
@@ -175,6 +221,7 @@ internal fun chatListItemFromProjection(
     activeAccountIdHex: String? = null,
     members: List<AppGroupMemberRecordFfi>? = null,
     previewTokens: MarkdownDocumentFfi? = null,
+    removed: Boolean = false,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
     val displayGroup =
@@ -213,6 +260,7 @@ internal fun chatListItemFromProjection(
         memberSnapshot = members?.let(::GroupMemberSnapshot),
         projection = row,
         previewTokens = previewTokens,
+        removed = removed,
     )
 }
 
@@ -368,6 +416,20 @@ data class TimelineMessage(
     val status: MessageStatus,
     val projected: TimelineMessageRecordFfi? = null,
     val timelineOrder: ULong = 0uL,
+)
+
+/**
+ * Local optimistic state for an in-flight edit of one's own message: the new
+ * body to display immediately and whether the kind-1009 publish is still
+ * [MessageStatus.Pending] or has [MessageStatus.Failed]. [preEditText] is the
+ * body shown before the edit (the latest applied version, or the original
+ * plaintext) so a failure can revert the bubble verbatim.
+ */
+@Immutable
+data class OptimisticEdit(
+    val text: String,
+    val preEditText: String,
+    val status: MessageStatus,
 )
 
 /**
@@ -601,7 +663,9 @@ internal fun committedButUnpublishedProjectionForOptimistic(
         if (optimisticIsMediaPending && projectedIsMedia) {
             timestampsAreNear(optimistic.recordedAt, projectedAction.recordedAt)
         } else {
-            optimistic.plaintext == projectedAction.plaintext && optimistic.tags == projectedAction.tags
+            optimistic.plaintext == projectedAction.plaintext &&
+                optimistic.tags == projectedAction.tags &&
+                timestampsAreNear(optimistic.recordedAt, projectedAction.recordedAt)
         }
     }
 }
@@ -814,6 +878,13 @@ class ChatsController(
     // `recompute()` per group; re-fetched on bind.
     private var memberCacheByGroup: Map<String, List<AppGroupMemberRecordFfi>> = emptyMap()
 
+    // Groups the active account is known to have been removed/left from, keyed
+    // by group id hex. Set on a confirmed self-leave or when a loaded roster
+    // omits self; lets [ChatListItem.removedFromGroup] treat a genuinely-empty
+    // post-removal roster as real removal (a fetch-failure empty roster, which
+    // never adds an id here, stays non-removed). Cleared on every bind.
+    private var removedGroupIds: Set<String> = emptySet()
+
     // Tracks groups whose member fetch is currently in flight, so we don't
     // fan out duplicate work for the same group. Invariant: an id sits in
     // exactly one state at a time — pending (not in either set), in-flight
@@ -890,6 +961,7 @@ class ChatsController(
         chatRows = emptyList()
         groupRecordsById = emptyMap()
         memberCacheByGroup = emptyMap()
+        removedGroupIds = emptySet()
         inFlightMemberFetches.clear()
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
@@ -1093,6 +1165,7 @@ class ChatsController(
                 activeAccountIdHex = me,
                 members = memberCacheByGroup[row.groupIdHex],
                 previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
+                removed = row.groupIdHex in removedGroupIds,
             )
         }
     }
@@ -1264,6 +1337,7 @@ class ChatsController(
                             override val deleted = record.deleted
                             override val plaintext = record.plaintext
                             override val messageIdHex = record.messageIdHex
+                            override val timelineAt = record.timelineAt
                         }
                     },
                     ciNeedle,
@@ -1274,6 +1348,7 @@ class ChatsController(
                     groupIdHex = groupIdHex,
                     messageIdHex = match.messageIdHex,
                     snippet = snippet,
+                    timelineAt = match.timelineAt,
                 )
             }
             // No eligible match in this page. Stop if the engine has no older
@@ -1380,6 +1455,11 @@ class ChatsController(
                 memberCacheByGroup =
                     memberCacheByGroup +
                     (groupIdHex to GroupProjector.membersWithoutActiveAccount(members, activeAccountIdHex))
+                // Known removal: a self-leave omits self from the roster even
+                // when that leaves it empty (sole-member leave). Mark it so the
+                // badge stays suppressed instead of reading the empty roster as
+                // a fetch failure.
+                removedGroupIds = removedGroupIds + groupIdHex
                 recompute()
             }
             appState.present(R.string.toast_left_chat)
@@ -1457,8 +1537,18 @@ class ChatsController(
 
     private fun recompute() {
         val unreadAccountRef = accountRef
+        // Project once and reuse for both the per-account aggregate and the
+        // visible list, so the aggregate sees the same removed-group
+        // suppression the row badge does (#625). The projection is cheap
+        // relative to the FFI fan-out it gates, and is needed even while hidden
+        // so a removed group's frozen unread can't keep lighting the
+        // cross-account dot behind an open conversation.
+        val projected = currentProjectedItems()
         if (unreadAccountRef != null) {
-            appState.updateAccountUnreadCount(unreadAccountRef, accountUnreadCount(chatRows))
+            appState.updateAccountUnreadCount(
+                unreadAccountRef,
+                accountUnreadCount(projected, appState.activeAccount?.accountIdHex),
+            )
         }
         // Hidden behind an open conversation: keep folding updates into the
         // backing maps (done by the caller) but defer the projection rebuild +
@@ -1468,7 +1558,7 @@ class ChatsController(
             return
         }
         pendingRecompute = false
-        val all = sortChatListItems(currentProjectedItems())
+        val all = sortChatListItems(projected)
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
         chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }
@@ -1512,6 +1602,17 @@ class ChatsController(
                                 .filter { it.isNotBlank() }
                                 .forEach(appState::requestProfile)
                             memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
+                            // A loaded roster that omits self is known removal
+                            // evidence (admin eviction / self-leave the engine
+                            // has already applied). Marking it makes an empty
+                            // self-only roster suppress the badge too, where the
+                            // snapshot path alone reads empty as ambiguous.
+                            val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                            if (activeAccountIdHex != null &&
+                                members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                            ) {
+                                removedGroupIds = removedGroupIds + groupIdHex
+                            }
                             recompute()
                         }
                     }
@@ -1720,6 +1821,24 @@ class ConversationController(
             GroupProjector.isActiveAccountMember(it, appState.activeAccount?.accountIdHex)
         } == true
 
+    // True when construction received a member snapshot at all — i.e. the local
+    // roster for this group was already known synchronously (warm from the chat
+    // list cache or the shared AppState snapshot). When true, `seededSelfMember`
+    // is an AUTHORITATIVE membership signal: self is either in the snapshot
+    // (member) or has been removed from it (the group the user left, #545).
+    //
+    // When false there is NO local membership signal yet (genuinely cold open:
+    // first-ever open, fresh process, or a row tapped before its background
+    // member fetch landed). In that case neither the active composer nor the
+    // "no longer a member" notice is known to be correct, so the bottom bar must
+    // not paint either — doing so flashes a wrong state for ~0.5–1s until
+    // refreshMembers() confirms. Before this, a cold open of a group the user IS
+    // a member of (especially an admin re-entering their own group) flashed the
+    // disabled notice (issue #623, the inverse of #545). Non-empty vs empty is
+    // not the test: a non-null snapshot is membership-known even if leaving a
+    // solo group emptied it.
+    val seededMembershipKnown: Boolean = initialMemberSnapshot != null
+
     // Typed media references keyed by `messageIdHex`. Populated from Rust's
     // `listMedia` FFI — the only place the receive-side `source_epoch` is
     // surfaced (TimelineMessageRecordFfi / AppMessageRecordFfi don't expose
@@ -1742,6 +1861,19 @@ class ConversationController(
      * affordance reads `.count`. Null entry == message never edited. */
     var editsByTarget by mutableStateOf<Map<String, EditState>>(emptyMap())
         private set
+
+    /**
+     * Local optimistic edits keyed by target message id, applied immediately on
+     * confirm so the bubble flips to the edited text without waiting for the
+     * kind-1009 to round-trip through the engine (the echo can lag ~1s). Merged
+     * over [aggregateEdits]' output on every publish, then dropped once the real
+     * edit lands in the timeline. A [MessageStatus.Pending] entry drives a
+     * brief sending indicator on the target bubble; [MessageStatus.Failed]
+     * reverts the displayed text to the pre-edit body and lights the same
+     * retry/discard affordance a failed send shows. Mirrors the
+     * [optimisticMessages] map: local-first display, reconciled on engine echo.
+     */
+    private val optimisticEdits = mutableStateMapOf<String, OptimisticEdit>()
 
     /** Set when the user has tapped Edit on a kind-9 they sent — the composer
      * banner reflects this and the next [send] routes through [editMessage]
@@ -2948,12 +3080,43 @@ class ConversationController(
         val target = targetMessageId.takeIf { it.isNotBlank() } ?: return
         val trimmed = content.trim()
         if (trimmed.isEmpty()) return
+        // Apply the new body locally before the publish round-trips so the
+        // bubble flips to the edited text at once instead of showing the old
+        // text until the kind-1009 echoes back (~1s). Capture the body shown
+        // before this edit (a prior optimistic edit's pre-edit text takes
+        // priority over the now-stale displayed text) so a failure reverts
+        // verbatim. Pending drives a brief sending indicator on the bubble.
+        val preEditText = optimisticEdits[target]?.preEditText ?: currentDisplayedText(target)
+        optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Pending)
+        publishTimelineFromIndexes()
         try {
             appState.withGroupCommitLock(account, group.groupIdHex) {
                 appState.marmotIo { editMessage(account, group.groupIdHex, target, trimmed) }
             }
+            // Publish accepted: drop the Pending indicator but keep the text
+            // overlay so the bubble doesn't flicker back to the old body in the
+            // gap before the kind-1009 lands in the timeline. The overlay is
+            // pruned once `aggregateEdits` reflects the same latest text.
+            // Only act if this attempt still owns the overlay: if the user
+            // re-edited the same target while this publish was in flight, a
+            // newer Pending overlay (different text) has superseded us, and
+            // flipping it to Sent would wrongly confirm the newer attempt.
+            optimisticEdits[target]
+                ?.takeIf { it.status == MessageStatus.Pending && it.text == trimmed }
+                ?.let { optimisticEdits[target] = it.copy(status = MessageStatus.Sent) }
+            publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
+            // Revert the displayed body to the pre-edit text and flip the
+            // bubble to Failed, lighting the same retry/discard affordance a
+            // failed send shows. Retry re-runs this edit; discard clears the
+            // overlay and restores the original body. Guarded the same way as
+            // the success path: a newer in-flight attempt's overlay must not be
+            // clobbered back to this stale attempt's Failed/pre-edit text.
+            optimisticEdits[target]
+                ?.takeIf { it.status == MessageStatus.Pending && it.text == trimmed }
+                ?.let { optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Failed) }
+            publishTimelineFromIndexes()
             appState.present(R.string.toast_couldnt_edit_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
     }
@@ -2964,7 +3127,21 @@ class ConversationController(
      * plaintext. Bubble + reply preview both read through this so an edit
      * shows everywhere the original would have.
      */
-    fun displayedText(record: AppMessageRecordFfi): String = editsByTarget[record.messageIdHex]?.latestText ?: record.plaintext
+    fun displayedText(record: AppMessageRecordFfi): String =
+        optimisticEdits[record.messageIdHex]?.text
+            ?: editsByTarget[record.messageIdHex]?.latestText
+            ?: record.plaintext
+
+    /**
+     * Body shown for [targetId] before any in-flight optimistic edit: the
+     * latest confirmed kind-1009 text if one exists, otherwise the message's
+     * original plaintext. Captured as an optimistic edit's revert target.
+     */
+    private fun currentDisplayedText(targetId: String): String =
+        editsByTarget[targetId]?.latestText
+            ?: messageById[targetId]?.plaintext
+            ?: optimisticMessages["msg:$targetId"]?.record?.plaintext
+            ?: ""
 
     // Tracks optimistic ids the user discarded while a retry was in flight.
     // The retry coroutine consults this set before re-inserting a failed
@@ -3188,6 +3365,15 @@ class ConversationController(
      */
     suspend fun retryFailedSend(item: TimelineMessage) {
         val key = item.id
+        // A failed edit's bubble is the target's projected row (no
+        // optimisticMessages entry); its retry re-runs the edit publish rather
+        // than re-sending a new message. editMessage flips the overlay back to
+        // Pending, so a double-tap finds it non-Failed and the guard below exits.
+        val failedEdit = optimisticEdits[item.record.messageIdHex]?.takeIf { it.status == MessageStatus.Failed }
+        if (failedEdit != null) {
+            editMessage(item.record.messageIdHex, failedEdit.text)
+            return
+        }
         // Re-check live state. The captured item.status may be stale if the
         // user double-taps before recomposition: both taps would see Failed
         // on the captured argument and both would queue FFI sends. By reading
@@ -3253,6 +3439,7 @@ class ConversationController(
                     activeAccountIdHex,
                 )
             if (committedProjection != null) {
+                preserveOptimisticDisplayPosition(committedProjection.messageIdHex, tempId)
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
                 }
@@ -3260,6 +3447,7 @@ class ConversationController(
                 messageById.remove(tempId)
                 messageById[committedProjection.messageIdHex] =
                     TimelineProjector.toAppMessageRecord(committedProjection)
+                        .withRecordedAtOverride(localTimelineTimestampOverrides[committedProjection.messageIdHex])
                 if (discardedDuringRetry.remove(key)) {
                     publishTimelineFromIndexes()
                     return
@@ -3330,6 +3518,14 @@ class ConversationController(
      */
     fun discardFailedSend(item: TimelineMessage) {
         val key = item.id
+        // Discarding a failed edit drops the local overlay, reverting the
+        // bubble to its pre-edit body. The original message is untouched —
+        // only the unsent kind-1009 edit is abandoned.
+        if (optimisticEdits[item.record.messageIdHex]?.status == MessageStatus.Failed) {
+            optimisticEdits.remove(item.record.messageIdHex)
+            publishTimelineFromIndexes()
+            return
+        }
         // Re-read live state. If the user taps Retry then Discard before the
         // bubble recomposes, the captured item.status is still Failed while
         // the live state has moved to Pending — the Failed branch would
@@ -3366,12 +3562,14 @@ class ConversationController(
                 appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
                 return false
             }
+            var demotedBeforeLeave = false
             runCatching {
                 val activeAccountIdHex = appState.activeAccount?.accountIdHex
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, members.size)) {
                         val demoteResult =
                             appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
+                        demotedBeforeLeave = true
                         applyMutationDetails(account, demoteResult.details)
                     }
                     appState.marmotIo { leaveGroup(account, group.groupIdHex) }
@@ -3396,7 +3594,11 @@ class ConversationController(
                 if (it is CancellationException) throw it
                 val message = mutationError(it)
                 lastMutationError = message
-                appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(message))
+                if (demotedBeforeLeave) {
+                    appState.present(R.string.toast_demoted_but_couldnt_leave, AppText.Plain(message))
+                } else {
+                    appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(message))
+                }
                 false
             }
         }
@@ -3583,7 +3785,7 @@ class ConversationController(
             // remove_members signs a roster update for a Nostr pubkey, so use the
             // stable member id. memberRef may be a local account label.
             val target = member.memberIdHex
-            runCatching {
+            try {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     val result =
                         appState.marmotIo { removeMembersDetailed(account, group.groupIdHex, listOf(target)) }
@@ -3591,12 +3793,26 @@ class ConversationController(
                 }
                 appState.present(R.string.toast_member_removed)
                 true
-            }.onFailure {
-                it.rethrowIfCancellation()
-                val message = mutationError(it)
-                lastMutationError = message
-                appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(message))
-            }.getOrDefault(false)
+            } catch (throwable: Throwable) {
+                throwable.rethrowIfCancellation()
+                // The MLS roster commit can persist locally even when a follow-on
+                // phase (relay directory fetch / runtime catch-up) fails with a
+                // transient backend-busy lock — e.g. a concurrent read kicked off
+                // as the user back-navigates out of the members list. Re-read engine
+                // truth before reporting: if the target is actually gone the removal
+                // succeeded, so converge the list in place and suppress the phantom
+                // failure toast rather than claiming an error that didn't happen.
+                refreshMembers()
+                if (members.none { it.memberIdHex.equals(target, ignoreCase = true) }) {
+                    appState.present(R.string.toast_member_removed)
+                    true
+                } else {
+                    val message = mutationError(throwable)
+                    lastMutationError = message
+                    appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(message))
+                    false
+                }
+            }
         }
 
     suspend fun setMemberAdmin(
@@ -4295,11 +4511,62 @@ class ConversationController(
 
     private fun publishTimelineFromIndexesInternal() {
         val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
+        val aggregated = aggregateEdits((optimisticMessages.values + projected).map { it.record })
+        // Drop any optimistic edit the real kind-1009 has now caught up to:
+        // once `aggregateEdits` reports the same latest text, the overlay is
+        // redundant and would otherwise mask a later remote edit. Failed/Pending
+        // overlays are kept until they resolve through editMessage.
+        optimisticEdits.entries
+            .filter { (target, edit) -> edit.status == MessageStatus.Sent && aggregated[target]?.latestText == edit.text }
+            .map { it.key }
+            .forEach(optimisticEdits::remove)
         timeline =
             (optimisticMessages.values + projected)
+                .map { it.withOptimisticEditStatus() }
                 .distinctBy { it.id }
                 .sortedWith(::compareTimelineMessages)
-        editsByTarget = aggregateEdits(timeline.map { it.record })
+        editsByTarget = applyOptimisticEdits(aggregated)
+    }
+
+    /**
+     * Overlay the optimistic edit text onto [aggregated] so the bubble renders
+     * the edited body immediately. A Pending/Sent overlay shows its text; a
+     * Failed overlay shows [OptimisticEdit.preEditText] (the revert target).
+     */
+    private fun applyOptimisticEdits(aggregated: Map<String, EditState>): Map<String, EditState> {
+        if (optimisticEdits.isEmpty()) return aggregated
+        val merged = LinkedHashMap(aggregated)
+        for ((target, edit) in optimisticEdits) {
+            val failed = edit.status == MessageStatus.Failed
+            val displayText = if (failed) edit.preEditText else edit.text
+            val base = merged[target]
+            when {
+                base != null -> merged[target] = base.copy(latestText = displayText)
+                // No real kind-1009 was accepted yet (null base). Synthesize an edit
+                // aggregate only for an applied overlay (Pending/Sent) so the bubble
+                // shows the optimistic body with an edited indicator. A Failed edit
+                // reverts to the original text and never accepted a kind-1009, so
+                // leave the target absent — no spurious "edited" badge.
+                !failed -> merged[target] = EditState(latestText = displayText, count = 1, versions = emptyList())
+            }
+        }
+        return merged
+    }
+
+    /**
+     * Surface an in-flight optimistic edit as the target bubble's status so the
+     * existing Sending indicator / Failed retry+discard row light up without a
+     * new affordance. Only overrides a confirmed (Sent) own bubble — a still
+     * in-flight optimistic *send* keeps its own status until that send resolves.
+     */
+    private fun TimelineMessage.withOptimisticEditStatus(): TimelineMessage {
+        val edit = optimisticEdits[record.messageIdHex] ?: return this
+        if (status != MessageStatus.Sent) return this
+        return when (edit.status) {
+            MessageStatus.Pending -> copy(status = MessageStatus.Pending)
+            MessageStatus.Failed -> copy(status = MessageStatus.Failed)
+            else -> this
+        }
     }
 
     private fun nextOptimisticTimelineOrder(): ULong =
