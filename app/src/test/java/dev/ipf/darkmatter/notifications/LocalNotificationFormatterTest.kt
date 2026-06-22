@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -220,6 +221,57 @@ class LocalNotificationFormatterTest {
             )
 
         assertEquals("We are go", content?.body)
+    }
+
+    @Test
+    fun messagePreviewResolutionIsNeededOnlyForNormalMessages() {
+        assertTrue(
+            LocalNotificationFormatter.needsPreviewTextResolution(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, reactionEmoji = null),
+            ),
+        )
+    }
+
+    @Test
+    fun reactionPreviewResolutionSkipsUnusedMessagePreview() {
+        assertFalse(
+            LocalNotificationFormatter.needsPreviewTextResolution(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    previewText = "message body that would otherwise be parsed",
+                    reactionEmoji = "👍",
+                    reactedToPreview = "reacted-to body still needs resolution",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun invitePreviewResolutionIsNotNeeded() {
+        assertFalse(
+            LocalNotificationFormatter.needsPreviewTextResolution(
+                update(trigger = NotificationTriggerFfi.GROUP_INVITE),
+            ),
+        )
+    }
+
+    @Test
+    fun reactedToPreviewResolutionIsNeededOnlyForReactions() {
+        assertTrue(
+            LocalNotificationFormatter.needsReactedToPreviewResolution(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, reactionEmoji = "👍", reactedToPreview = "hello"),
+            ),
+        )
+        assertFalse(
+            LocalNotificationFormatter.needsReactedToPreviewResolution(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, reactionEmoji = null, reactedToPreview = "hello"),
+            ),
+        )
+        assertFalse(
+            LocalNotificationFormatter.needsReactedToPreviewResolution(
+                update(trigger = NotificationTriggerFfi.GROUP_INVITE, reactedToPreview = "hello"),
+            ),
+        )
     }
 
     @Test

@@ -79,6 +79,12 @@ object LocalNotificationFormatter {
     fun isReaction(update: NotificationUpdateFfi): Boolean =
         update.trigger == NotificationTriggerFfi.NEW_MESSAGE && !clean(update.reactionEmoji).isNullOrEmpty()
 
+    /** True when the caller should resolve [update.previewText] before formatting. */
+    fun needsPreviewTextResolution(update: NotificationUpdateFfi): Boolean = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && !isReaction(update)
+
+    /** True when the caller should resolve [update.reactedToPreview] before formatting. */
+    fun needsReactedToPreviewResolution(update: NotificationUpdateFfi): Boolean = isReaction(update)
+
     fun content(
         update: NotificationUpdateFfi,
         context: Context? = null,

@@ -28,6 +28,7 @@ import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.ProfileLink
 import dev.ipf.darkmatter.core.ProfileSanitizer
 import dev.ipf.darkmatter.notifications.BackgroundConnectionPreferences
+import dev.ipf.darkmatter.notifications.LocalNotificationFormatter
 import dev.ipf.darkmatter.notifications.LocalNotificationPolicy
 import dev.ipf.darkmatter.notifications.LocalNotificationPresenter
 import dev.ipf.darkmatter.notifications.NotificationStreamForegroundService
@@ -43,6 +44,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
 import dev.ipf.marmotkit.AuditLogUploadSourceFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -87,6 +89,39 @@ sealed interface AppPhase {
     data class Failed(
         val message: String,
     ) : AppPhase
+}
+
+internal suspend fun resolveNotificationMentionDisplayName(
+    bech32: String,
+    accountIdHex: suspend (String) -> String?,
+    profileDisplayName: (String) -> String?,
+    readDisplayName: suspend (String) -> String?,
+    requestProfile: (String) -> Unit,
+): String? {
+    val id = accountIdHex(bech32) ?: return null
+    profileDisplayName(id)?.let { return it }
+    val displayName = readDisplayName(id)?.let { ProfileSanitizer.displayName(it) }
+    if (displayName == null) requestProfile(id)
+    return displayName
+}
+
+internal suspend fun resolveNotificationPreviewText(
+    raw: String?,
+    parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
+    mentionDisplayName: suspend (String) -> String?,
+): String? {
+    val text = raw?.takeIf { it.isNotBlank() } ?: return null
+    val document = parseMarkdown(text)
+    if (document.blocks.isEmpty()) return null
+    val mentionNames = mutableMapOf<String, String?>()
+    for (bech32 in markdownDocumentMentionBech32s(document)) {
+        mentionNames[bech32] = mentionDisplayName(bech32)
+    }
+    return markdownDocumentToPreviewAnnotatedString(
+        document = document,
+        codeStyle = SpanStyle(),
+        mentionDisplayName = mentionNames::get,
+    ).text.takeIf { it.isNotBlank() }
 }
 
 internal data class SignOutOutcome(
@@ -2461,34 +2496,27 @@ class DarkMatterAppState(
     // Resolve a mention for a one-shot notification. Unlike the Compose bubble
     // path, a notification will not recompose after requestProfile() finishes,
     // so do one local display-name read before falling back to shortened bech32.
-    private suspend fun notificationMentionDisplayName(bech32: String): String? {
-        val accountIdHex = accountIdHex(bech32) ?: return null
-        profileDisplayName(accountIdHex)?.let { return it }
-        val displayName =
-            marmotIo { runCatching { marmot().displayName(accountIdHex) }.getOrNull() }
-                ?.let { ProfileSanitizer.displayName(it) }
-        if (displayName == null) requestProfile(accountIdHex)
-        return displayName
-    }
+    private suspend fun notificationMentionDisplayName(bech32: String): String? =
+        resolveNotificationMentionDisplayName(
+            bech32 = bech32,
+            accountIdHex = { accountIdHex(it) },
+            profileDisplayName = { profileDisplayName(it) },
+            readDisplayName = { accountIdHex ->
+                marmotIo { runCatching { marmot().displayName(accountIdHex) }.getOrNull() }
+            },
+            requestProfile = { requestProfile(it) },
+        )
 
     // Flatten notification body text through the same Markdown mention path used
-    // by in-app bubbles/previews. A parser failure (empty document) deliberately
-    // returns null so LocalNotificationFormatter falls back to the raw FFI
-    // preview instead of dropping the message body.
-    private suspend fun notificationPreviewText(raw: String?): String? {
-        val text = raw?.takeIf { it.isNotBlank() } ?: return null
-        val document = parseMarkdownOrEmpty(text)
-        if (document.blocks.isEmpty()) return null
-        val mentionNames = mutableMapOf<String, String?>()
-        for (bech32 in markdownDocumentMentionBech32s(document)) {
-            mentionNames[bech32] = notificationMentionDisplayName(bech32)
-        }
-        return markdownDocumentToPreviewAnnotatedString(
-            document = document,
-            codeStyle = SpanStyle(),
-            mentionDisplayName = mentionNames::get,
-        ).text.takeIf { it.isNotBlank() }
-    }
+    // by in-app bubbles/previews. A parser failure or legitimately empty document
+    // deliberately returns null so LocalNotificationFormatter falls back to the
+    // raw FFI preview instead of dropping the message body.
+    private suspend fun notificationPreviewText(raw: String?): String? =
+        resolveNotificationPreviewText(
+            raw = raw,
+            parseMarkdown = { parseMarkdownOrEmpty(it) },
+            mentionDisplayName = { notificationMentionDisplayName(it) },
+        )
 
     // Resolve the conversation title for a notification the same way the chat
     // list does, since the runtime payload's group name is empty for unnamed
@@ -2555,12 +2583,24 @@ class DarkMatterAppState(
                                         "updateAccount=${update.accountRef.take(8)} post=$shouldPost"
                                 }
                                 if (shouldPost) {
+                                    val previewTextOverride =
+                                        if (LocalNotificationFormatter.needsPreviewTextResolution(update)) {
+                                            notificationPreviewText(update.previewText)
+                                        } else {
+                                            null
+                                        }
+                                    val reactedToPreviewOverride =
+                                        if (LocalNotificationFormatter.needsReactedToPreviewResolution(update)) {
+                                            notificationPreviewText(update.reactedToPreview)
+                                        } else {
+                                            null
+                                        }
                                     localNotificationPresenter.show(
                                         update,
                                         notificationConversationTitle(update),
                                         notificationSenderName(update),
-                                        notificationPreviewText(update.previewText),
-                                        notificationPreviewText(update.reactedToPreview),
+                                        previewTextOverride,
+                                        reactedToPreviewOverride,
                                     )
                                 }
                                 refreshAccountUnreadCount(update.accountRef)
