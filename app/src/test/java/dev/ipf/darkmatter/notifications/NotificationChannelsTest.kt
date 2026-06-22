@@ -3,6 +3,7 @@ package dev.ipf.darkmatter.notifications
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,14 +34,31 @@ class NotificationChannelsTest {
     }
 
     @Test
-    fun setChannelEnabledWritesImportanceNoneAndRestoresDefaultImportance() {
+    fun setChannelEnabledMutesAndRequiresSystemSettingsToUnmute() {
         val context = RuntimeEnvironment.getApplication()
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         NotificationChannels.ensureChannels(context)
 
         assertTrue(NotificationChannels.setChannelEnabled(context, NotificationChannelSpec.DIRECT_MESSAGES, false))
-        assertFalse(NotificationChannels.channelStates(context).first { it.spec == NotificationChannelSpec.DIRECT_MESSAGES }.enabled)
+        val muted = manager.getNotificationChannel(NotificationChannelSpec.DIRECT_MESSAGES.id)
+        assertEquals(NotificationManager.IMPORTANCE_NONE, muted.importance)
+        assertFalse(
+            NotificationChannels
+                .channelStates(context)
+                .first { it.spec == NotificationChannelSpec.DIRECT_MESSAGES }
+                .enabled,
+        )
 
-        assertTrue(NotificationChannels.setChannelEnabled(context, NotificationChannelSpec.DIRECT_MESSAGES, true))
-        assertTrue(NotificationChannels.channelStates(context).first { it.spec == NotificationChannelSpec.DIRECT_MESSAGES }.enabled)
+        assertFalse(NotificationChannels.setChannelEnabled(context, NotificationChannelSpec.DIRECT_MESSAGES, true))
+        assertEquals(
+            NotificationManager.IMPORTANCE_NONE,
+            manager.getNotificationChannel(NotificationChannelSpec.DIRECT_MESSAGES.id).importance,
+        )
+        assertFalse(
+            NotificationChannels
+                .channelStates(context)
+                .first { it.spec == NotificationChannelSpec.DIRECT_MESSAGES }
+                .enabled,
+        )
     }
 }

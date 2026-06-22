@@ -57,7 +57,7 @@ object NotificationChannels {
             val channel = manager?.getNotificationChannel(spec.id)
             NotificationChannelState(
                 spec = spec,
-                enabled = (channel?.importance ?: spec.importance.toAndroidImportance()) != NotificationManager.IMPORTANCE_NONE,
+                enabled = channel?.importance?.let { it != NotificationManager.IMPORTANCE_NONE } ?: false,
             )
         }
     }
@@ -70,18 +70,27 @@ object NotificationChannels {
         ensureChannels(context)
         val manager = context.getSystemService(NotificationManager::class.java) ?: return false
         val channel = manager.getNotificationChannel(spec.id) ?: return false
-        val targetImportance =
-            if (enabled) {
-                spec.importance.toAndroidImportance()
-            } else {
-                NotificationManager.IMPORTANCE_NONE
-            }
 
-        if (channel.importance == targetImportance) return true
+        if (enabled) {
+            if (channel.importance != NotificationManager.IMPORTANCE_NONE) return true
 
-        channel.setImportance(targetImportance)
-        manager.createNotificationChannel(channel)
-        return manager.getNotificationChannel(spec.id)?.importance == targetImportance
+            // Android does not let apps raise an existing channel's importance.
+            // Deleting and recreating the same id only undeletes the old OS row;
+            // it still keeps the user's locked importance. Keep the channel UI as
+            // the source of truth and let the caller deep-link there to re-enable.
+            return false
+        }
+
+        if (channel.importance == NotificationManager.IMPORTANCE_NONE) return true
+
+        // Muting is a permitted importance downgrade on normal channels. Use a
+        // fresh channel object rather than mutating the one returned by
+        // NotificationManager so Robolectric cannot mask platform copy semantics.
+        val muted =
+            buildChannel(context, spec, NotificationManager.IMPORTANCE_NONE)
+                .also { copyUserSettings(from = channel, to = it) }
+        manager.createNotificationChannel(muted)
+        return manager.getNotificationChannel(spec.id)?.importance == NotificationManager.IMPORTANCE_NONE
     }
 
     fun channelNameRes(spec: NotificationChannelSpec): Int = spec.nameRes()

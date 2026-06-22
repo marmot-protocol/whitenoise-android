@@ -14437,7 +14437,17 @@ private fun NotificationsScreen(
     var pendingNativePushEnable by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val lifecycleOwner = context.lifecycleOwner()
     var notificationChannelStates by remember { mutableStateOf<List<NotificationChannelState>>(emptyList()) }
+    var notificationChannelBusySpec by remember { mutableStateOf<NotificationChannelSpec?>(null) }
+
+    suspend fun refreshNotificationChannelStates() {
+        notificationChannelStates =
+            withContext(Dispatchers.IO) {
+                NotificationChannels.channelStates(context)
+            }
+    }
+
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             appState.refreshLocalNotificationPermission()
@@ -14461,7 +14471,22 @@ private fun NotificationsScreen(
     LaunchedEffect(appState.activeAccountRef, context) {
         appState.refreshLocalNotificationPermission()
         appState.refreshLocalNotificationSettings()
-        notificationChannelStates = NotificationChannels.channelStates(context)
+        refreshNotificationChannelStates()
+    }
+
+    DisposableEffect(lifecycleOwner, context) {
+        if (lifecycleOwner == null) {
+            onDispose { }
+        } else {
+            val observer =
+                LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        scope.launch { refreshNotificationChannelStates() }
+                    }
+                }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
     }
 
     Scaffold(
@@ -14577,10 +14602,21 @@ private fun NotificationsScreen(
                                 }
                                 Switch(
                                     checked = state.enabled,
+                                    enabled = notificationChannelBusySpec == null,
                                     onCheckedChange = { enabled ->
-                                        val applied = NotificationChannels.setChannelEnabled(context, state.spec, enabled)
-                                        notificationChannelStates = NotificationChannels.channelStates(context)
-                                        if (!applied) openNotificationChannelSettings(context, state.spec)
+                                        notificationChannelBusySpec = state.spec
+                                        scope.launch {
+                                            val applied =
+                                                try {
+                                                    withContext(Dispatchers.IO) {
+                                                        NotificationChannels.setChannelEnabled(context, state.spec, enabled)
+                                                    }
+                                                } finally {
+                                                    refreshNotificationChannelStates()
+                                                    notificationChannelBusySpec = null
+                                                }
+                                            if (!applied) openNotificationChannelSettings(context, state.spec)
+                                        }
                                     },
                                 )
                             }
