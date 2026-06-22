@@ -7761,7 +7761,11 @@ private fun ConversationScreen(
     // it from a separate mutation scope — so it's cancelled on controller
     // disposal here rather than in start()'s teardown (#279).
     DisposableEffect(controller) {
-        onDispose { controller.onCleared() }
+        appState.attachConversationController(controller)
+        onDispose {
+            appState.detachConversationController(controller)
+            controller.onCleared()
+        }
     }
     // Edits (kind-1009) are derived state, not chat — they mutate the
     // original message's body via [editsByTarget] and must not occupy a slot
