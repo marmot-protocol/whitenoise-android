@@ -236,6 +236,7 @@
     <string name="no_active_account_period">沒有使用中的帳號。</string>
     <string name="anonymous">匿名</string>
     <string name="display_name">名稱</string>
+    <string name="regenerate_display_name">重新產生個人資料名稱</string>
     <string name="about">關於</string>
     <string name="picture_url">圖URL</string>
     <string name="nip_05">Verified address</string>

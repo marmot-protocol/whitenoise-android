@@ -236,6 +236,7 @@
     <string name="no_active_account_period">没有活动账户。</string>
     <string name="anonymous">匿名</string>
     <string name="display_name">名称</string>
+    <string name="regenerate_display_name">重新生成个人资料名称</string>
     <string name="about">关于</string>
     <string name="picture_url">图片URL</string>
     <string name="nip_05">Verified address</string>

@@ -237,6 +237,7 @@
     <string name="no_active_account_period">Etkin hesap yok.</string>
     <string name="anonymous">Anonim</string>
     <string name="display_name">Profil adı</string>
+    <string name="regenerate_display_name">Profil adını yeniden oluştur</string>
     <string name="about">Hakkında</string>
     <string name="picture_url">Resim URL</string>
     <string name="nip_05">Verified address</string>

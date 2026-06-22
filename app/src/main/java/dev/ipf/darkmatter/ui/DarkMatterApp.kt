@@ -343,6 +343,7 @@ import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.Nip05Resolver
 import dev.ipf.darkmatter.core.ProfileFieldValidation
 import dev.ipf.darkmatter.core.ProfileLink
+import dev.ipf.darkmatter.core.ProfilePseudonymGenerator
 import dev.ipf.darkmatter.core.ProfileSanitizer
 import dev.ipf.darkmatter.core.QrCodeEncoder
 import dev.ipf.darkmatter.core.ReactionTally
@@ -16001,6 +16002,19 @@ private fun ProfileEditScreen(
                         onValueChange = { displayName = it },
                         label = { Text(stringResource(R.string.display_name)) },
                         singleLine = true,
+                        trailingIcon = {
+                            IconButton(
+                                onClick = {
+                                    displayName = ProfilePseudonymGenerator.random(excluding = displayName)
+                                },
+                                enabled = !busy && active != null,
+                            ) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = stringResource(R.string.regenerate_display_name),
+                                )
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     TextField(
