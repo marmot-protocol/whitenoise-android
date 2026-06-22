@@ -9421,7 +9421,34 @@ private fun GroupDetailsScreen(
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                 }
-                controller.members.forEach { member ->
+                // #612: render members in a deterministic order — you first,
+                // then other admins alpha by display name, then non-admins
+                // alpha by display name, with memberIdHex as a stable
+                // tiebreaker. Display names are resolved once into a map so
+                // the comparator does pure reads. lowercase(Locale.ROOT) keeps
+                // ordering consistent across device locales (e.g. Turkish I).
+                val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                val displayedMembers =
+                    remember(
+                        controller.members,
+                        activeAccountIdHex,
+                        appState.profileRevisionForCompose,
+                    ) {
+                        val titlesByHex =
+                            controller.members.associate {
+                                it.memberIdHex to
+                                    appState.chatMemberTitle(it.memberIdHex).lowercase(Locale.ROOT)
+                            }
+                        controller.members.sortedWith(
+                            compareBy(
+                                { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) },
+                                { !controller.isAdmin(it) },
+                                { titlesByHex[it.memberIdHex].orEmpty() },
+                                { it.memberIdHex.lowercase(Locale.ROOT) },
+                            ),
+                        )
+                    }
+                displayedMembers.forEachIndexed { index, member ->
                     GroupMemberRow(
                         member = member,
                         controller = controller,
@@ -9453,7 +9480,7 @@ private fun GroupDetailsScreen(
                             pendingConfirm = DetailsConfirm.RemoveMember(member)
                         },
                     )
-                    if (member != controller.members.last()) {
+                    if (index < displayedMembers.lastIndex) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                     }
                 }
