@@ -3393,6 +3393,7 @@ private fun ReplyPreviewCard(
     // fillMaxWidth there expands the enclosing bubble Column to its max
     // width even when the quote and reply text are both short.
     fillWidth: Boolean = true,
+    mentionDisplayName: ((String) -> String?)? = null,
 ) {
     val title = if (isOwn) stringResource(R.string.reply_you) else senderTitle
     val mediaLabel =
@@ -3411,7 +3412,9 @@ private fun ReplyPreviewCard(
             dev.ipf.darkmatter.core.ReplyMediaKind.Document -> Icons.Default.Description
             dev.ipf.darkmatter.core.ReplyMediaKind.None -> null
         }
-    val bodyText = mediaLabel ?: body
+    // Media path shows a label; only the plaintext body carries raw `@npub1…`
+    // runs, so resolve mentions there to match the bubble's rendering (#615).
+    val bodyText = mediaLabel ?: resolveMentionsInPlaintext(body, mentionDisplayName)
     val accent =
         if (isOwn) {
             MaterialTheme.colorScheme.primary
@@ -11768,6 +11771,7 @@ private fun MessageBubble(
                             // quote + short reply still keeps a narrow bubble
                             // because the widest child is then small (#208 preserved).
                             fillWidth = true,
+                            mentionDisplayName = { appState.mentionDisplayName(it) },
                         )
                     }
                 }
@@ -12818,8 +12822,11 @@ private fun ForwardMessageSheet(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
+                // Preview only: resolve `@npub1…` runs to display names so the
+                // confirmation reads like the bubble (#615). The forwarded text
+                // stays the verbatim `body` — onForward never sees this string.
                 Text(
-                    body,
+                    resolveMentionsInPlaintext(body) { appState.mentionDisplayName(it) },
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
@@ -13535,6 +13542,7 @@ private fun ComposerBar(
                 mediaKind = mediaKind,
                 onClick = null,
                 onDismiss = onCancelReply,
+                mentionDisplayName = appState?.let { state -> { state.mentionDisplayName(it) } },
             )
         }
         // #414: live @-mention picker. Compute the open query from the current
