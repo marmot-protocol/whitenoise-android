@@ -1202,7 +1202,17 @@ private fun MainShell(
         chatsController.isLoading,
         chatsController.items,
     ) {
-        val target = inboundNotificationTarget ?: return@LaunchedEffect
+        val target =
+            inboundNotificationTarget ?: run {
+                // The pending target was cancelled or replaced mid-route (e.g. a
+                // darkmatter:// deep link cleared it via routeInboundIntent) while
+                // we were still in SwitchAccount/AwaitChatList. Nothing left to
+                // resolve, so release the routing loading overlay; otherwise the
+                // render gate below would keep MainShell on a permanent
+                // LoadingScreen with no target to ever clear it (issue #585).
+                routingNotification = false
+                return@LaunchedEffect
+            }
         if (appState.accounts.isEmpty()) return@LaunchedEffect // accounts not loaded yet
         val chatListReady =
             chatsController.boundAccountRef == target.accountRef &&
