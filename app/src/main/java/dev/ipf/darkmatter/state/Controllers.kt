@@ -240,6 +240,28 @@ internal fun chatRowPreviewMarkdownSource(row: ChatListRowFfi): String? {
 }
 
 /**
+ * Distinct, non-blank account ids whose profile presentation a timeline page
+ * needs painted: every message author, every reply-preview author, and every
+ * reaction author. First-seen order is preserved so the warm pass below favors
+ * the rows nearest the top of the page. Used to pre-warm local profile
+ * presentations before the first composition so sender names + avatars don't
+ * pop in a few frames after the message bubble. See #609.
+ */
+internal fun timelineRecordProfileSenders(records: Iterable<TimelineMessageRecordFfi>): List<String> {
+    val senders = linkedSetOf<String>()
+
+    fun add(id: String) {
+        if (id.isNotBlank()) senders.add(id)
+    }
+    records.forEach { record ->
+        add(record.sender)
+        record.replyPreview?.let { add(it.sender) }
+        record.reactions.userReactions.forEach { add(it.sender) }
+    }
+    return senders.toList()
+}
+
+/**
  * Next optimistic timelineOrder: one past the max across both the published
  * timeline and the in-flight optimistic items. Including `pending` is what
  * stops back-to-back optimistic sends from colliding while a publish is still
@@ -3807,7 +3829,7 @@ class ConversationController(
         )
     }
 
-    private fun applyTimelinePage(
+    private suspend fun applyTimelinePage(
         page: TimelinePageFfi,
         replaceWindow: Boolean,
         updatePagination: Boolean,
@@ -3846,6 +3868,19 @@ class ConversationController(
                 }
             }
         }
+        // Materialize local profile presentations for everyone this page
+        // references (message authors, reply-preview authors, reaction authors)
+        // and AWAIT it before the publish below kicks off the first composition.
+        // The requestProfile calls above are the gated *relay* refresh (network);
+        // this is the ungated *local* read each row would otherwise lazily fire
+        // on its own first paint. Awaiting it (rather than fire-and-forget) is
+        // what actually closes the per-row sender name/avatar hydration flicker
+        // for already-on-device history: a launch-and-return warm races this
+        // synchronous publish and can still lose, so the row's first frame would
+        // observe ProfilePresentation.Empty and pop the name/avatar in a frame
+        // later. Blocking here guarantees the cache is populated before publish,
+        // so the first composition paints the sender metadata. See #609.
+        appState.warmProfilePresentationsBlocking(timelineRecordProfileSenders(page.messages))
         if (updatePagination) {
             hasMoreBefore = page.hasMoreBefore
         }
