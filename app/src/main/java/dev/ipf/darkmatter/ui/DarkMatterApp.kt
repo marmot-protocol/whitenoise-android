@@ -13592,6 +13592,16 @@ private fun ComposerBar(
                             // chip in one keypress, so a mention reads as one
                             // token. Falls through to the verbatim IME edit
                             // otherwise.
+                            //
+                            // #607: an IME swipe-to-delete (hold-backspace and
+                            // swipe) fires per-char or multi-char deletes that
+                            // can land *inside* a chip, chopping it into a
+                            // truncated `@npub1…` run. A partial chip corrupts
+                            // the npub reference and crashes the composer's
+                            // chip renderer / offset mapping. repairChipDeletion
+                            // detects any deletion that partially overlaps a
+                            // chip and widens it to remove the whole chip, so a
+                            // partial-chip state can never reach the renderer.
                             val whole =
                                 MentionComposer.wholeChipBackspace(
                                     oldText = textFieldValue.text,
@@ -13599,6 +13609,10 @@ private fun ComposerBar(
                                     newText = value.text,
                                     newCaret = value.selection.start,
                                 )
+                                    ?: MentionComposer.repairChipDeletion(
+                                        oldText = textFieldValue.text,
+                                        newText = value.text,
+                                    )
                             val edited =
                                 if (whole != null) {
                                     TextFieldValue(text = whole.text, selection = TextRange(whole.selection))
@@ -14133,29 +14147,48 @@ private fun ComposerPill(
                 VisualTransformation.None
             } else {
                 VisualTransformation { text ->
-                    val visual = MentionComposer.visualText(text.text, mentionCandidateLookup)
-                    val styled =
-                        buildAnnotatedString {
-                            append(visual.text)
-                            visual.ranges.forEach { range ->
-                                addStyle(
-                                    SpanStyle(
-                                        color = chipColor,
-                                        fontWeight = FontWeight.Medium,
-                                        background = chipColor.copy(alpha = 0.12f),
-                                    ),
-                                    range.transformed.first,
-                                    range.transformed.last + 1,
-                                )
+                    // #607: the chip renderer must never crash the composer. The
+                    // primary fix (MentionComposer.repairChipDeletion in
+                    // onValueChange) makes a partial `@npub1…` chip state
+                    // impossible, but degrade gracefully — fall back to the
+                    // untransformed text — if any unforeseen malformed input
+                    // state still drives buildAnnotatedString / the offset
+                    // mapping out of bounds, rather than letting it throw.
+                    runCatching {
+                        val visual = MentionComposer.visualText(text.text, mentionCandidateLookup)
+                        val visualLength = visual.text.length
+                        val styled =
+                            buildAnnotatedString {
+                                append(visual.text)
+                                visual.ranges.forEach { range ->
+                                    // Clamp span bounds into the transformed text
+                                    // so a stale/oversized range can't trip
+                                    // addStyle's range check.
+                                    val spanStart = range.transformed.first.coerceIn(0, visualLength)
+                                    val spanEnd = (range.transformed.last + 1).coerceIn(spanStart, visualLength)
+                                    if (spanEnd > spanStart) {
+                                        addStyle(
+                                            SpanStyle(
+                                                color = chipColor,
+                                                fontWeight = FontWeight.Medium,
+                                                background = chipColor.copy(alpha = 0.12f),
+                                            ),
+                                            spanStart,
+                                            spanEnd,
+                                        )
+                                    }
+                                }
                             }
-                        }
-                    val offsetMapping =
-                        object : OffsetMapping {
-                            override fun originalToTransformed(offset: Int): Int = visual.originalToTransformed(offset)
+                        val offsetMapping =
+                            object : OffsetMapping {
+                                override fun originalToTransformed(offset: Int): Int = visual.originalToTransformed(offset).coerceIn(0, visualLength)
 
-                            override fun transformedToOriginal(offset: Int): Int = visual.transformedToOriginal(offset)
-                        }
-                    TransformedText(styled, offsetMapping)
+                                override fun transformedToOriginal(offset: Int): Int = visual.transformedToOriginal(offset).coerceIn(0, text.text.length)
+                            }
+                        TransformedText(styled, offsetMapping)
+                    }.getOrElse {
+                        TransformedText(text, OffsetMapping.Identity)
+                    }
                 }
             }
         }
