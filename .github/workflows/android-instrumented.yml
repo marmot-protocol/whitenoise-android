@@ -1,0 +1,74 @@
+name: Android Instrumented Tests
+
+# Runs app/src/androidTest on an emulator (connectedDebugAndroidTest). These
+# tests are slow and need a booted emulator + KVM, so they live in their own
+# workflow off the fast unit/ktlint path (see android-ci.yml). It runs on
+# pushes to master ONLY — never on pull requests — so a slow emulator boot can
+# never gate a PR merge.
+#
+# Debug variant only: no signing secrets, no Firebase config, matching the
+# unit-test workflow's no-credentials posture.
+
+on:
+  push:
+    branches: [master]
+
+# Cancel superseded runs on the same ref so a force-push or rapid re-push does
+# not pile up redundant (and expensive) emulator runs.
+concurrency:
+  group: android-instrumented-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  instrumented:
+    name: Connected Android tests (emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # AGP 9.x / Gradle 9.4.1 require JDK 17 (matches android-ci.yml).
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # KVM lets the emulator run hardware-accelerated on the GitHub-hosted
+      # ubuntu runner; without it the AVD boot is far slower or fails.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run connected Android tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
+
+      - name: Upload instrumented test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumented-reports
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+          if-no-files-found: ignore
+          retention-days: 7

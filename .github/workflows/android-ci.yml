@@ -67,6 +67,26 @@ jobs:
       - name: Android lint
         run: ./gradlew :app:lintDebug --no-daemon --stacktrace
 
+      # Coverage visibility only (phase 1): generate the Kover report and publish
+      # it as an artifact. No thresholds/gates — non-blocking, never fails the
+      # build. Debug variant only: the aggregate kover tasks pull in the release
+      # variant, whose packaging trips the unsigned-release guard (no signing in
+      # CI), so the *Debug tasks scope coverage to what the unit tests exercise.
+      - name: Coverage report (Kover)
+        if: always()
+        continue-on-error: true
+        run: ./gradlew :app:koverXmlReportDebug :app:koverHtmlReportDebug --no-daemon --stacktrace
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kover-coverage-report
+          path: |
+            app/build/reports/kover/
+          if-no-files-found: ignore
+          retention-days: 7
+
       # Surface failure details (unit-test HTML/XML, lint reports, and Roborazzi
       # screenshot diff/compare/actual images) on red runs. The roborazzi output
       # dir holds *_compare.png / *_actual.png for any screenshot that diverged
