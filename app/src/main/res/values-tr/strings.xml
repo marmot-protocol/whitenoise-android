@@ -347,8 +347,8 @@
     <string name="notification_invite_from_sender">%1$s tarafından davet</string>
     <string name="notification_sender_invited_you_to_group">%1$s sizi %2$s grubuna davet etti</string>
     <string name="background_connection_notification_title">Dark Matter bağlı</string>
-    <string name="background_connection_notification_text">Mesajlar ve davetler dinleniyor</string>
-    <string name="background_connection_notification_hint">Bu bildirimi gizlemek için uzun basın. Bağlantı açık kalır.</string>
+    <string name="background_connection_notification_text">Mesajlar dinleniyor</string>
+    <string name="background_connection_notification_hint">Bu bildirimi gizlemek için uzun basın</string>
     <string name="notification_channel_background_connection">Arka plan bağlantısı</string>
     <string name="notification_channel_background_connection_description">Yerel bildirimler için Dark Matter’yi bağlı tutar</string>
     <string name="toast_restarting">Yeniden başlatılıyor</string>
