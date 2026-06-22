@@ -658,4 +658,24 @@
     <string name="media_quality_footer">照片中的位置與裝置中繼資料（EXIF GPS、品牌和型號）一律會移除，即使選擇原始。影片和已選取的音訊檔會原樣傳送；音訊位元率套用於錄製的語音訊息。</string>
     <string name="profile_is_public">個人檔案是公開的</string>
     <string name="profile_public_description">您的個人檔案資訊會讓網路上的所有人看見。</string>
+    <string name="shared_media">共用媒體</string>
+    <string name="shared_media_see_all">查看全部</string>
+    <string name="shared_media_view">查看共用媒體</string>
+    <string name="shared_media_tab_images">圖片</string>
+    <string name="shared_media_tab_videos">影片</string>
+    <string name="shared_media_tab_voice">語音</string>
+    <string name="shared_media_tab_files">檔案</string>
+    <string name="shared_media_tab_urls">連結</string>
+    <string name="shared_media_empty_images">尚無圖片</string>
+    <string name="shared_media_empty_videos">尚無影片</string>
+    <string name="shared_media_empty_voice">尚無語音訊息</string>
+    <string name="shared_media_empty_files">尚無檔案</string>
+    <string name="shared_media_empty_urls">尚無連結</string>
+    <string name="shared_media_back">返回</string>
+    <string name="shared_media_file_actions">檔案操作</string>
+    <string name="shared_media_save">儲存</string>
+    <string name="shared_media_share">分享</string>
+    <string name="shared_media_saved">已儲存</string>
+    <string name="shared_media_save_failed">無法儲存檔案</string>
+    <string name="shared_media_voice_failed">無法播放語音訊息</string>
 </resources>

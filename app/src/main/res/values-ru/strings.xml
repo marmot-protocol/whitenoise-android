@@ -678,4 +678,24 @@
     <string name="media_quality_footer">Метаданные местоположения и устройства (EXIF GPS, марка и модель) всегда удаляются из фото, даже в исходном качестве. Видео и выбранные аудиофайлы отправляются как есть; битрейт звука применяется к записанным голосовым сообщениям.</string>
     <string name="profile_is_public">Профиль публичный</string>
     <string name="profile_public_description">Информация вашего профиля будет видна всем в сети.</string>
+    <string name="shared_media">Общие медиафайлы</string>
+    <string name="shared_media_see_all">Показать все</string>
+    <string name="shared_media_view">Посмотреть общие медиафайлы</string>
+    <string name="shared_media_tab_images">Изображения</string>
+    <string name="shared_media_tab_videos">Видео</string>
+    <string name="shared_media_tab_voice">Голос</string>
+    <string name="shared_media_tab_files">Файлы</string>
+    <string name="shared_media_tab_urls">Ссылки</string>
+    <string name="shared_media_empty_images">Пока нет изображений</string>
+    <string name="shared_media_empty_videos">Пока нет видео</string>
+    <string name="shared_media_empty_voice">Пока нет голосовых сообщений</string>
+    <string name="shared_media_empty_files">Пока нет файлов</string>
+    <string name="shared_media_empty_urls">Пока нет ссылок</string>
+    <string name="shared_media_back">Назад</string>
+    <string name="shared_media_file_actions">Действия с файлом</string>
+    <string name="shared_media_save">Сохранить</string>
+    <string name="shared_media_share">Поделиться</string>
+    <string name="shared_media_saved">Сохранено</string>
+    <string name="shared_media_save_failed">Не удалось сохранить файл</string>
+    <string name="shared_media_voice_failed">Не удалось воспроизвести голосовое сообщение</string>
 </resources>

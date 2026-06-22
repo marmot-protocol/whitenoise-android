@@ -261,6 +261,10 @@ class LocalizationResourceTest {
                 "media_type_audio",
                 "media_type_video",
                 "media_type_documents",
+                // Shared-media tab labels that are loan-words / spelled the same
+                // in some locales ("Images" in French, "Videos" in German).
+                "shared_media_tab_images",
+                "shared_media_tab_videos",
             )
     }
 }

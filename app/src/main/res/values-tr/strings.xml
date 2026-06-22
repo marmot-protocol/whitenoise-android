@@ -664,4 +664,24 @@
     <string name="media_quality_footer">Konum ve cihaz meta verileri (EXIF GPS, marka ve model) fotoğraflardan her zaman kaldırılır, Özgün dahil. Videolar ve seçilen ses dosyaları olduğu gibi gönderilir; ses bit hızı kaydedilen sesli mesajlara uygulanır.</string>
     <string name="profile_is_public">Profil herkese açık</string>
     <string name="profile_public_description">Profil bilgileriniz ağdaki herkes tarafından görülebilir.</string>
+    <string name="shared_media">Paylaşılan medya</string>
+    <string name="shared_media_see_all">Tümünü gör</string>
+    <string name="shared_media_view">Paylaşılan medyayı gör</string>
+    <string name="shared_media_tab_images">Görseller</string>
+    <string name="shared_media_tab_videos">Videolar</string>
+    <string name="shared_media_tab_voice">Ses</string>
+    <string name="shared_media_tab_files">Dosyalar</string>
+    <string name="shared_media_tab_urls">Bağlantılar</string>
+    <string name="shared_media_empty_images">Henüz görsel yok</string>
+    <string name="shared_media_empty_videos">Henüz video yok</string>
+    <string name="shared_media_empty_voice">Henüz sesli mesaj yok</string>
+    <string name="shared_media_empty_files">Henüz dosya yok</string>
+    <string name="shared_media_empty_urls">Henüz bağlantı yok</string>
+    <string name="shared_media_back">Geri</string>
+    <string name="shared_media_file_actions">Dosya işlemleri</string>
+    <string name="shared_media_save">Kaydet</string>
+    <string name="shared_media_share">Paylaş</string>
+    <string name="shared_media_saved">Kaydedildi</string>
+    <string name="shared_media_save_failed">Dosya kaydedilemedi</string>
+    <string name="shared_media_voice_failed">Sesli mesaj oynatılamadı</string>
 </resources>

@@ -667,4 +667,24 @@
     <string name="media_quality_footer">Les métadonnées de localisation et d\'appareil (GPS EXIF, marque et modèle) sont toujours retirées des photos, même en Originale. Les vidéos et fichiers audio choisis sont envoyés tels quels ; le débit audio concerne les messages vocaux enregistrés.</string>
     <string name="profile_is_public">Le profil est public</string>
     <string name="profile_public_description">Les informations de votre profil seront visibles par tous sur le réseau.</string>
+    <string name="shared_media">Médias partagés</string>
+    <string name="shared_media_see_all">Tout voir</string>
+    <string name="shared_media_view">Voir les médias partagés</string>
+    <string name="shared_media_tab_images">Images</string>
+    <string name="shared_media_tab_videos">Vidéos</string>
+    <string name="shared_media_tab_voice">Vocal</string>
+    <string name="shared_media_tab_files">Fichiers</string>
+    <string name="shared_media_tab_urls">Liens</string>
+    <string name="shared_media_empty_images">Aucune image pour l\'instant</string>
+    <string name="shared_media_empty_videos">Aucune vidéo pour l\'instant</string>
+    <string name="shared_media_empty_voice">Aucun message vocal pour l\'instant</string>
+    <string name="shared_media_empty_files">Aucun fichier pour l\'instant</string>
+    <string name="shared_media_empty_urls">Aucun lien pour l\'instant</string>
+    <string name="shared_media_back">Retour</string>
+    <string name="shared_media_file_actions">Actions du fichier</string>
+    <string name="shared_media_save">Enregistrer</string>
+    <string name="shared_media_share">Partager</string>
+    <string name="shared_media_saved">Enregistré</string>
+    <string name="shared_media_save_failed">Impossible d\'enregistrer le fichier</string>
+    <string name="shared_media_voice_failed">Impossible de lire le message vocal</string>
 </resources>

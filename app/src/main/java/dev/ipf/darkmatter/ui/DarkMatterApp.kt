@@ -231,6 +231,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
@@ -3162,7 +3163,7 @@ private fun imageBubbleSizing(ratio: Float?): Modifier =
  * blurred preview before the real bytes arrive.
  */
 @Composable
-private fun rememberThumbhashImage(thumbhash: String?): ImageBitmap? {
+internal fun rememberThumbhashImage(thumbhash: String?): ImageBitmap? {
     if (thumbhash.isNullOrBlank()) return null
     // The decode is a few hundred μs to a couple ms (cosine-basis sum
     // across a 32×32 grid). Doing it inside `remember { ... }` runs it on
@@ -3541,6 +3542,8 @@ private fun MediaImageBubble(
             attachments = listOf(IndexedValue(attachmentIndex, reference)),
             startIndex = 0,
             onDismiss = { viewerOpen = false },
+            sender = record.sender,
+            recordedAt = record.recordedAt,
             mine = mine,
         )
     }
@@ -3657,6 +3660,8 @@ private fun MediaImageGridBubble(
             attachments = attachments,
             startIndex = index,
             onDismiss = { viewerOpenAt = null },
+            sender = record.sender,
+            recordedAt = record.recordedAt,
             mine = mine,
         )
     }
@@ -3736,6 +3741,8 @@ private fun MediaVisualGridBubble(
             attachments = attachments,
             startIndex = tileIndex,
             onDismiss = { viewerOpenAt = null },
+            sender = record.sender,
+            recordedAt = record.recordedAt,
             mine = mine,
         )
     }
@@ -3749,7 +3756,7 @@ private fun MediaVisualGridBubble(
  * the bubble can open the fullscreen player.
  */
 @Composable
-private fun MediaVideoGridTile(
+internal fun MediaVideoGridTile(
     messageIdHex: String,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
@@ -3920,7 +3927,7 @@ private fun MediaVideoGridTile(
  * full-screen viewer at this attachment's index).
  */
 @Composable
-private fun MediaImageGridTile(
+internal fun MediaImageGridTile(
     messageIdHex: String,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
@@ -4898,7 +4905,7 @@ private fun VoiceSpeedPill(currentSpeed: Float) {
  * the still-retained source bytes from the pending-attachments list while
  * the Blossom upload is in flight.
  */
-private suspend fun materializeVoiceAttachment(
+internal suspend fun materializeVoiceAttachment(
     context: android.content.Context,
     controller: ConversationController,
     messageIdHex: String,
@@ -5013,7 +5020,7 @@ private fun VoiceWaveform(
  * becomes "PDF", `image/jpeg` becomes "JPG", `application/vnd.…` falls back
  * to the lowercase MIME so the bubble never goes blank.
  */
-private fun shortMediaTypeLabel(mediaType: String): String {
+internal fun shortMediaTypeLabel(mediaType: String): String {
     val trimmed = mediaType.trim()
     if (trimmed.isEmpty()) return ""
     val tail = trimmed.substringAfterLast('/', missingDelimiterValue = trimmed)
@@ -5030,7 +5037,7 @@ private fun shortMediaTypeLabel(mediaType: String): String {
     }
 }
 
-private fun fileIconFor(mediaType: String): androidx.compose.ui.graphics.vector.ImageVector =
+internal fun fileIconFor(mediaType: String): androidx.compose.ui.graphics.vector.ImageVector =
     when {
         mediaType.startsWith("audio/", ignoreCase = true) -> Icons.Default.Audiotrack
         mediaType.startsWith("video/", ignoreCase = true) -> Icons.Default.Movie
@@ -5049,7 +5056,7 @@ private fun formatFileSize(bytes: Long): String {
     return String.format(java.util.Locale.US, "%.1f GB", gb)
 }
 
-private enum class OpenAttachmentResult { Opened, NoHandler, Error }
+internal enum class OpenAttachmentResult { Opened, NoHandler, Error }
 
 /** Which `ImageSearchSheet` button is currently driving an in-flight
  *  mutation, so the sheet can place the spinner on it. */
@@ -5081,7 +5088,7 @@ private enum class GroupImageAction { Apply, Remove }
  * exit; we don't track it per-call because the handing-off intent may
  * need it alive for an unbounded duration after this function returns.
  */
-private suspend fun openAttachmentExternally(
+internal suspend fun openAttachmentExternally(
     context: android.content.Context,
     bytes: ByteArray,
     fileName: String,
@@ -5479,6 +5486,23 @@ private suspend fun attachmentBytes(
     return controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
 }
 
+// One page of the full-screen media viewer. Unlike the original single-album
+// viewer (one fixed messageIdHex + mine for the whole pager), each page now
+// carries its own message context so the pager can span attachments from
+// different messages — the cross-message gallery the shared-media grids open.
+// The save/share/decrypt paths read the CURRENT page's descriptor.
+internal data class MediaViewerPage(
+    val messageIdHex: String,
+    val attachmentIndex: Int,
+    val reference: MediaAttachmentReferenceFfi,
+    val mine: Boolean,
+    val sender: String,
+    val recordedAt: ULong,
+)
+
+// Album wrapper preserving the original call shape: a single message's
+// attachments, one `mine` flag. The three conversation bubble callsites use
+// this; it just projects the album onto per-page descriptors.
 @Composable
 private fun FullScreenImageViewer(
     controller: ConversationController,
@@ -5487,9 +5511,34 @@ private fun FullScreenImageViewer(
     attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
     startIndex: Int,
     onDismiss: () -> Unit,
+    sender: String,
+    recordedAt: ULong,
     mine: Boolean = false,
 ) {
-    if (attachments.isEmpty()) {
+    val pages =
+        remember(messageIdHex, attachments, mine, sender, recordedAt) {
+            attachments.map { entry ->
+                MediaViewerPage(messageIdHex, entry.index, entry.value, mine, sender, recordedAt)
+            }
+        }
+    FullScreenMediaViewer(
+        controller = controller,
+        appState = appState,
+        pages = pages,
+        startIndex = startIndex,
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+internal fun FullScreenMediaViewer(
+    controller: ConversationController,
+    appState: DarkMatterAppState,
+    pages: List<MediaViewerPage>,
+    startIndex: Int,
+    onDismiss: () -> Unit,
+) {
+    if (pages.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
         // pager doesn't NPE on a vanished album.
         onDismiss()
@@ -5502,12 +5551,14 @@ private fun FullScreenImageViewer(
     val saveFailedMessage = stringResource(R.string.media_save_failed)
     val pagerState =
         rememberPagerState(
-            initialPage = startIndex.coerceIn(0, attachments.lastIndex),
-            pageCount = { attachments.size },
+            initialPage = startIndex.coerceIn(0, pages.lastIndex),
+            pageCount = { pages.size },
         )
-    val currentEntry = attachments[pagerState.currentPage]
-    val currentReference = currentEntry.value
-    val currentAttachmentIndex = currentEntry.index
+    val currentPage = pages[pagerState.currentPage]
+    val currentReference = currentPage.reference
+    val currentAttachmentIndex = currentPage.attachmentIndex
+    val currentMessageIdHex = currentPage.messageIdHex
+    val currentMine = currentPage.mine
     // Zoom state is hoisted to the viewer scope (not per-page) so the pager
     // can read it to gate horizontal swipe. Without this gate, the page's
     // `detectTransformGestures` claims every horizontal drag and the pager
@@ -5537,27 +5588,27 @@ private fun FullScreenImageViewer(
                 // the horizontal drag. At scale 1× the pager wins.
                 userScrollEnabled = scale <= 1f,
             ) { page ->
-                val pageEntry = attachments[page]
-                if (MediaReferenceParser.isVideoMedia(pageEntry.value)) {
+                val pageDescriptor = pages[page]
+                if (MediaReferenceParser.isVideoMedia(pageDescriptor.reference)) {
                     VideoViewerPage(
                         controller = controller,
-                        messageIdHex = messageIdHex,
-                        attachmentIndex = pageEntry.index,
-                        reference = pageEntry.value,
+                        messageIdHex = pageDescriptor.messageIdHex,
+                        attachmentIndex = pageDescriptor.attachmentIndex,
+                        reference = pageDescriptor.reference,
                         isCurrent = page == pagerState.currentPage,
-                        mine = mine,
+                        mine = pageDescriptor.mine,
                     )
                 } else {
                     ViewerPage(
                         controller = controller,
-                        messageIdHex = messageIdHex,
-                        attachmentIndex = pageEntry.index,
-                        reference = pageEntry.value,
+                        messageIdHex = pageDescriptor.messageIdHex,
+                        attachmentIndex = pageDescriptor.attachmentIndex,
+                        reference = pageDescriptor.reference,
                         scale = if (page == pagerState.currentPage) scale else 1f,
                         offset = if (page == pagerState.currentPage) offset else Offset.Zero,
                         onScaleChange = { if (page == pagerState.currentPage) scale = it },
                         onOffsetChange = { if (page == pagerState.currentPage) offset = it },
-                        mine = mine,
+                        mine = pageDescriptor.mine,
                     )
                 }
             }
@@ -5574,9 +5625,9 @@ private fun FullScreenImageViewer(
                 IconButton(onClick = onDismiss) {
                     Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
                 }
-                if (attachments.size > 1) {
+                if (pages.size > 1) {
                     Text(
-                        text = "${pagerState.currentPage + 1} / ${attachments.size}",
+                        text = "${pagerState.currentPage + 1} / ${pages.size}",
                         color = Color.White,
                         style = MaterialTheme.typography.labelLarge,
                     )
@@ -5586,10 +5637,12 @@ private fun FullScreenImageViewer(
                         onClick = {
                             val ref = currentReference
                             val attachmentIndex = currentAttachmentIndex
+                            val msgId = currentMessageIdHex
+                            val owned = currentMine
                             scope.launch {
                                 val data =
                                     runCatching {
-                                        attachmentBytes(controller, messageIdHex, attachmentIndex, ref, mine)
+                                        attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
                                     }.getOrNull()
                                 val ok =
                                     data != null &&
@@ -5610,9 +5663,11 @@ private fun FullScreenImageViewer(
                         onClick = {
                             val ref = currentReference
                             val attachmentIndex = currentAttachmentIndex
+                            val msgId = currentMessageIdHex
+                            val owned = currentMine
                             scope.launch {
                                 runCatching {
-                                    attachmentBytes(controller, messageIdHex, attachmentIndex, ref, mine)
+                                    attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
                                 }.getOrNull()?.let { shareImage(context, it, ref.fileName, ref.mediaType) }
                             }
                         },
@@ -5620,6 +5675,40 @@ private fun FullScreenImageViewer(
                         Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
                     }
                 }
+            }
+            // Sender + send-time caption for the visible page, over a bottom
+            // scrim so it stays readable on bright photos. Reads the current
+            // page so it tracks swipes.
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
+                            ),
+                        ).navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                Text(
+                    text = appState.displayName(currentPage.sender),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text =
+                        DateUtils.formatDateTime(
+                            context,
+                            currentPage.recordedAt.toLong() * 1000L,
+                            DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_ALL,
+                        ),
+                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.labelMedium,
+                )
             }
             SnackbarHost(
                 hostState = snackbarHostState,
@@ -5887,7 +5976,7 @@ private fun ViewerPage(
  * Uses the IS_PENDING dance so other apps never see a half-written entry, and
  * sanitizes the remote-supplied [fileName] to a basename.
  */
-private fun saveImageToGallery(
+internal fun saveImageToGallery(
     context: android.content.Context,
     bytes: ByteArray,
     fileName: String,
@@ -5924,7 +6013,7 @@ private fun saveImageToGallery(
 /** Persist a decrypted video to the public Movies/DarkMatter folder via the
  *  Video MediaStore so it shows up in the system gallery. Mirrors the image
  *  save flow's IS_PENDING dance. */
-private fun saveVideoToGallery(
+internal fun saveVideoToGallery(
     context: android.content.Context,
     bytes: ByteArray,
     fileName: String,
@@ -5964,7 +6053,7 @@ private fun saveVideoToGallery(
  * write. The `startActivity` call has to run on Main, so the I/O is hopped
  * to `Dispatchers.IO` and the chooser is fired back on Main.
  */
-private suspend fun shareImage(
+internal suspend fun shareImage(
     context: android.content.Context,
     bytes: ByteArray,
     fileName: String,
@@ -7863,6 +7952,11 @@ private fun ConversationScreen(
                 openAddMemberOnDetails = false
             },
             onLeft = onBack,
+            onJumpToMessage = { messageId ->
+                showDetails = false
+                openTransferOnDetails = false
+                scrollToSearchMatch(messageId)
+            },
             autoOpenTransferAdmin = openTransferOnDetails,
             autoOpenAddMember = openAddMemberOnDetails,
             onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
@@ -8693,6 +8787,9 @@ private fun GroupDetailsScreen(
     controller: ConversationController,
     onBack: () -> Unit,
     onLeft: () -> Unit,
+    // Jump back to a message in the conversation (Shared Media tile tap). The
+    // caller closes details and reuses the existing focus-scroll mechanism.
+    onJumpToMessage: (String) -> Unit = {},
     // When true (sole admin routed in from the blocked top-level Leave gate),
     // open the transfer-admin picker immediately so the trapped admin lands on
     // the action instead of having to hunt for it in the Admins section (#417).
@@ -8809,6 +8906,21 @@ private fun GroupDetailsScreen(
                 accountIdHex == null || accountIdHex !in memberIds
             }
         if (filtered != pendingInvites) pendingInvites = filtered
+    }
+
+    val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
+    var showMediaLibrary by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+
+    if (showMediaLibrary) {
+        BackHandler { showMediaLibrary = false }
+        MediaLibraryRoute(
+            tiles = sharedMediaTiles,
+            controller = controller,
+            appState = appState,
+            onBack = { showMediaLibrary = false },
+            onJumpToMessage = onJumpToMessage,
+        )
+        return
     }
 
     BackHandler { onBack() }
@@ -8945,6 +9057,14 @@ private fun GroupDetailsScreen(
                     onDismiss = { controller.clearLastMutationError() },
                 )
             }
+
+            SharedMediaSection(
+                tiles = sharedMediaTiles,
+                controller = controller,
+                appState = appState,
+                onSeeAll = { showMediaLibrary = true },
+                onJumpToMessage = onJumpToMessage,
+            )
 
             SectionCardWithAction(
                 title = "${stringResource(R.string.members)} · ${controller.members.size}",
@@ -16848,7 +16968,7 @@ private fun DiagnosticRow(
 // one step above the page" relationship, resolved per theme by luminance since
 // "lighter == elevated" can't be expressed the same way in both.
 @Composable
-private fun sectionPanelColor(): Color =
+internal fun sectionPanelColor(): Color =
     if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
         MaterialTheme.colorScheme.surfaceContainerLowest
     } else {
@@ -16856,7 +16976,7 @@ private fun sectionPanelColor(): Color =
     }
 
 @Composable
-private fun SectionCard(
+internal fun SectionCard(
     title: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -16872,7 +16992,7 @@ private fun SectionCard(
 }
 
 @Composable
-private fun SectionCardWithAction(
+internal fun SectionCardWithAction(
     title: String,
     action: @Composable RowScope.() -> Unit,
     content: @Composable ColumnScope.() -> Unit,
@@ -16939,7 +17059,7 @@ private val AvatarPalette =
     )
 
 @Composable
-private fun Avatar(
+internal fun Avatar(
     title: String,
     seed: String,
     size: androidx.compose.ui.unit.Dp,

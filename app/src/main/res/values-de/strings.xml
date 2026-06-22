@@ -664,4 +664,24 @@
     <string name="media_quality_footer">Standort- und Gerätemetadaten (EXIF-GPS, Hersteller und Modell) werden immer aus Fotos entfernt, auch bei Originalgröße. Videos und ausgewählte Audiodateien werden unverändert gesendet; die Audio-Bitrate gilt für aufgenommene Sprachnachrichten.</string>
     <string name="profile_is_public">Profil ist öffentlich</string>
     <string name="profile_public_description">Deine Profilinformationen sind für alle im Netzwerk sichtbar.</string>
+    <string name="shared_media">Geteilte Medien</string>
+    <string name="shared_media_see_all">Alle ansehen</string>
+    <string name="shared_media_view">Geteilte Medien ansehen</string>
+    <string name="shared_media_tab_images">Bilder</string>
+    <string name="shared_media_tab_videos">Videos</string>
+    <string name="shared_media_tab_voice">Sprache</string>
+    <string name="shared_media_tab_files">Dateien</string>
+    <string name="shared_media_tab_urls">Links</string>
+    <string name="shared_media_empty_images">Noch keine Bilder</string>
+    <string name="shared_media_empty_videos">Noch keine Videos</string>
+    <string name="shared_media_empty_voice">Noch keine Sprachnachrichten</string>
+    <string name="shared_media_empty_files">Noch keine Dateien</string>
+    <string name="shared_media_empty_urls">Noch keine Links</string>
+    <string name="shared_media_back">Zurück</string>
+    <string name="shared_media_file_actions">Dateiaktionen</string>
+    <string name="shared_media_save">Speichern</string>
+    <string name="shared_media_share">Teilen</string>
+    <string name="shared_media_saved">Gespeichert</string>
+    <string name="shared_media_save_failed">Datei konnte nicht gespeichert werden</string>
+    <string name="shared_media_voice_failed">Sprachnachricht konnte nicht abgespielt werden</string>
 </resources>

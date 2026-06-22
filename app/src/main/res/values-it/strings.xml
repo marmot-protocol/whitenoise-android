@@ -667,4 +667,24 @@
     <string name="media_quality_footer">I metadati di posizione e dispositivo (GPS EXIF, marca e modello) vengono sempre rimossi dalle foto, anche in Originale. Video e file audio selezionati vengono inviati così come sono; il bitrate audio si applica ai messaggi vocali registrati.</string>
     <string name="profile_is_public">Il profilo è pubblico</string>
     <string name="profile_public_description">Le informazioni del tuo profilo saranno visibili a tutti sulla rete.</string>
+    <string name="shared_media">Media condivisi</string>
+    <string name="shared_media_see_all">Vedi tutto</string>
+    <string name="shared_media_view">Visualizza media condivisi</string>
+    <string name="shared_media_tab_images">Immagini</string>
+    <string name="shared_media_tab_videos">Video</string>
+    <string name="shared_media_tab_voice">Voce</string>
+    <string name="shared_media_tab_files">File</string>
+    <string name="shared_media_tab_urls">Link</string>
+    <string name="shared_media_empty_images">Ancora nessuna immagine</string>
+    <string name="shared_media_empty_videos">Ancora nessun video</string>
+    <string name="shared_media_empty_voice">Ancora nessun messaggio vocale</string>
+    <string name="shared_media_empty_files">Ancora nessun file</string>
+    <string name="shared_media_empty_urls">Ancora nessun link</string>
+    <string name="shared_media_back">Indietro</string>
+    <string name="shared_media_file_actions">Azioni file</string>
+    <string name="shared_media_save">Salva</string>
+    <string name="shared_media_share">Condividi</string>
+    <string name="shared_media_saved">Salvato</string>
+    <string name="shared_media_save_failed">Impossibile salvare il file</string>
+    <string name="shared_media_voice_failed">Impossibile riprodurre il messaggio vocale</string>
 </resources>

@@ -669,4 +669,24 @@
     <string name="reply_media_video">Video</string>
     <string name="reply_media_voice">Voice message</string>
     <string name="reply_media_document">Document</string>
+    <string name="shared_media">Shared media</string>
+    <string name="shared_media_see_all">See all</string>
+    <string name="shared_media_view">View shared media</string>
+    <string name="shared_media_tab_images">Images</string>
+    <string name="shared_media_tab_videos">Videos</string>
+    <string name="shared_media_tab_voice">Voice</string>
+    <string name="shared_media_tab_files">Files</string>
+    <string name="shared_media_tab_urls">URLs</string>
+    <string name="shared_media_empty_images">No images yet</string>
+    <string name="shared_media_empty_videos">No videos yet</string>
+    <string name="shared_media_empty_voice">No voice messages yet</string>
+    <string name="shared_media_empty_files">No files yet</string>
+    <string name="shared_media_empty_urls">No links yet</string>
+    <string name="shared_media_back">Back</string>
+    <string name="shared_media_file_actions">File actions</string>
+    <string name="shared_media_save">Save</string>
+    <string name="shared_media_share">Share</string>
+    <string name="shared_media_saved">Saved</string>
+    <string name="shared_media_save_failed">Couldn\'t save file</string>
+    <string name="shared_media_voice_failed">Couldn\'t play voice message</string>
 </resources>

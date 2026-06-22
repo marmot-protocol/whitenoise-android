@@ -667,4 +667,24 @@
     <string name="media_quality_footer">Los metadatos de ubicación y dispositivo (GPS EXIF, marca y modelo) siempre se eliminan de las fotos, incluso en Sin modificar. Los videos y archivos de audio elegidos se envían tal cual; la tasa de bits de audio se aplica a las notas de voz grabadas.</string>
     <string name="profile_is_public">El perfil es público</string>
     <string name="profile_public_description">La información de tu perfil será visible para todos en la red.</string>
+    <string name="shared_media">Multimedia compartido</string>
+    <string name="shared_media_see_all">Ver todo</string>
+    <string name="shared_media_view">Ver multimedia compartido</string>
+    <string name="shared_media_tab_images">Imágenes</string>
+    <string name="shared_media_tab_videos">Vídeos</string>
+    <string name="shared_media_tab_voice">Voz</string>
+    <string name="shared_media_tab_files">Archivos</string>
+    <string name="shared_media_tab_urls">Enlaces</string>
+    <string name="shared_media_empty_images">Aún no hay imágenes</string>
+    <string name="shared_media_empty_videos">Aún no hay vídeos</string>
+    <string name="shared_media_empty_voice">Aún no hay mensajes de voz</string>
+    <string name="shared_media_empty_files">Aún no hay archivos</string>
+    <string name="shared_media_empty_urls">Aún no hay enlaces</string>
+    <string name="shared_media_back">Atrás</string>
+    <string name="shared_media_file_actions">Acciones de archivo</string>
+    <string name="shared_media_save">Guardar</string>
+    <string name="shared_media_share">Compartir</string>
+    <string name="shared_media_saved">Guardado</string>
+    <string name="shared_media_save_failed">No se pudo guardar el archivo</string>
+    <string name="shared_media_voice_failed">No se pudo reproducir el mensaje de voz</string>
 </resources>
