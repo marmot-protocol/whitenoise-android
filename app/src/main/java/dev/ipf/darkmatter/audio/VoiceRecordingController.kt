@@ -1,6 +1,9 @@
 package dev.ipf.darkmatter.audio
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -36,6 +39,11 @@ class VoiceRecordingController(
         // the comfortable-voice-note range; longer payloads should be sent
         // as audio file attachments, not held-mic captures.
         const val MAX_RECORDING_MS: Long = 5L * 60L * 1000L
+
+        // Keep capturing this long after the user releases before finalizing the
+        // encoder, so the trailing word isn't clipped when they release as their
+        // last syllable ends. Short enough to stay imperceptible as send latency.
+        const val RECORDING_TAIL_MS: Long = 400L
     }
 
     var isRecording: Boolean by mutableStateOf(false)
@@ -57,12 +65,21 @@ class VoiceRecordingController(
 
     private var recorder: VoiceRecorder? = null
     private var tickJob: Job? = null
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    private var focusRequest: AudioFocusRequest? = null
 
     fun start(): Boolean {
         if (isRecording) return true
         if (!onPermissionRequest()) return false
-        // Pause AFTER permission is confirmed — a denied prompt shouldn't
-        // also silence whatever the user was listening to.
+        // Request transient audio focus AFTER permission is confirmed (a denied
+        // prompt shouldn't disturb playback). Focus pauses other apps' media for
+        // the duration of the capture and resumes it when abandoned on
+        // stop/cancel. A denied grant means the mic is unavailable (e.g. an
+        // active call) — surface it rather than capture competing audio.
+        if (!requestRecordingFocus()) {
+            onError(IllegalStateException("Couldn't start recording — audio is in use"))
+            return false
+        }
         VoicePlaybackController.pause()
         val file =
             File(
@@ -95,6 +112,7 @@ class VoiceRecordingController(
                 }
             true
         } catch (t: Throwable) {
+            abandonRecordingFocus()
             recorder = null
             isRecording = false
             onError(t)
@@ -120,6 +138,10 @@ class VoiceRecordingController(
         // the container is finalized. See #372.
         scope.launch(Dispatchers.Main) {
             try {
+                // Keep the encoder running a short tail so the trailing word
+                // isn't clipped. Only the send path (stop) pays this; cancel
+                // never does. The recorder is still capturing until r.stop().
+                delay(RECORDING_TAIL_MS)
                 val result = withContext(Dispatchers.IO) { r.stop() }
                 if (result == null) {
                     onError(IllegalStateException("voice recording too short"))
@@ -134,6 +156,8 @@ class VoiceRecordingController(
                 // too — matching start()'s contract — rather than dropping it on
                 // the scope's handler.
                 onError(t)
+            } finally {
+                abandonRecordingFocus()
             }
         }
     }
@@ -150,8 +174,33 @@ class VoiceRecordingController(
         willCancel = false
         willLock = false
         // Same off-main finalize as stop() (#372); a cancel has nothing to
-        // deliver, so just release the recorder in the background.
+        // deliver, so just release the recorder in the background. No tail delay
+        // — the take was discarded. Release focus so paused media resumes.
+        abandonRecordingFocus()
         scope.launch(Dispatchers.IO) { r.cancel() }
+    }
+
+    private fun requestRecordingFocus(): Boolean {
+        val am = audioManager ?: return true
+        val attrs =
+            AudioAttributes
+                .Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .build()
+        val req =
+            AudioFocusRequest
+                .Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(attrs)
+                .build()
+        focusRequest = req
+        return am.requestAudioFocus(req) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+
+    private fun abandonRecordingFocus() {
+        val am = audioManager ?: return
+        focusRequest?.let { am.abandonAudioFocusRequest(it) }
+        focusRequest = null
     }
 
     fun lock() {
