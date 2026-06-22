@@ -178,6 +178,39 @@ object MessageProjector {
 
     fun isGroupSystemKind(kind: ULong): Boolean = kind == KindGroupSystem
 
+    /**
+     * True for a regular chat-message kind (kind 9). Narrower than
+     * [rendersRawBodyPreview]: not every kind whose chat-list preview is the
+     * raw body is a kind-9 chat message (e.g. kind-1 legacy notes and
+     * kind-1209 agent-stream finals also fall through to the verbatim-body
+     * arm). Use [rendersRawBodyPreview] when the question is "is the displayed
+     * preview the raw plaintext?"; reserve this for "is this specifically a
+     * kind-9 chat record?".
+     */
+    fun isChatKind(kind: ULong): Boolean = kind == KindChat
+
+    /**
+     * True when a chat-list row's displayed preview line is the message's raw
+     * plaintext itself, rather than derived/fallback copy. This is the exact
+     * complement of the special-cased arms in
+     * [ChatListItem.projectedPreviewText]: edit records (kind-1009),
+     * agent-stream starts (kind-1200) and group-system events (kind-1210)
+     * surface synthetic copy, so they are excluded; every other kind falls
+     * through to the verbatim `preview.plaintext` arm. Naming the predicate
+     * here keeps the markdown parse gate
+     * ([Controllers.chatRowPreviewMarkdownSource]) tied to the same set of
+     * rows the preview renderer would show verbatim, so it covers kind-1
+     * (legacy note), kind-9 (chat), kind-1209 (agent-stream final) and any
+     * future body kind without re-enumerating them (issue #577).
+     *
+     * Callers still apply the deleted/blank guards separately, matching the
+     * `preview.deleted` and `plaintext.isNotBlank()` checks the renderer makes.
+     */
+    fun rendersRawBodyPreview(kind: ULong): Boolean =
+        kind != KindEdit &&
+            kind != KindAgentStreamStart &&
+            !isGroupSystemKind(kind)
+
     fun isReaction(message: AppMessageRecordFfi): Boolean = message.kind == KindReaction
 
     fun isDelete(message: AppMessageRecordFfi): Boolean = message.kind == KindDelete
