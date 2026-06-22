@@ -2354,20 +2354,36 @@ class DarkMatterAppState(
      * sender name + avatar slot render empty for a few frames and then pop in
      * once the off-main local read lands and bumps [profileRevision] (#609).
      *
-     * Calling this when a timeline page is applied — before the first
-     * composition publishes — warms `profilePresentations` from the same local,
-     * ungated, off-main read the row would otherwise trigger one frame later, so
-     * the name + avatar URL are present on (or within a frame of) the first
-     * paint instead of after a network round-trip. This is *not* a new
-     * Android-owned data cache: it reuses the existing in-memory presentation
-     * materialization, just scheduled proactively. The gated relay refresh for
-     * freshness stays the job of [requestProfile]/[requestProfiles].
+     * This suspends until every sender's presentation is materialized into the
+     * caches, so a caller that awaits it before publishing a timeline page
+     * guarantees the first composition observes a populated presentation rather
+     * than [ProfilePresentation.Empty] — closing the per-row hydration flicker
+     * entirely (rather than just narrowing it, as a fire-and-forget warm would:
+     * a launch-and-return warm races the synchronous publish and can still lose,
+     * leaving rows blank on the first frame).
+     *
+     * The reads run off the main thread via [marmotIo]; only cache writes touch
+     * the main thread. This is *not* a new Android-owned data cache: it reuses
+     * the existing in-memory presentation materialization, just scheduled
+     * proactively and awaited. The gated relay refresh for freshness stays the
+     * job of [requestProfile]/[requestProfiles].
      */
-    fun warmProfilePresentations(accountIdHexes: Iterable<String>) {
+    suspend fun warmProfilePresentationsBlocking(accountIdHexes: Iterable<String>) {
         accountIdHexes.forEach { id ->
             val trimmed = id.trim()
             if (trimmed.isEmpty()) return@forEach
-            ensureProfileMaterialized(trimmed)
+            // Already cached → nothing to do; the row will read it synchronously.
+            if (synchronized(profilePresentationLock) { profilePresentations.containsKey(trimmed) }) {
+                return@forEach
+            }
+            // Not cached. Do the local read ourselves and await it so the cache
+            // is populated before we return (and thus before the caller's
+            // publish). We deliberately do NOT skip when a lazy async job is
+            // already in flight for this id: that job races the synchronous
+            // publish and may not have landed yet, which is the exact #609
+            // flicker. Doing the read here and applying it (idempotently, only
+            // if still absent) guarantees the presentation is present on return.
+            materializeProfileLocally(trimmed)
         }
     }
 
@@ -2854,29 +2870,59 @@ class DarkMatterAppState(
      */
     private fun ensureProfileMaterialized(accountIdHex: String) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
-        synchronized(profilePresentationLock) {
-            if (profilePresentations.containsKey(id)) return
-            if (!materializingProfiles.add(id)) return
-        }
-        val epoch = profileCacheEpoch.get()
+        // Dedup concurrent lazy triggers: only launch if not already cached and
+        // not already in flight. The blocking warm path does not use this set —
+        // it reads and applies idempotently (see [warmProfilePresentationsBlocking]).
+        if (!claimProfileMaterialization(id)) return
         profileScope.launch {
             try {
-                val profile = marmotIo { runCatching { marmot().userProfile(id) }.getOrNull() }
-                val displayName =
-                    marmotIo { runCatching { marmot().displayName(id) }.getOrNull() }
-                        ?.let { ProfileSanitizer.displayName(it) }
-                val presentation =
-                    ProfilePresentation(
-                        displayName = displayName,
-                        avatarUrl = ProfileSanitizer.imageUrl(profile?.picture),
-                    )
-                if (profileCacheEpoch.get() == epoch) {
-                    synchronized(profilePresentationLock) { profile?.let { userProfiles[id] = it } }
-                    applyProfilePresentation(id, presentation)
-                }
+                materializeProfileLocally(id)
             } finally {
                 synchronized(profilePresentationLock) { materializingProfiles.remove(id) }
             }
+        }
+    }
+
+    /**
+     * Reserve [id] for an in-flight lazy materialization. Returns false (already
+     * cached or another lazy materialization in flight) so [ensureProfileMaterialized]
+     * skips a redundant launch. The reservation is released in that launch's
+     * `finally`, so a reserved id is always freed even on failure.
+     */
+    private fun claimProfileMaterialization(id: String): Boolean =
+        synchronized(profilePresentationLock) {
+            if (profilePresentations.containsKey(id)) {
+                false
+            } else {
+                materializingProfiles.add(id)
+            }
+        }
+
+    /**
+     * Read the *local* presentation (display name + avatar URL) for [id] off the
+     * main thread and publish it into the caches, dropping the result if an
+     * account switch / sign-out cleared the caches mid-read (epoch guard).
+     *
+     * This is the single source of truth for the local materialization that both
+     * the lazy async path ([ensureProfileMaterialized]) and the blocking warm
+     * path ([warmProfilePresentationsBlocking]) run, so they can never diverge.
+     * It is pure read + idempotent apply (no `materializingProfiles` bookkeeping),
+     * so it is safe to call directly from the blocking warm without a prior claim.
+     */
+    private suspend fun materializeProfileLocally(id: String) {
+        val epoch = profileCacheEpoch.get()
+        val profile = marmotIo { runCatching { marmot().userProfile(id) }.getOrNull() }
+        val displayName =
+            marmotIo { runCatching { marmot().displayName(id) }.getOrNull() }
+                ?.let { ProfileSanitizer.displayName(it) }
+        val presentation =
+            ProfilePresentation(
+                displayName = displayName,
+                avatarUrl = ProfileSanitizer.imageUrl(profile?.picture),
+            )
+        if (profileCacheEpoch.get() == epoch) {
+            synchronized(profilePresentationLock) { profile?.let { userProfiles[id] = it } }
+            applyProfilePresentation(id, presentation)
         }
     }
 

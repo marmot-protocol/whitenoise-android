@@ -3774,7 +3774,7 @@ class ConversationController(
         )
     }
 
-    private fun applyTimelinePage(
+    private suspend fun applyTimelinePage(
         page: TimelinePageFfi,
         replaceWindow: Boolean,
         updatePagination: Boolean,
@@ -3813,14 +3813,19 @@ class ConversationController(
                 }
             }
         }
-        // Pre-warm local profile presentations for everyone this page references
-        // (message authors, reply-preview authors, reaction authors) before the
-        // publish below kicks off the first composition. The requestProfile calls
-        // above are the gated *relay* refresh (network); this is the ungated
-        // *local* read each row would otherwise lazily fire on its own first
-        // paint — pulling it forward in one batch closes the per-row sender
-        // name/avatar hydration flicker for already-on-device history. See #609.
-        appState.warmProfilePresentations(timelineRecordProfileSenders(page.messages))
+        // Materialize local profile presentations for everyone this page
+        // references (message authors, reply-preview authors, reaction authors)
+        // and AWAIT it before the publish below kicks off the first composition.
+        // The requestProfile calls above are the gated *relay* refresh (network);
+        // this is the ungated *local* read each row would otherwise lazily fire
+        // on its own first paint. Awaiting it (rather than fire-and-forget) is
+        // what actually closes the per-row sender name/avatar hydration flicker
+        // for already-on-device history: a launch-and-return warm races this
+        // synchronous publish and can still lose, so the row's first frame would
+        // observe ProfilePresentation.Empty and pop the name/avatar in a frame
+        // later. Blocking here guarantees the cache is populated before publish,
+        // so the first composition paints the sender metadata. See #609.
+        appState.warmProfilePresentationsBlocking(timelineRecordProfileSenders(page.messages))
         if (updatePagination) {
             hasMoreBefore = page.hasMoreBefore
         }
