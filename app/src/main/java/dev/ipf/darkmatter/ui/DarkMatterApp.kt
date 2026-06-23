@@ -2803,35 +2803,33 @@ private fun ChatRow(
                         },
                     )
                 }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // A body-content hit makes the matched message itself the subtitle:
+            // the highlighted snippet replaces the last-message preview (its
+            // timestamp already rides `timestampAt` above), so the line the user
+            // reads is the one that actually matched. Title/preview-only hits
+            // (bodyMatch null) keep the normal last-message preview.
+            if (bodyMatch != null) {
+                val highlightStyle =
+                    SpanStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                val snippetText =
+                    remember(bodyMatch.snippet, highlightStyle) {
+                        highlightedSnippet(bodyMatch.snippet, highlightStyle)
+                    }
+                Text(
+                    text = snippetText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
                 Text(
                     text = preview,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
                 )
-                // Search snippet line: only for rows matched on a message body
-                // (not title/preview), so a normal chat list and title/preview
-                // hits keep the single-line layout. The matched needle is
-                // emphasized so the reason the chat surfaced is obvious.
-                if (bodyMatch != null) {
-                    val highlightStyle =
-                        SpanStyle(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    val snippetText =
-                        remember(bodyMatch.snippet, highlightStyle) {
-                            highlightedSnippet(bodyMatch.snippet, highlightStyle)
-                        }
-                    Text(
-                        text = snippetText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         },
         trailingContent = {

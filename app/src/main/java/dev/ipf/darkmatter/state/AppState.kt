@@ -470,13 +470,21 @@ class DarkMatterAppState(
      * Whether any *other* signed-in account has unread messages (#592). Drives
      * the cross-account unread dot on the active account's chat-list avatar so
      * a notification waiting on a different account is visible without opening
-     * the account switcher. Keyed on the per-account [accountUnreadCounts] map
-     * (account label → unread total, local-signing accounts only), excluding
-     * the active account. False on a single-account device or when only the
-     * active account has unread — the dot then never shows.
+     * the account switcher. The candidate refs are derived from the live
+     * [accounts] list — currently-signed-in accounts (local-signing, not
+     * signed out) other than the active one — rather than straight off the
+     * [accountUnreadCounts] keys, so a signed-out/stale account whose unread
+     * total is still persisted in the map can no longer light the dot. False on
+     * a single-account device or when only the active account has unread.
      */
     val hasUnreadOnOtherAccounts: Boolean
-        get() = accountUnreadCounts.any { it.key != activeAccountRef && it.value > 0uL }
+        get() =
+            accounts.any { account ->
+                account.localSigning &&
+                    !account.signedOut &&
+                    account.label != activeAccountRef &&
+                    (accountUnreadCounts[account.label] ?: 0uL) > 0uL
+            }
 
     var developerMode by mutableStateOf(preferences.getBoolean(DEVELOPER_MODE_KEY, false))
         private set

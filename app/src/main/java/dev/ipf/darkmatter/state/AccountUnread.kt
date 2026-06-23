@@ -13,3 +13,20 @@ internal fun accountUnreadCount(rows: Iterable<ChatListRowFfi>): ULong =
     rows.fold(0uL) { total, row ->
         if (row.archived) total else total + row.unreadCount
     }
+
+/**
+ * Aggregate unread messages from projected chat items, applying the
+ * removed-group suppression ([ChatListItem.effectiveUnreadCount]) for the
+ * active account so a group the user has left/been removed from no longer
+ * contributes its frozen unread total. Same archived exclusion as the raw-row
+ * overload. Used when the controller already holds projected items and the
+ * suppressed count must flow to every consumer of the per-account aggregate —
+ * notably the cross-account unread dot (#625).
+ */
+internal fun accountUnreadCount(
+    items: Iterable<ChatListItem>,
+    activeAccountIdHex: String?,
+): ULong =
+    items.fold(0uL) { total, item ->
+        if (item.group.archived) total else total + item.effectiveUnreadCount(activeAccountIdHex)
+    }
