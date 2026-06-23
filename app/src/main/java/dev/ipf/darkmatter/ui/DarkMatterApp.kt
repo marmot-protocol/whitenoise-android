@@ -10,6 +10,8 @@ import android.graphics.Bitmap
 import android.provider.Settings
 import android.text.format.DateUtils
 import android.util.Log
+import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -247,6 +249,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -263,6 +266,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -310,6 +314,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.core.content.ContextCompat
 import androidx.core.os.ConfigurationCompat
+import androidx.core.view.ViewCompat
 import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -13137,16 +13142,39 @@ private fun EmojiPickerSheet(
         onDismissRequest = onDismissRequest,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
-        AndroidView(
-            modifier = Modifier.fillMaxWidth().height(384.dp).navigationBarsPadding(),
-            factory = { context ->
-                EmojiPickerView(context).apply {
-                    emojiGridColumns = 8
-                    emojiGridRows = 5.25f
-                    setOnEmojiPickedListener { item -> onEmojiPicked(item.emoji) }
-                }
-            },
-        )
+        // EmojiPickerView hosts an Android RecyclerView (a NestedScrollingChild) that
+        // competes with the ModalBottomSheet's Compose nested-scroll handler for vertical
+        // drags. rememberNestedScrollInteropConnection() bridges the two systems: the
+        // RecyclerView consumes the drag while it can scroll and only forwards the leftover
+        // distance (at the top/bottom of the grid) to the sheet's drag/dismiss handler.
+        val nestedScrollInterop = rememberNestedScrollInteropConnection()
+        Box(modifier = Modifier.nestedScroll(nestedScrollInterop)) {
+            AndroidView(
+                modifier = Modifier.fillMaxWidth().height(384.dp).navigationBarsPadding(),
+                factory = { context ->
+                    EmojiPickerView(context).apply {
+                        emojiGridColumns = 8
+                        emojiGridRows = 5.25f
+                        setOnEmojiPickedListener { item -> onEmojiPicked(item.emoji) }
+                        // The body grid RecyclerView is built asynchronously once emoji data
+                        // loads, so enable nested scrolling on every descendant after layout to
+                        // guarantee the scrolling child dispatches deltas to the interop parent.
+                        // setNestedScrollingEnabled is a no-op on Views that are not a
+                        // NestedScrollingChild, so this safely targets only the RecyclerViews.
+                        post { enableNestedScrollingOnDescendants(this) }
+                    }
+                },
+            )
+        }
+    }
+}
+
+private fun enableNestedScrollingOnDescendants(view: View) {
+    ViewCompat.setNestedScrollingEnabled(view, true)
+    if (view is ViewGroup) {
+        for (index in 0 until view.childCount) {
+            enableNestedScrollingOnDescendants(view.getChildAt(index))
+        }
     }
 }
 
