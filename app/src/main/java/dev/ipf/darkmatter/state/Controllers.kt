@@ -3,6 +3,7 @@ package dev.ipf.darkmatter.state
 import android.util.Log
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.darkmatter.BuildConfig
@@ -415,6 +416,20 @@ data class TimelineMessage(
     val status: MessageStatus,
     val projected: TimelineMessageRecordFfi? = null,
     val timelineOrder: ULong = 0uL,
+)
+
+/**
+ * Local optimistic state for an in-flight edit of one's own message: the new
+ * body to display immediately and whether the kind-1009 publish is still
+ * [MessageStatus.Pending] or has [MessageStatus.Failed]. [preEditText] is the
+ * body shown before the edit (the latest applied version, or the original
+ * plaintext) so a failure can revert the bubble verbatim.
+ */
+@Immutable
+data class OptimisticEdit(
+    val text: String,
+    val preEditText: String,
+    val status: MessageStatus,
 )
 
 /**
@@ -1834,6 +1849,19 @@ class ConversationController(
     var editsByTarget by mutableStateOf<Map<String, EditState>>(emptyMap())
         private set
 
+    /**
+     * Local optimistic edits keyed by target message id, applied immediately on
+     * confirm so the bubble flips to the edited text without waiting for the
+     * kind-1009 to round-trip through the engine (the echo can lag ~1s). Merged
+     * over [aggregateEdits]' output on every publish, then dropped once the real
+     * edit lands in the timeline. A [MessageStatus.Pending] entry drives a
+     * brief sending indicator on the target bubble; [MessageStatus.Failed]
+     * reverts the displayed text to the pre-edit body and lights the same
+     * retry/discard affordance a failed send shows. Mirrors the
+     * [optimisticMessages] map: local-first display, reconciled on engine echo.
+     */
+    private val optimisticEdits = mutableStateMapOf<String, OptimisticEdit>()
+
     /** Set when the user has tapped Edit on a kind-9 they sent — the composer
      * banner reflects this and the next [send] routes through [editMessage]
      * instead of producing a new chat. Cleared on submit, cancel, or
@@ -3031,10 +3059,41 @@ class ConversationController(
         val target = targetMessageId.takeIf { it.isNotBlank() } ?: return
         val trimmed = content.trim()
         if (trimmed.isEmpty()) return
+        // Apply the new body locally before the publish round-trips so the
+        // bubble flips to the edited text at once instead of showing the old
+        // text until the kind-1009 echoes back (~1s). Capture the body shown
+        // before this edit (a prior optimistic edit's pre-edit text takes
+        // priority over the now-stale displayed text) so a failure reverts
+        // verbatim. Pending drives a brief sending indicator on the bubble.
+        val preEditText = optimisticEdits[target]?.preEditText ?: currentDisplayedText(target)
+        optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Pending)
+        publishTimelineFromIndexes()
         try {
             appState.marmotIo { editMessage(account, group.groupIdHex, target, trimmed) }
+            // Publish accepted: drop the Pending indicator but keep the text
+            // overlay so the bubble doesn't flicker back to the old body in the
+            // gap before the kind-1009 lands in the timeline. The overlay is
+            // pruned once `aggregateEdits` reflects the same latest text.
+            // Only act if this attempt still owns the overlay: if the user
+            // re-edited the same target while this publish was in flight, a
+            // newer Pending overlay (different text) has superseded us, and
+            // flipping it to Sent would wrongly confirm the newer attempt.
+            optimisticEdits[target]
+                ?.takeIf { it.status == MessageStatus.Pending && it.text == trimmed }
+                ?.let { optimisticEdits[target] = it.copy(status = MessageStatus.Sent) }
+            publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
+            // Revert the displayed body to the pre-edit text and flip the
+            // bubble to Failed, lighting the same retry/discard affordance a
+            // failed send shows. Retry re-runs this edit; discard clears the
+            // overlay and restores the original body. Guarded the same way as
+            // the success path: a newer in-flight attempt's overlay must not be
+            // clobbered back to this stale attempt's Failed/pre-edit text.
+            optimisticEdits[target]
+                ?.takeIf { it.status == MessageStatus.Pending && it.text == trimmed }
+                ?.let { optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Failed) }
+            publishTimelineFromIndexes()
             appState.present(R.string.toast_couldnt_edit_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
     }
@@ -3045,7 +3104,21 @@ class ConversationController(
      * plaintext. Bubble + reply preview both read through this so an edit
      * shows everywhere the original would have.
      */
-    fun displayedText(record: AppMessageRecordFfi): String = editsByTarget[record.messageIdHex]?.latestText ?: record.plaintext
+    fun displayedText(record: AppMessageRecordFfi): String =
+        optimisticEdits[record.messageIdHex]?.text
+            ?: editsByTarget[record.messageIdHex]?.latestText
+            ?: record.plaintext
+
+    /**
+     * Body shown for [targetId] before any in-flight optimistic edit: the
+     * latest confirmed kind-1009 text if one exists, otherwise the message's
+     * original plaintext. Captured as an optimistic edit's revert target.
+     */
+    private fun currentDisplayedText(targetId: String): String =
+        editsByTarget[targetId]?.latestText
+            ?: messageById[targetId]?.plaintext
+            ?: optimisticMessages["msg:$targetId"]?.record?.plaintext
+            ?: ""
 
     // Tracks optimistic ids the user discarded while a retry was in flight.
     // The retry coroutine consults this set before re-inserting a failed
@@ -3269,6 +3342,15 @@ class ConversationController(
      */
     suspend fun retryFailedSend(item: TimelineMessage) {
         val key = item.id
+        // A failed edit's bubble is the target's projected row (no
+        // optimisticMessages entry); its retry re-runs the edit publish rather
+        // than re-sending a new message. editMessage flips the overlay back to
+        // Pending, so a double-tap finds it non-Failed and the guard below exits.
+        val failedEdit = optimisticEdits[item.record.messageIdHex]?.takeIf { it.status == MessageStatus.Failed }
+        if (failedEdit != null) {
+            editMessage(item.record.messageIdHex, failedEdit.text)
+            return
+        }
         // Re-check live state. The captured item.status may be stale if the
         // user double-taps before recomposition: both taps would see Failed
         // on the captured argument and both would queue FFI sends. By reading
@@ -3387,6 +3469,14 @@ class ConversationController(
      */
     fun discardFailedSend(item: TimelineMessage) {
         val key = item.id
+        // Discarding a failed edit drops the local overlay, reverting the
+        // bubble to its pre-edit body. The original message is untouched —
+        // only the unsent kind-1009 edit is abandoned.
+        if (optimisticEdits[item.record.messageIdHex]?.status == MessageStatus.Failed) {
+            optimisticEdits.remove(item.record.messageIdHex)
+            publishTimelineFromIndexes()
+            return
+        }
         // Re-read live state. If the user taps Retry then Discard before the
         // bubble recomposes, the captured item.status is still Failed while
         // the live state has moved to Pending — the Failed branch would
@@ -4366,11 +4456,62 @@ class ConversationController(
 
     private fun publishTimelineFromIndexesInternal() {
         val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
+        val aggregated = aggregateEdits((optimisticMessages.values + projected).map { it.record })
+        // Drop any optimistic edit the real kind-1009 has now caught up to:
+        // once `aggregateEdits` reports the same latest text, the overlay is
+        // redundant and would otherwise mask a later remote edit. Failed/Pending
+        // overlays are kept until they resolve through editMessage.
+        optimisticEdits.entries
+            .filter { (target, edit) -> edit.status == MessageStatus.Sent && aggregated[target]?.latestText == edit.text }
+            .map { it.key }
+            .forEach(optimisticEdits::remove)
         timeline =
             (optimisticMessages.values + projected)
+                .map { it.withOptimisticEditStatus() }
                 .distinctBy { it.id }
                 .sortedWith(::compareTimelineMessages)
-        editsByTarget = aggregateEdits(timeline.map { it.record })
+        editsByTarget = applyOptimisticEdits(aggregated)
+    }
+
+    /**
+     * Overlay the optimistic edit text onto [aggregated] so the bubble renders
+     * the edited body immediately. A Pending/Sent overlay shows its text; a
+     * Failed overlay shows [OptimisticEdit.preEditText] (the revert target).
+     */
+    private fun applyOptimisticEdits(aggregated: Map<String, EditState>): Map<String, EditState> {
+        if (optimisticEdits.isEmpty()) return aggregated
+        val merged = LinkedHashMap(aggregated)
+        for ((target, edit) in optimisticEdits) {
+            val failed = edit.status == MessageStatus.Failed
+            val displayText = if (failed) edit.preEditText else edit.text
+            val base = merged[target]
+            when {
+                base != null -> merged[target] = base.copy(latestText = displayText)
+                // No real kind-1009 was accepted yet (null base). Synthesize an edit
+                // aggregate only for an applied overlay (Pending/Sent) so the bubble
+                // shows the optimistic body with an edited indicator. A Failed edit
+                // reverts to the original text and never accepted a kind-1009, so
+                // leave the target absent — no spurious "edited" badge.
+                !failed -> merged[target] = EditState(latestText = displayText, count = 1, versions = emptyList())
+            }
+        }
+        return merged
+    }
+
+    /**
+     * Surface an in-flight optimistic edit as the target bubble's status so the
+     * existing Sending indicator / Failed retry+discard row light up without a
+     * new affordance. Only overrides a confirmed (Sent) own bubble — a still
+     * in-flight optimistic *send* keeps its own status until that send resolves.
+     */
+    private fun TimelineMessage.withOptimisticEditStatus(): TimelineMessage {
+        val edit = optimisticEdits[record.messageIdHex] ?: return this
+        if (status != MessageStatus.Sent) return this
+        return when (edit.status) {
+            MessageStatus.Pending -> copy(status = MessageStatus.Pending)
+            MessageStatus.Failed -> copy(status = MessageStatus.Failed)
+            else -> this
+        }
     }
 
     private fun nextOptimisticTimelineOrder(): ULong =
