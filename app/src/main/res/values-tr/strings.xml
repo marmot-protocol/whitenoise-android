@@ -34,6 +34,11 @@
     <string name="chat_list_search_open_profile">Profili aç</string>
     <string name="chat_list_search_nip05_not_found">\"%1$s\" için profil bulunamadı</string>
     <string name="chat_list_search_invalid_npub">Bu geçerli bir npub gibi görünmüyor</string>
+    <string name="recipient_preview_resolving">Çözümleniyor…</string>
+    <string name="recipient_preview_no_profile">Yayınlanmış profil yok</string>
+    <string name="recipient_preview_unresolved">Bu tanımlayıcı çözümlenemedi</string>
+    <string name="recipient_preview_nip05_verified">Doğrulanmış adres</string>
+    <string name="recipient_preview_nip05_unverified">Doğrulanmamış adres</string>
     <string name="chat_row_action_archive">Arşivle</string>
     <string name="chat_row_action_unarchive">Arşivden çıkar</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>

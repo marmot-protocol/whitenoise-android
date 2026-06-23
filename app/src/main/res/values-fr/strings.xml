@@ -34,6 +34,11 @@
     <string name="chat_list_search_open_profile">Ouvrir le profil</string>
     <string name="chat_list_search_nip05_not_found">Aucun profil trouvé pour « %1$s »</string>
     <string name="chat_list_search_invalid_npub">Cela ne ressemble pas à un npub valide</string>
+    <string name="recipient_preview_resolving">Résolution en cours…</string>
+    <string name="recipient_preview_no_profile">Aucun profil publié</string>
+    <string name="recipient_preview_unresolved">Impossible de résoudre cet identifiant</string>
+    <string name="recipient_preview_nip05_verified">Adresse vérifiée</string>
+    <string name="recipient_preview_nip05_unverified">Adresse non vérifiée</string>
     <string name="chat_row_action_archive">Archiver</string>
     <string name="chat_row_action_unarchive">Désarchiver</string>
     <string name="chat_row_action_mark_read">Marquer comme lu</string>
