@@ -403,6 +403,9 @@ import dev.ipf.darkmatter.state.shortHex
 import dev.ipf.darkmatter.state.shouldResetNavOnAccountChange
 import dev.ipf.darkmatter.state.shouldShowOriginalTimestamp
 import dev.ipf.darkmatter.ui.theme.Dimens
+import dev.ipf.darkmatter.ui.theme.amoledSurfaceBorder
+import dev.ipf.darkmatter.ui.theme.amoledSurfaceBorderStroke
+import dev.ipf.darkmatter.ui.theme.isAmoledSurfaceTheme
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
@@ -2660,7 +2663,10 @@ private fun ConversationSearchNavBar(
     onNext: () -> Unit,
 ) {
     val navEnabled = matchCount > 0
-    Surface(tonalElevation = 3.dp) {
+    Surface(
+        border = amoledSurfaceBorderStroke(),
+        tonalElevation = 3.dp,
+    ) {
         Row(
             modifier =
                 Modifier
@@ -2842,6 +2848,8 @@ private fun ChatRowWithMenu(
         DropdownMenu(
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
+            shape = MenuDefaults.shape,
+            border = amoledSurfaceBorderStroke(),
         ) {
             DropdownMenuItem(
                 text = {
@@ -3534,7 +3542,10 @@ private fun NewChatSheet(
             else -> throwable.message ?: throwable.javaClass.simpleName
         }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -3961,6 +3972,7 @@ private fun ReplyPreviewCard(
     Surface(
         color = container,
         shape = RoundedCornerShape(10.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier =
             Modifier
                 .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
@@ -4118,6 +4130,7 @@ private fun MediaImageBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         // Single source of truth for image-bubble shape: portraits become
         // uniform-width cards (capped height), landscapes fill the bubble
         // width. Used by both the confirmed bubble and the optimistic
@@ -4309,6 +4322,7 @@ private fun MediaImageGridBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         MasonryImageLayout(visibleCount = visible.size, onLongPress = onLongPress, tile = tileAt)
@@ -4388,6 +4402,7 @@ private fun MediaVisualGridBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         MasonryImageLayout(visibleCount = visible.size, onLongPress = onLongPress, tile = tileAt)
@@ -4826,6 +4841,7 @@ private fun MediaFileBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -5037,6 +5053,7 @@ private fun MediaVideoBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = imageBubbleSizing(aspectRatioFromDim(reference.dim)),
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -5405,6 +5422,7 @@ private fun MediaVoiceBubble(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(18.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -5906,6 +5924,7 @@ private fun MediaPendingPlaceholder(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -5991,6 +6010,7 @@ private fun PendingFilePill(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -6960,6 +6980,7 @@ private fun StagingDocumentTile(uri: android.net.Uri) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = Modifier.fillMaxSize(),
     ) {
         Column(
@@ -7004,6 +7025,7 @@ private fun MediaPreviewSheet(
     var sending by remember { mutableStateOf(false) }
     var addMoreMenuOpen by remember { mutableStateOf(false) }
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -7076,6 +7098,8 @@ private fun MediaPreviewSheet(
                         DropdownMenu(
                             expanded = addMoreMenuOpen,
                             onDismissRequest = { addMoreMenuOpen = false },
+                            shape = MenuDefaults.shape,
+                            border = amoledSurfaceBorderStroke(),
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.attach_photo_library)) },
@@ -9471,6 +9495,7 @@ private fun AutoAcceptedInviteBanner(
         modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
+        border = amoledSurfaceBorderStroke(),
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
         Row(
@@ -10213,6 +10238,7 @@ private fun GroupDetailsScreen(
 
     if (showAddMember) {
         ModalBottomSheet(
+            modifier = amoledModalSheetModifier(),
             onDismissRequest = {
                 showAddMember = false
                 pendingMemberAsAdmin = false
@@ -10582,6 +10608,7 @@ private fun ImageSearchSheet(
     }
 
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -10926,6 +10953,7 @@ private fun GroupMutationErrorBanner(
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
     ) {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
@@ -10965,6 +10993,7 @@ private fun ProfilePublicWarning() {
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
     ) {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
@@ -11009,6 +11038,7 @@ private fun GroupActionRow(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (enabled) 0.5f else 0.28f),
         contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
     ) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 14.dp, vertical = 10.dp),
@@ -11221,6 +11251,8 @@ private fun GroupMemberRow(
                 DropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
+                    shape = MenuDefaults.shape,
+                    border = amoledSurfaceBorderStroke(),
                 ) {
                     memberActions.forEach { action ->
                         when (action) {
@@ -11326,7 +11358,10 @@ private fun TransferAdminSheet(
             }
         }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -11407,6 +11442,20 @@ private fun TransferAdminSheet(
     }
 }
 
+@Composable
+private fun amoledModalSheetModifier(): Modifier = Modifier.amoledSurfaceBorder(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+
+@Composable
+private fun messageBubbleBorder(
+    highlighted: Boolean,
+    mine: Boolean,
+): BorderStroke? =
+    when {
+        highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
+        mine && isAmoledSurfaceTheme() -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        else -> amoledSurfaceBorderStroke()
+    }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageBubble(
@@ -11420,6 +11469,7 @@ private fun MessageBubble(
     onReactionEmojiPicked: (String) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
 ) {
+    val amoledSurfaceTheme = isAmoledSurfaceTheme()
     val record = item.record
     val mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex)
     val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
@@ -11429,8 +11479,9 @@ private fun MessageBubble(
     val invalidated = !deleted && item.projected?.invalidationStatus != null
     val bubbleColor =
         when {
-            deleted -> MaterialTheme.colorScheme.surfaceVariant
             invalidated -> MaterialTheme.colorScheme.errorContainer
+            amoledSurfaceTheme -> Color.Black
+            deleted -> MaterialTheme.colorScheme.surfaceVariant
             mine -> MaterialTheme.colorScheme.primaryContainer
             else -> MaterialTheme.colorScheme.surfaceVariant
         }
@@ -11530,6 +11581,7 @@ private fun MessageBubble(
     val timestampColor =
         when {
             invalidated -> MaterialTheme.colorScheme.onErrorContainer
+            amoledSurfaceTheme -> MaterialTheme.colorScheme.onSurfaceVariant
             mine && !deleted -> MaterialTheme.colorScheme.onPrimaryContainer
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
@@ -12417,7 +12469,7 @@ private fun MessageBubble(
                             Surface(
                                 color = bubbleColor,
                                 shape = RoundedCornerShape(18.dp),
-                                border = if (highlighted) BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary) else null,
+                                border = messageBubbleBorder(highlighted, mine),
                                 tonalElevation = if (mine) 1.dp else 0.dp,
                             ) {
                                 Column(
@@ -12446,7 +12498,7 @@ private fun MessageBubble(
                                 .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
                         color = bubbleColor,
                         shape = RoundedCornerShape(18.dp),
-                        border = if (highlighted) BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary) else null,
+                        border = messageBubbleBorder(highlighted, mine),
                         tonalElevation = if (mine) 1.dp else 0.dp,
                     ) {
                         Column(
@@ -12706,7 +12758,12 @@ private fun MessageFullScreenView(
                         IconButton(onClick = { overflowOpen = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.message_actions))
                         }
-                        DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
+                        DropdownMenu(
+                            expanded = overflowOpen,
+                            onDismissRequest = { overflowOpen = false },
+                            shape = MenuDefaults.shape,
+                            border = amoledSurfaceBorderStroke(),
+                        ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.reply)) },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null) },
@@ -12762,6 +12819,7 @@ private fun MessageFullScreenView(
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(18.dp),
+                    border = amoledSurfaceBorderStroke(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
@@ -12791,6 +12849,12 @@ private fun ReactionSummaryChip(
     val total = tallies.sumOf { it.count }
     val emojis = tallies.take(MAX_VISIBLE_REACTIONS).joinToString(separator = "") { it.emoji }
     val viewReactorsLabel = stringResource(R.string.view_reactors)
+    val border =
+        if (isAmoledSurfaceTheme()) {
+            BorderStroke(1.dp, colorScheme.outlineVariant)
+        } else {
+            BorderStroke(1.5.dp, colorScheme.surface)
+        }
     Surface(
         modifier =
             Modifier
@@ -12802,7 +12866,7 @@ private fun ReactionSummaryChip(
         shape = RoundedCornerShape(percent = 50),
         color = if (mine) colorScheme.secondaryContainer else colorScheme.surfaceContainerHigh,
         contentColor = if (mine) colorScheme.onSecondaryContainer else colorScheme.onSurface,
-        border = BorderStroke(1.5.dp, colorScheme.surface),
+        border = border,
         tonalElevation = 1.dp,
     ) {
         Row(
@@ -12841,7 +12905,10 @@ private fun ReactionDetailsSheet(
             selectedEmoji?.let { emoji -> participants.filter { it.emoji == emoji } } ?: participants
         }
 
-    ModalBottomSheet(onDismissRequest = onDismissRequest) {
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -12978,7 +13045,11 @@ private fun EditHistorySheet(
                 )
             }
         }
-    ModalBottomSheet(onDismissRequest = onDismissRequest, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
+        modifier = amoledModalSheetModifier(),
+    ) {
         // The header is anchored above the scroll region so the title and
         // count chip remain visible while the user pages through a long edit
         // chain. The rail keeps its visual continuity because every row is
@@ -13004,6 +13075,7 @@ private fun EditHistorySheet(
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     shape = RoundedCornerShape(999.dp),
+                    border = amoledSurfaceBorderStroke(),
                 ) {
                     Text(
                         text = stringResource(R.string.edited_count, editState.versions.size),
@@ -13116,6 +13188,7 @@ private fun EditHistoryVersionRow(
                         MaterialTheme.colorScheme.surfaceContainerHigh
                     },
                 shape = RoundedCornerShape(14.dp),
+                border = amoledSurfaceBorderStroke(),
             ) {
                 Text(
                     text = row.text,
@@ -13306,6 +13379,7 @@ private fun MessageActionMenu(
             Surface(
                 modifier = Modifier.onSizeChanged { measuredPopupHeightPx = it.height },
                 shape = RoundedCornerShape(12.dp),
+                border = amoledSurfaceBorderStroke(),
                 tonalElevation = 3.dp,
                 shadowElevation = 6.dp,
             ) {
@@ -13429,7 +13503,11 @@ private fun ForwardMessageSheet(
             }
         }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -13443,6 +13521,7 @@ private fun ForwardMessageSheet(
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(12.dp),
+                border = amoledSurfaceBorderStroke(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 // Preview only: resolve `@npub1…` runs to display names so the
@@ -13485,9 +13564,12 @@ private fun ForwardMessageSheet(
                         val isSelected = selected.contains(groupId)
                         ListItem(
                             modifier =
-                                Modifier.clickable {
-                                    if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                                },
+                                Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        if (isSelected) selected.remove(groupId) else selected.add(groupId)
+                                    },
                             leadingContent = {
                                 val avatarAccount =
                                     item.otherMemberAccount
@@ -13597,6 +13679,7 @@ private fun MessageInfoSheet(
     val copyActionLabel = stringResource(R.string.copy_text)
 
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismissRequest,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -13707,6 +13790,7 @@ private fun EmojiPickerSheet(
     onEmojiPicked: (String) -> Unit,
 ) {
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismissRequest,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -13756,6 +13840,7 @@ private fun EmojiActionButton(
         modifier = modifier.height(36.dp).clip(CircleShape).clickable(onClick = onClick),
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = CircleShape,
+        border = amoledSurfaceBorderStroke(),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(emoji, style = MaterialTheme.typography.titleMedium)
@@ -13996,6 +14081,7 @@ private fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .navigationBarsPadding(),
         color = MaterialTheme.colorScheme.surface,
+        border = amoledSurfaceBorderStroke(),
         tonalElevation = 3.dp,
     ) {
         Text(
@@ -14410,6 +14496,7 @@ private fun MentionPicker(
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
+        border = amoledSurfaceBorderStroke(),
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,
         modifier = Modifier.fillMaxWidth(),
@@ -14748,6 +14835,7 @@ private fun KeyboardPreservingDropdownMenu(
         modifier = modifier,
         offset = offset,
         shape = shape,
+        border = amoledSurfaceBorderStroke(),
         properties =
             PopupProperties(
                 focusable = false,
@@ -14844,6 +14932,7 @@ private fun ComposerPill(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(22.dp),
+        border = amoledSurfaceBorderStroke(),
         modifier = modifier,
     ) {
         Row(
@@ -15301,6 +15390,16 @@ private val MediaAutoDownloadType.labelRes: Int
             MediaAutoDownloadType.Document -> R.string.media_type_documents
         }
 
+private val LocalSettingsRowsInsideSectionCard = staticCompositionLocalOf { false }
+
+@Composable
+private fun Modifier.settingsRowAmoledSurfaceBorder(shape: Shape = RoundedCornerShape(12.dp)): Modifier =
+    if (LocalSettingsRowsInsideSectionCard.current) {
+        this
+    } else {
+        clip(shape).amoledSurfaceBorder(shape)
+    }
+
 @Composable
 private fun SelectableSettingsRow(
     title: String,
@@ -15308,7 +15407,10 @@ private fun SelectableSettingsRow(
     onClick: () -> Unit,
 ) {
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .settingsRowAmoledSurfaceBorder()
+                .clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
         trailingContent = {
@@ -15334,7 +15436,10 @@ private fun SelectableSettingsRowWithSubtitle(
     onClick: () -> Unit,
 ) {
     ListItem(
-        modifier = Modifier.selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
+        modifier =
+            Modifier
+                .settingsRowAmoledSurfaceBorder()
+                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
         supportingContent = {
@@ -15704,7 +15809,12 @@ private fun SettingsSwitchRow(
     busy: Boolean = false,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .settingsRowAmoledSurfaceBorder(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             if (subtitle != null) {
@@ -15739,6 +15849,7 @@ fun SettingsAccountHeader(
     ListItem(
         modifier =
             Modifier
+                .settingsRowAmoledSurfaceBorder()
                 .clickable(onClick = onOpenAccountSelector)
                 .semantics { contentDescription = switchAccountDescription },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -15774,7 +15885,10 @@ private fun AccountSelectorSheet(
     LaunchedEffect(Unit) {
         appState.refreshAccounts()
     }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleLarge)
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
@@ -15782,24 +15896,27 @@ private fun AccountSelectorSheet(
                     val unreadCount = appState.unreadCountForAccount(account.label)
                     ListItem(
                         modifier =
-                            Modifier.clickable {
-                                // Run on the process-lifetime mutation scope, not this
-                                // sheet's rememberCoroutineScope. setActiveAccount flips
-                                // activeAccountRef partway through and keeps suspending
-                                // (profile warm, notification refresh, push sync); the
-                                // account-change nav reset in MainShell then disposes this
-                                // sheet, which would cancel a sheet-scoped coroutine before
-                                // the switch cleanup finishes (#547). onDismiss /
-                                // onAccountSwitched only set parent composition state, so
-                                // they are safe to run from the mutation scope.
-                                appState.launchMutation {
-                                    appState.setActiveAccount(account.label)
-                                    onDismiss()
-                                    // Land on the newly-active account's chat list
-                                    // instead of leaving the user on Settings (#316).
-                                    onAccountSwitched()
-                                }
-                            },
+                            Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    // Run on the process-lifetime mutation scope, not this
+                                    // sheet's rememberCoroutineScope. setActiveAccount flips
+                                    // activeAccountRef partway through and keeps suspending
+                                    // (profile warm, notification refresh, push sync); the
+                                    // account-change nav reset in MainShell then disposes this
+                                    // sheet, which would cancel a sheet-scoped coroutine before
+                                    // the switch cleanup finishes (#547). onDismiss /
+                                    // onAccountSwitched only set parent composition state, so
+                                    // they are safe to run from the mutation scope.
+                                    appState.launchMutation {
+                                        appState.setActiveAccount(account.label)
+                                        onDismiss()
+                                        // Land on the newly-active account's chat list
+                                        // instead of leaving the user on Settings (#316).
+                                        onAccountSwitched()
+                                    }
+                                },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         leadingContent = {
                             Avatar(
@@ -15864,7 +15981,10 @@ private fun SettingsRow(
     onClick: () -> Unit,
 ) {
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .settingsRowAmoledSurfaceBorder()
+                .clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
         supportingContent = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -15889,7 +16009,11 @@ private fun ProfileQrSheet(
     val shareProfileTitle = stringResource(R.string.share_profile)
     val notDarkMatterProfileQrError = stringResource(R.string.error_not_dark_matter_profile_qr)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -16033,7 +16157,11 @@ private fun ProfileSheet(
     // conversation opens.
     var creatingChat by remember(npub) { mutableStateOf(false) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -16322,7 +16450,11 @@ private fun ProfileSharedGroupRow(
             else -> stringResource(R.string.members)
         }
     ListItem(
-        modifier = Modifier.clickable(role = Role.Button, onClick = onOpen),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                .clickable(role = Role.Button, onClick = onOpen),
         leadingContent = {
             Avatar(
                 title = title,
@@ -16457,7 +16589,11 @@ private fun QrScannerSheet(
         if (!permissionGranted) launcher.launch(Manifest.permission.CAMERA)
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = amoledModalSheetModifier(),
+    ) {
         Column(
             Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -17016,6 +17152,7 @@ private fun AddIdentitySheet(
     // so the nsec field inside is also protected from Recents/screenshot
     // capture.
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismiss,
         properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
     ) {
@@ -17414,6 +17551,7 @@ private fun EncryptedBackupSheet(
     }
 
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = { dismissAndClear() },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
@@ -17481,6 +17619,7 @@ private fun EncryptedBackupSheet(
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = amoledSurfaceBorderStroke(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
@@ -17639,6 +17778,7 @@ private fun SignOutSheet(
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -17690,6 +17830,7 @@ private fun SignOutAndWipeSheet(
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
+        modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -18124,7 +18265,7 @@ private fun KeyPackageCard(
     val copyKeyPackageLabel = stringResource(R.string.copy)
     val keyPackageLabelText = stringResource(R.string.key_package)
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
         colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -18476,12 +18617,14 @@ internal fun SectionCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
         colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
     ) {
         Column(Modifier.fillMaxWidth().padding(Dimens.spaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            content()
+            CompositionLocalProvider(LocalSettingsRowsInsideSectionCard provides true) {
+                content()
+            }
         }
     }
 }
@@ -18493,7 +18636,7 @@ internal fun SectionCardWithAction(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
         colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
     ) {
         Column(Modifier.fillMaxWidth().padding(Dimens.spaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
@@ -18510,7 +18653,9 @@ internal fun SectionCardWithAction(
                 )
                 action()
             }
-            content()
+            CompositionLocalProvider(LocalSettingsRowsInsideSectionCard provides true) {
+                content()
+            }
         }
     }
 }
