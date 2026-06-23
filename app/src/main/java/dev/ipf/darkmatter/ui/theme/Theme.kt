@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
@@ -118,8 +119,8 @@ fun DarkMatterTheme(
             // surfaceContainerLow, DropdownMenu/menus use surfaceContainer,
             // AlertDialog uses surfaceContainerHigh — so they must be black too,
             // not the near-black grays they used to be. Boundaries for elevated
-            // components on the black canvas come from `outline`, not a lifted
-            // fill. Snackbars are the odd M3 case: their container uses
+            // components on the black canvas come from the outline tokens, not a
+            // lifted fill. Snackbars are the odd M3 case: their container uses
             // `inverseSurface` and their text/action colors use inverse tokens,
             // so keep those black/readable here instead of inheriting the
             // light inverse surface from the regular dark scheme. Text follows
@@ -136,6 +137,8 @@ fun DarkMatterTheme(
                 surfaceVariant = Color.Black,
                 surfaceBright = Color.Black,
                 surfaceDim = Color.Black,
+                outline = AmoledEmphasizedSurfaceBorder,
+                outlineVariant = AmoledSurfaceBorder,
                 inverseSurface = Color.Black,
                 inverseOnSurface = baseColorScheme.onSurface,
                 inversePrimary = Highlight,
@@ -159,9 +162,11 @@ fun DarkMatterTheme(
             surfaceTint = if (amoledActive) Color.Transparent else Highlight,
         )
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalAmoledSurfaceTheme provides amoledActive) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content,
+        )
+    }
 }
