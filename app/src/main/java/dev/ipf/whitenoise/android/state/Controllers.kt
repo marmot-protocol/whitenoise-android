@@ -2159,6 +2159,17 @@ class ConversationController(
                 // group-state + timeline subscriptions below still fold in
                 // peer commits as they arrive.
                 launch { appState.catchUpAccounts() }
+                // Local NIP-40 enforcement (#333): re-publish on a slow cadence so
+                // a message crossing the retention window disappears from the open
+                // timeline without waiting for a sync or re-entry. Lifecycle-bound
+                // to this conversation; skipped while the timer is off. Deliberately
+                // coarse (60s) to tolerate clock skew and stay off the hot path.
+                launch {
+                    while (isActive) {
+                        delay(60_000L)
+                        if (group.disappearingMessageSecs > 0uL) publishTimelineFromIndexes()
+                    }
+                }
                 runConversationSubscriptionLoop(account)
             }
         } catch (cancel: CancellationException) {
@@ -4698,7 +4709,20 @@ class ConversationController(
 
     private fun publishTimelineFromIndexesInternal() {
         val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
-        val aggregated = aggregateEdits((optimisticMessages.values + projected).map { it.record })
+        // Local NIP-40 enforcement (#333): hide messages past the per-group
+        // retention window. expiry = recordedAt + window, mirroring the engine's
+        // prune cutoff (recorded_at < now - secs) so the visible timeline matches
+        // what a sync-time prune will permanently remove. A recent optimistic send
+        // never matches (recordedAt ≈ now). Window 0 (off) filters nothing.
+        val window = group.disappearingMessageSecs
+        val live =
+            if (window == 0uL) {
+                optimisticMessages.values + projected
+            } else {
+                val nowSecs = (System.currentTimeMillis() / 1000L).toULong()
+                (optimisticMessages.values + projected).filter { it.record.recordedAt + window > nowSecs }
+            }
+        val aggregated = aggregateEdits(live.map { it.record })
         // Drop any optimistic edit the real kind-1009 has now caught up to:
         // once `aggregateEdits` reports the same latest text, the overlay is
         // redundant and would otherwise mask a later remote edit. Failed/Pending
@@ -4708,7 +4732,7 @@ class ConversationController(
             .map { it.key }
             .forEach(optimisticEdits::remove)
         timeline =
-            (optimisticMessages.values + projected + streamDebugTimelineItems.values)
+            (live + streamDebugTimelineItems.values)
                 .map { it.withOptimisticEditStatus() }
                 .distinctBy { it.id }
                 .sortedWith(::compareTimelineMessages)
