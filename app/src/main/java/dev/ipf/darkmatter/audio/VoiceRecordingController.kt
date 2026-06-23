@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /** Hold-to-record controller. Slide left to cancel, slide up to lock,
@@ -68,9 +70,36 @@ class VoiceRecordingController(
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private var focusRequest: AudioFocusRequest? = null
 
+    // The in-flight stop() finalize (the post-release tail + encoder stop) and a
+    // signal to cut its tail short when a new recording starts during it.
+    private var finalizeJob: Job? = null
+    private var tailCut: CompletableDeferred<Unit>? = null
+    private var restarting = false
+
     fun start(): Boolean {
         if (isRecording) return true
         if (!onPermissionRequest()) return false
+
+        val pending = finalizeJob?.takeIf { it.isActive }
+        if (pending != null) {
+            // A previous take is still finalizing its tail and holds the mic and
+            // audio focus. Cut the tail to release the mic now, reuse that focus,
+            // and open the new recorder only once the old one has stopped —
+            // opening a second recorder mid-capture throws "mic busy" on devices
+            // without concurrent capture.
+            restarting = true
+            tailCut?.complete(Unit)
+            VoicePlaybackController.pause()
+            isRecording = true
+            resetRecordingUiState()
+            scope.launch(Dispatchers.Main) {
+                pending.join()
+                restarting = false
+                if (isRecording) beginRecording()
+            }
+            return true
+        }
+
         // Request transient audio focus AFTER permission is confirmed (a denied
         // prompt shouldn't disturb playback). Focus pauses other apps' media for
         // the duration of the capture and resumes it when abandoned on
@@ -81,6 +110,10 @@ class VoiceRecordingController(
             return false
         }
         VoicePlaybackController.pause()
+        return beginRecording()
+    }
+
+    private fun beginRecording(): Boolean {
         val file =
             File(
                 outputDirectory,
@@ -91,12 +124,7 @@ class VoiceRecordingController(
             r.start()
             recorder = r
             isRecording = true
-            locked = false
-            _elapsedMs.longValue = 0L
-            dragOffsetPx = 0f
-            verticalOffsetPx = 0f
-            willCancel = false
-            willLock = false
+            resetRecordingUiState()
             tickJob =
                 scope.launch(Dispatchers.Main) {
                     val started = System.nanoTime()
@@ -120,6 +148,15 @@ class VoiceRecordingController(
         }
     }
 
+    private fun resetRecordingUiState() {
+        locked = false
+        _elapsedMs.longValue = 0L
+        dragOffsetPx = 0f
+        verticalOffsetPx = 0f
+        willCancel = false
+        willLock = false
+    }
+
     fun stop() {
         val r = recorder ?: return
         recorder = null
@@ -136,30 +173,36 @@ class VoiceRecordingController(
         // slow storage), causing jank/ANR exactly as the record bar animates
         // away. UI state is already reset above; deliver the result on Main once
         // the container is finalized. See #372.
-        scope.launch(Dispatchers.Main) {
-            try {
-                // Keep the encoder running a short tail so the trailing word
-                // isn't clipped. Only the send path (stop) pays this; cancel
-                // never does. The recorder is still capturing until r.stop().
-                delay(RECORDING_TAIL_MS)
-                val result = withContext(Dispatchers.IO) { r.stop() }
-                if (result == null) {
-                    onError(IllegalStateException("voice recording too short"))
-                } else {
-                    onRecordingComplete(result.file, result.durationMs)
+        val cut = CompletableDeferred<Unit>()
+        tailCut = cut
+        finalizeJob =
+            scope.launch(Dispatchers.Main) {
+                try {
+                    // Keep the encoder running a short tail so the trailing word
+                    // isn't clipped. Only the send path (stop) pays this; cancel
+                    // never does. A new start() completes `cut` to end the tail
+                    // early and free the mic. The recorder captures until r.stop().
+                    withTimeoutOrNull(RECORDING_TAIL_MS) { cut.await() }
+                    val result = withContext(Dispatchers.IO) { r.stop() }
+                    if (result == null) {
+                        onError(IllegalStateException("voice recording too short"))
+                    } else {
+                        onRecordingComplete(result.file, result.durationMs)
+                    }
+                } catch (c: CancellationException) {
+                    throw c
+                } catch (t: Throwable) {
+                    // VoiceRecorder.stop() is exception-safe today (returns null on
+                    // failure), but route any unexpected finalize error to onError
+                    // too — matching start()'s contract — rather than dropping it on
+                    // the scope's handler.
+                    onError(t)
+                } finally {
+                    // A restart reuses this take's focus for the next recording;
+                    // only abandon it when no restart took over.
+                    if (!restarting) abandonRecordingFocus()
                 }
-            } catch (c: CancellationException) {
-                throw c
-            } catch (t: Throwable) {
-                // VoiceRecorder.stop() is exception-safe today (returns null on
-                // failure), but route any unexpected finalize error to onError
-                // too — matching start()'s contract — rather than dropping it on
-                // the scope's handler.
-                onError(t)
-            } finally {
-                abandonRecordingFocus()
             }
-        }
     }
 
     fun cancel() {
