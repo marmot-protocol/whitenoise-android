@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.InetAddress
 import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
@@ -158,6 +159,11 @@ class DuckDuckGoImageSearchClient(
             val host = parsed.host ?: return null
             if (!parsed.userInfo.isNullOrEmpty()) return null
             if (host.isBlank() || HostSafety.isPrivateOrLoopbackHost(host) || !isDuckDuckGoFetchHost(host)) {
+                return null
+            }
+            // Resolve-time check closes the DNS-rebinding gap the literal-host check leaves open.
+            val resolved = runCatching { InetAddress.getAllByName(host) }.getOrNull()
+            if (resolved.isNullOrEmpty() || resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }) {
                 return null
             }
             val connection = (parsed.openConnection() as? HttpURLConnection) ?: return null
