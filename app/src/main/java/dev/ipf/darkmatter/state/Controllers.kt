@@ -1094,7 +1094,7 @@ class ChatsController(
 
     private fun foldGroup(record: AppGroupRecordFfi) {
         groupRecordsById = groupRecordsById + (record.groupIdHex to record)
-        recompute()
+        scheduleRecompute()
     }
 
     // Marmot's `set_group_archived` writes local state + saves but emits no
@@ -1197,12 +1197,12 @@ class ChatsController(
             } else {
                 chatRows + row
             }
-        recompute()
+        scheduleRecompute()
     }
 
     private fun removeChatRow(groupIdHex: String) {
         chatRows = chatRows.filterNot { it.groupIdHex == groupIdHex }
-        recompute()
+        scheduleRecompute()
     }
 
     /**
@@ -1522,6 +1522,28 @@ class ChatsController(
         if (visible && pendingRecompute) recompute()
     }
 
+    private var recomputeScheduled = false
+    private val recomputeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    // Coalesce the per-fold recompute. The chat-list stream emits a flurry of Row
+    // updates during a sync burst (open / reconnect catch-up); running the full
+    // O(n log n) sort + member/preview/invite fan-out on each one janks the main
+    // thread. Fold updates land in the backing maps synchronously; this defers the
+    // projection rebuild one frame so a burst collapses into a single recompute,
+    // mirroring the conversation timeline's coalescing.
+    private fun scheduleRecompute() {
+        if (recomputeScheduled) return
+        recomputeScheduled = true
+        recomputeScope.launch {
+            try {
+                delay(CHAT_LIST_RECOMPUTE_DEBOUNCE_MS)
+            } finally {
+                recomputeScheduled = false
+            }
+            recompute()
+        }
+    }
+
     private fun recompute() {
         val unreadAccountRef = accountRef
         // Project once and reuse for both the per-account aggregate and the
@@ -1751,6 +1773,15 @@ private inline fun chatsDebug(
 }
 
 private val ConversationTimelinePageLimit = 50u
+
+// Cap on the live-projected timeline window (≈4 pages). Bounds memory for a
+// long-open, busy conversation while leaving ample scroll headroom before
+// loadOlder() must re-fetch.
+private const val LIVE_TIMELINE_WINDOW_CAP = 200
+
+// One frame: long enough to collapse a chat-list sync burst into a single
+// recompute, short enough to stay imperceptible.
+private const val CHAT_LIST_RECOMPUTE_DEBOUNCE_MS = 16L
 
 // Chat-list message-body search (issue #290). [SEARCH_FANOUT] caps the number
 // of per-chat `timelineMessages` FFI queries running at once so a large chat
@@ -4184,9 +4215,18 @@ class ConversationController(
         pruneConfirmedOptimisticMessages()
         pruneConfirmedOptimisticReactions()
         recomputeReactions(reactionTargets)
+        // The engine streams Upserts for new messages but never Removes ones that
+        // scroll out, so the live indexes grow without bound for a conversation
+        // kept open while messages arrive. Cap the live window to the newest
+        // entries; scrolling up triggers loadOlder(), whose replaceWindow rebuild
+        // restores the authoritative window. Skipped once the user has expanded
+        // the window via loadOlder so deliberately-loaded history isn't trimmed.
+        if (!hasLoadedOlderPages) {
+            trimLiveTimelineWindow(LIVE_TIMELINE_WINDOW_CAP)
+        }
         // Live Upsert/Projection batches add to messageById but never trim it;
-        // prune to the window + optimistic records so it doesn't grow unbounded
-        // for an actively-watched conversation (#373).
+        // prune to the (now-bounded) window + optimistic records so it doesn't
+        // grow unbounded for an actively-watched conversation (#373).
         pruneMessageByIdToWindow(messageById, timelineRecords.keys, optimisticMessages.values)
         publishTimelineFromIndexes()
         // Don't relaunch a watcher for a stream finalized in this same batch
@@ -4404,6 +4444,18 @@ class ConversationController(
         localTimelineTimestampOverrides.remove(messageIdHex)
         timelineItemsById.remove(itemId)
         timelineOrder.remove(itemId)
+    }
+
+    // Drop the oldest projected records beyond [maxItems], using the same total
+    // order the publish sorts by, so only the newest window is retained.
+    private fun trimLiveTimelineWindow(maxItems: Int) {
+        val overflow = timelineItemsById.size - maxItems
+        if (overflow <= 0) return
+        timelineItemsById.values
+            .sortedWith(::compareTimelineMessages)
+            .take(overflow)
+            .mapNotNull { it.projected?.messageIdHex }
+            .forEach(::removeProjectedRecord)
     }
 
     private fun timelineMessageFromProjection(
