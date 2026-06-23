@@ -357,6 +357,10 @@
     <string name="notification_joined_group_from_sender">%1$s sizi davet etti</string>
     <string name="notification_group_invite">Güvenli bir sohbete davet edildiniz</string>
     <string name="notification_new_message">Yeni mesaj</string>
+    <string name="notification_sent_picture">bir fotoğraf gönderdi</string>
+    <string name="notification_sent_video">bir video gönderdi</string>
+    <string name="notification_sent_voice_message">bir sesli mesaj gönderdi</string>
+    <string name="notification_sent_file">bir dosya gönderdi</string>
     <string name="notification_sender_in_group">%1$s, %2$s içinde</string>
     <string name="notification_invite_from_sender">%1$s tarafından davet</string>
     <string name="notification_sender_invited_you_to_group">%1$s sizi %2$s grubuna davet etti</string>

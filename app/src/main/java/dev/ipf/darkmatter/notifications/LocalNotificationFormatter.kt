@@ -4,6 +4,7 @@ import android.content.Context
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.ProfileSanitizer
+import dev.ipf.darkmatter.core.ReplyMediaKind
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
@@ -99,6 +100,11 @@ object LocalNotificationFormatter {
         // the text reaches NotificationManager.
         previewTextOverride: String? = null,
         reactedToPreviewOverride: String? = null,
+        // Caller-resolved media classification, used to describe an attachment
+        // with no caption ("sent a picture") instead of the generic "New
+        // message". None for text messages and for media that carries a caption
+        // (the caption is shown verbatim via the preview overrides).
+        mediaKind: ReplyMediaKind = ReplyMediaKind.None,
         groupInviteAutoAccepted: Boolean = false,
         conversationTitleOverride: String? = null,
     ): LocalNotificationContent? {
@@ -111,7 +117,7 @@ object LocalNotificationFormatter {
             }
         val body =
             when (update.trigger) {
-                NotificationTriggerFfi.NEW_MESSAGE -> messageBody(update, context, previewTextOverride, reactedToPreviewOverride)
+                NotificationTriggerFfi.NEW_MESSAGE -> messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
                 NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context, senderName, groupInviteAutoAccepted)
             }
         return LocalNotificationContent(
@@ -162,6 +168,7 @@ object LocalNotificationFormatter {
         context: Context?,
         previewTextOverride: String?,
         reactedToPreviewOverride: String?,
+        mediaKind: ReplyMediaKind,
     ): String {
         val emoji = clean(update.reactionEmoji)
         if (emoji != null) {
@@ -172,8 +179,26 @@ object LocalNotificationFormatter {
                 text(context, R.string.notification_reacted, "reacted %1\$s", emoji)
             }
         }
-        return clean(previewTextOverride) ?: clean(update.previewText) ?: text(context, R.string.notification_new_message, "New message")
+        // A caption (or any resolved text) always wins; only a captionless
+        // attachment falls through to the type-aware label, and a non-media
+        // empty message to the generic body.
+        return clean(previewTextOverride)
+            ?: clean(update.previewText)
+            ?: mediaBody(context, mediaKind)
+            ?: text(context, R.string.notification_new_message, "New message")
     }
+
+    private fun mediaBody(
+        context: Context?,
+        mediaKind: ReplyMediaKind,
+    ): String? =
+        when (mediaKind) {
+            ReplyMediaKind.Photo -> text(context, R.string.notification_sent_picture, "sent a picture")
+            ReplyMediaKind.Video -> text(context, R.string.notification_sent_video, "sent a video")
+            ReplyMediaKind.Voice -> text(context, R.string.notification_sent_voice_message, "sent a voice message")
+            ReplyMediaKind.Document -> text(context, R.string.notification_sent_file, "sent a file")
+            ReplyMediaKind.None -> null
+        }
 
     private fun inviteTitle(
         update: NotificationUpdateFfi,

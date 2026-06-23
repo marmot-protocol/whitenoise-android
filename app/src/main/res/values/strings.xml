@@ -465,6 +465,10 @@
     <string name="notification_joined_group_from_sender">You were invited by %1$s</string>
     <string name="notification_group_invite">Group invite</string>
     <string name="notification_new_message">New message</string>
+    <string name="notification_sent_picture">sent a picture</string>
+    <string name="notification_sent_video">sent a video</string>
+    <string name="notification_sent_voice_message">sent a voice message</string>
+    <string name="notification_sent_file">sent a file</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>
     <string name="notification_invite_from_sender">Invite from %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s invited you to %2$s</string>

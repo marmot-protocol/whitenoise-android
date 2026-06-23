@@ -356,6 +356,10 @@
     <string name="notification_joined_group_from_sender">你由 %1$s 邀请加入</string>
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新消息</string>
+    <string name="notification_sent_picture">发送了一张图片</string>
+    <string name="notification_sent_video">发送了一段视频</string>
+    <string name="notification_sent_voice_message">发送了一条语音消息</string>
+    <string name="notification_sent_file">发送了一个文件</string>
     <string name="notification_sender_in_group">%1$s 在 %2$s 中</string>
     <string name="notification_invite_from_sender">来自 %1$s 的邀请</string>
     <string name="notification_sender_invited_you_to_group">%1$s 邀请你加入 %2$s</string>

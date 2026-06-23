@@ -27,6 +27,7 @@ import dev.ipf.darkmatter.core.MarmotClient
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.ProfileLink
 import dev.ipf.darkmatter.core.ProfileSanitizer
+import dev.ipf.darkmatter.core.ReplyMediaKind
 import dev.ipf.darkmatter.notifications.BackgroundConnectionPreferences
 import dev.ipf.darkmatter.notifications.LocalNotificationFormatter
 import dev.ipf.darkmatter.notifications.LocalNotificationPolicy
@@ -2859,6 +2860,22 @@ class DarkMatterAppState(
             mentionDisplayName = { notificationMentionDisplayName(it) },
         )
 
+    // Classify a captionless incoming message so its notification body can name
+    // the attachment type. The runtime payload carries no content type, so read
+    // the stored record (recent history tail) and match by id; a miss or a
+    // non-media record yields None and the generic "New message" body stands.
+    private suspend fun notificationMediaKind(update: NotificationUpdateFfi): ReplyMediaKind {
+        val messageId = update.messageIdHex ?: return ReplyMediaKind.None
+        val record =
+            // A small recent tail; the just-arrived message is within it, and a
+            // miss simply falls back to the generic body.
+            runCatching { marmotIo { messages(update.accountRef, update.groupIdHex, 30u) } }
+                .getOrNull()
+                ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
+                ?: return ReplyMediaKind.None
+        return MessageProjector.mediaKind(record)
+    }
+
     // Resolve the conversation title for a notification the same way the chat
     // list does, since the runtime payload's group name is empty for unnamed
     // groups. Returns null for DMs (MessagingStyle shows the sender instead).
@@ -2927,12 +2944,22 @@ class DarkMatterAppState(
                 } else {
                     null
                 }
+            // Only a message with no resolvable text preview can be a captionless
+            // attachment, so classify just those (a single history read) to name
+            // the media type in the body. Text messages never reach the fetch.
+            val mediaKind =
+                if (LocalNotificationFormatter.needsPreviewTextResolution(update) && previewTextOverride.isNullOrBlank()) {
+                    notificationMediaKind(update)
+                } else {
+                    ReplyMediaKind.None
+                }
             localNotificationPresenter.show(
                 update,
                 notificationConversationTitle(update, autoAcceptedInvite),
                 notificationSenderName(update),
                 previewTextOverride,
                 reactedToPreviewOverride,
+                mediaKind,
                 groupInviteAutoAccepted = autoAcceptedInvite != null,
             )
         }

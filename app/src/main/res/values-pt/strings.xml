@@ -357,6 +357,10 @@
     <string name="notification_joined_group_from_sender">Você foi convidado por %1$s</string>
     <string name="notification_group_invite">Você foi convidado para uma conversa segura</string>
     <string name="notification_new_message">Nova mensagem</string>
+    <string name="notification_sent_picture">enviou uma foto</string>
+    <string name="notification_sent_video">enviou um vídeo</string>
+    <string name="notification_sent_voice_message">enviou uma mensagem de voz</string>
+    <string name="notification_sent_file">enviou um arquivo</string>
     <string name="notification_sender_in_group">%1$s em %2$s</string>
     <string name="notification_invite_from_sender">Convite de %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s convidou você para %2$s</string>
