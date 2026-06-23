@@ -14001,6 +14001,32 @@ private fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Inserts an emoji at the composer's current selection, replacing any selected
+ * range and moving the caret just after the inserted glyph. Kept pure so the
+ * cursor math is pinned by local unit tests instead of only by Compose wiring.
+ */
+internal fun insertComposerEmoji(
+    value: TextFieldValue,
+    emoji: String,
+): TextFieldValue {
+    val text = value.text
+    val start =
+        minOf(value.selection.start, value.selection.end)
+            .coerceIn(0, text.length)
+    val end =
+        maxOf(value.selection.start, value.selection.end)
+            .coerceIn(start, text.length)
+    val updatedText =
+        buildString {
+            append(text, 0, start)
+            append(emoji)
+            append(text, end, text.length)
+        }
+    val caret = start + emoji.length
+    return value.copy(text = updatedText, selection = TextRange(caret), composition = null)
+}
+
 @Composable
 private fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
@@ -14042,6 +14068,7 @@ private fun ComposerBar(
     onComposerFocusChanged: (Boolean) -> Unit = {},
 ) {
     var attachMenuOpen by remember { mutableStateOf(false) }
+    var composerEmojiPickerOpen by remember { mutableStateOf(false) }
     // Field state is a TextFieldValue (not a bare String) so the caret can
     // be positioned at the end of the prefilled body on edit-entry, and so
     // a re-tap on a different message rebases the caret too. Keyed on
@@ -14133,6 +14160,19 @@ private fun ComposerBar(
                 }
             }
         }
+    }
+    if (composerEmojiPickerOpen) {
+        EmojiPickerSheet(
+            onDismissRequest = { composerEmojiPickerOpen = false },
+            onEmojiPicked = { emoji ->
+                composerEmojiPickerOpen = false
+                val updated = insertComposerEmoji(textFieldValue, emoji)
+                textFieldValue = updated
+                if (editingMessageId == null) onDraftChange(updated.text)
+                runCatching { composerFocus.requestFocus() }
+                keyboardController?.show()
+            },
+        )
     }
     Column(
         modifier
@@ -14289,6 +14329,12 @@ private fun ComposerBar(
                             // preEditFieldValue on cancel/submit.
                             if (editingMessageId == null) onDraftChange(applied.text)
                         }
+                    },
+                    onEmojiPickerOpen = {
+                        attachMenuOpen = false
+                        composerEmojiPickerOpen = true
+                        runCatching { composerFocus.requestFocus() }
+                        keyboardController?.show()
                     },
                     onAttachMenuToggle = { attachMenuOpen = !attachMenuOpen },
                     attachMenuOpen = attachMenuOpen,
@@ -14757,6 +14803,7 @@ private fun ComposerPill(
     textFieldValue: TextFieldValue,
     composerFocus: FocusRequester,
     onValueChange: (TextFieldValue) -> Unit,
+    onEmojiPickerOpen: () -> Unit,
     onAttachMenuToggle: () -> Unit,
     attachMenuOpen: Boolean,
     onAttachMenuDismiss: () -> Unit,
@@ -14841,8 +14888,19 @@ private fun ComposerPill(
             modifier =
                 Modifier
                     .heightIn(min = 44.dp)
-                    .padding(start = 16.dp, end = 4.dp),
+                    .padding(start = 4.dp, end = 4.dp),
         ) {
+            IconButton(
+                onClick = onEmojiPickerOpen,
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    Icons.Default.EmojiEmotions,
+                    contentDescription = stringResource(R.string.open_emoji_picker),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
             Box(
                 modifier =
                     Modifier
