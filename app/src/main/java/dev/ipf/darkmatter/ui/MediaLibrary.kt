@@ -640,6 +640,7 @@ private fun VoiceLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
                 .amoledSurfaceBorder(RoundedCornerShape(12.dp))
                 .clickable { onJumpToMessage(row.messageIdHex) }
                 .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -653,7 +654,6 @@ private fun VoiceLibraryRow(
         Surface(
             color = MaterialTheme.colorScheme.primary,
             shape = CircleShape,
-            border = amoledSurfaceBorderStroke(),
             modifier =
                 Modifier
                     .size(44.dp)
@@ -782,6 +782,7 @@ private fun FileLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
                 .amoledSurfaceBorder(RoundedCornerShape(12.dp))
                 .clickable(enabled = !inFlight) {
                     inFlight = true
@@ -853,9 +854,10 @@ private fun FileLibraryRow(
                     )
                 }
                 DropdownMenu(
-                    modifier = Modifier.amoledSurfaceBorder(MenuDefaults.shape),
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
+                    shape = MenuDefaults.shape,
+                    border = amoledSurfaceBorderStroke(),
                 ) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.shared_media_save)) },
@@ -981,6 +983,7 @@ private fun UrlLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
                 .amoledSurfaceBorder(RoundedCornerShape(12.dp))
                 .combinedClickable(onClick = onOpen, onLongClick = onCopy)
                 .padding(horizontal = 16.dp, vertical = 10.dp),

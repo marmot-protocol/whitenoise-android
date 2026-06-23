@@ -2846,9 +2846,10 @@ private fun ChatRowWithMenu(
             bodyMatch = bodyMatch,
         )
         DropdownMenu(
-            modifier = Modifier.amoledSurfaceBorder(MenuDefaults.shape),
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
+            shape = MenuDefaults.shape,
+            border = amoledSurfaceBorderStroke(),
         ) {
             DropdownMenuItem(
                 text = {
@@ -7095,9 +7096,10 @@ private fun MediaPreviewSheet(
                             }
                         }
                         DropdownMenu(
-                            modifier = Modifier.amoledSurfaceBorder(MenuDefaults.shape),
                             expanded = addMoreMenuOpen,
                             onDismissRequest = { addMoreMenuOpen = false },
+                            shape = MenuDefaults.shape,
+                            border = amoledSurfaceBorderStroke(),
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.attach_photo_library)) },
@@ -11247,9 +11249,10 @@ private fun GroupMemberRow(
                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.member_actions))
                 }
                 DropdownMenu(
-                    modifier = Modifier.amoledSurfaceBorder(MenuDefaults.shape),
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
+                    shape = MenuDefaults.shape,
+                    border = amoledSurfaceBorderStroke(),
                 ) {
                     memberActions.forEach { action ->
                         when (action) {
@@ -11443,11 +11446,14 @@ private fun TransferAdminSheet(
 private fun amoledModalSheetModifier(): Modifier = Modifier.amoledSurfaceBorder(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
 
 @Composable
-private fun messageBubbleBorder(highlighted: Boolean): BorderStroke? =
-    if (highlighted) {
-        BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
-    } else {
-        amoledSurfaceBorderStroke()
+private fun messageBubbleBorder(
+    highlighted: Boolean,
+    mine: Boolean,
+): BorderStroke? =
+    when {
+        highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
+        mine && isAmoledSurfaceTheme() -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        else -> amoledSurfaceBorderStroke()
     }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -11463,7 +11469,7 @@ private fun MessageBubble(
     onReactionEmojiPicked: (String) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
 ) {
-    val amoledSurfaceTheme = MaterialTheme.colorScheme.isAmoledSurfaceTheme()
+    val amoledSurfaceTheme = isAmoledSurfaceTheme()
     val record = item.record
     val mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex)
     val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
@@ -12463,7 +12469,7 @@ private fun MessageBubble(
                             Surface(
                                 color = bubbleColor,
                                 shape = RoundedCornerShape(18.dp),
-                                border = messageBubbleBorder(highlighted),
+                                border = messageBubbleBorder(highlighted, mine),
                                 tonalElevation = if (mine) 1.dp else 0.dp,
                             ) {
                                 Column(
@@ -12492,7 +12498,7 @@ private fun MessageBubble(
                                 .offset { IntOffset(animatedSwipeOffset.roundToInt(), 0) },
                         color = bubbleColor,
                         shape = RoundedCornerShape(18.dp),
-                        border = messageBubbleBorder(highlighted),
+                        border = messageBubbleBorder(highlighted, mine),
                         tonalElevation = if (mine) 1.dp else 0.dp,
                     ) {
                         Column(
@@ -12755,7 +12761,8 @@ private fun MessageFullScreenView(
                         DropdownMenu(
                             expanded = overflowOpen,
                             onDismissRequest = { overflowOpen = false },
-                            modifier = Modifier.amoledSurfaceBorder(MenuDefaults.shape),
+                            shape = MenuDefaults.shape,
+                            border = amoledSurfaceBorderStroke(),
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.reply)) },
@@ -12843,7 +12850,7 @@ private fun ReactionSummaryChip(
     val emojis = tallies.take(MAX_VISIBLE_REACTIONS).joinToString(separator = "") { it.emoji }
     val viewReactorsLabel = stringResource(R.string.view_reactors)
     val border =
-        if (colorScheme.isAmoledSurfaceTheme()) {
+        if (isAmoledSurfaceTheme()) {
             BorderStroke(1.dp, colorScheme.outlineVariant)
         } else {
             BorderStroke(1.5.dp, colorScheme.surface)
@@ -13558,6 +13565,7 @@ private fun ForwardMessageSheet(
                         ListItem(
                             modifier =
                                 Modifier
+                                    .clip(RoundedCornerShape(12.dp))
                                     .amoledSurfaceBorder(RoundedCornerShape(12.dp))
                                     .clickable {
                                         if (isSelected) selected.remove(groupId) else selected.add(groupId)
@@ -14824,9 +14832,10 @@ private fun KeyboardPreservingDropdownMenu(
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
-        modifier = modifier.amoledSurfaceBorder(shape),
+        modifier = modifier,
         offset = offset,
         shape = shape,
+        border = amoledSurfaceBorderStroke(),
         properties =
             PopupProperties(
                 focusable = false,
@@ -15381,6 +15390,16 @@ private val MediaAutoDownloadType.labelRes: Int
             MediaAutoDownloadType.Document -> R.string.media_type_documents
         }
 
+private val LocalSettingsRowsInsideSectionCard = staticCompositionLocalOf { false }
+
+@Composable
+private fun Modifier.settingsRowAmoledSurfaceBorder(shape: Shape = RoundedCornerShape(12.dp)): Modifier =
+    if (LocalSettingsRowsInsideSectionCard.current) {
+        this
+    } else {
+        clip(shape).amoledSurfaceBorder(shape)
+    }
+
 @Composable
 private fun SelectableSettingsRow(
     title: String,
@@ -15390,7 +15409,7 @@ private fun SelectableSettingsRow(
     ListItem(
         modifier =
             Modifier
-                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                .settingsRowAmoledSurfaceBorder()
                 .clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
@@ -15419,7 +15438,7 @@ private fun SelectableSettingsRowWithSubtitle(
     ListItem(
         modifier =
             Modifier
-                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                .settingsRowAmoledSurfaceBorder()
                 .selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
@@ -15793,7 +15812,7 @@ private fun SettingsSwitchRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .amoledSurfaceBorder(RoundedCornerShape(12.dp)),
+            .settingsRowAmoledSurfaceBorder(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -15830,7 +15849,7 @@ fun SettingsAccountHeader(
     ListItem(
         modifier =
             Modifier
-                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                .settingsRowAmoledSurfaceBorder()
                 .clickable(onClick = onOpenAccountSelector)
                 .semantics { contentDescription = switchAccountDescription },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -15878,6 +15897,7 @@ private fun AccountSelectorSheet(
                     ListItem(
                         modifier =
                             Modifier
+                                .clip(RoundedCornerShape(12.dp))
                                 .amoledSurfaceBorder(RoundedCornerShape(12.dp))
                                 .clickable {
                                     // Run on the process-lifetime mutation scope, not this
@@ -15963,7 +15983,7 @@ private fun SettingsRow(
     ListItem(
         modifier =
             Modifier
-                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                .settingsRowAmoledSurfaceBorder()
                 .clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         headlineContent = { Text(title) },
@@ -16432,6 +16452,7 @@ private fun ProfileSharedGroupRow(
     ListItem(
         modifier =
             Modifier
+                .clip(RoundedCornerShape(12.dp))
                 .amoledSurfaceBorder(RoundedCornerShape(12.dp))
                 .clickable(role = Role.Button, onClick = onOpen),
         leadingContent = {
@@ -18601,7 +18622,9 @@ internal fun SectionCard(
     ) {
         Column(Modifier.fillMaxWidth().padding(Dimens.spaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            content()
+            CompositionLocalProvider(LocalSettingsRowsInsideSectionCard provides true) {
+                content()
+            }
         }
     }
 }
@@ -18630,7 +18653,9 @@ internal fun SectionCardWithAction(
                 )
                 action()
             }
-            content()
+            CompositionLocalProvider(LocalSettingsRowsInsideSectionCard provides true) {
+                content()
+            }
         }
     }
 }

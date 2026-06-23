@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
@@ -136,7 +137,7 @@ fun DarkMatterTheme(
                 surfaceVariant = Color.Black,
                 surfaceBright = Color.Black,
                 surfaceDim = Color.Black,
-                outline = AmoledSurfaceOutline,
+                outline = AmoledEmphasizedSurfaceBorder,
                 outlineVariant = AmoledSurfaceBorder,
                 inverseSurface = Color.Black,
                 inverseOnSurface = baseColorScheme.onSurface,
@@ -161,9 +162,11 @@ fun DarkMatterTheme(
             surfaceTint = if (amoledActive) Color.Transparent else Highlight,
         )
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalAmoledSurfaceTheme provides amoledActive) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content,
+        )
+    }
 }
