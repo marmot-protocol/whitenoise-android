@@ -169,6 +169,9 @@
     <string name="stream_failed_format">Akış başarısız: %1$s</string>
     <string name="copy_text">Metni kopyala</string>
     <string name="open_emoji_picker">Emoji seçiciyi aç</string>
+    <string name="emoji_search_hint">Emoji ara</string>
+    <string name="emoji_search_clear">Emoji aramasını temizle</string>
+    <string name="emoji_search_no_results">Emoji bulunamadı</string>
     <string name="reply">Yanıtla</string>
     <string name="forward">İlet</string>
     <string name="forward_to">Şuraya ilet</string>

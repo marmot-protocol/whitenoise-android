@@ -13789,35 +13789,150 @@ private fun EmojiPickerSheet(
     onDismissRequest: () -> Unit,
     onEmojiPicked: (String) -> Unit,
 ) {
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val searchFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val searchIndex = rememberEmojiSearchIndex()
+    val searchResults = remember(searchQuery, searchIndex) { searchIndex.search(searchQuery) }
+
     ModalBottomSheet(
         modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismissRequest,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
-        // EmojiPickerView hosts an Android RecyclerView (a NestedScrollingChild) that
-        // competes with the ModalBottomSheet's Compose nested-scroll handler for vertical
-        // drags. rememberNestedScrollInteropConnection() bridges the two systems: the
-        // RecyclerView consumes the drag while it can scroll and only forwards the leftover
-        // distance (at the top/bottom of the grid) to the sheet's drag/dismiss handler.
-        val nestedScrollInterop = rememberNestedScrollInteropConnection()
-        Box(modifier = Modifier.nestedScroll(nestedScrollInterop)) {
-            AndroidView(
-                modifier = Modifier.fillMaxWidth().height(384.dp).navigationBarsPadding(),
-                factory = { context ->
-                    EmojiPickerView(context).apply {
-                        emojiGridColumns = 8
-                        emojiGridRows = 5.25f
-                        setOnEmojiPickedListener { item -> onEmojiPicked(item.emoji) }
-                        // The body grid RecyclerView is built asynchronously once emoji data
-                        // loads, so enable nested scrolling on every descendant after layout to
-                        // guarantee the scrolling child dispatches deltas to the interop parent.
-                        // setNestedScrollingEnabled is a no-op on Views that are not a
-                        // NestedScrollingChild, so this safely targets only the RecyclerViews.
-                        post { enableNestedScrollingOnDescendants(this) }
+        LaunchedEffect(Unit) {
+            runCatching { searchFocusRequester.requestFocus() }
+            keyboardController?.show()
+        }
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .focusRequester(searchFocusRequester),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.emoji_search_clear),
+                            )
+                        }
                     }
                 },
+                placeholder = { Text(stringResource(R.string.emoji_search_hint)) },
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                    ),
+            )
+            if (searchQuery.isBlank()) {
+                // EmojiPickerView hosts an Android RecyclerView (a NestedScrollingChild) that
+                // competes with the ModalBottomSheet's Compose nested-scroll handler for vertical
+                // drags. rememberNestedScrollInteropConnection() bridges the two systems: the
+                // RecyclerView consumes the drag while it can scroll and only forwards the leftover
+                // distance (at the top/bottom of the grid) to the sheet's drag/dismiss handler.
+                val nestedScrollInterop = rememberNestedScrollInteropConnection()
+                Box(modifier = Modifier.nestedScroll(nestedScrollInterop)) {
+                    AndroidView(
+                        modifier = Modifier.fillMaxWidth().height(384.dp),
+                        factory = { context ->
+                            EmojiPickerView(context).apply {
+                                emojiGridColumns = 8
+                                emojiGridRows = 5.25f
+                                setOnEmojiPickedListener { item -> onEmojiPicked(item.emoji) }
+                                // The body grid RecyclerView is built asynchronously once emoji data
+                                // loads, so enable nested scrolling on every descendant after layout to
+                                // guarantee the scrolling child dispatches deltas to the interop parent.
+                                // setNestedScrollingEnabled is a no-op on Views that are not a
+                                // NestedScrollingChild, so this safely targets only the RecyclerViews.
+                                post { enableNestedScrollingOnDescendants(this) }
+                            }
+                        },
+                    )
+                }
+            } else {
+                EmojiSearchResultsGrid(
+                    results = searchResults,
+                    onEmojiPicked = onEmojiPicked,
+                    modifier = Modifier.fillMaxWidth().height(384.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun rememberEmojiSearchIndex(): EmojiSearchIndex {
+    val context = LocalContext.current
+    return remember(context) {
+        val json =
+            context.resources
+                .openRawResource(R.raw.emoji_annotations_en)
+                .bufferedReader()
+                .use { it.readText() }
+        EmojiSearchIndex.fromJson(json)
+    }
+}
+
+@Composable
+private fun EmojiSearchResultsGrid(
+    results: List<EmojiSearchEntry>,
+    onEmojiPicked: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (results.isEmpty()) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text(
+                text = stringResource(R.string.emoji_search_no_results),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(8),
+        modifier = modifier,
+        contentPadding = PaddingValues(vertical = 4.dp),
+    ) {
+        items(results, key = { it.emoji }) { entry ->
+            EmojiSearchResultCell(
+                emoji = entry.emoji,
+                onClick = { onEmojiPicked(entry.emoji) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmojiSearchResultCell(
+    emoji: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(CircleShape)
+                .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(emoji, style = MaterialTheme.typography.headlineSmall)
     }
 }
 

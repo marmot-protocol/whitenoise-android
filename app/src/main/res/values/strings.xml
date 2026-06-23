@@ -223,6 +223,9 @@
     <string name="stream_failed_format">Stream failed: %1$s</string>
     <string name="copy_text">Copy text</string>
     <string name="open_emoji_picker">Open emoji picker</string>
+    <string name="emoji_search_hint">Search emoji</string>
+    <string name="emoji_search_clear">Clear emoji search</string>
+    <string name="emoji_search_no_results">No emoji found</string>
     <string name="reply">Reply</string>
     <string name="forward">Forward</string>
     <string name="forward_to">Forward to</string>

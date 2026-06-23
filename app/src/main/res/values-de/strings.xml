@@ -169,6 +169,9 @@
     <string name="stream_failed_format">Stream fehlgeschlagen: %1$s</string>
     <string name="copy_text">Text kopieren</string>
     <string name="open_emoji_picker">Emoji-Auswahl öffnen</string>
+    <string name="emoji_search_hint">Emoji suchen</string>
+    <string name="emoji_search_clear">Emoji-Suche löschen</string>
+    <string name="emoji_search_no_results">Kein Emoji gefunden</string>
     <string name="reply">Antworten</string>
     <string name="forward">Weiterleiten</string>
     <string name="forward_to">Weiterleiten an</string>

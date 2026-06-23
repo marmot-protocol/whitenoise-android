@@ -169,6 +169,9 @@
     <string name="stream_failed_format">Error en el flujo: %1$s</string>
     <string name="copy_text">Copiar texto</string>
     <string name="open_emoji_picker">Abrir selector de emojis</string>
+    <string name="emoji_search_hint">Buscar emojis</string>
+    <string name="emoji_search_clear">Borrar búsqueda de emojis</string>
+    <string name="emoji_search_no_results">No se encontraron emojis</string>
     <string name="reply">Responder</string>
     <string name="forward">Reenviar</string>
     <string name="forward_to">Reenviar a</string>
