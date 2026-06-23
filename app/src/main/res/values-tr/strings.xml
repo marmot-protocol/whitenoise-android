@@ -16,6 +16,7 @@
     <string name="back">Geri dön</string>
     <string name="back_to_chats">Sohbetlere geri dön</string>
     <string name="open_settings">Ayarları aç</string>
+    <string name="other_account_unread_indicator">Başka bir hesapta okunmamış mesajlar var</string>
     <string name="archived">Arşivlendi</string>
     <string name="chats_count">%1$d sohbetleri</string>
     <string name="couldnt_load_chats">Sohbetler yüklenemedi</string>

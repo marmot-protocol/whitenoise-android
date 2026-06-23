@@ -16,6 +16,7 @@
     <string name="back">Назад</string>
     <string name="back_to_chats">Вернуться к чатам</string>
     <string name="open_settings">Открыть настройки</string>
+    <string name="other_account_unread_indicator">В другом аккаунте есть непрочитанные сообщения</string>
     <string name="archived">В архиве</string>
     <string name="chats_count">%1$d чаты</string>
     <string name="couldnt_load_chats">Не удалось загрузить чаты</string>

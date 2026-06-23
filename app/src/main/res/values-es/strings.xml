@@ -16,6 +16,7 @@
     <string name="back">Volver</string>
     <string name="back_to_chats">Volver a los chats</string>
     <string name="open_settings">Abrir ajustes</string>
+    <string name="other_account_unread_indicator">Otra cuenta tiene mensajes sin leer</string>
     <string name="archived">Archivado</string>
     <string name="chats_count">%1$d charlas</string>
     <string name="couldnt_load_chats">No se pudieron cargar los chats</string>

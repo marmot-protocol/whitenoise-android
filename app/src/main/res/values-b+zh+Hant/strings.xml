@@ -16,6 +16,7 @@
     <string name="back">返回</string>
     <string name="back_to_chats">返回聊天</string>
     <string name="open_settings">開啟設定</string>
+    <string name="other_account_unread_indicator">另一個帳號有未讀訊息</string>
     <string name="archived">已存檔</string>
     <string name="chats_count">%1$d 聊天</string>
     <string name="couldnt_load_chats">無法載入聊天</string>

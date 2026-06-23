@@ -16,6 +16,7 @@
     <string name="back">Back</string>
     <string name="back_to_chats">Back to chats</string>
     <string name="open_settings">Open settings</string>
+    <string name="other_account_unread_indicator">Another account has unread messages</string>
     <string name="archived">Archived</string>
     <string name="chats_count">%1$d chats</string>
     <string name="couldnt_load_chats">Couldn\'t load chats</string>

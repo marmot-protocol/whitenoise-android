@@ -87,6 +87,15 @@ data class ChatListItem(
      * (non-deleted, non-blank), so fallback copy is never styled.
      */
     val previewTokens: MarkdownDocumentFfi? = null,
+    /**
+     * Known removal evidence that the [memberSnapshot] roster alone can't
+     * carry: a successful self-leave (including leaving as the sole member,
+     * which caches an *empty* roster) or a loaded roster that omits self.
+     * Set by [ChatsController] when removal is established; lets
+     * [removedFromGroup] treat a known-empty-post-removal roster as real
+     * removal while a null/failed-fetch empty roster stays non-removed.
+     */
+    val removed: Boolean = false,
 ) {
     val id: String = group.groupIdHex
 
@@ -108,6 +117,42 @@ data class ChatListItem(
 
     val hasUnread: Boolean
         get() = projection?.hasUnread ?: false
+
+    /**
+     * Whether the active account is no longer a member of this group. Two
+     * independent signals establish this:
+     *
+     *  - [removed]: an explicit marker [ChatsController] sets once removal is
+     *    *known* — a self-leave (including leaving as the sole member, which
+     *    caches an empty roster) or a roster fetch that loaded and omits self.
+     *    This is what lets a genuinely-empty post-removal roster suppress the
+     *    badge, since an empty [memberSnapshot] alone is ambiguous.
+     *  - a *loaded, non-empty* [memberSnapshot] that omits self — the engine's
+     *    `groupMembers` roster landed and self isn't in it.
+     *
+     * A null snapshot (fetch hasn't landed) and an empty snapshot *without* the
+     * [removed] marker (a best-effort fetch failure) are both treated as "not
+     * yet known", so neither suppresses the row's badge. Returns false with a
+     * blank/absent active account, matching [GroupProjector] semantics.
+     */
+    fun removedFromGroup(activeAccountIdHex: String?): Boolean {
+        val active = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() } ?: return false
+        if (removed) return true
+        val snapshot = memberSnapshot?.takeIf { it.members.isNotEmpty() } ?: return false
+        return !snapshot.containsAccount(active)
+    }
+
+    /**
+     * The unread badge to render for this row given the active account. A group
+     * the user has been removed from keeps a frozen [unreadCount] in the
+     * projection (the engine stops advancing reads once self is evicted), which
+     * reads as a stale alert; suppress it to zero so a removed group shows no
+     * badge (#625).
+     */
+    fun effectiveUnreadCount(activeAccountIdHex: String?): ULong = if (removedFromGroup(activeAccountIdHex)) 0uL else unreadCount
+
+    /** [hasUnread] with the removed-group suppression applied (#625). */
+    fun effectiveHasUnread(activeAccountIdHex: String?): Boolean = hasUnread && !removedFromGroup(activeAccountIdHex)
 
     fun projectedPreviewText(
         copy: MessageTextCopy = MessageTextCopy.Default,
@@ -175,6 +220,7 @@ internal fun chatListItemFromProjection(
     activeAccountIdHex: String? = null,
     members: List<AppGroupMemberRecordFfi>? = null,
     previewTokens: MarkdownDocumentFfi? = null,
+    removed: Boolean = false,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
     val displayGroup =
@@ -213,6 +259,7 @@ internal fun chatListItemFromProjection(
         memberSnapshot = members?.let(::GroupMemberSnapshot),
         projection = row,
         previewTokens = previewTokens,
+        removed = removed,
     )
 }
 
@@ -788,6 +835,13 @@ class ChatsController(
     // `recompute()` per group; re-fetched on bind.
     private var memberCacheByGroup: Map<String, List<AppGroupMemberRecordFfi>> = emptyMap()
 
+    // Groups the active account is known to have been removed/left from, keyed
+    // by group id hex. Set on a confirmed self-leave or when a loaded roster
+    // omits self; lets [ChatListItem.removedFromGroup] treat a genuinely-empty
+    // post-removal roster as real removal (a fetch-failure empty roster, which
+    // never adds an id here, stays non-removed). Cleared on every bind.
+    private var removedGroupIds: Set<String> = emptySet()
+
     // Tracks groups whose member fetch is currently in flight, so we don't
     // fan out duplicate work for the same group. Invariant: an id sits in
     // exactly one state at a time — pending (not in either set), in-flight
@@ -864,6 +918,7 @@ class ChatsController(
         chatRows = emptyList()
         groupRecordsById = emptyMap()
         memberCacheByGroup = emptyMap()
+        removedGroupIds = emptySet()
         inFlightMemberFetches.clear()
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
@@ -1067,6 +1122,7 @@ class ChatsController(
                 activeAccountIdHex = me,
                 members = memberCacheByGroup[row.groupIdHex],
                 previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
+                removed = row.groupIdHex in removedGroupIds,
             )
         }
     }
@@ -1238,6 +1294,7 @@ class ChatsController(
                             override val deleted = record.deleted
                             override val plaintext = record.plaintext
                             override val messageIdHex = record.messageIdHex
+                            override val timelineAt = record.timelineAt
                         }
                     },
                     ciNeedle,
@@ -1248,6 +1305,7 @@ class ChatsController(
                     groupIdHex = groupIdHex,
                     messageIdHex = match.messageIdHex,
                     snippet = snippet,
+                    timelineAt = match.timelineAt,
                 )
             }
             // No eligible match in this page. Stop if the engine has no older
@@ -1369,6 +1427,11 @@ class ChatsController(
                 memberCacheByGroup =
                     memberCacheByGroup +
                     (groupIdHex to GroupProjector.membersWithoutActiveAccount(members, activeAccountIdHex))
+                // Known removal: a self-leave omits self from the roster even
+                // when that leaves it empty (sole-member leave). Mark it so the
+                // badge stays suppressed instead of reading the empty roster as
+                // a fetch failure.
+                removedGroupIds = removedGroupIds + groupIdHex
                 recompute()
             }
             appState.present(R.string.toast_left_chat)
@@ -1446,8 +1509,18 @@ class ChatsController(
 
     private fun recompute() {
         val unreadAccountRef = accountRef
+        // Project once and reuse for both the per-account aggregate and the
+        // visible list, so the aggregate sees the same removed-group
+        // suppression the row badge does (#625). The projection is cheap
+        // relative to the FFI fan-out it gates, and is needed even while hidden
+        // so a removed group's frozen unread can't keep lighting the
+        // cross-account dot behind an open conversation.
+        val projected = currentProjectedItems()
         if (unreadAccountRef != null) {
-            appState.updateAccountUnreadCount(unreadAccountRef, accountUnreadCount(chatRows))
+            appState.updateAccountUnreadCount(
+                unreadAccountRef,
+                accountUnreadCount(projected, appState.activeAccount?.accountIdHex),
+            )
         }
         // Hidden behind an open conversation: keep folding updates into the
         // backing maps (done by the caller) but defer the projection rebuild +
@@ -1457,7 +1530,7 @@ class ChatsController(
             return
         }
         pendingRecompute = false
-        val all = sortChatListItems(currentProjectedItems())
+        val all = sortChatListItems(projected)
         items = all.filter { !it.group.archived }
         archivedItems = all.filter { it.group.archived }
         chatsDebug { "recompute visible=${items.size} archived=${archivedItems.size} total=${all.size}" }
@@ -1501,6 +1574,17 @@ class ChatsController(
                                 .filter { it.isNotBlank() }
                                 .forEach(appState::requestProfile)
                             memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
+                            // A loaded roster that omits self is known removal
+                            // evidence (admin eviction / self-leave the engine
+                            // has already applied). Marking it makes an empty
+                            // self-only roster suppress the badge too, where the
+                            // snapshot path alone reads empty as ambiguous.
+                            val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                            if (activeAccountIdHex != null &&
+                                members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                            ) {
+                                removedGroupIds = removedGroupIds + groupIdHex
+                            }
                             recompute()
                         }
                     }

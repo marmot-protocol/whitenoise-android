@@ -148,6 +148,7 @@ object ChatListMessageSearch {
         val deleted: Boolean
         val plaintext: String
         val messageIdHex: String
+        val timelineAt: ULong
     }
 
     /**
@@ -197,4 +198,11 @@ data class MessageBodyMatch(
     val groupIdHex: String,
     val messageIdHex: String,
     val snippet: SnippetHighlight,
+    /**
+     * Timeline timestamp (unix seconds) of the matched message — *not* the
+     * chat's last-message time. A body-match row surfaces this so its
+     * timestamp points at the message the search actually found, which can be
+     * far older than the conversation's latest activity (#594).
+     */
+    val timelineAt: ULong,
 )
