@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
+import java.net.InetAddress
 import java.net.URL
 import java.util.LinkedHashMap
 
@@ -147,6 +148,11 @@ object AvatarImageLoader {
             // HostSafety now decodes); without a per-hop host check the manual
             // follow below would happily connect to it. See #129.
             if (HostSafety.isPrivateOrLoopbackHost(parsed.host)) return null
+            // Resolve-time check narrows the DNS-rebinding window the literal-host
+            // check leaves open. HttpURLConnection re-resolves at connect, so this
+            // is a mitigation, not a full close (matches Nip05Resolver).
+            val resolved = runCatching { InetAddress.getAllByName(parsed.host) }.getOrNull()
+            if (resolved.isNullOrEmpty() || resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }) return null
             val connection = parsed.openConnection() as? HttpURLConnection ?: return null
             try {
                 connection.instanceFollowRedirects = false

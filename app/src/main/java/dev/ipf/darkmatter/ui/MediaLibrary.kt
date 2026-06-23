@@ -156,9 +156,14 @@ internal fun rememberSharedMediaTiles(
         controller.mediaReferences,
         myAccountId,
     ) {
-        val records = controller.timeline.map { it.record }
-        val references = records.associate { it.messageIdHex to controller.mediaReferences[it.messageIdHex] }
-        value = withContext(Dispatchers.Default) { buildTiles(records, references, myAccountId) }
+        val timelineSnapshot = controller.timeline
+        val mediaReferences = controller.mediaReferences
+        value =
+            withContext(Dispatchers.Default) {
+                val records = timelineSnapshot.map { it.record }
+                val references = records.associate { it.messageIdHex to mediaReferences[it.messageIdHex] }
+                buildTiles(records, references, myAccountId)
+            }
     }
     return tiles
 }
