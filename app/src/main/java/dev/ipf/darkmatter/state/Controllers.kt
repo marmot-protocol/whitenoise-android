@@ -642,6 +642,34 @@ internal fun optimisticMessageIdForProjection(
         ?.messageIdHex
 }
 
+/**
+ * Find a projected timeline row that matches [optimistic] and is committed locally
+ * but not yet published (`sourceMessageIdHex == null`). Used when retrying a failed
+ * optimistic send so we drive `retryGroupConvergence` instead of minting a duplicate.
+ */
+internal fun committedButUnpublishedProjectionForOptimistic(
+    timelineRecords: Map<String, TimelineMessageRecordFfi>,
+    optimistic: AppMessageRecordFfi,
+    activeAccountIdHex: String?,
+): TimelineMessageRecordFfi? {
+    val optimisticIsMediaPending = optimistic.tags.any { it.values.firstOrNull() == "_media_pending" }
+    return timelineRecords.values.firstOrNull { projected ->
+        if (projected.deleted || projected.sourceMessageIdHex != null) return@firstOrNull false
+        if (projected.direction != "sent") return@firstOrNull false
+        val projectedAction = TimelineProjector.toAppMessageRecord(projected)
+        if (!MessageProjector.isMine(projectedAction, activeAccountIdHex)) return@firstOrNull false
+        if (optimistic.groupIdHex != projectedAction.groupIdHex) return@firstOrNull false
+        val projectedIsMedia = projectedAction.tags.any { it.values.firstOrNull() == "imeta" }
+        if (optimisticIsMediaPending && projectedIsMedia) {
+            timestampsAreNear(optimistic.recordedAt, projectedAction.recordedAt)
+        } else {
+            optimistic.plaintext == projectedAction.plaintext &&
+                optimistic.tags == projectedAction.tags &&
+                timestampsAreNear(optimistic.recordedAt, projectedAction.recordedAt)
+        }
+    }
+}
+
 private fun timestampsAreNear(
     left: ULong,
     right: ULong,
@@ -1359,8 +1387,10 @@ class ChatsController(
     ): Boolean {
         val account = accountRef ?: return false
         return runCatching {
-            val updated = appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
-            appState.applyLocalGroupUpdate(updated)
+            appState.withGroupCommitLock(account, groupIdHex) {
+                val updated = appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
+                appState.applyLocalGroupUpdate(updated)
+            }
             if (notify) {
                 appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
             }
@@ -1404,31 +1434,14 @@ class ChatsController(
                 )
                 return@runCatching false
             }
-            if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
-                appState.marmotIo { selfDemoteAdmin(account, groupIdHex) }
-                demotedBeforeLeave = true
-                // Mirror the conversation-controller path: drop the local
-                // admin entry so the cached record matches the engine's
-                // post-demote state even if the subsequent leaveGroup
-                // fails (the user is no longer an admin regardless of
-                // whether they end up leaving). Case-insensitive because
-                // admin-list hex casing can drift from the active
-                // account id, same as in [ConversationController.leaveGroup].
-                if (activeAccountIdHex != null) {
-                    groupRecordsById[groupIdHex]?.let { cached ->
-                        val patched =
-                            cached.copy(
-                                admins =
-                                    cached.admins.filterNot {
-                                        it.equals(activeAccountIdHex, ignoreCase = true)
-                                    },
-                            )
-                        groupRecordsById = groupRecordsById + (groupIdHex to patched)
-                        recompute()
-                    }
+            appState.withGroupCommitLock(account, groupIdHex) {
+                if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
+                    val demoteResult = appState.marmotIo { selfDemoteAdminDetailed(account, groupIdHex) }
+                    demotedBeforeLeave = true
+                    appState.applyLocalGroupUpdate(demoteResult.details.group)
                 }
+                appState.marmotIo { leaveGroup(account, groupIdHex) }
             }
-            appState.marmotIo { leaveGroup(account, groupIdHex) }
             // Invalidate both snapshot sources that seed the next
             // ConversationController so re-opening the just-left group renders
             // the disabled notice immediately instead of flashing the active
@@ -2498,7 +2511,9 @@ class ConversationController(
             // exhausted — keeps the hard failure. The optimistic bubble stays
             // Pending across retries, so the user sees "sending", not "failed".
             val summary =
-                publishTextWithRetry(replyTarget, account, trimmed)
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    publishTextWithRetry(replyTarget, account, trimmed)
+                }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = optimistic.copy(messageIdHex = confirmedId)
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
@@ -2806,8 +2821,10 @@ class ConversationController(
                     return
                 }
                 val summary =
-                    appState.marmotIo {
-                        sendMediaAttachments(account, group.groupIdHex, references, retained.caption)
+                    appState.withGroupCommitLock(account, group.groupIdHex) {
+                        appState.marmotIo {
+                            sendMediaAttachments(account, group.groupIdHex, references, retained.caption)
+                        }
                     }
                 val confirmedId = summary.messageIds.firstOrNull() ?: tempId
                 optimisticMessages.remove(key)
@@ -2981,48 +2998,50 @@ class ConversationController(
             )
         recomputeReactions()
         try {
-            if (alreadyMine) {
-                // Retract just the tapped emoji by deleting its own reaction
-                // event; the FFI unreact is target-only and clears the latest
-                // reaction, so it would drop the wrong emoji when a user holds
-                // more than one on the same message.
-                // activeAccountRef can be set while the account row hasn't loaded
-                // into `accounts` yet; surface that distinctly from an ambiguous
-                // reaction so the failure reason isn't misleading.
-                val me =
-                    appState.activeAccount?.accountIdHex
-                        ?: error("no active account to retract reaction")
-                val ownReactions =
-                    timelineRecords[target]
-                        ?.reactions
-                        ?.userReactions
-                        .orEmpty()
-                        .filter { it.sender.equals(me, ignoreCase = true) }
-                val reactionEventId =
-                    ownReactions
-                        .firstOrNull { it.emoji == emoji && it.reactionMessageIdHex.isNotBlank() }
-                        ?.reactionMessageIdHex
-                when {
-                    reactionEventId != null ->
-                        appState.marmotIo { deleteMessage(account, group.groupIdHex, reactionEventId) }
-                    // Target-only unreact is safe only when this is the single
-                    // reaction to clear; with several it could drop another emoji.
-                    ownReactions.size == 1 && ownReactions.first().emoji == emoji ->
-                        appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
-                    // No event id yet (optimistic/unsynced) and ambiguous — fail so
-                    // the optimistic toggle reverts instead of retracting the wrong one.
-                    else -> error("no reaction event to retract for $emoji")
+            appState.withGroupCommitLock(account, group.groupIdHex) {
+                if (alreadyMine) {
+                    // Retract just the tapped emoji by deleting its own reaction
+                    // event; the FFI unreact is target-only and clears the latest
+                    // reaction, so it would drop the wrong emoji when a user holds
+                    // more than one on the same message.
+                    // activeAccountRef can be set while the account row hasn't loaded
+                    // into `accounts` yet; surface that distinctly from an ambiguous
+                    // reaction so the failure reason isn't misleading.
+                    val me =
+                        appState.activeAccount?.accountIdHex
+                            ?: error("no active account to retract reaction")
+                    val ownReactions =
+                        timelineRecords[target]
+                            ?.reactions
+                            ?.userReactions
+                            .orEmpty()
+                            .filter { it.sender.equals(me, ignoreCase = true) }
+                    val reactionEventId =
+                        ownReactions
+                            .firstOrNull { it.emoji == emoji && it.reactionMessageIdHex.isNotBlank() }
+                            ?.reactionMessageIdHex
+                    when {
+                        reactionEventId != null ->
+                            appState.marmotIo { deleteMessage(account, group.groupIdHex, reactionEventId) }
+                        // Target-only unreact is safe only when this is the single
+                        // reaction to clear; with several it could drop another emoji.
+                        ownReactions.size == 1 && ownReactions.first().emoji == emoji ->
+                            appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
+                        // No event id yet (optimistic/unsynced) and ambiguous — fail so
+                        // the optimistic toggle reverts instead of retracting the wrong one.
+                        else -> error("no reaction event to retract for $emoji")
+                    }
+                } else {
+                    appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
+                    // Reacting is unambiguous evidence the user saw this message, so
+                    // advance the read marker through it. Without this the chat-list
+                    // unread badge can survive a react-then-leave until the next open,
+                    // because the scroll-driven mark-read may not have fired (the user
+                    // was already at the bottom when the message arrived). This runs on
+                    // the caller's durable mutation scope, so it isn't cancelled when
+                    // the conversation closes right after the tap.
+                    markReadUpTo(target)
                 }
-            } else {
-                appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
-                // Reacting is unambiguous evidence the user saw this message, so
-                // advance the read marker through it. Without this the chat-list
-                // unread badge can survive a react-then-leave until the next open,
-                // because the scroll-driven mark-read may not have fired (the user
-                // was already at the bottom when the message arrived). This runs on
-                // the caller's durable mutation scope, so it isn't cancelled when
-                // the conversation closes right after the tap.
-                markReadUpTo(target)
             }
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
@@ -3038,7 +3057,9 @@ class ConversationController(
         val target = message.messageIdHex.takeIf { it.isNotBlank() } ?: return
         deletedMessageIds = deletedMessageIds + target
         try {
-            appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
+            appState.withGroupCommitLock(account, group.groupIdHex) {
+                appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
+            }
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
             deletedMessageIds = deletedMessageIds - target
@@ -3072,7 +3093,9 @@ class ConversationController(
         optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Pending)
         publishTimelineFromIndexes()
         try {
-            appState.marmotIo { editMessage(account, group.groupIdHex, target, trimmed) }
+            appState.withGroupCommitLock(account, group.groupIdHex) {
+                appState.marmotIo { editMessage(account, group.groupIdHex, target, trimmed) }
+            }
             // Publish accepted: drop the Pending indicator but keep the text
             // overlay so the bubble doesn't flicker back to the old body in the
             // gap before the kind-1009 lands in the timeline. The overlay is
@@ -3411,11 +3434,40 @@ class ConversationController(
         messageById[tempId] = refreshedRecord
         publishTimelineFromIndexes()
         try {
+            val activeAccountIdHex = appState.activeAccount?.accountIdHex
+            val committedProjection =
+                committedButUnpublishedProjectionForOptimistic(
+                    timelineRecords,
+                    refreshedRecord,
+                    activeAccountIdHex,
+                )
+            if (committedProjection != null) {
+                preserveOptimisticDisplayPosition(committedProjection.messageIdHex, tempId)
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
+                }
+                optimisticMessages.remove(key)
+                messageById.remove(tempId)
+                val projectedAction = TimelineProjector.toAppMessageRecord(committedProjection)
+                val projectedRecord =
+                    projectedAction.withRecordedAtOverride(
+                        localTimelineTimestampOverrides[committedProjection.messageIdHex],
+                    )
+                messageById[committedProjection.messageIdHex] = projectedRecord
+                if (discardedDuringRetry.remove(key)) {
+                    publishTimelineFromIndexes()
+                    return
+                }
+                publishTimelineFromIndexes()
+                return
+            }
             val summary =
-                if (replyTarget != null) {
-                    appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, text) }
-                } else {
-                    appState.marmotIo { sendText(account, group.groupIdHex, text) }
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    if (replyTarget != null) {
+                        appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, text) }
+                    } else {
+                        appState.marmotIo { sendText(account, group.groupIdHex, text) }
+                    }
                 }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = refreshedRecord.copy(messageIdHex = confirmedId)
@@ -3516,19 +3568,18 @@ class ConversationController(
                 appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
                 return false
             }
+            var demotedBeforeLeave = false
             runCatching {
                 val activeAccountIdHex = appState.activeAccount?.accountIdHex
-                if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, members.size)) {
-                    appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
-                    // Case-insensitive so hex-casing drift between the admin
-                    // list and the active account id doesn't leave the UI
-                    // showing you as admin after a successful self-demote.
-                    group =
-                        group.copy(
-                            admins = group.admins.filterNot { it.equals(activeAccountIdHex, ignoreCase = true) },
-                        )
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, members.size)) {
+                        val demoteResult =
+                            appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
+                        demotedBeforeLeave = true
+                        applyMutationDetails(account, demoteResult.details)
+                    }
+                    appState.marmotIo { leaveGroup(account, group.groupIdHex) }
                 }
-                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
                 appState.forgetAutoAcceptedInvite(group.groupIdHex)
                 // Drop self from the cached member snapshot synchronously so
                 // re-opening the just-left group seeds a roster without self
@@ -3549,7 +3600,11 @@ class ConversationController(
                 if (it is CancellationException) throw it
                 val message = mutationError(it)
                 lastMutationError = message
-                appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(message))
+                if (demotedBeforeLeave) {
+                    appState.present(R.string.toast_demoted_but_couldnt_leave, AppText.Plain(message))
+                } else {
+                    appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(message))
+                }
                 false
             }
         }
@@ -3610,9 +3665,11 @@ class ConversationController(
             lastMutationError = null
             val account = appState.activeAccountRef ?: return@withMutationLockResult false
             runCatching {
-                val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
-                group = updated
-                appState.applyLocalGroupUpdate(updated)
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
+                    group = updated
+                    appState.applyLocalGroupUpdate(updated)
+                }
                 appState.present(if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored)
                 true
             }.onFailure {
@@ -3694,12 +3751,17 @@ class ConversationController(
                 }
             var inviteSent = false
             try {
-                appState.marmotIo { inviteMembers(account, group.groupIdHex, refs) }
-                inviteSent = true
-                adminTargets.forEach { target ->
-                    appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    val inviteResult =
+                        appState.marmotIo { inviteMembersDetailed(account, group.groupIdHex, refs) }
+                    applyMutationDetails(account, inviteResult.details)
+                    inviteSent = true
+                    adminTargets.forEach { target ->
+                        val promoteResult =
+                            appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
+                        applyMutationDetails(account, promoteResult.details)
+                    }
                 }
-                refreshMembers()
                 appState.present(R.string.toast_invite_sent)
                 true
             } catch (throwable: Throwable) {
@@ -3709,7 +3771,6 @@ class ConversationController(
                     // The invite is already out; keep the UI honest about the
                     // partial success and leave the row-level Admin switch as the
                     // retry path once the member appears in details.
-                    refreshMembers()
                     lastMutationError = "Invite sent, but admin promotion failed: $message"
                     appState.present(R.string.toast_invite_sent_but_couldnt_add_admin, AppText.Plain(message))
                     true
@@ -3729,11 +3790,11 @@ class ConversationController(
             // stable member id. memberRef may be a local account label.
             val target = member.memberIdHex
             try {
-                appState.marmotIo { removeMembers(account, group.groupIdHex, listOf(target)) }
-                // The group-state subscription should eventually converge from the
-                // published MLS commit. Update this controller immediately so the
-                // admin does not need an account switch to see the removed row leave.
-                removeMemberLocally(account, target)
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    val result =
+                        appState.marmotIo { removeMembersDetailed(account, group.groupIdHex, listOf(target)) }
+                    applyMutationDetails(account, result.details)
+                }
                 appState.present(R.string.toast_member_removed)
                 true
             } catch (throwable: Throwable) {
@@ -3774,25 +3835,19 @@ class ConversationController(
                 return@withMutationLockResult false
             }
             runCatching {
-                if (admin) {
-                    appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
-                    val updatedAdmins = group.admins.toMutableList()
-                    if (updatedAdmins.none { it.equals(target, ignoreCase = true) }) {
-                        updatedAdmins += target
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    if (admin) {
+                        val result =
+                            appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
+                        applyMutationDetails(account, result.details)
+                        appState.present(R.string.toast_admin_added)
+                    } else {
+                        val result =
+                            appState.marmotIo { demoteAdminDetailed(account, group.groupIdHex, target) }
+                        applyMutationDetails(account, result.details)
+                        appState.present(R.string.toast_admin_removed)
                     }
-                    group = group.copy(admins = updatedAdmins)
-                    appState.present(R.string.toast_admin_added)
-                } else {
-                    appState.marmotIo { demoteAdmin(account, group.groupIdHex, target) }
-                    // Case-insensitive so admin hex casing variations don't keep
-                    // the local UI showing the member as admin until next refresh.
-                    group =
-                        group.copy(
-                            admins = group.admins.filterNot { it.equals(target, ignoreCase = true) },
-                        )
-                    appState.present(R.string.toast_admin_removed)
                 }
-                refreshMembers()
                 true
             }.onFailure {
                 it.rethrowIfCancellation()
@@ -3813,15 +3868,10 @@ class ConversationController(
                 return@withMutationLockResult false
             }
             runCatching {
-                appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
-                // Case-insensitive so hex-casing drift between the admin list
-                // and the active account id doesn't leave the row switch on
-                // after a successful self-demote.
-                group =
-                    group.copy(
-                        admins = group.admins.filterNot { it.equals(activeAccountIdHex, ignoreCase = true) },
-                    )
-                refreshMembers()
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    val result = appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
+                    applyMutationDetails(account, result.details)
+                }
                 appState.present(R.string.toast_admin_removed)
                 true
             }.onFailure {
@@ -3863,32 +3913,21 @@ class ConversationController(
             // a self-demote failure reports the partial state honestly.
             var grantedBeforeDemote = false
             runCatching {
-                appState.marmotIo { promoteAdmin(account, group.groupIdHex, target) }
-                grantedBeforeDemote = true
-                val withTarget = group.admins.toMutableList()
-                if (withTarget.none { it.equals(target, ignoreCase = true) }) {
-                    withTarget += target
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    val promoteResult =
+                        appState.marmotIo { promoteAdminDetailed(account, group.groupIdHex, target) }
+                    grantedBeforeDemote = true
+                    applyMutationDetails(account, promoteResult.details)
+                    // The grant has already landed on the MLS group. If the scope is
+                    // cancelled now, skipping the demote would strand both accounts as
+                    // admin without telling the caller (rethrowIfCancellation below
+                    // jumps past the partial-state branch). Run it to completion.
+                    withContext(NonCancellable) {
+                        val demoteResult =
+                            appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
+                        applyMutationDetails(account, demoteResult.details)
+                    }
                 }
-                group = group.copy(admins = withTarget)
-
-                // The grant has already landed on the MLS group. If the scope is
-                // cancelled now, skipping the demote would strand both accounts as
-                // admin without telling the caller (rethrowIfCancellation below
-                // jumps past the partial-state branch). Run it to completion.
-                withContext(NonCancellable) {
-                    appState.marmotIo { selfDemoteAdmin(account, group.groupIdHex) }
-                }
-                // Case-insensitive so admin-list hex casing drift from the
-                // active account id doesn't leave the UI showing us as admin
-                // after a successful self-demote.
-                group =
-                    group.copy(
-                        admins =
-                            group.admins.filterNot {
-                                activeAccountIdHex != null && it.equals(activeAccountIdHex, ignoreCase = true)
-                            },
-                    )
-                refreshMembers()
                 appState.present(R.string.toast_admin_transferred)
                 true
             }.onFailure {
@@ -3896,10 +3935,8 @@ class ConversationController(
                 val message = mutationError(it)
                 lastMutationError = message
                 if (grantedBeforeDemote) {
-                    // Target is now an admin but we couldn't step down. Keep the
-                    // local admin list converged on that fact and tell the user
+                    // Target is now an admin but we couldn't step down. Tell the user
                     // so they can retry the step-down (or revoke the grant).
-                    refreshMembers()
                     appState.present(R.string.toast_granted_but_couldnt_step_down, AppText.Plain(message))
                 } else {
                     appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message))
@@ -4423,7 +4460,12 @@ class ConversationController(
             status =
                 when {
                     streamId != null -> MessageStatus.Streaming
-                    MessageProjector.isMine(actionRecord, appState.activeAccount?.accountIdHex) -> MessageStatus.Sent
+                    MessageProjector.isMine(actionRecord, appState.activeAccount?.accountIdHex) ->
+                        if (record.sourceMessageIdHex == null) {
+                            MessageStatus.Pending
+                        } else {
+                            MessageStatus.Sent
+                        }
                     else -> MessageStatus.Received
                 },
             projected = record,
@@ -4758,25 +4800,6 @@ class ConversationController(
         members = updatedMembers
         membersLoaded = true
         membersVerified = true
-        group =
-            group.copy(
-                admins = group.admins.filterNot { it.equals(activeAccountIdHex, ignoreCase = true) },
-            )
-        appState.cacheGroupMemberSnapshot(account, group.groupIdHex, updatedMembers)
-    }
-
-    private fun removeMemberLocally(
-        account: String,
-        target: String,
-    ) {
-        val updatedMembers = members.filterNot { it.memberIdHex.equals(target, ignoreCase = true) }
-        members = updatedMembers
-        membersLoaded = true
-        membersVerified = true
-        group =
-            group.copy(
-                admins = group.admins.filterNot { it.equals(target, ignoreCase = true) },
-            )
         appState.cacheGroupMemberSnapshot(account, group.groupIdHex, updatedMembers)
     }
 
@@ -4809,6 +4832,14 @@ class ConversationController(
         membersVerified = true
         appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
         appState.requestProfiles(members.map { it.memberIdHex })
+    }
+
+    private fun applyMutationDetails(
+        account: String,
+        details: GroupDetailsFfi,
+    ) {
+        applyGroupDetails(account, details)
+        appState.applyLocalGroupUpdate(details.group)
     }
 
     private suspend fun watchAgentTextStream(
