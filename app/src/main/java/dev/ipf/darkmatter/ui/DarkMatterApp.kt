@@ -10,8 +10,6 @@ import android.graphics.Bitmap
 import android.provider.Settings
 import android.text.format.DateUtils
 import android.util.Log
-import android.view.View
-import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -83,8 +81,10 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -267,7 +267,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -315,8 +314,6 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.core.content.ContextCompat
 import androidx.core.os.ConfigurationCompat
-import androidx.core.view.ViewCompat
-import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
@@ -13789,41 +13786,61 @@ private fun EmojiPickerSheet(
     onDismissRequest: () -> Unit,
     onEmojiPicked: (String) -> Unit,
 ) {
+    val context = LocalContext.current
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    val searchFocusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
     val searchIndex by rememberEmojiSearchIndex()
     val searchResults =
         remember(searchQuery, searchIndex) {
             searchIndex?.search(searchQuery).orEmpty()
         }
+    val browseEmoji = remember { EmojiData.load(context) }
+    val grouped = remember(browseEmoji) { browseEmoji.groupBy { it.group } }
+    val recents = remember { RecentEmojiPreferences.load(context).filter { it.isNotBlank() } }
+    val gridState = rememberLazyGridState()
+    val scope = rememberCoroutineScope()
+    // Grid item index of each section's header, so a bottom category tab scrolls
+    // straight to it. Layout: recents (header + cells) then each group (header +
+    // cells); every header and every emoji counts as one grid item.
+    val sectionHeaderIndex =
+        remember(grouped, recents) {
+            IntArray(EmojiData.GroupCount).also { arr ->
+                var index = if (recents.isEmpty()) 0 else 1 + recents.size
+                for (group in 0 until EmojiData.GroupCount) {
+                    arr[group] = index
+                    val count = grouped[group]?.size ?: 0
+                    if (count > 0) index += 1 + count
+                }
+            }
+        }
+
+    fun pick(emoji: String) {
+        RecentEmojiPreferences.recordPicked(context, emoji)
+        onEmojiPicked(emoji)
+    }
 
     ModalBottomSheet(
         modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismissRequest,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        // Opens at the partial detent and drags up to full; the Compose grid below
+        // scrolls natively within whatever height the sheet is at.
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
     ) {
-        LaunchedEffect(Unit) {
-            runCatching { searchFocusRequester.requestFocus() }
-            keyboardController?.show()
-        }
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .fillMaxHeight(0.9f)
                     .navigationBarsPadding()
                     .imePadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .focusRequester(searchFocusRequester),
+                modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                shape = RoundedCornerShape(28.dp),
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
@@ -13838,43 +13855,55 @@ private fun EmojiPickerSheet(
                 placeholder = { Text(stringResource(R.string.emoji_search_hint)) },
                 colors =
                     OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
                     ),
             )
             if (searchQuery.isBlank()) {
-                // EmojiPickerView hosts an Android RecyclerView (a NestedScrollingChild) that
-                // competes with the ModalBottomSheet's Compose nested-scroll handler for vertical
-                // drags. rememberNestedScrollInteropConnection() bridges the two systems: the
-                // RecyclerView consumes the drag while it can scroll and only forwards the leftover
-                // distance (at the top/bottom of the grid) to the sheet's drag/dismiss handler.
-                val nestedScrollInterop = rememberNestedScrollInteropConnection()
-                Box(modifier = Modifier.nestedScroll(nestedScrollInterop)) {
-                    AndroidView(
-                        modifier = Modifier.fillMaxWidth().height(384.dp),
-                        factory = { context ->
-                            EmojiPickerView(context).apply {
-                                emojiGridColumns = 8
-                                emojiGridRows = 5.25f
-                                // The body grid RecyclerView is built asynchronously once emoji data
-                                // loads, so enable nested scrolling on every descendant after layout to
-                                // guarantee the scrolling child dispatches deltas to the interop parent.
-                                // setNestedScrollingEnabled is a no-op on Views that are not a
-                                // NestedScrollingChild, so this safely targets only the RecyclerViews.
-                                post { enableNestedScrollingOnDescendants(this) }
-                            }
-                        },
-                        update = { view ->
-                            view.setOnEmojiPickedListener { item -> onEmojiPicked(item.emoji) }
-                        },
-                    )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(8),
+                    state = gridState,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                ) {
+                    if (recents.isNotEmpty()) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            EmojiSectionHeader(stringResource(R.string.emoji_category_recent))
+                        }
+                        items(recents, key = { "recent:$it" }) { emoji ->
+                            EmojiSearchResultCell(emoji = emoji, onClick = { pick(emoji) })
+                        }
+                    }
+                    for (group in 0 until EmojiData.GroupCount) {
+                        val groupEmoji = grouped[group].orEmpty()
+                        if (groupEmoji.isEmpty()) continue
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            EmojiSectionHeader(stringResource(emojiGroupTitleRes(group)))
+                        }
+                        items(groupEmoji, key = { it.emoji }) { entry ->
+                            EmojiSearchResultCell(emoji = entry.emoji, onClick = { pick(entry.emoji) })
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (recents.isNotEmpty()) {
+                        EmojiCategoryTab("🕘") { scope.launch { gridState.scrollToItem(0) } }
+                    }
+                    EmojiData.groupTabIcons.forEachIndexed { group, icon ->
+                        EmojiCategoryTab(icon) { scope.launch { gridState.scrollToItem(sectionHeaderIndex[group]) } }
+                    }
                 }
             } else {
                 EmojiSearchResultsGrid(
                     results = searchResults,
                     isLoading = searchIndex == null,
-                    onEmojiPicked = onEmojiPicked,
-                    modifier = Modifier.fillMaxWidth().height(384.dp),
+                    onEmojiPicked = { pick(it) },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                 )
             }
         }
@@ -13952,14 +13981,42 @@ private fun EmojiSearchResultCell(
     }
 }
 
-private fun enableNestedScrollingOnDescendants(view: View) {
-    ViewCompat.setNestedScrollingEnabled(view, true)
-    if (view is ViewGroup) {
-        for (index in 0 until view.childCount) {
-            enableNestedScrollingOnDescendants(view.getChildAt(index))
-        }
+@Composable
+private fun EmojiCategoryTab(
+    icon: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(icon, style = MaterialTheme.typography.titleMedium)
     }
 }
+
+@Composable
+private fun EmojiSectionHeader(title: String) {
+    Text(
+        text = title,
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 10.dp, bottom = 4.dp),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@StringRes
+private fun emojiGroupTitleRes(group: Int): Int =
+    when (group) {
+        0 -> R.string.emoji_category_smileys
+        1 -> R.string.emoji_category_people
+        2 -> R.string.emoji_category_animals
+        3 -> R.string.emoji_category_food
+        4 -> R.string.emoji_category_travel
+        5 -> R.string.emoji_category_activities
+        6 -> R.string.emoji_category_objects
+        7 -> R.string.emoji_category_symbols
+        else -> R.string.emoji_category_flags
+    }
 
 @Composable
 private fun EmojiActionButton(
