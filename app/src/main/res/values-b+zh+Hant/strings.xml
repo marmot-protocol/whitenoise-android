@@ -746,4 +746,8 @@
     <string name="toast_couldnt_update_disappearing">無法更新閱後即焚訊息</string>
     <string name="save">儲存</string>
 
+    <string name="disappearing_confirm_title">設定閱後即焚計時器？</string>
+    <string name="disappearing_confirm_message">早於 %1$s 的訊息將對所有人永久刪除。</string>
+    <string name="disappearing_confirm_button">設定</string>
+
 </resources>

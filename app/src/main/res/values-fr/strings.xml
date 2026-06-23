@@ -755,4 +755,8 @@
     <string name="toast_couldnt_update_disappearing">Impossible de mettre à jour les messages éphémères</string>
     <string name="save">Enregistrer</string>
 
+    <string name="disappearing_confirm_title">Définir le minuteur d\'effacement ?</string>
+    <string name="disappearing_confirm_message">Les messages datant de plus de %1$s seront définitivement supprimés pour tout le monde.</string>
+    <string name="disappearing_confirm_button">Définir</string>
+
 </resources>

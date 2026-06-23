@@ -755,4 +755,8 @@
     <string name="toast_couldnt_update_disappearing">Impossibile aggiornare i messaggi effimeri</string>
     <string name="save">Salva</string>
 
+    <string name="disappearing_confirm_title">Impostare il timer di scomparsa?</string>
+    <string name="disappearing_confirm_message">I messaggi più vecchi di %1$s verranno rimossi definitivamente per tutti.</string>
+    <string name="disappearing_confirm_button">Imposta</string>
+
 </resources>

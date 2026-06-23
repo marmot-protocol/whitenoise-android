@@ -3946,6 +3946,11 @@ class ConversationController(
             runCatching {
                 appState.marmotIo { updateMessageRetention(account, group.groupIdHex, disappearingMessageSecs) }
                 group = group.copy(disappearingMessageSecs = disappearingMessageSecs)
+                // The engine prunes plaintext older than the new window during the
+                // call above. Reload the open timeline so the admin who just set
+                // the timer sees the pruned state immediately, instead of only
+                // after leaving and re-entering the chat.
+                refreshCurrentTimeline(account)
                 appState.present(R.string.toast_disappearing_messages_updated)
                 true
             }.onFailure {

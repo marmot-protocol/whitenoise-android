@@ -766,4 +766,8 @@
     <string name="toast_couldnt_update_disappearing">Не удалось обновить исчезающие сообщения</string>
     <string name="save">Сохранить</string>
 
+    <string name="disappearing_confirm_title">Установить таймер исчезновения?</string>
+    <string name="disappearing_confirm_message">Сообщения старше %1$s будут безвозвратно удалены у всех.</string>
+    <string name="disappearing_confirm_button">Установить</string>
+
 </resources>

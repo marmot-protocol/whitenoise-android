@@ -769,4 +769,8 @@
     <string name="toast_couldnt_update_disappearing">Couldn\'t update disappearing messages</string>
     <string name="save">Save</string>
 
+    <string name="disappearing_confirm_title">Set disappearing timer?</string>
+    <string name="disappearing_confirm_message">Messages older than %1$s will be permanently removed for everyone.</string>
+    <string name="disappearing_confirm_button">Set timer</string>
+
 </resources>

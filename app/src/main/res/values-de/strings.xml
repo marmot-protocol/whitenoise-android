@@ -752,4 +752,8 @@
     <string name="toast_couldnt_update_disappearing">Verschwindende Nachrichten konnten nicht aktualisiert werden</string>
     <string name="save">Speichern</string>
 
+    <string name="disappearing_confirm_title">Verschwinde-Timer einstellen?</string>
+    <string name="disappearing_confirm_message">Nachrichten, die älter als %1$s sind, werden für alle dauerhaft entfernt.</string>
+    <string name="disappearing_confirm_button">Timer einstellen</string>
+
 </resources>

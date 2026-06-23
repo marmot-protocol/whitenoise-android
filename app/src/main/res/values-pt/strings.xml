@@ -755,4 +755,8 @@
     <string name="toast_couldnt_update_disappearing">Não foi possível atualizar as mensagens temporárias</string>
     <string name="save">Salvar</string>
 
+    <string name="disappearing_confirm_title">Definir o temporizador de mensagens?</string>
+    <string name="disappearing_confirm_message">As mensagens com mais de %1$s serão removidas permanentemente para todos.</string>
+    <string name="disappearing_confirm_button">Definir</string>
+
 </resources>

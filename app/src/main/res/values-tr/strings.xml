@@ -752,4 +752,8 @@
     <string name="toast_couldnt_update_disappearing">Kaybolan mesajlar güncellenemedi</string>
     <string name="save">Kaydet</string>
 
+    <string name="disappearing_confirm_title">Kaybolma zamanlayıcısı ayarlansın mı?</string>
+    <string name="disappearing_confirm_message">%1$s değerinden eski mesajlar herkes için kalıcı olarak silinecek.</string>
+    <string name="disappearing_confirm_button">Ayarla</string>
+
 </resources>

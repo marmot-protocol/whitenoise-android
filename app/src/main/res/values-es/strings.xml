@@ -755,4 +755,8 @@
     <string name="toast_couldnt_update_disappearing">No se pudieron actualizar los mensajes temporales</string>
     <string name="save">Guardar</string>
 
+    <string name="disappearing_confirm_title">¿Activar el temporizador de mensajes?</string>
+    <string name="disappearing_confirm_message">Los mensajes con más de %1$s se eliminarán permanentemente para todos.</string>
+    <string name="disappearing_confirm_button">Activar</string>
+
 </resources>

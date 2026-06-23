@@ -10435,6 +10435,7 @@ private fun GroupDetailsScreen(
     val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
     var showMediaLibrary by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var pendingDisappearingSecs by remember(controller.group.groupIdHex) { mutableStateOf<Long?>(null) }
 
     if (showMediaLibrary) {
         BackHandler { showMediaLibrary = false }
@@ -10626,11 +10627,36 @@ private fun GroupDetailsScreen(
                     onDismiss = { showDisappearingPicker = false },
                     onPick = { secs ->
                         showDisappearingPicker = false
+                        // Turning the timer ON (or shortening it) permanently prunes
+                        // history older than the window, so gate any non-Off choice
+                        // behind a confirm. Off only stops future pruning — apply it
+                        // directly.
+                        if (secs == 0L) {
+                            runGroupMutation(
+                                action = GroupMutationAction.DisappearingMessages,
+                                mutation = { controller.updateMessageRetention(0uL) },
+                            )
+                        } else {
+                            pendingDisappearingSecs = secs
+                        }
+                    },
+                )
+            }
+
+            pendingDisappearingSecs?.let { secs ->
+                ConfirmDialog(
+                    title = stringResource(R.string.disappearing_confirm_title),
+                    message = stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
+                    confirmLabel = stringResource(R.string.disappearing_confirm_button),
+                    onConfirm = {
+                        pendingDisappearingSecs = null
                         runGroupMutation(
                             action = GroupMutationAction.DisappearingMessages,
                             mutation = { controller.updateMessageRetention(secs.toULong()) },
                         )
                     },
+                    onDismiss = { pendingDisappearingSecs = null },
+                    destructive = true,
                 )
             }
 
