@@ -3725,7 +3725,7 @@ class ConversationController(
             // remove_members signs a roster update for a Nostr pubkey, so use the
             // stable member id. memberRef may be a local account label.
             val target = member.memberIdHex
-            runCatching {
+            try {
                 appState.marmotIo { removeMembers(account, group.groupIdHex, listOf(target)) }
                 // The group-state subscription should eventually converge from the
                 // published MLS commit. Update this controller immediately so the
@@ -3733,12 +3733,26 @@ class ConversationController(
                 removeMemberLocally(account, target)
                 appState.present(R.string.toast_member_removed)
                 true
-            }.onFailure {
-                it.rethrowIfCancellation()
-                val message = mutationError(it)
-                lastMutationError = message
-                appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(message))
-            }.getOrDefault(false)
+            } catch (throwable: Throwable) {
+                throwable.rethrowIfCancellation()
+                // The MLS roster commit can persist locally even when a follow-on
+                // phase (relay directory fetch / runtime catch-up) fails with a
+                // transient backend-busy lock — e.g. a concurrent read kicked off
+                // as the user back-navigates out of the members list. Re-read engine
+                // truth before reporting: if the target is actually gone the removal
+                // succeeded, so converge the list in place and suppress the phantom
+                // failure toast rather than claiming an error that didn't happen.
+                refreshMembers()
+                if (members.none { it.memberIdHex.equals(target, ignoreCase = true) }) {
+                    appState.present(R.string.toast_member_removed)
+                    true
+                } else {
+                    val message = mutationError(throwable)
+                    lastMutationError = message
+                    appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(message))
+                    false
+                }
+            }
         }
 
     suspend fun setMemberAdmin(
