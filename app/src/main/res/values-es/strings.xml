@@ -759,4 +759,6 @@
     <string name="disappearing_confirm_message">Los mensajes con más de %1$s se eliminarán permanentemente para todos.</string>
     <string name="disappearing_confirm_button">Activar</string>
 
+    <string name="disappearing_tooltip_text">Los mensajes de este chat desaparecen tras el tiempo configurado.</string>
+
 </resources>

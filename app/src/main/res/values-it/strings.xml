@@ -759,4 +759,6 @@
     <string name="disappearing_confirm_message">I messaggi più vecchi di %1$s verranno rimossi definitivamente per tutti.</string>
     <string name="disappearing_confirm_button">Imposta</string>
 
+    <string name="disappearing_tooltip_text">I messaggi di questa chat scompaiono dopo il tempo impostato.</string>
+
 </resources>

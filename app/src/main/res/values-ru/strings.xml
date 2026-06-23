@@ -770,4 +770,6 @@
     <string name="disappearing_confirm_message">Сообщения старше %1$s будут безвозвратно удалены у всех.</string>
     <string name="disappearing_confirm_button">Установить</string>
 
+    <string name="disappearing_tooltip_text">Сообщения в этом чате исчезают по истечении заданного времени.</string>
+
 </resources>

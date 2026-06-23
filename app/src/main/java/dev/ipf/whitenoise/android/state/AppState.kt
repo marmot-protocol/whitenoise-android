@@ -576,6 +576,13 @@ class WhiteNoiseAppState(
     )
     private var defaultNotificationPermissionPromptInFlight by mutableStateOf(false)
 
+    // One-time onboarding hint for the conversation disappearing-timer chip (#335):
+    // shown the first time the user opens a conversation whose timer is enabled.
+    var disappearingTooltipShown by mutableStateOf(
+        preferences.getBoolean(DISAPPEARING_TOOLTIP_SHOWN_KEY, false),
+    )
+        private set
+
     private val npubs = BoundedNpubCache()
     private var profileRevision by mutableStateOf(0)
 
@@ -2490,6 +2497,12 @@ class WhiteNoiseAppState(
         appStateDebug { "default notifications enable attempted" }
     }
 
+    fun markDisappearingTooltipShown() {
+        if (disappearingTooltipShown) return
+        disappearingTooltipShown = true
+        preferences.edit().putBoolean(DISAPPEARING_TOOLTIP_SHOWN_KEY, true).apply()
+    }
+
     suspend fun enableDefaultNotificationsIfReady(): Boolean {
         if (defaultNotificationsEnableAttempted) return false
         val account = activeAccountRef ?: return false
@@ -3293,6 +3306,7 @@ class WhiteNoiseAppState(
         private const val MEDIA_QUALITY_KEY = "media_quality"
         private const val ENTER_KEY_BEHAVIOR_KEY = "enter_key_behavior"
         private const val DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY = "default_notifications_enable_attempted"
+        private const val DISAPPEARING_TOOLTIP_SHOWN_KEY = "disappearing_tooltip_shown"
         private const val AUTO_ACCEPTED_INVITES_KEY = "auto_accepted_invites"
 
         // 24 MiB cap on decrypted attachment bytes resident in memory —

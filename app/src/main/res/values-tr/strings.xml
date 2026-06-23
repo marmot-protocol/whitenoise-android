@@ -756,4 +756,6 @@
     <string name="disappearing_confirm_message">%1$s değerinden eski mesajlar herkes için kalıcı olarak silinecek.</string>
     <string name="disappearing_confirm_button">Ayarla</string>
 
+    <string name="disappearing_tooltip_text">Bu sohbetteki mesajlar ayarladığınız süre sonunda kaybolur.</string>
+
 </resources>

@@ -750,4 +750,6 @@
     <string name="disappearing_confirm_message">早於 %1$s 的訊息將對所有人永久刪除。</string>
     <string name="disappearing_confirm_button">設定</string>
 
+    <string name="disappearing_tooltip_text">此聊天中的訊息會在設定的時間後消失。</string>
+
 </resources>

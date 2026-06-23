@@ -759,4 +759,6 @@
     <string name="disappearing_confirm_message">Les messages datant de plus de %1$s seront définitivement supprimés pour tout le monde.</string>
     <string name="disappearing_confirm_button">Définir</string>
 
+    <string name="disappearing_tooltip_text">Les messages de cette discussion disparaissent après le délai défini.</string>
+
 </resources>

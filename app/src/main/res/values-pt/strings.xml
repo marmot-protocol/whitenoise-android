@@ -759,4 +759,6 @@
     <string name="disappearing_confirm_message">As mensagens com mais de %1$s serão removidas permanentemente para todos.</string>
     <string name="disappearing_confirm_button">Definir</string>
 
+    <string name="disappearing_tooltip_text">As mensagens desta conversa desaparecem após o tempo definido.</string>
+
 </resources>

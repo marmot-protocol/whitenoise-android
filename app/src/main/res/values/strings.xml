@@ -773,4 +773,6 @@
     <string name="disappearing_confirm_message">Messages older than %1$s will be permanently removed for everyone.</string>
     <string name="disappearing_confirm_button">Set timer</string>
 
+    <string name="disappearing_tooltip_text">Messages in this chat disappear after the timer you set.</string>
+
 </resources>

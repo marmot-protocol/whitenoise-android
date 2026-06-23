@@ -184,6 +184,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Snackbar
@@ -201,10 +202,13 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -9475,21 +9479,37 @@ private fun ConversationScreen(
                                 // lives (sub-issue 2/7). Hidden when the timer is off.
                                 val disappearingSecs = controller.group.disappearingMessageSecs.toLong()
                                 if (disappearingSecs > 0L) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    val timerTooltipState = rememberTooltipState(isPersistent = true)
+                                    val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
+                                    if (!appState.disappearingTooltipShown) {
+                                        LaunchedEffect(controller.group.groupIdHex) {
+                                            // Mark before showing so a quick exit doesn't
+                                            // re-arm the one-time hint on the next open.
+                                            appState.markDisappearingTooltipShown()
+                                            timerTooltipState.show()
+                                        }
+                                    }
+                                    TooltipBox(
+                                        positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
+                                        tooltip = { RichTooltip { Text(timerTooltipText) } },
+                                        state = timerTooltipState,
                                     ) {
-                                        Icon(
-                                            Icons.Default.Schedule,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(13.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                        Text(
-                                            disappearingMessagesLabel(disappearingSecs),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Schedule,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(13.dp),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                            Text(
+                                                disappearingMessagesLabel(disappearingSecs),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
                                 }
                             }
