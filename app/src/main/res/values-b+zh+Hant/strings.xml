@@ -168,6 +168,9 @@
     <string name="stream_failed_format">串流失敗：%1$s</string>
     <string name="copy_text">複製文字</string>
     <string name="open_emoji_picker">開啟表情符號選擇器</string>
+    <string name="emoji_search_hint">搜尋表情符號</string>
+    <string name="emoji_search_clear">清除表情符號搜尋</string>
+    <string name="emoji_search_no_results">找不到表情符號</string>
     <string name="reply">回覆</string>
     <string name="forward">轉發</string>
     <string name="forward_to">轉發至</string>

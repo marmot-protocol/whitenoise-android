@@ -168,6 +168,9 @@
     <string name="stream_failed_format">流失败：%1$s</string>
     <string name="copy_text">复制文本</string>
     <string name="open_emoji_picker">打开表情选择器</string>
+    <string name="emoji_search_hint">搜索表情符号</string>
+    <string name="emoji_search_clear">清除表情符号搜索</string>
+    <string name="emoji_search_no_results">未找到表情符号</string>
     <string name="reply">回复</string>
     <string name="forward">转发</string>
     <string name="forward_to">转发至</string>

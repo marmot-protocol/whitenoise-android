@@ -169,6 +169,9 @@
     <string name="stream_failed_format">Échec du flux : %1$s</string>
     <string name="copy_text">Copier le texte</string>
     <string name="open_emoji_picker">Ouvrir le sélecteur d’émojis</string>
+    <string name="emoji_search_hint">Rechercher des émojis</string>
+    <string name="emoji_search_clear">Effacer la recherche d’émojis</string>
+    <string name="emoji_search_no_results">Aucun émoji trouvé</string>
     <string name="reply">Répondre</string>
     <string name="forward">Transferer</string>
     <string name="forward_to">Transferer vers</string>

@@ -171,6 +171,9 @@
     <string name="stream_failed_format">Ошибка потока: %1$s</string>
     <string name="copy_text">Копировать текст</string>
     <string name="open_emoji_picker">Открыть выбор эмодзи</string>
+    <string name="emoji_search_hint">Поиск эмодзи</string>
+    <string name="emoji_search_clear">Очистить поиск эмодзи</string>
+    <string name="emoji_search_no_results">Эмодзи не найдены</string>
     <string name="reply">Ответить</string>
     <string name="forward">Переслать</string>
     <string name="forward_to">Переслать в</string>
