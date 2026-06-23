@@ -2897,28 +2897,71 @@ internal fun canInviteFromEmptyGroup(
         memberCount == 1
 
 /**
- * Whether the conversation bottom bar should render the active composer (true)
- * or the "no longer a member" notice (false). Pulled out as a pure predicate so
- * the gate decision can be unit-tested without Compose and pinned against
- * regression (issue #545).
+ * The three things the conversation bottom bar can render for the membership
+ * gate. Pulled out of Compose as a pure decision so [conversationComposerGate]
+ * can be unit-tested and pinned against regression (issues #545 and #623).
+ */
+internal enum class ComposerGate {
+    /** Active composer — self is (believed to be) a member. */
+    COMPOSER,
+
+    /** "You are no longer a member of this group" notice. */
+    NOTICE,
+
+    /**
+     * Membership is not yet known locally: render NOTHING this frame and wait
+     * for `refreshMembers()` rather than flash a wrong state. See [PENDING] use
+     * in [conversationComposerGate].
+     */
+    PENDING,
+}
+
+/**
+ * Decide what the conversation bottom bar renders for the membership gate,
+ * given only what is known synchronously at (and shortly after) first paint.
  *
- * - Confirmed member (`isSelfMember`) → composer.
- * - Confirmed not-member (`membersLoaded && !isSelfMember`) → notice.
- * - Still loading (`!membersLoaded`): show the composer only when the seeding
- *   snapshot positively placed self in the roster (`seededSelfMember`). For a
- *   cold/unknown snapshot, or one that has self removed (the group the user
- *   left), default to the disabled notice and upgrade to the composer only once
- *   `refreshMembers()` confirms membership — this is what removes the
- *   active-composer flash for a left group.
+ * The two prior bugs were symmetric flashes during the brief window before
+ * `refreshMembers()` confirms the roster:
+ *
+ * - #545: a group the user LEFT opened showing the active composer for ~1s
+ *   before flipping to the notice (the old gate defaulted to the composer while
+ *   loading).
+ * - #623 (inverse): a group the user IS a member of — especially an admin
+ *   re-entering their own group — opened showing the notice for ~1s before
+ *   flipping to the composer (the #545 fix overcorrected to defaulting to the
+ *   notice while loading).
+ *
+ * The fix for both is to never paint a state we don't actually know:
+ *
+ * - Confirmed member (`isSelfMember`) → [ComposerGate.COMPOSER].
+ * - Confirmed not-member (`membersLoaded && !isSelfMember`) → [ComposerGate.NOTICE].
+ * - Still loading (`!membersLoaded`):
+ *   - The seeding snapshot was present (`seededMembershipKnown`) → it is an
+ *     authoritative local signal: self is in it (`seededSelfMember`) →
+ *     [ComposerGate.COMPOSER] (warm member, no blank-bar flash, preserving the
+ *     #264 intent); self was removed from it (the left group) →
+ *     [ComposerGate.NOTICE] immediately (the #545 fix).
+ *   - No seeding snapshot at all (genuinely cold open) → membership is unknown,
+ *     so [ComposerGate.PENDING]: render neither the composer nor the notice
+ *     until `refreshMembers()` confirms. This removes the #623 notice-flash for
+ *     a member opening cold without reintroducing the #545 composer-flash for a
+ *     left group.
  *
  * This drives only the INITIAL VISUAL state; it does not affect send-gating,
  * which stays guarded by `canSendMessages` / [canAcceptTextSend] (issue #264).
  */
-internal fun shouldShowComposer(
+internal fun conversationComposerGate(
     membersLoaded: Boolean,
     isSelfMember: Boolean,
     seededSelfMember: Boolean,
-): Boolean = isSelfMember || (!membersLoaded && seededSelfMember)
+    seededMembershipKnown: Boolean,
+): ComposerGate =
+    when {
+        isSelfMember -> ComposerGate.COMPOSER
+        membersLoaded -> ComposerGate.NOTICE
+        seededMembershipKnown -> if (seededSelfMember) ComposerGate.COMPOSER else ComposerGate.NOTICE
+        else -> ComposerGate.PENDING
+    }
 
 /**
  * Decide whether to restore composer focus (and thus re-raise the soft
@@ -8475,116 +8518,123 @@ private fun ConversationScreen(
                         onNext = { navigateToSearchMatch(forward = true) },
                     )
                 controller.error != null || controller.group.pendingConfirmation -> Unit
-                // Render the disabled "no longer a member" notice by default
-                // during the membership-load window, and upgrade to the active
-                // composer only once we believe self is a member (#545). A
-                // confirmed member, or a known member from the seeding snapshot
-                // (`seededSelfMember`), shows the composer immediately — the
-                // latter preserves the #264 intent of not staring at a blank
-                // bottom bar during `refreshMembers()`. A group the user has
-                // left (whose cached snapshot has self removed) seeds
-                // `seededSelfMember = false`, so its notice renders at once
-                // instead of flashing the active composer. The controller's
+                // Membership-display gate (issues #545 and #623). During the
+                // brief window before refreshMembers() confirms the roster we
+                // must not flash a state we don't actually know: a left group
+                // flashing the active composer (#545) OR a member's group —
+                // especially an admin re-entering their own group — flashing the
+                // "no longer a member" notice (#623, the inverse). The gate
+                // paints the composer only for a (believed) member, the notice
+                // only for a known not-member, and NOTHING while membership is
+                // genuinely unknown (cold open with no seeding snapshot), where
+                // it upgrades on the confirmed result. The controller's
                 // `canSendMessages` guard still keeps any actual mutation safe
                 // until membership is verified.
-                !shouldShowComposer(
-                    membersLoaded = controller.membersLoaded,
-                    isSelfMember = controller.isSelfMember,
-                    seededSelfMember = controller.seededSelfMember,
-                ) -> RemovedMemberComposerNotice()
-                else -> {
-                    val groupIdHex = controller.group.groupIdHex
-                    val editingRecord =
-                        controller.editingMessageId?.let { id ->
-                            controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
-                        }
-                    // #414: candidates for the @-mention picker — the group's
-                    // own roster minus the local account (you can't mention
-                    // yourself). Keyed on the roster + profile revision so a
-                    // late-arriving display name / nip05 re-derives the list.
-                    // The list already arrives most-recently-active first from
-                    // the roster, and MentionComposer.filter preserves order.
-                    val mentionPickerEnabled = !controller.isDm
-                    val mentionCandidates =
-                        if (mentionPickerEnabled) {
-                            val revision = appState.profileRevisionForCompose
-                            val activeAccountIdHex = appState.activeAccount?.accountIdHex
-                            remember(controller.members, revision, activeAccountIdHex) {
-                                controller.members
-                                    // Exclude only the active account, not every member
-                                    // flagged `local`. Marmot sets `local` for any identity
-                                    // present on the device, which on some rosters marks all
-                                    // members local and would empty the mention list entirely.
-                                    // Mirrors the isActiveAccountMember gate used for admin actions.
-                                    .filterNot { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                                    .map { member ->
-                                        MentionComposer.Candidate(
-                                            accountIdHex = member.memberIdHex,
-                                            npub = appState.npub(member.memberIdHex),
-                                            displayName = appState.chatMemberTitle(member.memberIdHex),
-                                            nip05 = appState.userProfile(member.memberIdHex)?.nip05,
-                                        )
+                else ->
+                    when (
+                        conversationComposerGate(
+                            membersLoaded = controller.membersLoaded,
+                            isSelfMember = controller.isSelfMember,
+                            seededSelfMember = controller.seededSelfMember,
+                            seededMembershipKnown = controller.seededMembershipKnown,
+                        )
+                    ) {
+                        ComposerGate.PENDING -> Unit
+                        ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                        ComposerGate.COMPOSER -> {
+                            val groupIdHex = controller.group.groupIdHex
+                            val editingRecord =
+                                controller.editingMessageId?.let { id ->
+                                    controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
+                                }
+                            // #414: candidates for the @-mention picker — the group's
+                            // own roster minus the local account (you can't mention
+                            // yourself). Keyed on the roster + profile revision so a
+                            // late-arriving display name / nip05 re-derives the list.
+                            // The list already arrives most-recently-active first from
+                            // the roster, and MentionComposer.filter preserves order.
+                            val mentionPickerEnabled = !controller.isDm
+                            val mentionCandidates =
+                                if (mentionPickerEnabled) {
+                                    val revision = appState.profileRevisionForCompose
+                                    val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                                    remember(controller.members, revision, activeAccountIdHex) {
+                                        controller.members
+                                            // Exclude only the active account, not every member
+                                            // flagged `local`. Marmot sets `local` for any identity
+                                            // present on the device, which on some rosters marks all
+                                            // members local and would empty the mention list entirely.
+                                            // Mirrors the isActiveAccountMember gate used for admin actions.
+                                            .filterNot { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                                            .map { member ->
+                                                MentionComposer.Candidate(
+                                                    accountIdHex = member.memberIdHex,
+                                                    npub = appState.npub(member.memberIdHex),
+                                                    displayName = appState.chatMemberTitle(member.memberIdHex),
+                                                    nip05 = appState.userProfile(member.memberIdHex)?.nip05,
+                                                )
+                                            }
                                     }
-                            }
-                        } else {
-                            emptyList()
-                        }
-                    ComposerBar(
-                        replyingTo = controller.replyingTo,
-                        messageTextCopy = messageTextCopy,
-                        onCancelReply = { controller.replyingTo = null },
-                        onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
-                        initialDraft = appState.draftFor(groupIdHex).orEmpty(),
-                        onDraftChange = { appState.setDraft(groupIdHex, it) },
-                        draftKey = groupIdHex,
-                        editingMessageId = controller.editingMessageId,
-                        editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                        onCancelEdit = { controller.editingMessageId = null },
-                        onAfterSend = {
-                            // Always pull the user down to see their just-sent
-                            // bubble, even if they were reading older history.
-                            // Matches standard chat-app behavior.
-                            scope.launch {
-                                val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                                listState.animateScrollToItem(lastIndex)
-                            }
-                        },
-                        onPickFromGallery = {
-                            imagePickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                                } else {
+                                    emptyList()
+                                }
+                            ComposerBar(
+                                replyingTo = controller.replyingTo,
+                                messageTextCopy = messageTextCopy,
+                                onCancelReply = { controller.replyingTo = null },
+                                onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
+                                initialDraft = appState.draftFor(groupIdHex).orEmpty(),
+                                onDraftChange = { appState.setDraft(groupIdHex, it) },
+                                draftKey = groupIdHex,
+                                editingMessageId = controller.editingMessageId,
+                                editingInitialText = editingRecord?.let { controller.displayedText(it) },
+                                onCancelEdit = { controller.editingMessageId = null },
+                                onAfterSend = {
+                                    // Always pull the user down to see their just-sent
+                                    // bubble, even if they were reading older history.
+                                    // Matches standard chat-app behavior.
+                                    scope.launch {
+                                        val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                                        listState.animateScrollToItem(lastIndex)
+                                    }
+                                },
+                                onPickFromGallery = {
+                                    imagePickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                                    )
+                                },
+                                onCaptureFromCamera = {
+                                    val granted =
+                                        ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.CAMERA,
+                                        ) == PackageManager.PERMISSION_GRANTED
+                                    if (granted) {
+                                        launchCameraCapture()
+                                    } else {
+                                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                    }
+                                },
+                                onPickDocument = {
+                                    // `*/*` lets the system file picker surface every
+                                    // installed provider (Drive, Downloads, Files…)
+                                    // without restricting by MIME. Bytes upload as-is.
+                                    documentPickerLauncher.launch(arrayOf("*/*"))
+                                },
+                                voiceRecordingController = voiceRecordingController,
+                                appState = appState,
+                                mentionCandidates = mentionCandidates,
+                                mentionPickerEnabled = mentionPickerEnabled,
+                                autoFocusOnEnter = justCreated,
+                                enterKeyBehavior = appState.enterKeyBehavior,
+                                // #589: hoisted focus plumbing — the requester lets the
+                                // resume observer restore focus, and the callback keeps
+                                // `composerFocused` tracking the live keyboard state.
+                                composerFocus = composerFocus,
+                                onComposerFocusChanged = { composerFocused = it },
                             )
-                        },
-                        onCaptureFromCamera = {
-                            val granted =
-                                ContextCompat.checkSelfPermission(
-                                    context,
-                                    Manifest.permission.CAMERA,
-                                ) == PackageManager.PERMISSION_GRANTED
-                            if (granted) {
-                                launchCameraCapture()
-                            } else {
-                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                            }
-                        },
-                        onPickDocument = {
-                            // `*/*` lets the system file picker surface every
-                            // installed provider (Drive, Downloads, Files…)
-                            // without restricting by MIME. Bytes upload as-is.
-                            documentPickerLauncher.launch(arrayOf("*/*"))
-                        },
-                        voiceRecordingController = voiceRecordingController,
-                        appState = appState,
-                        mentionCandidates = mentionCandidates,
-                        mentionPickerEnabled = mentionPickerEnabled,
-                        autoFocusOnEnter = justCreated,
-                        enterKeyBehavior = appState.enterKeyBehavior,
-                        // #589: hoisted focus plumbing — the requester lets the
-                        // resume observer restore focus, and the callback keeps
-                        // `composerFocused` tracking the live keyboard state.
-                        composerFocus = composerFocus,
-                        onComposerFocusChanged = { composerFocused = it },
-                    )
-                }
+                        }
+                    }
             }
         },
     ) { padding ->

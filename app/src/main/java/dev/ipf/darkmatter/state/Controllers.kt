@@ -1709,6 +1709,24 @@ class ConversationController(
             GroupProjector.isActiveAccountMember(it, appState.activeAccount?.accountIdHex)
         } == true
 
+    // True when construction received a member snapshot at all — i.e. the local
+    // roster for this group was already known synchronously (warm from the chat
+    // list cache or the shared AppState snapshot). When true, `seededSelfMember`
+    // is an AUTHORITATIVE membership signal: self is either in the snapshot
+    // (member) or has been removed from it (the group the user left, #545).
+    //
+    // When false there is NO local membership signal yet (genuinely cold open:
+    // first-ever open, fresh process, or a row tapped before its background
+    // member fetch landed). In that case neither the active composer nor the
+    // "no longer a member" notice is known to be correct, so the bottom bar must
+    // not paint either — doing so flashes a wrong state for ~0.5–1s until
+    // refreshMembers() confirms. Before this, a cold open of a group the user IS
+    // a member of (especially an admin re-entering their own group) flashed the
+    // disabled notice (issue #623, the inverse of #545). Non-empty vs empty is
+    // not the test: a non-null snapshot is membership-known even if leaving a
+    // solo group emptied it.
+    val seededMembershipKnown: Boolean = initialMemberSnapshot != null
+
     // Typed media references keyed by `messageIdHex`. Populated from Rust's
     // `listMedia` FFI — the only place the receive-side `source_epoch` is
     // surfaced (TimelineMessageRecordFfi / AppMessageRecordFfi don't expose
