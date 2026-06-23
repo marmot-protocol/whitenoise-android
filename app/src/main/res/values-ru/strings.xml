@@ -34,6 +34,11 @@
     <string name="chat_list_search_open_profile">Открыть профиль</string>
     <string name="chat_list_search_nip05_not_found">Профиль для «%1$s» не найден</string>
     <string name="chat_list_search_invalid_npub">Это не похоже на действительный npub</string>
+    <string name="recipient_preview_resolving">Разрешение…</string>
+    <string name="recipient_preview_no_profile">Профиль не опубликован</string>
+    <string name="recipient_preview_unresolved">Не удалось разрешить этот идентификатор</string>
+    <string name="recipient_preview_nip05_verified">Подтверждённый адрес</string>
+    <string name="recipient_preview_nip05_unverified">Неподтверждённый адрес</string>
     <string name="chat_row_action_archive">Архивировать</string>
     <string name="chat_row_action_unarchive">Восстановить</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>

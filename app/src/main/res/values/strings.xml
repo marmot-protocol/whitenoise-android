@@ -35,6 +35,11 @@
     <string name="chat_list_search_open_profile">Open profile</string>
     <string name="chat_list_search_nip05_not_found">No profile found for \"%1$s\"</string>
     <string name="chat_list_search_invalid_npub">That doesn\'t look like a valid npub</string>
+    <string name="recipient_preview_resolving">Resolving…</string>
+    <string name="recipient_preview_no_profile">No profile published</string>
+    <string name="recipient_preview_unresolved">Couldn\'t resolve this identifier</string>
+    <string name="recipient_preview_nip05_verified">Verified address</string>
+    <string name="recipient_preview_nip05_unverified">Unverified address</string>
     <string name="chat_row_action_archive">Archive</string>
     <string name="chat_row_action_unarchive">Unarchive</string>
     <string name="chat_row_action_mark_read">Mark as read</string>

@@ -179,6 +179,7 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -2112,6 +2113,247 @@ private fun ChatListIdentifierResult(
     }
 }
 
+/**
+ * Profile-preview card shown below the recipient input in NewChatSheet (DM
+ * branch) and the Add-member sheet (issue #631). After the user pastes/enters
+ * an `npub1…`, a hex pubkey, or a NIP-05 `name@domain`, this resolves the
+ * identifier and renders one of four states (resolving / loaded / resolved-but-
+ * no-profile / invalid) so the user can confirm "this is the right person"
+ * before inviting them. Empty input renders nothing.
+ *
+ * Resolution reuses the existing ProfileSheet + chat-list-search pattern:
+ * [ChatListIdentifierSearch.classify] sorts npub vs NIP-05, an npub/hex
+ * resolves synchronously through `appState.accountIdHex`, and a NIP-05 goes
+ * through [Nip05Resolver] (debounced, so a half-typed address doesn't fire a
+ * lookup on every keystroke). The kind:0 fields are read back through the same
+ * `appState` accessors the profile sheet uses, so a name that lands a beat
+ * after the key resolves repaints via the profile-revision recomposition.
+ *
+ * The resolved display state is hoisted to the parent via [onResolutionChanged]
+ * so the surface can keep its action button disabled while the card is
+ * invalid/resolving (but enabled for the loaded AND no-profile states).
+ *
+ * No contact/follow status is shown: the UniFFI surface exposes no kind:3
+ * contacts API, and the issue says to omit it gracefully rather than block the
+ * card on it.
+ */
+@Composable
+private fun RecipientPreviewCard(
+    input: String,
+    appState: DarkMatterAppState,
+    onResolutionChanged: (RecipientResolution) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val trimmed = input.trim()
+    // Re-key on the trimmed input so each edit cancels the prior in-flight
+    // resolve (npub validation, NIP-05 lookup) and starts fresh.
+    var resolving by remember(trimmed) { mutableStateOf(trimmed.isNotEmpty()) }
+    var resolvedHex by remember(trimmed) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(trimmed) {
+        if (trimmed.isEmpty()) {
+            resolving = false
+            resolvedHex = null
+            return@LaunchedEffect
+        }
+        resolving = true
+        resolvedHex = null
+        val hex =
+            when (val id = ChatListIdentifierSearch.classify(trimmed)) {
+                // An npub / nostr: / darkmatter link carries the key; accountIdHex
+                // validates the bech32 (rejecting a bad checksum) and yields hex.
+                is ChatListIdentifierSearch.Identifier.Npub -> appState.accountIdHex(id.npub)
+                // A NIP-05 address needs a network /.well-known lookup. Debounce
+                // so a mid-typed domain doesn't fire a request every keystroke;
+                // the effect re-keys and cancels the prior attempt as typing
+                // continues.
+                is ChatListIdentifierSearch.Identifier.Nip05 -> {
+                    delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
+                    Nip05Resolver.resolve(id.identifier)
+                }
+                // Not an npub/NIP-05: still try a bare hex pubkey — accountIdHex
+                // accepts it and ProfileSheet relies on the same call.
+                null -> appState.accountIdHex(trimmed)
+            }
+        resolvedHex = hex
+        if (hex != null) appState.refreshProfile(hex)
+        resolving = false
+    }
+
+    // Read the kind:0 fields through the same accessors ProfileSheet uses, so a
+    // name/avatar that resolves a beat after the key repaints via the profile
+    // cache's revision recomposition.
+    val profile = resolvedHex?.let { appState.userProfile(it) }
+    val npub = resolvedHex?.let { appState.npub(it) }
+    val resolvedDisplayName = resolvedHex?.let { appState.displayName(it) }
+    val pictureUrl =
+        resolvedHex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
+    val about = ProfileSanitizer.about(profile?.about)
+    val nip05 =
+        profile
+            ?.nip05
+            ?.trim()
+            ?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
+    // A kind:0 nip05 is a self-assertion until proven: re-resolve it via the
+    // same /.well-known lookup and only trust it if it maps back to the pubkey
+    // the card resolved. Showing a check on an unverified address would weaken
+    // the very wrong-key / NIP-05-hijack signal this card exists to surface
+    // (#631). Re-keys on (nip05, resolvedHex) so an edit cancels the prior probe.
+    var nip05ResolvedHex by remember(nip05, resolvedHex) { mutableStateOf<String?>(null) }
+    LaunchedEffect(nip05, resolvedHex) {
+        nip05ResolvedHex = null
+        val declared = nip05
+        if (declared == null || resolvedHex == null) return@LaunchedEffect
+        nip05ResolvedHex = Nip05Resolver.resolve(declared)
+    }
+    val nip05Verified = recipientNip05Verified(nip05, nip05ResolvedHex, resolvedHex)
+    val shortNpub = npub?.let { IdentityFormatter.short(it, prefix = 12, suffix = 8) }
+    // A published profile is one carrying at least one usable kind:0 field. We
+    // read the raw metadata (not the displayName accessor, which falls back to
+    // a short-npub string when no name is published) so a key with no metadata
+    // lands on the NoProfile fallback rather than masquerading as Loaded.
+    val hasProfile =
+        profile != null &&
+            (
+                !ProfileSanitizer.displayName(profile.displayName ?: profile.name).isNullOrBlank() ||
+                    about != null ||
+                    pictureUrl != null ||
+                    nip05 != null
+            )
+
+    val state = recipientPreviewState(trimmed.isNotEmpty(), resolving, resolvedHex, hasProfile)
+    LaunchedEffect(state, resolvedHex) {
+        onResolutionChanged(RecipientResolution(state, resolvedHex))
+    }
+
+    when (state) {
+        RecipientPreviewState.Empty -> Unit
+        RecipientPreviewState.Resolving ->
+            OutlinedCard(modifier = modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Text(
+                        stringResource(R.string.recipient_preview_resolving),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        RecipientPreviewState.Invalid ->
+            OutlinedCard(modifier = modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(
+                        Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(
+                        stringResource(R.string.recipient_preview_unresolved),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        RecipientPreviewState.Loaded, RecipientPreviewState.NoProfile -> {
+            val title = resolvedDisplayName?.takeUnless { it.isBlank() } ?: IdentityFormatter.short(npub.orEmpty())
+            OutlinedCard(modifier = modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Avatar(
+                        title = title,
+                        seed = resolvedHex ?: trimmed,
+                        size = 56.dp,
+                        pictureUrl = pictureUrl,
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (nip05 != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                // Only a NIP-05 that resolves back to THIS pubkey
+                                // earns a verified check; a self-asserted kind:0
+                                // nip05 that hasn't been verified shows no check
+                                // (and an "unverified" a11y label), so the card
+                                // never paints a false trust signal at the
+                                // wrong-key / hijack checkpoint (#631).
+                                if (nip05Verified) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription =
+                                            stringResource(R.string.recipient_preview_nip05_verified),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.ErrorOutline,
+                                        contentDescription =
+                                            stringResource(R.string.recipient_preview_nip05_unverified),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
+                                Text(
+                                    nip05,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        shortNpub?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (state == RecipientPreviewState.NoProfile) {
+                            Text(
+                                stringResource(R.string.recipient_preview_no_profile),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else if (about != null) {
+                            Text(
+                                about,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,
     rawQuery: String,
@@ -2890,6 +3132,161 @@ internal fun newChatMemberRefs(
         emptyList()
     }
 
+/**
+ * Display state for the recipient profile-preview card shown below the
+ * new-chat / add-member input (issue #631). The card lets the user visually
+ * confirm "this is the right person" before inviting them — a wrong invite can
+ * leak group history to a stranger.
+ *
+ * Pulled out as a pure sealed enum + mapper (no Compose deps) so the
+ * input→state decision is unit-testable and pinned against regression, the
+ * same way [canSubmitNewChatSheet] / [canInviteFromEmptyGroup] are.
+ */
+internal sealed interface RecipientPreviewState {
+    /** No input yet — render nothing. */
+    data object Empty : RecipientPreviewState
+
+    /**
+     * The identifier is being resolved (a NIP-05 `/.well-known` lookup is in
+     * flight, or the resolved key's kind:0 is still being fetched). Show a
+     * spinner + "Resolving…" text.
+     */
+    data object Resolving : RecipientPreviewState
+
+    /**
+     * Resolved to a real pubkey with published kind:0 metadata — render the
+     * full card (avatar, name, NIP-05, bio, npub fragment).
+     */
+    data object Loaded : RecipientPreviewState
+
+    /**
+     * Resolved to a real pubkey but no kind:0 metadata published. Show the npub
+     * fragment + a "No profile published" note. The action stays ENABLED — the
+     * user may legitimately know an npub without a profile.
+     */
+    data object NoProfile : RecipientPreviewState
+
+    /** The identifier does not resolve to a pubkey at all. Block the action. */
+    data object Invalid : RecipientPreviewState
+}
+
+/**
+ * Whether [RecipientPreviewState] permits the surrounding action button to be
+ * enabled. Loaded and NoProfile are confirmable; Empty/Resolving/Invalid are
+ * not. The card's gate is AND-ed into the existing per-surface enable
+ * predicates so the button can never fire on an unresolved/invalid identifier
+ * (issue #631), while an unparsed plain-text input (Empty) still defers to the
+ * surface's own validation.
+ */
+internal fun recipientPreviewAllowsSubmit(state: RecipientPreviewState): Boolean =
+    when (state) {
+        RecipientPreviewState.Loaded, RecipientPreviewState.NoProfile -> true
+        RecipientPreviewState.Empty -> true
+        RecipientPreviewState.Resolving, RecipientPreviewState.Invalid -> false
+    }
+
+/**
+ * Pure mapper from the raw resolution signals to a [RecipientPreviewState]
+ * (issue #631):
+ *  - blank input → [RecipientPreviewState.Empty];
+ *  - still resolving (NIP-05 lookup / kind:0 fetch in flight) → [RecipientPreviewState.Resolving];
+ *  - resolution settled with no pubkey → [RecipientPreviewState.Invalid];
+ *  - resolved to a pubkey with metadata → [RecipientPreviewState.Loaded];
+ *  - resolved to a pubkey but no metadata → [RecipientPreviewState.NoProfile].
+ *
+ * @param hasInput whether the trimmed input is non-blank.
+ * @param resolving whether an async resolve/fetch is still in flight.
+ * @param resolvedHex the resolved 64-char hex pubkey, or null when resolution
+ *   has settled without a key (invalid) or hasn't produced one yet.
+ * @param hasProfile whether kind:0 metadata with any usable field is present.
+ */
+internal fun recipientPreviewState(
+    hasInput: Boolean,
+    resolving: Boolean,
+    resolvedHex: String?,
+    hasProfile: Boolean,
+): RecipientPreviewState =
+    when {
+        !hasInput -> RecipientPreviewState.Empty
+        resolving -> RecipientPreviewState.Resolving
+        resolvedHex == null -> RecipientPreviewState.Invalid
+        hasProfile -> RecipientPreviewState.Loaded
+        else -> RecipientPreviewState.NoProfile
+    }
+
+/**
+ * What [RecipientPreviewCard] hoists to its host (issue #631): the display
+ * [state] AND the resolved hex pubkey the card actually settled on.
+ *
+ * Hoisting [resolvedHex] (not just the state) is what makes a NIP-05 entry
+ * actually submittable: the card resolves `alice@example.com` to a hex pubkey
+ * over the network, but the submit path's [RecipientReference.normalize] only
+ * accepts npub/profile-link/64-char-hex and CANNOT re-do that lookup. Without
+ * the resolved key, a resolved NIP-05 preview enables the button and then the
+ * create/invite fails with "valid npub/profile link/hex". The host submits
+ * [resolvedHex] directly (the engine accepts a bare hex recipient ref, the
+ * same way the card's own resolve calls `accountIdHex(hex)`).
+ */
+internal data class RecipientResolution(
+    val state: RecipientPreviewState,
+    val resolvedHex: String?,
+) {
+    companion object {
+        val Empty = RecipientResolution(RecipientPreviewState.Empty, null)
+    }
+}
+
+/**
+ * The recipient ref(s) to actually submit for a new chat / add-member action
+ * (issue #631 blocking fix). When the preview card resolved the input to a hex
+ * pubkey ([resolvedHex] non-null), submit THAT — it is the authoritative key
+ * the user just visually confirmed, and is the only way a NIP-05 entry (which
+ * [RecipientReference.normalize] cannot parse) reaches the engine. Otherwise
+ * fall back to the caller-supplied [normalizedFallback] (npub/hex tokens the
+ * normalize path already produced), preserving the prior multi-token behavior.
+ *
+ * Returns null when nothing resolvable is available, so the caller surfaces its
+ * "valid recipient reference" error instead of submitting a bad ref.
+ */
+internal fun resolvedRecipientRefs(
+    resolvedHex: String?,
+    normalizedFallback: List<String>,
+): List<String>? =
+    when {
+        resolvedHex != null -> listOf(resolvedHex)
+        normalizedFallback.isNotEmpty() -> normalizedFallback
+        else -> null
+    }
+
+/**
+ * Whether a kind:0-declared NIP-05 ([declaredNip05]) may be rendered with a
+ * VERIFIED check next to it (issue #631 blocking fix).
+ *
+ * A profile can self-assert any `nip05` string in its kind:0 metadata; passing
+ * [ProfileFieldValidation.isAcceptableNip05] only proves the string is
+ * well-formed, NOT that the domain's `/.well-known/nostr.json` actually maps
+ * that name to this pubkey. Showing a check on an unverified self-assertion is
+ * actively harmful for this safety checkpoint — it makes the wrong-key /
+ * NIP-05-hijack case the card exists to catch HARDER to spot. We only show the
+ * check when the declared NIP-05 has been independently resolved (via
+ * [Nip05Resolver]) back to the SAME pubkey the card resolved
+ * ([resolvedHex]); otherwise the address renders plainly, with no check.
+ *
+ * @param declaredNip05 the (already syntax-validated) kind:0 `nip05`, or null.
+ * @param nip05ResolvedHex the hex the declared NIP-05 resolved to over the
+ *   network, or null when that lookup hasn't completed / failed.
+ * @param resolvedHex the hex pubkey the card resolved the input to.
+ */
+internal fun recipientNip05Verified(
+    declaredNip05: String?,
+    nip05ResolvedHex: String?,
+    resolvedHex: String?,
+): Boolean =
+    declaredNip05 != null &&
+        resolvedHex != null &&
+        nip05ResolvedHex != null &&
+        nip05ResolvedHex.equals(resolvedHex, ignoreCase = true)
+
 internal fun canInviteFromEmptyGroup(
     isSelfMember: Boolean,
     isSelfAdmin: Boolean,
@@ -3032,6 +3429,10 @@ private fun NewChatSheet(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showScanner by remember { mutableStateOf(false) }
+    // Resolution state of the recipient preview card (#631), hoisted so the
+    // Create button can stay disabled while the pasted identifier is
+    // invalid/resolving (but enabled for the loaded AND no-profile states).
+    var recipientPreview by remember { mutableStateOf(RecipientResolution.Empty) }
     val validRecipientReferenceError = stringResource(R.string.error_valid_recipient_reference)
     val missingKeyPackageError = stringResource(R.string.error_missing_key_package)
     val missingKeyPackageForFormat = stringResource(R.string.error_missing_key_package_for)
@@ -3109,6 +3510,13 @@ private fun NewChatSheet(
                         Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_recipient_qr_code))
                     }
                 }
+                // Resolved profile preview so the user can confirm "this is the
+                // right person" before starting the DM (#631).
+                RecipientPreviewCard(
+                    input = pending,
+                    appState = appState,
+                    onResolutionChanged = { recipientPreview = it },
+                )
             } else {
                 OutlinedTextField(
                     value = groupName,
@@ -3141,10 +3549,21 @@ private fun NewChatSheet(
                 onClick = {
                     val normalizedPending =
                         if (directMessage) {
-                            RecipientReference.tokenize(pending).map { input ->
-                                RecipientReference.normalize(input) ?: run {
-                                    error = validRecipientReferenceError
-                                    return@Button
+                            // Prefer the key the preview card already resolved
+                            // (#631): it's the pubkey the user just visually
+                            // confirmed, and is the ONLY thing that carries a
+                            // resolved NIP-05 — RecipientReference.normalize
+                            // can't parse name@domain. Fall back to tokenize +
+                            // normalize for the npub/hex direct-entry path.
+                            val resolved = recipientPreview.resolvedHex
+                            if (resolved != null) {
+                                listOf(resolved)
+                            } else {
+                                RecipientReference.tokenize(pending).map { input ->
+                                    RecipientReference.normalize(input) ?: run {
+                                        error = validRecipientReferenceError
+                                        return@Button
+                                    }
                                 }
                             }
                         } else {
@@ -3200,7 +3619,14 @@ private fun NewChatSheet(
                         busy = false
                     }
                 },
-                enabled = canSubmitNewChatSheet(directMessage, busy, pending, groupName),
+                // Gate on the preview resolution too (#631): never let the
+                // create fire on an unresolved/invalid identifier. The card
+                // stays Empty in group mode (no recipient field), where
+                // recipientPreviewAllowsSubmit is true, so group create is
+                // unaffected.
+                enabled =
+                    canSubmitNewChatSheet(directMessage, busy, pending, groupName) &&
+                        recipientPreviewAllowsSubmit(recipientPreview.state),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (busy) {
@@ -9222,6 +9648,10 @@ private fun GroupDetailsScreen(
     var pendingMember by remember { mutableStateOf("") }
     var pendingMemberAsAdmin by remember { mutableStateOf(false) }
     var pendingMemberError by remember { mutableStateOf<String?>(null) }
+    // Resolution state of the add-member preview card (#631), hoisted so the
+    // Add button stays disabled while the pasted identifier is invalid or
+    // resolving (but enabled for the loaded AND no-profile states).
+    var pendingMemberPreview by remember { mutableStateOf(RecipientResolution.Empty) }
     var showMemberScanner by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember { mutableStateOf(false) }
@@ -9738,6 +10168,14 @@ private fun GroupDetailsScreen(
                     },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                 )
+                // Resolved profile preview so the admin can confirm they're
+                // inviting the right person before history is shared with them
+                // (#631).
+                RecipientPreviewCard(
+                    input = pendingMember,
+                    appState = appState,
+                    onResolutionChanged = { pendingMemberPreview = it },
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -9752,11 +10190,17 @@ private fun GroupDetailsScreen(
                 }
                 Button(
                     onClick = {
+                        // Prefer the key the preview card resolved (#631): it
+                        // carries a resolved NIP-05, which RecipientReference
+                        // .normalize can't parse. Fall back to normalize for
+                        // the npub/hex direct-entry path.
                         val ref =
-                            RecipientReference.normalize(pendingMember) ?: run {
-                                pendingMemberError = oneValidMemberReferenceError
-                                return@Button
-                            }
+                            pendingMemberPreview.resolvedHex
+                                ?: RecipientReference.normalize(pendingMember)
+                        if (ref == null) {
+                            pendingMemberError = oneValidMemberReferenceError
+                            return@Button
+                        }
                         pendingMemberError = null
                         runGroupMutation(
                             action = GroupMutationAction.InviteMember,
@@ -9771,7 +10215,14 @@ private fun GroupDetailsScreen(
                             },
                         )
                     },
-                    enabled = pendingMember.isNotBlank() && activeMutation == null && !controller.mutationInFlight,
+                    // Gate on the preview resolution too (#631): keep the invite
+                    // from firing on an unresolved/invalid identifier, while
+                    // still allowing the loaded AND no-profile states through.
+                    enabled =
+                        pendingMember.isNotBlank() &&
+                            activeMutation == null &&
+                            !controller.mutationInFlight &&
+                            recipientPreviewAllowsSubmit(pendingMemberPreview.state),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (activeMutation?.action == GroupMutationAction.InviteMember) {

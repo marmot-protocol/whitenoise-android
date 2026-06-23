@@ -34,6 +34,11 @@
     <string name="chat_list_search_open_profile">打开资料</string>
     <string name="chat_list_search_nip05_not_found">未找到「%1$s」的资料</string>
     <string name="chat_list_search_invalid_npub">这看起来不是有效的 npub</string>
+    <string name="recipient_preview_resolving">正在解析…</string>
+    <string name="recipient_preview_no_profile">未发布资料</string>
+    <string name="recipient_preview_unresolved">无法解析此标识符</string>
+    <string name="recipient_preview_nip05_verified">已验证的地址</string>
+    <string name="recipient_preview_nip05_unverified">未验证的地址</string>
     <string name="chat_row_action_archive">归档</string>
     <string name="chat_row_action_unarchive">取消归档</string>
     <string name="chat_row_action_mark_read">标记为已读</string>
