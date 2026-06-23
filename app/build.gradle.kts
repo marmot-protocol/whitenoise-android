@@ -203,6 +203,23 @@ tasks.matching { it.name.startsWith("package") && it.name.contains("Release") }.
     }
 }
 
+kover {
+    reports {
+        filters {
+            excludes {
+                // Keep coverage focused on app-owned code. These mirror the ktlint
+                // excludes below: generated UniFFI bindings, the vendored keyring
+                // stub, and Android's generated BuildConfig class.
+                classes(
+                    "dev.ipf.marmotkit.*",
+                    "io.crates.keyring.*",
+                    "*.BuildConfig",
+                )
+            }
+        }
+    }
+}
+
 ktlint {
     // Pin the ktlint engine from the version catalog so rule behavior is
     // stable across plugin upgrades.
