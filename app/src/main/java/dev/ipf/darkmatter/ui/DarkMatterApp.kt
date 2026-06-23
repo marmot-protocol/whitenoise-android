@@ -13792,8 +13792,11 @@ private fun EmojiPickerSheet(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val searchFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
-    val searchIndex = rememberEmojiSearchIndex()
-    val searchResults = remember(searchQuery, searchIndex) { searchIndex.search(searchQuery) }
+    val searchIndex by rememberEmojiSearchIndex()
+    val searchResults =
+        remember(searchQuery, searchIndex) {
+            searchIndex?.search(searchQuery).orEmpty()
+        }
 
     ModalBottomSheet(
         modifier = amoledModalSheetModifier(),
@@ -13869,6 +13872,7 @@ private fun EmojiPickerSheet(
             } else {
                 EmojiSearchResultsGrid(
                     results = searchResults,
+                    isLoading = searchIndex == null,
                     onEmojiPicked = onEmojiPicked,
                     modifier = Modifier.fillMaxWidth().height(384.dp),
                 )
@@ -13878,24 +13882,34 @@ private fun EmojiPickerSheet(
 }
 
 @Composable
-private fun rememberEmojiSearchIndex(): EmojiSearchIndex {
-    val context = LocalContext.current
-    return remember(context) {
-        val json =
-            context.resources
-                .openRawResource(R.raw.emoji_annotations_en)
-                .bufferedReader()
-                .use { it.readText() }
-        EmojiSearchIndex.fromJson(json)
+private fun rememberEmojiSearchIndex(): State<EmojiSearchIndex?> {
+    val appContext = LocalContext.current.applicationContext
+    return produceState<EmojiSearchIndex?>(initialValue = null, appContext) {
+        value =
+            withContext(Dispatchers.Default) {
+                val json =
+                    appContext.resources
+                        .openRawResource(R.raw.emoji_annotations_en)
+                        .bufferedReader()
+                        .use { it.readText() }
+                EmojiSearchIndex.fromJson(json)
+            }
     }
 }
 
 @Composable
 private fun EmojiSearchResultsGrid(
     results: List<EmojiSearchEntry>,
+    isLoading: Boolean,
     onEmojiPicked: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (isLoading) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
     if (results.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(

@@ -13,6 +13,7 @@ class EmojiSearchIndexTest {
                 """
                 [
                   {"emoji":"🦊","name":"fox","keywords":["animal","face","fox"]},
+                  {"emoji":"🧑‍🚒","name":"firefighter","keywords":["fire","rescue"]},
                   {"emoji":"🔥","name":"fire","keywords":["burn","flame","hot"]},
                   {"emoji":"😀","name":"grinning face","keywords":["cheerful","smile"]},
                   {"emoji":"😄","name":"grinning face with smiling eyes","keywords":["happy","smile"]}
@@ -22,9 +23,11 @@ class EmojiSearchIndexTest {
 
         assertEquals(listOf("🦊"), index.search("FOX").map { it.emoji })
         assertEquals(listOf("🔥"), index.search("flam").map { it.emoji })
+        assertEquals(listOf("🔥", "🧑‍🚒"), index.search("fire").map { it.emoji })
         assertEquals(listOf("😀", "😄"), index.search("smile").map { it.emoji })
         assertEquals(emptyList<EmojiSearchEntry>(), index.search("smile", limit = 0))
         assertEquals(emptyList<EmojiSearchEntry>(), index.search("smile", limit = -1))
+        assertEquals(emptyList<EmojiSearchEntry>(), index.search("🦊"))
         assertEquals(emptyList<EmojiSearchEntry>(), index.search("no-match"))
     }
 

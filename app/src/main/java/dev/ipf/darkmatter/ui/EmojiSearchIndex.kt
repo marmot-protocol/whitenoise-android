@@ -8,19 +8,26 @@ internal data class EmojiSearchEntry(
     val name: String,
     val keywords: List<String>,
 ) {
-    private val searchableText =
-        buildString {
-            append(emoji)
-            append(' ')
-            append(name)
-            keywords.forEach { keyword ->
-                append(' ')
-                append(keyword)
-            }
-        }.lowercase(Locale.ROOT)
+    private val normalizedName = name.lowercase(Locale.ROOT)
+    private val normalizedKeywords = keywords.map { it.lowercase(Locale.ROOT) }
 
-    fun matches(normalizedQuery: String): Boolean = searchableText.contains(normalizedQuery)
+    fun matchRank(normalizedQuery: String): Int? =
+        when {
+            normalizedName == normalizedQuery -> 0
+            normalizedName.startsWith(normalizedQuery) -> 1
+            normalizedKeywords.any { it == normalizedQuery } -> 2
+            normalizedKeywords.any { it.startsWith(normalizedQuery) } -> 3
+            normalizedName.contains(normalizedQuery) -> 4
+            normalizedKeywords.any { it.contains(normalizedQuery) } -> 5
+            else -> null
+        }
 }
+
+private data class RankedEmojiSearchEntry(
+    val rank: Int,
+    val sourceIndex: Int,
+    val entry: EmojiSearchEntry,
+)
 
 internal class EmojiSearchIndex private constructor(
     private val entries: List<EmojiSearchEntry>,
@@ -34,8 +41,18 @@ internal class EmojiSearchIndex private constructor(
         if (normalizedQuery.isEmpty()) return emptyList()
         return entries
             .asSequence()
-            .filter { it.matches(normalizedQuery) }
-            .take(limit)
+            .mapIndexedNotNull { sourceIndex, entry ->
+                entry.matchRank(normalizedQuery)?.let { rank ->
+                    RankedEmojiSearchEntry(
+                        rank = rank,
+                        sourceIndex = sourceIndex,
+                        entry = entry,
+                    )
+                }
+            }.sortedWith(
+                compareBy<RankedEmojiSearchEntry> { it.rank }.thenBy { it.sourceIndex },
+            ).take(limit)
+            .map { it.entry }
             .toList()
     }
 
