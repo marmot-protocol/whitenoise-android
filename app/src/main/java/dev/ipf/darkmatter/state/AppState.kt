@@ -1322,19 +1322,63 @@ class DarkMatterAppState(
             return
         }
         val previous = accountUnreadCounts
-        val refreshedCounts =
+        val rawCountsByHex =
             runCatching {
-                marmotIo {
-                    val byHex = accountUnreadSummary().associateBy { it.accountIdHex }
-                    localSigning.associate { summary ->
-                        summary.label to (byHex[summary.accountIdHex]?.unreadCount ?: previous[summary.label] ?: 0uL)
+                marmotIo { accountUnreadSummary().associateBy { it.accountIdHex } }
+            }.onFailure {
+                rethrowIfCancellation(it)
+                appStateDebug(it) { "account unread summary refresh failed: ${it.readableMessage()}" }
+            }.getOrNull()
+        val refreshedCounts = linkedMapOf<String, ULong>()
+        localSigning.forEach { summary ->
+            val rawCount = rawCountsByHex?.get(summary.accountIdHex)?.unreadCount
+            refreshedCounts[summary.label] =
+                if (rawCount == 0uL) {
+                    0uL
+                } else {
+                    refreshEffectiveAccountUnreadCount(summary)
+                        ?: rawCount
+                        ?: previous[summary.label]
+                        ?: 0uL
+                }
+        }
+        accountUnreadCounts = refreshedCounts
+    }
+
+    /**
+     * Reads one account's durable chat-list rows and folds them with loaded
+     * member rosters so removed/left groups no longer contribute frozen unread
+     * totals to [accountUnreadCounts]. This intentionally uses the same
+     * removed-group semantics as the active chat-list projection (#625), but is
+     * scoped to [summary.accountIdHex] instead of the currently-active account so
+     * cross-account indicators stay honest for background accounts too (#662).
+     */
+    private suspend fun refreshEffectiveAccountUnreadCount(summary: AccountSummaryFfi): ULong? {
+        val ref = summary.label.takeIf { it.isNotBlank() } ?: return null
+        return runCatching {
+            marmotIo {
+                val rows = chatList(ref, includeArchived = true)
+                val membersByGroupId = mutableMapOf<String, List<AppGroupMemberRecordFfi>>()
+                rows.forEach { row ->
+                    if (!row.archived && row.unreadCount > 0uL && row.groupIdHex.isNotBlank()) {
+                        try {
+                            membersByGroupId[row.groupIdHex] = groupMembers(ref, row.groupIdHex)
+                        } catch (error: Throwable) {
+                            rethrowIfCancellation(error)
+                            appStateDebug(error) {
+                                "account unread member refresh failed " +
+                                    "account=${ref.take(8)} group=${row.groupIdHex.take(8)}: " +
+                                    error.readableMessage()
+                            }
+                        }
                     }
                 }
-            }.onFailure {
-                appStateDebug(it) { "account unread refresh failed: ${it.readableMessage()}" }
-            }.getOrNull()
-                ?: return
-        accountUnreadCounts = refreshedCounts
+                accountUnreadCount(rows, summary.accountIdHex, membersByGroupId)
+            }
+        }.onFailure {
+            rethrowIfCancellation(it)
+            appStateDebug(it) { "account unread refresh failed for ${ref.take(8)}: ${it.readableMessage()}" }
+        }.getOrNull()
     }
 
     /**
@@ -1342,23 +1386,18 @@ class DarkMatterAppState(
      * [accountUnreadCounts] without disturbing the other accounts' counts.
      *
      * On a per-notification hot path we only ever need the one account that
-     * changed, so we read that account's durable chat-list rows directly via
-     * [Marmot.chatList] and fold them with [accountUnreadCount] (which excludes
-     * archived chats, matching `account_unread_total`). This avoids fanning out
-     * an all-account [Marmot.accountUnreadSummary] scan on every update (#473).
+     * changed, so we avoid fanning out an all-account scan (#473) while still
+     * applying removed-group suppression for that account (#662). This remains
+     * intentionally more expensive than the old raw-row fold: it loads the
+     * account's chat list plus member rosters for unread rows, so keep callers
+     * scoped to the changed account until Marmot exposes a suppressed summary.
      */
     private suspend fun refreshAccountUnreadCount(accountRef: String) {
         val ref = accountRef.takeIf { it.isNotBlank() } ?: return
         // Only local-signing accounts are tracked in accountUnreadCounts; skip
         // refs we don't know about (matches refreshAccountUnreadCounts' filter).
-        if (accounts.none { it.localSigning && it.label == ref }) return
-        val unreadCount =
-            runCatching {
-                marmotIo { accountUnreadCount(chatList(ref, includeArchived = true)) }
-            }.onFailure {
-                appStateDebug(it) { "account unread refresh failed for ${ref.take(8)}: ${it.readableMessage()}" }
-            }.getOrNull()
-                ?: return
+        val summary = accounts.firstOrNull { it.localSigning && it.label == ref } ?: return
+        val unreadCount = refreshEffectiveAccountUnreadCount(summary) ?: return
         accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
     }
 
