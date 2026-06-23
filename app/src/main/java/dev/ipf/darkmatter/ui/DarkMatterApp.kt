@@ -10724,7 +10724,7 @@ private fun ImageSearchSheet(
                             .fillMaxWidth()
                             .heightIn(max = 360.dp),
                 ) {
-                    items(results, key = { it.imageUrl }) { hit ->
+                    items(results.distinctBy { it.imageUrl }, key = { it.imageUrl }) { hit ->
                         GroupImageSearchTile(
                             hit = hit,
                             isSelected = hit.imageUrl == trimmedUrl,

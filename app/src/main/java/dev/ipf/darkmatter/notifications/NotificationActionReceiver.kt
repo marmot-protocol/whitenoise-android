@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 class NotificationActionReceiver : BroadcastReceiver() {
     override fun onReceive(
@@ -20,10 +21,23 @@ class NotificationActionReceiver : BroadcastReceiver() {
     ) {
         val action = NotificationActions.parse(intent) ?: return
         val pending = goAsync()
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        // Off the main thread: the handler does FFI/relay/Binder work. Bounded by
+        // a budget below the ~10s goAsync deadline so pending.finish() always runs
+        // and the broadcast is never killed mid-flight with the reply dropped.
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         scope.launch {
             try {
-                handleAction(context.applicationContext, action, intent)
+                val completed =
+                    withTimeoutOrNull(GO_ASYNC_BUDGET_MS) {
+                        handleAction(context.applicationContext, action, intent)
+                        true
+                    }
+                if (completed == null) {
+                    Log.w(
+                        "DMNotifyAction",
+                        "notification action timed out kind=${action.kind} group=${action.target.groupIdHex.take(8)}",
+                    )
+                }
             } catch (throwable: Throwable) {
                 Log.w(
                     "DMNotifyAction",
@@ -140,6 +154,9 @@ internal fun notificationReplyActionHandled(sent: Boolean): Boolean = sent
 // reply broadcast fires, so the live notification may not be in the active set
 // on the first look; retry the "reply handled" re-post a few times, then give
 // NMS a moment to clear the extension before cancelling.
+// Keep under the manifest receiver's ~10s goAsync() deadline, leaving margin for
+// pending.finish() so a slow/cold send can't get the process killed mid-reply.
+private const val GO_ASYNC_BUDGET_MS = 8_000L
 private const val REPLY_DISMISS_RETRIES = 6
 private const val REPLY_DISMISS_RETRY_DELAY_MS = 100L
 private const val REPLY_DISMISS_SETTLE_MS = 350L

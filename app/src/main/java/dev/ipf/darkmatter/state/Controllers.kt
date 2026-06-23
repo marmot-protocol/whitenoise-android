@@ -1837,8 +1837,11 @@ class ConversationController(
     private var membersVerified by mutableStateOf(false)
     var timeline by mutableStateOf<List<TimelineMessage>>(emptyList())
         private set
-    var reactions by mutableStateOf<Map<String, List<ReactionTally>>>(emptyMap())
-        private set
+
+    // A snapshot map (not mutableStateOf<Map>) so a bubble reading one key isn't
+    // recomposed when a different message's reactions change.
+    private val reactionsState = mutableStateMapOf<String, List<ReactionTally>>()
+    val reactions: Map<String, List<ReactionTally>> get() = reactionsState
     var deletedMessageIds by mutableStateOf<Set<String>>(emptySet())
         private set
     var replyingTo by mutableStateOf<AppMessageRecordFfi?>(null)
@@ -4050,6 +4053,12 @@ class ConversationController(
             // pending send still reconciles across a window replacement. See #68.
             val optimisticIds = optimisticMessages.values.mapTo(mutableSetOf()) { it.record.messageIdHex }
             messageById.keys.retainAll(optimisticIds)
+            // Same unbounded-growth trim for the optimistic position/timestamp
+            // overrides: the reconcile path below re-adds them for any optimistic
+            // message that reconciles into this page, so scrolled-out entries
+            // don't accumulate for the controller's lifetime.
+            localTimelineOrderOverrides.keys.retainAll(optimisticIds)
+            localTimelineTimestampOverrides.keys.retainAll(optimisticIds)
         }
         page.messages.forEach { record ->
             val actionRecord =
@@ -4551,7 +4560,7 @@ class ConversationController(
                 }
             }
         }
-        reactions =
+        val computed =
             sendersByTarget
                 .mapValues { (_, byEmoji) ->
                     byEmoji
@@ -4571,20 +4580,20 @@ class ConversationController(
                                 .thenBy { it.emoji },
                         )
                 }.filterValues { it.isNotEmpty() }
+        reactionsState.keys.retainAll(computed.keys)
+        reactionsState.putAll(computed)
     }
 
     private fun recomputeReactions(targetMessageIds: Set<String>) {
         if (targetMessageIds.isEmpty()) return
-        val next = reactions.toMutableMap()
         targetMessageIds.forEach { target ->
             val tallies = reactionTalliesFor(target)
             if (tallies.isEmpty()) {
-                next.remove(target)
+                reactionsState.remove(target)
             } else {
-                next[target] = tallies
+                reactionsState[target] = tallies
             }
         }
-        reactions = next
     }
 
     private fun reactionTalliesFor(targetMessageId: String): List<ReactionTally> {
