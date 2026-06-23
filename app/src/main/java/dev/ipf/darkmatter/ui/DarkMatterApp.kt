@@ -13312,13 +13312,15 @@ private fun MessageActionMenu(
         //   - one emoji/quick-reaction Row (36.dp)
         //   - a HorizontalDivider (1.dp)
         //   - the action buttons (each 48.dp min) in a spacedBy(2.dp) Column:
-        //       Reply, Copy, Info always; +Edit when canEdit; +Delete when canDelete
+        //       Reply, Copy, Info always; +Edit when canEdit; +Forward when
+        //       canForward; +Delete when canDelete
         //   - the outer Column's 8.dp padding (top + bottom) and its two
         //     spacedBy(8.dp) gaps between the three sections.
         // Keep this in sync with the menu Column below if its layout changes.
         val estimatedPopupHeightPx =
             with(density) {
-                val actionButtonCount = 3 + (if (canEdit) 1 else 0) + (if (canDelete) 1 else 0)
+                val actionButtonCount =
+                    3 + (if (canEdit) 1 else 0) + (if (canForward) 1 else 0) + (if (canDelete) 1 else 0)
                 val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1) * 2).dp
                 val totalHeight = (8.dp + 8.dp) + (8.dp + 8.dp) + 36.dp + 1.dp + actionsColumnHeight
                 totalHeight.roundToPx()
