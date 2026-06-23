@@ -182,6 +182,7 @@ class ChatListTitleTest {
         pendingConfirmation = pendingConfirmation,
         welcomerAccountIdHex = welcomer,
         viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
     )
 
     private fun chatItem(

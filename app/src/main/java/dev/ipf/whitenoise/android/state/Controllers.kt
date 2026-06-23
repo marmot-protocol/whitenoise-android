@@ -340,6 +340,7 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         pendingConfirmation = row.pendingConfirmation,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
     )
 
 private fun defaultEncryptedMediaComponent(): AppGroupEncryptedMediaComponentFfi =

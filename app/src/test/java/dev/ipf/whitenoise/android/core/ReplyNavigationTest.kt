@@ -99,11 +99,13 @@ class ReplyNavigationTest {
                     contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                     kind = 9uL,
                     mediaJson = null,
+                    media = emptyList(),
                     agentTextStreamJson = null,
                     deleted = false,
                 )
             },
         mediaJson = null,
+        media = emptyList(),
         agentTextStreamJson = null,
         groupSystem = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),

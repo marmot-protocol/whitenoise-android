@@ -35,6 +35,7 @@ class TimelineRecordProfileSendersTest {
             contentTokens = emptyDoc(),
             kind = 9uL,
             mediaJson = null,
+            media = emptyList(),
             agentTextStreamJson = null,
             deleted = false,
         )
@@ -59,6 +60,7 @@ class TimelineRecordProfileSendersTest {
         replyToMessageIdHex = replyPreview?.messageIdHex,
         replyPreview = replyPreview,
         mediaJson = null,
+        media = emptyList(),
         agentTextStreamJson = null,
         groupSystem = null,
         reactions =

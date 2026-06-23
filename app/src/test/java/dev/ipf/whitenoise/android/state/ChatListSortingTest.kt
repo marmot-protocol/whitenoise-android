@@ -238,6 +238,7 @@ class ChatListSortingTest {
         pendingConfirmation = pending,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
     )
 
     private fun encryptedMedia() =

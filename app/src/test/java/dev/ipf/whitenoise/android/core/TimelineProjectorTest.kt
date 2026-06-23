@@ -23,6 +23,7 @@ class TimelineProjectorTest {
                         contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
                         kind = 9uL,
                         mediaJson = null,
+                        media = emptyList(),
                         agentTextStreamJson = null,
                         deleted = false,
                     ),
@@ -30,8 +31,8 @@ class TimelineProjectorTest {
                     TimelineReactionSummaryFfi(
                         byEmoji =
                             listOf(
-                                TimelineReactionEmojiFfi("👍", listOf("bob", "carol")),
-                                TimelineReactionEmojiFfi("🔥", listOf("alice")),
+                                TimelineReactionEmojiFfi("👍", 2u, listOf("bob", "carol")),
+                                TimelineReactionEmojiFfi("🔥", 1u, listOf("alice")),
                             ),
                         userReactions = emptyList(),
                     ),
@@ -117,6 +118,7 @@ class TimelineProjectorTest {
         replyToMessageIdHex = replyPreview?.messageIdHex,
         replyPreview = replyPreview,
         mediaJson = null,
+        media = emptyList(),
         agentTextStreamJson = null,
         groupSystem = null,
         reactions = reactions,

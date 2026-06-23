@@ -407,6 +407,7 @@ class GroupProjectorTest {
         pendingConfirmation = pending,
         welcomerAccountIdHex = welcomer,
         viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
     )
 
     private fun encryptedMedia() =

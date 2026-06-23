@@ -338,6 +338,7 @@ class ChatListProjectionReducerTest {
         pendingConfirmation = pendingConfirmation,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
     )
 
     private fun member(

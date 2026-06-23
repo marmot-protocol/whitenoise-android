@@ -981,6 +981,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1241,6 +1243,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_update_group_avatar_url(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`url`: RustBuffer.ByValue,`dim`: RustBuffer.ByValue,`thumbhash`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_update_group_profile(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`name`: RustBuffer.ByValue,`description`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_update_message_retention(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`disappearingMessageSecs`: Long,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_upload_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`request`: RustBuffer.ByValue,
     ): Long
@@ -1605,6 +1609,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_update_group_avatar_url(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_update_group_profile(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_update_message_retention(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_upload_media(
     ): Short
@@ -1971,6 +1977,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_update_group_profile() != 53035.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_update_message_retention() != 38717.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_upload_media() != 20405.toShort()) {
@@ -4398,6 +4407,14 @@ public interface MarmotInterface {
     suspend fun `updateGroupProfile`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `name`: kotlin.String?, `description`: kotlin.String?): SendSummaryFfi
     
     /**
+     * Set the per-group disappearing-message retention, wrapping the engine's
+     * `update_message_retention`. `disappearing_message_secs` of `0` disables
+     * expiry; any positive value is the retention window in seconds. Thin
+     * passthrough over the already-public engine API (darkmatter#571).
+     */
+    suspend fun `updateMessageRetention`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `disappearingMessageSecs`: kotlin.ULong): SendSummaryFfi
+    
+    /**
      * Encrypt plaintext attachments, upload the ciphertext blobs, and
      * optionally send the resulting media references into the group.
      */
@@ -6768,6 +6785,33 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Set the per-group disappearing-message retention, wrapping the engine's
+     * `update_message_retention`. `disappearing_message_secs` of `0` disables
+     * expiry; any positive value is the retention window in seconds. Thin
+     * passthrough over the already-public engine API (darkmatter#571).
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `updateMessageRetention`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `disappearingMessageSecs`: kotlin.ULong) : SendSummaryFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_update_message_retention(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterULong.lower(`disappearingMessageSecs`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeSendSummaryFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Encrypt plaintext attachments, upload the ciphertext blobs, and
      * optionally send the resulting media references into the group.
      */
@@ -8218,6 +8262,11 @@ data class AppGroupRecordFfi (
     var `avatarDim`: kotlin.String?, 
     var `avatarThumbhash`: kotlin.String?, 
     var `encryptedMedia`: AppGroupEncryptedMediaComponentFfi, 
+    /**
+     * Per-group disappearing-message retention in seconds
+     * (`marmot.group.message-retention.v1`). `0` means messages never expire.
+     */
+    var `disappearingMessageSecs`: kotlin.ULong, 
     var `archived`: kotlin.Boolean, 
     var `pendingConfirmation`: kotlin.Boolean, 
     var `welcomerAccountIdHex`: kotlin.String?, 
@@ -8244,6 +8293,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterTypeAppGroupEncryptedMediaComponentFfi.read(buf),
+            FfiConverterULong.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -8263,6 +8313,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.allocationSize(value.`avatarDim`) +
             FfiConverterOptionalString.allocationSize(value.`avatarThumbhash`) +
             FfiConverterTypeAppGroupEncryptedMediaComponentFfi.allocationSize(value.`encryptedMedia`) +
+            FfiConverterULong.allocationSize(value.`disappearingMessageSecs`) +
             FfiConverterBoolean.allocationSize(value.`archived`) +
             FfiConverterBoolean.allocationSize(value.`pendingConfirmation`) +
             FfiConverterOptionalString.allocationSize(value.`welcomerAccountIdHex`) +
@@ -8281,6 +8332,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.write(value.`avatarDim`, buf)
             FfiConverterOptionalString.write(value.`avatarThumbhash`, buf)
             FfiConverterTypeAppGroupEncryptedMediaComponentFfi.write(value.`encryptedMedia`, buf)
+            FfiConverterULong.write(value.`disappearingMessageSecs`, buf)
             FfiConverterBoolean.write(value.`archived`, buf)
             FfiConverterBoolean.write(value.`pendingConfirmation`, buf)
             FfiConverterOptionalString.write(value.`welcomerAccountIdHex`, buf)
@@ -10724,6 +10776,15 @@ data class TimelineMessageRecordFfi (
     var `replyToMessageIdHex`: kotlin.String?, 
     var `replyPreview`: TimelineReplyPreviewFfi?, 
     var `mediaJson`: kotlin.String?, 
+    /**
+     * Fully-resolved, downloadable media references for this message, built
+     * from its `imeta` tags + its own `source_epoch` using the same resolution
+     * and validation as `list_media` (a `list_media` record and this row's
+     * `media` resolve identically for the same message). Empty when the message
+     * has no media; a malformed `imeta` attachment is dropped while the message
+     * still appears as text.
+     */
+    var `media`: List<MediaAttachmentReferenceFfi>, 
     var `agentTextStreamJson`: kotlin.String?, 
     /**
      * Parsed view of kind-1210 group system rows. `None` for chat, reactions,
@@ -10765,6 +10826,7 @@ public object FfiConverterTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<T
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalTypeTimelineReplyPreviewFfi.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterSequenceTypeMediaAttachmentReferenceFfi.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalTypeGroupSystemEventFfi.read(buf),
             FfiConverterTypeTimelineReactionSummaryFfi.read(buf),
@@ -10789,6 +10851,7 @@ public object FfiConverterTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<T
             FfiConverterOptionalString.allocationSize(value.`replyToMessageIdHex`) +
             FfiConverterOptionalTypeTimelineReplyPreviewFfi.allocationSize(value.`replyPreview`) +
             FfiConverterOptionalString.allocationSize(value.`mediaJson`) +
+            FfiConverterSequenceTypeMediaAttachmentReferenceFfi.allocationSize(value.`media`) +
             FfiConverterOptionalString.allocationSize(value.`agentTextStreamJson`) +
             FfiConverterOptionalTypeGroupSystemEventFfi.allocationSize(value.`groupSystem`) +
             FfiConverterTypeTimelineReactionSummaryFfi.allocationSize(value.`reactions`) +
@@ -10812,6 +10875,7 @@ public object FfiConverterTypeTimelineMessageRecordFfi: FfiConverterRustBuffer<T
             FfiConverterOptionalString.write(value.`replyToMessageIdHex`, buf)
             FfiConverterOptionalTypeTimelineReplyPreviewFfi.write(value.`replyPreview`, buf)
             FfiConverterOptionalString.write(value.`mediaJson`, buf)
+            FfiConverterSequenceTypeMediaAttachmentReferenceFfi.write(value.`media`, buf)
             FfiConverterOptionalString.write(value.`agentTextStreamJson`, buf)
             FfiConverterOptionalTypeGroupSystemEventFfi.write(value.`groupSystem`, buf)
             FfiConverterTypeTimelineReactionSummaryFfi.write(value.`reactions`, buf)
@@ -10905,6 +10969,13 @@ public object FfiConverterTypeTimelineProjectionUpdateFfi: FfiConverterRustBuffe
 
 data class TimelineReactionEmojiFfi (
     var `emoji`: kotlin.String, 
+    /**
+     * Number of distinct senders that reacted with this emoji
+     * (`== senders.len()`), surfaced so clients render the tally without
+     * counting. This is the authenticated reaction count only; clients overlay
+     * their own optimistic react/unreact and "did I react" state on top.
+     */
+    var `count`: kotlin.UInt, 
     var `senders`: List<kotlin.String>
 ) {
     
@@ -10918,17 +10989,20 @@ public object FfiConverterTypeTimelineReactionEmojiFfi: FfiConverterRustBuffer<T
     override fun read(buf: ByteBuffer): TimelineReactionEmojiFfi {
         return TimelineReactionEmojiFfi(
             FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
             FfiConverterSequenceString.read(buf),
         )
     }
 
     override fun allocationSize(value: TimelineReactionEmojiFfi) = (
             FfiConverterString.allocationSize(value.`emoji`) +
+            FfiConverterUInt.allocationSize(value.`count`) +
             FfiConverterSequenceString.allocationSize(value.`senders`)
     )
 
     override fun write(value: TimelineReactionEmojiFfi, buf: ByteBuffer) {
             FfiConverterString.write(value.`emoji`, buf)
+            FfiConverterUInt.write(value.`count`, buf)
             FfiConverterSequenceString.write(value.`senders`, buf)
     }
 }
@@ -10936,6 +11010,10 @@ public object FfiConverterTypeTimelineReactionEmojiFfi: FfiConverterRustBuffer<T
 
 
 data class TimelineReactionSummaryFfi (
+    /**
+     * Reaction tallies pre-sorted by `count` descending, ties broken by `emoji`
+     * ascending, so clients render a stable tally without re-sorting.
+     */
     var `byEmoji`: List<TimelineReactionEmojiFfi>, 
     var `userReactions`: List<TimelineUserReactionFfi>
 ) {
@@ -10974,6 +11052,13 @@ data class TimelineReplyPreviewFfi (
     var `contentTokens`: MarkdownDocumentFfi, 
     var `kind`: kotlin.ULong, 
     var `mediaJson`: kotlin.String?, 
+    /**
+     * Fully-resolved, downloadable media references for the previewed message,
+     * built from its `imeta` tags + its own `source_epoch` using the same
+     * resolution and validation as `list_media`. Empty when the previewed
+     * message has no media or its `imeta` is malformed.
+     */
+    var `media`: List<MediaAttachmentReferenceFfi>, 
     var `agentTextStreamJson`: kotlin.String?, 
     var `deleted`: kotlin.Boolean
 ) {
@@ -10993,6 +11078,7 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterTypeMarkdownDocumentFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterSequenceTypeMediaAttachmentReferenceFfi.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
         )
@@ -11005,6 +11091,7 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterTypeMarkdownDocumentFfi.allocationSize(value.`contentTokens`) +
             FfiConverterULong.allocationSize(value.`kind`) +
             FfiConverterOptionalString.allocationSize(value.`mediaJson`) +
+            FfiConverterSequenceTypeMediaAttachmentReferenceFfi.allocationSize(value.`media`) +
             FfiConverterOptionalString.allocationSize(value.`agentTextStreamJson`) +
             FfiConverterBoolean.allocationSize(value.`deleted`)
     )
@@ -11016,6 +11103,7 @@ public object FfiConverterTypeTimelineReplyPreviewFfi: FfiConverterRustBuffer<Ti
             FfiConverterTypeMarkdownDocumentFfi.write(value.`contentTokens`, buf)
             FfiConverterULong.write(value.`kind`, buf)
             FfiConverterOptionalString.write(value.`mediaJson`, buf)
+            FfiConverterSequenceTypeMediaAttachmentReferenceFfi.write(value.`media`, buf)
             FfiConverterOptionalString.write(value.`agentTextStreamJson`, buf)
             FfiConverterBoolean.write(value.`deleted`, buf)
     }
