@@ -13788,12 +13788,11 @@ private fun EmojiPickerSheet(
 ) {
     val context = LocalContext.current
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    val searchIndex by rememberEmojiSearchIndex()
-    val searchResults =
-        remember(searchQuery, searchIndex) {
-            searchIndex?.search(searchQuery).orEmpty()
-        }
     val browseEmoji = remember { EmojiData.load(context) }
+    val searchResults =
+        remember(searchQuery, browseEmoji) {
+            EmojiData.search(browseEmoji, searchQuery)
+        }
     val grouped = remember(browseEmoji) { browseEmoji.groupBy { it.group } }
     val recents = remember { RecentEmojiPreferences.load(context).filter { it.isNotBlank() } }
     val gridState = rememberLazyGridState()
@@ -13901,7 +13900,6 @@ private fun EmojiPickerSheet(
             } else {
                 EmojiSearchResultsGrid(
                     results = searchResults,
-                    isLoading = searchIndex == null,
                     onEmojiPicked = { pick(it) },
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 )
@@ -13911,34 +13909,11 @@ private fun EmojiPickerSheet(
 }
 
 @Composable
-private fun rememberEmojiSearchIndex(): State<EmojiSearchIndex?> {
-    val appContext = LocalContext.current.applicationContext
-    return produceState<EmojiSearchIndex?>(initialValue = null, appContext) {
-        value =
-            withContext(Dispatchers.Default) {
-                val json =
-                    appContext.resources
-                        .openRawResource(R.raw.emoji_annotations_en)
-                        .bufferedReader()
-                        .use { it.readText() }
-                EmojiSearchIndex.fromJson(json)
-            }
-    }
-}
-
-@Composable
 private fun EmojiSearchResultsGrid(
-    results: List<EmojiSearchEntry>,
-    isLoading: Boolean,
+    results: List<EmojiEntry>,
     onEmojiPicked: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (isLoading) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
-    }
     if (results.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(
