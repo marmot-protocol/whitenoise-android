@@ -40,7 +40,11 @@ object EmojiData {
         cache?.let { return it }
         val parsed =
             runCatching {
-                val text = context.applicationContext.assets.open("emoji.json").bufferedReader().use { it.readText() }
+                val text =
+                    context.applicationContext.assets
+                        .open("emoji.json")
+                        .bufferedReader()
+                        .use { it.readText() }
                 val array = JSONArray(text)
                 buildList(array.length()) {
                     for (i in 0 until array.length()) {
