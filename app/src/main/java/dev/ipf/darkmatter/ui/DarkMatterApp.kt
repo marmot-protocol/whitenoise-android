@@ -1546,7 +1546,9 @@ private fun OtherAccountAvatarsRow(
     onOpenSwitcher: () -> Unit,
 ) {
     val activeLabel = appState.activeAccount?.label
-    val others = appState.accounts.filterNot { it.label == activeLabel }
+    // Signed-in accounts only — a signed-out account is reachable via the full
+    // switcher, not a one-tap switch from here.
+    val others = appState.accounts.filter { it.label != activeLabel && !it.signedOut }
     if (others.isEmpty()) return
     val shown = others.take(MAX_TOP_BAR_OTHER_ACCOUNTS)
     val overflow = others.size - shown.size
@@ -1622,13 +1624,15 @@ private fun OverflowAccountChip(
     count: Int,
     onClick: () -> Unit,
 ) {
+    val description = stringResource(R.string.switch_account)
     Box(
         modifier =
             Modifier
                 .size(TOP_BAR_OTHER_ACCOUNT_SIZE)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surface)
-                .clickable(onClick = onClick),
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
         Box(

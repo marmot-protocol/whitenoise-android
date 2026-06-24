@@ -152,7 +152,8 @@ class IdentityFormatterTest {
 
     @Test
     fun relativeTimeShowsClockTimePastAnHour() {
-        val instant = Instant.now().minusSeconds(7_200L)
+        val now = Instant.now()
+        val instant = now.minusSeconds(7_200L)
         val zone = ZoneId.systemDefault()
         val time =
             DateTimeFormatter
@@ -161,7 +162,7 @@ class IdentityFormatterTest {
                 .withZone(zone)
                 .format(instant)
         val expected =
-            if (instant.atZone(zone).toLocalDate() == Instant.now().atZone(zone).toLocalDate()) {
+            if (instant.atZone(zone).toLocalDate() == now.atZone(zone).toLocalDate()) {
                 time
             } else {
                 DateTimeFormatter
