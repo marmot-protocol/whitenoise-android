@@ -1342,7 +1342,16 @@ class DarkMatterAppState(
                         ?: 0uL
                 }
         }
-        accountUnreadCounts = refreshedCounts
+        // Re-read after the FFI suspension: a single-key merge
+        // (updateAccountUnreadCount / refreshAccountUnreadCount) may have landed
+        // while we were suspended. Those values are fresher than our snapshot, so
+        // let them win for keys we still track; a wholesale assign would clobber
+        // them. Accounts absent from refreshedCounts (removed) are still dropped.
+        val merged = refreshedCounts.toMutableMap()
+        accountUnreadCounts.forEach { (ref, count) ->
+            if (previous[ref] != count && merged.containsKey(ref)) merged[ref] = count
+        }
+        accountUnreadCounts = merged
     }
 
     /**
@@ -1889,7 +1898,13 @@ class DarkMatterAppState(
         val updated = mediaAutoDownloadMatrix.withToggle(type, network, enabled)
         if (updated == mediaAutoDownloadMatrix) return
         mediaAutoDownloadMatrix = updated
-        preferences.edit().putString(mediaAutoDownloadPrefKey(activeAccountRef), updated.toPreference()).apply()
+        // Don't persist to the shared "default" bucket when the active account's
+        // hex can't be resolved yet (early bootstrap, or right after a switch
+        // before refreshAccounts) — that silently diverges from the per-account
+        // value. The in-memory matrix still updates so the UI reflects the toggle;
+        // a later toggle once the account resolves persists it to the right bucket.
+        val key = mediaAutoDownloadPrefKeyOrNull(activeAccountRef) ?: return
+        preferences.edit().putString(key, updated.toPreference()).apply()
     }
 
     fun updateEnterKeyBehavior(behavior: EnterKeyBehavior) {
@@ -1959,14 +1974,16 @@ class DarkMatterAppState(
      */
     private fun loadMediaAutoDownloadMatrix(accountRef: String?): MediaAutoDownloadMatrix {
         val account = accountRef?.let { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex }
-        val key = mediaAutoDownloadPrefKey(accountRef)
-        val stored = preferences.getString(key, null)
+        val key = mediaAutoDownloadPrefKeyOrNull(accountRef)
+        val stored = key?.let { preferences.getString(it, null) }
         if (stored != null) return MediaAutoDownloadMatrix.fromPreference(stored)
         // Only consume the legacy global key once a real account is bound, so
         // the migrated value lands on the user's account rather than the
         // transient pre-bootstrap "default" bucket.
         val seeded = if (account != null) migratedDefaultMatrix() else MediaAutoDownloadMatrix.DEFAULT
-        preferences.edit().putString(key, seeded.toPreference()).apply()
+        // Don't seed the shared "default" bucket when the account is unresolved;
+        // keep DEFAULT in memory and persist once a real account key exists.
+        if (key != null) preferences.edit().putString(key, seeded.toPreference()).apply()
         return seeded
     }
 
@@ -1995,9 +2012,11 @@ class DarkMatterAppState(
         return matrix
     }
 
-    private fun mediaAutoDownloadPrefKey(accountRef: String?): String {
-        val account = accountRef?.let { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex }
-        return "$MEDIA_AUTO_DOWNLOAD_MATRIX_KEY_PREFIX${account ?: "default"}"
+    // Null when the account hex can't be resolved, so the load and write paths
+    // can decline to touch the shared "default" bucket.
+    private fun mediaAutoDownloadPrefKeyOrNull(accountRef: String?): String? {
+        val account = accountRef?.let { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex } ?: return null
+        return "$MEDIA_AUTO_DOWNLOAD_MATRIX_KEY_PREFIX$account"
     }
 
     fun updateLanguageTag(tag: String) {

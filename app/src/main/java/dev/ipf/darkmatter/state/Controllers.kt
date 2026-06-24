@@ -4174,6 +4174,7 @@ class ConversationController(
         // is set) skips the replaceWindow trim above, so prune messageById to the
         // current window + optimistic records here too (#373).
         pruneMessageByIdToWindow(messageById, timelineRecords.keys, optimisticMessages.values)
+        pruneOptimisticEditsToWindow()
         // The pass above already projected every record into the by-id and
         // order indexes (and reconciled optimistics), exactly like the live
         // update paths do — so publish directly. A second full rebuild here
@@ -4265,6 +4266,7 @@ class ConversationController(
         // prune to the (now-bounded) window + optimistic records so it doesn't
         // grow unbounded for an actively-watched conversation (#373).
         pruneMessageByIdToWindow(messageById, timelineRecords.keys, optimisticMessages.values)
+        pruneOptimisticEditsToWindow()
         publishTimelineFromIndexes()
         // Don't relaunch a watcher for a stream finalized in this same batch
         // (start + final records together) — it was just marked removed. See #25.
@@ -4493,6 +4495,17 @@ class ConversationController(
             .take(overflow)
             .mapNotNull { it.projected?.messageIdHex }
             .forEach(::removeProjectedRecord)
+    }
+
+    // Drop optimistic edits whose target message has left the window (no longer
+    // in timelineRecords nor backed by an optimistic record). The status-based
+    // prune in publishTimelineFromIndexesInternal can't fire once aggregated[target]
+    // goes null, so a never-echoed Pending edit would otherwise leak (#691).
+    private fun pruneOptimisticEditsToWindow() {
+        if (optimisticEdits.isEmpty()) return
+        val present = HashSet(timelineRecords.keys)
+        optimisticMessages.values.forEach { present.add(it.record.messageIdHex) }
+        optimisticEdits.keys.retainAll { it in present }
     }
 
     private fun timelineMessageFromProjection(

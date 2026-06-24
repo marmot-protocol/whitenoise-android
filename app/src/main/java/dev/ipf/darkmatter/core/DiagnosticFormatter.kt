@@ -26,8 +26,21 @@ object DiagnosticFormatter {
             is MarmotEventFfi.GroupEvent ->
                 "[${event.accountLabel}] group event"
             is MarmotEventFfi.AccountError ->
-                "[${event.accountLabel}] error: ${event.message}"
+                // The FFI error string is not guaranteed content-free; truncate
+                // so a path that ever interpolates a relay URL, token, or
+                // decrypted content can't leak it in full through this
+                // screen-capturable surface.
+                "[${event.accountLabel}] error: ${redactError(event.message)}"
             is MarmotEventFfi.AgentStreamActivity ->
                 "[${event.accountLabel}] agent stream activity"
         }
+
+    private const val MAX_ERROR_LEN = 80
+
+    private fun redactError(message: String): String {
+        if (message.length <= MAX_ERROR_LEN) return message
+        // Don't truncate mid surrogate pair — that would leave a lone surrogate.
+        val end = if (Character.isHighSurrogate(message[MAX_ERROR_LEN - 1])) MAX_ERROR_LEN - 1 else MAX_ERROR_LEN
+        return message.take(end) + "…"
+    }
 }

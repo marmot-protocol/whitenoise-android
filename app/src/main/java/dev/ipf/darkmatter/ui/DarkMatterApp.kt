@@ -433,6 +433,8 @@ import java.time.format.FormatStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.ceil
@@ -3639,7 +3641,6 @@ private fun NewChatSheet(
                             emptyList()
                         }
                     val recipients = newChatMemberRefs(directMessage, normalizedPending)
-                    pending = ""
                     val account = appState.activeAccountRef ?: return@Button
                     // Reuse an existing 1:1 instead of creating a duplicate.
                     if (directMessage) {
@@ -3665,6 +3666,7 @@ private fun NewChatSheet(
                                 )
                             }
                         }.onSuccess { groupIdHex ->
+                            pending = ""
                             appState.present(R.string.toast_chat_created)
                             // #321/#385: navigate straight into the new
                             // conversation instead of leaving the user on the
@@ -4077,25 +4079,26 @@ private fun MediaImageBubble(
     LaunchedEffect(key, attachmentIndex, epoch, startDownload, reloadToken) {
         if (bitmap != null) return@LaunchedEffect // already have a decoded thumbnail
         if (!startDownload) return@LaunchedEffect
+        // Own optimistic sends still have their bytes only in the pending list
+        // (the projection hasn't reconciled them into the L1 cache yet). Use those
+        // directly so the bubble paints during the upload window instead of hanging
+        // on a missing-epoch FFI.
+        val pendingBytes =
+            if (mine) {
+                controller.pendingAttachmentsList(key).getOrNull(attachmentIndex)?.plaintextBytes
+            } else {
+                null
+            }
         // The imeta-tag parser falls back to sourceEpoch=0 (the wire format
         // doesn't carry it). Calling downloadMedia with epoch=0 errors with
         // "missing encrypted media secret for epoch 0". Wait for the typed
         // reference upgrade via `refreshMediaReferences` — once it lands,
         // `epoch` re-keys this effect with the real value. The spinner stays
         // visible during the wait (bitmap=null, failed=false, startDownload).
-        if (epoch == 0uL) return@LaunchedEffect
+        // Skip the wait when we already hold the pending bytes (own upload window).
+        if (pendingBytes == null && epoch == 0uL) return@LaunchedEffect
         failed = false
         try {
-            // Own optimistic sends still have their bytes only in the
-            // pending list (the projection hasn't reconciled them into the
-            // L1 cache yet). Use those directly so the bubble paints during
-            // the upload window instead of hanging on a missing-epoch FFI.
-            val pendingBytes =
-                if (mine) {
-                    controller.pendingAttachmentsList(key).getOrNull(attachmentIndex)?.plaintextBytes
-                } else {
-                    null
-                }
             val data = pendingBytes ?: controller.downloadAttachment(key, attachmentIndex, reference)
             // Decode a sampled bitmap sized to the bubble — a full 1920px
             // image would be a ~14 MB ARGB_8888 bitmap per visible row.
@@ -13797,7 +13800,9 @@ private fun EmojiPickerSheet(
             EmojiData.search(browseEmoji, searchQuery)
         }
     val grouped = remember(browseEmoji) { browseEmoji.groupBy { it.group } }
-    val recents = remember { RecentEmojiPreferences.load(context).filter { it.isNotBlank() } }
+    val recents by produceState(initialValue = emptyList<String>(), context) {
+        value = withContext(Dispatchers.IO) { RecentEmojiPreferences.load(context).filter { it.isNotBlank() } }
+    }
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     // Grid item index of each section's header, so a bottom category tab scrolls
@@ -13816,7 +13821,7 @@ private fun EmojiPickerSheet(
         }
 
     fun pick(emoji: String) {
-        RecentEmojiPreferences.recordPicked(context, emoji)
+        scope.launch { withContext(Dispatchers.IO) { RecentEmojiPreferences.recordPicked(context, emoji) } }
         onEmojiPicked(emoji)
     }
 
@@ -16896,11 +16901,16 @@ private fun CameraQrScanner(
     val providerRef = remember { AtomicReference<ProcessCameraProvider?>(null) }
     val scannerRef = remember { AtomicReference<BarcodeScanner?>(null) }
     val disposedRef = remember { AtomicBoolean(false) }
+    // Per-frame ML Kit analysis runs here, off the main thread, for as long as
+    // the scanner is open; shut down on dispose. The provider/bind callbacks
+    // still use the main executor (they touch the lifecycle and preview view).
+    val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(Unit) {
         onDispose {
             disposedRef.set(true)
             runCatching { providerRef.getAndSet(null)?.unbindAll() }
             runCatching { scannerRef.getAndSet(null)?.close() }
+            runCatching { analyzerExecutor.shutdown() }
         }
     }
 
@@ -16915,6 +16925,7 @@ private fun CameraQrScanner(
                     providerRef,
                     scannerRef,
                     disposedRef,
+                    analyzerExecutor,
                     onScan,
                     onError,
                 )
@@ -16976,6 +16987,7 @@ private fun bindQrScannerCamera(
     providerRef: AtomicReference<ProcessCameraProvider?>,
     scannerRef: AtomicReference<BarcodeScanner?>,
     disposedRef: AtomicBoolean,
+    analyzerExecutor: Executor,
     onScan: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
@@ -17021,7 +17033,7 @@ private fun bindQrScannerCamera(
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
 
-            analysis.setAnalyzer(executor) { imageProxy ->
+            analysis.setAnalyzer(analyzerExecutor) { imageProxy ->
                 if (!analyzerBusy.compareAndSet(false, true)) {
                     imageProxy.close()
                     return@setAnalyzer
@@ -17036,9 +17048,13 @@ private fun bindQrScannerCamera(
                 scanner
                     .process(image)
                     .addOnSuccessListener { codes ->
+                        // process() can resolve after the sheet is dismissed; don't
+                        // call back into torn-down UI state.
+                        if (disposedRef.get()) return@addOnSuccessListener
                         val raw = codes.firstOrNull { it.rawValue != null }?.rawValue
                         if (raw != null && didScan.compareAndSet(false, true)) onScan(raw)
                     }.addOnFailureListener {
+                        if (disposedRef.get()) return@addOnFailureListener
                         onError(it.message ?: it.javaClass.simpleName)
                     }.addOnCompleteListener {
                         analyzerBusy.set(false)
