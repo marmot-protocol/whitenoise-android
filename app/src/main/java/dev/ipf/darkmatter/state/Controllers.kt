@@ -784,6 +784,24 @@ data class ConversationControllerCopy(
     fun streamFailed(message: String): String = String.format(streamFailedFormat, message)
 }
 
+internal data class AppliedGroupDetails(
+    val group: AppGroupRecordFfi,
+    val members: List<AppGroupMemberRecordFfi>,
+)
+
+internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGroupDetails =
+    AppliedGroupDetails(
+        group = details.group,
+        members =
+            details.members.map {
+                AppGroupMemberRecordFfi(
+                    memberIdHex = it.memberIdHex,
+                    account = it.account,
+                    local = it.local,
+                )
+            },
+    )
+
 internal fun agentStreamFailureText(
     throwable: Throwable,
     copy: ConversationControllerCopy,
@@ -4871,15 +4889,9 @@ class ConversationController(
         account: String,
         details: GroupDetailsFfi,
     ) {
-        group = details.group
-        members =
-            details.members.map {
-                AppGroupMemberRecordFfi(
-                    memberIdHex = it.memberIdHex,
-                    account = it.account,
-                    local = it.local,
-                )
-            }
+        val applied = applyAuthoritativeGroupDetails(details)
+        group = applied.group
+        members = applied.members
         membersLoaded = true
         membersVerified = true
         appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
