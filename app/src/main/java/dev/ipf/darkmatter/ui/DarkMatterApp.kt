@@ -339,6 +339,9 @@ import dev.ipf.darkmatter.core.IdentityFormatter
 import dev.ipf.darkmatter.core.LeaveAction
 import dev.ipf.darkmatter.core.MentionComposer
 import dev.ipf.darkmatter.core.MessageBodyMatch
+import dev.ipf.darkmatter.core.MessageDebugCategory
+import dev.ipf.darkmatter.core.MessageDebugClassifier
+import dev.ipf.darkmatter.core.MessageDebugStyle
 import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageSearch
 import dev.ipf.darkmatter.core.MessageTextCopy
@@ -7308,6 +7311,159 @@ private fun GroupSystemRow(
     }
 }
 
+// Category -> accent color for the streaming-debug row. Kept out of the
+// Compose-free MessageDebugStyle classifier (#315) and resolved here so the
+// pure-Kotlin classifier stays JVM-testable. Literal hues stay legible across
+// the light/dark/amoled themes the app ships.
+private fun MessageDebugCategory.accentColor(): Color =
+    when (this) {
+        MessageDebugCategory.UserVisible -> Color(0xFF2E7D32)
+        MessageDebugCategory.StreamSignaling -> Color(0xFFEF6C00)
+        MessageDebugCategory.AgentChrome -> Color(0xFF7B1FA2)
+        MessageDebugCategory.GroupSystem -> Color(0xFF607D8B)
+        MessageDebugCategory.Control -> Color(0xFFB28900)
+        MessageDebugCategory.Unknown -> Color(0xFFC62828)
+    }
+
+/**
+ * Inline streaming-debug row (#315, iOS parity). Renders a non-user-visible
+ * signaling record (agent-stream-start, reaction, delete, group-system, unknown)
+ * with debug chrome: a category-accented header (category label + kind label),
+ * the kind-specific detail, and a multi-line tag summary, all in a small
+ * monospace caption. Display-only — wires NO reply/long-press gestures and does
+ * no read-marking, mirroring iOS debug-only rows. Only rendered when
+ * [DarkMatterAppState.streamingDebugEnabled] is true.
+ */
+@Composable
+private fun MessageDebugRow(
+    style: MessageDebugStyle,
+    record: AppMessageRecordFfi,
+) {
+    val accent = style.category.accentColor()
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = accent.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(8.dp),
+                    ).border(
+                        width = 1.dp,
+                        color = accent.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                    ).padding(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            val idSuffix =
+                record.messageIdHex
+                    .takeIf { it.isNotBlank() }
+                    ?.take(8)
+                    ?.let { " · $it" } ?: ""
+            Text(
+                text = "${style.category.label} · ${style.kindLabel}$idSuffix",
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = accent,
+            )
+            if (style.detailText.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = style.detailText,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = style.tagsSummary,
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Inline row for one live QUIC agent-stream update shown during streaming debug
+ * (#315, iOS parity with `StreamDebugEventRow`). Surfaces the chunk / status /
+ * progress / record / finished / failed events the conversation otherwise drops,
+ * so cross-platform bug reports line up. Display-only: wires no gestures and does
+ * no read-marking. Only rendered for synthetic `dbg:stream:` timeline rows, which
+ * exist only while [DarkMatterAppState.streamingDebugEnabled] is true.
+ */
+@Composable
+private fun StreamDebugEventRow(record: AppMessageRecordFfi) {
+    val accent = MessageDebugCategory.StreamSignaling.accentColor()
+    val eventKind =
+        record.tags
+            .firstOrNull { it.values.firstOrNull() == "dbg" }
+            ?.values
+            ?.getOrNull(1)
+            ?.takeIf { it.isNotBlank() }
+            ?: "event"
+    val streamId = MessageProjector.streamId(record).orEmpty()
+    val detail = record.plaintext
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = accent.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(8.dp),
+                    ).border(
+                        width = 1.dp,
+                        color = accent.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                    ).padding(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            Text(
+                text = "QUIC · $eventKind · ${MessageDebugCategory.StreamSignaling.label}",
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = accent,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "stream ${shortStreamId(streamId)}",
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (detail.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+// Abbreviate a long stream id to head…tail (iOS shortStreamId), leaving short
+// ids untouched so they stay copy-comparable across platforms.
+private fun shortStreamId(streamId: String): String {
+    if (streamId.length <= 16) return streamId.ifBlank { "(none)" }
+    return "${streamId.take(8)}…${streamId.takeLast(8)}"
+}
+
 // How many rows from the top to begin prefetching the next older page.
 private const val OLDER_PAGE_PREFETCH_ROWS = 4
 
@@ -7464,6 +7620,12 @@ private fun ConversationScreen(
                 copy = controllerCopy,
             )
         }
+    // Streaming debug (#315, iOS parity with refreshStreamingDebugPresentation):
+    // when the developer toggle flips, re-publish the timeline. Turning it off
+    // drops the transient QUIC debug rows so they don't linger after the toggle.
+    LaunchedEffect(controller, appState.streamingDebugEnabled) {
+        controller.refreshStreamingDebugPresentation()
+    }
     var menuOpen by remember { mutableStateOf(false) }
     // Keyed on chat.id so opening a different conversation (e.g. via Message or
     // a shared-group tap from a profile opened on this group's details page)
@@ -9289,6 +9451,29 @@ private fun ConversationScreen(
                                 }
                                 if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
                                     UnreadMessagesDivider(count = entryUnreadCount)
+                                }
+                                // Streaming debug (#315, iOS parity): when the
+                                // developer toggle is on, render non-user-visible
+                                // signaling kinds (agent-stream-start, reactions,
+                                // deletes, group-system, unknown) as a debug row
+                                // instead of their normal rendering. Fully gated
+                                // behind streamingDebugEnabled, so the timeline is
+                                // byte-identical to today when the toggle is off.
+                                if (appState.streamingDebugEnabled) {
+                                    // Live QUIC agent-stream events are surfaced as
+                                    // synthetic `dbg:stream:` rows by the controller
+                                    // (iOS appendStreamDebugEvent parity). Render
+                                    // those first — their synthetic records would
+                                    // otherwise classify as Unknown below.
+                                    if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
+                                        StreamDebugEventRow(record = item.record)
+                                        return@itemsIndexed
+                                    }
+                                    val debugStyle = MessageDebugClassifier.debugStyle(item.record)
+                                    if (!debugStyle.isUserVisibleBubble) {
+                                        MessageDebugRow(style = debugStyle, record = item.record)
+                                        return@itemsIndexed
+                                    }
                                 }
                                 // Group system rows (kind 1210) are derived state
                                 // facts, not chat: render the centered summary row,
@@ -16039,6 +16224,13 @@ private fun SecurityPrivacyScreen(
                     if (appState.developerMode) {
                         HorizontalDivider(Modifier.padding(vertical = 12.dp))
                         SettingsRow(stringResource(R.string.diagnostics), stringResource(R.string.diagnostics_settings_subtitle)) { onOpenDiagnostics() }
+                        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.streaming_debug),
+                            subtitle = stringResource(R.string.streaming_debug_subtitle),
+                            checked = appState.streamingDebugMode,
+                            onCheckedChange = { appState.updateStreamingDebugMode(it) },
+                        )
                     }
                 }
             }

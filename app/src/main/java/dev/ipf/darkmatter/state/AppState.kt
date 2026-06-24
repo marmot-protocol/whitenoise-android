@@ -491,6 +491,24 @@ class DarkMatterAppState(
         private set
 
     /**
+     * Developer-only streaming-debug toggle (#315, iOS parity). When ON, the
+     * conversation renders agent-stream and MLS-signaling kinds as debug rows
+     * inline. Stored independently, but only takes effect through
+     * [streamingDebugEnabled], which also requires [developerMode] — turning
+     * developer mode off suppresses the debug rows without clearing this value.
+     */
+    var streamingDebugMode by mutableStateOf(preferences.getBoolean(STREAMING_DEBUG_MODE_KEY, false))
+        private set
+
+    /**
+     * True only when both developer mode and the streaming-debug toggle are on.
+     * The conversation timeline must read this (never [streamingDebugMode]
+     * alone) so debug rows never leak when developer mode is off.
+     */
+    val streamingDebugEnabled: Boolean
+        get() = developerMode && streamingDebugMode
+
+    /**
      * Force the IME into incognito mode for every text field in the app (#405).
      * Default ON to match the app's privacy positioning: messages typed in an
      * E2EE chat must not leak back out through keyboard learning / cloud sync.
@@ -1797,6 +1815,11 @@ class DarkMatterAppState(
     fun updateDeveloperMode(enabled: Boolean) {
         developerMode = enabled
         preferences.edit().putBoolean(DEVELOPER_MODE_KEY, enabled).apply()
+    }
+
+    fun updateStreamingDebugMode(enabled: Boolean) {
+        streamingDebugMode = enabled
+        preferences.edit().putBoolean(STREAMING_DEBUG_MODE_KEY, enabled).apply()
     }
 
     fun updateForceIncognitoKeyboard(enabled: Boolean) {
@@ -3247,6 +3270,7 @@ class DarkMatterAppState(
     companion object {
         private const val ACTIVE_ACCOUNT_KEY = "active_account"
         private const val DEVELOPER_MODE_KEY = "developer_mode"
+        private const val STREAMING_DEBUG_MODE_KEY = "streaming_debug_mode"
         private const val FORCE_INCOGNITO_KEYBOARD_KEY = "force_incognito_keyboard"
         private const val THEME_MODE_KEY = "theme_mode"
         private const val MEDIA_AUTO_DOWNLOAD_KEY = "media_auto_download"

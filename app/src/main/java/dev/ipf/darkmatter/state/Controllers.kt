@@ -17,6 +17,7 @@ import dev.ipf.darkmatter.core.MessageProjector
 import dev.ipf.darkmatter.core.MessageTextCopy
 import dev.ipf.darkmatter.core.ReactionTally
 import dev.ipf.darkmatter.core.ReplyNavigation
+import dev.ipf.darkmatter.core.StreamDebugEventFormatter
 import dev.ipf.darkmatter.core.TimelineProjector
 import dev.ipf.darkmatter.core.TimelineReplyDisplay
 import dev.ipf.darkmatter.core.aggregateEdits
@@ -770,8 +771,13 @@ internal fun nextReadAnchor(
     currentAnchorId: String?,
     candidateIndex: Int,
 ): String? {
-    val candidateId = timeline.getOrNull(candidateIndex)?.record?.messageIdHex
+    val candidate = timeline.getOrNull(candidateIndex)
+    val candidateId = candidate?.record?.messageIdHex
     if (candidateId.isNullOrBlank()) return currentAnchorId
+    // Synthetic streaming-debug rows (#315) carry a non-hex id and never mark
+    // read; don't let one become the read anchor or it would pin the pointer
+    // off a real message until the next chat row advances it.
+    if (candidateId.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) return currentAnchorId
     if (currentAnchorId == null) return candidateId
     val anchorIdx = timeline.indexOfFirst { it.record.messageIdHex == currentAnchorId }
     return if (anchorIdx < 0 || candidateIndex > anchorIdx) candidateId else currentAnchorId
@@ -2022,6 +2028,15 @@ class ConversationController(
     private var startJob: Job? = null
     private var accountTeardownRequested = false
     private val activeStreamIds = mutableSetOf<String>()
+
+    // Transient streaming-debug rows (#315, iOS parity) keyed by their synthetic
+    // timeline id. Lifecycle-scoped UI state for the live agent-stream watch —
+    // NOT a persistent cache of protocol data (AGENTS.md): they exist only while
+    // the developer toggle is on, are never written to the Dark Matter store, and
+    // are dropped wholesale when the toggle turns off. Bounded so a long-lived
+    // agent-heavy conversation can't grow them without limit.
+    private val streamDebugTimelineItems = linkedMapOf<String, TimelineMessage>()
+    private var streamDebugEventSequence: ULong = 0uL
 
     // Bounded LRU set: tombstones are capped so an agent-heavy conversation
     // kept open for a long time can't grow memory or per-batch filter cost
@@ -4614,7 +4629,7 @@ class ConversationController(
             .map { it.key }
             .forEach(optimisticEdits::remove)
         timeline =
-            (optimisticMessages.values + projected)
+            (optimisticMessages.values + projected + streamDebugTimelineItems.values)
                 .map { it.withOptimisticEditStatus() }
                 .distinctBy { it.id }
                 .sortedWith(::compareTimelineMessages)
@@ -4945,6 +4960,11 @@ class ConversationController(
                 if (streamId in removedStreamIds) {
                     break
                 }
+                // Streaming debug (#315, iOS parity): when the developer toggle
+                // is on, surface every live agent-stream update as a transient
+                // inline debug row, mirroring iOS PR #137's appendStreamDebugEvent.
+                // No-op (and allocation-free past the boolean read) when off.
+                appendStreamDebugEvent(streamId, update)
                 when (update) {
                     is AgentStreamUpdateFfi.Chunk -> {
                         text.append(update.text)
@@ -4968,9 +4988,9 @@ class ConversationController(
                         updateStreamPreview(streamId, copy.streamFailed(update.message), MessageStatus.Failed)
                     }
                     // Typed Hermes-agent variants (Progress / Record / Status)
-                    // arrived with the recent Rust regen. We don't surface
-                    // them in the streaming preview yet — drop silently so
-                    // the loop keeps consuming the next chunk.
+                    // are surfaced only through the streaming-debug rows above;
+                    // they carry no user-visible preview text, so drop them here
+                    // and let the loop keep consuming the next chunk.
                     is AgentStreamUpdateFfi.Progress,
                     is AgentStreamUpdateFfi.Record,
                     is AgentStreamUpdateFfi.Status,
@@ -4989,6 +5009,74 @@ class ConversationController(
             }
             activeStreamIds.remove(streamId)
         }
+    }
+
+    /**
+     * Surface one live agent-stream update as a transient inline streaming-debug
+     * row (#315, iOS parity with PR #137's `appendStreamDebugEvent`). Each row is
+     * a display-only synthetic [TimelineMessage] tagged [STREAM_DEBUG_DIRECTION]
+     * so it never inflates unread counts, marks-read, or reacts; the conversation
+     * renders it as a [StreamDebugEventRow] keyed off the [STREAM_DEBUG_ID_PREFIX]
+     * id. Gated entirely on [DarkMatterAppState.streamingDebugEnabled]: a no-op
+     * (past a single boolean read) when the toggle is off, so the timeline is
+     * byte-identical to today. Surfaces Chunk / Status / Progress / Record /
+     * Finished / Failed — the variants the iOS reference shows live.
+     */
+    private fun appendStreamDebugEvent(
+        streamId: String,
+        update: AgentStreamUpdateFfi,
+    ) {
+        if (!appState.streamingDebugEnabled) return
+        val event = StreamDebugEventFormatter.of(update)
+        streamDebugEventSequence += 1uL
+        val now = nowSeconds()
+        // Zero-pad the sequence so same-second rows keep insertion order under
+        // the `id` tiebreak in `compareTimelineMessages`.
+        val id = "$STREAM_DEBUG_ID_PREFIX$streamId:$now:${streamDebugEventSequence.toString().padStart(20, '0')}"
+        val record =
+            AppMessageRecordFfi(
+                messageIdHex = id,
+                direction = STREAM_DEBUG_DIRECTION,
+                groupIdHex = group.groupIdHex,
+                sender = inferStreamSender(streamId),
+                plaintext = event.detail,
+                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                kind = STREAM_DEBUG_KIND,
+                tags = listOf(MessageProjector.streamTag(streamId), MessageTagFfi(listOf("dbg", event.eventKind))),
+                recordedAt = now,
+                receivedAt = now,
+            )
+        val item =
+            TimelineMessage(
+                id = id,
+                record = record,
+                status = MessageStatus.Sent,
+                timelineOrder = nextOptimisticTimelineOrder(),
+            )
+        streamDebugTimelineItems[id] = item
+        // Bound the retained rows: a long-lived agent-heavy conversation could
+        // otherwise accrete debug rows without limit while the toggle stays on.
+        while (streamDebugTimelineItems.size > MAX_STREAM_DEBUG_ROWS) {
+            val oldest = streamDebugTimelineItems.keys.first()
+            streamDebugTimelineItems.remove(oldest)
+        }
+        publishTimelineFromIndexes()
+    }
+
+    /**
+     * Re-publish the timeline after the streaming-debug toggle may have changed.
+     * Clears the transient debug rows when the effective toggle is off (mirrors
+     * iOS `refreshStreamingDebugPresentation`) so they don't linger once the
+     * developer turns it back off. Called from the conversation screen on the
+     * `streamingDebugEnabled` transition. When on, this is a plain republish.
+     */
+    fun refreshStreamingDebugPresentation() {
+        if (!appState.streamingDebugEnabled) {
+            if (streamDebugTimelineItems.isEmpty()) return
+            streamDebugTimelineItems.clear()
+            streamDebugEventSequence = 0uL
+        }
+        publishTimelineFromIndexes()
     }
 
     private fun updateStreamPreview(
@@ -5092,6 +5180,23 @@ class ConversationController(
             a.reactions == b.reactions
 
     companion object {
+        // Streaming-debug rows (#315, iOS parity). Synthetic timeline ids carry
+        // this prefix so the conversation can render them as StreamDebugEventRow
+        // and so they sort/key distinctly from real messages.
+        internal const val STREAM_DEBUG_ID_PREFIX = "dbg:stream:"
+
+        // Synthetic `direction` for debug rows: anything other than "received"
+        // keeps them out of unread counts (firstUnreadReceivedIndex /
+        // countUnreadIncoming only tally "received" rows).
+        private const val STREAM_DEBUG_DIRECTION = "debug"
+
+        // Sentinel kind for debug-row synthetic records; not a real Nostr kind,
+        // never round-trips to the engine.
+        private const val STREAM_DEBUG_KIND: ULong = 0uL
+
+        // Cap retained transient debug rows while the toggle stays on, oldest-first.
+        private const val MAX_STREAM_DEBUG_ROWS = 200
+
         /**
          * 32 MiB cap on retained compressed bytes for in-flight/failed
          * uploads. A few failed images stay retryable without letting an
