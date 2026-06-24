@@ -102,6 +102,7 @@ class NotificationChannelSpecTest {
         isDm: Boolean = false,
         reactionEmoji: String? = null,
     ) = NotificationUpdateFfi(
+        isMention = false,
         notificationKey = "key",
         conversationKey = "conversation",
         trigger = trigger,

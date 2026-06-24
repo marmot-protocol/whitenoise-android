@@ -983,6 +983,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1083,6 +1085,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_delete_account_key_package(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`eventIdHex`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_delete_audit_log_file(`ptr`: Pointer,`path`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_delete_group_local(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_delete_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,
     ): Long
@@ -1450,6 +1454,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_delete_audit_log_file(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_delete_group_local(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_delete_message(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_demote_admin(
@@ -1737,6 +1743,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_delete_audit_log_file() != 6934.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_delete_group_local() != 3764.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_delete_message() != 13951.toShort()) {
@@ -3897,6 +3906,18 @@ public interface MarmotInterface {
     suspend fun `deleteAuditLogFile`(`path`: kotlin.String): AuditLogDeleteResultFfi
     
     /**
+     * Delete this group's local app data without performing an MLS leave. The
+     * caller should cancel any active UI subscriptions for the group before
+     * invoking the wipe. The runtime removes the active transport route, then
+     * transactionally drops the chat-list/account projection, plaintext app
+     * events, timeline rows, agent-stream projection rows, push-token rows, and
+     * cached encrypted-media epoch secrets. MLS/OpenMLS group state is left
+     * intact; a future fresh group delivery can recreate a local chat row.
+     * Returns true if any local rows or a live route were removed.
+     */
+    suspend fun `deleteGroupLocal`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): kotlin.Boolean
+    
+    /**
      * Mark `target_message_id` deleted for the whole group. This is a
      * tombstone — the original stays in everyone's store; clients render a
      * "message deleted" placeholder.
@@ -4909,6 +4930,37 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
         { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeAuditLogDeleteResultFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Delete this group's local app data without performing an MLS leave. The
+     * caller should cancel any active UI subscriptions for the group before
+     * invoking the wipe. The runtime removes the active transport route, then
+     * transactionally drops the chat-list/account projection, plaintext app
+     * events, timeline rows, agent-stream projection rows, push-token rows, and
+     * cached encrypted-media epoch secrets. MLS/OpenMLS group state is left
+     * intact; a future fresh group delivery can recreate a local chat row.
+     * Returns true if any local rows or a live route were removed.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `deleteGroupLocal`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : kotlin.Boolean {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_delete_group_local(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_i8(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_i8(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_i8(future) },
+        // lift function
+        { FfiConverterBoolean.lift(it) },
         // Error FFI converter
         MarmotKitException.ErrorHandler,
     )
@@ -7905,7 +7957,7 @@ public object FfiConverterTypeAccountKeyPackageFfi: FfiConverterRustBuffer<Accou
 
 data class AccountRelayListsFfi (
     var `complete`: kotlin.Boolean, 
-    var `missing`: List<kotlin.String>, 
+    var `missing`: List<MissingRelayListKindFfi>, 
     var `defaultRelays`: List<kotlin.String>, 
     var `bootstrapRelays`: List<kotlin.String>, 
     var `nip65`: RelayListFfi, 
@@ -7922,7 +7974,7 @@ public object FfiConverterTypeAccountRelayListsFfi: FfiConverterRustBuffer<Accou
     override fun read(buf: ByteBuffer): AccountRelayListsFfi {
         return AccountRelayListsFfi(
             FfiConverterBoolean.read(buf),
-            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceTypeMissingRelayListKindFfi.read(buf),
             FfiConverterSequenceString.read(buf),
             FfiConverterSequenceString.read(buf),
             FfiConverterTypeRelayListFfi.read(buf),
@@ -7932,7 +7984,7 @@ public object FfiConverterTypeAccountRelayListsFfi: FfiConverterRustBuffer<Accou
 
     override fun allocationSize(value: AccountRelayListsFfi) = (
             FfiConverterBoolean.allocationSize(value.`complete`) +
-            FfiConverterSequenceString.allocationSize(value.`missing`) +
+            FfiConverterSequenceTypeMissingRelayListKindFfi.allocationSize(value.`missing`) +
             FfiConverterSequenceString.allocationSize(value.`defaultRelays`) +
             FfiConverterSequenceString.allocationSize(value.`bootstrapRelays`) +
             FfiConverterTypeRelayListFfi.allocationSize(value.`nip65`) +
@@ -7941,7 +7993,7 @@ public object FfiConverterTypeAccountRelayListsFfi: FfiConverterRustBuffer<Accou
 
     override fun write(value: AccountRelayListsFfi, buf: ByteBuffer) {
             FfiConverterBoolean.write(value.`complete`, buf)
-            FfiConverterSequenceString.write(value.`missing`, buf)
+            FfiConverterSequenceTypeMissingRelayListKindFfi.write(value.`missing`, buf)
             FfiConverterSequenceString.write(value.`defaultRelays`, buf)
             FfiConverterSequenceString.write(value.`bootstrapRelays`, buf)
             FfiConverterTypeRelayListFfi.write(value.`nip65`, buf)
@@ -8850,6 +8902,8 @@ data class ChatListRowFfi (
     var `lastMessage`: ChatListMessagePreviewFfi?, 
     var `unreadCount`: kotlin.ULong, 
     var `hasUnread`: kotlin.Boolean, 
+    var `unreadMentionCount`: kotlin.ULong, 
+    var `unreadMention`: kotlin.Boolean, 
     var `firstUnreadMessageIdHex`: kotlin.String?, 
     var `lastReadMessageIdHex`: kotlin.String?, 
     var `lastReadTimelineAt`: kotlin.ULong?, 
@@ -8875,6 +8929,8 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterOptionalTypeChatListMessagePreviewFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalULong.read(buf),
@@ -8893,6 +8949,8 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterOptionalTypeChatListMessagePreviewFfi.allocationSize(value.`lastMessage`) +
             FfiConverterULong.allocationSize(value.`unreadCount`) +
             FfiConverterBoolean.allocationSize(value.`hasUnread`) +
+            FfiConverterULong.allocationSize(value.`unreadMentionCount`) +
+            FfiConverterBoolean.allocationSize(value.`unreadMention`) +
             FfiConverterOptionalString.allocationSize(value.`firstUnreadMessageIdHex`) +
             FfiConverterOptionalString.allocationSize(value.`lastReadMessageIdHex`) +
             FfiConverterOptionalULong.allocationSize(value.`lastReadTimelineAt`) +
@@ -8910,6 +8968,8 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterOptionalTypeChatListMessagePreviewFfi.write(value.`lastMessage`, buf)
             FfiConverterULong.write(value.`unreadCount`, buf)
             FfiConverterBoolean.write(value.`hasUnread`, buf)
+            FfiConverterULong.write(value.`unreadMentionCount`, buf)
+            FfiConverterBoolean.write(value.`unreadMention`, buf)
             FfiConverterOptionalString.write(value.`firstUnreadMessageIdHex`, buf)
             FfiConverterOptionalString.write(value.`lastReadMessageIdHex`, buf)
             FfiConverterOptionalULong.write(value.`lastReadTimelineAt`, buf)
@@ -9329,7 +9389,15 @@ data class GroupSystemEventFfi (
     var `text`: kotlin.String, 
     var `actorAccountIdHex`: kotlin.String?, 
     var `subjectAccountIdHex`: kotlin.String?, 
-    var `name`: kotlin.String?
+    var `name`: kotlin.String?, 
+    /**
+     * Previous disappearing-message retention in seconds; `0` means off.
+     */
+    var `oldRetentionSeconds`: kotlin.ULong?, 
+    /**
+     * New disappearing-message retention in seconds; `0` means off.
+     */
+    var `newRetentionSeconds`: kotlin.ULong?
 ) {
     
     companion object
@@ -9346,6 +9414,8 @@ public object FfiConverterTypeGroupSystemEventFfi: FfiConverterRustBuffer<GroupS
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
         )
     }
 
@@ -9354,7 +9424,9 @@ public object FfiConverterTypeGroupSystemEventFfi: FfiConverterRustBuffer<GroupS
             FfiConverterString.allocationSize(value.`text`) +
             FfiConverterOptionalString.allocationSize(value.`actorAccountIdHex`) +
             FfiConverterOptionalString.allocationSize(value.`subjectAccountIdHex`) +
-            FfiConverterOptionalString.allocationSize(value.`name`)
+            FfiConverterOptionalString.allocationSize(value.`name`) +
+            FfiConverterOptionalULong.allocationSize(value.`oldRetentionSeconds`) +
+            FfiConverterOptionalULong.allocationSize(value.`newRetentionSeconds`)
     )
 
     override fun write(value: GroupSystemEventFfi, buf: ByteBuffer) {
@@ -9363,6 +9435,8 @@ public object FfiConverterTypeGroupSystemEventFfi: FfiConverterRustBuffer<GroupS
             FfiConverterOptionalString.write(value.`actorAccountIdHex`, buf)
             FfiConverterOptionalString.write(value.`subjectAccountIdHex`, buf)
             FfiConverterOptionalString.write(value.`name`, buf)
+            FfiConverterOptionalULong.write(value.`oldRetentionSeconds`, buf)
+            FfiConverterOptionalULong.write(value.`newRetentionSeconds`, buf)
     }
 }
 
@@ -10034,6 +10108,7 @@ data class NotificationUpdateFfi (
     var `groupIdHex`: kotlin.String, 
     var `groupName`: kotlin.String?, 
     var `isDm`: kotlin.Boolean, 
+    var `isMention`: kotlin.Boolean, 
     var `messageIdHex`: kotlin.String?, 
     var `sender`: NotificationUserFfi, 
     var `receiver`: NotificationUserFfi, 
@@ -10061,6 +10136,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterTypeNotificationUserFfi.read(buf),
             FfiConverterTypeNotificationUserFfi.read(buf),
@@ -10081,6 +10157,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterString.allocationSize(value.`groupIdHex`) +
             FfiConverterOptionalString.allocationSize(value.`groupName`) +
             FfiConverterBoolean.allocationSize(value.`isDm`) +
+            FfiConverterBoolean.allocationSize(value.`isMention`) +
             FfiConverterOptionalString.allocationSize(value.`messageIdHex`) +
             FfiConverterTypeNotificationUserFfi.allocationSize(value.`sender`) +
             FfiConverterTypeNotificationUserFfi.allocationSize(value.`receiver`) +
@@ -10100,6 +10177,7 @@ public object FfiConverterTypeNotificationUpdateFfi: FfiConverterRustBuffer<Noti
             FfiConverterString.write(value.`groupIdHex`, buf)
             FfiConverterOptionalString.write(value.`groupName`, buf)
             FfiConverterBoolean.write(value.`isDm`, buf)
+            FfiConverterBoolean.write(value.`isMention`, buf)
             FfiConverterOptionalString.write(value.`messageIdHex`, buf)
             FfiConverterTypeNotificationUserFfi.write(value.`sender`, buf)
             FfiConverterTypeNotificationUserFfi.write(value.`receiver`, buf)
@@ -13495,6 +13573,48 @@ public object FfiConverterTypeMessageUpdateFfi : FfiConverterRustBuffer<MessageU
 
 
 
+/**
+ * A relay list the account is missing, as a stable typed variant clients
+ * localize without parsing strings (darkmatter#565).
+ */
+
+enum class MissingRelayListKindFfi {
+    
+    /**
+     * NIP-65 relay list — where this account publishes (outbox/write-side).
+     */
+    NIP65,
+    /**
+     * Marmot inbox relay list — where this account receives (inbox/read-side).
+     */
+    INBOX;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMissingRelayListKindFfi: FfiConverterRustBuffer<MissingRelayListKindFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        MissingRelayListKindFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MissingRelayListKindFfi) = 4UL
+
+    override fun write(value: MissingRelayListKindFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
 
 enum class NotificationCollectionStatusFfi {
     
@@ -15506,6 +15626,34 @@ public object FfiConverterSequenceTypeMarkdownInlineFfi: FfiConverterRustBuffer<
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMarkdownInlineFfi.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMissingRelayListKindFfi: FfiConverterRustBuffer<List<MissingRelayListKindFfi>> {
+    override fun read(buf: ByteBuffer): List<MissingRelayListKindFfi> {
+        val len = buf.getInt()
+        return List<MissingRelayListKindFfi>(len) {
+            FfiConverterTypeMissingRelayListKindFfi.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MissingRelayListKindFfi>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMissingRelayListKindFfi.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MissingRelayListKindFfi>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMissingRelayListKindFfi.write(it, buf)
         }
     }
 }

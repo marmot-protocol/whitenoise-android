@@ -201,6 +201,8 @@ class ChatListTitleTest {
         groupId: String,
         rawTitle: String,
     ) = ChatListRowFfi(
+        unreadMentionCount = 0uL,
+        unreadMention = false,
         groupIdHex = groupId,
         archived = false,
         pendingConfirmation = false,

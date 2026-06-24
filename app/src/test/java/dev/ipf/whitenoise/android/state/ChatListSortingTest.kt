@@ -172,6 +172,8 @@ class ChatListSortingTest {
         latestAt: ULong,
         unreadCount: ULong,
     ) = ChatListRowFfi(
+        unreadMentionCount = 0uL,
+        unreadMention = false,
         groupIdHex = groupId,
         archived = false,
         pendingConfirmation = false,
@@ -203,6 +205,8 @@ class ChatListSortingTest {
         title: String,
         updatedAt: ULong,
     ) = ChatListRowFfi(
+        unreadMentionCount = 0uL,
+        unreadMention = false,
         groupIdHex = groupId,
         archived = false,
         pendingConfirmation = false,

@@ -295,6 +295,8 @@ class ChatListProjectionReducerTest {
         preview: ChatListMessagePreviewFfi? = preview(),
         updatedAt: ULong = 1uL,
     ) = ChatListRowFfi(
+        unreadMentionCount = 0uL,
+        unreadMention = false,
         groupIdHex = groupId,
         archived = archived,
         pendingConfirmation = pendingConfirmation,

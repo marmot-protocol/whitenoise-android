@@ -62,6 +62,7 @@ class LocalNotificationPolicyTest {
         groupIdHex: String,
         accountRef: String = "account",
     ) = NotificationUpdateFfi(
+        isMention = false,
         notificationKey = "message:$accountRef:message",
         conversationKey = "conversation:$accountRef:$groupIdHex",
         trigger = NotificationTriggerFfi.NEW_MESSAGE,

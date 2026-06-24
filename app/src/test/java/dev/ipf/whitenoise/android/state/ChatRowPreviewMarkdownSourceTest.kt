@@ -103,6 +103,8 @@ class ChatRowPreviewMarkdownSourceTest {
                 deleted = deleted,
             ),
     ) = ChatListRowFfi(
+        unreadMentionCount = 0uL,
+        unreadMention = false,
         groupIdHex = "group-1",
         archived = false,
         pendingConfirmation = false,
