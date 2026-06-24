@@ -309,7 +309,7 @@ object VoicePlaybackController {
     /** Pause the active player (no-op if nothing is active). */
     fun pause() {
         val mp = player ?: return
-        if (mp.isPlaying) {
+        if (runCatching { mp.isPlaying }.getOrDefault(false)) {
             mp.pause()
             _state.value =
                 _state.value.copy(
