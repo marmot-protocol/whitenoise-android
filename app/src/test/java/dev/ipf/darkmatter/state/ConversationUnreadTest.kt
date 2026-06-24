@@ -200,6 +200,18 @@ class ConversationUnreadTest {
     }
 
     @Test
+    fun nextAnchor_streamDebugRowCandidate_keepsCurrentAnchor() {
+        // Synthetic streaming-debug rows carry a non-hex `dbg:stream:` id and
+        // never mark read. Settling on one must not move the read pointer off
+        // the last real message.
+        val debugId = "${ConversationController.STREAM_DEBUG_ID_PREFIX}abc:1:00000000000000000001"
+        val timeline = listOf(received("r1"), message(id = debugId, direction = "debug"))
+        assertEquals("r1", nextReadAnchor(timeline, currentAnchorId = "r1", candidateIndex = 1))
+        // Even with no prior anchor, a debug row can't become the first anchor.
+        assertEquals(null, nextReadAnchor(timeline, currentAnchorId = null, candidateIndex = 1))
+    }
+
+    @Test
     fun nextAnchor_currentAnchorEvicted_resetsToCandidate() {
         val timeline = listOf(received("r2"), received("r3"))
         // "r1" trimmed out of the window -> anchorIdx < 0 -> adopt candidate.
