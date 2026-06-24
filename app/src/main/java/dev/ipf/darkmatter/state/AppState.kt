@@ -2496,6 +2496,11 @@ class DarkMatterAppState(
         return shortNpub(accountIdHex)
     }
 
+    // Pure read for use inside remember{}: returns the cached display name or the
+    // short npub, without the requestProfile() prefetch side-effect. Callers drive
+    // the prefetch from a LaunchedEffect (e.g. requestProfiles over the roster).
+    fun chatMemberTitleCached(accountIdHex: String): String = profileDisplayName(accountIdHex) ?: shortNpub(accountIdHex)
+
     private fun profileDisplayName(accountIdHex: String): String? = profilePresentation(accountIdHex).displayName
 
     fun shortNpub(accountIdHex: String): String {

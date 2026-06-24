@@ -9250,6 +9250,11 @@ private fun ConversationScreen(
                             // The list already arrives most-recently-active first from
                             // the roster, and MentionComposer.filter preserves order.
                             val mentionPickerEnabled = !controller.isDm
+                            LaunchedEffect(mentionPickerEnabled, controller.members) {
+                                if (mentionPickerEnabled) {
+                                    appState.requestProfiles(controller.members.map { it.memberIdHex })
+                                }
+                            }
                             val mentionCandidates =
                                 if (mentionPickerEnabled) {
                                     val revision = appState.profileRevisionForCompose
@@ -9266,7 +9271,7 @@ private fun ConversationScreen(
                                                 MentionComposer.Candidate(
                                                     accountIdHex = member.memberIdHex,
                                                     npub = appState.npub(member.memberIdHex),
-                                                    displayName = appState.chatMemberTitle(member.memberIdHex),
+                                                    displayName = appState.chatMemberTitleCached(member.memberIdHex),
                                                     nip05 = appState.userProfile(member.memberIdHex)?.nip05,
                                                 )
                                             }
@@ -10212,6 +10217,12 @@ private fun GroupDetailsScreen(
                 // the comparator does pure reads. lowercase(Locale.ROOT) keeps
                 // ordering consistent across device locales (e.g. Turkish I).
                 val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                // Prefetch member profiles here so the title map below can stay a
+                // pure read (chatMemberTitleCached); the profile-revision key
+                // recomposes the sort once names land.
+                LaunchedEffect(controller.members) {
+                    appState.requestProfiles(controller.members.map { it.memberIdHex })
+                }
                 val displayedMembers =
                     remember(
                         controller.members,
@@ -10221,7 +10232,7 @@ private fun GroupDetailsScreen(
                         val titlesByHex =
                             controller.members.associate {
                                 it.memberIdHex to
-                                    appState.chatMemberTitle(it.memberIdHex).lowercase(Locale.ROOT)
+                                    appState.chatMemberTitleCached(it.memberIdHex).lowercase(Locale.ROOT)
                             }
                         controller.members.sortedWith(
                             compareBy(
@@ -10396,6 +10407,9 @@ private fun GroupDetailsScreen(
             modifier = amoledModalSheetModifier(),
             onDismissRequest = {
                 showAddMember = false
+                pendingMember = ""
+                pendingMemberError = null
+                pendingMemberPreview = RecipientResolution.Empty
                 pendingMemberAsAdmin = false
             },
         ) {
