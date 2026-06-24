@@ -40,6 +40,8 @@
     <string name="recipient_preview_unresolved">Impossibile risolvere questo identificatore</string>
     <string name="recipient_preview_nip05_verified">Indirizzo verificato</string>
     <string name="recipient_preview_nip05_unverified">Indirizzo non verificato</string>
+    <string name="recipient_already_in_chats">Già nelle chat</string>
+    <string name="recipient_open_existing_chat">Apri chat esistente</string>
     <string name="chat_row_action_archive">Archivia</string>
     <string name="chat_row_action_unarchive">Ripristina</string>
     <string name="chat_row_action_mark_read">Segna come letto</string>

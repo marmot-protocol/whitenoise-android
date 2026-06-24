@@ -40,6 +40,8 @@
     <string name="recipient_preview_unresolved">Не удалось разрешить этот идентификатор</string>
     <string name="recipient_preview_nip05_verified">Подтверждённый адрес</string>
     <string name="recipient_preview_nip05_unverified">Неподтверждённый адрес</string>
+    <string name="recipient_already_in_chats">Уже в чатах</string>
+    <string name="recipient_open_existing_chat">Открыть существующий чат</string>
     <string name="chat_row_action_archive">Архивировать</string>
     <string name="chat_row_action_unarchive">Восстановить</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>

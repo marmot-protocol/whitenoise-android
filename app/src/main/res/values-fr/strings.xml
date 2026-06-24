@@ -40,6 +40,8 @@
     <string name="recipient_preview_unresolved">Impossible de résoudre cet identifiant</string>
     <string name="recipient_preview_nip05_verified">Adresse vérifiée</string>
     <string name="recipient_preview_nip05_unverified">Adresse non vérifiée</string>
+    <string name="recipient_already_in_chats">Déjà dans les discussions</string>
+    <string name="recipient_open_existing_chat">Ouvrir la discussion existante</string>
     <string name="chat_row_action_archive">Archiver</string>
     <string name="chat_row_action_unarchive">Désarchiver</string>
     <string name="chat_row_action_mark_read">Marquer comme lu</string>

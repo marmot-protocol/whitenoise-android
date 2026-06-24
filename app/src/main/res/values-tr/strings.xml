@@ -40,6 +40,8 @@
     <string name="recipient_preview_unresolved">Bu tanımlayıcı çözümlenemedi</string>
     <string name="recipient_preview_nip05_verified">Doğrulanmış adres</string>
     <string name="recipient_preview_nip05_unverified">Doğrulanmamış adres</string>
+    <string name="recipient_already_in_chats">Zaten sohbetlerde</string>
+    <string name="recipient_open_existing_chat">Mevcut sohbeti aç</string>
     <string name="chat_row_action_archive">Arşivle</string>
     <string name="chat_row_action_unarchive">Arşivden çıkar</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
