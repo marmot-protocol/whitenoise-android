@@ -3034,7 +3034,7 @@ class ConversationController(
         emoji: String,
         message: AppMessageRecordFfi,
     ) {
-        val account = appState.activeAccountRef ?: return
+        val account = conversationAccountRef ?: return
         if (!canSendMessages) return
         val target = message.messageIdHex.takeIf { it.isNotBlank() } ?: return
         val alreadyMine = reactions[target]?.any { it.emoji == emoji && it.mine } == true
@@ -3101,7 +3101,7 @@ class ConversationController(
     }
 
     suspend fun deleteMessage(message: AppMessageRecordFfi) {
-        val account = appState.activeAccountRef ?: return
+        val account = conversationAccountRef ?: return
         if (!canSendMessages) return
         val target = message.messageIdHex.takeIf { it.isNotBlank() } ?: return
         deletedMessageIds = deletedMessageIds + target
@@ -3127,7 +3127,7 @@ class ConversationController(
         targetMessageId: String,
         content: String,
     ) {
-        val account = appState.activeAccountRef ?: return
+        val account = conversationAccountRef ?: return
         if (!canSendMessages) return
         val target = targetMessageId.takeIf { it.isNotBlank() } ?: return
         val trimmed = content.trim()
@@ -3612,7 +3612,7 @@ class ConversationController(
     suspend fun leaveGroup(displayName: String? = null): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
-            val account = appState.activeAccountRef ?: return false
+            val account = conversationAccountRef ?: return false
             if (!canLeaveGroup) {
                 appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
                 return false
@@ -3662,7 +3662,7 @@ class ConversationController(
         notify: Boolean = true,
         autoAccepted: Boolean = false,
     ): Boolean {
-        val account = appState.activeAccountRef ?: return false
+        val account = conversationAccountRef ?: return false
         return runCatching {
             group =
                 if (autoAccepted) {
@@ -3693,7 +3693,7 @@ class ConversationController(
     }
 
     suspend fun declineInvite(): Boolean {
-        val account = appState.activeAccountRef ?: return false
+        val account = conversationAccountRef ?: return false
         return runCatching {
             appState.marmotIo { declineGroupInvite(account, group.groupIdHex) }
             appState.dismissConversationNotifications(account, group.groupIdHex)
@@ -3712,7 +3712,7 @@ class ConversationController(
     suspend fun setArchived(archived: Boolean): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
-            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatching {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     val updated = appState.marmotIo { setGroupArchived(account, group.groupIdHex, archived) }
@@ -3735,7 +3735,7 @@ class ConversationController(
     ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
-            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatching {
                 appState.marmotIo {
                     updateGroupProfile(
@@ -3758,7 +3758,7 @@ class ConversationController(
     suspend fun updateGroupAvatarUrl(url: String?): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
-            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            val account = conversationAccountRef ?: return@withMutationLockResult false
             // The Rust side validates + normalizes the URL (https-only, no
             // private hosts). We only set the URL here; dim/thumbhash are
             // optimization hints we don't compute on Android, so clear them.
@@ -3786,7 +3786,7 @@ class ConversationController(
     ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
-            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            val account = conversationAccountRef ?: return@withMutationLockResult false
             val refs = memberRefs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
             if (refs.isEmpty()) return@withMutationLockResult false
             val adminTargets =
@@ -3834,7 +3834,7 @@ class ConversationController(
     suspend fun removeMember(member: AppGroupMemberRecordFfi): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
-            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            val account = conversationAccountRef ?: return@withMutationLockResult false
             // remove_members signs a roster update for a Nostr pubkey, so use the
             // stable member id. memberRef may be a local account label.
             val target = member.memberIdHex
@@ -3874,7 +3874,7 @@ class ConversationController(
     ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
-            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            val account = conversationAccountRef ?: return@withMutationLockResult false
             // promote_admin / demote_admin sign the new admin list onto the MLS
             // group, so they require a Nostr pubkey hex — not a local-account
             // label. memberRef can return either; memberIdHex is always the hex.
@@ -3909,7 +3909,7 @@ class ConversationController(
     suspend fun stepDownAsAdmin(): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
-            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            val account = conversationAccountRef ?: return@withMutationLockResult false
             val activeAccountIdHex = appState.activeAccount?.accountIdHex ?: return@withMutationLockResult false
             if (!GroupProjector.isAdminRef(group, activeAccountIdHex)) return@withMutationLockResult false
             if (group.admins.distinctBy { it.lowercase() }.size <= 1) {
@@ -3946,7 +3946,7 @@ class ConversationController(
     suspend fun transferAdmin(member: AppGroupMemberRecordFfi): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
-            val account = appState.activeAccountRef ?: return@withMutationLockResult false
+            val account = conversationAccountRef ?: return@withMutationLockResult false
             val activeAccountIdHex = appState.activeAccount?.accountIdHex
             // promote_admin / self_demote_admin sign the new admin list onto
             // the MLS group, so the grant target needs a Nostr pubkey hex, not
@@ -4002,7 +4002,7 @@ class ConversationController(
     fun memberAvatarUrl(member: AppGroupMemberRecordFfi): String? = appState.avatarUrl(member.memberIdHex)
 
     suspend fun groupMlsState(): AppGroupMlsStateFfi? {
-        val account = appState.activeAccountRef ?: return null
+        val account = conversationAccountRef ?: return null
         return runCatching {
             appState.marmotIo { groupMlsState(account, group.groupIdHex) }
         }.onFailure {
@@ -4813,7 +4813,7 @@ class ConversationController(
     }
 
     private suspend fun refreshMembers() {
-        val account = appState.activeAccountRef ?: return
+        val account = conversationAccountRef ?: return
         runCatching {
             // Force OpenMLS replay before trusting cached group details. For an
             // evicted account this is where Rust currently reports
@@ -4856,7 +4856,7 @@ class ConversationController(
      * with `missing encrypted media secret for epoch 0`.
      */
     private suspend fun refreshMediaReferences() {
-        val account = appState.activeAccountRef ?: return
+        val account = conversationAccountRef ?: return
         runCatching {
             appState.marmotIo { listMedia(account, group.groupIdHex, null) }
         }.onSuccess { records ->

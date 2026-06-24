@@ -4457,8 +4457,9 @@ internal fun MediaVideoGridTile(
     var startDownload by remember(messageIdHex, attachmentIndex, appState.mediaAutoDownloadMatrix) {
         mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video))
     }
+    var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(0) }
 
-    LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload) {
+    LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload, reloadToken) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
         if (!mine && epoch == 0uL) return@LaunchedEffect
@@ -4510,7 +4511,14 @@ internal fun MediaVideoGridTile(
                 onLongClick = onLongPress,
                 onClick = {
                     val f = localFile
-                    if (f != null) onTap(f) else startDownload = true
+                    when {
+                        f != null -> onTap(f)
+                        failed -> {
+                            failed = false
+                            reloadToken++
+                        }
+                        else -> startDownload = true
+                    }
                 },
             ),
     ) {
@@ -6152,18 +6160,25 @@ private fun PendingGridTile(
  *  decoding or when [bytes] is null/undecodable. */
 @Composable
 private fun rememberSampledBitmap(bytes: ByteArray?): ImageBitmap? {
-    var bitmap by remember(bytes) { mutableStateOf<ImageBitmap?>(null) }
+    var bitmap by remember(bytes) { mutableStateOf<android.graphics.Bitmap?>(null) }
     LaunchedEffect(bytes) {
         bitmap =
             if (bytes == null) {
                 null
             } else {
                 withContext(Dispatchers.Default) {
-                    MediaPipeline.decodeSampledBitmap(bytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)?.asImageBitmap()
+                    MediaPipeline.decodeSampledBitmap(bytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
                 }
             }
     }
-    return bitmap
+    // Recycle the multi-MB ARGB buffer on key change and dispose instead of
+    // leaving it to the GC, mirroring ViewerPage. Capture the instance so a
+    // key change recycles the previous bitmap, not the replacement.
+    DisposableEffect(bitmap) {
+        val decoded = bitmap
+        onDispose { decoded?.recycle() }
+    }
+    return remember(bitmap) { bitmap?.asImageBitmap() }
 }
 
 /**
@@ -6258,7 +6273,9 @@ internal fun FullScreenMediaViewer(
             initialPage = startIndex.coerceIn(0, pages.lastIndex),
             pageCount = { pages.size },
         )
-    val currentPage = pages[pagerState.currentPage]
+    // pagerState outlives a shrinking pages list (album reconcile): currentPage
+    // isn't re-clamped to the new lastIndex for a frame, so clamp at the read.
+    val currentPage = pages[pagerState.currentPage.coerceIn(0, pages.lastIndex)]
     val currentReference = currentPage.reference
     val currentAttachmentIndex = currentPage.attachmentIndex
     val currentMessageIdHex = currentPage.messageIdHex
@@ -6292,7 +6309,7 @@ internal fun FullScreenMediaViewer(
                 // the horizontal drag. At scale 1× the pager wins.
                 userScrollEnabled = scale <= 1f,
             ) { page ->
-                val pageDescriptor = pages[page]
+                val pageDescriptor = pages[page.coerceIn(0, pages.lastIndex)]
                 if (MediaReferenceParser.isVideoMedia(pageDescriptor.reference)) {
                     VideoViewerPage(
                         controller = controller,
@@ -17383,7 +17400,6 @@ private fun AddIdentitySheet(
     WindowSecureFlag()
     var identity by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
     val creatingIdentityDescription = stringResource(R.string.creating_identity)
 
     // ModalBottomSheet renders in its own window on Android, separate from
@@ -17401,7 +17417,7 @@ private fun AddIdentitySheet(
             Button(
                 onClick = {
                     busy = true
-                    scope.launch {
+                    appState.launchMutation {
                         try {
                             appState.createIdentity()
                         } finally {
@@ -17451,9 +17467,12 @@ private fun AddIdentitySheet(
                     KeyboardActions(
                         onDone = {
                             busy = true
-                            scope.launch {
-                                appState.importIdentity(identity)
-                                busy = false
+                            appState.launchMutation {
+                                try {
+                                    appState.importIdentity(identity)
+                                } finally {
+                                    busy = false
+                                }
                             }
                         },
                     ),
@@ -17461,9 +17480,12 @@ private fun AddIdentitySheet(
             OutlinedButton(
                 onClick = {
                     busy = true
-                    scope.launch {
-                        appState.importIdentity(identity)
-                        busy = false
+                    appState.launchMutation {
+                        try {
+                            appState.importIdentity(identity)
+                        } finally {
+                            busy = false
+                        }
                     }
                 },
                 enabled = !busy && identity.isNotBlank(),
