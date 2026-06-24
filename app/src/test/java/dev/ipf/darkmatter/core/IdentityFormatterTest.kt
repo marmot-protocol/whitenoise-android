@@ -113,8 +113,7 @@ class IdentityFormatterTest {
         val zone = ZoneId.systemDefault()
         val epochZeroFormatted =
             DateTimeFormatter
-                .ofLocalizedDate(FormatStyle.MEDIUM)
-                .withLocale(Locale.US)
+                .ofPattern("d MMM", Locale.US)
                 .withZone(zone)
                 .format(Instant.ofEpochSecond(0)) + " " +
                 DateTimeFormatter
@@ -166,8 +165,7 @@ class IdentityFormatterTest {
                 time
             } else {
                 DateTimeFormatter
-                    .ofLocalizedDate(FormatStyle.MEDIUM)
-                    .withLocale(Locale.US)
+                    .ofPattern("d MMM", Locale.US)
                     .withZone(zone)
                     .format(instant) + " " + time
             }
@@ -198,8 +196,7 @@ class IdentityFormatterTest {
         val zone = ZoneId.systemDefault()
         val expected =
             DateTimeFormatter
-                .ofLocalizedDate(FormatStyle.MEDIUM)
-                .withLocale(Locale.US)
+                .ofPattern("d MMM", Locale.US)
                 .withZone(zone)
                 .format(eightDaysAgo) + " " +
                 DateTimeFormatter

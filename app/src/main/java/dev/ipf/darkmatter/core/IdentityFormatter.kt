@@ -118,10 +118,11 @@ object IdentityFormatter {
                     if (instant.atZone(zone).toLocalDate() == now.atZone(zone).toLocalDate()) {
                         time
                     } else {
+                        // Day + month, no year — the year is noise on a chat-list
+                        // row (e.g. "14 Jun 08:14").
                         val date =
                             DateTimeFormatter
-                                .ofLocalizedDate(FormatStyle.MEDIUM)
-                                .withLocale(locale)
+                                .ofPattern("d MMM", locale)
                                 .withZone(zone)
                                 .format(instant)
                         "$date $time"
