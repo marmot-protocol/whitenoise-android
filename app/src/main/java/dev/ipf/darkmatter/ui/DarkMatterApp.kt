@@ -5813,6 +5813,9 @@ private fun VoiceWaveform(
                     // Consume so the bubble's parent swipe-to-reply gesture
                     // doesn't snatch a rightward drag mid-scrub.
                     down.consume()
+                    // Before the first onSizeChanged, widthPx is 0 → x/0 = NaN → a
+                    // stray seek-to-zero. Skip the gesture until the size is known.
+                    if (widthPx <= 0f) return@awaitEachGesture
                     onSeek((down.position.x / widthPx).coerceIn(0f, 1f))
                     while (true) {
                         val event = awaitPointerEvent()
@@ -9247,6 +9250,11 @@ private fun ConversationScreen(
                             // The list already arrives most-recently-active first from
                             // the roster, and MentionComposer.filter preserves order.
                             val mentionPickerEnabled = !controller.isDm
+                            LaunchedEffect(mentionPickerEnabled, controller.members) {
+                                if (mentionPickerEnabled) {
+                                    appState.requestProfiles(controller.members.map { it.memberIdHex })
+                                }
+                            }
                             val mentionCandidates =
                                 if (mentionPickerEnabled) {
                                     val revision = appState.profileRevisionForCompose
@@ -9263,7 +9271,7 @@ private fun ConversationScreen(
                                                 MentionComposer.Candidate(
                                                     accountIdHex = member.memberIdHex,
                                                     npub = appState.npub(member.memberIdHex),
-                                                    displayName = appState.chatMemberTitle(member.memberIdHex),
+                                                    displayName = appState.chatMemberTitleCached(member.memberIdHex),
                                                     nip05 = appState.userProfile(member.memberIdHex)?.nip05,
                                                 )
                                             }
@@ -10209,6 +10217,12 @@ private fun GroupDetailsScreen(
                 // the comparator does pure reads. lowercase(Locale.ROOT) keeps
                 // ordering consistent across device locales (e.g. Turkish I).
                 val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                // Prefetch member profiles here so the title map below can stay a
+                // pure read (chatMemberTitleCached); the profile-revision key
+                // recomposes the sort once names land.
+                LaunchedEffect(controller.members) {
+                    appState.requestProfiles(controller.members.map { it.memberIdHex })
+                }
                 val displayedMembers =
                     remember(
                         controller.members,
@@ -10218,7 +10232,7 @@ private fun GroupDetailsScreen(
                         val titlesByHex =
                             controller.members.associate {
                                 it.memberIdHex to
-                                    appState.chatMemberTitle(it.memberIdHex).lowercase(Locale.ROOT)
+                                    appState.chatMemberTitleCached(it.memberIdHex).lowercase(Locale.ROOT)
                             }
                         controller.members.sortedWith(
                             compareBy(
@@ -10393,6 +10407,9 @@ private fun GroupDetailsScreen(
             modifier = amoledModalSheetModifier(),
             onDismissRequest = {
                 showAddMember = false
+                pendingMember = ""
+                pendingMemberError = null
+                pendingMemberPreview = RecipientResolution.Empty
                 pendingMemberAsAdmin = false
             },
         ) {
@@ -11495,7 +11512,7 @@ private fun TransferAdminSheet(
     onDismiss: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val candidates = controller.transferAdminCandidates()
+    val candidates = remember(controller.members) { controller.transferAdminCandidates() }
     val filtered =
         remember(query, candidates) {
             val needle = query.trim()
@@ -15002,7 +15019,7 @@ private fun MicHoldButton(controller: dev.ipf.darkmatter.audio.VoiceRecordingCon
                         } finally {
                             // Composable removal / coroutine cancellation while still
                             // recording-unlocked → cancel cleanly instead of letting
-                            // the recorder tick to the 60 s auto-stop.
+                            // the recorder tick to the MAX_RECORDING_MS auto-stop.
                             if (!terminated && controller.isRecording && !controller.locked) {
                                 controller.cancel()
                             }
@@ -17906,7 +17923,6 @@ private fun EncryptedBackupSheet(
     WindowSecureFlag()
     val context = LocalContext.current
     val lifecycleOwner = context.lifecycleOwner()
-    val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var passphrase by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
@@ -18030,7 +18046,15 @@ private fun EncryptedBackupSheet(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = {
-                            clipboard.setText(AnnotatedString(encryptedBackup))
+                            // Flag the clip sensitive so Android 13+ doesn't render
+                            // the passphrase-protected backup in the clipboard preview.
+                            val clip = android.content.ClipData.newPlainText("encrypted backup", encryptedBackup)
+                            clip.description.extras =
+                                android.os.PersistableBundle().apply {
+                                    putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                                }
+                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                                .setPrimaryClip(clip)
                             appState.present(R.string.toast_encrypted_backup_copied)
                         },
                         modifier = Modifier.weight(1f),

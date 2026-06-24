@@ -286,7 +286,10 @@ class VoiceRecordingController(
         dragOffsetPx = deltaX.coerceAtMost(0f)
         verticalOffsetPx = deltaY.coerceAtMost(0f)
         willCancel = (-deltaX) > cancelThresholdPx
-        willLock = (-deltaY) > lockThresholdPx
+        // Match the actual lock gesture, which also requires staying out of the
+        // cancel zone; otherwise the hint shows "armed" in the up+left overlap
+        // region where release would actually cancel.
+        willLock = (-deltaY) > lockThresholdPx && (-deltaX) <= cancelThresholdPx
     }
 
     fun release() {
