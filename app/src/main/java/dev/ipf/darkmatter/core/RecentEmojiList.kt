@@ -12,11 +12,11 @@ object RecentEmojiList {
         limit: Int = StoredLimit,
     ): List<String> {
         val normalized = picked.trim()
-        if (normalized.isEmpty() || limit <= 0) return existing.distinct().take(limit.coerceAtLeast(0))
-        return (listOf(normalized) + existing)
+        val source = if (normalized.isEmpty()) existing else listOf(normalized) + existing
+        return source
             .filter { it.isNotBlank() }
-            .distinct()
-            .take(limit)
+            .distinctBy { emojiIdentity(it) }
+            .take(limit.coerceAtLeast(0))
     }
 
     fun quickChoices(
@@ -27,7 +27,11 @@ object RecentEmojiList {
         if (limit <= 0) return emptyList()
         return (recent + defaults)
             .filter { it.isNotBlank() }
-            .distinct()
+            .distinctBy { emojiIdentity(it) }
             .take(limit)
     }
+
+    // Dedup key that ignores variation selectors, so the same glyph stored with
+    // and without U+FE0F (e.g. ❤️ vs ❤) collapses to one entry.
+    private fun emojiIdentity(emoji: String): String = emoji.filterNot { it == '\uFE0F' || it == '\uFE0E' }
 }
