@@ -2,6 +2,7 @@ package dev.ipf.darkmatter.ui
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -327,6 +328,7 @@ import dev.ipf.darkmatter.core.AvatarImageLoader
 import dev.ipf.darkmatter.core.ChatListIdentifierSearch
 import dev.ipf.darkmatter.core.ChatListMessageSearch
 import dev.ipf.darkmatter.core.ClipboardPasteAffordance
+import dev.ipf.darkmatter.core.ConversationTranscriptExport
 import dev.ipf.darkmatter.core.DiagnosticFormatter
 import dev.ipf.darkmatter.core.ENCRYPTED_BACKUP_MIN_PASSPHRASE_LENGTH
 import dev.ipf.darkmatter.core.EditState
@@ -6766,6 +6768,31 @@ internal fun saveVideoToGallery(
     }
 }
 
+internal fun shareConversationTranscript(
+    context: Context,
+    file: java.io.File,
+): Boolean {
+    val uri = fileProviderUri(context, file)
+    val intent =
+        Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, file.name)
+            putExtra(Intent.EXTRA_TITLE, file.name)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    return try {
+        context.startActivity(
+            Intent.createChooser(intent, null).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+        true
+    } catch (_: ActivityNotFoundException) {
+        false
+    }
+}
+
 /**
  * Share [bytes] via a FileProvider Uri using the system share sheet.
  *
@@ -6857,7 +6884,7 @@ private fun sweepStaleSharedMedia(
         // Same age-based reaper covers the decrypted voice cache too —
         // those bytes are plaintext E2EE-decrypted audio and shouldn't
         // linger past the last MediaPlayer that opened them.
-        listOf(MediaCacheDirs.SHARED, MediaCacheDirs.VOICE, MediaCacheDirs.VIDEO).forEach { name ->
+        listOf(MediaCacheDirs.SHARED, ConversationTranscriptExport.CacheDirName, MediaCacheDirs.VOICE, MediaCacheDirs.VIDEO).forEach { name ->
             val dir = java.io.File(context.cacheDir, name)
             if (!dir.isDirectory) return@forEach
             dir.listFiles()?.forEach { entry ->
@@ -9812,8 +9839,11 @@ private fun GroupDetailsScreen(
     var pendingInvites by remember(controller.group.groupIdHex) { mutableStateOf<List<String>>(emptyList()) }
     var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var transcriptExportInFlight by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val inviteLabelText = stringResource(R.string.invite)
+    val noShareTargetText = stringResource(R.string.no_share_target_available)
     val groupTitleCopy = rememberGroupTitleCopy()
     val oneValidMemberReferenceError = stringResource(R.string.error_one_valid_member_reference)
     val qrNotValidNpubOrPublicKeyError = stringResource(R.string.error_qr_not_valid_npub_or_public_key)
@@ -9864,6 +9894,24 @@ private fun GroupDetailsScreen(
                 LeaveAction.SoleAdminMustTransfer -> DetailsConfirm.LeaveSoleAdmin(displayName)
                 LeaveAction.Standard -> DetailsConfirm.Leave(displayName)
             }
+    }
+
+    fun exportTranscript() {
+        if (transcriptExportInFlight) return
+        transcriptExportInFlight = true
+        appState.launchMutation {
+            try {
+                val file = controller.exportConversationTranscriptFile(context.cacheDir) ?: return@launchMutation
+                if (!shareConversationTranscript(context, file)) {
+                    appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(noShareTargetText))
+                }
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(error.message ?: error.javaClass.simpleName))
+            } finally {
+                transcriptExportInFlight = false
+            }
+        }
     }
 
     LaunchedEffect(
@@ -10177,6 +10225,35 @@ private fun GroupDetailsScreen(
             }
 
             if (appState.developerMode) {
+                SectionCard(title = stringResource(R.string.transcript_export)) {
+                    Text(
+                        stringResource(R.string.transcript_export_description),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    TextButton(
+                        onClick = { exportTranscript() },
+                        enabled = !transcriptExportInFlight && appState.activeAccountRef != null,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (transcriptExportInFlight) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Description, contentDescription = null)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(
+                                if (transcriptExportInFlight) {
+                                    R.string.exporting_transcript
+                                } else {
+                                    R.string.export_conversation_transcript
+                                },
+                            ),
+                        )
+                    }
+                }
+
                 SectionCard(title = stringResource(R.string.mls)) {
                     when {
                         mlsLoading -> Text(stringResource(R.string.loading_mls_state), color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -122,6 +122,12 @@
     <string name="leave_chat">Quitter le groupe</string>
     <string name="leaving_chat">Sortie du chat...</string>
     <string name="promote_admin_before_leaving">Promouvoir un autre administrateur avant de partir</string>
+    <string name="transcript_export">Export du transcript</string>
+    <string name="export_conversation_transcript">Exporter le transcript de la conversation</string>
+    <string name="exporting_transcript">Export du transcript...</string>
+    <string name="transcript_export_description">Exporte l’historique brut des événements internes de ce groupe au format JSON, trié par heure. Utilisez Partager pour copier ou enregistrer le fichier.</string>
+    <string name="toast_couldnt_export_transcript">Impossible d’exporter le transcript : %1$s</string>
+    <string name="no_share_target_available">Aucune cible de partage disponible</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">Chargement de l’état MLS...</string>
     <string name="mls_state_unavailable">État MLS indisponible.</string>

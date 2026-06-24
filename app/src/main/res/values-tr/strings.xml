@@ -122,6 +122,12 @@
     <string name="leave_chat">Gruptan ayrıl</string>
     <string name="leaving_chat">Sohbetten ayrılınıyor...</string>
     <string name="promote_admin_before_leaving">Ayrılmadan önce başka bir yöneticinin terfisini alın</string>
+    <string name="transcript_export">Döküm dışa aktarma</string>
+    <string name="export_conversation_transcript">Konuşma dökümünü dışa aktar</string>
+    <string name="exporting_transcript">Döküm dışa aktarılıyor...</string>
+    <string name="transcript_export_description">Bu grubun ham iç olay geçmişini zaman sırasına göre JSON olarak dışa aktarır. Dosyayı kopyalamak veya kaydetmek için Paylaş’ı kullanın.</string>
+    <string name="toast_couldnt_export_transcript">Döküm dışa aktarılamadı: %1$s</string>
+    <string name="no_share_target_available">Kullanılabilir paylaşım hedefi yok</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">MLS durumu yükleniyor...</string>
     <string name="mls_state_unavailable">MLS durumu kullanılamıyor.</string>

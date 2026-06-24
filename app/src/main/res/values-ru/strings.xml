@@ -124,6 +124,12 @@
     <string name="leave_chat">Покинуть группу</string>
     <string name="leaving_chat">Выход из чата...</string>
     <string name="promote_admin_before_leaving">Повысьте другого администратора перед уходом</string>
+    <string name="transcript_export">Экспорт стенограммы</string>
+    <string name="export_conversation_transcript">Экспортировать стенограмму беседы</string>
+    <string name="exporting_transcript">Экспорт стенограммы...</string>
+    <string name="transcript_export_description">Экспортирует сырой внутренний журнал событий этой группы в JSON, упорядоченный по времени. Используйте «Поделиться», чтобы скопировать или сохранить файл.</string>
+    <string name="toast_couldnt_export_transcript">Не удалось экспортировать стенограмму: %1$s</string>
+    <string name="no_share_target_available">Нет доступной цели для отправки</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">Загрузка состояния MLS...</string>
     <string name="mls_state_unavailable">Состояние MLS недоступно.</string>

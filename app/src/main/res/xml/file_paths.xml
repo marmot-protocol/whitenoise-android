@@ -3,5 +3,6 @@
     <!-- Temp files we create for camera capture and outgoing share intents. -->
     <cache-path name="camera" path="camera/" />
     <cache-path name="shared_media" path="shared_media/" />
+    <cache-path name="transcripts" path="transcripts/" />
     <cache-path name="video_attachments" path="video_attachments/" />
 </paths>

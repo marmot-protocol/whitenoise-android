@@ -121,6 +121,12 @@
     <string name="leave_chat">退出群组</string>
     <string name="leaving_chat">正在离开聊天...</string>
     <string name="promote_admin_before_leaving">离开前晋升另一位管理员</string>
+    <string name="transcript_export">导出对话记录</string>
+    <string name="export_conversation_transcript">导出会话记录</string>
+    <string name="exporting_transcript">正在导出记录...</string>
+    <string name="transcript_export_description">将此群组的原始内部事件历史按时间顺序导出为 JSON。使用“分享”复制或保存文件。</string>
+    <string name="toast_couldnt_export_transcript">无法导出记录：%1$s</string>
+    <string name="no_share_target_available">没有可用的分享目标</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">正在加载 MLS 状态...</string>
     <string name="mls_state_unavailable">MLS 状态不可用。</string>

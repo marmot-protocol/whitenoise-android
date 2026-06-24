@@ -9,6 +9,8 @@ import androidx.compose.runtime.setValue
 import dev.ipf.darkmatter.BuildConfig
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.ChatListMessageSearch
+import dev.ipf.darkmatter.core.ConversationTranscriptExport
+import dev.ipf.darkmatter.core.ConversationTranscriptTimelineReader
 import dev.ipf.darkmatter.core.EditState
 import dev.ipf.darkmatter.core.GroupProjector
 import dev.ipf.darkmatter.core.GroupSystemEvents
@@ -4008,6 +4010,39 @@ class ConversationController(
         }.onFailure {
             if (it is CancellationException) throw it
             appState.present(R.string.toast_couldnt_load_mls_state, AppText.Plain(it.message ?: it.javaClass.simpleName))
+        }.getOrNull()
+    }
+
+    suspend fun exportConversationTranscriptFile(cacheDir: java.io.File): java.io.File? {
+        val account = conversationAccountRef ?: return null
+        return runCatching {
+            val messages =
+                ConversationTranscriptExport.fetchAllMessages(
+                    timelineReader =
+                        object : ConversationTranscriptTimelineReader {
+                            override suspend fun timelineMessages(
+                                accountRef: String,
+                                query: TimelineMessageQueryFfi,
+                            ): TimelinePageFfi = appState.marmotIo { timelineMessages(accountRef, query) }
+                        },
+                    accountRef = account,
+                    groupIdHex = group.groupIdHex,
+                )
+            val data =
+                withContext(Dispatchers.Default) {
+                    val document = ConversationTranscriptExport.makeDocument(group, messages)
+                    ConversationTranscriptExport.encodeJson(document)
+                }
+            withContext(Dispatchers.IO) {
+                ConversationTranscriptExport.writeTemporaryFile(
+                    cacheDir = cacheDir,
+                    data = data,
+                    groupIdHex = group.groupIdHex,
+                )
+            }
+        }.onFailure {
+            it.rethrowIfCancellation()
+            appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(it.message ?: it.javaClass.simpleName))
         }.getOrNull()
     }
 
