@@ -351,6 +351,7 @@ import dev.ipf.darkmatter.core.QrCodeEncoder
 import dev.ipf.darkmatter.core.ReactionTally
 import dev.ipf.darkmatter.core.RecentEmojiList
 import dev.ipf.darkmatter.core.RecipientReference
+import dev.ipf.darkmatter.core.RecipientSearch
 import dev.ipf.darkmatter.core.ReplySwipe
 import dev.ipf.darkmatter.core.SnippetHighlight
 import dev.ipf.darkmatter.core.TimelineProjector
@@ -2316,12 +2317,15 @@ private fun RecipientPreviewCard(
 ) {
     val trimmed = input.trim()
     // Re-key on the trimmed input so each edit cancels the prior in-flight
-    // resolve (npub validation, NIP-05 lookup) and starts fresh.
-    var resolving by remember(trimmed) { mutableStateOf(trimmed.isNotEmpty()) }
+    // resolve (npub validation, NIP-05 lookup) and starts fresh. A plain-text
+    // name isn't an identifier to resolve — it drives the local name search —
+    // so it must never enter the Resolving state, or the card flashes a spinner
+    // on every keystroke and hides the name results.
+    var resolving by remember(trimmed) { mutableStateOf(trimmed.isNotEmpty() && !isPlainNameQuery(trimmed)) }
     var resolvedHex by remember(trimmed) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(trimmed) {
-        if (trimmed.isEmpty()) {
+        if (trimmed.isEmpty() || isPlainNameQuery(trimmed)) {
             resolving = false
             resolvedHex = null
             return@LaunchedEffect
@@ -2412,23 +2416,31 @@ private fun RecipientPreviewCard(
                     )
                 }
             }
+        // A plain display-name query isn't a malformed identifier — it
+        // drives the local name search ([RecipientSearchResults]) instead, so
+        // suppress the "couldn't resolve" card here rather than painting an
+        // error above the valid name-search rows. The reported state stays
+        // Invalid (submit remains disabled until a result row is tapped, which
+        // fills an npub and flips this back to the identifier path).
         RecipientPreviewState.Invalid ->
-            OutlinedCard(modifier = modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Icon(
-                        Icons.Default.ErrorOutline,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Text(
-                        stringResource(R.string.recipient_preview_unresolved),
-                        color = MaterialTheme.colorScheme.error,
-                    )
+            if (!isPlainNameQuery(trimmed)) {
+                OutlinedCard(modifier = modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            stringResource(R.string.recipient_preview_unresolved),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
         RecipientPreviewState.Loaded, RecipientPreviewState.NoProfile -> {
@@ -2519,6 +2531,140 @@ private fun RecipientPreviewCard(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * True when [query] is plain text (name search) rather than an identifier
+ * (npub / profile link / NIP-05 / bare hex) that routes to the preview card.
+ */
+private fun isPlainNameQuery(query: String): Boolean {
+    val trimmed = query.trim()
+    if (trimmed.isEmpty()) return false
+    if (ChatListIdentifierSearch.classify(trimmed) != null) return false
+    if (RecipientReference.normalize(trimmed) != null) return false
+    return true
+}
+
+/**
+ * Distinct, non-active-account recipient candidates derived on demand from the
+ * already-loaded chat-list state — UI-derived, not a new cache of protocol data
+ * (AGENTS.md), since no profile-enumeration FFI exists.
+ */
+private fun deriveRecipientCandidates(
+    appState: DarkMatterAppState,
+    activeAccountIdHex: String?,
+): List<RecipientSearch.Candidate> {
+    val active = activeAccountIdHex?.trim()?.lowercase(Locale.ROOT)
+    val seen = LinkedHashSet<String>()
+    val candidates = ArrayList<RecipientSearch.Candidate>()
+
+    fun add(rawHex: String?) {
+        val hex = rawHex?.trim()?.lowercase(Locale.ROOT) ?: return
+        if (hex.isEmpty()) return
+        if (active != null && hex == active) return
+        if (!seen.add(hex)) return
+        candidates +=
+            RecipientSearch.Candidate(
+                accountIdHex = hex,
+                displayName = appState.displayName(hex),
+                npub = appState.npub(hex),
+            )
+    }
+    for (item in appState.chatListItems) {
+        // Group rosters give the members. A DM's roster, though, often holds only
+        // the active account — the counterpart isn't an enumerable member — so
+        // also take the resolved DM counterpart and the latest message's sender
+        // (the recent-sender source) to surface DM partners.
+        item.memberSnapshot?.members?.forEach { add(it.memberIdHex) }
+        add(item.otherMemberAccount)
+        add(item.latest?.sender)
+        add(item.group.welcomerAccountIdHex)
+    }
+    return candidates
+}
+
+/**
+ * Display-name search result list shown below the recipient input in
+ * [NewChatSheet] (DM branch) and the Add-member sheet. Renders only for
+ * a plain-text [query] ([isPlainNameQuery]); identifier inputs keep using
+ * [RecipientPreviewCard]. Each row shows the avatar + display name + (verified)
+ * NIP-05 + truncated npub.
+ *
+ * Tapping a row invokes [onSelect] with the account hex (the same effect as
+ * pasting the npub: the host sets the input/resolved hex so the existing submit
+ * path uses it).
+ */
+@Composable
+private fun RecipientSearchResults(
+    query: String,
+    appState: DarkMatterAppState,
+    onSelect: (RecipientSearch.Candidate) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (!isPlainNameQuery(query)) return
+    val activeAccountIdHex = appState.activeAccount?.accountIdHex
+    // Derive candidates from in-memory chat-list state and match by name. The
+    // accessors used inside deriveRecipientCandidates (displayName/npub) read
+    // through the profile cache, so a name that resolves a beat after the
+    // roster lands repaints the list via the profile-revision recomposition.
+    val candidates = deriveRecipientCandidates(appState, activeAccountIdHex)
+    val matches = RecipientSearch.filterByDisplayName(query, candidates, activeAccountIdHex)
+    if (matches.isEmpty()) return
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        matches.forEach { candidate ->
+            RecipientSearchResultRow(
+                candidate = candidate,
+                appState = appState,
+                onSelect = { onSelect(candidate) },
+            )
+        }
+    }
+}
+
+/** One row of the [RecipientSearchResults] list: avatar, display name, npub. */
+@Composable
+private fun RecipientSearchResultRow(
+    candidate: RecipientSearch.Candidate,
+    appState: DarkMatterAppState,
+    onSelect: () -> Unit,
+) {
+    val hex = candidate.accountIdHex
+    val pictureUrl = appState.avatarUrl(hex) ?: ProfileSanitizer.imageUrl(appState.userProfile(hex)?.picture)
+    val shortNpub = IdentityFormatter.short(candidate.npub, prefix = 12, suffix = 8)
+    val title = candidate.displayName.takeUnless { it.isBlank() } ?: IdentityFormatter.short(candidate.npub)
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onSelect() },
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Avatar(title = title, seed = hex, size = 48.dp, pictureUrl = pictureUrl)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    shortNpub,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -3723,6 +3869,18 @@ private fun NewChatSheet(
                     input = pending,
                     appState = appState,
                     onResolutionChanged = { recipientPreview = it },
+                )
+                // Plain-text name search over local chat-list contacts.
+                // Tapping a row fills the npub into the field so the existing
+                // submit/resolve path uses it; "Open existing chat" reuses the
+                // sheet's onOpenConversation handoff instead of starting a dupe.
+                RecipientSearchResults(
+                    query = pending,
+                    appState = appState,
+                    onSelect = { candidate ->
+                        pending = candidate.npub
+                        error = null
+                    },
                 )
             } else {
                 OutlinedTextField(
@@ -10456,6 +10614,18 @@ private fun GroupDetailsScreen(
                     input = pendingMember,
                     appState = appState,
                     onResolutionChanged = { pendingMemberPreview = it },
+                )
+                // Plain-text name search over local chat-list contacts.
+                // The Create Group flow keeps every row addable (tapping fills
+                // the npub into the field), but still shows the "Already in
+                // chats" badge — it does NOT offer "Open existing chat".
+                RecipientSearchResults(
+                    query = pendingMember,
+                    appState = appState,
+                    onSelect = { candidate ->
+                        pendingMember = candidate.npub
+                        pendingMemberError = null
+                    },
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
