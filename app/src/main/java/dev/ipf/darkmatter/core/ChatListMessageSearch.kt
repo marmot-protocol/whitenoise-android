@@ -117,6 +117,10 @@ object ChatListMessageSearch {
         // the left, so we use the full budget.
         windowStart = (windowEnd - maxLength).coerceAtLeast(0)
         windowEnd = (windowStart + maxLength).coerceAtMost(normalized.length)
+        // Don't slice through a surrogate pair at either edge — a half pair
+        // renders as U+FFFD in the snippet. Mirror MarkdownRenderer.previewSafeEnd.
+        if (windowStart > 0 && Character.isLowSurrogate(normalized[windowStart])) windowStart++
+        if (windowEnd > windowStart && Character.isHighSurrogate(normalized[windowEnd - 1])) windowEnd--
 
         val clippedLeft = windowStart > 0
         val clippedRight = windowEnd < normalized.length

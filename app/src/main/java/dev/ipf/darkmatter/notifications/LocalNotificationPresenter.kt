@@ -20,6 +20,8 @@ import dev.ipf.darkmatter.MainActivity
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.core.ReplyMediaKind
 import dev.ipf.marmotkit.NotificationUpdateFfi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class LocalNotificationPresenter(
     private val context: Context,
@@ -78,7 +80,7 @@ class LocalNotificationPresenter(
     }
 
     @SuppressLint("MissingPermission")
-    fun show(
+    suspend fun show(
         update: NotificationUpdateFfi,
         conversationTitleOverride: String? = null,
         senderNameOverride: String? = null,
@@ -149,7 +151,13 @@ class LocalNotificationPresenter(
             // Messages stack into one per-conversation card; invites are
             // one-off events, so keep them as a plain expandable notification.
             NotificationStyleChoice.Messaging -> {
-                builder.setStyle(messagingStyle(update, notificationContent, conversationTitleOverride, decision.historyCap))
+                // Resolve the carried-forward history off-main: activeNotifications
+                // is a Binder round-trip and extractMessagingStyle re-serializes it.
+                val carried =
+                    withContext(Dispatchers.Default) {
+                        existingMessagingStyle(notificationContent.notificationTag)?.messages
+                    }
+                builder.setStyle(messagingStyle(update, notificationContent, conversationTitleOverride, decision.historyCap, carried))
                 NotificationActions
                     .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                     ?.let { actionTarget ->
@@ -263,6 +271,7 @@ class LocalNotificationPresenter(
         content: LocalNotificationContent,
         conversationTitleOverride: String?,
         historyCap: Int,
+        carriedHistory: List<NotificationCompat.MessagingStyle.Message>?,
     ): NotificationCompat.MessagingStyle {
         val self =
             Person
@@ -272,8 +281,7 @@ class LocalNotificationPresenter(
                 .build()
         // Cap carried-forward history; the extracted style is otherwise re-serialized unbounded across Binder on every post.
         val style = NotificationCompat.MessagingStyle(self)
-        existingMessagingStyle(content.notificationTag)
-            ?.messages
+        carriedHistory
             ?.let { capNotificationHistory(it, historyCap) }
             ?.forEach { style.addMessage(it) }
         style.isGroupConversation = content.isGroupConversation

@@ -205,7 +205,7 @@ object GroupSystemEvents {
                     else -> String.format(copy.adminRemovedPassiveFormat, subject)
                 }
             TypeGroupRenamed ->
-                event.name?.let { name ->
+                ProfileSanitizer.displayName(event.name)?.let { name ->
                     when {
                         actorIsSelf -> String.format(copy.youRenamedFormat, name)
                         actorName != null -> String.format(copy.renamedFormat, actorName, name)
