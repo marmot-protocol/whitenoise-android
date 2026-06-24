@@ -125,7 +125,7 @@
     <string name="export_conversation_transcript">匯出會話記錄</string>
     <string name="exporting_transcript">正在匯出記錄...</string>
     <string name="transcript_export_description">將此群組的原始內部事件歷史按時間順序匯出為 JSON。使用「分享」複製或儲存檔案。</string>
-    <string name="toast_couldnt_export_transcript">無法匯出記錄：%1$s</string>
+    <string name="toast_couldnt_export_transcript">無法匯出記錄</string>
     <string name="no_share_target_available">沒有可用的分享目標</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">正在載入 MLS 狀態...</string>

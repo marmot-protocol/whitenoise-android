@@ -143,7 +143,7 @@
     <string name="export_conversation_transcript">Export Conversation Transcript</string>
     <string name="exporting_transcript">Exporting transcript...</string>
     <string name="transcript_export_description">Exports the raw inner event history for this group as JSON, ordered by time. Use Share to copy or save the file.</string>
-    <string name="toast_couldnt_export_transcript">Couldn\'t export transcript: %1$s</string>
+    <string name="toast_couldnt_export_transcript">Couldn\'t export transcript</string>
     <string name="no_share_target_available">No share target available</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">Loading MLS state...</string>

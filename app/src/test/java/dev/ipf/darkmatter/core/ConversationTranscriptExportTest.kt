@@ -163,6 +163,54 @@ class ConversationTranscriptExportTest {
         }
 
     @Test
+    fun fetchAllMessagesDeduplicatesOverlappingPageBoundary() =
+        runBlocking {
+            val newestId = "33".repeat(32)
+            val boundaryId = "22".repeat(32)
+            val oldestId = "11".repeat(32)
+            val groupId = "aa".repeat(32)
+            val reader =
+                FakeTranscriptTimelineReader(
+                    pages =
+                        mutableListOf(
+                            TimelinePageFfi(
+                                messages =
+                                    listOf(
+                                        timelineRecord(messageIdHex = newestId, timelineAt = 3uL),
+                                        timelineRecord(messageIdHex = boundaryId, timelineAt = 2uL),
+                                    ),
+                                hasMoreBefore = true,
+                                hasMoreAfter = false,
+                            ),
+                            TimelinePageFfi(
+                                messages =
+                                    listOf(
+                                        timelineRecord(messageIdHex = boundaryId, timelineAt = 2uL),
+                                        timelineRecord(messageIdHex = oldestId, timelineAt = 1uL),
+                                    ),
+                                hasMoreBefore = false,
+                                hasMoreAfter = false,
+                            ),
+                        ),
+                )
+
+            val messages =
+                ConversationTranscriptExport.fetchAllMessages(
+                    timelineReader = reader,
+                    accountRef = "account-1",
+                    groupIdHex = groupId,
+                )
+
+            assertEquals(listOf(oldestId, boundaryId, newestId), messages.map { it.messageIdHex })
+            assertEquals(3, messages.map { it.messageIdHex }.toSet().size)
+            assertEquals(2, reader.queries.size)
+            assertNull(reader.queries.first().before)
+            assertNull(reader.queries.first().beforeMessageId)
+            assertEquals(2uL, reader.queries.last().before)
+            assertEquals(boundaryId, reader.queries.last().beforeMessageId)
+        }
+
+    @Test
     fun fetchAllMessagesStopsWithoutDuplicatingWhenCursorStalls() =
         runBlocking {
             val newestId = "44".repeat(32)

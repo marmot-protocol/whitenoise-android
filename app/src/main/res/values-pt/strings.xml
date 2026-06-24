@@ -126,7 +126,7 @@
     <string name="export_conversation_transcript">Exportar transcrição da conversa</string>
     <string name="exporting_transcript">Exportando transcrição...</string>
     <string name="transcript_export_description">Exporta o histórico bruto de eventos internos deste grupo como JSON, ordenado por tempo. Use Compartilhar para copiar ou salvar o arquivo.</string>
-    <string name="toast_couldnt_export_transcript">Não foi possível exportar a transcrição: %1$s</string>
+    <string name="toast_couldnt_export_transcript">Não foi possível exportar a transcrição</string>
     <string name="no_share_target_available">Nenhum destino de compartilhamento disponível</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">Carregando estado MLS...</string>

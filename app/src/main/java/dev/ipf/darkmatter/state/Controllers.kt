@@ -4017,17 +4017,19 @@ class ConversationController(
         val account = conversationAccountRef ?: return null
         return runCatching {
             val messages =
-                ConversationTranscriptExport.fetchAllMessages(
-                    timelineReader =
-                        object : ConversationTranscriptTimelineReader {
-                            override suspend fun timelineMessages(
-                                accountRef: String,
-                                query: TimelineMessageQueryFfi,
-                            ): TimelinePageFfi = appState.marmotIo { timelineMessages(accountRef, query) }
-                        },
-                    accountRef = account,
-                    groupIdHex = group.groupIdHex,
-                )
+                withContext(Dispatchers.Default) {
+                    ConversationTranscriptExport.fetchAllMessages(
+                        timelineReader =
+                            object : ConversationTranscriptTimelineReader {
+                                override suspend fun timelineMessages(
+                                    accountRef: String,
+                                    query: TimelineMessageQueryFfi,
+                                ): TimelinePageFfi = appState.marmotIo { timelineMessages(accountRef, query) }
+                            },
+                        accountRef = account,
+                        groupIdHex = group.groupIdHex,
+                    )
+                }
             val data =
                 withContext(Dispatchers.Default) {
                     val document = ConversationTranscriptExport.makeDocument(group, messages)

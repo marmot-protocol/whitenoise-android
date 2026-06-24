@@ -35,9 +35,17 @@ object ConversationTranscriptExport {
         accountRef: String,
         groupIdHex: String,
     ): List<TimelineMessageRecordFfi> {
-        val collected = mutableListOf<TimelineMessageRecordFfi>()
+        val collected = linkedMapOf<String, TimelineMessageRecordFfi>()
         var before: ULong? = null
         var beforeMessageId: String? = null
+
+        fun appendUnique(messages: List<TimelineMessageRecordFfi>) {
+            messages.forEach { message ->
+                if (!collected.containsKey(message.messageIdHex)) {
+                    collected[message.messageIdHex] = message
+                }
+            }
+        }
 
         while (true) {
             coroutineContext.ensureActive()
@@ -58,7 +66,7 @@ object ConversationTranscriptExport {
             coroutineContext.ensureActive()
 
             if (!page.hasMoreBefore || page.messages.isEmpty()) {
-                collected += page.messages
+                appendUnique(page.messages)
                 break
             }
 
@@ -69,12 +77,12 @@ object ConversationTranscriptExport {
                 break
             }
 
-            collected += page.messages
+            appendUnique(page.messages)
             before = nextBefore
             beforeMessageId = nextBeforeMessageId
         }
 
-        return sortChronologically(collected)
+        return sortChronologically(collected.values.toList())
     }
 
     fun makeDocument(

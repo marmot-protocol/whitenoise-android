@@ -128,7 +128,7 @@
     <string name="export_conversation_transcript">Экспортировать стенограмму беседы</string>
     <string name="exporting_transcript">Экспорт стенограммы...</string>
     <string name="transcript_export_description">Экспортирует сырой внутренний журнал событий этой группы в JSON, упорядоченный по времени. Используйте «Поделиться», чтобы скопировать или сохранить файл.</string>
-    <string name="toast_couldnt_export_transcript">Не удалось экспортировать стенограмму: %1$s</string>
+    <string name="toast_couldnt_export_transcript">Не удалось экспортировать стенограмму</string>
     <string name="no_share_target_available">Нет доступной цели для отправки</string>
     <string name="mls">MLS</string>
     <string name="loading_mls_state">Загрузка состояния MLS...</string>
