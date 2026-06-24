@@ -15005,7 +15005,7 @@ private fun MicHoldButton(controller: dev.ipf.darkmatter.audio.VoiceRecordingCon
                         } finally {
                             // Composable removal / coroutine cancellation while still
                             // recording-unlocked → cancel cleanly instead of letting
-                            // the recorder tick to the 60 s auto-stop.
+                            // the recorder tick to the MAX_RECORDING_MS auto-stop.
                             if (!terminated && controller.isRecording && !controller.locked) {
                                 controller.cancel()
                             }
@@ -17909,7 +17909,6 @@ private fun EncryptedBackupSheet(
     WindowSecureFlag()
     val context = LocalContext.current
     val lifecycleOwner = context.lifecycleOwner()
-    val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var passphrase by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
@@ -18033,7 +18032,15 @@ private fun EncryptedBackupSheet(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = {
-                            clipboard.setText(AnnotatedString(encryptedBackup))
+                            // Flag the clip sensitive so Android 13+ doesn't render
+                            // the passphrase-protected backup in the clipboard preview.
+                            val clip = android.content.ClipData.newPlainText("encrypted backup", encryptedBackup)
+                            clip.description.extras =
+                                android.os.PersistableBundle().apply {
+                                    putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                                }
+                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                                .setPrimaryClip(clip)
                             appState.present(R.string.toast_encrypted_backup_copied)
                         },
                         modifier = Modifier.weight(1f),
