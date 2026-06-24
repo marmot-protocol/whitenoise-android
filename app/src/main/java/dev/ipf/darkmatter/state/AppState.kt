@@ -491,9 +491,9 @@ class DarkMatterAppState(
         private set
 
     /**
-     * Developer-only streaming-debug toggle (#315, iOS parity). When ON, the
-     * conversation renders agent-stream and MLS-signaling kinds as debug rows
-     * inline. Stored independently, but only takes effect through
+     * Developer-only streaming-debug toggle. When ON, the conversation renders
+     * agent-stream and MLS-signaling kinds as debug rows inline. Stored
+     * independently, but only takes effect through
      * [streamingDebugEnabled], which also requires [developerMode] — turning
      * developer mode off suppresses the debug rows without clearing this value.
      */

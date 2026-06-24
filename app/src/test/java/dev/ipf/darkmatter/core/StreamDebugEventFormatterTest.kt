@@ -6,10 +6,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Covers the live-agent-stream → streaming-debug-row formatting (#315, iOS
- * parity). The blocking adversarial finding on PR #699 was that the Status /
- * Progress / Record variants were dropped entirely; these assertions pin that
- * every live variant now produces a visible, non-empty debug row.
+ * Covers the live-agent-stream → streaming-debug-row formatting. The Status /
+ * Progress / Record variants were previously dropped entirely; these assertions
+ * pin that every live variant now produces a visible, non-empty debug row.
  */
 class StreamDebugEventFormatterTest {
     @Test

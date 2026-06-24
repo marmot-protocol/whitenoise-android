@@ -774,9 +774,9 @@ internal fun nextReadAnchor(
     val candidate = timeline.getOrNull(candidateIndex)
     val candidateId = candidate?.record?.messageIdHex
     if (candidateId.isNullOrBlank()) return currentAnchorId
-    // Synthetic streaming-debug rows (#315) carry a non-hex id and never mark
-    // read; don't let one become the read anchor or it would pin the pointer
-    // off a real message until the next chat row advances it.
+    // Synthetic streaming-debug rows carry a non-hex id and never mark read;
+    // don't let one become the read anchor or it would pin the pointer off a
+    // real message until the next chat row advances it.
     if (candidateId.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) return currentAnchorId
     if (currentAnchorId == null) return candidateId
     val anchorIdx = timeline.indexOfFirst { it.record.messageIdHex == currentAnchorId }
@@ -2029,10 +2029,10 @@ class ConversationController(
     private var accountTeardownRequested = false
     private val activeStreamIds = mutableSetOf<String>()
 
-    // Transient streaming-debug rows (#315, iOS parity) keyed by their synthetic
-    // timeline id. Lifecycle-scoped UI state for the live agent-stream watch —
-    // NOT a persistent cache of protocol data (AGENTS.md): they exist only while
-    // the developer toggle is on, are never written to the Dark Matter store, and
+    // Transient streaming-debug rows keyed by their synthetic timeline id.
+    // Lifecycle-scoped UI state for the live agent-stream watch — NOT a
+    // persistent cache of protocol data (AGENTS.md): they exist only while the
+    // developer toggle is on, are never written to the Dark Matter store, and
     // are dropped wholesale when the toggle turns off. Bounded so a long-lived
     // agent-heavy conversation can't grow them without limit.
     private val streamDebugTimelineItems = linkedMapOf<String, TimelineMessage>()
@@ -4960,10 +4960,9 @@ class ConversationController(
                 if (streamId in removedStreamIds) {
                     break
                 }
-                // Streaming debug (#315, iOS parity): when the developer toggle
-                // is on, surface every live agent-stream update as a transient
-                // inline debug row, mirroring iOS PR #137's appendStreamDebugEvent.
-                // No-op (and allocation-free past the boolean read) when off.
+                // When the developer toggle is on, surface every live
+                // agent-stream update as a transient inline debug row. No-op
+                // (and allocation-free past the boolean read) when off.
                 appendStreamDebugEvent(streamId, update)
                 when (update) {
                     is AgentStreamUpdateFfi.Chunk -> {
@@ -5013,14 +5012,13 @@ class ConversationController(
 
     /**
      * Surface one live agent-stream update as a transient inline streaming-debug
-     * row (#315, iOS parity with PR #137's `appendStreamDebugEvent`). Each row is
-     * a display-only synthetic [TimelineMessage] tagged [STREAM_DEBUG_DIRECTION]
-     * so it never inflates unread counts, marks-read, or reacts; the conversation
-     * renders it as a [StreamDebugEventRow] keyed off the [STREAM_DEBUG_ID_PREFIX]
-     * id. Gated entirely on [DarkMatterAppState.streamingDebugEnabled]: a no-op
-     * (past a single boolean read) when the toggle is off, so the timeline is
-     * byte-identical to today. Surfaces Chunk / Status / Progress / Record /
-     * Finished / Failed — the variants the iOS reference shows live.
+     * row. Each row is a display-only synthetic [TimelineMessage] tagged
+     * [STREAM_DEBUG_DIRECTION] so it never inflates unread counts, marks-read, or
+     * reacts; the conversation renders it as a [StreamDebugEventRow] keyed off the
+     * [STREAM_DEBUG_ID_PREFIX] id. Gated entirely on
+     * [DarkMatterAppState.streamingDebugEnabled]: a no-op (past a single boolean
+     * read) when the toggle is off, so the timeline is byte-identical to today.
+     * Surfaces every live Chunk / Status / Progress / Record / Finished / Failed.
      */
     private fun appendStreamDebugEvent(
         streamId: String,
@@ -5056,19 +5054,29 @@ class ConversationController(
         streamDebugTimelineItems[id] = item
         // Bound the retained rows: a long-lived agent-heavy conversation could
         // otherwise accrete debug rows without limit while the toggle stays on.
+        var evicted = false
         while (streamDebugTimelineItems.size > MAX_STREAM_DEBUG_ROWS) {
-            val oldest = streamDebugTimelineItems.keys.first()
-            streamDebugTimelineItems.remove(oldest)
+            streamDebugTimelineItems.remove(streamDebugTimelineItems.keys.first())
+            evicted = true
         }
-        publishTimelineFromIndexes()
+        if (evicted) {
+            // A row dropped out of the middle of the published list — only a full
+            // rebuild can drop it from the timeline.
+            publishTimelineFromIndexes()
+        } else {
+            // The new row sorts to the tail (highest recordedAt + timelineOrder),
+            // so append it in place rather than re-sorting the whole timeline on
+            // every stream update — the slot trick updateStreamPreview uses.
+            timeline = timeline + item.withOptimisticEditStatus()
+        }
     }
 
     /**
      * Re-publish the timeline after the streaming-debug toggle may have changed.
-     * Clears the transient debug rows when the effective toggle is off (mirrors
-     * iOS `refreshStreamingDebugPresentation`) so they don't linger once the
-     * developer turns it back off. Called from the conversation screen on the
-     * `streamingDebugEnabled` transition. When on, this is a plain republish.
+     * Clears the transient debug rows when the effective toggle is off so they
+     * don't linger once the developer turns it back off. Called from the
+     * conversation screen on the `streamingDebugEnabled` transition. When on,
+     * this is a plain republish.
      */
     fun refreshStreamingDebugPresentation() {
         if (!appState.streamingDebugEnabled) {
@@ -5180,9 +5188,9 @@ class ConversationController(
             a.reactions == b.reactions
 
     companion object {
-        // Streaming-debug rows (#315, iOS parity). Synthetic timeline ids carry
-        // this prefix so the conversation can render them as StreamDebugEventRow
-        // and so they sort/key distinctly from real messages.
+        // Streaming-debug rows. Synthetic timeline ids carry this prefix so the
+        // conversation can render them as StreamDebugEventRow and so they
+        // sort/key distinctly from real messages.
         internal const val STREAM_DEBUG_ID_PREFIX = "dbg:stream:"
 
         // Synthetic `direction` for debug rows: anything other than "received"
@@ -5190,9 +5198,10 @@ class ConversationController(
         // countUnreadIncoming only tally "received" rows).
         private const val STREAM_DEBUG_DIRECTION = "debug"
 
-        // Sentinel kind for debug-row synthetic records; not a real Nostr kind,
-        // never round-trips to the engine.
-        private const val STREAM_DEBUG_KIND: ULong = 0uL
+        // Sentinel kind for debug-row synthetic records. ULong.MAX_VALUE is not a
+        // real Nostr kind; these records are identified by their id prefix and
+        // never round-trip to the engine, so the value is display-only.
+        private const val STREAM_DEBUG_KIND: ULong = ULong.MAX_VALUE
 
         // Cap retained transient debug rows while the toggle stays on, oldest-first.
         private const val MAX_STREAM_DEBUG_ROWS = 200

@@ -5,11 +5,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Coarse category for the streaming-debug inline row (#315, iOS parity). Mirrors
- * iOS `MessageDebugCategory`: a category label is shown in the debug chrome so
- * cross-platform bug reports line up. The accent color mapping is intentionally
- * NOT here — this file is pure Kotlin (no Compose) so it stays JVM-unit-testable;
- * the Compose row owns the category -> Color mapping.
+ * Coarse category for the streaming-debug inline row; its label shows in the
+ * debug chrome. The accent-color mapping is intentionally NOT here — this file
+ * is pure Kotlin (no Compose) so it stays JVM-unit-testable; the Compose row
+ * owns the category -> Color mapping.
  */
 enum class MessageDebugCategory(
     val label: String,
@@ -23,11 +22,11 @@ enum class MessageDebugCategory(
 }
 
 /**
- * Debug-row presentation derived from a timeline record. Mirrors iOS
- * `MessageDebugStyle`: a [category] label, a [kindLabel] such as
- * "kind 1200 · agent-stream-start", a multi-line [tagsSummary], and a
- * kind-specific [detailText]. [isUserVisibleBubble] lets the conversation skip
- * debug rendering for ordinary chat bubbles even when streaming debug is on.
+ * Debug-row presentation derived from a timeline record: a [category] label, a
+ * [kindLabel] such as "kind 1200 · agent-stream-start", a multi-line
+ * [tagsSummary], and a kind-specific [detailText]. [isUserVisibleBubble] lets
+ * the conversation skip debug rendering for ordinary chat bubbles even when
+ * streaming debug is on.
  */
 data class MessageDebugStyle(
     val category: MessageDebugCategory,
@@ -66,6 +65,7 @@ object MessageDebugClassifier {
             MessageProjector.isGroupSystem(record) -> MessageDebugCategory.GroupSystem
             MessageProjector.isReaction(record) -> MessageDebugCategory.Control
             MessageProjector.isDelete(record) -> MessageDebugCategory.Control
+            MessageProjector.isEdit(record) -> MessageDebugCategory.Control
             else -> MessageDebugCategory.Unknown
         }
 

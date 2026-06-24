@@ -7312,7 +7312,7 @@ private fun GroupSystemRow(
 }
 
 // Category -> accent color for the streaming-debug row. Kept out of the
-// Compose-free MessageDebugStyle classifier (#315) and resolved here so the
+// Compose-free MessageDebugStyle classifier and resolved here so the
 // pure-Kotlin classifier stays JVM-testable. Literal hues stay legible across
 // the light/dark/amoled themes the app ships.
 private fun MessageDebugCategory.accentColor(): Color =
@@ -7326,13 +7326,13 @@ private fun MessageDebugCategory.accentColor(): Color =
     }
 
 /**
- * Inline streaming-debug row (#315, iOS parity). Renders a non-user-visible
- * signaling record (agent-stream-start, reaction, delete, group-system, unknown)
- * with debug chrome: a category-accented header (category label + kind label),
- * the kind-specific detail, and a multi-line tag summary, all in a small
- * monospace caption. Display-only — wires NO reply/long-press gestures and does
- * no read-marking, mirroring iOS debug-only rows. Only rendered when
- * [DarkMatterAppState.streamingDebugEnabled] is true.
+ * Inline streaming-debug row. Renders a non-user-visible signaling record
+ * (agent-stream-start, reaction, delete, group-system, unknown) with debug
+ * chrome: a category-accented header (category label + kind label), the
+ * kind-specific detail, and a multi-line tag summary, all in a small monospace
+ * caption. Display-only — wires NO reply/long-press gestures and does no
+ * read-marking. Only rendered when [DarkMatterAppState.streamingDebugEnabled]
+ * is true.
  */
 @Composable
 private fun MessageDebugRow(
@@ -7392,12 +7392,12 @@ private fun MessageDebugRow(
 }
 
 /**
- * Inline row for one live QUIC agent-stream update shown during streaming debug
- * (#315, iOS parity with `StreamDebugEventRow`). Surfaces the chunk / status /
- * progress / record / finished / failed events the conversation otherwise drops,
- * so cross-platform bug reports line up. Display-only: wires no gestures and does
- * no read-marking. Only rendered for synthetic `dbg:stream:` timeline rows, which
- * exist only while [DarkMatterAppState.streamingDebugEnabled] is true.
+ * Inline row for one live QUIC agent-stream update shown during streaming
+ * debug. Surfaces the chunk / status / progress / record / finished / failed
+ * events the conversation otherwise drops. Display-only: wires no gestures and
+ * does no read-marking. Only rendered for synthetic `dbg:stream:` timeline
+ * rows, which exist only while [DarkMatterAppState.streamingDebugEnabled] is
+ * true.
  */
 @Composable
 private fun StreamDebugEventRow(record: AppMessageRecordFfi) {
@@ -7457,8 +7457,8 @@ private fun StreamDebugEventRow(record: AppMessageRecordFfi) {
     }
 }
 
-// Abbreviate a long stream id to head…tail (iOS shortStreamId), leaving short
-// ids untouched so they stay copy-comparable across platforms.
+// Abbreviate a long stream id to head…tail, leaving short ids untouched so
+// they stay copy-comparable.
 private fun shortStreamId(streamId: String): String {
     if (streamId.length <= 16) return streamId.ifBlank { "(none)" }
     return "${streamId.take(8)}…${streamId.takeLast(8)}"
@@ -7620,9 +7620,8 @@ private fun ConversationScreen(
                 copy = controllerCopy,
             )
         }
-    // Streaming debug (#315, iOS parity with refreshStreamingDebugPresentation):
-    // when the developer toggle flips, re-publish the timeline. Turning it off
-    // drops the transient QUIC debug rows so they don't linger after the toggle.
+    // When the developer streaming-debug toggle flips, re-publish the timeline.
+    // Turning it off drops the transient QUIC debug rows so they don't linger.
     LaunchedEffect(controller, appState.streamingDebugEnabled) {
         controller.refreshStreamingDebugPresentation()
     }
@@ -9452,19 +9451,17 @@ private fun ConversationScreen(
                                 if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
                                     UnreadMessagesDivider(count = entryUnreadCount)
                                 }
-                                // Streaming debug (#315, iOS parity): when the
-                                // developer toggle is on, render non-user-visible
-                                // signaling kinds (agent-stream-start, reactions,
-                                // deletes, group-system, unknown) as a debug row
-                                // instead of their normal rendering. Fully gated
+                                // When the developer toggle is on, render
+                                // non-user-visible signaling kinds (agent-stream-start,
+                                // reactions, deletes, group-system, unknown) as a debug
+                                // row instead of their normal rendering. Fully gated
                                 // behind streamingDebugEnabled, so the timeline is
                                 // byte-identical to today when the toggle is off.
                                 if (appState.streamingDebugEnabled) {
                                     // Live QUIC agent-stream events are surfaced as
-                                    // synthetic `dbg:stream:` rows by the controller
-                                    // (iOS appendStreamDebugEvent parity). Render
-                                    // those first — their synthetic records would
-                                    // otherwise classify as Unknown below.
+                                    // synthetic `dbg:stream:` rows by the controller.
+                                    // Render those first — their synthetic records
+                                    // would otherwise classify as Unknown below.
                                     if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
                                         StreamDebugEventRow(record = item.record)
                                         return@itemsIndexed

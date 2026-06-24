@@ -4,10 +4,9 @@ import dev.ipf.marmotkit.AgentStreamUpdateFfi
 
 /**
  * The presentation pair for one live agent-stream update surfaced as a
- * streaming-debug row (#315, iOS parity). [eventKind] is the short label shown
- * in the row chrome ("chunk", "status", "progress", "record(<type>)", "finished",
- * "failed"); [detail] is the one-line payload summary. Mirrors iOS PR #137's
- * `appendStreamDebugEvent` formatting so cross-platform bug reports line up.
+ * streaming-debug row. [eventKind] is the short label shown in the row chrome
+ * ("chunk", "status", "progress", "record(<type>)", "finished", "failed");
+ * [detail] is the one-line payload summary.
  */
 data class StreamDebugEvent(
     val eventKind: String,
@@ -22,7 +21,6 @@ data class StreamDebugEvent(
  * result as a synthetic timeline row.
  */
 object StreamDebugEventFormatter {
-    // Match iOS streamDebugTextSummary's 120-char preview cap.
     const val SUMMARY_MAX = 120
 
     fun of(update: AgentStreamUpdateFfi): StreamDebugEvent =
