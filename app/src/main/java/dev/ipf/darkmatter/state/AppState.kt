@@ -2497,9 +2497,15 @@ class DarkMatterAppState(
     }
 
     // Pure read for use inside remember{}: returns the cached display name or the
-    // short npub, without the requestProfile() prefetch side-effect. Callers drive
-    // the prefetch from a LaunchedEffect (e.g. requestProfiles over the roster).
-    fun chatMemberTitleCached(accountIdHex: String): String = profileDisplayName(accountIdHex) ?: shortNpub(accountIdHex)
+    // short npub. Reads the presentation map directly (not profilePresentation(),
+    // whose lazy ensureProfileMaterialized is a side effect); touches
+    // profileRevision only for Compose invalidation. Callers drive the prefetch
+    // from a LaunchedEffect (e.g. requestProfiles over the roster).
+    fun chatMemberTitleCached(accountIdHex: String): String {
+        profileRevision
+        val cachedName = synchronized(profilePresentationLock) { profilePresentations[accountIdHex]?.displayName }
+        return cachedName ?: shortNpub(accountIdHex)
+    }
 
     private fun profileDisplayName(accountIdHex: String): String? = profilePresentation(accountIdHex).displayName
 
