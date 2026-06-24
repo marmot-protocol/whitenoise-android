@@ -11498,7 +11498,7 @@ private fun TransferAdminSheet(
     onDismiss: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val candidates = controller.transferAdminCandidates()
+    val candidates = remember(controller.members) { controller.transferAdminCandidates() }
     val filtered =
         remember(query, candidates) {
             val needle = query.trim()
