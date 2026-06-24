@@ -433,6 +433,8 @@ import java.time.format.FormatStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.ceil
@@ -16899,11 +16901,16 @@ private fun CameraQrScanner(
     val providerRef = remember { AtomicReference<ProcessCameraProvider?>(null) }
     val scannerRef = remember { AtomicReference<BarcodeScanner?>(null) }
     val disposedRef = remember { AtomicBoolean(false) }
+    // Per-frame ML Kit analysis runs here, off the main thread, for as long as
+    // the scanner is open; shut down on dispose. The provider/bind callbacks
+    // still use the main executor (they touch the lifecycle and preview view).
+    val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(Unit) {
         onDispose {
             disposedRef.set(true)
             runCatching { providerRef.getAndSet(null)?.unbindAll() }
             runCatching { scannerRef.getAndSet(null)?.close() }
+            runCatching { analyzerExecutor.shutdown() }
         }
     }
 
@@ -16918,6 +16925,7 @@ private fun CameraQrScanner(
                     providerRef,
                     scannerRef,
                     disposedRef,
+                    analyzerExecutor,
                     onScan,
                     onError,
                 )
@@ -16979,6 +16987,7 @@ private fun bindQrScannerCamera(
     providerRef: AtomicReference<ProcessCameraProvider?>,
     scannerRef: AtomicReference<BarcodeScanner?>,
     disposedRef: AtomicBoolean,
+    analyzerExecutor: Executor,
     onScan: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
@@ -17024,7 +17033,7 @@ private fun bindQrScannerCamera(
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
 
-            analysis.setAnalyzer(executor) { imageProxy ->
+            analysis.setAnalyzer(analyzerExecutor) { imageProxy ->
                 if (!analyzerBusy.compareAndSet(false, true)) {
                     imageProxy.close()
                     return@setAnalyzer
