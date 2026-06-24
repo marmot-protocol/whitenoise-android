@@ -396,7 +396,6 @@ import dev.ipf.darkmatter.state.isAcceptableRelayUrl
 import dev.ipf.darkmatter.state.labelFor
 import dev.ipf.darkmatter.state.nextReadAnchor
 import dev.ipf.darkmatter.state.outgoingIndicator
-import dev.ipf.darkmatter.state.sharedChatListItemsWith
 import dev.ipf.darkmatter.state.shortHex
 import dev.ipf.darkmatter.state.shouldResetNavOnAccountChange
 import dev.ipf.darkmatter.state.shouldShowOriginalTimestamp
@@ -2191,12 +2190,15 @@ private fun RecipientPreviewCard(
 ) {
     val trimmed = input.trim()
     // Re-key on the trimmed input so each edit cancels the prior in-flight
-    // resolve (npub validation, NIP-05 lookup) and starts fresh.
-    var resolving by remember(trimmed) { mutableStateOf(trimmed.isNotEmpty()) }
+    // resolve (npub validation, NIP-05 lookup) and starts fresh. A plain-text
+    // name isn't an identifier to resolve — it drives the local name search —
+    // so it must never enter the Resolving state, or the card flashes a spinner
+    // on every keystroke and hides the name results (#291).
+    var resolving by remember(trimmed) { mutableStateOf(trimmed.isNotEmpty() && !isPlainNameQuery(trimmed)) }
     var resolvedHex by remember(trimmed) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(trimmed) {
-        if (trimmed.isEmpty()) {
+        if (trimmed.isEmpty() || isPlainNameQuery(trimmed)) {
             resolving = false
             resolvedHex = null
             return@LaunchedEffect
@@ -2442,20 +2444,28 @@ private fun deriveRecipientCandidates(
     val active = activeAccountIdHex?.trim()?.lowercase(Locale.ROOT)
     val seen = LinkedHashSet<String>()
     val candidates = ArrayList<RecipientSearch.Candidate>()
+
+    fun add(rawHex: String?) {
+        val hex = rawHex?.trim()?.lowercase(Locale.ROOT) ?: return
+        if (hex.isEmpty()) return
+        if (active != null && hex == active) return
+        if (!seen.add(hex)) return
+        candidates +=
+            RecipientSearch.Candidate(
+                accountIdHex = hex,
+                displayName = appState.displayName(hex),
+                npub = appState.npub(hex),
+            )
+    }
     for (item in appState.chatListItems) {
-        val members = item.memberSnapshot?.members ?: continue
-        for (member in members) {
-            val hex = member.memberIdHex.trim().lowercase(Locale.ROOT)
-            if (hex.isEmpty()) continue
-            if (active != null && hex == active) continue
-            if (!seen.add(hex)) continue
-            candidates +=
-                RecipientSearch.Candidate(
-                    accountIdHex = hex,
-                    displayName = appState.displayName(hex),
-                    npub = appState.npub(hex),
-                )
-        }
+        // Group rosters give the members. A DM's roster, though, often holds only
+        // the active account — the counterpart isn't an enumerable member — so
+        // also take the resolved DM counterpart and the latest message's sender
+        // (the "recent senders" source #291 calls for) to surface DM partners.
+        item.memberSnapshot?.members?.forEach { add(it.memberIdHex) }
+        add(item.otherMemberAccount)
+        add(item.latest?.sender)
+        add(item.group.welcomerAccountIdHex)
     }
     return candidates
 }
@@ -2465,9 +2475,7 @@ private fun deriveRecipientCandidates(
  * [NewChatSheet] (DM branch) and the Add-member sheet (#291). Renders only for
  * a plain-text [query] ([isPlainNameQuery]); identifier inputs keep using
  * [RecipientPreviewCard]. Each row shows the avatar + display name + (verified)
- * NIP-05 + truncated npub, an "Already in chats" badge when the active account
- * already has a DM or shared group with that account, and — in the DM flow only
- * — an "Open existing chat" affordance when a 1:1 already exists.
+ * NIP-05 + truncated npub.
  *
  * Tapping a row invokes [onSelect] with the account hex (the same effect as
  * pasting the npub: the host sets the input/resolved hex so the existing submit
@@ -2477,9 +2485,7 @@ private fun deriveRecipientCandidates(
 private fun RecipientSearchResults(
     query: String,
     appState: DarkMatterAppState,
-    directMessage: Boolean,
     onSelect: (RecipientSearch.Candidate) -> Unit,
-    onOpenExisting: (ChatListItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (!isPlainNameQuery(query)) return
@@ -2496,28 +2502,10 @@ private fun RecipientSearchResults(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         matches.forEach { candidate ->
-            val existingDm = appState.existingDirectChat(candidate.accountIdHex)
-            val sharedGroups =
-                sharedChatListItemsWith(
-                    appState.chatListItems,
-                    candidate.accountIdHex,
-                    activeAccountIdHex,
-                )
-            val alreadyInChats =
-                RecipientSearch.alreadyInChats(
-                    hasDirectChat = existingDm != null,
-                    sharedGroupCount = sharedGroups.size,
-                )
             RecipientSearchResultRow(
                 candidate = candidate,
                 appState = appState,
-                alreadyInChats = alreadyInChats,
-                // "Open existing chat" only applies in the DM flow, and only
-                // when a 1:1 already exists (a shared group is not the same
-                // conversation a new DM would open).
-                existingDirectChat = existingDm.takeIf { directMessage },
                 onSelect = { onSelect(candidate) },
-                onOpenExisting = onOpenExisting,
             )
         }
     }
@@ -2533,10 +2521,7 @@ private fun RecipientSearchResults(
 private fun RecipientSearchResultRow(
     candidate: RecipientSearch.Candidate,
     appState: DarkMatterAppState,
-    alreadyInChats: Boolean,
-    existingDirectChat: ChatListItem?,
     onSelect: () -> Unit,
-    onOpenExisting: (ChatListItem) -> Unit,
 ) {
     val hex = candidate.accountIdHex
     val profile = appState.userProfile(hex)
@@ -2612,34 +2597,6 @@ private fun RecipientSearchResultRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                }
-            }
-            if (alreadyInChats) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.Chat,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        stringResource(R.string.recipient_already_in_chats),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            // DM flow only: a direct "open the existing conversation instead of
-            // starting a duplicate DM" action when a 1:1 already exists (#291).
-            existingDirectChat?.let { existing ->
-                TextButton(
-                    onClick = { onOpenExisting(existing) },
-                    contentPadding = PaddingValues(0.dp),
-                ) {
-                    Text(stringResource(R.string.recipient_open_existing_chat))
                 }
             }
         }
@@ -3844,14 +3801,9 @@ private fun NewChatSheet(
                 RecipientSearchResults(
                     query = pending,
                     appState = appState,
-                    directMessage = true,
                     onSelect = { candidate ->
                         pending = candidate.npub
                         error = null
-                    },
-                    onOpenExisting = { existing ->
-                        onOpenConversation(existing, false)
-                        onDismiss()
                     },
                 )
             } else {
@@ -10577,12 +10529,10 @@ private fun GroupDetailsScreen(
                 RecipientSearchResults(
                     query = pendingMember,
                     appState = appState,
-                    directMessage = false,
                     onSelect = { candidate ->
                         pendingMember = candidate.npub
                         pendingMemberError = null
                     },
-                    onOpenExisting = {},
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),

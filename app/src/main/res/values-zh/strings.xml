@@ -40,8 +40,6 @@
     <string name="recipient_preview_unresolved">无法解析此标识符</string>
     <string name="recipient_preview_nip05_verified">已验证的地址</string>
     <string name="recipient_preview_nip05_unverified">未验证的地址</string>
-    <string name="recipient_already_in_chats">已在聊天中</string>
-    <string name="recipient_open_existing_chat">打开现有聊天</string>
     <string name="chat_row_action_archive">归档</string>
     <string name="chat_row_action_unarchive">取消归档</string>
     <string name="chat_row_action_mark_read">标记为已读</string>

@@ -41,8 +41,6 @@
     <string name="recipient_preview_unresolved">Couldn\'t resolve this identifier</string>
     <string name="recipient_preview_nip05_verified">Verified address</string>
     <string name="recipient_preview_nip05_unverified">Unverified address</string>
-    <string name="recipient_already_in_chats">Already in chats</string>
-    <string name="recipient_open_existing_chat">Open existing chat</string>
     <string name="chat_row_action_archive">Archive</string>
     <string name="chat_row_action_unarchive">Unarchive</string>
     <string name="chat_row_action_mark_read">Mark as read</string>

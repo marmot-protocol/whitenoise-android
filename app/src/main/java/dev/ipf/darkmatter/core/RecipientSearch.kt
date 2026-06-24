@@ -73,20 +73,4 @@ object RecipientSearch {
         }
         return prefix + contained
     }
-
-    /**
-     * Whether the active account already has an active chat with the target
-     * account — either a 1:1 DM or a shared group — derived purely from the
-     * supplied chat-list facts. The "already in chats" badge (#291) and the
-     * "open existing chat" affordance both gate on this.
-     *
-     * @param hasDirectChat whether an existing 1:1 DM with the target exists
-     *   (the UI passes `appState.existingDirectChat(...) != null`).
-     * @param sharedGroupCount how many groups the active account shares with
-     *   the target (the UI passes `sharedChatListItemsWith(...).size`).
-     */
-    fun alreadyInChats(
-        hasDirectChat: Boolean,
-        sharedGroupCount: Int,
-    ): Boolean = hasDirectChat || sharedGroupCount > 0
 }

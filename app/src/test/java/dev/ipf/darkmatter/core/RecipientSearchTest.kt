@@ -107,19 +107,4 @@ class RecipientSearchTest {
                 .isEmpty(),
         )
     }
-
-    @Test
-    fun alreadyInChatsTrueForDirectChat() {
-        assertTrue(RecipientSearch.alreadyInChats(hasDirectChat = true, sharedGroupCount = 0))
-    }
-
-    @Test
-    fun alreadyInChatsTrueForSharedGroup() {
-        assertTrue(RecipientSearch.alreadyInChats(hasDirectChat = false, sharedGroupCount = 2))
-    }
-
-    @Test
-    fun alreadyInChatsFalseWithNoChat() {
-        assertFalse(RecipientSearch.alreadyInChats(hasDirectChat = false, sharedGroupCount = 0))
-    }
 }
