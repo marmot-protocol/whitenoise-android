@@ -37,5 +37,10 @@ object DiagnosticFormatter {
 
     private const val MAX_ERROR_LEN = 80
 
-    private fun redactError(message: String): String = if (message.length <= MAX_ERROR_LEN) message else message.take(MAX_ERROR_LEN) + "…"
+    private fun redactError(message: String): String {
+        if (message.length <= MAX_ERROR_LEN) return message
+        // Don't truncate mid surrogate pair — that would leave a lone surrogate.
+        val end = if (Character.isHighSurrogate(message[MAX_ERROR_LEN - 1])) MAX_ERROR_LEN - 1 else MAX_ERROR_LEN
+        return message.take(end) + "…"
+    }
 }
