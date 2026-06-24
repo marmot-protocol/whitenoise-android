@@ -99,22 +99,36 @@ object IdentityFormatter {
             // Clock skew within tolerance reads as "now", not "future".
             delta < -CLOCK_SKEW_TOLERANCE_SECONDS -> copy.future
             delta < 60 -> copy.now
-            // Plural-aware unit rendering: the callbacks resolve the correct
-            // grammatical form (e.g. Russian one/few/many) for the count. The
-            // count is clamped to a non-negative Int — every delta here is well
-            // within the day/week ranges below, so the conversion is safe.
+            // Plural-aware unit rendering: the callback resolves the correct
+            // grammatical form (e.g. Russian one/few/many) for the count, clamped
+            // to a non-negative Int (the sub-hour delta makes the conversion safe).
             delta < 3_600 -> copy.minutes((delta / 60).toInt())
-            delta < 86_400 -> copy.hours((delta / 3_600).toInt())
-            delta < 604_800 -> copy.days((delta / 86_400).toInt())
-            else ->
-                // Locale-aware month-day ordering rather than forced "MMM d".
+            // Past an hour the clock is more informative than "N hours ago": show
+            // the localized time, prefixed with the localized date once the
+            // instant falls on an earlier day.
+            else -> {
+                val zone = ZoneId.systemDefault()
                 runCatching {
-                    DateTimeFormatter
-                        .ofLocalizedDate(FormatStyle.MEDIUM)
-                        .withLocale(locale)
-                        .withZone(ZoneId.systemDefault())
-                        .format(instant)
+                    val time =
+                        DateTimeFormatter
+                            .ofLocalizedTime(FormatStyle.SHORT)
+                            .withLocale(locale)
+                            .withZone(zone)
+                            .format(instant)
+                    if (instant.atZone(zone).toLocalDate() == now.atZone(zone).toLocalDate()) {
+                        time
+                    } else {
+                        // Day + month, no year — the year is noise on a chat-list
+                        // row (e.g. "14 Jun 08:14").
+                        val date =
+                            DateTimeFormatter
+                                .ofPattern("d MMM", locale)
+                                .withZone(zone)
+                                .format(instant)
+                        "$date $time"
+                    }
                 }.getOrDefault(copy.now)
+            }
         }
     }
 }

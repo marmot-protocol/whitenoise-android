@@ -110,12 +110,17 @@ class IdentityFormatterTest {
         // #468: untrusted epoch values must not throw DateTimeException into the
         // render path. ULong.MAX_VALUE wraps to -1L and a high-bit value wraps to
         // Long.MIN_VALUE; both clamp to a safe instant instead of crashing.
+        val zone = ZoneId.systemDefault()
         val epochZeroFormatted =
             DateTimeFormatter
-                .ofLocalizedDate(FormatStyle.MEDIUM)
-                .withLocale(Locale.US)
-                .withZone(ZoneId.systemDefault())
-                .format(Instant.ofEpochSecond(0))
+                .ofPattern("d MMM", Locale.US)
+                .withZone(zone)
+                .format(Instant.ofEpochSecond(0)) + " " +
+                DateTimeFormatter
+                    .ofLocalizedTime(FormatStyle.SHORT)
+                    .withLocale(Locale.US)
+                    .withZone(zone)
+                    .format(Instant.ofEpochSecond(0))
 
         assertEquals(epochZeroFormatted, IdentityFormatter.relativeTime(ULong.MAX_VALUE, RelativeTimeCopy.Default, Locale.US))
         assertEquals(
@@ -146,18 +151,27 @@ class IdentityFormatterTest {
     }
 
     @Test
-    fun relativeTimeUsesInjectedCopyForUnits() {
-        val twoHoursAgo = (Instant.now().epochSecond - 7_200L).toULong()
-        val copy =
-            RelativeTimeCopy(
-                future = "FUT",
-                now = "NOW",
-                minutes = { count -> "$count-min" },
-                hours = { count -> "$count-hr" },
-                days = { count -> "$count-day" },
-            )
+    fun relativeTimeShowsClockTimePastAnHour() {
+        val now = Instant.now()
+        val instant = now.minusSeconds(7_200L)
+        val zone = ZoneId.systemDefault()
+        val time =
+            DateTimeFormatter
+                .ofLocalizedTime(FormatStyle.SHORT)
+                .withLocale(Locale.US)
+                .withZone(zone)
+                .format(instant)
+        val expected =
+            if (instant.atZone(zone).toLocalDate() == now.atZone(zone).toLocalDate()) {
+                time
+            } else {
+                DateTimeFormatter
+                    .ofPattern("d MMM", Locale.US)
+                    .withZone(zone)
+                    .format(instant) + " " + time
+            }
 
-        assertEquals("2-hr", IdentityFormatter.relativeTime(twoHoursAgo, copy, Locale.US))
+        assertEquals(expected, IdentityFormatter.relativeTime(instant.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))
     }
 
     @Test
@@ -178,15 +192,20 @@ class IdentityFormatterTest {
     }
 
     @Test
-    fun relativeTimeFallsThroughToLocalizedDateForOlderInstants() {
-        val eightDaysAgo = (Instant.now().epochSecond - (8 * 86_400L)).toULong()
+    fun relativeTimeShowsDateAndTimeForOlderInstants() {
+        val eightDaysAgo = Instant.now().minusSeconds(8 * 86_400L)
+        val zone = ZoneId.systemDefault()
         val expected =
             DateTimeFormatter
-                .ofLocalizedDate(FormatStyle.MEDIUM)
-                .withLocale(Locale.US)
-                .withZone(ZoneId.systemDefault())
-                .format(Instant.ofEpochSecond(eightDaysAgo.toLong()))
+                .ofPattern("d MMM", Locale.US)
+                .withZone(zone)
+                .format(eightDaysAgo) + " " +
+                DateTimeFormatter
+                    .ofLocalizedTime(FormatStyle.SHORT)
+                    .withLocale(Locale.US)
+                    .withZone(zone)
+                    .format(eightDaysAgo)
 
-        assertEquals(expected, IdentityFormatter.relativeTime(eightDaysAgo, RelativeTimeCopy.Default, Locale.US))
+        assertEquals(expected, IdentityFormatter.relativeTime(eightDaysAgo.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))
     }
 }
