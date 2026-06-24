@@ -40,7 +40,7 @@ object StreamDebugEventFormatter {
                         "hashLen=${update.transcriptHashHex.length}",
                 )
             is AgentStreamUpdateFfi.Failed ->
-                StreamDebugEvent("failed", update.message)
+                StreamDebugEvent("failed", textSummary(update.message))
         }
 
     /**

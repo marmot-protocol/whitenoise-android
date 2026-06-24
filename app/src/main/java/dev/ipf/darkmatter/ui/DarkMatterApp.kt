@@ -7411,6 +7411,10 @@ private fun StreamDebugEventRow(record: AppMessageRecordFfi) {
             ?: "event"
     val streamId = MessageProjector.streamId(record).orEmpty()
     val detail = record.plaintext
+    val tagsSummary =
+        record.tags
+            .joinToString(" · ") { tag -> tag.values.joinToString(" ") }
+            .ifBlank { "tags: (none)" }
     Box(
         modifier =
             Modifier
@@ -7453,6 +7457,13 @@ private fun StreamDebugEventRow(record: AppMessageRecordFfi) {
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = tagsSummary,
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -9451,21 +9462,24 @@ private fun ConversationScreen(
                                 if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
                                     UnreadMessagesDivider(count = entryUnreadCount)
                                 }
-                                // When the developer toggle is on, render
-                                // non-user-visible signaling kinds (agent-stream-start,
-                                // reactions, deletes, group-system, unknown) as a debug
-                                // row instead of their normal rendering. Fully gated
-                                // behind streamingDebugEnabled, so the timeline is
-                                // byte-identical to today when the toggle is off.
-                                if (appState.streamingDebugEnabled) {
-                                    // Live QUIC agent-stream events are surfaced as
-                                    // synthetic `dbg:stream:` rows by the controller.
-                                    // Render those first — their synthetic records
-                                    // would otherwise classify as Unknown below.
-                                    if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
+                                // Synthetic `dbg:stream:` rows must never fall
+                                // through to normal message rendering — not even in
+                                // the window between the toggle flipping off and the
+                                // republish that drops them. Draw the debug row only
+                                // when enabled; otherwise suppress the row entirely.
+                                if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
+                                    if (appState.streamingDebugEnabled) {
                                         StreamDebugEventRow(record = item.record)
-                                        return@itemsIndexed
                                     }
+                                    return@itemsIndexed
+                                }
+                                // When the developer toggle is on, render
+                                // non-user-visible signaling kinds (reactions, deletes,
+                                // group-system, agent-stream-start, unknown) as a debug
+                                // row instead of their normal rendering. Gated behind
+                                // streamingDebugEnabled, so the timeline is byte-identical
+                                // to today when the toggle is off.
+                                if (appState.streamingDebugEnabled) {
                                     val debugStyle = MessageDebugClassifier.debugStyle(item.record)
                                     if (!debugStyle.isUserVisibleBubble) {
                                         MessageDebugRow(style = debugStyle, record = item.record)
