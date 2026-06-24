@@ -1858,6 +1858,12 @@ class ConversationController(
     var membersLoaded by mutableStateOf(initialMemberSnapshot?.members?.isNotEmpty() == true)
         private set
 
+    // Hex of the account active when this conversation opened. Captured like
+    // conversationAccountRef so display/permission/"is me" helpers stay tied to
+    // the conversation's account instead of reading the live active account
+    // (which can differ from the controller's account before teardown).
+    private val conversationAccountIdHex = appState.activeAccount?.accountIdHex
+
     // True when the seeding snapshot positively places the active account in
     // the roster. Lets the bottom bar show the active composer immediately for
     // a known member while refreshMembers() verifies, without flashing the
@@ -1867,7 +1873,7 @@ class ConversationController(
     // (issue #545).
     val seededSelfMember: Boolean =
         initialMemberSnapshot?.members?.any {
-            GroupProjector.isActiveAccountMember(it, appState.activeAccount?.accountIdHex)
+            GroupProjector.isActiveAccountMember(it, conversationAccountIdHex)
         } == true
 
     // True when construction received a member snapshot at all — i.e. the local
@@ -2038,7 +2044,7 @@ class ConversationController(
         get() = title()
 
     fun title(copy: dev.ipf.darkmatter.core.GroupTitleCopy = dev.ipf.darkmatter.core.GroupTitleCopy.Default): String {
-        val me = appState.activeAccount?.accountIdHex
+        val me = conversationAccountIdHex
         val other = GroupProjector.otherMemberAccount(members, me)
         return GroupProjector.displayTitle(
             group = group,
@@ -2051,7 +2057,7 @@ class ConversationController(
 
     val inviteAccount: String?
         get() {
-            val me = appState.activeAccount?.accountIdHex
+            val me = conversationAccountIdHex
             val other = GroupProjector.otherMemberAccount(members, me)
             return GroupProjector.inviteAccount(group, other)
         }
@@ -2079,16 +2085,16 @@ class ConversationController(
     }
 
     val isSelfAdmin: Boolean
-        get() = GroupProjector.isAdminRef(group, appState.activeAccount?.accountIdHex)
+        get() = GroupProjector.isAdminRef(group, conversationAccountIdHex)
 
     val isSelfMember: Boolean
-        get() = members.any { GroupProjector.isActiveAccountMember(it, appState.activeAccount?.accountIdHex) }
+        get() = members.any { GroupProjector.isActiveAccountMember(it, conversationAccountIdHex) }
 
     val canSendMessages: Boolean
         get() = membersVerified && isSelfMember
 
     val canLeaveGroup: Boolean
-        get() = GroupProjector.canLeaveGroup(group, appState.activeAccount?.accountIdHex, members.size)
+        get() = GroupProjector.canLeaveGroup(group, conversationAccountIdHex, members.size)
 
     /**
      * True when the active account is the only admin of a group that still has
@@ -2098,15 +2104,14 @@ class ConversationController(
      * paths (issue #417).
      */
     val isSoleAdminWithOtherMembers: Boolean
-        get() = GroupProjector.isSoleAdminWithOtherMembers(group, appState.activeAccount?.accountIdHex, members.size)
+        get() = GroupProjector.isSoleAdminWithOtherMembers(group, conversationAccountIdHex, members.size)
 
     /** Members eligible to receive a transferred admin role from the active account. */
-    fun transferAdminCandidates(): List<AppGroupMemberRecordFfi> =
-        members.filter { GroupProjector.canTransferAdminTo(group, it, appState.activeAccount?.accountIdHex) }
+    fun transferAdminCandidates(): List<AppGroupMemberRecordFfi> = members.filter { GroupProjector.canTransferAdminTo(group, it, conversationAccountIdHex) }
 
     fun revokeWouldDepleteAdmins(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.revokeWouldDepleteAdmins(group, member, members.size)
 
-    fun canTransferAdminTo(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.canTransferAdminTo(group, member, appState.activeAccount?.accountIdHex)
+    fun canTransferAdminTo(member: AppGroupMemberRecordFfi): Boolean = GroupProjector.canTransferAdminTo(group, member, conversationAccountIdHex)
 
     suspend fun start() {
         val account = conversationAccountRef ?: return
@@ -2518,7 +2523,7 @@ class ConversationController(
                 messageIdHex = tempId,
                 direction = "sent",
                 groupIdHex = group.groupIdHex,
-                sender = appState.activeAccount?.accountIdHex ?: "",
+                sender = conversationAccountIdHex ?: "",
                 plaintext = trimmed,
                 // Parse locally so the optimistic bubble renders the same
                 // markdown the projected record will carry once the send
@@ -2739,7 +2744,7 @@ class ConversationController(
                 messageIdHex = tempId,
                 direction = "sent",
                 groupIdHex = group.groupIdHex,
-                sender = appState.activeAccount?.accountIdHex ?: "",
+                sender = conversationAccountIdHex ?: "",
                 plaintext = body,
                 contentTokens = appState.parseMarkdownOrEmpty(body),
                 kind = 9uL,
@@ -3057,7 +3062,7 @@ class ConversationController(
                     // into `accounts` yet; surface that distinctly from an ambiguous
                     // reaction so the failure reason isn't misleading.
                     val me =
-                        appState.activeAccount?.accountIdHex
+                        conversationAccountIdHex
                             ?: error("no active account to retract reaction")
                     val ownReactions =
                         timelineRecords[target]
@@ -3483,7 +3488,7 @@ class ConversationController(
         messageById[tempId] = refreshedRecord
         publishTimelineFromIndexes()
         try {
-            val activeAccountIdHex = appState.activeAccount?.accountIdHex
+            val activeAccountIdHex = conversationAccountIdHex
             val committedProjection =
                 committedButUnpublishedProjectionForOptimistic(
                     timelineRecords,
@@ -3619,7 +3624,7 @@ class ConversationController(
             }
             var demotedBeforeLeave = false
             runCatching {
-                val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                val activeAccountIdHex = conversationAccountIdHex
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, members.size)) {
                         val demoteResult =
@@ -3910,7 +3915,7 @@ class ConversationController(
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            val activeAccountIdHex = appState.activeAccount?.accountIdHex ?: return@withMutationLockResult false
+            val activeAccountIdHex = conversationAccountIdHex ?: return@withMutationLockResult false
             if (!GroupProjector.isAdminRef(group, activeAccountIdHex)) return@withMutationLockResult false
             if (group.admins.distinctBy { it.lowercase() }.size <= 1) {
                 appState.present(R.string.toast_keep_one_admin, R.string.toast_promote_before_removing_admin)
@@ -3947,7 +3952,7 @@ class ConversationController(
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            val activeAccountIdHex = appState.activeAccount?.accountIdHex
+            val activeAccountIdHex = conversationAccountIdHex
             // promote_admin / self_demote_admin sign the new admin list onto
             // the MLS group, so the grant target needs a Nostr pubkey hex, not
             // a local-account label. memberIdHex is always the hex.
@@ -4385,7 +4390,7 @@ class ConversationController(
     }
 
     private fun pruneConfirmedOptimisticReactions() {
-        val mine = appState.activeAccount?.accountIdHex?.lowercase() ?: return
+        val mine = conversationAccountIdHex?.lowercase() ?: return
         val base = baseReactionSenders()
         optimisticReactionChanges.entries
             .filter { (_, change) ->
@@ -4543,7 +4548,7 @@ class ConversationController(
             status =
                 when {
                     streamId != null -> MessageStatus.Streaming
-                    MessageProjector.isMine(actionRecord, appState.activeAccount?.accountIdHex) ->
+                    MessageProjector.isMine(actionRecord, conversationAccountIdHex) ->
                         if (record.sourceMessageIdHex == null) {
                             MessageStatus.Pending
                         } else {
@@ -4672,7 +4677,7 @@ class ConversationController(
         // Lowercased to match baseReactionSenders(): hex account-id casing can
         // drift between the active account and reaction senders, and a mismatch
         // would render your own reaction as not-mine. See #143.
-        val mine = appState.activeAccount?.accountIdHex?.lowercase()
+        val mine = conversationAccountIdHex?.lowercase()
         val sendersByTarget = baseReactionSenders()
         if (mine != null) {
             optimisticReactionChanges.values.forEach { change ->
@@ -4724,7 +4729,7 @@ class ConversationController(
     private fun reactionTalliesFor(targetMessageId: String): List<ReactionTally> {
         // Lowercased sender sets for the same casing-drift reason as
         // recomputeReactions(). See #143.
-        val mine = appState.activeAccount?.accountIdHex?.lowercase()
+        val mine = conversationAccountIdHex?.lowercase()
         val sendersByEmoji = linkedMapOf<String, MutableSet<String>>()
         timelineRecords[targetMessageId]?.reactions?.byEmoji?.forEach { summary ->
             sendersByEmoji.getOrPut(summary.emoji) { linkedSetOf() }.addAll(summary.senders.map { it.lowercase() })
@@ -4760,7 +4765,7 @@ class ConversationController(
     }
 
     fun reactionParticipantsFor(targetMessageId: String): List<ReactionParticipant> {
-        val mine = appState.activeAccount?.accountIdHex
+        val mine = conversationAccountIdHex
         val participants =
             timelineRecords[targetMessageId]
                 ?.reactions
@@ -4875,7 +4880,7 @@ class ConversationController(
     }
 
     private fun markActiveAccountRemovedFromMembers(account: String) {
-        val activeAccountIdHex = appState.activeAccount?.accountIdHex ?: return
+        val activeAccountIdHex = conversationAccountIdHex ?: return
         val updatedMembers =
             members.filterNot {
                 GroupProjector.isActiveAccountMember(it, activeAccountIdHex)
