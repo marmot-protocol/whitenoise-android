@@ -9473,53 +9473,66 @@ private fun ConversationScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                if (!controller.isDm) {
-                                    Text(
+                                // Subtitle line: members count (groups) and the
+                                // disappearing-timer indicator inline on ONE row,
+                                // not stacked. The one-time tooltip anchors to the
+                                // whole line when the timer is on.
+                                val membersSubtitle =
+                                    if (!controller.isDm) {
                                         controller.subtitle(
                                             justYou = stringResource(R.string.just_you),
                                             oneMember = stringResource(R.string.one_member),
                                             membersFormat = stringResource(R.string.members_count),
-                                        ),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                // Read-only disappearing-timer indicator; the whole
-                                // title strip already opens Details, where the picker
-                                // lives (sub-issue 2/7). Hidden when the timer is off.
-                                val disappearingSecs = controller.group.disappearingMessageSecs.toLong()
-                                if (disappearingSecs > 0L) {
-                                    val timerTooltipState = rememberTooltipState(isPersistent = true)
-                                    val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
-                                    if (!appState.disappearingTooltipShown) {
-                                        LaunchedEffect(controller.group.groupIdHex) {
-                                            // Mark before showing so a quick exit doesn't
-                                            // re-arm the one-time hint on the next open.
-                                            appState.markDisappearingTooltipShown()
-                                            timerTooltipState.show()
-                                        }
+                                        )
+                                    } else {
+                                        null
                                     }
-                                    TooltipBox(
-                                        positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
-                                        tooltip = { RichTooltip { Text(timerTooltipText) } },
-                                        state = timerTooltipState,
-                                    ) {
+                                val disappearingSecs = controller.group.disappearingMessageSecs.toLong()
+                                val showTimer = disappearingSecs > 0L
+                                if (membersSubtitle != null || showTimer) {
+                                    val labelStyle = MaterialTheme.typography.labelSmall
+                                    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    val subtitleRow: @Composable () -> Unit = {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         ) {
-                                            Icon(
-                                                Icons.Default.Schedule,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(13.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                            Text(
-                                                disappearingMessagesLabel(disappearingSecs),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
+                                            if (membersSubtitle != null) {
+                                                Text(membersSubtitle, style = labelStyle, color = labelColor)
+                                            }
+                                            if (showTimer) {
+                                                if (membersSubtitle != null) {
+                                                    Text("·", style = labelStyle, color = labelColor)
+                                                }
+                                                Icon(
+                                                    Icons.Default.Schedule,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(13.dp),
+                                                    tint = labelColor,
+                                                )
+                                                Text(disappearingMessagesLabel(disappearingSecs), style = labelStyle, color = labelColor)
+                                            }
                                         }
+                                    }
+                                    if (showTimer) {
+                                        val timerTooltipState = rememberTooltipState(isPersistent = true)
+                                        val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
+                                        if (!appState.disappearingTooltipShown) {
+                                            LaunchedEffect(controller.group.groupIdHex) {
+                                                // Mark before showing so a quick exit doesn't
+                                                // re-arm the one-time hint on the next open.
+                                                appState.markDisappearingTooltipShown()
+                                                timerTooltipState.show()
+                                            }
+                                        }
+                                        TooltipBox(
+                                            positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
+                                            tooltip = { RichTooltip { Text(timerTooltipText) } },
+                                            state = timerTooltipState,
+                                            content = subtitleRow,
+                                        )
+                                    } else {
+                                        subtitleRow()
                                     }
                                 }
                             }
