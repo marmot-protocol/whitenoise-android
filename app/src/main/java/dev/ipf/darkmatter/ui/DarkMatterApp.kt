@@ -3,6 +3,7 @@ package dev.ipf.darkmatter.ui
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ClipDescription
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -18116,6 +18117,9 @@ private fun IdentityScreen(
     appState: DarkMatterAppState,
     onBack: () -> Unit,
 ) {
+    // The screen surfaces the raw nsec; keep it out of Recents thumbnails and
+    // screenshots, matching the encrypted-backup sheet's posture.
+    WindowSecureFlag()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
@@ -18135,6 +18139,9 @@ private fun IdentityScreen(
             Intent(Intent.ACTION_SEND)
                 .setType("text/plain")
                 .putExtra(Intent.EXTRA_TEXT, text)
+                // Marks the payload as private so the share sheet and clipboard
+                // keep the raw nsec out of previews, history, and logs.
+                .putExtra(ClipDescription.EXTRA_IS_SENSITIVE, true)
         context.startActivity(
             Intent.createChooser(sendIntent, shareSecretKeyTitle),
         )
