@@ -1182,18 +1182,21 @@ class ChatsController(
     // conversation, #6), so on-demand callers — shared groups, DM lookup,
     // by-id resolution for navigation — see freshly created/updated groups
     // instead of the stale `items` snapshot.
-    private fun currentProjectedItems(): List<ChatListItem> {
-        val me = appState.activeAccount?.accountIdHex
-        return chatRows.map { row ->
+    private fun currentProjectedItems(activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex): List<ChatListItem> =
+        chatRows.map { row ->
             chatListItemFromProjection(
                 row = row,
                 group = groupRecordsById[row.groupIdHex],
-                activeAccountIdHex = me,
+                activeAccountIdHex = activeAccountIdHex,
                 members = memberCacheByGroup[row.groupIdHex],
                 previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
                 removed = row.groupIdHex in removedGroupIds,
             )
         }
+
+    private fun boundAccountIdHex(): String? {
+        val ref = accountRef ?: return null
+        return appState.accounts.firstOrNull { it.label == ref }?.accountIdHex
     }
 
     fun sharedGroupsWith(
@@ -1591,11 +1594,12 @@ class ChatsController(
         // relative to the FFI fan-out it gates, and is needed even while hidden
         // so a removed group's frozen unread can't keep lighting the
         // cross-account dot behind an open conversation.
-        val projected = currentProjectedItems()
+        val unreadAccountIdHex = boundAccountIdHex()
+        val projected = currentProjectedItems(unreadAccountIdHex)
         if (unreadAccountRef != null) {
             appState.updateAccountUnreadCount(
                 unreadAccountRef,
-                accountUnreadCount(projected, appState.activeAccount?.accountIdHex),
+                accountUnreadCount(projected, unreadAccountIdHex),
             )
         }
         // Hidden behind an open conversation: keep folding updates into the

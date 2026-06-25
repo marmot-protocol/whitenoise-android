@@ -576,7 +576,7 @@ class DarkMatterAppState(
     )
     private var defaultNotificationPermissionPromptInFlight by mutableStateOf(false)
 
-    private val npubs = ConcurrentHashMap<String, String>()
+    private val npubs = BoundedNpubCache()
     private var profileRevision by mutableStateOf(0)
 
     /**
@@ -2538,14 +2538,14 @@ class DarkMatterAppState(
     }
 
     fun npub(accountIdHex: String): String {
-        npubs[accountIdHex]?.let { return it }
+        npubs.get(accountIdHex)?.let { return it }
         // npub is a pure hex→bech32 encoding of the pubkey — no storage read, so
         // no DB-lock contention, and safe to resolve inline (unlike displayName /
         // userProfile, which this change moves off the composition thread).
         // Resolving here also keeps it independent of whether a published profile
         // exists — an account with no profile metadata still gets a real npub.
         val resolved = runCatching { marmot().npub(accountIdHex) }.getOrNull() ?: return accountIdHex
-        npubs[accountIdHex] = resolved
+        npubs.put(accountIdHex, resolved)
         return resolved
     }
 

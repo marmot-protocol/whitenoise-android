@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.PorterDuff
 import android.media.ExifInterface
 import android.net.Uri
 import java.io.ByteArrayOutputStream
@@ -642,10 +643,15 @@ object MediaPipeline {
             try {
                 opaque =
                     if (scaled.hasAlpha()) {
-                        Bitmap.createBitmap(scaled.width, scaled.height, Bitmap.Config.ARGB_8888).also {
-                            Canvas(it).apply {
-                                drawColor(Color.WHITE)
-                                drawBitmap(scaled, 0f, 0f, null)
+                        if (scaled.isMutable) {
+                            Canvas(scaled).drawColor(Color.WHITE, PorterDuff.Mode.DST_OVER)
+                            scaled
+                        } else {
+                            Bitmap.createBitmap(scaled.width, scaled.height, Bitmap.Config.ARGB_8888).also {
+                                Canvas(it).apply {
+                                    drawColor(Color.WHITE)
+                                    drawBitmap(scaled, 0f, 0f, null)
+                                }
                             }
                         }
                     } else {
