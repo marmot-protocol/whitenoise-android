@@ -224,7 +224,7 @@ android {
             buildConfigField(
                 "String",
                 "WHITENOISE_PROFILE_LINK_BASE_URL",
-                "https://www.whitenoise.chat/profile".asBuildConfigString(),
+                "".asBuildConfigString(),
             )
 
             buildConfigField(
@@ -433,6 +433,63 @@ androidComponents {
             }
         variantBuilder.enable = enabled
     }
+}
+
+tasks.register("verifyProfileLinkConfiguration") {
+    group = "verification"
+    description = "Verifies profile link BuildConfig values and production App Link manifest."
+
+    dependsOn(
+        "generateDevDebugBuildConfig",
+        "generateProductionReleaseBuildConfig",
+        "generateStagingReleaseBuildConfig",
+        "processProductionReleaseMainManifest",
+    )
+
+    fun generatedBuildConfig(
+        flavor: String,
+        buildType: String,
+    ) = layout.buildDirectory.file("generated/source/buildConfig/$flavor/$buildType/dev/ipf/darkmatter/BuildConfig.java")
+
+    val devBuildConfig = generatedBuildConfig("dev", "debug")
+    val productionBuildConfig = generatedBuildConfig("production", "release")
+    val stagingBuildConfig = generatedBuildConfig("staging", "release")
+    val productionMergedManifest =
+        layout.buildDirectory.file(
+            "intermediates/merged_manifest/productionRelease/processProductionReleaseMainManifest/AndroidManifest.xml",
+        )
+
+    inputs.files(devBuildConfig, productionBuildConfig, stagingBuildConfig, productionMergedManifest)
+
+    doLast {
+        fun requireContains(
+            file: File,
+            expected: String,
+        ) {
+            val text = file.readText()
+            check(text.contains(expected)) {
+                "${file.relativeTo(projectDir)} is missing expected text: $expected"
+            }
+        }
+
+        requireContains(devBuildConfig.get().asFile, "WHITENOISE_DEEP_LINK_SCHEME = \"whitenoise-dev\";")
+        requireContains(devBuildConfig.get().asFile, "WHITENOISE_PROFILE_LINK_BASE_URL = \"\";")
+        requireContains(productionBuildConfig.get().asFile, "WHITENOISE_DEEP_LINK_SCHEME = \"whitenoise\";")
+        requireContains(productionBuildConfig.get().asFile, "WHITENOISE_PROFILE_LINK_BASE_URL = \"\";")
+        requireContains(stagingBuildConfig.get().asFile, "WHITENOISE_DEEP_LINK_SCHEME = \"whitenoise-staging\";")
+        requireContains(stagingBuildConfig.get().asFile, "WHITENOISE_PROFILE_LINK_BASE_URL = \"\";")
+
+        val manifest = productionMergedManifest.get().asFile
+        requireContains(manifest, "android:autoVerify=\"true\"")
+        requireContains(manifest, "android:scheme=\"https\"")
+        requireContains(manifest, "android:host=\"www.whitenoise.chat\"")
+        requireContains(manifest, "android:host=\"whitenoise.chat\"")
+        requireContains(manifest, "android:pathPrefix=\"/profile/\"")
+    }
+}
+
+tasks.named("check") {
+    dependsOn("verifyProfileLinkConfiguration")
 }
 
 fun releaseSigningConfiguredForPackageTask(taskName: String): Boolean =

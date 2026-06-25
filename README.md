@@ -43,17 +43,19 @@ The supported build matrix is intentionally small:
 - production release: `dev.ipf.whitenoise.android`
 
 Dev registers `whitenoise-dev://` deep links, staging registers
-`whitenoise-staging://`, and production registers `whitenoise://` for
-backward-compatible inbound links. Production shares new profile links as
-verified HTTPS App Links under `https://www.whitenoise.chat/profile/<npub>` and
-declares an `android:autoVerify="true"` production intent filter for
-`whitenoise.chat` / `www.whitenoise.chat`. The custom URI schemes are
-convenience fallbacks, not a security boundary; Android can only verify
-`http(s)` App Links backed by a hosted `/.well-known/assetlinks.json` that lists
-the production package (`dev.ipf.whitenoise.android`) and release/Play signing
-certificate fingerprints. Gradle disables production/staging debug builds and
-the dev release build so each bundle ID maps to exactly one intended notification
-environment.
+`whitenoise-staging://`, and production registers `whitenoise://`. Production
+also declares an `android:autoVerify="true"` HTTPS App Link intent filter for
+`whitenoise.chat` / `www.whitenoise.chat` profile URLs, but generated production
+profile links intentionally remain on `whitenoise://profile/<npub>` until the
+website hosts both `/.well-known/assetlinks.json` and the `/profile/<npub>`
+route. The custom URI schemes are convenience fallbacks, not a security boundary;
+Android can only verify `http(s)` App Links backed by a hosted
+`/.well-known/assetlinks.json` that lists the production package
+(`dev.ipf.whitenoise.android`) and release/Play signing certificate fingerprints.
+Once that host is live, update `WHITENOISE_PROFILE_LINK_BASE_URL` to
+`https://www.whitenoise.chat/profile`. Gradle disables production/staging debug
+builds and the dev release build so each bundle ID maps to exactly one intended
+notification environment.
 
 ## Continuous Integration
 

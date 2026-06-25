@@ -64,19 +64,22 @@ data class ProfileLink(
         }
 
         private fun parseAppLink(uri: URI): ProfileLink? {
-            if (uri.host?.lowercase() !in PROFILE_APP_LINK_HOSTS) return null
+            if (uri.rawUserInfo != null || uri.port != -1) return null
+            if (uri.rawQuery != null || uri.rawFragment != null) return null
+            if (uri.host !in PROFILE_APP_LINK_HOSTS) return null
 
-            val parts =
-                uri.path
-                    .orEmpty()
-                    .trim('/')
-                    .split('/')
-            if (parts.size != 2 || !parts[0].equals("profile", ignoreCase = true)) return null
-            val npub = parts[1]
+            val path = uri.rawPath.orEmpty()
+            if (!path.startsWith(PROFILE_APP_LINK_PATH_PREFIX)) return null
+
+            val npub = path.removePrefix(PROFILE_APP_LINK_PATH_PREFIX)
+            if (npub.contains('/')) return null
             return if (isLikelyNpub(npub)) ProfileLink(npub) else null
         }
 
+        // `darkmatter` is parse-only legacy support. The Android manifest no longer
+        // registers that custom scheme for inbound intents.
         private val PROFILE_SCHEMES = setOf("whitenoise", "whitenoise-staging", "whitenoise-dev", "darkmatter")
         private val PROFILE_APP_LINK_HOSTS = setOf("whitenoise.chat", "www.whitenoise.chat")
+        private const val PROFILE_APP_LINK_PATH_PREFIX = "/profile/"
     }
 }

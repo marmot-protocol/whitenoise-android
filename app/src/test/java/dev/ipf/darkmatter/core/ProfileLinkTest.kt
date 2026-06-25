@@ -45,6 +45,16 @@ class ProfileLinkTest {
     }
 
     @Test
+    fun rejectsNonCanonicalHttpsProfileLinks() {
+        assertNull(ProfileLink.parse("https://www.whitenoise.chat:444/profile/$sampleNpub"))
+        assertNull(ProfileLink.parse("https://user@www.whitenoise.chat/profile/$sampleNpub"))
+        assertNull(ProfileLink.parse("https://www.whitenoise.chat/PROFILE/$sampleNpub"))
+        assertNull(ProfileLink.parse("https://www.whitenoise.chat/profile/$sampleNpub/extra"))
+        assertNull(ProfileLink.parse("https://www.whitenoise.chat/profile/$sampleNpub?ref=qr"))
+        assertNull(ProfileLink.parse("https://www.whitenoise.chat/profile/$sampleNpub#fragment"))
+    }
+
+    @Test
     fun parsesLegacyDarkMatterProfileLinks() {
         assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("darkmatter://profile/$sampleNpub"))
     }
