@@ -203,7 +203,7 @@
     <string name="profile_settings_subtitle">Nostr kind:0 profilinizi yayınlayın</string>
     <string name="identity_and_keys">Kimlik ve Anahtarlar</string>
     <string name="identity_settings_subtitle">Genel anahtar, npub, imzalama durumu</string>
-    <string name="relays_settings_subtitle">White Noise-yönetilen aktarma listeleri</string>
+    <string name="relays_settings_subtitle">White Noise tarafından yönetilen aktarma listeleri</string>
     <string name="key_packages">Anahtar paketi yönetimi</string>
     <string name="key_packages_settings_subtitle">Yayınlanan anahtar paketler ve rotasyon</string>
     <string name="notifications">Bildirimler</string>

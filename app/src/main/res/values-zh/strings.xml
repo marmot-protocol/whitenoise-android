@@ -246,7 +246,7 @@
     <string name="cancel">取消</string>
     <string name="link_confirm_title">打开外部链接？</string>
     <string name="link_confirm_open">打开</string>
-    <string name="point_camera_at_profile_qr">将相机对准 White Noise 轮廓 QR</string>
+    <string name="point_camera_at_profile_qr">将相机对准 White Noise 个人资料 QR</string>
     <string name="camera_access_required">请在设备设置中开启相机权限以扫描二维码。</string>
     <string name="allow_camera">允许拍照</string>
     <string name="camera_lifecycle_unavailable">扫描器发生故障。请重试。</string>

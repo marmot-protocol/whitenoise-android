@@ -125,15 +125,54 @@ uninstall-release: uninstall-production
 keystore-gen:
     ./scripts/keystore-gen.sh
 
-# Print SHA-256 fingerprint of the current release keystore (useful for
-# Play App Signing, FCM, etc.).
-keystore-fingerprint:
+# Print SHA-256 fingerprint of the release keystore (useful for Play App
+# Signing, FCM, etc.). Use `just keystore-fingerprint staging` for staging.
+keystore-fingerprint flavor="production":
     @bash -c ' \
-        path=$$(grep -E "^(WHITENOISE|DARKMATTER)_KEYSTORE_PATH=" local.properties | head -1 | cut -d= -f2-); \
-        pw=$$(grep -E "^(WHITENOISE|DARKMATTER)_KEYSTORE_PASSWORD=" local.properties | head -1 | cut -d= -f2-); \
-        alias=$$(grep -E "^(WHITENOISE|DARKMATTER)_KEY_ALIAS=" local.properties | head -1 | cut -d= -f2-); \
-        keytool -list -v -keystore "$$path" -alias "$$alias" -storepass "$$pw" | grep -E "SHA(1|256):" \
-    '
+        set -euo pipefail; \
+        flavor="$1"; \
+        local_props="local.properties"; \
+        prop_value() { \
+            local key value; \
+            for key in "$@"; do \
+                if [[ -n "${!key:-}" ]]; then \
+                    printf "%s\n" "${!key}"; \
+                    return 0; \
+                fi; \
+                value=$(grep "^${key}=" "$local_props" 2>/dev/null | head -1 | cut -d= -f2- || true); \
+                if [[ -n "$value" ]]; then \
+                    printf "%s\n" "$value"; \
+                    return 0; \
+                fi; \
+            done; \
+            return 1; \
+        }; \
+        require_prop() { \
+            local label="$1"; \
+            shift; \
+            prop_value "$@" || { \
+                echo "error: missing $label signing value for $flavor" >&2; \
+                exit 1; \
+            }; \
+        }; \
+        case "$flavor" in \
+            production) \
+                path=$(require_prop KEYSTORE_PATH WHITENOISE_PRODUCTION_KEYSTORE_PATH WHITENOISE_KEYSTORE_PATH DARKMATTER_KEYSTORE_PATH); \
+                pw=$(require_prop KEYSTORE_PASSWORD WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD WHITENOISE_KEYSTORE_PASSWORD DARKMATTER_KEYSTORE_PASSWORD); \
+                key_alias=$(require_prop KEY_ALIAS WHITENOISE_PRODUCTION_KEY_ALIAS WHITENOISE_KEY_ALIAS DARKMATTER_KEY_ALIAS); \
+                ;; \
+            staging) \
+                path=$(require_prop KEYSTORE_PATH WHITENOISE_STAGING_KEYSTORE_PATH); \
+                pw=$(require_prop KEYSTORE_PASSWORD WHITENOISE_STAGING_KEYSTORE_PASSWORD); \
+                key_alias=$(require_prop KEY_ALIAS WHITENOISE_STAGING_KEY_ALIAS); \
+                ;; \
+            *) \
+                echo "error: unsupported flavor: $flavor (expected production or staging)" >&2; \
+                exit 1; \
+                ;; \
+        esac; \
+        keytool -list -v -keystore "$path" -alias "$key_alias" -storepass "$pw" | grep -E "SHA(1|256):" \
+    ' bash "{{flavor}}"
 
 # Clean all build outputs.
 clean:

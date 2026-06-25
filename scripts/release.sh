@@ -137,6 +137,29 @@ flavor_task_name() {
   esac
 }
 
+apk_name_pattern_for_abi() {
+  case "$1" in
+    universal) printf '*universal*release*.apk' ;;
+    *) printf '*%s*release*.apk' "$1" ;;
+  esac
+}
+
+select_release_apk() {
+  local apk_dir="$1"
+  local intermediate_apk_dir="$2"
+  local target_abi="$3"
+  local pattern selected_apk
+
+  pattern="$(apk_name_pattern_for_abi "$target_abi")"
+  selected_apk="$(find "$apk_dir" -maxdepth 1 -type f -name "$pattern" 2>/dev/null | sort | head -1 || true)"
+  if [[ -n "$selected_apk" ]]; then
+    printf '%s\n' "$selected_apk"
+    return 0
+  fi
+
+  find "$intermediate_apk_dir" -maxdepth 1 -type f -name "$pattern" 2>/dev/null | sort | head -1 || true
+}
+
 # --- Java sanity ---
 if ! command -v java >/dev/null 2>&1; then
   for candidate in \
@@ -245,18 +268,19 @@ for flavor in "${BUILD_FLAVORS[@]}"; do
   INTERMEDIATE_APK_DIR="$REPO_DIR/app/build/intermediates/apk/$flavor/release"
   mkdir -p "$APK_DIR"
 
-  if [[ -n "$TARGET_ABI" && "$TARGET_ABI" != "universal" ]]; then
+  if [[ -n "$TARGET_ABI" ]]; then
     echo "==> Assembling $flavor release APK for $TARGET_ABI"
     rm -f "$APK_DIR"/*.apk
-    ./gradlew ":app:assemble${flavor_task}Release" \
-      -Pandroid.injected.build.abi="$TARGET_ABI" \
-      -Pandroid.injected.testOnly=false
+    if [[ "$TARGET_ABI" == "universal" ]]; then
+      ./gradlew ":app:assemble${flavor_task}Release" \
+        -Pandroid.injected.testOnly=false
+    else
+      ./gradlew ":app:assemble${flavor_task}Release" \
+        -Pandroid.injected.build.abi="$TARGET_ABI" \
+        -Pandroid.injected.testOnly=false
+    fi
 
-    selected_apk="$(
-      find "$APK_DIR" "$INTERMEDIATE_APK_DIR" -maxdepth 1 -type f -name "*${TARGET_ABI}*release*.apk" 2>/dev/null \
-        | sort \
-        | head -1 || true
-    )"
+    selected_apk="$(select_release_apk "$APK_DIR" "$INTERMEDIATE_APK_DIR" "$TARGET_ABI")"
     if [[ -z "$selected_apk" || ! -f "$selected_apk" ]]; then
       echo "error: no APK found for ABI: $TARGET_ABI ($flavor)" >&2
       exit 1

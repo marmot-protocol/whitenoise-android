@@ -24,7 +24,8 @@ just release-fast          # signed production + staging APKs, reuses checked-in
 just install-production    # install production arm64-v8a APK on connected device
 just install-staging       # install staging arm64-v8a APK on connected device
 just keystore-gen          # one-time release keystore generation
-just keystore-fingerprint  # print SHA-256 of release keystore
+just keystore-fingerprint         # print SHA-256 of production release keystore
+just keystore-fingerprint staging # print SHA-256 of staging release keystore
 ```
 
 Direct Gradle equivalents:
