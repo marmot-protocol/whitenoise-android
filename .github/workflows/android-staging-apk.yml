@@ -1,0 +1,127 @@
+name: Android Staging APK
+
+# Builds a signed staging APK for internal installation. This intentionally
+# stays separate from android-ci.yml: PR validation remains credential-free,
+# while master pushes can produce a downloadable staging artifact.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: android-staging-apk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
+  WHITENOISE_STAGING_KEYSTORE_BASE64: ${{ secrets.WHITENOISE_STAGING_KEYSTORE_BASE64 }}
+  WHITENOISE_STAGING_KEYSTORE_PASSWORD: ${{ secrets.WHITENOISE_STAGING_KEYSTORE_PASSWORD }}
+  WHITENOISE_STAGING_KEY_ALIAS: ${{ secrets.WHITENOISE_STAGING_KEY_ALIAS }}
+  WHITENOISE_STAGING_KEY_PASSWORD: ${{ secrets.WHITENOISE_STAGING_KEY_PASSWORD }}
+  WHITENOISE_STAGING_OTLP_ENDPOINT: ${{ secrets.WHITENOISE_STAGING_OTLP_ENDPOINT }}
+  WHITENOISE_STAGING_OTLP_AUTH_TOKEN: ${{ secrets.WHITENOISE_STAGING_OTLP_AUTH_TOKEN }}
+  WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT: ${{ secrets.WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT }}
+  WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN: ${{ secrets.WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN }}
+  WHITENOISE_STAGING_TELEMETRY_TENANT: ${{ secrets.WHITENOISE_STAGING_TELEMETRY_TENANT }}
+  WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX: ${{ secrets.WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX }}
+  WHITENOISE_STAGING_PUSH_RELAY_HINT: ${{ secrets.WHITENOISE_STAGING_PUSH_RELAY_HINT }}
+
+jobs:
+  build:
+    name: Build signed staging APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # AGP 9.x / Gradle 9.4.1 require JDK 17.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Check staging secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required=(
+            ANDROID_GOOGLE_SERVICES_JSON_BASE64
+            WHITENOISE_STAGING_KEYSTORE_BASE64
+            WHITENOISE_STAGING_KEYSTORE_PASSWORD
+            WHITENOISE_STAGING_KEY_ALIAS
+            WHITENOISE_STAGING_KEY_PASSWORD
+            WHITENOISE_STAGING_OTLP_ENDPOINT
+            WHITENOISE_STAGING_OTLP_AUTH_TOKEN
+            WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT
+            WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN
+            WHITENOISE_STAGING_TELEMETRY_TENANT
+            WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX
+            WHITENOISE_STAGING_PUSH_RELAY_HINT
+          )
+
+          missing=()
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing staging CI secret(s):\n' >&2
+            printf ' - %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
+      - name: Write Firebase config
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          package_name = "dev.ipf.whitenoise.android.staging"
+          config = json.loads(Path("app/google-services.json").read_text())
+          packages = [
+              client.get("client_info", {})
+              .get("android_client_info", {})
+              .get("package_name")
+              for client in config.get("client", [])
+          ]
+          if package_name not in packages:
+              raise SystemExit(f"google-services.json is missing client for {package_name}")
+          PY
+
+      - name: Decode staging keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          keystore_path="$RUNNER_TEMP/whitenoise-staging-release.p12"
+          printf '%s' "$WHITENOISE_STAGING_KEYSTORE_BASE64" \
+            | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+          printf 'WHITENOISE_STAGING_KEYSTORE_PATH=%s\n' "$keystore_path" >> "$GITHUB_ENV"
+
+      - name: Build staging APK
+        run: ./scripts/release.sh --skip-bindings --flavor staging --abi arm64-v8a
+
+      - name: Upload staging APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: whitenoise-staging-v8a-release
+          path: app/build/outputs/apk/staging/release/whitenoise-staging-v8a-release-*.apk
+          if-no-files-found: error
+          retention-days: 30

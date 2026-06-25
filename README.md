@@ -58,6 +58,25 @@ master-only, not a pull-request gate, because emulator boot is slower and more
 flake-prone than the fast JVM checks. It uploads Android test reports when
 available and retains them for seven days.
 
+Pushes to `master` also run `.github/workflows/android-staging-apk.yml`, which
+builds and uploads a signed `arm64-v8a` staging release APK for internal
+installation. That workflow is also manually runnable from GitHub Actions. It
+uses the checked-in Marmot bindings and requires these repository Actions
+secrets:
+
+- `ANDROID_GOOGLE_SERVICES_JSON_BASE64`
+- `WHITENOISE_STAGING_KEYSTORE_BASE64`
+- `WHITENOISE_STAGING_KEYSTORE_PASSWORD`
+- `WHITENOISE_STAGING_KEY_ALIAS`
+- `WHITENOISE_STAGING_KEY_PASSWORD`
+- `WHITENOISE_STAGING_OTLP_ENDPOINT`
+- `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
+- `WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT`
+- `WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN`
+- `WHITENOISE_STAGING_TELEMETRY_TENANT`
+- `WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX`
+- `WHITENOISE_STAGING_PUSH_RELAY_HINT`
+
 Run the same fast checks locally before pushing:
 
 ```bash
