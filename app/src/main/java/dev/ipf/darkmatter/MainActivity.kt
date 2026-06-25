@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Route an inbound intent: a notification tap (our [NotificationNavigation.ACTION_OPEN]
-     * action) becomes a navigation target; a `darkmatter://` data URI becomes a
+     * action) becomes a navigation target; a White Noise data URI becomes a
      * profile-link payload. A dataless, non-notification intent leaves any
      * already-queued target/link intact (see [routeInboundIntent]).
      */

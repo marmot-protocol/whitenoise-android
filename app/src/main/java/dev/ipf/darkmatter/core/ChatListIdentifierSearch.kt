@@ -2,7 +2,7 @@ package dev.ipf.darkmatter.core
 
 /**
  * Classifies a chat-list search query as a Nostr identifier the user pasted
- * (an `npub` / `nostr:` / `darkmatter://profile/...` link, or a NIP-05
+ * (an `npub` / `nostr:` / `whitenoise://profile/...` link, or a NIP-05
  * `name@domain` address) versus a plain-text filter string.
  *
  * Plain-text queries keep behaving as before (filter the chat list by title /
@@ -14,7 +14,7 @@ object ChatListIdentifierSearch {
     /** A recognised identifier in a chat-list search query. */
     sealed interface Identifier {
         /**
-         * An npub / nostr: / darkmatter profile link that already carries the
+         * An npub / nostr: / White Noise profile link that already carries the
          * key — no network needed, the [npub] is ready to hand to the profile
          * sheet.
          */

@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Dark Matter</string>
-    <string name="dark_matter_couldnt_start">Dark Matter 無法啟動</string>
+    <string name="app_name">White Noise</string>
+    <string name="dark_matter_couldnt_start">White Noise 無法啟動</string>
     <string name="refresh">重新整理傾印</string>
     <string name="retry">重試</string>
-    <string name="dark_matter_shield">Dark Matter 盾牌</string>
+    <string name="dark_matter_shield">White Noise 盾牌</string>
     <string name="onboarding_tagline">端對端加密群組訊息。</string>
     <string name="creating_identity">創造身份</string>
     <string name="creating_identity_title">正在建立身分</string>
     <string name="create_new_identity">建立新身分</string>
     <string name="sign_in">登入</string>
-    <string name="sign_in_to_dark_matter">登入 Dark Matter</string>
+    <string name="sign_in_to_dark_matter">登入 White Noise</string>
     <string name="sign_in_secret_key_help">輸入您的 Nostr 金鑰以使用此裝置上的現有身分。</string>
     <string name="nostr_nsec">輸入您的私鑰</string>
     <string name="back">返回</string>
@@ -57,10 +57,10 @@
     <string name="no_chats_yet">尚無聊天</string>
     <string name="empty_chats_invite_npub">透過邀請某人及其 npub 來開始對話。</string>
     <string name="new_chat">新聊天</string>
-    <string name="error_not_dark_matter_profile_qr">該 QR 程式碼不是 Dark Matter 設定檔。</string>
+    <string name="error_not_dark_matter_profile_qr">該 QR 程式碼不是 White Noise 設定檔。</string>
     <string name="error_valid_recipient_reference">輸入有效的 npub、設定檔連結或 hex 公鑰。</string>
-    <string name="error_missing_key_package">該帳戶尚未發布密鑰包。請他們打開 Dark Matter，然後再試一次。</string>
-    <string name="error_missing_key_package_for">%1$s 尚未發布密鑰包。請他們打開 Dark Matter，然後再試一次。</string>
+    <string name="error_missing_key_package">該帳戶尚未發布密鑰包。請他們打開 White Noise，然後再試一次。</string>
+    <string name="error_missing_key_package_for">%1$s 尚未發布密鑰包。請他們打開 White Noise，然後再試一次。</string>
     <string name="error_invalid_identity_reference">該收件者不是有效的 Nostr 公鑰。使用 npub、設定檔連結或 hex 公鑰。</string>
     <string name="error_group_publish_failed">該群組已在本地創建，但發布失敗：%1$s</string>
     <string name="remove">移除</string>
@@ -202,7 +202,7 @@
     <string name="profile_settings_subtitle">發佈您的 Nostr kind:0 個人資料</string>
     <string name="identity_and_keys">身分和金鑰</string>
     <string name="identity_settings_subtitle">公鑰、npub、簽章狀態</string>
-    <string name="relays_settings_subtitle">Dark Matter 管理的中繼列表</string>
+    <string name="relays_settings_subtitle">White Noise 管理的中繼列表</string>
     <string name="key_packages">金鑰套件管理</string>
     <string name="key_packages_settings_subtitle">已發布的密鑰包和輪換</string>
     <string name="notifications">通知</string>
@@ -223,9 +223,9 @@
     <string name="diagnostics">診斷</string>
     <string name="diagnostics_settings_subtitle">繼電器健康狀況和 MLS 內部結構</string>
     <string name="local_notifications">通知</string>
-    <string name="local_notifications_subtitle">在 Dark Matter 執行時顯示訊息並邀請警報。</string>
+    <string name="local_notifications_subtitle">在 White Noise 執行時顯示訊息並邀請警報。</string>
     <string name="keep_connected">保持連線</string>
-    <string name="keep_connected_subtitle">在 Dark Matter 後台執行時接收訊息。</string>
+    <string name="keep_connected_subtitle">在 White Noise 後台執行時接收訊息。</string>
     <string name="native_push">推播通知</string>
     <string name="native_push_subtitle">中繼有新事件需要送達時喚醒應用程式。</string>
     <string name="native_push_unavailable_subtitle">需要 Google Play 服務，以及配置了推播伺服器的構建版本。</string>
@@ -246,7 +246,7 @@
     <string name="cancel">取消</string>
     <string name="link_confirm_title">開啟外部連結？</string>
     <string name="link_confirm_open">開啟</string>
-    <string name="point_camera_at_profile_qr">将相机对准 Dark Matter 轮廓 QR</string>
+    <string name="point_camera_at_profile_qr">請將相機對準 White Noise 個人資料 QR 碼</string>
     <string name="camera_access_required">請在裝置設定中開啟相機權限，以掃描 QR 碼。</string>
     <string name="allow_camera">允許拍照</string>
     <string name="camera_lifecycle_unavailable">掃描器發生問題。請再試一次。</string>
@@ -288,7 +288,7 @@
     <string name="encrypted_backup_short_warning">短密碼片語可能被暴力破解。請使用較長片語，並與此備份分開保存。</string>
     <string name="encrypted_backup_create">建立備份</string>
     <string name="encrypted_backup_result_title">你的加密備份</string>
-    <string name="encrypted_backup_result_help">現在複製這段 ncryptsec1 字串。60 秒後或 Dark Matter 進入背景時會自動隱藏。</string>
+    <string name="encrypted_backup_result_help">現在複製這段 ncryptsec1 字串。60 秒後或 White Noise 進入背景時會自動隱藏。</string>
     <string name="encrypted_backup_unavailable">加密備份需要此裝置上有本機簽署帳戶。</string>
     <string name="show">顯示</string>
     <string name="hide">隱藏</string>
@@ -351,7 +351,7 @@
     <string name="event_log">事件日誌</string>
     <string name="waiting_for_events">等待事件發生。</string>
     <string name="notification_channel_messages">訊息</string>
-    <string name="notification_channel_messages_description">Dark Matter 訊息和邀請</string>
+    <string name="notification_channel_messages_description">White Noise 訊息和邀請</string>
     <string name="notification_channel_direct_messages">私訊</string>
     <string name="notification_channel_direct_messages_description">一對一對話訊息</string>
     <string name="notification_channel_group_messages">群組訊息</string>
@@ -372,11 +372,11 @@
     <string name="notification_sender_in_group">%1$s 在 %2$s 中</string>
     <string name="notification_invite_from_sender">來自 %1$s 的邀請</string>
     <string name="notification_sender_invited_you_to_group">%1$s 邀請你加入 %2$s</string>
-    <string name="background_connection_notification_title">Dark Matter 已連線</string>
+    <string name="background_connection_notification_title">White Noise 已連線</string>
     <string name="background_connection_notification_text">正在監聽訊息</string>
     <string name="background_connection_notification_hint">長按以隱藏此通知</string>
     <string name="notification_channel_background_connection">背景連線</string>
-    <string name="notification_channel_background_connection_description">保持 Dark Matter 連接以取得本地通知</string>
+    <string name="notification_channel_background_connection_description">保持 White Noise 連接以取得本地通知</string>
     <string name="toast_restarting">正在重啟</string>
     <string name="toast_identity_created">身分已建立</string>
     <string name="toast_couldnt_create_identity">無法建立身分</string>

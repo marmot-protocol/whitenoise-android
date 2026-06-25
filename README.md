@@ -1,6 +1,6 @@
-# Dark Matter Android
+# White Noise Android
 
-Android client for Dark Matter.
+Android client for White Noise, backed by the Dark Matter Marmot bindings.
 
 ## Project Shape
 
@@ -14,26 +14,35 @@ The Android app should not become a second database for Dark Matter data. If a s
 just test                  # unit tests
 just lint                  # ktlint check (read-only)
 just format                # ktlint format (rewrites in place)
-just debug                 # build debug APKs
-just install-debug         # install debug on connected device
-just run-debug             # install + launch debug
-just apk                   # signed arm64-v8a release APK (fast)
-just release               # signed release APKs, rebuilds Marmot bindings
-just release-fast          # signed release APKs, reuses checked-in bindings
-just install-release       # install release arm64-v8a on connected device
+just debug                 # build dev debug APKs
+just install-debug         # install dev debug on connected device
+just run-debug             # install + launch dev debug
+just apk-production        # signed production arm64-v8a APK (fast)
+just apk-staging           # signed staging arm64-v8a APK (fast)
+just release               # signed production + staging APKs, rebuilds Marmot bindings
+just release-fast          # signed production + staging APKs, reuses checked-in bindings
+just install-production    # install production arm64-v8a APK on connected device
+just install-staging       # install staging arm64-v8a APK on connected device
 just keystore-gen          # one-time release keystore generation
-just keystore-fingerprint  # print SHA-256 of release keystore
+just keystore-fingerprint         # print SHA-256 of production release keystore
+just keystore-fingerprint staging # print SHA-256 of staging release keystore
 ```
 
 Direct Gradle equivalents:
 
 ```bash
-./gradlew :app:testDebugUnitTest
-./gradlew :app:assembleDebug
-./gradlew :app:installDebug
+./gradlew :app:testDevDebugUnitTest
+./gradlew :app:assembleDevDebug
+./gradlew :app:installDevDebug
 ```
 
-The debug variant uses an `applicationIdSuffix` of `.debug` (`dev.ipf.darkmatter.debug`), so it installs alongside the release build (`dev.ipf.darkmatter`) without collision.
+The supported build matrix is intentionally small:
+
+- dev debug: `dev.ipf.whitenoise.android.dev`
+- staging release: `dev.ipf.whitenoise.android.staging`
+- production release: `dev.ipf.whitenoise.android`
+
+Dev registers `whitenoise-dev://` deep links, staging registers `whitenoise-staging://`, and production registers `whitenoise://`. Gradle disables production/staging debug builds and the dev release build so each bundle ID maps to exactly one intended notification environment.
 
 ## Continuous Integration
 
@@ -41,23 +50,42 @@ Every pull request to `master` (and every push to `master`) runs the
 `.github/workflows/android-ci.yml` validation workflow. It fails the build on
 Kotlin compile errors, unit-test failures, Compose screenshot regressions
 (Roborazzi — see [Screenshot tests](#screenshot-tests)), ktlint violations, or
-Android lint regressions. The workflow uses the debug variant only and requires
-no signing secrets or `google-services.json`.
+Android lint regressions. The workflow uses the dev debug variant only
+and requires no signing secrets or `google-services.json`.
 
 Pushes to `master` also run `.github/workflows/android-instrumented.yml`, a
-separate emulator workflow for `:app:connectedDebugAndroidTest`. It is
+separate emulator workflow for `:app:connectedDevDebugAndroidTest`. It is
 master-only, not a pull-request gate, because emulator boot is slower and more
 flake-prone than the fast JVM checks. It uploads Android test reports when
 available and retains them for seven days.
 
+Pushes to `master` also run `.github/workflows/android-staging-apk.yml`, which
+builds and uploads a signed `arm64-v8a` staging release APK for internal
+installation. That workflow is also manually runnable from GitHub Actions. It
+uses the checked-in Marmot bindings and requires these repository Actions
+secrets:
+
+- `ANDROID_GOOGLE_SERVICES_JSON_BASE64`
+- `WHITENOISE_STAGING_KEYSTORE_BASE64`
+- `WHITENOISE_STAGING_KEYSTORE_PASSWORD`
+- `WHITENOISE_STAGING_KEY_ALIAS`
+- `WHITENOISE_STAGING_KEY_PASSWORD`
+- `WHITENOISE_STAGING_OTLP_ENDPOINT`
+- `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
+- `WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT`
+- `WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN`
+- `WHITENOISE_STAGING_TELEMETRY_TENANT`
+- `WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX`
+- `WHITENOISE_STAGING_PUSH_RELAY_HINT`
+
 Run the same fast checks locally before pushing:
 
 ```bash
-./gradlew :app:compileDebugKotlin   # Kotlin compile
-./gradlew :app:testDebugUnitTest    # unit tests          (also: just test)
-./gradlew :app:verifyRoborazziDebug # screenshot tests    (compares baselines)
-./gradlew :app:ktlintCheck          # style/format check  (also: just lint)
-./gradlew :app:lintDebug            # Android lint
+./gradlew :app:compileDevDebugKotlin   # Kotlin compile
+./gradlew :app:testDevDebugUnitTest    # unit tests          (also: just test)
+./gradlew :app:verifyRoborazziDevDebug # screenshot tests    (compares baselines)
+./gradlew :app:ktlintCheck             # style/format check  (also: just lint)
+./gradlew :app:lintDevDebug            # Android lint
 ```
 
 Use `just format` (`./gradlew :app:ktlintFormat`) to auto-fix ktlint findings
@@ -87,68 +115,120 @@ covers two surfaces:
 - `OnboardingContentScreenshotTest` — the onboarding entry screen, light theme.
 
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
-runs `:app:verifyRoborazziDebug`; on a mismatch the build fails and the
+runs `:app:verifyRoborazziDevDebug`; on a mismatch the build fails and the
 diff/compare images are uploaded as workflow artifacts (`android-ci-reports`).
 
 **Re-baseline after an intentional UI change.** When you deliberately change a
 covered composable, regenerate the baselines and commit the updated PNGs:
 
 ```bash
-./gradlew :app:recordRoborazziDebug   # rewrite baselines under app/src/test/snapshots/
+./gradlew :app:recordRoborazziDevDebug   # rewrite baselines under app/src/test/snapshots/
 git add app/src/test/snapshots/        # review the image diff, then commit
 ```
 
 Always eyeball the regenerated PNGs before committing — that review is the point
-of the check. If `verifyRoborazziDebug` fails on a change you did *not* intend,
+of the check. If `verifyRoborazziDevDebug` fails on a change you did *not* intend,
 that is a caught regression: fix the UI, don't re-record.
 
 ## Release Builds
 
-Release builds use signing values from `local.properties` or matching environment variables:
+Production release builds use signing values from `local.properties` or matching environment variables:
 
-- `DARKMATTER_KEYSTORE_PATH`
-- `DARKMATTER_KEYSTORE_PASSWORD`
-- `DARKMATTER_KEY_ALIAS`
-- `DARKMATTER_KEY_PASSWORD`
+- `WHITENOISE_PRODUCTION_KEYSTORE_PATH`
+- `WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD`
+- `WHITENOISE_PRODUCTION_KEY_ALIAS`
+- `WHITENOISE_PRODUCTION_KEY_PASSWORD`
+
+Production also accepts global signing values as fallbacks:
+
+- `WHITENOISE_KEYSTORE_PATH`
+- `WHITENOISE_KEYSTORE_PASSWORD`
+- `WHITENOISE_KEY_ALIAS`
+- `WHITENOISE_KEY_PASSWORD`
+
+Legacy `DARKMATTER_KEYSTORE_*` names are still accepted as fallbacks.
+
+Staging release builds use staging-only signing values:
+
+- `WHITENOISE_STAGING_KEYSTORE_PATH`
+- `WHITENOISE_STAGING_KEYSTORE_PASSWORD`
+- `WHITENOISE_STAGING_KEY_ALIAS`
+- `WHITENOISE_STAGING_KEY_PASSWORD`
 
 Release packaging fails if signing is unconfigured. To override for a local smoke build, set:
 
-- `DARKMATTER_ALLOW_UNSIGNED_RELEASE=true`
+- `WHITENOISE_ALLOW_UNSIGNED_RELEASE=true`
 
 Runtime configuration is also read from `local.properties` or environment variables so endpoints and tokens stay out of Git.
 
-**Telemetry / audit:**
+**Dev telemetry / audit:**
 
-- `DARKMATTER_OTLP_ENDPOINT`
-- `DARKMATTER_OTLP_AUTH_TOKEN`
-- `DARKMATTER_AUDIT_LOG_ENDPOINT`
-- `DARKMATTER_AUDIT_LOG_AUTH_TOKEN`
-- `OTLP_TOKEN_DARKMATTER_ANDROID` (fallback auth token for OTLP only; audit logs require their own token)
-- `DARKMATTER_DEPLOYMENT_ENVIRONMENT` (defaults to `production`)
-- `DARKMATTER_TELEMETRY_TENANT` (defaults to `darkmatter-android`)
+- `WHITENOISE_DEV_OTLP_ENDPOINT`
+- `WHITENOISE_DEV_OTLP_AUTH_TOKEN`
+- `WHITENOISE_DEV_AUDIT_LOG_ENDPOINT`
+- `WHITENOISE_DEV_AUDIT_LOG_AUTH_TOKEN`
+- `WHITENOISE_DEV_TELEMETRY_TENANT` (defaults to `whitenoise-rs-android-dev`)
 
-**Push (MIP-05):**
+Dev also accepts `OTLP_TOKEN_WHITENOISE_ANDROID_DEV` as an OTLP auth-token alias.
 
-- `DARKMATTER_PUSH_SERVER_PUBKEY_HEX` — push-server identity pubkey
-- `DARKMATTER_PUSH_RELAY_HINT` (defaults to `wss://relay.eu.whitenoise.chat`)
+**Dev push (MIP-05):**
+
+- `WHITENOISE_DEV_PUSH_SERVER_PUBKEY_HEX` — dev push-server identity pubkey
+- `WHITENOISE_DEV_PUSH_RELAY_HINT`
+
+**Production telemetry / audit:**
+
+- `WHITENOISE_PRODUCTION_OTLP_ENDPOINT`
+- `WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN`
+- `WHITENOISE_PRODUCTION_AUDIT_LOG_ENDPOINT`
+- `WHITENOISE_PRODUCTION_AUDIT_LOG_AUTH_TOKEN`
+- `WHITENOISE_PRODUCTION_TELEMETRY_TENANT` (defaults to `whitenoise-rs-android`)
+
+Production also accepts `OTLP_TOKEN_WHITENOISE_ANDROID` as an OTLP auth-token alias. Legacy global `DARKMATTER_*` runtime names and `OTLP_TOKEN_DARKMATTER_ANDROID` are accepted as production fallbacks.
+
+**Production push (MIP-05):**
+
+- `WHITENOISE_PRODUCTION_PUSH_SERVER_PUBKEY_HEX` — push-server identity pubkey
+- `WHITENOISE_PRODUCTION_PUSH_RELAY_HINT` (defaults to `wss://relay.eu.whitenoise.chat`)
+
+**Staging telemetry / audit:**
+
+- `WHITENOISE_STAGING_OTLP_ENDPOINT`
+- `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
+- `WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT`
+- `WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN`
+- `WHITENOISE_STAGING_TELEMETRY_TENANT` (defaults to `whitenoise-rs-android-staging`)
+
+Staging also accepts `OTLP_TOKEN_WHITENOISE_ANDROID_STAGING` as an OTLP auth-token alias.
+
+**Staging push (MIP-05):**
+
+- `WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX` — staging push-server identity pubkey
+- `WHITENOISE_STAGING_PUSH_RELAY_HINT`
 
 Unset push values mean the runtime treats push as unconfigured rather than registering against a default server.
 
-`app/google-services.json` is optional. When present, the Firebase plugin is applied and FCM works; when absent, the app falls back to local notifications.
+`app/google-services.json` is optional. When present, the Firebase plugin is applied and FCM works; when absent, the app falls back to local notifications. For the supported variants it must include Android clients for `dev.ipf.whitenoise.android.dev`, `dev.ipf.whitenoise.android.staging`, and `dev.ipf.whitenoise.android`.
 
 ### Building a release
 
 ```bash
-just apk
+just apk-production
 ```
 
-Builds the signed `arm64-v8a` release APK using the checked-in Marmot bindings and native libraries. The output filename is `darkmatter-v8a-release-YYYY-MM-DD.apk`. The release folder is printed as the final line for Finder.
+Builds the signed production `arm64-v8a` APK using the checked-in Marmot bindings and native libraries. The output filename is `whitenoise-production-v8a-release-YYYY-MM-DD.apk`. The release folder is printed as the final line for Finder.
+
+```bash
+just apk-staging
+```
+
+Builds the signed staging `arm64-v8a` APK. The output filename is `whitenoise-staging-v8a-release-YYYY-MM-DD.apk`.
 
 ```bash
 just release
 ```
 
-Builds all signed APKs (per-ABI + universal) and rebuilds the Marmot bindings. Assumes a sibling checkout of the `darkmatter` Rust workspace at `../darkmatter`; override with `DARKMATTER_MARMOT_DIR`.
+Builds all signed production and staging APKs (per-ABI + universal) and rebuilds the Marmot bindings. Assumes a sibling checkout of the `darkmatter` Rust workspace at `../darkmatter`; override with `DARKMATTER_MARMOT_DIR`.
 
 ```bash
 just release-fast
@@ -164,7 +244,7 @@ For local device checks, prefer:
 just install-debug
 ```
 
-Avoid `connectedDebugAndroidTest` on Jeff's Pixel unless he asks for it, because it can uninstall the app and wipe local state.
+Avoid `connectedDevDebugAndroidTest` on Jeff's Pixel unless he asks for it, because it can uninstall the app and wipe local state.
 
 ## Performance Guidance
 

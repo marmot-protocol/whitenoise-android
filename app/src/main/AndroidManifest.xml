@@ -46,7 +46,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data android:scheme="darkmatter" />
+                <data android:scheme="${deepLinkScheme}" />
             </intent-filter>
         </activity>
         <service

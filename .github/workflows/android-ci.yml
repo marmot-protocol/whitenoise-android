@@ -2,8 +2,9 @@ name: Android CI
 
 # Required validation CI for the Android client. Runs the same checks a
 # contributor should run locally before pushing (see README "Continuous
-# Integration"). Debug variant only: no signing secrets, no google-services.json,
-# so this never depends on release/Play/Zapstore credentials.
+# Integration"). Dev debug variant only: no signing secrets, no
+# google-services.json, so this never depends on release/Play/Zapstore
+# credentials.
 #
 # Scope: compile + unit tests + ktlint + Android lint. APK build artifacts are a
 # separate workflow (see issue #247).
@@ -46,36 +47,36 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Compile (Kotlin)
-        run: ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace
+        run: ./gradlew :app:compileDevDebugKotlin --no-daemon --stacktrace
 
       - name: Unit tests
-        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+        run: ./gradlew :app:testDevDebugUnitTest --no-daemon --stacktrace
 
       # Roborazzi Compose screenshot pilot (issue #551). Verifies the committed
       # baselines under app/src/test/snapshots/ against freshly rendered output
       # so visual regressions (e.g. the AMOLED true-black class, #446/#495) fail
       # the build instead of shipping. Runs on the JVM via Robolectric — no
       # emulator, so it adds no device-test runtime. Re-baseline after an
-      # intentional UI change with `./gradlew :app:recordRoborazziDebug` (see
+      # intentional UI change with `./gradlew :app:recordRoborazziDevDebug` (see
       # README "Screenshot tests").
       - name: Screenshot tests (Roborazzi)
-        run: ./gradlew :app:verifyRoborazziDebug --no-daemon --stacktrace
+        run: ./gradlew :app:verifyRoborazziDevDebug --no-daemon --stacktrace
 
       - name: ktlint
         run: ./gradlew :app:ktlintCheck --no-daemon --stacktrace
 
       - name: Android lint
-        run: ./gradlew :app:lintDebug --no-daemon --stacktrace
+        run: ./gradlew :app:lintDevDebug --no-daemon --stacktrace
 
       # Coverage visibility only (phase 1): generate the Kover report and publish
       # it as an artifact. No thresholds/gates — non-blocking, never fails the
-      # build. Debug variant only: the aggregate kover tasks pull in the release
+      # build. DevDebug variant only: the aggregate kover tasks pull in the release
       # variant, whose packaging trips the unsigned-release guard (no signing in
-      # CI), so the *Debug tasks scope coverage to what the unit tests exercise.
+      # CI), so the DevDebug tasks scope coverage to what the unit tests exercise.
       - name: Coverage report (Kover)
         if: always()
         continue-on-error: true
-        run: ./gradlew :app:koverXmlReportDebug :app:koverHtmlReportDebug --no-daemon --stacktrace
+        run: ./gradlew :app:koverXmlReportDevDebug :app:koverHtmlReportDevDebug --no-daemon --stacktrace
 
       - name: Upload coverage report
         if: always()

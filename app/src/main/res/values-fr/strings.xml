@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Dark Matter</string>
-    <string name="dark_matter_couldnt_start">Dark Matter n’a pas pu démarrer</string>
+    <string name="app_name">White Noise</string>
+    <string name="dark_matter_couldnt_start">White Noise n’a pas pu démarrer</string>
     <string name="refresh">Actualiser l’export</string>
     <string name="retry">Réessayer</string>
-    <string name="dark_matter_shield">Bouclier Dark Matter</string>
+    <string name="dark_matter_shield">Bouclier White Noise</string>
     <string name="onboarding_tagline">Messagerie de groupe chiffrée de bout en bout.</string>
     <string name="creating_identity">Créer une identité</string>
     <string name="creating_identity_title">Création de l’identité</string>
     <string name="create_new_identity">Créer une nouvelle identité</string>
     <string name="sign_in">Connexion</string>
-    <string name="sign_in_to_dark_matter">Se connecter à Dark Matter</string>
+    <string name="sign_in_to_dark_matter">Se connecter à White Noise</string>
     <string name="sign_in_secret_key_help">Saisissez votre clé secrète Nostr pour utiliser une identité existante sur cet appareil.</string>
     <string name="nostr_nsec">Entrez votre clé privée</string>
     <string name="back">Retour</string>
@@ -58,10 +58,10 @@
     <string name="no_chats_yet">Pas encore de discussions</string>
     <string name="empty_chats_invite_npub">Démarrez une conversation en invitant quelqu’un avec son npub.</string>
     <string name="new_chat">Nouveau chat</string>
-    <string name="error_not_dark_matter_profile_qr">Ce code QR n’est pas un profil Dark Matter.</string>
+    <string name="error_not_dark_matter_profile_qr">Ce code QR n’est pas un profil White Noise.</string>
     <string name="error_valid_recipient_reference">Entrez un npub valide, un lien de profil ou une clé publique hex.</string>
-    <string name="error_missing_key_package">Ce compte n’a pas encore de package de clés publié. Demandez-leur d’ouvrir Dark Matter, puis réessayez.</string>
-    <string name="error_missing_key_package_for">%1$s n’a pas encore de package de clés publié. Demandez-leur d’ouvrir Dark Matter, puis réessayez.</string>
+    <string name="error_missing_key_package">Ce compte n’a pas encore de package de clés publié. Demandez-leur d’ouvrir White Noise, puis réessayez.</string>
+    <string name="error_missing_key_package_for">%1$s n’a pas encore de package de clés publié. Demandez-leur d’ouvrir White Noise, puis réessayez.</string>
     <string name="error_invalid_identity_reference">Ce destinataire n’est pas une clé publique Nostr valide. Utilisez un npub, un lien de profil ou une clé publique hex.</string>
     <string name="error_group_publish_failed">Le groupe a été créé localement, mais la publication a échoué : %1$s</string>
     <string name="remove">Supprimer</string>
@@ -203,7 +203,7 @@
     <string name="profile_settings_subtitle">Publiez votre profil Nostr kind:0</string>
     <string name="identity_and_keys">Identité et clés</string>
     <string name="identity_settings_subtitle">Clé publique, npub, statut de signature</string>
-    <string name="relays_settings_subtitle">Listes de relais gérées par Dark Matter</string>
+    <string name="relays_settings_subtitle">Listes de relais gérées par White Noise</string>
     <string name="key_packages">Gestion des paquets de clés</string>
     <string name="key_packages_settings_subtitle">Packages clés publiés et rotation</string>
     <string name="notifications">Notifications</string>
@@ -224,9 +224,9 @@
     <string name="diagnostics">Diagnostic</string>
     <string name="diagnostics_settings_subtitle">État de santé du relais et composants internes MLS</string>
     <string name="local_notifications">Notifications</string>
-    <string name="local_notifications_subtitle">Afficher des alertes de message et d’invitation pendant l’exécution de Dark Matter.</string>
+    <string name="local_notifications_subtitle">Afficher des alertes de message et d’invitation pendant l’exécution de White Noise.</string>
     <string name="keep_connected">Rester connecté</string>
-    <string name="keep_connected_subtitle">Recevoir des messages pendant que Dark Matter fonctionne en arrière-plan.</string>
+    <string name="keep_connected_subtitle">Recevoir des messages pendant que White Noise fonctionne en arrière-plan.</string>
     <string name="native_push">Notifications push</string>
     <string name="native_push_subtitle">Réveille l’application lorsque le relais a de nouveaux événements à livrer.</string>
     <string name="native_push_unavailable_subtitle">Nécessite les services Google Play et une version configurée avec un serveur push.</string>
@@ -247,7 +247,7 @@
     <string name="cancel">Annuler</string>
     <string name="link_confirm_title">Ouvrir le lien externe ?</string>
     <string name="link_confirm_open">Ouvrir</string>
-    <string name="point_camera_at_profile_qr">Pointez la caméra vers un profil Dark Matter QR</string>
+    <string name="point_camera_at_profile_qr">Pointez la caméra vers un profil White Noise QR</string>
     <string name="camera_access_required">Veuillez activer l’accès à la caméra dans les paramètres de votre appareil pour scanner les codes QR.</string>
     <string name="allow_camera">Autoriser la caméra</string>
     <string name="camera_lifecycle_unavailable">Une erreur s’est produite avec le scanner. Veuillez réessayer.</string>
@@ -289,7 +289,7 @@
     <string name="encrypted_backup_short_warning">Les phrases courtes peuvent être forcées par attaque brute. Utilisez une longue phrase et gardez-la séparée de cette sauvegarde.</string>
     <string name="encrypted_backup_create">Créer la sauvegarde</string>
     <string name="encrypted_backup_result_title">Votre sauvegarde chiffrée</string>
-    <string name="encrypted_backup_result_help">Copiez maintenant cette chaîne ncryptsec1. Elle se masque après 60 secondes ou quand Dark Matter quitte le premier plan.</string>
+    <string name="encrypted_backup_result_help">Copiez maintenant cette chaîne ncryptsec1. Elle se masque après 60 secondes ou quand White Noise quitte le premier plan.</string>
     <string name="encrypted_backup_unavailable">La sauvegarde chiffrée nécessite un compte à signature locale sur cet appareil.</string>
     <string name="show">Afficher</string>
     <string name="hide">Masquer</string>
@@ -352,7 +352,7 @@
     <string name="event_log">Journal des événements</string>
     <string name="waiting_for_events">En attente des événements.</string>
     <string name="notification_channel_messages">Messages</string>
-    <string name="notification_channel_messages_description">Dark Matter messages et invitations</string>
+    <string name="notification_channel_messages_description">White Noise messages et invitations</string>
     <string name="notification_channel_direct_messages">Messages directs</string>
     <string name="notification_channel_direct_messages_description">Messages des conversations individuelles</string>
     <string name="notification_channel_group_messages">Messages de groupe</string>
@@ -373,11 +373,11 @@
     <string name="notification_sender_in_group">%1$s dans %2$s</string>
     <string name="notification_invite_from_sender">Invitation de %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s vous a invité à %2$s</string>
-    <string name="background_connection_notification_title">Dark Matter est connecté</string>
+    <string name="background_connection_notification_title">White Noise est connecté</string>
     <string name="background_connection_notification_text">Écoute des messages</string>
     <string name="background_connection_notification_hint">Appuyez longuement pour masquer cette notification</string>
     <string name="notification_channel_background_connection">Connexion en arrière-plan</string>
-    <string name="notification_channel_background_connection_description">Maintient Dark Matter connecté pour les notifications locales</string>
+    <string name="notification_channel_background_connection_description">Maintient White Noise connecté pour les notifications locales</string>
     <string name="toast_restarting">Redémarrage</string>
     <string name="toast_identity_created">Identité créée</string>
     <string name="toast_couldnt_create_identity">Impossible de créer l’identité</string>

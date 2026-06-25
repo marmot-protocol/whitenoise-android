@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Dark Matter</string>
-    <string name="dark_matter_couldnt_start">Dark Matter başlatılamadı</string>
+    <string name="app_name">White Noise</string>
+    <string name="dark_matter_couldnt_start">White Noise başlatılamadı</string>
     <string name="refresh">Dökümü yenile</string>
     <string name="retry">Tekrar dene</string>
-    <string name="dark_matter_shield">Dark Matter kalkan</string>
+    <string name="dark_matter_shield">White Noise kalkan</string>
     <string name="onboarding_tagline">Uçtan uca şifreli grup mesajlaşması.</string>
     <string name="creating_identity">Kimlik oluşturma</string>
     <string name="creating_identity_title">Kimlik Oluşturuluyor</string>
     <string name="create_new_identity">Yeni Kimlik Oluştur</string>
     <string name="sign_in">Giriş Yap</string>
-    <string name="sign_in_to_dark_matter">Dark Matter’a giriş yap</string>
+    <string name="sign_in_to_dark_matter">White Noise’a giriş yap</string>
     <string name="sign_in_secret_key_help">Bu cihazda mevcut bir kimliği kullanmak için Nostr gizli anahtarınızı girin.</string>
     <string name="nostr_nsec">Özel anahtarınızı girin</string>
     <string name="back">Geri dön</string>
@@ -58,10 +58,10 @@
     <string name="no_chats_yet">Henüz sohbet yok</string>
     <string name="empty_chats_invite_npub">Birisini npub ile davet ederek bir sohbet başlatın.</string>
     <string name="new_chat">Yeni sohbet</string>
-    <string name="error_not_dark_matter_profile_qr">Bu QR kodu bir Dark Matter profili değil.</string>
+    <string name="error_not_dark_matter_profile_qr">Bu QR kodu bir White Noise profili değil.</string>
     <string name="error_valid_recipient_reference">Geçerli bir npub, profil bağlantısı veya hex genel anahtarı girin.</string>
-    <string name="error_missing_key_package">Bu hesabın henüz yayınlanmış bir anahtar paketi yok. Onlardan Dark Matter açmalarını isteyin ve tekrar deneyin.</string>
-    <string name="error_missing_key_package_for">%1$s için henüz yayınlanmış bir anahtar paketi yok. Onlardan Dark Matter açmalarını isteyin ve tekrar deneyin.</string>
+    <string name="error_missing_key_package">Bu hesabın henüz yayınlanmış bir anahtar paketi yok. Onlardan White Noise açmalarını isteyin ve tekrar deneyin.</string>
+    <string name="error_missing_key_package_for">%1$s için henüz yayınlanmış bir anahtar paketi yok. Onlardan White Noise açmalarını isteyin ve tekrar deneyin.</string>
     <string name="error_invalid_identity_reference">Bu alıcı geçerli bir Nostr genel anahtarı değil. Bir npub, profil bağlantısı veya hex genel anahtarı kullanın.</string>
     <string name="error_group_publish_failed">Grup yerel olarak oluşturuldu ancak yayınlanamadı: %1$s</string>
     <string name="remove">Kaldır</string>
@@ -203,7 +203,7 @@
     <string name="profile_settings_subtitle">Nostr kind:0 profilinizi yayınlayın</string>
     <string name="identity_and_keys">Kimlik ve Anahtarlar</string>
     <string name="identity_settings_subtitle">Genel anahtar, npub, imzalama durumu</string>
-    <string name="relays_settings_subtitle">Dark Matter-yönetilen aktarma listeleri</string>
+    <string name="relays_settings_subtitle">White Noise tarafından yönetilen aktarma listeleri</string>
     <string name="key_packages">Anahtar paketi yönetimi</string>
     <string name="key_packages_settings_subtitle">Yayınlanan anahtar paketler ve rotasyon</string>
     <string name="notifications">Bildirimler</string>
@@ -224,9 +224,9 @@
     <string name="diagnostics">Teşhis</string>
     <string name="diagnostics_settings_subtitle">Aktarma durumu ve MLS dahili bilgileri</string>
     <string name="local_notifications">Bildirimler</string>
-    <string name="local_notifications_subtitle">Dark Matter çalışırken mesaj ve davet uyarılarını göster.</string>
+    <string name="local_notifications_subtitle">White Noise çalışırken mesaj ve davet uyarılarını göster.</string>
     <string name="keep_connected">Bağlı kal</string>
-    <string name="keep_connected_subtitle">Dark Matter arka planda çalışırken mesajları al.</string>
+    <string name="keep_connected_subtitle">White Noise arka planda çalışırken mesajları al.</string>
     <string name="native_push">Anlık bildirimler</string>
     <string name="native_push_subtitle">Röledeki yeni olayları teslim etmek için uygulamayı uyandırır.</string>
     <string name="native_push_unavailable_subtitle">Google Play hizmetleri ve push sunucusu yapılandırılmış bir derleme gerektirir.</string>
@@ -247,7 +247,7 @@
     <string name="cancel">İptal</string>
     <string name="link_confirm_title">Harici bağlantıyı aç?</string>
     <string name="link_confirm_open">Aç</string>
-    <string name="point_camera_at_profile_qr">Kamerayı bir Dark Matter profiline QR doğrultun</string>
+    <string name="point_camera_at_profile_qr">Kamerayı bir White Noise profiline QR doğrultun</string>
     <string name="camera_access_required">QR kodlarını taramak için cihaz ayarlarınızda kamera erişimini etkinleştirin.</string>
     <string name="allow_camera">Kameraya İzin Ver</string>
     <string name="camera_lifecycle_unavailable">Tarayıcıda bir hata oluştu. Lütfen tekrar deneyin.</string>
@@ -289,7 +289,7 @@
     <string name="encrypted_backup_short_warning">Kısa parolalar kaba kuvvetle kırılabilir. Uzun bir cümle kullanın ve bu yedekten ayrı saklayın.</string>
     <string name="encrypted_backup_create">Yedek oluştur</string>
     <string name="encrypted_backup_result_title">Şifreli yedeğiniz</string>
-    <string name="encrypted_backup_result_help">Bu ncryptsec1 dizisini şimdi kopyalayın. 60 saniye sonra veya Dark Matter arka plana geçince otomatik gizlenir.</string>
+    <string name="encrypted_backup_result_help">Bu ncryptsec1 dizisini şimdi kopyalayın. 60 saniye sonra veya White Noise arka plana geçince otomatik gizlenir.</string>
     <string name="encrypted_backup_unavailable">Şifreli yedek için bu cihazda yerel imzalama yapan bir hesap gerekir.</string>
     <string name="show">Göster</string>
     <string name="hide">Gizle</string>
@@ -352,7 +352,7 @@
     <string name="event_log">Olay Günlüğü</string>
     <string name="waiting_for_events">Etkinlikleri bekliyorum.</string>
     <string name="notification_channel_messages">Mesajlar</string>
-    <string name="notification_channel_messages_description">Dark Matter mesajlar ve davetler</string>
+    <string name="notification_channel_messages_description">White Noise mesajlar ve davetler</string>
     <string name="notification_channel_direct_messages">Doğrudan mesajlar</string>
     <string name="notification_channel_direct_messages_description">Bire bir görüşme mesajları</string>
     <string name="notification_channel_group_messages">Grup mesajları</string>
@@ -373,11 +373,11 @@
     <string name="notification_sender_in_group">%1$s, %2$s içinde</string>
     <string name="notification_invite_from_sender">%1$s tarafından davet</string>
     <string name="notification_sender_invited_you_to_group">%1$s sizi %2$s grubuna davet etti</string>
-    <string name="background_connection_notification_title">Dark Matter bağlı</string>
+    <string name="background_connection_notification_title">White Noise bağlı</string>
     <string name="background_connection_notification_text">Mesajlar dinleniyor</string>
     <string name="background_connection_notification_hint">Bu bildirimi gizlemek için uzun basın</string>
     <string name="notification_channel_background_connection">Arka plan bağlantısı</string>
-    <string name="notification_channel_background_connection_description">Yerel bildirimler için Dark Matter’yi bağlı tutar</string>
+    <string name="notification_channel_background_connection_description">Yerel bildirimler için White Noise’yi bağlı tutar</string>
     <string name="toast_restarting">Yeniden başlatılıyor</string>
     <string name="toast_identity_created">Kimlik oluşturuldu</string>
     <string name="toast_couldnt_create_identity">Kimlik oluşturulamadı</string>
