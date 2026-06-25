@@ -1,5 +1,7 @@
 package dev.ipf.darkmatter.core
 
+import java.util.Locale
+
 /**
  * Pure logic for the chat-list message-body search (issue #290).
  *
@@ -43,7 +45,7 @@ object ChatListMessageSearch {
     fun bodyMatches(
         plaintext: String,
         ciNeedle: String,
-    ): Boolean = ciNeedle.isNotEmpty() && plaintext.lowercase().contains(ciNeedle)
+    ): Boolean = ciNeedle.isNotEmpty() && plaintext.lowercase(Locale.ROOT).contains(ciNeedle)
 
     /**
      * Whether a row's match is fully explained by its title, last-message
@@ -66,9 +68,9 @@ object ChatListMessageSearch {
     ): Boolean =
         ciNeedle.isNotEmpty() &&
             (
-                displayTitle.lowercase().contains(ciNeedle) ||
-                    previewText.lowercase().contains(ciNeedle) ||
-                    description.lowercase().contains(ciNeedle)
+                displayTitle.lowercase(Locale.ROOT).contains(ciNeedle) ||
+                    previewText.lowercase(Locale.ROOT).contains(ciNeedle) ||
+                    description.lowercase(Locale.ROOT).contains(ciNeedle)
             )
 
     /**
@@ -94,7 +96,7 @@ object ChatListMessageSearch {
         // single-line snippet the UI renders. Don't trim mid-string -- only the
         // window edges get ellipsized.
         val normalized = WHITESPACE_RUN.replace(plaintext, " ").trim()
-        val matchStart = normalized.lowercase().indexOf(needle.lowercase())
+        val matchStart = normalized.lowercase(Locale.ROOT).indexOf(needle.lowercase(Locale.ROOT))
         if (matchStart < 0) return null
         val matchEnd = matchStart + needle.length
 

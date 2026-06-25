@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class MentionComposerTest {
     // A canonical 63-char npub for chip/insertion assertions.
@@ -99,6 +100,19 @@ class MentionComposerTest {
         assertEquals(listOf(bob), MentionComposer.filter("rob", candidates))
         assertEquals(listOf(alice), MentionComposer.filter("ALI", candidates))
     }
+
+    @Test
+    fun filtersByDisplayNameUsingLocaleRootCaseFolding() =
+        withDefaultLocale(Locale.forLanguageTag("tr")) {
+            val candidate =
+                MentionComposer.Candidate(
+                    accountIdHex = "cc".repeat(32),
+                    npub = "npub1" + "c".repeat(58),
+                    displayName = "INDIGO",
+                    nip05 = null,
+                )
+            assertEquals(listOf(candidate), MentionComposer.filter("i", listOf(candidate)))
+        }
 
     @Test
     fun filtersByNip05LocalPartPrefix() {
@@ -457,5 +471,18 @@ class MentionComposerTest {
         val clamped = MentionComposer.clampSelectionOutOfChips(text, firstStart + 1, secondEnd - 1)
         assertEquals(firstStart, clamped.start)
         assertEquals(secondEnd, clamped.end)
+    }
+
+    private fun withDefaultLocale(
+        locale: Locale,
+        block: () -> Unit,
+    ) {
+        val old = Locale.getDefault()
+        Locale.setDefault(locale)
+        try {
+            block()
+        } finally {
+            Locale.setDefault(old)
+        }
     }
 }

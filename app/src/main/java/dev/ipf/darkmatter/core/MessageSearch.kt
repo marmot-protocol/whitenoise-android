@@ -1,6 +1,7 @@
 package dev.ipf.darkmatter.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import java.util.Locale
 
 /**
  * In-conversation / cross-conversation message-content search primitives.
@@ -43,7 +44,7 @@ object MessageSearch {
     }
 
     /** Trim + lowercase a query or body to the canonical match form. */
-    fun normalize(value: String): String = value.trim().lowercase()
+    fun normalize(value: String): String = value.trim().lowercase(Locale.ROOT)
 
     /**
      * Indices into [bodies] (in the same order) whose normalized text

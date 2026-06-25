@@ -12951,13 +12951,15 @@ private fun MessageBubble(
                                                 .trimEnd()
                                         }
                                     val clippedText =
-                                        buildAnnotatedString {
-                                            append(cut)
-                                            append("… ")
-                                            withLink(
-                                                LinkAnnotation.Clickable("read_more") { expandedFullView = true },
-                                            ) {
-                                                withStyle(readMoreStyle) { append(readMoreLabel) }
+                                        remember(cut, readMoreLabel, readMoreStyle) {
+                                            buildAnnotatedString {
+                                                append(cut)
+                                                append("… ")
+                                                withLink(
+                                                    LinkAnnotation.Clickable("read_more") { expandedFullView = true },
+                                                ) {
+                                                    withStyle(readMoreStyle) { append(readMoreLabel) }
+                                                }
                                             }
                                         }
                                     Text(

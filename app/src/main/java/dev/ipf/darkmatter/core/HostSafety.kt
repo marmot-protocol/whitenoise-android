@@ -1,8 +1,11 @@
 package dev.ipf.darkmatter.core
 
+import java.net.IDN
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
+import java.text.Normalizer
+import java.util.Locale
 
 /**
  * First-layer SSRF guard for URLs that arrive from untrusted protocol data —
@@ -33,13 +36,14 @@ object HostSafety {
         val normalized =
             host
                 ?.trim()
+                ?.removeSurrounding("[", "]")
+                ?.let(::canonicalizeHostLiteral)
                 // Drop a single rooting dot first: `127.0.0.1.` and `localhost.`
                 // still resolve to loopback, but the trailing empty label would
                 // otherwise make the IPv4 decode (5 parts) and the localhost
                 // check both miss. See #153.
                 ?.removeSuffix(".")
-                ?.removeSurrounding("[", "]")
-                ?.lowercase()
+                ?.lowercase(Locale.ROOT)
                 .orEmpty()
         if (normalized.isEmpty()) return true
         if (normalized == "localhost" || normalized.endsWith(".localhost")) return true
@@ -193,29 +197,52 @@ object HostSafety {
     private fun isPrivateIpv6(host: String): Boolean {
         val address = host.substringBefore('%') // drop any zone id
         if (address == "::1" || address == "::") return true
-        if (address.contains('.')) {
-            // Dotted embedded IPv4, e.g. ::ffff:192.168.0.1 — follow the
-            // embedded address.
-            val embedded = parseIpv4(address.substringAfterLast(':'))
-            if (embedded != null && isPrivateIpv4(embedded)) return true
-        } else {
-            // Hex-grouped IPv4-mapped (::ffff:7f00:1) and IPv4-compatible
-            // (::7f00:1) literals carry the embedded IPv4 in the final two
-            // hextets. These reach 127.0.0.1 just like the dotted form — the
-            // IPv6 sibling of the #153 non-dotted-encoding bypass.
-            val embedded = embeddedIpv4FromHextets(address)
-            if (embedded != null && isPrivateIpv4(embedded)) return true
-        }
-        return when {
-            // fc00::/7 unique-local.
-            address.startsWith("fc") || address.startsWith("fd") -> true
-            // fe80::/10 link-local.
-            address.startsWith("fe8") ||
-                address.startsWith("fe9") ||
-                address.startsWith("fea") ||
-                address.startsWith("feb") -> true
-            else -> false
-        }
+        val groups =
+            if (address.contains('.')) {
+                // Dotted embedded IPv4, e.g. ::ffff:192.168.0.1 — follow the
+                // embedded address.
+                val embedded = parseIpv4(address.substringAfterLast(':'))
+                if (embedded != null && isPrivateIpv4(embedded)) return true
+                embedded?.let { expandIpv6WithEmbeddedIpv4(address, it) }
+            } else {
+                // Hex-grouped IPv4-mapped (::ffff:7f00:1) and IPv4-compatible
+                // (::7f00:1) literals carry the embedded IPv4 in the final two
+                // hextets. These reach 127.0.0.1 just like the dotted form —
+                // the IPv6 sibling of the #153 non-dotted-encoding bypass.
+                val embedded = embeddedIpv4FromHextets(address)
+                if (embedded != null && isPrivateIpv4(embedded)) return true
+                expandIpv6(address)
+            } ?: return false
+        val first = groups[0]
+        // fc00::/7 unique-local, fe80::/10 link-local, and fec0::/10 site-local.
+        // Classify the parsed first hextet instead of the textual prefix so
+        // non-canonical but accepted IPv6 spellings are handled too.
+        return (first and 0xFE00) == 0xFC00 ||
+            (first and 0xFFC0) == 0xFE80 ||
+            (first and 0xFFC0) == 0xFEC0
+    }
+
+    private fun expandIpv6WithEmbeddedIpv4(
+        address: String,
+        embedded: IntArray,
+    ): IntArray? {
+        val lastColon = address.lastIndexOf(':')
+        if (lastColon < 0) return null
+        val prefix = address.substring(0, lastColon)
+        val high = (embedded[0] shl 8) or embedded[1]
+        val low = (embedded[2] shl 8) or embedded[3]
+        return expandIpv6("$prefix:${high.toString(16)}:${low.toString(16)}")
+    }
+
+    private fun canonicalizeHostLiteral(host: String): String {
+        if (host.contains(':')) return host
+        val normalized =
+            Normalizer
+                .normalize(host, Normalizer.Form.NFKC)
+                .replace('\u3002', '.')
+                .replace('\uFF0E', '.')
+                .replace('\uFF61', '.')
+        return runCatching { IDN.toASCII(normalized, IDN.ALLOW_UNASSIGNED) }.getOrDefault(normalized)
     }
 
     /**

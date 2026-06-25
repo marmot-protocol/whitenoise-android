@@ -1,5 +1,7 @@
 package dev.ipf.darkmatter.core
 
+import java.util.Locale
+
 /**
  * Pure, JVM-testable logic for the group composer's `@`-mention picker
  * (issue #414). All Compose/Android wiring lives in the UI layer; everything
@@ -114,7 +116,7 @@ object MentionComposer {
         query: String,
         candidates: List<Candidate>,
     ): List<Candidate> {
-        val q = query.trim().lowercase()
+        val q = query.trim().lowercase(Locale.ROOT)
         if (q.isEmpty()) return candidates
         return candidates.filter { matches(it, q) }
     }
@@ -123,10 +125,10 @@ object MentionComposer {
         candidate: Candidate,
         loweredQuery: String,
     ): Boolean {
-        if (candidate.displayName.lowercase().contains(loweredQuery)) return true
-        val nip05Local = candidate.nip05?.substringBefore('@')?.lowercase()
+        if (candidate.displayName.lowercase(Locale.ROOT).contains(loweredQuery)) return true
+        val nip05Local = candidate.nip05?.substringBefore('@')?.lowercase(Locale.ROOT)
         if (nip05Local != null && nip05Local.isNotEmpty() && nip05Local.startsWith(loweredQuery)) return true
-        val npub = candidate.npub.lowercase()
+        val npub = candidate.npub.lowercase(Locale.ROOT)
         if (npub.startsWith(loweredQuery)) return true
         // Also allow matching the npub body (what the user types after `npub1`).
         if (npub.startsWith("npub1") && npub.substring(5).startsWith(loweredQuery)) return true
@@ -459,7 +461,7 @@ object MentionComposer {
         candidates: List<Candidate>,
     ): ChipVisualText = visualText(text, candidatesByNpub(candidates))
 
-    fun candidatesByNpub(candidates: List<Candidate>): Map<String, Candidate> = candidates.associateBy { it.npub.lowercase() }
+    fun candidatesByNpub(candidates: List<Candidate>): Map<String, Candidate> = candidates.associateBy { it.npub.lowercase(Locale.ROOT) }
 
     fun visualText(
         text: String,
@@ -475,7 +477,7 @@ object MentionComposer {
             transformed.append(text.substring(sourceOffset, range.first))
             val transformedStart = transformed.length
             val npub = text.substring(range.first + 1, range.last + 1)
-            transformed.append(chipDisplayLabel(npub, candidatesByNpub[npub.lowercase()]))
+            transformed.append(chipDisplayLabel(npub, candidatesByNpub[npub.lowercase(Locale.ROOT)]))
             val transformedEnd = transformed.length
             transformedRanges +=
                 ChipVisualRange(

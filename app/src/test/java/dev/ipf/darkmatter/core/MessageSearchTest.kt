@@ -7,6 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class MessageSearchTest {
     @Test
@@ -16,6 +17,12 @@ class MessageSearchTest {
         assertEquals(listOf(0, 2), MessageSearch.matchIndices(bodies, "WORLD"))
         assertEquals(listOf(1), MessageSearch.matchIndices(bodies, "bye"))
     }
+
+    @Test
+    fun matchIndicesUsesLocaleRootCaseFolding() =
+        withDefaultLocale(Locale.forLanguageTag("tr")) {
+            assertEquals(listOf(0), MessageSearch.matchIndices(listOf("INDIGO"), "i"))
+        }
 
     @Test
     fun matchIndicesTrimsTheQuery() {
@@ -104,4 +111,17 @@ class MessageSearchTest {
         recordedAt = at.toULong(),
         receivedAt = at.toULong(),
     )
+
+    private fun withDefaultLocale(
+        locale: Locale,
+        block: () -> Unit,
+    ) {
+        val old = Locale.getDefault()
+        Locale.setDefault(locale)
+        try {
+            block()
+        } finally {
+            Locale.setDefault(old)
+        }
+    }
 }

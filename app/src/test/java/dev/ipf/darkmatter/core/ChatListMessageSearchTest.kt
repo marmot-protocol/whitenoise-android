@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class ChatListMessageSearchTest {
     // ---- isSearchableBody ---------------------------------------------------
@@ -42,6 +43,12 @@ class ChatListMessageSearchTest {
         assertTrue(ChatListMessageSearch.bodyMatches("lowercase needle", "NEEDLE".lowercase()))
         assertFalse(ChatListMessageSearch.bodyMatches("nothing here", "absent"))
     }
+
+    @Test
+    fun bodyMatchesUsesLocaleRootCaseFolding() =
+        withDefaultLocale(Locale.forLanguageTag("tr")) {
+            assertTrue(ChatListMessageSearch.bodyMatches("INDIGO", "i"))
+        }
 
     @Test
     fun blankNeedleNeverMatches() {
@@ -151,6 +158,14 @@ class ChatListMessageSearchTest {
     }
 
     @Test
+    fun titleOrPreviewUsesLocaleRootCaseFolding() =
+        withDefaultLocale(Locale.forLanguageTag("tr")) {
+            assertTrue(ChatListMessageSearch.titleOrPreviewMatches("INDIGO", "preview", "i"))
+            assertTrue(ChatListMessageSearch.titleOrPreviewMatches("title", "INDIGO", "i"))
+            assertTrue(ChatListMessageSearch.titleOrPreviewMatches("title", "preview", "i", description = "INDIGO"))
+        }
+
+    @Test
     fun titleOrPreviewBlankNeedleNeverMatches() {
         assertFalse(ChatListMessageSearch.titleOrPreviewMatches("anything", "anything", ""))
     }
@@ -256,5 +271,18 @@ class ChatListMessageSearchTest {
         // An eligible kind whose body does NOT contain the needle is skipped.
         val records = listOf(Rec(kind = 9uL, deleted = false, plaintext = "no needle present", messageIdHex = "y1"))
         assertNull(ChatListMessageSearch.firstEligibleBodyMatch(records, "marmot"))
+    }
+
+    private fun withDefaultLocale(
+        locale: Locale,
+        block: () -> Unit,
+    ) {
+        val old = Locale.getDefault()
+        Locale.setDefault(locale)
+        try {
+            block()
+        } finally {
+            Locale.setDefault(old)
+        }
     }
 }

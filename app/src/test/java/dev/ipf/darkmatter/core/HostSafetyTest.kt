@@ -45,6 +45,13 @@ class HostSafetyTest {
     }
 
     @Test
+    fun unicodeLoopbackHostLiteralsAreFlagged() {
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("127。0。0。1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("１２７．０．０．１"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("ⓛocalhost"))
+    }
+
+    @Test
     fun ordinaryHostnamesAreAllowed() {
         assertFalse(HostSafety.isPrivateOrLoopbackHost("relay.example"))
         assertFalse(HostSafety.isPrivateOrLoopbackHost("blossom.primal.net"))
@@ -62,8 +69,11 @@ class HostSafetyTest {
     @Test
     fun ipv6UniqueLocalAndLinkLocalAreFlagged() {
         assertTrue(HostSafety.isPrivateOrLoopbackHost("fc00::1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("fdff::1"))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("fd12:3456:789a::1"))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("fe80::1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("febf::1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("fec0::1"))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("FE80::1")) // case-insensitive
         assertTrue(HostSafety.isPrivateOrLoopbackHost("fe80::1%eth0")) // zone id stripped
     }
@@ -71,11 +81,14 @@ class HostSafetyTest {
     @Test
     fun publicIpv6IsAllowed() {
         assertFalse(HostSafety.isPrivateOrLoopbackHost("2001:4860:4860::8888"))
+        assertFalse(HostSafety.isPrivateOrLoopbackHost("fbff::1"))
     }
 
     @Test
     fun ipv4MappedIpv6FollowsTheEmbeddedAddress() {
         assertTrue(HostSafety.isPrivateOrLoopbackHost("::ffff:192.168.0.1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("fe80::8.8.8.8"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("fd00::8.8.8.8"))
         assertFalse(HostSafety.isPrivateOrLoopbackHost("::ffff:8.8.8.8"))
     }
 

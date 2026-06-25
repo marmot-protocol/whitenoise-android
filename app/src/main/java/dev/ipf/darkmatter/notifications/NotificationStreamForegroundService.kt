@@ -153,6 +153,9 @@ internal fun decideForegroundStart(
 private object BackgroundConnectionNotification {
     private const val CHANNEL_ID = "darkmatter.background_connection.v1"
 
+    @Volatile
+    private var channelEnsured = false
+
     fun build(context: Context): Notification {
         ensureChannel(context)
         val pendingIntent =
@@ -185,17 +188,22 @@ private object BackgroundConnectionNotification {
     }
 
     private fun ensureChannel(context: Context) {
-        val manager = context.getSystemService(NotificationManager::class.java)
-        val channel =
-            NotificationChannel(
-                CHANNEL_ID,
-                context.getString(R.string.notification_channel_background_connection),
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = context.getString(R.string.notification_channel_background_connection_description)
-                setShowBadge(false)
-            }
-        manager.createNotificationChannel(channel)
+        if (channelEnsured) return
+        synchronized(this) {
+            if (channelEnsured) return
+            val manager = context.getSystemService(NotificationManager::class.java)
+            val channel =
+                NotificationChannel(
+                    CHANNEL_ID,
+                    context.getString(R.string.notification_channel_background_connection),
+                    NotificationManager.IMPORTANCE_LOW,
+                ).apply {
+                    description = context.getString(R.string.notification_channel_background_connection_description)
+                    setShowBadge(false)
+                }
+            manager.createNotificationChannel(channel)
+            channelEnsured = true
+        }
     }
 }
 
