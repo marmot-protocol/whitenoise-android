@@ -66,16 +66,56 @@ fun environmentRuntimeConfigProperty(
     return runtimeConfigProperty(keys, defaultValue)
 }
 
-val releaseKeystorePath = signingProperty("WHITENOISE_KEYSTORE_PATH", "DARKMATTER_KEYSTORE_PATH")
-val releaseKeystorePassword = signingProperty("WHITENOISE_KEYSTORE_PASSWORD", "DARKMATTER_KEYSTORE_PASSWORD")
-val releaseKeyAlias = signingProperty("WHITENOISE_KEY_ALIAS", "DARKMATTER_KEY_ALIAS")
-val releaseKeyPassword = signingProperty("WHITENOISE_KEY_PASSWORD", "DARKMATTER_KEY_PASSWORD")
-val hasReleaseSigning =
-    !releaseKeystorePath.isNullOrBlank() &&
-        !releaseKeystorePassword.isNullOrBlank() &&
-        !releaseKeyAlias.isNullOrBlank() &&
-        !releaseKeyPassword.isNullOrBlank() &&
-        file(releaseKeystorePath!!).exists()
+data class ReleaseSigning(
+    val keystorePath: String?,
+    val keystorePassword: String?,
+    val keyAlias: String?,
+    val keyPassword: String?,
+)
+
+fun ReleaseSigning.isConfigured(): Boolean =
+    !keystorePath.isNullOrBlank() &&
+        !keystorePassword.isNullOrBlank() &&
+        !keyAlias.isNullOrBlank() &&
+        !keyPassword.isNullOrBlank() &&
+        file(keystorePath!!).exists()
+
+val productionReleaseSigning =
+    ReleaseSigning(
+        keystorePath =
+            signingProperty(
+                "WHITENOISE_PRODUCTION_KEYSTORE_PATH",
+                "WHITENOISE_KEYSTORE_PATH",
+                "DARKMATTER_KEYSTORE_PATH",
+            ),
+        keystorePassword =
+            signingProperty(
+                "WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD",
+                "WHITENOISE_KEYSTORE_PASSWORD",
+                "DARKMATTER_KEYSTORE_PASSWORD",
+            ),
+        keyAlias =
+            signingProperty(
+                "WHITENOISE_PRODUCTION_KEY_ALIAS",
+                "WHITENOISE_KEY_ALIAS",
+                "DARKMATTER_KEY_ALIAS",
+            ),
+        keyPassword =
+            signingProperty(
+                "WHITENOISE_PRODUCTION_KEY_PASSWORD",
+                "WHITENOISE_KEY_PASSWORD",
+                "DARKMATTER_KEY_PASSWORD",
+            ),
+    )
+val stagingReleaseSigning =
+    ReleaseSigning(
+        keystorePath = signingProperty("WHITENOISE_STAGING_KEYSTORE_PATH"),
+        keystorePassword = signingProperty("WHITENOISE_STAGING_KEYSTORE_PASSWORD"),
+        keyAlias = signingProperty("WHITENOISE_STAGING_KEY_ALIAS"),
+        keyPassword = signingProperty("WHITENOISE_STAGING_KEY_PASSWORD"),
+    )
+val hasProductionReleaseSigning = productionReleaseSigning.isConfigured()
+val hasStagingReleaseSigning = stagingReleaseSigning.isConfigured()
 
 // Escape hatch for the unsigned-release guard below. Off by default: a release
 // build without signing must fail rather than emit an uninstallable artifact.
@@ -100,6 +140,25 @@ android {
     }
 
     flavorDimensions += "environment"
+
+    signingConfigs {
+        if (hasProductionReleaseSigning) {
+            create("productionRelease") {
+                storeFile = file(productionReleaseSigning.keystorePath!!)
+                storePassword = productionReleaseSigning.keystorePassword
+                keyAlias = productionReleaseSigning.keyAlias
+                keyPassword = productionReleaseSigning.keyPassword
+            }
+        }
+        if (hasStagingReleaseSigning) {
+            create("stagingRelease") {
+                storeFile = file(stagingReleaseSigning.keystorePath!!)
+                storePassword = stagingReleaseSigning.keystorePassword
+                keyAlias = stagingReleaseSigning.keyAlias
+                keyPassword = stagingReleaseSigning.keyPassword
+            }
+        }
+    }
 
     productFlavors {
         create("dev") {
@@ -156,6 +215,9 @@ android {
 
         create("production") {
             dimension = "environment"
+            if (hasProductionReleaseSigning) {
+                signingConfig = signingConfigs.getByName("productionRelease")
+            }
             manifestPlaceholders["deepLinkScheme"] = "whitenoise"
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise".asBuildConfigString())
 
@@ -242,6 +304,9 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".staging"
             versionNameSuffix = "-staging"
+            if (hasStagingReleaseSigning) {
+                signingConfig = signingConfigs.getByName("stagingRelease")
+            }
             manifestPlaceholders["deepLinkScheme"] = "whitenoise-staging"
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-staging".asBuildConfigString())
             buildConfigField(
@@ -291,17 +356,6 @@ android {
         }
     }
 
-    signingConfigs {
-        if (hasReleaseSigning) {
-            create("release") {
-                storeFile = file(releaseKeystorePath!!)
-                storePassword = releaseKeystorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
-            }
-        }
-    }
-
     buildTypes {
         debug {
             // Debug builds keep each flavor's applicationId so the local
@@ -320,9 +374,6 @@ android {
             // public, so a release APK signed with it is trivially forgeable.
             // When signing is absent, the release packaging tasks fail (see the
             // guard below) instead of producing an unsigned artifact.
-            if (hasReleaseSigning) {
-                signingConfig = signingConfigs.getByName("release")
-            }
         }
     }
     compileOptions {
@@ -377,16 +428,36 @@ androidComponents {
     }
 }
 
-// Fail any release packaging task when signing isn't configured. Checked at
-// execution time so debug builds are never affected; an unsigned release APK
-// is uninstallable, so a build that "succeeds" while emitting one hides a
-// release-blocking failure. Override with WHITENOISE_ALLOW_UNSIGNED_RELEASE=true.
+fun releaseSigningConfiguredForPackageTask(taskName: String): Boolean =
+    when {
+        taskName.contains("ProductionRelease") -> hasProductionReleaseSigning
+        taskName.contains("StagingRelease") -> hasStagingReleaseSigning
+        else -> false
+    }
+
+fun releaseSigningHintForPackageTask(taskName: String): String =
+    when {
+        taskName.contains("ProductionRelease") ->
+            "WHITENOISE_PRODUCTION_KEYSTORE_PATH/PASSWORD/KEY_ALIAS/KEY_PASSWORD " +
+                "(or WHITENOISE_KEYSTORE_* / DARKMATTER_KEYSTORE_* fallback)"
+
+        taskName.contains("StagingRelease") ->
+            "WHITENOISE_STAGING_KEYSTORE_PATH/PASSWORD/KEY_ALIAS/KEY_PASSWORD"
+
+        else -> "release signing credentials"
+    }
+
+// Fail any release packaging task when signing isn't configured for that
+// environment. Checked at execution time so debug builds are never affected; an
+// unsigned release APK is uninstallable, so a build that "succeeds" while
+// emitting one hides a release-blocking failure. Override with
+// WHITENOISE_ALLOW_UNSIGNED_RELEASE=true.
 tasks.matching { it.name.startsWith("package") && it.name.contains("Release") }.configureEach {
     doFirst {
-        if (!hasReleaseSigning && !allowUnsignedRelease) {
+        if (!releaseSigningConfiguredForPackageTask(name) && !allowUnsignedRelease) {
             throw GradleException(
-                "Release signing is not configured (set WHITENOISE_KEYSTORE_PATH/PASSWORD/" +
-                    "KEY_ALIAS/KEY_PASSWORD). Refusing to produce an unsigned release artifact; " +
+                "Release signing is not configured for $name (set ${releaseSigningHintForPackageTask(name)}). " +
+                    "Refusing to produce an unsigned release artifact; " +
                     "set WHITENOISE_ALLOW_UNSIGNED_RELEASE=true to override.",
             )
         }

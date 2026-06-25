@@ -22,13 +22,20 @@ Usage: scripts/release.sh [--skip-bindings] [--abi <ABI>] [--help]
                     (production | staging | all; default: production)
   --help            Show this help
 
-Signing creds (in local.properties or env):
-  WHITENOISE_KEYSTORE_PATH       Path to .p12 / .jks keystore
-  WHITENOISE_KEY_ALIAS           Key alias inside the keystore
-  WHITENOISE_KEYSTORE_PASSWORD   Keystore password
-  WHITENOISE_KEY_PASSWORD        Key password (same as keystore for PKCS12)
+Production signing creds (in local.properties or env):
+  WHITENOISE_PRODUCTION_KEYSTORE_PATH       Path to .p12 / .jks keystore
+  WHITENOISE_PRODUCTION_KEY_ALIAS           Key alias inside the keystore
+  WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD   Keystore password
+  WHITENOISE_PRODUCTION_KEY_PASSWORD        Key password (same as keystore for PKCS12)
 
-Legacy DARKMATTER_KEYSTORE_* names are still accepted as fallbacks.
+Production also accepts WHITENOISE_KEYSTORE_* and legacy DARKMATTER_KEYSTORE_*
+names as fallbacks.
+
+Staging signing creds:
+  WHITENOISE_STAGING_KEYSTORE_PATH
+  WHITENOISE_STAGING_KEY_ALIAS
+  WHITENOISE_STAGING_KEYSTORE_PASSWORD
+  WHITENOISE_STAGING_KEY_PASSWORD
 
 Optional env:
   DARKMATTER_MARMOT_DIR          Path to marmot workspace (default: ../darkmatter)
@@ -165,21 +172,44 @@ prop_value() {
   return 1
 }
 
-missing=()
-prop_value WHITENOISE_KEYSTORE_PATH DARKMATTER_KEYSTORE_PATH >/dev/null || missing+=("WHITENOISE_KEYSTORE_PATH")
-prop_value WHITENOISE_KEY_ALIAS DARKMATTER_KEY_ALIAS >/dev/null || missing+=("WHITENOISE_KEY_ALIAS")
-prop_value WHITENOISE_KEYSTORE_PASSWORD DARKMATTER_KEYSTORE_PASSWORD >/dev/null || missing+=("WHITENOISE_KEYSTORE_PASSWORD")
-prop_value WHITENOISE_KEY_PASSWORD DARKMATTER_KEY_PASSWORD >/dev/null || missing+=("WHITENOISE_KEY_PASSWORD")
-if (( ${#missing[@]} > 0 )); then
-  echo "error: missing signing config (in local.properties or env): ${missing[*]}" >&2
-  echo "Run 'just keystore-gen' to create one." >&2
-  exit 1
-fi
-keystore_path="$(prop_value WHITENOISE_KEYSTORE_PATH DARKMATTER_KEYSTORE_PATH)"
-if [[ ! -f "$keystore_path" ]]; then
-  echo "error: keystore not found at: $keystore_path" >&2
-  exit 1
-fi
+flavor_signing_value() {
+  local flavor="$1"
+  local suffix="$2"
+  case "$flavor" in
+    production) prop_value "WHITENOISE_PRODUCTION_${suffix}" "WHITENOISE_${suffix}" "DARKMATTER_${suffix}" ;;
+    staging) prop_value "WHITENOISE_STAGING_${suffix}" ;;
+    *) return 1 ;;
+  esac
+}
+
+require_flavor_signing() {
+  local flavor="$1"
+  local missing=()
+  flavor_signing_value "$flavor" KEYSTORE_PATH >/dev/null || missing+=("${flavor}:KEYSTORE_PATH")
+  flavor_signing_value "$flavor" KEY_ALIAS >/dev/null || missing+=("${flavor}:KEY_ALIAS")
+  flavor_signing_value "$flavor" KEYSTORE_PASSWORD >/dev/null || missing+=("${flavor}:KEYSTORE_PASSWORD")
+  flavor_signing_value "$flavor" KEY_PASSWORD >/dev/null || missing+=("${flavor}:KEY_PASSWORD")
+  if (( ${#missing[@]} > 0 )); then
+    echo "error: missing signing config (in local.properties or env): ${missing[*]}" >&2
+    if [[ "$flavor" == "staging" ]]; then
+      echo "Set WHITENOISE_STAGING_KEYSTORE_* values for staging release builds." >&2
+    else
+      echo "Set WHITENOISE_PRODUCTION_KEYSTORE_* or WHITENOISE_KEYSTORE_* values for production release builds." >&2
+    fi
+    exit 1
+  fi
+
+  local keystore_path
+  keystore_path="$(flavor_signing_value "$flavor" KEYSTORE_PATH)"
+  if [[ ! -f "$keystore_path" ]]; then
+    echo "error: $flavor keystore not found at: $keystore_path" >&2
+    exit 1
+  fi
+}
+
+for flavor in "${BUILD_FLAVORS[@]}"; do
+  require_flavor_signing "$flavor"
+done
 
 # --- Rebuild Rust .so (smaller via strip=symbols) ---
 if [[ "$SKIP_BINDINGS" == "false" ]]; then
@@ -223,7 +253,9 @@ for flavor in "${BUILD_FLAVORS[@]}"; do
       -Pandroid.injected.testOnly=false
 
     selected_apk="$(
-      find "$APK_DIR" "$INTERMEDIATE_APK_DIR" -maxdepth 1 -type f -name "*${TARGET_ABI}*release*.apk" 2>/dev/null | sort | head -1
+      find "$APK_DIR" "$INTERMEDIATE_APK_DIR" -maxdepth 1 -type f -name "*${TARGET_ABI}*release*.apk" 2>/dev/null \
+        | sort \
+        | head -1 || true
     )"
     if [[ -z "$selected_apk" || ! -f "$selected_apk" ]]; then
       echo "error: no APK found for ABI: $TARGET_ABI ($flavor)" >&2
@@ -232,6 +264,7 @@ for flavor in "${BUILD_FLAVORS[@]}"; do
 
     if [[ "$TARGET_ABI" == "arm64-v8a" ]]; then
       renamed_apk="$APK_DIR/whitenoise-${flavor}-v8a-release-$(date +%F).apk"
+      mkdir -p "$APK_DIR"
       mv "$selected_apk" "$renamed_apk"
       selected_apk="$renamed_apk"
     fi

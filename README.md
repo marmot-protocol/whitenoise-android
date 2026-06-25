@@ -112,7 +112,14 @@ that is a caught regression: fix the UI, don't re-record.
 
 ## Release Builds
 
-Release builds use signing values from `local.properties` or matching environment variables:
+Production release builds use signing values from `local.properties` or matching environment variables:
+
+- `WHITENOISE_PRODUCTION_KEYSTORE_PATH`
+- `WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD`
+- `WHITENOISE_PRODUCTION_KEY_ALIAS`
+- `WHITENOISE_PRODUCTION_KEY_PASSWORD`
+
+Production also accepts global signing values as fallbacks:
 
 - `WHITENOISE_KEYSTORE_PATH`
 - `WHITENOISE_KEYSTORE_PASSWORD`
@@ -120,6 +127,13 @@ Release builds use signing values from `local.properties` or matching environmen
 - `WHITENOISE_KEY_PASSWORD`
 
 Legacy `DARKMATTER_KEYSTORE_*` names are still accepted as fallbacks.
+
+Staging release builds use staging-only signing values:
+
+- `WHITENOISE_STAGING_KEYSTORE_PATH`
+- `WHITENOISE_STAGING_KEYSTORE_PASSWORD`
+- `WHITENOISE_STAGING_KEY_ALIAS`
+- `WHITENOISE_STAGING_KEY_PASSWORD`
 
 Release packaging fails if signing is unconfigured. To override for a local smoke build, set:
 
