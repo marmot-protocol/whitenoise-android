@@ -1,11 +1,12 @@
 package dev.ipf.darkmatter.core
 
+import dev.ipf.darkmatter.BuildConfig
 import java.net.URI
 
 data class ProfileLink(
     val npub: String,
 ) {
-    val uri: String = "darkmatter://profile/$npub"
+    val uri: String = "${BuildConfig.WHITENOISE_DEEP_LINK_SCHEME}://profile/$npub"
 
     companion object {
         // A Nostr npub is bech32-encoded: prefix `npub1`, body in the bech32
@@ -37,7 +38,7 @@ data class ProfileLink(
 
         private fun parseUri(raw: String): ProfileLink? {
             val uri = runCatching { URI(raw) }.getOrNull() ?: return null
-            if (uri.scheme?.lowercase() != "darkmatter") return null
+            if (uri.scheme?.lowercase() !in PROFILE_SCHEMES) return null
 
             val host = uri.host.orEmpty()
             val path = uri.path.orEmpty().trim('/')
@@ -47,5 +48,7 @@ data class ProfileLink(
                 else -> null
             }
         }
+
+        private val PROFILE_SCHEMES = setOf("whitenoise", "whitenoise-staging", "whitenoise-dev", "darkmatter")
     }
 }

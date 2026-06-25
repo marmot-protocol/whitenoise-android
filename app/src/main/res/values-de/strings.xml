@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Dark Matter</string>
-    <string name="dark_matter_couldnt_start">Dark Matter konnte nicht gestartet werden</string>
+    <string name="app_name">White Noise</string>
+    <string name="dark_matter_couldnt_start">White Noise konnte nicht gestartet werden</string>
     <string name="refresh">Dump aktualisieren</string>
     <string name="retry">Erneut versuchen</string>
-    <string name="dark_matter_shield">Dark Matter Schild</string>
+    <string name="dark_matter_shield">White Noise Schild</string>
     <string name="onboarding_tagline">Ende-zu-Ende verschlüsselte Gruppennachrichten.</string>
     <string name="creating_identity">Identität schaffen</string>
     <string name="creating_identity_title">Identität wird erstellt</string>
     <string name="create_new_identity">Neue Identität erstellen</string>
     <string name="sign_in">Anmelden</string>
-    <string name="sign_in_to_dark_matter">Bei Dark Matter anmelden</string>
+    <string name="sign_in_to_dark_matter">Bei White Noise anmelden</string>
     <string name="sign_in_secret_key_help">Geben Sie Ihren geheimen Nostr-Schlüssel ein, um eine vorhandene Identität auf diesem Gerät zu verwenden.</string>
     <string name="nostr_nsec">Privaten Schlüssel eingeben</string>
     <string name="back">Zurück</string>
@@ -58,10 +58,10 @@
     <string name="no_chats_yet">Noch keine Chats</string>
     <string name="empty_chats_invite_npub">Beginnen Sie ein Gespräch, indem Sie jemanden mit seinem npub einladen.</string>
     <string name="new_chat">Neuer Chat</string>
-    <string name="error_not_dark_matter_profile_qr">Dieser QR-Code ist kein Dark Matter-Profil.</string>
+    <string name="error_not_dark_matter_profile_qr">Dieser QR-Code ist kein White Noise-Profil.</string>
     <string name="error_valid_recipient_reference">Geben Sie einen gültigen öffentlichen Schlüssel npub, Profillink oder hex ein.</string>
-    <string name="error_missing_key_package">Für dieses Konto ist noch kein veröffentlichtes Schlüsselpaket vorhanden. Bitten Sie sie, Dark Matter zu öffnen, und versuchen Sie es dann erneut.</string>
-    <string name="error_missing_key_package_for">Für %1$s ist noch kein veröffentlichtes Schlüsselpaket vorhanden. Bitten Sie diese Person, Dark Matter zu öffnen, und versuchen Sie es dann erneut.</string>
+    <string name="error_missing_key_package">Für dieses Konto ist noch kein veröffentlichtes Schlüsselpaket vorhanden. Bitten Sie sie, White Noise zu öffnen, und versuchen Sie es dann erneut.</string>
+    <string name="error_missing_key_package_for">Für %1$s ist noch kein veröffentlichtes Schlüsselpaket vorhanden. Bitten Sie diese Person, White Noise zu öffnen, und versuchen Sie es dann erneut.</string>
     <string name="error_invalid_identity_reference">Dieser Empfänger ist kein gültiger öffentlicher Nostr-Schlüssel. Verwenden Sie einen öffentlichen Schlüssel vom Typ npub, Profillink oder hex.</string>
     <string name="error_group_publish_failed">Die Gruppe wurde lokal erstellt, aber die Veröffentlichung ist fehlgeschlagen: %1$s</string>
     <string name="remove">Entfernen</string>
@@ -203,7 +203,7 @@
     <string name="profile_settings_subtitle">Veröffentlichen Sie Ihr Nostr kind:0-Profil</string>
     <string name="identity_and_keys">Identität und Schlüssel</string>
     <string name="identity_settings_subtitle">Öffentlicher Schlüssel, npub, Signaturstatus</string>
-    <string name="relays_settings_subtitle">Von Dark Matter verwaltete Relay-Listen</string>
+    <string name="relays_settings_subtitle">Von White Noise verwaltete Relay-Listen</string>
     <string name="key_packages">Schlüsselpaket-Verwaltung</string>
     <string name="key_packages_settings_subtitle">Veröffentlichte Schlüsselpakete und Rotation</string>
     <string name="notifications">Benachrichtigungen</string>
@@ -224,9 +224,9 @@
     <string name="diagnostics">Diagnose</string>
     <string name="diagnostics_settings_subtitle">Relay-Zustand und MLS-Interna</string>
     <string name="local_notifications">Benachrichtigungen</string>
-    <string name="local_notifications_subtitle">Zeigen Sie Nachrichten- und Einladungsbenachrichtigungen an, während Dark Matter ausgeführt wird.</string>
+    <string name="local_notifications_subtitle">Zeigen Sie Nachrichten- und Einladungsbenachrichtigungen an, während White Noise ausgeführt wird.</string>
     <string name="keep_connected">Verbunden bleiben</string>
-    <string name="keep_connected_subtitle">Nachrichten empfangen, während Dark Matter im Hintergrund läuft.</string>
+    <string name="keep_connected_subtitle">Nachrichten empfangen, während White Noise im Hintergrund läuft.</string>
     <string name="native_push">Push-Benachrichtigungen</string>
     <string name="native_push_subtitle">Die App aufwecken, wenn der Relay neue Ereignisse zustellen will.</string>
     <string name="native_push_unavailable_subtitle">Benötigt Google Play-Dienste und einen Build mit konfiguriertem Push-Server.</string>
@@ -247,7 +247,7 @@
     <string name="cancel">Abbrechen</string>
     <string name="link_confirm_title">Externen Link öffnen?</string>
     <string name="link_confirm_open">Öffnen</string>
-    <string name="point_camera_at_profile_qr">Richten Sie die Kamera auf ein Dark Matter-Profil QR</string>
+    <string name="point_camera_at_profile_qr">Richten Sie die Kamera auf ein White Noise-Profil QR</string>
     <string name="camera_access_required">Bitte aktivieren Sie den Kamerazugriff in Ihren Geräteeinstellungen, um QR-Codes zu scannen.</string>
     <string name="allow_camera">Kamera zulassen</string>
     <string name="camera_lifecycle_unavailable">Ein Fehler ist beim Scanner aufgetreten. Bitte versuchen Sie es erneut.</string>
@@ -352,7 +352,7 @@
     <string name="event_log">Ereignisprotokoll</string>
     <string name="waiting_for_events">Warten auf Ereignisse.</string>
     <string name="notification_channel_messages">Nachrichten</string>
-    <string name="notification_channel_messages_description">Dark Matter Nachrichten und Einladungen</string>
+    <string name="notification_channel_messages_description">White Noise Nachrichten und Einladungen</string>
     <string name="notification_channel_direct_messages">Direktnachrichten</string>
     <string name="notification_channel_direct_messages_description">Nachrichten aus Einzelunterhaltungen</string>
     <string name="notification_channel_group_messages">Gruppennachrichten</string>
@@ -373,11 +373,11 @@
     <string name="notification_sender_in_group">%1$s in %2$s</string>
     <string name="notification_invite_from_sender">Einladung von %1$s</string>
     <string name="notification_sender_invited_you_to_group">%1$s hat dich zu %2$s eingeladen</string>
-    <string name="background_connection_notification_title">Dark Matter ist verbunden</string>
+    <string name="background_connection_notification_title">White Noise ist verbunden</string>
     <string name="background_connection_notification_text">Wartet auf Nachrichten</string>
     <string name="background_connection_notification_hint">Lange drücken, um diese Benachrichtigung auszublenden</string>
     <string name="notification_channel_background_connection">Hintergrundverbindung</string>
-    <string name="notification_channel_background_connection_description">Hält Dark Matter für lokale Benachrichtigungen verbunden</string>
+    <string name="notification_channel_background_connection_description">Hält White Noise für lokale Benachrichtigungen verbunden</string>
     <string name="toast_restarting">Neustart</string>
     <string name="toast_identity_created">Identität erstellt</string>
     <string name="toast_couldnt_create_identity">Identität konnte nicht erstellt werden</string>

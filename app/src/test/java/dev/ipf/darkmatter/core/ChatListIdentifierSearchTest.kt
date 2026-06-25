@@ -16,7 +16,15 @@ class ChatListIdentifierSearchTest {
         assertEquals(Identifier.Npub(sampleNpub), ChatListIdentifierSearch.classify("nostr:$sampleNpub"))
         assertEquals(
             Identifier.Npub(sampleNpub),
-            ChatListIdentifierSearch.classify("darkmatter://profile/$sampleNpub"),
+            ChatListIdentifierSearch.classify("whitenoise://profile/$sampleNpub"),
+        )
+        assertEquals(
+            Identifier.Npub(sampleNpub),
+            ChatListIdentifierSearch.classify("whitenoise-staging://profile/$sampleNpub"),
+        )
+        assertEquals(
+            Identifier.Npub(sampleNpub),
+            ChatListIdentifierSearch.classify("whitenoise-dev://profile/$sampleNpub"),
         )
     }
 

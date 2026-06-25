@@ -21,8 +21,8 @@ class NotificationTargetTest {
         val routed =
             routeInboundIntent(
                 parsedTarget = target,
-                dataString = "darkmatter://profile/npub1abc",
-                current = InboundIntentRouting(null, "darkmatter://profile/old"),
+                dataString = "whitenoise://profile/npub1abc",
+                current = InboundIntentRouting(null, "whitenoise://profile/old"),
             )
         assertEquals(target, routed.notificationTarget)
         assertNull(routed.profilePayload)
@@ -33,18 +33,18 @@ class NotificationTargetTest {
         val routed =
             routeInboundIntent(
                 parsedTarget = null,
-                dataString = "darkmatter://profile/npub1abc",
+                dataString = "whitenoise://profile/npub1abc",
                 current = noPending,
             )
         assertNull(routed.notificationTarget)
-        assertEquals("darkmatter://profile/npub1abc", routed.profilePayload)
+        assertEquals("whitenoise://profile/npub1abc", routed.profilePayload)
     }
 
     @Test
     fun routeInboundIntent_datalessNonNotificationIntentPreservesPendingDeepLink() {
         // Regression for #67: a bare relaunch intent (no data, not a
         // notification) must not silently discard a queued profile deep link.
-        val pending = InboundIntentRouting(null, "darkmatter://profile/npub1pending")
+        val pending = InboundIntentRouting(null, "whitenoise://profile/npub1pending")
         val routed = routeInboundIntent(parsedTarget = null, dataString = null, current = pending)
         assertEquals(pending, routed)
     }

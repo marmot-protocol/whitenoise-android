@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Dark Matter"
+rootProject.name = "whitenoise-rs"
 include(":app")

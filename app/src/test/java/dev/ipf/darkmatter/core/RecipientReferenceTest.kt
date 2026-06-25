@@ -12,7 +12,9 @@ class RecipientReferenceTest {
     fun normalizesProfileLinksNpubsAndHexKeysForGroupRecipients() {
         val hex = "AB".repeat(32)
 
-        assertEquals(sampleNpub, RecipientReference.normalize("darkmatter://profile/$sampleNpub"))
+        assertEquals(sampleNpub, RecipientReference.normalize("whitenoise://profile/$sampleNpub"))
+        assertEquals(sampleNpub, RecipientReference.normalize("whitenoise-staging://profile/$sampleNpub"))
+        assertEquals(sampleNpub, RecipientReference.normalize("whitenoise-dev://profile/$sampleNpub"))
         assertEquals(sampleNpub, RecipientReference.normalize("nostr:$sampleNpub"))
         assertEquals(sampleNpub, RecipientReference.normalize(" $sampleNpub "))
         assertEquals(hex.lowercase(), RecipientReference.normalize(hex))
@@ -40,7 +42,7 @@ class RecipientReferenceTest {
     fun acceptsOnlyPublicIdentifierClipboardInput() {
         val hex = "AB".repeat(32)
 
-        assertEquals(sampleNpub, RecipientReference.plausibleClipboardInput("darkmatter://profile/$sampleNpub"))
+        assertEquals(sampleNpub, RecipientReference.plausibleClipboardInput("whitenoise://profile/$sampleNpub"))
         assertEquals(hex.lowercase(), RecipientReference.plausibleClipboardInput(hex))
         assertNull(RecipientReference.plausibleClipboardInput("nsec1not-a-public-identifier"))
         assertNull(RecipientReference.plausibleClipboardInput("just some notes"))

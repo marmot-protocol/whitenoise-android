@@ -17,8 +17,14 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        // The build under test is either the base id or that id with the
-        // `.debug` applicationIdSuffix — assert exactly that set, nothing wider.
-        assertTrue(appContext.packageName in setOf("dev.ipf.darkmatter", "dev.ipf.darkmatter.debug"))
+        // The build under test is one of the three White Noise application IDs.
+        assertTrue(
+            appContext.packageName in
+                setOf(
+                    "dev.ipf.whitenoise.android",
+                    "dev.ipf.whitenoise.android.dev",
+                    "dev.ipf.whitenoise.android.staging",
+                ),
+        )
     }
 }

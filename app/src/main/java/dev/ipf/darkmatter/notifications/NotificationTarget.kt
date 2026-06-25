@@ -72,7 +72,7 @@ fun resolveNotificationNav(
 }
 
 /** The activity's pending inbound-intent routing: a tapped-notification target
- *  and/or a `darkmatter://` profile deep link awaiting consumption by the UI. */
+ *  and/or a White Noise profile deep link awaiting consumption by the UI. */
 data class InboundIntentRouting(
     val notificationTarget: NotificationTarget?,
     val profilePayload: String?,
@@ -82,7 +82,7 @@ data class InboundIntentRouting(
  * Resolve a newly-arrived intent against the [current] pending routing:
  * - a notification tap ([parsedTarget] non-null) wins and clears any pending
  *   profile link (the two are mutually exclusive);
- * - otherwise a `darkmatter://` data URI ([dataString]) becomes the profile
+ * - otherwise a White Noise data URI ([dataString]) becomes the profile
  *   payload;
  * - otherwise — a dataless, non-notification intent such as a bare launcher
  *   relaunch — the [current] target/link is left intact rather than being

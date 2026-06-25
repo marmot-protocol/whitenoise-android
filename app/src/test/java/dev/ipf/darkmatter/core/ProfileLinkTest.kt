@@ -1,5 +1,6 @@
 package dev.ipf.darkmatter.core
 
+import dev.ipf.darkmatter.BuildConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -9,24 +10,31 @@ class ProfileLinkTest {
     private val sampleNpub = "npub1" + "a".repeat(58)
 
     @Test
-    fun buildsDarkMatterProfileDeepLinks() {
+    fun buildsWhiteNoiseProfileDeepLinks() {
         val link = ProfileLink(sampleNpub)
 
-        assertEquals("darkmatter://profile/$sampleNpub", link.uri)
+        assertEquals("${BuildConfig.WHITENOISE_DEEP_LINK_SCHEME}://profile/$sampleNpub", link.uri)
     }
 
     @Test
-    fun parsesDarkMatterNostrAndBareNpubPayloads() {
-        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("darkmatter://profile/$sampleNpub"))
-        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("darkmatter://$sampleNpub"))
+    fun parsesWhiteNoiseNostrAndBareNpubPayloads() {
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise://profile/$sampleNpub"))
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise://$sampleNpub"))
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise-staging://profile/$sampleNpub"))
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise-dev://profile/$sampleNpub"))
         assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("nostr:$sampleNpub"))
         assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("  $sampleNpub  "))
     }
 
     @Test
+    fun parsesLegacyDarkMatterProfileLinks() {
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("darkmatter://profile/$sampleNpub"))
+    }
+
+    @Test
     fun rejectsNonProfilePayloads() {
         assertNull(ProfileLink.parse("https://example.com/$sampleNpub"))
-        assertNull(ProfileLink.parse("darkmatter://profile/not-a-profile"))
+        assertNull(ProfileLink.parse("whitenoise://profile/not-a-profile"))
         assertNull(ProfileLink.parse(""))
     }
 
@@ -45,6 +53,6 @@ class ProfileLinkTest {
         assertNull(ProfileLink.parse("npub1" + "i".repeat(58)))
         // Garbage with the right prefix but wrong shape doesn't smuggle through.
         assertNull(ProfileLink.parse("nostr:npub1garbage"))
-        assertNull(ProfileLink.parse("darkmatter://profile/npub1garbage"))
+        assertNull(ProfileLink.parse("whitenoise://profile/npub1garbage"))
     }
 }

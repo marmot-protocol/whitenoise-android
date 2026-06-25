@@ -1,13 +1,13 @@
 name: Android Instrumented Tests
 
-# Runs app/src/androidTest on an emulator (connectedDebugAndroidTest). These
-# tests are slow and need a booted emulator + KVM, so they live in their own
+# Runs app/src/androidTest on an emulator (connectedDevDebugAndroidTest).
+# These tests are slow and need a booted emulator + KVM, so they live in their own
 # workflow off the fast unit/ktlint path (see android-ci.yml). It runs on
 # pushes to master ONLY — never on pull requests — so a slow emulator boot can
 # never gate a PR merge.
 #
-# Debug variant only: no signing secrets, no Firebase config, matching the
-# unit-test workflow's no-credentials posture.
+# Dev debug variant only: no signing secrets, no Firebase config,
+# matching the unit-test workflow's no-credentials posture.
 
 on:
   push:
@@ -60,7 +60,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
+          script: ./gradlew :app:connectedDevDebugAndroidTest --no-daemon --stacktrace
 
       - name: Upload instrumented test reports
         if: always()
