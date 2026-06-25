@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build signed release APKs for Dark Matter Android.
+# Build signed release APKs for White Noise Android.
 #
 # Pre-reqs:
 #   - JAVA_HOME or a JBR pointing at JDK 17+
@@ -7,7 +7,7 @@
 #   - Signing creds in local.properties (see scripts/release.sh --help)
 #   - Sibling checkout of marmot at $DARKMATTER_MARMOT_DIR (default: ../darkmatter)
 #
-# Outputs signed per-ABI and universal APKs in app/build/outputs/apk/release/.
+# Outputs signed per-ABI and universal APKs under app/build/outputs/apk/<flavor>/release/.
 
 set -euo pipefail
 
@@ -18,13 +18,17 @@ Usage: scripts/release.sh [--skip-bindings] [--abi <ABI>] [--help]
   --skip-bindings   Don't rebuild the Rust .so libs (use whatever's checked in)
   --abi <ABI>       Build only a specific ABI APK, then print its path
                     (arm64-v8a | armeabi-v7a | x86 | x86_64 | universal)
+  --flavor <name>   Build one release flavor, or both with "all"
+                    (production | staging | all; default: production)
   --help            Show this help
 
 Signing creds (in local.properties or env):
-  DARKMATTER_KEYSTORE_PATH       Path to .p12 / .jks keystore
-  DARKMATTER_KEY_ALIAS           Key alias inside the keystore
-  DARKMATTER_KEYSTORE_PASSWORD   Keystore password
-  DARKMATTER_KEY_PASSWORD        Key password (same as keystore for PKCS12)
+  WHITENOISE_KEYSTORE_PATH       Path to .p12 / .jks keystore
+  WHITENOISE_KEY_ALIAS           Key alias inside the keystore
+  WHITENOISE_KEYSTORE_PASSWORD   Keystore password
+  WHITENOISE_KEY_PASSWORD        Key password (same as keystore for PKCS12)
+
+Legacy DARKMATTER_KEYSTORE_* names are still accepted as fallbacks.
 
 Optional env:
   DARKMATTER_MARMOT_DIR          Path to marmot workspace (default: ../darkmatter)
@@ -34,6 +38,7 @@ EOF
 
 SKIP_BINDINGS=false
 TARGET_ABI=""
+FLAVOR="production"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-bindings) SKIP_BINDINGS=true; shift ;;
@@ -44,6 +49,15 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       TARGET_ABI="$2"
+      shift 2
+      ;;
+    --flavor)
+      if [[ $# -lt 2 || "$2" == --* ]]; then
+        echo "error: --flavor requires a value" >&2
+        usage
+        exit 1
+      fi
+      FLAVOR="$2"
       shift 2
       ;;
     --help|-h) usage; exit 0 ;;
@@ -93,6 +107,29 @@ if [[ -n "$TARGET_ABI" ]]; then
   esac
 fi
 
+case "$FLAVOR" in
+  production|staging|all) ;;
+  *)
+    echo "error: unsupported flavor: $FLAVOR" >&2
+    usage
+    exit 1
+    ;;
+esac
+
+if [[ "$FLAVOR" == "all" ]]; then
+  BUILD_FLAVORS=(production staging)
+else
+  BUILD_FLAVORS=("$FLAVOR")
+fi
+
+flavor_task_name() {
+  case "$1" in
+    production) printf 'Production' ;;
+    staging) printf 'Staging' ;;
+    *) return 1 ;;
+  esac
+}
+
 # --- Java sanity ---
 if ! command -v java >/dev/null 2>&1; then
   for candidate in \
@@ -112,19 +149,33 @@ fi
 
 # --- Signing sanity ---
 LOCAL_PROPS="$REPO_DIR/local.properties"
-required_props=(DARKMATTER_KEYSTORE_PATH DARKMATTER_KEY_ALIAS DARKMATTER_KEYSTORE_PASSWORD DARKMATTER_KEY_PASSWORD)
+prop_value() {
+  local key value
+  for key in "$@"; do
+    value="$(grep "^${key}=" "$LOCAL_PROPS" 2>/dev/null | head -1 | cut -d= -f2- || true)"
+    if [[ -n "$value" ]]; then
+      printf '%s\n' "$value"
+      return 0
+    fi
+    if [[ -n "${!key:-}" ]]; then
+      printf '%s\n' "${!key}"
+      return 0
+    fi
+  done
+  return 1
+}
+
 missing=()
-for prop in "${required_props[@]}"; do
-  if ! grep -q "^${prop}=" "$LOCAL_PROPS" 2>/dev/null && [[ -z "${!prop:-}" ]]; then
-    missing+=("$prop")
-  fi
-done
+prop_value WHITENOISE_KEYSTORE_PATH DARKMATTER_KEYSTORE_PATH >/dev/null || missing+=("WHITENOISE_KEYSTORE_PATH")
+prop_value WHITENOISE_KEY_ALIAS DARKMATTER_KEY_ALIAS >/dev/null || missing+=("WHITENOISE_KEY_ALIAS")
+prop_value WHITENOISE_KEYSTORE_PASSWORD DARKMATTER_KEYSTORE_PASSWORD >/dev/null || missing+=("WHITENOISE_KEYSTORE_PASSWORD")
+prop_value WHITENOISE_KEY_PASSWORD DARKMATTER_KEY_PASSWORD >/dev/null || missing+=("WHITENOISE_KEY_PASSWORD")
 if (( ${#missing[@]} > 0 )); then
   echo "error: missing signing config (in local.properties or env): ${missing[*]}" >&2
   echo "Run 'just keystore-gen' to create one." >&2
   exit 1
 fi
-keystore_path=$(grep "^DARKMATTER_KEYSTORE_PATH=" "$LOCAL_PROPS" 2>/dev/null | cut -d= -f2- || echo "${DARKMATTER_KEYSTORE_PATH:-}")
+keystore_path="$(prop_value WHITENOISE_KEYSTORE_PATH DARKMATTER_KEYSTORE_PATH)"
 if [[ ! -f "$keystore_path" ]]; then
   echo "error: keystore not found at: $keystore_path" >&2
   exit 1
@@ -156,44 +207,53 @@ fi
 # --- Gradle release build ---
 cd "$REPO_DIR"
 
-APK_DIR="$REPO_DIR/app/build/outputs/apk/release"
-INTERMEDIATE_APK_DIR="$REPO_DIR/app/build/intermediates/apk/release"
-mkdir -p "$APK_DIR"
+selected_apks=()
 
-if [[ -n "$TARGET_ABI" && "$TARGET_ABI" != "universal" ]]; then
-  echo "==> Assembling release APK for $TARGET_ABI"
-  rm -f "$APK_DIR"/*.apk
-  ./gradlew :app:assembleRelease \
-    -Pandroid.injected.build.abi="$TARGET_ABI" \
-    -Pandroid.injected.testOnly=false
+for flavor in "${BUILD_FLAVORS[@]}"; do
+  flavor_task="$(flavor_task_name "$flavor")"
+  APK_DIR="$REPO_DIR/app/build/outputs/apk/$flavor/release"
+  INTERMEDIATE_APK_DIR="$REPO_DIR/app/build/intermediates/apk/$flavor/release"
+  mkdir -p "$APK_DIR"
 
-  gradle_apk_name="app-${TARGET_ABI}-release.apk"
-  selected_apk="$APK_DIR/$gradle_apk_name"
-  intermediate_apk="$INTERMEDIATE_APK_DIR/$gradle_apk_name"
-  if [[ ! -f "$selected_apk" && -f "$intermediate_apk" ]]; then
-    cp "$intermediate_apk" "$selected_apk"
+  if [[ -n "$TARGET_ABI" && "$TARGET_ABI" != "universal" ]]; then
+    echo "==> Assembling $flavor release APK for $TARGET_ABI"
+    rm -f "$APK_DIR"/*.apk
+    ./gradlew ":app:assemble${flavor_task}Release" \
+      -Pandroid.injected.build.abi="$TARGET_ABI" \
+      -Pandroid.injected.testOnly=false
+
+    selected_apk="$(
+      find "$APK_DIR" "$INTERMEDIATE_APK_DIR" -maxdepth 1 -type f -name "*${TARGET_ABI}*release*.apk" 2>/dev/null | sort | head -1
+    )"
+    if [[ -z "$selected_apk" || ! -f "$selected_apk" ]]; then
+      echo "error: no APK found for ABI: $TARGET_ABI ($flavor)" >&2
+      exit 1
+    fi
+
+    if [[ "$TARGET_ABI" == "arm64-v8a" ]]; then
+      renamed_apk="$APK_DIR/whitenoise-${flavor}-v8a-release-$(date +%F).apk"
+      mv "$selected_apk" "$renamed_apk"
+      selected_apk="$renamed_apk"
+    fi
+
+    assert_not_test_only "$selected_apk"
+    selected_apks+=("$selected_apk")
+  else
+    echo "==> Assembling $flavor release APKs"
+    ./gradlew ":app:assemble${flavor_task}Release"
   fi
-  if [[ ! -f "$selected_apk" ]]; then
-    echo "error: no APK found for ABI: $TARGET_ABI" >&2
-    exit 1
-  fi
-
-  if [[ "$TARGET_ABI" == "arm64-v8a" ]]; then
-    selected_apk="$APK_DIR/darkmatter-v8a-release-$(date +%F).apk"
-    mv "$APK_DIR/$gradle_apk_name" "$selected_apk"
-  fi
-
-  assert_not_test_only "$selected_apk"
-else
-  echo "==> Assembling release APKs"
-  ./gradlew :app:assembleRelease
-fi
+done
 
 echo ""
 echo "==> Release APKs:"
-ls -lh "$APK_DIR"/*.apk
+for flavor in "${BUILD_FLAVORS[@]}"; do
+  APK_DIR="$REPO_DIR/app/build/outputs/apk/$flavor/release"
+  if compgen -G "$APK_DIR/*.apk" >/dev/null; then
+    ls -lh "$APK_DIR"/*.apk
+  fi
+done
 
 if [[ -n "$TARGET_ABI" ]]; then
   echo ""
-  echo "==> Selected: $selected_apk"
+  printf '==> Selected: %s\n' "${selected_apks[@]}"
 fi

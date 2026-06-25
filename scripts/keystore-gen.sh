@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate a new release keystore for Dark Matter Android and write its
+# Generate a new release keystore for White Noise Android and write its
 # credentials to local.properties.
 #
 # DESTRUCTIVE: if a keystore already exists at the target path, this script
@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-KEYSTORE_PATH_DEFAULT="$HOME/.android/keystores/darkmatter-release.p12"
+KEYSTORE_PATH_DEFAULT="$HOME/.android/keystores/whitenoise-android-release.p12"
 KEYSTORE_PATH="${1:-$KEYSTORE_PATH_DEFAULT}"
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -44,25 +44,25 @@ echo "==> Generating PKCS12 keystore at $KEYSTORE_PATH"
 keytool -genkeypair \
   -keystore "$KEYSTORE_PATH" \
   -storetype PKCS12 \
-  -alias darkmatter \
+  -alias whitenoise \
   -keyalg RSA \
   -keysize 2048 \
   -validity 9999 \
   -storepass "$KEYSTORE_PASSWORD" \
   -keypass "$KEYSTORE_PASSWORD" \
-  -dname "CN=Dark Matter Release, OU=Engineering, O=IPF, C=US"
+  -dname "CN=White Noise Android Release, OU=Engineering, O=IPF, C=US"
 
 # Write/update local.properties
 touch "$LOCAL_PROPS"
-grep -v -E "^DARKMATTER_(KEYSTORE_|KEY_)" "$LOCAL_PROPS" > "$LOCAL_PROPS.tmp" || true
+grep -v -E "^(WHITENOISE|DARKMATTER)_(KEYSTORE_|KEY_)" "$LOCAL_PROPS" > "$LOCAL_PROPS.tmp" || true
 mv "$LOCAL_PROPS.tmp" "$LOCAL_PROPS"
 {
   echo ""
   echo "# Android release signing (DO NOT COMMIT)"
-  echo "DARKMATTER_KEYSTORE_PATH=$KEYSTORE_PATH"
-  echo "DARKMATTER_KEY_ALIAS=darkmatter"
-  echo "DARKMATTER_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
-  echo "DARKMATTER_KEY_PASSWORD=$KEYSTORE_PASSWORD"
+  echo "WHITENOISE_KEYSTORE_PATH=$KEYSTORE_PATH"
+  echo "WHITENOISE_KEY_ALIAS=whitenoise"
+  echo "WHITENOISE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+  echo "WHITENOISE_KEY_PASSWORD=$KEYSTORE_PASSWORD"
 } >> "$LOCAL_PROPS"
 
 cat <<EOF
@@ -70,7 +70,7 @@ cat <<EOF
 ==> Done.
 
    Keystore:  $KEYSTORE_PATH
-   Alias:     darkmatter
+   Alias:     whitenoise
    Password:  $KEYSTORE_PASSWORD
 
 SAVE THE PASSWORD NOW (1Password, etc.). Losing it bricks future releases.

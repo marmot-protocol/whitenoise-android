@@ -1222,7 +1222,7 @@ private fun MainShell(
         val target =
             inboundNotificationTarget ?: run {
                 // The pending target was cancelled or replaced mid-route (e.g. a
-                // darkmatter:// deep link cleared it via routeInboundIntent) while
+                // White Noise deep link cleared it via routeInboundIntent) while
                 // we were still in SwitchAccount/AwaitChatList. Nothing left to
                 // resolve, so release the routing loading overlay; otherwise the
                 // render gate below would keep MainShell on a permanent
