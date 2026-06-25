@@ -201,9 +201,11 @@ class MessageProjectorTest {
     fun outgoingAndDeletedPredicatesAreStable() {
         val sent = message(id = "m1", direction = "sent")
         val received = message(id = "m2", direction = "received")
+        val receivedFromMe = message(id = "m3", direction = "received", sender = "AbC123")
 
         assertTrue(MessageProjector.isMine(sent, myAccountId = "me"))
         assertFalse(MessageProjector.isMine(received, myAccountId = "me"))
+        assertTrue(MessageProjector.isMine(receivedFromMe, myAccountId = "abc123"))
         assertTrue(MessageProjector.isDeleted("m1", setOf("m1")))
         assertFalse(MessageProjector.isDeleted("m2", setOf("m1")))
     }

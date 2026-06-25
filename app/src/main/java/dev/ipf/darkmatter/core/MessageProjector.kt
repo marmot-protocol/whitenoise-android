@@ -167,7 +167,9 @@ object MessageProjector {
     fun isMine(
         message: AppMessageRecordFfi,
         myAccountId: String?,
-    ): Boolean = message.direction == "sent" || (myAccountId != null && message.sender == myAccountId)
+    ): Boolean =
+        message.direction == "sent" ||
+            (myAccountId != null && message.sender.equals(myAccountId, ignoreCase = true))
 
     fun isDeleted(
         messageIdHex: String,
