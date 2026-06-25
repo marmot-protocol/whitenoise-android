@@ -28,9 +28,11 @@ object AudioWaveformExtractor {
     private const val FLOOR = 0.05f
 
     // Decode work runs on Dispatchers.IO but still holds a scarce MediaCodec.
-    // These generous caps cover slow/corrupt clips without letting a stream that
-    // never emits EOS pin the codec and worker thread indefinitely.
-    private const val MAX_DECODE_LOOP_ITERATIONS = 20_000
+    // The elapsed cap is the primary runaway guard; the iteration ceiling is a
+    // secondary backstop sized to clear the ~5-minute maximum recording (one
+    // in/one out buffer per pass is tens of thousands of passes) with wide
+    // margin, so a legitimately long clip still produces a waveform.
+    private const val MAX_DECODE_LOOP_ITERATIONS = 500_000
     private const val MAX_DECODE_ELAPSED_NANOS = 30_000_000_000L
 
     // Cap on cached waveforms. Each value is a 64-float array (~256 B of
