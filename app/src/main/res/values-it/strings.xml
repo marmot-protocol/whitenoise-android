@@ -741,13 +741,14 @@
     <string name="disappearing_7_days">7 giorni</string>
     <string name="disappearing_30_days">30 giorni</string>
     <string name="disappearing_90_days">90 giorni</string>
-    <string name="disappearing_custom">Personalizzato</string>
+    <string name="disappearing_custom">Tempo personalizzato</string>
     <string name="disappearing_days_format">%1$d giorni</string>
     <string name="disappearing_hours_format">%1$d ore</string>
     <string name="disappearing_minutes_format">%1$d minuti</string>
     <string name="disappearing_unit_minutes">Minuti</string>
     <string name="disappearing_unit_hours">Ore</string>
     <string name="disappearing_unit_days">Giorni</string>
+    <string name="disappearing_unit_weeks">Settimane</string>
     <string name="disappearing_custom_amount_label">Quantità</string>
     <string name="disappearing_row_hint_admin">Tocca per impostare la durata dei nuovi messaggi</string>
     <string name="disappearing_row_hint_readonly">Solo gli amministratori possono modificarlo</string>
@@ -767,5 +768,16 @@
     <string name="group_system_disappearing_off">%1$s ha disattivato i messaggi effimeri</string>
     <string name="group_system_disappearing_off_you">Hai disattivato i messaggi effimeri</string>
     <string name="group_system_disappearing_off_passive">I messaggi effimeri sono disattivati</string>
+
+    <string name="disappearing_4_weeks">4 settimane</string>
+    <string name="disappearing_1_week">1 settimana</string>
+    <string name="disappearing_8_hours">8 ore</string>
+    <string name="disappearing_1_hour">1 ora</string>
+    <string name="disappearing_5_minutes">5 minuti</string>
+    <string name="disappearing_30_seconds">30 secondi</string>
+    <string name="disappearing_explainer">Se attivati, i nuovi messaggi inviati e ricevuti in questa chat scompariranno dopo essere stati visti.</string>
+    <string name="disappearing_seconds_format">%1$d secondi</string>
+    <string name="disappearing_unit_seconds">Secondi</string>
+    <string name="disappearing_set">Imposta</string>
 
 </resources>

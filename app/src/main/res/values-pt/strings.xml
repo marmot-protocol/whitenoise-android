@@ -741,13 +741,14 @@
     <string name="disappearing_7_days">7 dias</string>
     <string name="disappearing_30_days">30 dias</string>
     <string name="disappearing_90_days">90 dias</string>
-    <string name="disappearing_custom">Personalizado</string>
+    <string name="disappearing_custom">Tempo personalizado</string>
     <string name="disappearing_days_format">%1$d dias</string>
     <string name="disappearing_hours_format">%1$d horas</string>
     <string name="disappearing_minutes_format">%1$d minutos</string>
     <string name="disappearing_unit_minutes">Minutos</string>
     <string name="disappearing_unit_hours">Horas</string>
     <string name="disappearing_unit_days">Dias</string>
+    <string name="disappearing_unit_weeks">Semanas</string>
     <string name="disappearing_custom_amount_label">Quantidade</string>
     <string name="disappearing_row_hint_admin">Toque para definir a duração das novas mensagens</string>
     <string name="disappearing_row_hint_readonly">Apenas administradores podem alterar isto</string>
@@ -767,5 +768,16 @@
     <string name="group_system_disappearing_off">%1$s desativou as mensagens temporárias</string>
     <string name="group_system_disappearing_off_you">Você desativou as mensagens temporárias</string>
     <string name="group_system_disappearing_off_passive">As mensagens temporárias estão desativadas</string>
+
+    <string name="disappearing_4_weeks">4 semanas</string>
+    <string name="disappearing_1_week">1 semana</string>
+    <string name="disappearing_8_hours">8 horas</string>
+    <string name="disappearing_1_hour">1 hora</string>
+    <string name="disappearing_5_minutes">5 minutos</string>
+    <string name="disappearing_30_seconds">30 segundos</string>
+    <string name="disappearing_explainer">Quando ativado, as novas mensagens enviadas e recebidas neste chat desaparecerão depois de vistas.</string>
+    <string name="disappearing_seconds_format">%1$d segundos</string>
+    <string name="disappearing_unit_seconds">Segundos</string>
+    <string name="disappearing_set">Definir</string>
 
 </resources>

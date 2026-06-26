@@ -732,13 +732,14 @@
     <string name="disappearing_7_days">7 天</string>
     <string name="disappearing_30_days">30 天</string>
     <string name="disappearing_90_days">90 天</string>
-    <string name="disappearing_custom">自定义</string>
+    <string name="disappearing_custom">自定义时间</string>
     <string name="disappearing_days_format">%1$d 天</string>
     <string name="disappearing_hours_format">%1$d 小时</string>
     <string name="disappearing_minutes_format">%1$d 分钟</string>
     <string name="disappearing_unit_minutes">分钟</string>
     <string name="disappearing_unit_hours">小时</string>
     <string name="disappearing_unit_days">天</string>
+    <string name="disappearing_unit_weeks">周</string>
     <string name="disappearing_custom_amount_label">数量</string>
     <string name="disappearing_row_hint_admin">点按设置新消息的留存时间</string>
     <string name="disappearing_row_hint_readonly">只有管理员可以更改</string>
@@ -758,5 +759,16 @@
     <string name="group_system_disappearing_off">%1$s 关闭了阅后即焚消息</string>
     <string name="group_system_disappearing_off_you">你关闭了阅后即焚消息</string>
     <string name="group_system_disappearing_off_passive">阅后即焚消息已关闭</string>
+
+    <string name="disappearing_4_weeks">4 周</string>
+    <string name="disappearing_1_week">1 周</string>
+    <string name="disappearing_8_hours">8 小时</string>
+    <string name="disappearing_1_hour">1 小时</string>
+    <string name="disappearing_5_minutes">5 分钟</string>
+    <string name="disappearing_30_seconds">30 秒</string>
+    <string name="disappearing_explainer">启用后，此聊天中发送和接收的新消息将在被查看后消失。</string>
+    <string name="disappearing_seconds_format">%1$d 秒</string>
+    <string name="disappearing_unit_seconds">秒</string>
+    <string name="disappearing_set">设置</string>
 
 </resources>

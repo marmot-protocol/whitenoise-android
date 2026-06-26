@@ -738,13 +738,14 @@
     <string name="disappearing_7_days">7 Tage</string>
     <string name="disappearing_30_days">30 Tage</string>
     <string name="disappearing_90_days">90 Tage</string>
-    <string name="disappearing_custom">Benutzerdefiniert</string>
+    <string name="disappearing_custom">Benutzerdefinierte Zeit</string>
     <string name="disappearing_days_format">%1$d Tage</string>
     <string name="disappearing_hours_format">%1$d Stunden</string>
     <string name="disappearing_minutes_format">%1$d Minuten</string>
     <string name="disappearing_unit_minutes">Minuten</string>
     <string name="disappearing_unit_hours">Stunden</string>
     <string name="disappearing_unit_days">Tage</string>
+    <string name="disappearing_unit_weeks">Wochen</string>
     <string name="disappearing_custom_amount_label">Anzahl</string>
     <string name="disappearing_row_hint_admin">Tippen, um die Lebensdauer neuer Nachrichten festzulegen</string>
     <string name="disappearing_row_hint_readonly">Nur Admins können das ändern</string>
@@ -764,5 +765,16 @@
     <string name="group_system_disappearing_off">%1$s hat verschwindende Nachrichten deaktiviert</string>
     <string name="group_system_disappearing_off_you">Du hast verschwindende Nachrichten deaktiviert</string>
     <string name="group_system_disappearing_off_passive">Verschwindende Nachrichten sind aus</string>
+
+    <string name="disappearing_4_weeks">4 Wochen</string>
+    <string name="disappearing_1_week">1 Woche</string>
+    <string name="disappearing_8_hours">8 Stunden</string>
+    <string name="disappearing_1_hour">1 Stunde</string>
+    <string name="disappearing_5_minutes">5 Minuten</string>
+    <string name="disappearing_30_seconds">30 Sekunden</string>
+    <string name="disappearing_explainer">Wenn aktiviert, verschwinden neue gesendete und empfangene Nachrichten in diesem Chat, nachdem sie gesehen wurden.</string>
+    <string name="disappearing_seconds_format">%1$d Sekunden</string>
+    <string name="disappearing_unit_seconds">Sekunden</string>
+    <string name="disappearing_set">Festlegen</string>
 
 </resources>

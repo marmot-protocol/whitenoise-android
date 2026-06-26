@@ -741,13 +741,14 @@
     <string name="disappearing_7_days">7 días</string>
     <string name="disappearing_30_days">30 días</string>
     <string name="disappearing_90_days">90 días</string>
-    <string name="disappearing_custom">Personalizado</string>
+    <string name="disappearing_custom">Tiempo personalizado</string>
     <string name="disappearing_days_format">%1$d días</string>
     <string name="disappearing_hours_format">%1$d horas</string>
     <string name="disappearing_minutes_format">%1$d minutos</string>
     <string name="disappearing_unit_minutes">Minutos</string>
     <string name="disappearing_unit_hours">Horas</string>
     <string name="disappearing_unit_days">Días</string>
+    <string name="disappearing_unit_weeks">Semanas</string>
     <string name="disappearing_custom_amount_label">Cantidad</string>
     <string name="disappearing_row_hint_admin">Toca para definir cuánto duran los mensajes nuevos</string>
     <string name="disappearing_row_hint_readonly">Solo los administradores pueden cambiarlo</string>
@@ -767,5 +768,16 @@
     <string name="group_system_disappearing_off">%1$s desactivó los mensajes temporales</string>
     <string name="group_system_disappearing_off_you">Desactivaste los mensajes temporales</string>
     <string name="group_system_disappearing_off_passive">Los mensajes temporales están desactivados</string>
+
+    <string name="disappearing_4_weeks">4 semanas</string>
+    <string name="disappearing_1_week">1 semana</string>
+    <string name="disappearing_8_hours">8 horas</string>
+    <string name="disappearing_1_hour">1 hora</string>
+    <string name="disappearing_5_minutes">5 minutos</string>
+    <string name="disappearing_30_seconds">30 segundos</string>
+    <string name="disappearing_explainer">Cuando se activa, los mensajes nuevos enviados y recibidos en este chat desaparecerán después de verse.</string>
+    <string name="disappearing_seconds_format">%1$d segundos</string>
+    <string name="disappearing_unit_seconds">Segundos</string>
+    <string name="disappearing_set">Establecer</string>
 
 </resources>

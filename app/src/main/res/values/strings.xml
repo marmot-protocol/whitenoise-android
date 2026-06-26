@@ -755,13 +755,14 @@
     <string name="disappearing_7_days">7 days</string>
     <string name="disappearing_30_days">30 days</string>
     <string name="disappearing_90_days">90 days</string>
-    <string name="disappearing_custom">Custom</string>
+    <string name="disappearing_custom">Custom time</string>
     <string name="disappearing_days_format">%1$d days</string>
     <string name="disappearing_hours_format">%1$d hours</string>
     <string name="disappearing_minutes_format">%1$d minutes</string>
     <string name="disappearing_unit_minutes">Minutes</string>
     <string name="disappearing_unit_hours">Hours</string>
     <string name="disappearing_unit_days">Days</string>
+    <string name="disappearing_unit_weeks">Weeks</string>
     <string name="disappearing_custom_amount_label">Amount</string>
     <string name="disappearing_row_hint_admin">Tap to set how long new messages last</string>
     <string name="disappearing_row_hint_readonly">Only admins can change this</string>
@@ -781,5 +782,16 @@
     <string name="group_system_disappearing_off">%1$s turned off disappearing messages</string>
     <string name="group_system_disappearing_off_you">You turned off disappearing messages</string>
     <string name="group_system_disappearing_off_passive">Disappearing messages are off</string>
+
+    <string name="disappearing_4_weeks">4 weeks</string>
+    <string name="disappearing_1_week">1 week</string>
+    <string name="disappearing_8_hours">8 hours</string>
+    <string name="disappearing_1_hour">1 hour</string>
+    <string name="disappearing_5_minutes">5 minutes</string>
+    <string name="disappearing_30_seconds">30 seconds</string>
+    <string name="disappearing_explainer">When enabled, new messages sent and received in this chat will disappear after they have been seen.</string>
+    <string name="disappearing_seconds_format">%1$d seconds</string>
+    <string name="disappearing_unit_seconds">Seconds</string>
+    <string name="disappearing_set">Set</string>
 
 </resources>

@@ -752,13 +752,14 @@
     <string name="disappearing_7_days">7 дней</string>
     <string name="disappearing_30_days">30 дней</string>
     <string name="disappearing_90_days">90 дней</string>
-    <string name="disappearing_custom">Другое</string>
+    <string name="disappearing_custom">Своё время</string>
     <string name="disappearing_days_format">%1$d дн.</string>
     <string name="disappearing_hours_format">%1$d ч.</string>
     <string name="disappearing_minutes_format">%1$d мин.</string>
     <string name="disappearing_unit_minutes">Минуты</string>
     <string name="disappearing_unit_hours">Часы</string>
     <string name="disappearing_unit_days">Дни</string>
+    <string name="disappearing_unit_weeks">Недели</string>
     <string name="disappearing_custom_amount_label">Количество</string>
     <string name="disappearing_row_hint_admin">Нажмите, чтобы задать срок жизни новых сообщений</string>
     <string name="disappearing_row_hint_readonly">Изменить это могут только администраторы</string>
@@ -778,5 +779,16 @@
     <string name="group_system_disappearing_off">%1$s отключил исчезающие сообщения</string>
     <string name="group_system_disappearing_off_you">Вы отключили исчезающие сообщения</string>
     <string name="group_system_disappearing_off_passive">Исчезающие сообщения отключены</string>
+
+    <string name="disappearing_4_weeks">4 недели</string>
+    <string name="disappearing_1_week">1 неделя</string>
+    <string name="disappearing_8_hours">8 часов</string>
+    <string name="disappearing_1_hour">1 час</string>
+    <string name="disappearing_5_minutes">5 минут</string>
+    <string name="disappearing_30_seconds">30 секунд</string>
+    <string name="disappearing_explainer">Если включено, новые отправленные и полученные в этом чате сообщения исчезнут после просмотра.</string>
+    <string name="disappearing_seconds_format">%1$d сек.</string>
+    <string name="disappearing_unit_seconds">Секунды</string>
+    <string name="disappearing_set">Задать</string>
 
 </resources>
