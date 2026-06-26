@@ -24,9 +24,12 @@ import dev.ipf.whitenoise.android.WhiteNoiseApplication
 class MarmotFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         fcmDebug { "FCM token rotated (${token.length} chars)" }
-        PushTokenStore.create(applicationContext).setToken(token)
-        val app = applicationContext as? WhiteNoiseApplication ?: return
-        app.appState.onPushTokenRotated(token)
+        val app = applicationContext as? WhiteNoiseApplication
+        if (app != null) {
+            app.appState.onPushTokenRotated(token)
+        } else {
+            PushTokenStore.create(applicationContext).setToken(token)
+        }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {

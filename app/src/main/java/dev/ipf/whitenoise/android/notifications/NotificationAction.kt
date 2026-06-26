@@ -79,7 +79,7 @@ object NotificationActions {
         )
     }
 
-    fun parseFields(
+    fun parseRawFields(
         action: String?,
         accountRef: String?,
         groupIdHex: String?,

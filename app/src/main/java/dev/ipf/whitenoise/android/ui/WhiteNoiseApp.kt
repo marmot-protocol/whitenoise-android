@@ -4277,7 +4277,10 @@ private fun ReplyPreviewCard(
         }
     // Media path shows a label; only the plaintext body carries raw `@npub1…`
     // runs, so resolve mentions there to match the bubble's rendering (#615).
-    val bodyText = mediaLabel ?: resolveMentionsInPlaintext(body, mentionDisplayName)
+    val bodyText =
+        remember(body, mediaLabel, mentionDisplayName) {
+            mediaLabel ?: resolveMentionsInPlaintext(body, mentionDisplayName)
+        }
     val accent =
         if (isOwn) {
             MaterialTheme.colorScheme.primary
@@ -9687,9 +9690,13 @@ private fun ConversationScreen(
                             // The list already arrives most-recently-active first from
                             // the roster, and MentionComposer.filter preserves order.
                             val mentionPickerEnabled = !controller.isDm
-                            LaunchedEffect(mentionPickerEnabled, controller.members) {
+                            val mentionMemberIds =
+                                remember(controller.members) {
+                                    controller.members.map { it.memberIdHex }
+                                }
+                            LaunchedEffect(mentionPickerEnabled, mentionMemberIds) {
                                 if (mentionPickerEnabled) {
-                                    appState.requestProfiles(controller.members.map { it.memberIdHex })
+                                    appState.requestProfiles(mentionMemberIds)
                                 }
                             }
                             val mentionCandidates =
@@ -13961,7 +13968,7 @@ private fun ReactionDetailsSheet(
             ) {
                 itemsIndexed(
                     visibleParticipants,
-                    key = { index, participant -> "${participant.sender}:${participant.emoji}:${participant.reactedAt}:$index" },
+                    key = { _, participant -> "${participant.sender}:${participant.emoji}:${participant.reactedAt}" },
                 ) { _, participant ->
                     val isMine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true)
                     ReactionParticipantRow(
@@ -14822,8 +14829,9 @@ private fun EmojiPickerSheet(
             EmojiData.search(browseEmoji, searchQuery)
         }
     val grouped = remember(browseEmoji) { browseEmoji.groupBy { it.group } }
-    val recents by produceState(initialValue = emptyList<String>(), context) {
-        value = withContext(Dispatchers.IO) { RecentEmojiPreferences.load(context).filter { it.isNotBlank() } }
+    var recents by remember(context) { mutableStateOf(emptyList<String>()) }
+    LaunchedEffect(context) {
+        recents = withContext(Dispatchers.IO) { RecentEmojiPreferences.load(context).filter { it.isNotBlank() } }
     }
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
@@ -14843,7 +14851,9 @@ private fun EmojiPickerSheet(
         }
 
     fun pick(emoji: String) {
-        scope.launch { withContext(Dispatchers.IO) { RecentEmojiPreferences.recordPicked(context, emoji) } }
+        scope.launch {
+            recents = withContext(Dispatchers.IO) { RecentEmojiPreferences.recordPicked(context, emoji).filter { it.isNotBlank() } }
+        }
         onEmojiPicked(emoji)
     }
 
@@ -16743,19 +16753,18 @@ private fun NotificationsScreen(
     var pendingNotificationEnable by remember { mutableStateOf(false) }
     var pendingBackgroundConnectionEnable by remember { mutableStateOf(false) }
     var pendingNativePushEnable by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             appState.refreshLocalNotificationPermission()
             if (granted && pendingNotificationEnable) {
-                scope.launch { appState.setLocalNotificationsEnabled(true) }
+                appState.launchMutation { appState.setLocalNotificationsEnabled(true) }
             }
             if (granted && pendingBackgroundConnectionEnable) {
-                scope.launch { appState.setBackgroundConnectionEnabled(true) }
+                appState.launchMutation { appState.setBackgroundConnectionEnabled(true) }
             }
             if (granted && pendingNativePushEnable) {
-                scope.launch { appState.setNativePushEnabled(true) }
+                appState.launchMutation { appState.setNativePushEnabled(true) }
             }
             if (!granted) {
                 appState.present(R.string.toast_notification_permission_denied)
@@ -16798,7 +16807,7 @@ private fun NotificationsScreen(
                                     pendingNotificationEnable = true
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 } else {
-                                    scope.launch { appState.setLocalNotificationsEnabled(enabled) }
+                                    appState.launchMutation { appState.setLocalNotificationsEnabled(enabled) }
                                 }
                             },
                         )
@@ -16817,7 +16826,7 @@ private fun NotificationsScreen(
                                     pendingBackgroundConnectionEnable = true
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 } else {
-                                    scope.launch { appState.setBackgroundConnectionEnabled(enabled) }
+                                    appState.launchMutation { appState.setBackgroundConnectionEnabled(enabled) }
                                 }
                             },
                         )
@@ -16846,7 +16855,7 @@ private fun NotificationsScreen(
                                     pendingNativePushEnable = true
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 } else {
-                                    scope.launch { appState.setNativePushEnabled(enabled) }
+                                    appState.launchMutation { appState.setNativePushEnabled(enabled) }
                                 }
                             },
                         )
@@ -16913,7 +16922,6 @@ private fun SecurityPrivacyScreen(
     onBack: () -> Unit,
     onOpenDiagnostics: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
     var telemetryBusy by remember { mutableStateOf(false) }
     var auditLogsBusy by remember { mutableStateOf(false) }
 
@@ -16951,7 +16959,7 @@ private fun SecurityPrivacyScreen(
                         busy = telemetryBusy,
                         onCheckedChange = { enabled ->
                             telemetryBusy = true
-                            scope.launch {
+                            appState.launchMutation {
                                 try {
                                     appState.setTelemetryEnabled(enabled)
                                 } finally {

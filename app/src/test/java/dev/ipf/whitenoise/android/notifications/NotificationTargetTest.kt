@@ -199,7 +199,7 @@ class NotificationTargetTest {
     @Test
     fun actionParseFields_validReply_roundTrips() {
         val action =
-            NotificationActions.parseFields(
+            NotificationActions.parseRawFields(
                 action = NotificationActions.ACTION_REPLY,
                 accountRef = "acct-a",
                 groupIdHex = "group-1",
@@ -222,7 +222,7 @@ class NotificationTargetTest {
     @Test
     fun actionParseFields_rejectsUntrustedOrIncompletePayloads() {
         assertNull(
-            NotificationActions.parseFields(
+            NotificationActions.parseRawFields(
                 action = "android.intent.action.VIEW",
                 accountRef = "acct-a",
                 groupIdHex = "group-1",
@@ -233,7 +233,7 @@ class NotificationTargetTest {
             ),
         )
         assertNull(
-            NotificationActions.parseFields(
+            NotificationActions.parseRawFields(
                 action = NotificationActions.ACTION_MARK_READ,
                 accountRef = "acct-a",
                 groupIdHex = "group-1",
@@ -244,7 +244,7 @@ class NotificationTargetTest {
             ),
         )
         assertNull(
-            NotificationActions.parseFields(
+            NotificationActions.parseRawFields(
                 action = NotificationActions.ACTION_MARK_READ,
                 accountRef = "acct-a",
                 groupIdHex = "group-1",
@@ -255,7 +255,7 @@ class NotificationTargetTest {
             ),
         )
         assertNull(
-            NotificationActions.parseFields(
+            NotificationActions.parseRawFields(
                 action = NotificationActions.ACTION_MARK_READ,
                 accountRef = "acct-a",
                 groupIdHex = "group-1",
@@ -266,7 +266,7 @@ class NotificationTargetTest {
             ),
         )
         assertNull(
-            NotificationActions.parseFields(
+            NotificationActions.parseRawFields(
                 action = NotificationActions.ACTION_MARK_READ,
                 accountRef = "acct-a",
                 groupIdHex = "group-1",

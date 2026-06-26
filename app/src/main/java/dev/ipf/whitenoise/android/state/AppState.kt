@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -1051,7 +1052,7 @@ class WhiteNoiseAppState(
         val groupId = groupIdHex.takeIf { it.isNotBlank() } ?: return null
         val key = "$account\u0000$groupId"
         val job =
-            mutationsScope.async {
+            mutationsScope.async(start = CoroutineStart.LAZY) {
                 runCatching {
                     val accepted = marmotIo { acceptGroupInvite(account, groupId) }
                     val acceptedGroupId = accepted.groupIdHex.takeIf { it.isNotBlank() } ?: groupId
@@ -1071,9 +1072,9 @@ class WhiteNoiseAppState(
             }
         val existing = autoAcceptingInviteJobs.putIfAbsent(key, job)
         if (existing != null) {
-            job.cancel()
             return existing.await()
         }
+        job.start()
         return try {
             job.await()
         } finally {

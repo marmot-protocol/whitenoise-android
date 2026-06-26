@@ -22,10 +22,13 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 class LocalNotificationPresenter(
     private val context: Context,
 ) {
+    private val redactedPublicVersions = ConcurrentHashMap<String, Notification>()
+
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)
     }
@@ -76,7 +79,10 @@ class LocalNotificationPresenter(
                     accountRef = accountRef,
                     groupIdHex = groupIdHex,
                 )
-            }?.forEach { NotificationManagerCompat.from(context).cancel(it.tag, it.id) }
+            }?.let { inviteNotifications ->
+                val compat = NotificationManagerCompat.from(context)
+                inviteNotifications.forEach { compat.cancel(it.tag, it.id) }
+            }
     }
 
     @SuppressLint("MissingPermission")
@@ -131,8 +137,6 @@ class LocalNotificationPresenter(
                 .setWhen(update.timestampMs)
                 .setShowWhen(true)
                 .setAutoCancel(true)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                 .setPublicVersion(redactedPublicVersion(decision.channelId, decision.category))
                 .setSilent(false)
@@ -203,13 +207,15 @@ class LocalNotificationPresenter(
         channelId: String,
         category: String,
     ): Notification =
-        NotificationCompat
-            .Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_stat_whitenoise)
-            .setContentTitle(context.getString(R.string.app_name))
-            .setCategory(category)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .build()
+        redactedPublicVersions.getOrPut("$channelId\u0000$category") {
+            NotificationCompat
+                .Builder(context, channelId)
+                .setSmallIcon(R.drawable.ic_stat_whitenoise)
+                .setContentTitle(context.getString(R.string.app_name))
+                .setCategory(category)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .build()
+        }
 
     fun cancel(
         notificationTag: String,
