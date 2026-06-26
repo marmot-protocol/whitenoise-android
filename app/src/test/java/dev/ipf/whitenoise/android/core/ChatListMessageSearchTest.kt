@@ -51,8 +51,15 @@ class ChatListMessageSearchTest {
         }
 
     @Test
+    fun bodyMatchesNormalizesWhitespaceLikeSnippet() {
+        assertTrue(ChatListMessageSearch.bodyMatches("before foo\n   bar after", "foo bar"))
+        assertTrue(ChatListMessageSearch.bodyMatches("before foo bar after", "foo\n\n   bar"))
+    }
+
+    @Test
     fun blankNeedleNeverMatches() {
         assertFalse(ChatListMessageSearch.bodyMatches("anything", ""))
+        assertFalse(ChatListMessageSearch.bodyMatches("anything", " \n\t "))
     }
 
     // ---- buildSnippet -------------------------------------------------------
@@ -75,6 +82,20 @@ class ChatListMessageSearchTest {
         val s = ChatListMessageSearch.buildSnippet("hello\n\n   spaced\tout world", "spaced")!!
         assertEquals("hello spaced out world", s.text)
         assertEquals("spaced", s.text.substring(s.highlightStart, s.highlightEnd))
+    }
+
+    @Test
+    fun snippetNeedleWhitespaceNormalizesLikeBody() {
+        val s = ChatListMessageSearch.buildSnippet("before foo\n   bar after", "foo bar")!!
+        assertEquals("before foo bar after", s.text)
+        assertEquals("foo bar", s.text.substring(s.highlightStart, s.highlightEnd))
+    }
+
+    @Test
+    fun snippetNeedleInternalWhitespaceCollapsesBeforeSearch() {
+        val s = ChatListMessageSearch.buildSnippet("before foo bar after", "foo\n\n   bar")!!
+        assertEquals("before foo bar after", s.text)
+        assertEquals("foo bar", s.text.substring(s.highlightStart, s.highlightEnd))
     }
 
     @Test

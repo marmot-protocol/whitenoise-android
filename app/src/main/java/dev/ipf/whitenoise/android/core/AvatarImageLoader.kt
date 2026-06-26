@@ -232,9 +232,7 @@ internal class AvatarFailureExpiryCache(
         expiresAtMillis: Long,
         nowMillis: Long,
     ) {
-        if (expiresAtByUrl.size >= maxEntries) {
-            removeExpired(nowMillis)
-        }
+        removeExpired(nowMillis)
         expiresAtByUrl[url] = expiresAtMillis
     }
 
