@@ -229,13 +229,15 @@ class VoiceRecordingController(
                     // A restart reuses this take's focus for the next recording;
                     // only abandon it when no restart took over.
                     if (!restarting) abandonRecordingFocus()
-                    // If this coroutine was cancelled before stop() ran (the
-                    // conversation closed during the send tail), stop() never
-                    // released the recorder. Free it on the lifecycle-independent
-                    // scope; cancel() is a no-op when stop() already released.
-                    recorderScope.launch { r.cancel() }
                 }
             }
+        // Guarantee the recorder is released even if the finalize coroutine is
+        // cancelled before its body ever runs (the conversation closes the same
+        // frame stop() is called) — a completion handler fires on cancellation
+        // too, unlike the body's finally. cancel()/release() can't recover this
+        // because `recorder` is already null. r.cancel() is idempotent, so this
+        // is a no-op once stop() has finalized the take.
+        finalizeJob?.invokeOnCompletion { recorderScope.launch { r.cancel() } }
     }
 
     fun cancel() {
