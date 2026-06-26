@@ -43,6 +43,7 @@ class LocalizationResourceTest {
                     stringValues(localized)
                         .filter { (key, value) ->
                             key !in identicalValueAllowedKeys &&
+                                key !in localeScopedAllowedKeys[localized.parentFile.name].orEmpty() &&
                                 value.isNotBlank() &&
                                 value == englishValues[key]
                         }.keys
@@ -265,12 +266,25 @@ class LocalizationResourceTest {
                 // in some locales ("Images" in French, "Videos" in German).
                 "shared_media_tab_images",
                 "shared_media_tab_videos",
-                // "minute(s)" is spelled identically in French; the unit label,
-                // the custom-duration format, and the "5 minutes" preset
-                // legitimately match English.
-                "disappearing_unit_minutes",
-                "disappearing_minutes_format",
-                "disappearing_5_minutes",
+            )
+
+        // Exemptions that are valid only for SPECIFIC locales, keyed by the
+        // `values-<locale>` directory name. Unlike [identicalValueAllowedKeys]
+        // (which waives the copied-English check for every locale), these waive
+        // it only where the match is legitimate — so a regression that copies
+        // English into a different locale for the same key still fails.
+        //
+        // "minute(s)" is spelled identically in French: the unit label, the
+        // custom-duration format, and the "5 minutes" preset legitimately match
+        // English there — but nowhere else (de "Minuten", es "minutos", …).
+        val localeScopedAllowedKeys: Map<String, Set<String>> =
+            mapOf(
+                "values-fr" to
+                    setOf(
+                        "disappearing_unit_minutes",
+                        "disappearing_minutes_format",
+                        "disappearing_5_minutes",
+                    ),
             )
     }
 }
