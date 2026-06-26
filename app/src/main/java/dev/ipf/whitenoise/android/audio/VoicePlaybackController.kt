@@ -74,6 +74,7 @@ object VoicePlaybackController {
 
     private var player: MediaPlayer? = null
     private var currentKey: String? = null
+    private var currentOwnerKey: String? = null
     private var tickerJob: Job? = null
     private var currentSpeed: Float = 1f
 
@@ -98,12 +99,32 @@ object VoicePlaybackController {
         audioManager = context.applicationContext.getSystemService(AudioManager::class.java)
     }
 
+    private data class CompletionCallback(
+        val ownerKey: String,
+        val token: Any,
+        val callback: (completedKey: String) -> Unit,
+    )
+
+    private var completionCallback: CompletionCallback? = null
+
     /**
-     * Fires once when MediaPlayer reports completion, with the key of the
-     * clip that just finished. Conversation screen uses it to chain into
-     * the next voice attachment.
+     * Fires once when MediaPlayer reports completion, scoped to the owner that
+     * started playback. Conversation screens use this to chain into the next
+     * voice attachment without letting a completion from a previous screen drive
+     * the currently visible screen.
      */
-    var onCompletion: ((completedKey: String) -> Unit)? = null
+    fun registerCompletionCallback(
+        ownerKey: String,
+        callback: (completedKey: String) -> Unit,
+    ): () -> Unit {
+        val token = Any()
+        completionCallback = CompletionCallback(ownerKey, token, callback)
+        return {
+            if (completionCallback?.token === token) {
+                completionCallback = null
+            }
+        }
+    }
 
     /**
      * Cycle to the next speed in [speedOptions] and apply it to the active
@@ -168,13 +189,15 @@ object VoicePlaybackController {
     suspend fun play(
         key: String,
         file: File,
+        ownerKey: String? = null,
     ) {
-        playSerializer.withSerializedPlayback { playLocked(key, file) }
+        playSerializer.withSerializedPlayback { playLocked(key, file, ownerKey) }
     }
 
     private suspend fun playLocked(
         key: String,
         file: File,
+        ownerKey: String?,
     ) {
         if (currentKey == key && player != null) {
             // Re-acquire focus before resuming: a transient focus loss
@@ -186,6 +209,7 @@ object VoicePlaybackController {
                 return
             }
             player?.start()
+            currentOwnerKey = ownerKey
             _state.value =
                 _state.value.copy(
                     key = key,
@@ -238,9 +262,13 @@ object VoicePlaybackController {
                 // auto-advance the wrong clip (onCompletion of the old key). See #470.
                 if (player !== p) return@launch
                 val completed = currentKey
+                val completedOwner = currentOwnerKey
                 releasePlayerInternal()
                 _state.value = PlaybackState()
-                if (completed != null) onCompletion?.invoke(completed)
+                val callback = completionCallback
+                if (completed != null && completedOwner != null && callback?.ownerKey == completedOwner) {
+                    callback.callback(completed)
+                }
             }
         }
         mp.setOnErrorListener { p, what, extra ->
@@ -264,6 +292,7 @@ object VoicePlaybackController {
         mp.start()
         player = mp
         currentKey = key
+        currentOwnerKey = ownerKey
         // Mirror probeDuration's positivity guard (#275): some streams report
         // a non-positive duration at start() time. Caching that value would
         // pin the clip to "no duration" via the durationCache read short-circuit
@@ -360,6 +389,7 @@ object VoicePlaybackController {
         }
         player = null
         currentKey = null
+        currentOwnerKey = null
         abandonFocus()
     }
 

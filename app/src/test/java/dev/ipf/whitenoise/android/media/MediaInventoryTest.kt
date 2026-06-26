@@ -89,6 +89,15 @@ class MediaInventoryTest {
         assertEquals(listOf("first", "second"), inventory.images.map { it.messageIdHex })
     }
 
+    @Test
+    fun cacheKeyIncludesBodySoEditedLinksRefresh() {
+        val first = MediaInventory.build(listOf(record(id = "m", body = link("https://example.com/one"))))
+        val second = MediaInventory.build(listOf(record(id = "m", body = link("https://example.com/two"))))
+
+        assertEquals(listOf("https://example.com/one"), first.urls.map { it.url })
+        assertEquals(listOf("https://example.com/two"), second.urls.map { it.url })
+    }
+
     // --- builders ---
 
     private fun attachment(
