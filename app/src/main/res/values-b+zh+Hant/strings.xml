@@ -726,4 +726,49 @@
     <string name="shared_media_saved">已儲存</string>
     <string name="shared_media_save_failed">無法儲存檔案</string>
     <string name="shared_media_voice_failed">無法播放語音訊息</string>
+    <string name="disappearing_messages">閱後即焚訊息</string>
+    <string name="disappearing_off">關閉</string>
+    <string name="disappearing_1_day">1 天</string>
+    <string name="disappearing_7_days">7 天</string>
+    <string name="disappearing_30_days">30 天</string>
+    <string name="disappearing_90_days">90 天</string>
+    <string name="disappearing_custom">自訂時間</string>
+    <string name="disappearing_days_format">%1$d 天</string>
+    <string name="disappearing_hours_format">%1$d 小時</string>
+    <string name="disappearing_minutes_format">%1$d 分鐘</string>
+    <string name="disappearing_unit_minutes">分鐘</string>
+    <string name="disappearing_unit_hours">小時</string>
+    <string name="disappearing_unit_days">天</string>
+    <string name="disappearing_unit_weeks">週</string>
+    <string name="disappearing_custom_amount_label">數量</string>
+    <string name="disappearing_row_hint_admin">點按設定新訊息的保留時間</string>
+    <string name="disappearing_row_hint_readonly">只有管理員可以變更</string>
+    <string name="toast_disappearing_messages_updated">已更新閱後即焚訊息</string>
+    <string name="toast_couldnt_update_disappearing">無法更新閱後即焚訊息</string>
+    <string name="save">儲存</string>
+
+    <string name="disappearing_confirm_title">設定閱後即焚計時器？</string>
+    <string name="disappearing_confirm_message">早於 %1$s 的訊息將對所有人永久刪除。</string>
+    <string name="disappearing_confirm_button">設定</string>
+
+    <string name="disappearing_tooltip_text">此聊天中的訊息會在設定的時間後消失。</string>
+
+    <string name="group_system_disappearing_set">%1$s 將訊息設定為 %2$s 後消失</string>
+    <string name="group_system_disappearing_set_you">你將訊息設定為 %1$s 後消失</string>
+    <string name="group_system_disappearing_set_passive">訊息現在會在 %1$s 後消失</string>
+    <string name="group_system_disappearing_off">%1$s 關閉了閱後即焚訊息</string>
+    <string name="group_system_disappearing_off_you">你關閉了閱後即焚訊息</string>
+    <string name="group_system_disappearing_off_passive">閱後即焚訊息已關閉</string>
+
+    <string name="disappearing_4_weeks">4 週</string>
+    <string name="disappearing_1_week">1 週</string>
+    <string name="disappearing_8_hours">8 小時</string>
+    <string name="disappearing_1_hour">1 小時</string>
+    <string name="disappearing_5_minutes">5 分鐘</string>
+    <string name="disappearing_30_seconds">30 秒</string>
+    <string name="disappearing_explainer">啟用後，此聊天中傳送和接收的新訊息將在被檢視後消失。</string>
+    <string name="disappearing_seconds_format">%1$d 秒</string>
+    <string name="disappearing_unit_seconds">秒</string>
+    <string name="disappearing_set">設定</string>
+
 </resources>

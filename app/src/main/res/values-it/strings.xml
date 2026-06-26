@@ -735,4 +735,49 @@
     <string name="shared_media_saved">Salvato</string>
     <string name="shared_media_save_failed">Impossibile salvare il file</string>
     <string name="shared_media_voice_failed">Impossibile riprodurre il messaggio vocale</string>
+    <string name="disappearing_messages">Messaggi effimeri</string>
+    <string name="disappearing_off">Disattivato</string>
+    <string name="disappearing_1_day">1 giorno</string>
+    <string name="disappearing_7_days">7 giorni</string>
+    <string name="disappearing_30_days">30 giorni</string>
+    <string name="disappearing_90_days">90 giorni</string>
+    <string name="disappearing_custom">Tempo personalizzato</string>
+    <string name="disappearing_days_format">%1$d giorni</string>
+    <string name="disappearing_hours_format">%1$d ore</string>
+    <string name="disappearing_minutes_format">%1$d minuti</string>
+    <string name="disappearing_unit_minutes">Minuti</string>
+    <string name="disappearing_unit_hours">Ore</string>
+    <string name="disappearing_unit_days">Giorni</string>
+    <string name="disappearing_unit_weeks">Settimane</string>
+    <string name="disappearing_custom_amount_label">Quantità</string>
+    <string name="disappearing_row_hint_admin">Tocca per impostare la durata dei nuovi messaggi</string>
+    <string name="disappearing_row_hint_readonly">Solo gli amministratori possono modificarlo</string>
+    <string name="toast_disappearing_messages_updated">Messaggi effimeri aggiornati</string>
+    <string name="toast_couldnt_update_disappearing">Impossibile aggiornare i messaggi effimeri</string>
+    <string name="save">Salva</string>
+
+    <string name="disappearing_confirm_title">Impostare il timer di scomparsa?</string>
+    <string name="disappearing_confirm_message">I messaggi più vecchi di %1$s verranno rimossi definitivamente per tutti.</string>
+    <string name="disappearing_confirm_button">Imposta</string>
+
+    <string name="disappearing_tooltip_text">I messaggi di questa chat scompaiono dopo il tempo impostato.</string>
+
+    <string name="group_system_disappearing_set">%1$s ha impostato la scomparsa dei messaggi dopo %2$s</string>
+    <string name="group_system_disappearing_set_you">Hai impostato la scomparsa dei messaggi dopo %1$s</string>
+    <string name="group_system_disappearing_set_passive">I messaggi ora scompaiono dopo %1$s</string>
+    <string name="group_system_disappearing_off">%1$s ha disattivato i messaggi effimeri</string>
+    <string name="group_system_disappearing_off_you">Hai disattivato i messaggi effimeri</string>
+    <string name="group_system_disappearing_off_passive">I messaggi effimeri sono disattivati</string>
+
+    <string name="disappearing_4_weeks">4 settimane</string>
+    <string name="disappearing_1_week">1 settimana</string>
+    <string name="disappearing_8_hours">8 ore</string>
+    <string name="disappearing_1_hour">1 ora</string>
+    <string name="disappearing_5_minutes">5 minuti</string>
+    <string name="disappearing_30_seconds">30 secondi</string>
+    <string name="disappearing_explainer">Se attivati, i nuovi messaggi inviati e ricevuti in questa chat scompariranno dopo essere stati visti.</string>
+    <string name="disappearing_seconds_format">%1$d secondi</string>
+    <string name="disappearing_unit_seconds">Secondi</string>
+    <string name="disappearing_set">Imposta</string>
+
 </resources>

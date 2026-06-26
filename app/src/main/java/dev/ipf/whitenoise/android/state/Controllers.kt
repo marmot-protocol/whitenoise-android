@@ -251,7 +251,7 @@ internal fun chatListItemFromProjection(
                     // ChatsController), not this synthesized record. Parsing
                     // here would force an FFI hop into a pure projection
                     // helper.
-                    contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                     kind = preview.kind,
                     tags = emptyList(),
                     recordedAt = preview.timelineAt,
@@ -340,6 +340,7 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         pendingConfirmation = row.pendingConfirmation,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
     )
 
 private fun defaultEncryptedMediaComponent(): AppGroupEncryptedMediaComponentFfi =
@@ -1767,7 +1768,7 @@ internal suspend fun WhiteNoiseAppState.parseMarkdownOrEmpty(text: String): Mark
         marmotIo { parseMarkdown(text) }
     } catch (throwable: Throwable) {
         rethrowIfCancellation(throwable)
-        MarkdownDocumentFfi(blocks = emptyList())
+        MarkdownDocumentFfi(truncated = false, blocks = emptyList())
     }
 
 private fun AppGroupRecordFfi.debugSummary(): String =
@@ -2158,6 +2159,33 @@ class ConversationController(
                 // group-state + timeline subscriptions below still fold in
                 // peer commits as they arrive.
                 launch { appState.catchUpAccounts() }
+                // Local NIP-40 enforcement (#333) + secure delete (#334): on open
+                // and then on a slow cadence, securely wipe plaintext past the
+                // retention window via the engine, then re-publish so the pruned
+                // rows leave the open timeline without waiting for a sync or
+                // re-entry. Lifecycle-bound to this conversation; skipped while the
+                // timer is off. Coarse (60s) to tolerate clock skew and stay off the
+                // hot path. The secure-delete failure is swallowed — the local
+                // filter still hides expired rows even if the wipe transiently
+                // fails, and the next tick retries.
+                launch {
+                    while (isActive) {
+                        if (group.disappearingMessageSecs > 0uL) {
+                            runCatching { appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) } }
+                                .onSuccess { result ->
+                                    // When the engine actually pruned rows, clear the
+                                    // conversation's accumulating tray card so it can't
+                                    // keep pointing at a now-vanished message. #333.
+                                    if (result.prunedMessages > 0uL) {
+                                        appState.dismissConversationNotifications(account, group.groupIdHex)
+                                    }
+                                    evictExpiredMediaCaches(account, result.mediaCiphertextSha256.toSet())
+                                }.onFailure { it.rethrowIfCancellation() }
+                            publishTimelineFromIndexes()
+                        }
+                        delay(60_000L)
+                    }
+                }
                 runConversationSubscriptionLoop(account)
             }
         } catch (cancel: CancellationException) {
@@ -2287,7 +2315,7 @@ class ConversationController(
                 withContext(Dispatchers.IO) {
                     groupStream.snapshot()
                 }
-            groupSnapshot?.let { group = it }
+            groupSnapshot?.let(::applyGroupState)
             refreshMembers()
             isLoading = false
             error = null
@@ -2329,13 +2357,26 @@ class ConversationController(
         return false to false
     }
 
+    // Apply a fresh group-state snapshot/update, republishing the timeline when
+    // the disappearing-message window changed. A controller seeded from
+    // emptyGroupRecord() starts at retention 0, so the first real snapshot can
+    // flip it on — without this republish the expiry filter wouldn't apply until
+    // the next 60s sweep, flashing expired messages for up to a minute (#674).
+    private fun applyGroupState(update: AppGroupRecordFfi) {
+        val previousRetention = group.disappearingMessageSecs
+        group = update
+        if (previousRetention != update.disappearingMessageSecs) {
+            publishTimelineFromIndexes()
+        }
+    }
+
     private suspend fun runGroupStateSubscriptionLoop(groupStream: GroupStateSubscription) {
         while (coroutineContext.isActive) {
             val update =
                 withContext(Dispatchers.IO) {
                     groupStream.next()
                 } ?: break
-            group = update
+            applyGroupState(update)
             refreshMembers()
         }
     }
@@ -2948,8 +2989,14 @@ class ConversationController(
                             ?.let { appState.mediaThumbnailCache.put(confirmedKey, it) }
                         val bytesToPersist = attachment.plaintextBytes
                         val cacheGeneration = appState.diskMediaCache.generation()
+                        // Tag with the uploaded blob's ciphertext hash so the
+                        // expiry sweep can wipe this self-sent entry from disk by
+                        // hash even after a restart / when its row isn't loaded.
+                        val ciphertextTag = references.getOrNull(index)?.ciphertextSha256
                         appState.launchMutation {
-                            withContext(Dispatchers.IO) { appState.diskMediaCache.put(confirmedKey, bytesToPersist, cacheGeneration) }
+                            withContext(Dispatchers.IO) {
+                                appState.diskMediaCache.put(confirmedKey, bytesToPersist, cacheGeneration, ciphertextTag)
+                            }
                         }
                     }
                 }
@@ -3259,6 +3306,39 @@ class ConversationController(
         attachmentIndex: Int,
     ): String = "$account|${group.groupIdHex}|$messageIdHex|$attachmentIndex"
 
+    // Evict decrypted media (L1 plaintext, decoded thumbnails, L2 disk) for the
+    // attachments the engine just secure-deleted on expiry, matched by ciphertext
+    // hash through the cached references. Without this the decrypted bytes stay
+    // recoverable from the local caches after the row is gone (#674 review).
+    private suspend fun evictExpiredMediaCaches(
+        account: String,
+        expiredCiphertextSha256: Set<String>,
+    ) {
+        if (expiredCiphertextSha256.isEmpty()) return
+        // Map expired hashes to cache keys via the loaded references. Covers the
+        // in-memory tiers (L1 plaintext + decoded thumbnails, keyed by cache key
+        // and session-scoped, so anything resident is in mediaReferences) and the
+        // on-disk entries for loaded messages — including untagged ones such as
+        // self-sent media seeded at send time before its ciphertext hash existed.
+        val loadedKeys =
+            mediaReferences.flatMap { (messageIdHex, refs) ->
+                refs.mapIndexedNotNull { index, ref ->
+                    if (ref.ciphertextSha256 in expiredCiphertextSha256) mediaCacheKey(account, messageIdHex, index) else null
+                }
+            }
+        loadedKeys.forEach { key ->
+            appState.mediaPlaintextCache.remove(key)
+            appState.mediaThumbnailCache.remove(key)
+        }
+        withContext(Dispatchers.IO) {
+            loadedKeys.forEach { appState.diskMediaCache.remove(it) }
+            // Plus any disk entry stamped with an expired ciphertext tag — the
+            // only path that reaches media whose message isn't currently loaded
+            // (no mediaReferences entry), including across process restarts. #674 review.
+            appState.diskMediaCache.removeByCiphertextTags(expiredCiphertextSha256)
+        }
+    }
+
     /**
      * Yes/no probe: are the decrypted bytes for [messageIdHex] /
      * [attachmentIndex] already resident in either cache tier? Lets a file
@@ -3336,8 +3416,12 @@ class ConversationController(
                     appState.mediaPlaintextCache.put(cacheKey, result.plaintext)
                     val plaintext = result.plaintext
                     // Persist to L2 still on this background scope (same
-                    // lifetime as the FFI fetch).
-                    withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, plaintext, cacheGeneration) }
+                    // lifetime as the FFI fetch). Tag the entry with the
+                    // attachment's ciphertext hash so the expiry sweep can wipe
+                    // it from disk later even if its message isn't loaded then.
+                    withContext(Dispatchers.IO) {
+                        appState.diskMediaCache.put(cacheKey, plaintext, cacheGeneration, reference.ciphertextSha256)
+                    }
                 }
                 result.plaintext
             }
@@ -3394,8 +3478,13 @@ class ConversationController(
                 ?.let { appState.mediaThumbnailCache.put(cacheKey, it) }
             val bytesToPersist = attachment.plaintextBytes
             val cacheGeneration = appState.diskMediaCache.generation()
+            // Tag with the uploaded blob's ciphertext hash (captured at upload)
+            // so hash-based expiry eviction reaches this entry across sessions.
+            val ciphertextTag = retained.uploadedReferences?.getOrNull(index)?.ciphertextSha256
             appState.launchMutation {
-                withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, bytesToPersist, cacheGeneration) }
+                withContext(Dispatchers.IO) {
+                    appState.diskMediaCache.put(cacheKey, bytesToPersist, cacheGeneration, ciphertextTag)
+                }
             }
         }
     }
@@ -3929,6 +4018,44 @@ class ConversationController(
                 val message = mutationError(it)
                 lastMutationError = message
                 appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message))
+            }.getOrDefault(false)
+        }
+
+    /**
+     * Set the per-group disappearing-message retention. `0` disables it; any
+     * positive value is the NIP-40 expiration the engine applies to outgoing
+     * kind:445 events. Optimistically updates the local group so the row
+     * reflects the new value without waiting for the group-state subscription.
+     */
+    suspend fun updateMessageRetention(disappearingMessageSecs: ULong): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            // Stay bound to the conversation's account (like every other mutation
+            // here); activeAccountRef could shift if the user switches accounts
+            // before this completes, sending the retention change to the wrong store.
+            val account = conversationAccountRef ?: return@withMutationLockResult false
+            runCatching {
+                appState.marmotIo { updateMessageRetention(account, group.groupIdHex, disappearingMessageSecs) }
+                group = group.copy(disappearingMessageSecs = disappearingMessageSecs)
+                // The engine prunes plaintext older than the new window during the
+                // call above. Reload the open timeline so the admin who just set
+                // the timer sees the pruned state immediately, instead of only
+                // after leaving and re-entering the chat. The retention change has
+                // already succeeded, so a refresh failure must NOT flip this to a
+                // failure toast — log it and fall back to an in-memory re-filter.
+                runCatching { refreshCurrentTimeline(account) }
+                    .onFailure { refreshError ->
+                        refreshError.rethrowIfCancellation()
+                        Log.w("DMConversation", "refresh after retention update failed for ${group.groupIdHex.take(8)}", refreshError)
+                        publishTimelineFromIndexes()
+                    }
+                appState.present(R.string.toast_disappearing_messages_updated)
+                true
+            }.onFailure {
+                it.rethrowIfCancellation()
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_update_disappearing, AppText.Plain(message))
             }.getOrDefault(false)
         }
 
@@ -4669,7 +4796,20 @@ class ConversationController(
 
     private fun publishTimelineFromIndexesInternal() {
         val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
-        val aggregated = aggregateEdits((optimisticMessages.values + projected).map { it.record })
+        // Local NIP-40 enforcement (#333): hide messages past the per-group
+        // retention window. expiry = recordedAt + window, mirroring the engine's
+        // prune cutoff (recorded_at < now - secs) so the visible timeline matches
+        // what a sync-time prune will permanently remove. A recent optimistic send
+        // never matches (recordedAt ≈ now). Window 0 (off) filters nothing.
+        val window = group.disappearingMessageSecs
+        val live =
+            if (window == 0uL) {
+                optimisticMessages.values + projected
+            } else {
+                val nowSecs = (System.currentTimeMillis() / 1000L).toULong()
+                (optimisticMessages.values + projected).filter { it.record.recordedAt + window > nowSecs }
+            }
+        val aggregated = aggregateEdits(live.map { it.record })
         // Drop any optimistic edit the real kind-1009 has now caught up to:
         // once `aggregateEdits` reports the same latest text, the overlay is
         // redundant and would otherwise mask a later remote edit. Failed/Pending
@@ -4679,7 +4819,7 @@ class ConversationController(
             .map { it.key }
             .forEach(optimisticEdits::remove)
         timeline =
-            (optimisticMessages.values + projected + streamDebugTimelineItems.values)
+            (live + streamDebugTimelineItems.values)
                 .map { it.withOptimisticEditStatus() }
                 .distinctBy { it.id }
                 .sortedWith(::compareTimelineMessages)
@@ -5088,7 +5228,7 @@ class ConversationController(
                 groupIdHex = group.groupIdHex,
                 sender = inferStreamSender(streamId),
                 plaintext = event.detail,
-                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                 kind = STREAM_DEBUG_KIND,
                 tags = listOf(MessageProjector.streamTag(streamId), MessageTagFfi(listOf("dbg", event.eventKind))),
                 recordedAt = now,
@@ -5155,7 +5295,7 @@ class ConversationController(
                     groupIdHex = group.groupIdHex,
                     sender = inferStreamSender(streamId),
                     plaintext = "",
-                    contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                     kind = 1200uL,
                     tags = listOf(MessageProjector.streamTag(streamId)),
                     recordedAt = nowSeconds(),
@@ -5168,7 +5308,7 @@ class ConversationController(
                 // chunks, failure copy), reset to empty — carrying forward a
                 // previous revision's tokens would render stale markdown
                 // against the new text. Empty falls back to plain rendering.
-                contentTokens = tokens ?: MarkdownDocumentFfi(blocks = emptyList()),
+                contentTokens = tokens ?: MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
             )
         val updated =
             TimelineMessage(

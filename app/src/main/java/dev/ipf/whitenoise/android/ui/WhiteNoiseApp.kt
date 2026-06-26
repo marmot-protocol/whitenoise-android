@@ -13,6 +13,7 @@ import android.provider.Settings
 import android.text.format.DateUtils
 import android.util.Log
 import android.view.WindowManager
+import android.widget.NumberPicker
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -163,6 +164,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -184,6 +186,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Snackbar
@@ -201,15 +205,19 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -245,6 +253,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -268,6 +277,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -309,12 +319,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.core.content.ContextCompat
 import androidx.core.os.ConfigurationCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
@@ -542,6 +554,12 @@ private fun rememberGroupSystemCopy(): GroupSystemCopy =
         adminRemovedYouPassive = stringResource(R.string.group_system_admin_removed_you_passive),
         youRenamedFormat = stringResource(R.string.group_system_you_renamed),
         youAvatarChanged = stringResource(R.string.group_system_you_avatar_changed),
+        disappearingSetFormat = stringResource(R.string.group_system_disappearing_set),
+        disappearingSetYouFormat = stringResource(R.string.group_system_disappearing_set_you),
+        disappearingSetPassiveFormat = stringResource(R.string.group_system_disappearing_set_passive),
+        disappearingOffFormat = stringResource(R.string.group_system_disappearing_off),
+        disappearingOffYou = stringResource(R.string.group_system_disappearing_off_you),
+        disappearingOffPassive = stringResource(R.string.group_system_disappearing_off_passive),
         someone = stringResource(R.string.group_system_someone),
         fallback = stringResource(R.string.group_system_fallback),
     )
@@ -7597,6 +7615,9 @@ private fun GroupSystemRow(
 ) {
     val copy = rememberGroupSystemCopy()
     val event = remember(record.plaintext, groupSystem) { GroupSystemEvents.resolve(record.plaintext, groupSystem) }
+    // Localized new-window label for the disappearing-timer "set to …" rows; null
+    // when the event isn't a timer-on change (off/other rows need no duration).
+    val retentionLabel = event?.newRetentionSeconds?.takeIf { it > 0uL }?.let { disappearingMessagesLabel(it.toLong()) }
     val summary =
         if (event != null) {
             run {
@@ -7608,6 +7629,7 @@ private fun GroupSystemRow(
                     subjectName = event.subject?.let { appState.displayName(it) },
                     actorIsSelf = GroupSystemEvents.isSelf(selfHex, actorHex),
                     subjectIsSelf = GroupSystemEvents.isSelf(selfHex, event.subject),
+                    retentionLabel = retentionLabel,
                     copy = copy,
                 )
             }
@@ -9459,16 +9481,73 @@ private fun ConversationScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                if (!controller.isDm) {
-                                    Text(
+                                // Subtitle line: members count (groups) and the
+                                // disappearing-timer indicator inline on ONE row,
+                                // not stacked. The one-time tooltip anchors to the
+                                // whole line when the timer is on.
+                                val membersSubtitle =
+                                    if (!controller.isDm) {
                                         controller.subtitle(
                                             justYou = stringResource(R.string.just_you),
                                             oneMember = stringResource(R.string.one_member),
                                             membersFormat = stringResource(R.string.members_count),
-                                        ),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                        )
+                                    } else {
+                                        null
+                                    }
+                                val disappearingSecs = controller.group.disappearingMessageSecs.toLong()
+                                val showTimer = disappearingSecs > 0L
+                                if (membersSubtitle != null || showTimer) {
+                                    val labelStyle = MaterialTheme.typography.labelSmall
+                                    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    val subtitleRow: @Composable () -> Unit = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        ) {
+                                            if (membersSubtitle != null) {
+                                                Text(membersSubtitle, style = labelStyle, color = labelColor)
+                                            }
+                                            if (showTimer) {
+                                                if (membersSubtitle != null) {
+                                                    Text("·", style = labelStyle, color = labelColor)
+                                                }
+                                                Icon(
+                                                    Icons.Default.Schedule,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(13.dp),
+                                                    tint = labelColor,
+                                                )
+                                                Text(disappearingMessagesLabel(disappearingSecs), style = labelStyle, color = labelColor)
+                                            }
+                                        }
+                                    }
+                                    if (showTimer) {
+                                        val timerTooltipState = rememberTooltipState(isPersistent = true)
+                                        val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
+                                        // Snapshot the one-time decision so marking the flag
+                                        // (which we do first, to persist before a quick exit
+                                        // can re-arm it) doesn't recompose this branch away and
+                                        // cancel the still-suspended show().
+                                        val showTooltipOnce =
+                                            remember(controller.group.groupIdHex) {
+                                                !appState.disappearingTooltipShown
+                                            }
+                                        if (showTooltipOnce) {
+                                            LaunchedEffect(controller.group.groupIdHex) {
+                                                appState.markDisappearingTooltipShown()
+                                                timerTooltipState.show()
+                                            }
+                                        }
+                                        TooltipBox(
+                                            positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
+                                            tooltip = { RichTooltip { Text(timerTooltipText) } },
+                                            state = timerTooltipState,
+                                            content = subtitleRow,
+                                        )
+                                    } else {
+                                        subtitleRow()
+                                    }
                                 }
                             }
                         }
@@ -10434,6 +10513,8 @@ private fun GroupDetailsScreen(
 
     val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
     var showMediaLibrary by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var pendingDisappearingSecs by remember(controller.group.groupIdHex) { mutableStateOf<Long?>(null) }
 
     if (showMediaLibrary) {
         BackHandler { showMediaLibrary = false }
@@ -10589,6 +10670,78 @@ private fun GroupDetailsScreen(
                 onSeeAll = { showMediaLibrary = true },
                 onJumpToMessage = onJumpToMessage,
             )
+
+            SectionCard(title = stringResource(R.string.disappearing_messages)) {
+                val canEdit = controller.isSelfMember && controller.isSelfAdmin
+                val inProgress = activeMutation?.action == GroupMutationAction.DisappearingMessages
+                ListItem(
+                    modifier =
+                        if (canEdit && activeMutation == null && !controller.mutationInFlight) {
+                            Modifier.clickable { showDisappearingPicker = true }
+                        } else {
+                            Modifier
+                        },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    leadingContent = { Icon(Icons.Default.Schedule, contentDescription = null) },
+                    headlineContent = { Text(disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong())) },
+                    supportingContent = {
+                        Text(
+                            stringResource(
+                                if (canEdit) R.string.disappearing_row_hint_admin else R.string.disappearing_row_hint_readonly,
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    trailingContent = {
+                        if (inProgress) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        }
+                    },
+                )
+            }
+
+            if (showDisappearingPicker) {
+                DisappearingMessagesPickerDialog(
+                    currentSecs = controller.group.disappearingMessageSecs.toLong(),
+                    onDismiss = { showDisappearingPicker = false },
+                    onPick = { secs ->
+                        showDisappearingPicker = false
+                        val currentSecs = controller.group.disappearingMessageSecs.toLong()
+                        // Only turning the timer ON (from off) or SHORTENING it prunes
+                        // existing history, so confirm just those. An unchanged pick is
+                        // a no-op; turning off or relaxing (lengthening) the window
+                        // prunes nothing, so apply it directly without the destructive
+                        // warning (#674 review).
+                        val needsConfirm = secs > 0L && (currentSecs == 0L || secs < currentSecs)
+                        when {
+                            secs == currentSecs -> Unit
+                            needsConfirm -> pendingDisappearingSecs = secs
+                            else ->
+                                runGroupMutation(
+                                    action = GroupMutationAction.DisappearingMessages,
+                                    mutation = { controller.updateMessageRetention(secs.toULong()) },
+                                )
+                        }
+                    },
+                )
+            }
+
+            pendingDisappearingSecs?.let { secs ->
+                ConfirmDialog(
+                    title = stringResource(R.string.disappearing_confirm_title),
+                    message = stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
+                    confirmLabel = stringResource(R.string.disappearing_confirm_button),
+                    onConfirm = {
+                        pendingDisappearingSecs = null
+                        runGroupMutation(
+                            action = GroupMutationAction.DisappearingMessages,
+                            mutation = { controller.updateMessageRetention(secs.toULong()) },
+                        )
+                    },
+                    onDismiss = { pendingDisappearingSecs = null },
+                    destructive = true,
+                )
+            }
 
             SectionCardWithAction(
                 title = "${stringResource(R.string.members)} · ${controller.members.size}",
@@ -11709,6 +11862,258 @@ private sealed class DetailsConfirm {
     ) : DetailsConfirm()
 }
 
+// Disappearing-message timer presets, in seconds. 0 = off. Custom durations
+// fall outside this set and render via [disappearingMessagesLabel]'s day/hour/
+// minute fallback.
+// Preset retention windows, longest → shortest, matching the reference design.
+private val disappearingPresetSecs = listOf(0L, 2_419_200L, 604_800L, 86_400L, 28_800L, 3_600L, 300L, 30L)
+
+@Composable
+private fun disappearingMessagesLabel(secs: Long): String =
+    when (secs) {
+        0L -> stringResource(R.string.disappearing_off)
+        2_419_200L -> stringResource(R.string.disappearing_4_weeks)
+        604_800L -> stringResource(R.string.disappearing_1_week)
+        86_400L -> stringResource(R.string.disappearing_1_day)
+        28_800L -> stringResource(R.string.disappearing_8_hours)
+        3_600L -> stringResource(R.string.disappearing_1_hour)
+        300L -> stringResource(R.string.disappearing_5_minutes)
+        30L -> stringResource(R.string.disappearing_30_seconds)
+        else ->
+            when {
+                secs % 86_400L == 0L -> stringResource(R.string.disappearing_days_format, secs / 86_400L)
+                secs % 3_600L == 0L -> stringResource(R.string.disappearing_hours_format, secs / 3_600L)
+                secs % 60L == 0L -> stringResource(R.string.disappearing_minutes_format, secs / 60L)
+                else -> stringResource(R.string.disappearing_seconds_format, secs)
+            }
+    }
+
+// Full-screen retention picker: an explanatory line, a radio list of preset
+// windows + Custom, and a Save action. The selection is STAGED — nothing
+// changes until Save, so the caller's [onPick] (which routes through the group
+// mutation lock + prune confirm) fires once. Custom opens a wheel picker.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DisappearingMessagesPickerDialog(
+    currentSecs: Long,
+    onDismiss: () -> Unit,
+    onPick: (Long) -> Unit,
+) {
+    var selected by remember(currentSecs) { mutableStateOf(currentSecs) }
+    var showCustom by remember { mutableStateOf(false) }
+    val isCustom = selected !in disappearingPresetSecs
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+    ) {
+        // The edge-to-edge dialog owns its own window, so tint the status/nav
+        // bar icons to match the active surface (light icons on dark themes,
+        // dark icons on the light theme) instead of inheriting stale activity
+        // appearance.
+        val view = LocalView.current
+        val lightBars = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+        SideEffect {
+            val window = (view.parent as? DialogWindowProvider)?.window ?: return@SideEffect
+            WindowInsetsControllerCompat(window, view).apply {
+                isAppearanceLightStatusBars = lightBars
+                isAppearanceLightNavigationBars = lightBars
+            }
+        }
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+            Scaffold(
+                containerColor = MaterialTheme.colorScheme.surface,
+                topBar = {
+                    TopAppBar(
+                        title = { Text(stringResource(R.string.disappearing_messages)) },
+                        navigationIcon = {
+                            IconButton(onClick = onDismiss) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                            }
+                        },
+                    )
+                },
+                floatingActionButton = {
+                    ExtendedFloatingActionButton(onClick = { onPick(selected) }) {
+                        Text(stringResource(R.string.save))
+                    }
+                },
+            ) { padding ->
+                Column(
+                    Modifier
+                        .padding(padding)
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        stringResource(R.string.disappearing_explainer),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier =
+                            Modifier.padding(
+                                start = 20.dp,
+                                end = 20.dp,
+                                top = 8.dp,
+                                bottom = 16.dp,
+                            ),
+                    )
+                    disappearingPresetSecs.forEach { secs ->
+                        DisappearingOptionRow(
+                            label = disappearingMessagesLabel(secs),
+                            selected = !isCustom && selected == secs,
+                            onClick = { selected = secs },
+                        )
+                    }
+                    DisappearingOptionRow(
+                        label = stringResource(R.string.disappearing_custom),
+                        selected = isCustom,
+                        onClick = { showCustom = true },
+                    )
+                    Spacer(Modifier.height(80.dp))
+                }
+            }
+        }
+    }
+    if (showCustom) {
+        DisappearingCustomDialog(
+            onDismiss = { showCustom = false },
+            onConfirm = { secs ->
+                selected = secs
+                showCustom = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun DisappearingOptionRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+// Wheel picker for an arbitrary duration: a value column + a unit column
+// (seconds/minutes/hours/days), using the platform NumberPicker for the
+// native wheel feel of the reference.
+@Composable
+private fun DisappearingCustomDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit,
+) {
+    // Per-unit wheel caps roll over into the next larger unit: 59s, 59m, 23h,
+    // 6d, and 4 weeks (the ceiling preset).
+    val units = disappearingCustomUnits
+    val unitLabels = units.map { stringResource(it.labelRes) }.toTypedArray()
+    var unitIndex by remember { mutableStateOf(1) }
+    var value by remember { mutableStateOf(1) }
+    val maxForUnit = units[unitIndex].max
+    val clamped = value.coerceIn(1, maxForUnit)
+    // The selected (center) number is rendered bright by the theme; only the
+    // scrolling neighbours expose a public color setter.
+    val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.width(300.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(modifier = Modifier.padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 12.dp)) {
+                Text(
+                    text = stringResource(R.string.disappearing_custom),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AndroidView(
+                        factory = { ctx ->
+                            NumberPicker(ctx).apply {
+                                minValue = 1
+                                setOnValueChangedListener { _, _, n -> value = n }
+                            }
+                        },
+                        update = { picker ->
+                            picker.textColor = unselectedColor
+                            picker.maxValue = maxForUnit
+                            picker.value = clamped
+                        },
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    AndroidView(
+                        factory = { ctx ->
+                            NumberPicker(ctx).apply {
+                                minValue = 0
+                                wrapSelectorWheel = false
+                                setOnValueChangedListener { _, _, n -> unitIndex = n }
+                            }
+                        },
+                        update = { picker ->
+                            picker.textColor = unselectedColor
+                            picker.displayedValues = null
+                            picker.maxValue = unitLabels.size - 1
+                            picker.displayedValues = unitLabels
+                            picker.value = unitIndex
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = { onConfirm(clamped.toLong() * units[unitIndex].seconds) }) {
+                        Text(stringResource(R.string.disappearing_set))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class DisappearingUnit(
+    val labelRes: Int,
+    val seconds: Long,
+    val max: Int,
+)
+
+private val disappearingCustomUnits =
+    listOf(
+        DisappearingUnit(R.string.disappearing_unit_seconds, 1L, 59),
+        DisappearingUnit(R.string.disappearing_unit_minutes, 60L, 59),
+        DisappearingUnit(R.string.disappearing_unit_hours, 3_600L, 23),
+        DisappearingUnit(R.string.disappearing_unit_days, 86_400L, 6),
+        DisappearingUnit(R.string.disappearing_unit_weeks, 604_800L, 4),
+    )
+
 private enum class GroupMutationAction {
     SaveProfile,
     InviteMember,
@@ -11717,6 +12122,7 @@ private enum class GroupMutationAction {
     DemoteAdmin,
     SelfDemoteAdmin,
     TransferAdmin,
+    DisappearingMessages,
     Archive,
     Leave,
 }

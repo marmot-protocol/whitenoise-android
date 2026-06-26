@@ -184,6 +184,7 @@ class ChatListProjectionReducerTest {
         val sourceRow = row(groupId = "g1", rawTitle = "Marmot Lab")
         val tokens =
             MarkdownDocumentFfi(
+                truncated = false,
                 blocks = listOf(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("hi")))),
             )
 
@@ -280,7 +281,7 @@ class ChatListProjectionReducerTest {
         sender = sender,
         senderDisplayName = null,
         plaintext = plaintext,
-        contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
         kind = kind,
         timelineAt = timelineAt,
         deleted = deleted,
@@ -295,6 +296,8 @@ class ChatListProjectionReducerTest {
         preview: ChatListMessagePreviewFfi? = preview(),
         updatedAt: ULong = 1uL,
     ) = ChatListRowFfi(
+        unreadMentionCount = 0uL,
+        unreadMention = false,
         groupIdHex = groupId,
         archived = archived,
         pendingConfirmation = pendingConfirmation,
@@ -338,6 +341,7 @@ class ChatListProjectionReducerTest {
         pendingConfirmation = pendingConfirmation,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
     )
 
     private fun member(

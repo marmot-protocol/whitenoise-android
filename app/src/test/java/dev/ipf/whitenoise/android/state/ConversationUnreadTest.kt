@@ -289,7 +289,7 @@ class ConversationUnreadTest {
                     groupIdHex = "group",
                     sender = if (direction == "received") "bob" else "alice",
                     plaintext = "text-$id",
-                    contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                     kind = kind,
                     tags = emptyList(),
                     recordedAt = recordedAt,

@@ -84,20 +84,22 @@ class NotificationPreviewTextTest {
                     parseMarkdown = { raw ->
                         assertEquals("hello mentions", raw)
                         MarkdownDocumentFfi(
-                            listOf(
-                                MarkdownBlockFfi.Paragraph(
-                                    listOf(
-                                        MarkdownInlineFfi.Text("hello "),
-                                        MarkdownInlineFfi.NostrMention(
-                                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, knownNpub),
-                                        ),
-                                        MarkdownInlineFfi.Text(" and "),
-                                        MarkdownInlineFfi.NostrMention(
-                                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, unknownNpub),
+                            truncated = false,
+                            blocks =
+                                listOf(
+                                    MarkdownBlockFfi.Paragraph(
+                                        listOf(
+                                            MarkdownInlineFfi.Text("hello "),
+                                            MarkdownInlineFfi.NostrMention(
+                                                MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, knownNpub),
+                                            ),
+                                            MarkdownInlineFfi.Text(" and "),
+                                            MarkdownInlineFfi.NostrMention(
+                                                MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, unknownNpub),
+                                            ),
                                         ),
                                     ),
                                 ),
-                            ),
                         )
                     },
                     mentionDisplayName = { bech32 -> "Alice".takeIf { bech32 == knownNpub } },
@@ -116,19 +118,21 @@ class NotificationPreviewTextTest {
                     raw = "duplicate mention",
                     parseMarkdown = {
                         MarkdownDocumentFfi(
-                            listOf(
-                                MarkdownBlockFfi.Paragraph(
-                                    listOf(
-                                        MarkdownInlineFfi.NostrMention(
-                                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, knownNpub),
-                                        ),
-                                        MarkdownInlineFfi.Text(" then again "),
-                                        MarkdownInlineFfi.NostrMention(
-                                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, knownNpub),
+                            truncated = false,
+                            blocks =
+                                listOf(
+                                    MarkdownBlockFfi.Paragraph(
+                                        listOf(
+                                            MarkdownInlineFfi.NostrMention(
+                                                MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, knownNpub),
+                                            ),
+                                            MarkdownInlineFfi.Text(" then again "),
+                                            MarkdownInlineFfi.NostrMention(
+                                                MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, knownNpub),
+                                            ),
                                         ),
                                     ),
                                 ),
-                            ),
                         )
                     },
                     mentionDisplayName = {
@@ -153,7 +157,7 @@ class NotificationPreviewTextTest {
             val emptyDocument =
                 resolveNotificationPreviewText(
                     raw = "not blank",
-                    parseMarkdown = { MarkdownDocumentFfi(blocks = emptyList()) },
+                    parseMarkdown = { MarkdownDocumentFfi(truncated = false, blocks = emptyList()) },
                     mentionDisplayName = { error("empty document should not resolve mentions") },
                 )
 

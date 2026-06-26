@@ -735,4 +735,49 @@
     <string name="shared_media_saved">Enregistré</string>
     <string name="shared_media_save_failed">Impossible d\'enregistrer le fichier</string>
     <string name="shared_media_voice_failed">Impossible de lire le message vocal</string>
+    <string name="disappearing_messages">Messages éphémères</string>
+    <string name="disappearing_off">Désactivé</string>
+    <string name="disappearing_1_day">1 jour</string>
+    <string name="disappearing_7_days">7 jours</string>
+    <string name="disappearing_30_days">30 jours</string>
+    <string name="disappearing_90_days">90 jours</string>
+    <string name="disappearing_custom">Durée personnalisée</string>
+    <string name="disappearing_days_format">%1$d jours</string>
+    <string name="disappearing_hours_format">%1$d heures</string>
+    <string name="disappearing_minutes_format">%1$d minutes</string>
+    <string name="disappearing_unit_minutes">Minutes</string>
+    <string name="disappearing_unit_hours">Heures</string>
+    <string name="disappearing_unit_days">Jours</string>
+    <string name="disappearing_unit_weeks">Semaines</string>
+    <string name="disappearing_custom_amount_label">Quantité</string>
+    <string name="disappearing_row_hint_admin">Appuyez pour définir la durée de vie des nouveaux messages</string>
+    <string name="disappearing_row_hint_readonly">Seuls les administrateurs peuvent le modifier</string>
+    <string name="toast_disappearing_messages_updated">Messages éphémères mis à jour</string>
+    <string name="toast_couldnt_update_disappearing">Impossible de mettre à jour les messages éphémères</string>
+    <string name="save">Enregistrer</string>
+
+    <string name="disappearing_confirm_title">Définir le minuteur d\'effacement ?</string>
+    <string name="disappearing_confirm_message">Les messages datant de plus de %1$s seront définitivement supprimés pour tout le monde.</string>
+    <string name="disappearing_confirm_button">Définir</string>
+
+    <string name="disappearing_tooltip_text">Les messages de cette discussion disparaissent après le délai défini.</string>
+
+    <string name="group_system_disappearing_set">%1$s a réglé la disparition des messages sur %2$s</string>
+    <string name="group_system_disappearing_set_you">Vous avez réglé la disparition des messages sur %1$s</string>
+    <string name="group_system_disappearing_set_passive">Les messages disparaissent désormais après %1$s</string>
+    <string name="group_system_disappearing_off">%1$s a désactivé les messages éphémères</string>
+    <string name="group_system_disappearing_off_you">Vous avez désactivé les messages éphémères</string>
+    <string name="group_system_disappearing_off_passive">Les messages éphémères sont désactivés</string>
+
+    <string name="disappearing_4_weeks">4 semaines</string>
+    <string name="disappearing_1_week">1 semaine</string>
+    <string name="disappearing_8_hours">8 heures</string>
+    <string name="disappearing_1_hour">1 heure</string>
+    <string name="disappearing_5_minutes">5 minutes</string>
+    <string name="disappearing_30_seconds">30 secondes</string>
+    <string name="disappearing_explainer">Une fois activés, les nouveaux messages envoyés et reçus dans cette discussion disparaîtront après avoir été vus.</string>
+    <string name="disappearing_seconds_format">%1$d secondes</string>
+    <string name="disappearing_unit_seconds">Secondes</string>
+    <string name="disappearing_set">Définir</string>
+
 </resources>

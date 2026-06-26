@@ -110,6 +110,7 @@ class MediaInventoryTest {
 
     private fun link(url: String): MarkdownDocumentFfi =
         MarkdownDocumentFfi(
+            truncated = false,
             blocks =
                 listOf(
                     MarkdownBlockFfi.Paragraph(
@@ -119,7 +120,7 @@ class MediaInventoryTest {
         )
 
     private fun text(content: String): MarkdownDocumentFfi =
-        MarkdownDocumentFfi(blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(MarkdownInlineFfi.Text(content)))))
+        MarkdownDocumentFfi(truncated = false, blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(MarkdownInlineFfi.Text(content)))))
 
     private fun record(
         id: String,

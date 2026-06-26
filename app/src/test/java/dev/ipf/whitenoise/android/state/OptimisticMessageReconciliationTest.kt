@@ -270,7 +270,7 @@ class OptimisticMessageReconciliationTest {
                     groupIdHex = "group",
                     sender = "alice",
                     plaintext = "📎 $filename",
-                    contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                     kind = 9uL,
                     tags =
                         listOf(
@@ -298,7 +298,7 @@ class OptimisticMessageReconciliationTest {
                     groupIdHex = "group",
                     sender = "alice",
                     plaintext = "",
-                    contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                     kind = 9uL,
                     tags =
                         listOf(
@@ -320,7 +320,7 @@ class OptimisticMessageReconciliationTest {
             groupIdHex = "group",
             sender = "alice",
             plaintext = "",
-            contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
             kind = 9uL,
             tags =
                 listOf(
@@ -345,7 +345,7 @@ class OptimisticMessageReconciliationTest {
             groupIdHex = "group",
             sender = "alice",
             plaintext = plaintext,
-            contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
             kind = 9uL,
             tags = emptyList(),
             timelineAt = recordedAt,
@@ -353,6 +353,7 @@ class OptimisticMessageReconciliationTest {
             replyToMessageIdHex = null,
             replyPreview = null,
             mediaJson = null,
+            media = emptyList(),
             agentTextStreamJson = null,
             groupSystem = null,
             reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
@@ -387,7 +388,7 @@ class OptimisticMessageReconciliationTest {
             groupIdHex = "group",
             sender = "alice",
             plaintext = plaintext,
-            contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
             kind = 9uL,
             tags = emptyList(),
             recordedAt = recordedAt,

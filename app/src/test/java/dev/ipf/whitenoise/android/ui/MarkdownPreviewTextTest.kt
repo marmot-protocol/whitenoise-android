@@ -31,7 +31,7 @@ class MarkdownPreviewTextTest {
     private fun build(
         blocks: List<MarkdownBlockFfi>,
         maxLength: Int = 200,
-    ) = markdownDocumentToPreviewAnnotatedString(MarkdownDocumentFfi(blocks), codeStyle, maxLength)
+    ) = markdownDocumentToPreviewAnnotatedString(MarkdownDocumentFfi(blocks = blocks, truncated = false), codeStyle, maxLength)
 
     private fun paragraph(text: String) = MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(text)))
 
@@ -254,23 +254,25 @@ class MarkdownPreviewTextTest {
             markdownDocumentToPreviewAnnotatedString(
                 document =
                     MarkdownDocumentFfi(
-                        listOf(
-                            MarkdownBlockFfi.Paragraph(
-                                listOf(
-                                    MarkdownInlineFfi.NostrMention(
-                                        MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, knownNpub),
-                                    ),
-                                    MarkdownInlineFfi.Text(" "),
-                                    MarkdownInlineFfi.NostrMention(
-                                        MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, unknownNpub),
-                                    ),
-                                    MarkdownInlineFfi.Text(" "),
-                                    MarkdownInlineFfi.NostrUri(
-                                        MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NEVENT, nevent),
+                        truncated = false,
+                        blocks =
+                            listOf(
+                                MarkdownBlockFfi.Paragraph(
+                                    listOf(
+                                        MarkdownInlineFfi.NostrMention(
+                                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, knownNpub),
+                                        ),
+                                        MarkdownInlineFfi.Text(" "),
+                                        MarkdownInlineFfi.NostrMention(
+                                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, unknownNpub),
+                                        ),
+                                        MarkdownInlineFfi.Text(" "),
+                                        MarkdownInlineFfi.NostrUri(
+                                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NEVENT, nevent),
+                                        ),
                                     ),
                                 ),
                             ),
-                        ),
                     ),
                 codeStyle = codeStyle,
                 mentionDisplayName = { bech32 -> "Alice".takeIf { bech32 == knownNpub } },
@@ -286,26 +288,28 @@ class MarkdownPreviewTextTest {
         val note = "note1" + "q".repeat(58)
         val document =
             MarkdownDocumentFfi(
-                listOf(
-                    MarkdownBlockFfi.BlockQuote(
-                        listOf(
-                            MarkdownBlockFfi.Paragraph(
-                                listOf(
-                                    MarkdownInlineFfi.Emph(
-                                        listOf(
-                                            MarkdownInlineFfi.NostrMention(
-                                                MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub),
+                truncated = false,
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.BlockQuote(
+                            listOf(
+                                MarkdownBlockFfi.Paragraph(
+                                    listOf(
+                                        MarkdownInlineFfi.Emph(
+                                            listOf(
+                                                MarkdownInlineFfi.NostrMention(
+                                                    MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub),
+                                                ),
                                             ),
                                         ),
-                                    ),
-                                    MarkdownInlineFfi.NostrUri(
-                                        MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NOTE, note),
+                                        MarkdownInlineFfi.NostrUri(
+                                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NOTE, note),
+                                        ),
                                     ),
                                 ),
                             ),
                         ),
                     ),
-                ),
             )
 
         assertEquals(setOf(npub), markdownDocumentMentionBech32s(document))

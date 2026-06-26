@@ -93,6 +93,8 @@ class AccountUnreadTest {
         unreadCount: ULong,
         archived: Boolean = false,
     ) = ChatListRowFfi(
+        unreadMentionCount = 0uL,
+        unreadMention = false,
         groupIdHex = groupId,
         archived = archived,
         pendingConfirmation = false,

@@ -515,6 +515,7 @@ class LocalNotificationFormatterTest {
         reactionEmoji: String? = null,
         reactedToPreview: String? = null,
     ) = NotificationUpdateFfi(
+        isMention = false,
         notificationKey = notificationKey,
         conversationKey = "conversation:account:$groupIdHex",
         trigger = trigger,

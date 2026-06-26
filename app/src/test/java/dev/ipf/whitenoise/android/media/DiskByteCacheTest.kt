@@ -217,6 +217,78 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun removeByCiphertextTags_evictsTaggedEntriesOnly() {
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        cache.put("acct|grp|msg-1|0", ByteArray(30), cache.generation(), "hash-a")
+        cache.put("acct|grp|msg-2|0", ByteArray(30), cache.generation(), "hash-b")
+        cache.put("acct|grp|msg-3|0", ByteArray(30)) // untagged
+        val removed = cache.removeByCiphertextTags(setOf("hash-a"))
+        assertEquals(1, removed)
+        assertNull(cache.get("acct|grp|msg-1|0"))
+        assertNotNull(cache.get("acct|grp|msg-2|0"))
+        assertNotNull(cache.get("acct|grp|msg-3|0"))
+        assertEquals(60L, cache.residentBytes())
+    }
+
+    @Test
+    fun removeByCiphertextTags_worksAfterRehydrate_forUnloadedMedia() {
+        // The #334 crux: media cached in a prior session must still be evictable
+        // by ciphertext hash after a process restart, when nothing in memory maps
+        // the hash to its cache key. Proven by tagging, dropping the instance, and
+        // evicting purely by hash from a fresh instance over the same dir.
+        // generation 0 is the initial generation of a fresh instance.
+        DiskByteCache(dir, maxBytes = 1024)
+            .put("acct|grp|old-msg|0", ByteArray(40) { 5 }, 0, "expired-hash")
+        val rehydrated = DiskByteCache(dir, maxBytes = 1024)
+        assertNotNull("entry should survive the restart", rehydrated.get("acct|grp|old-msg|0"))
+        val removed = rehydrated.removeByCiphertextTags(setOf("expired-hash"))
+        assertEquals("the persisted tag must drive eviction across sessions", 1, removed)
+        assertNull(rehydrated.get("acct|grp|old-msg|0"))
+        assertEquals(0L, rehydrated.residentBytes())
+        // The sidecar must be gone too, not orphaned.
+        assertTrue(dir.listFiles()?.none { it.name.endsWith(".tag") } ?: true)
+    }
+
+    @Test
+    fun taggedPut_failsClosed_whenTagCannotBePersisted() {
+        // The ciphertext tag authorizes hash-based expiry deletion, so a tagged
+        // write must fail closed: if the tag can't land, no decrypted .bin may
+        // survive untagged. Force the failure by occupying the tag's temp path
+        // with a non-empty directory (writeText to a dir throws), mirroring the
+        // on-disk naming sha256(key).tag.tmp.
+        val key = "acct|grp|msg|0"
+        File(dir, sha256Hex(key) + ".tag.tmp").apply {
+            mkdirs()
+            File(this, "occupied").writeText("x") // non-empty so the tmp-sweep can't delete it
+        }
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        cache.put(key, ByteArray(40) { 1 }, cache.generation(), "the-hash")
+        assertNull("a tagged write whose tag failed must not be readable", cache.get(key))
+        assertEquals(0, cache.size())
+        assertEquals(0L, cache.residentBytes())
+        assertTrue(
+            "no decrypted .bin may linger when its required tag could not be written",
+            dir.listFiles()?.none { it.isFile && it.name.endsWith(".bin") } ?: true,
+        )
+    }
+
+    @Test
+    fun removeByCiphertextTags_emptySet_isNoOp() {
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        cache.put("k", ByteArray(30), cache.generation(), "h")
+        assertEquals(0, cache.removeByCiphertextTags(emptySet()))
+        assertNotNull(cache.get("k"))
+    }
+
+    private fun sha256Hex(value: String): String {
+        val digest =
+            java.security.MessageDigest
+                .getInstance("SHA-256")
+                .digest(value.toByteArray())
+        return digest.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+    }
+
+    @Test
     fun differentKeys_collideToDifferentFiles() {
         // Defense against hash collision oversight — two keys must map to
         // two distinct files. (sha256 makes real collisions improbable; this

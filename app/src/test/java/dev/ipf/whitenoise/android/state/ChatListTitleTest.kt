@@ -182,6 +182,7 @@ class ChatListTitleTest {
         pendingConfirmation = pendingConfirmation,
         welcomerAccountIdHex = welcomer,
         viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
     )
 
     private fun chatItem(
@@ -200,6 +201,8 @@ class ChatListTitleTest {
         groupId: String,
         rawTitle: String,
     ) = ChatListRowFfi(
+        unreadMentionCount = 0uL,
+        unreadMention = false,
         groupIdHex = groupId,
         archived = false,
         pendingConfirmation = false,
@@ -213,7 +216,7 @@ class ChatListTitleTest {
                 sender = "peer-acc",
                 senderDisplayName = null,
                 plaintext = "hello",
-                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                 kind = 9uL,
                 timelineAt = 1uL,
                 deleted = false,

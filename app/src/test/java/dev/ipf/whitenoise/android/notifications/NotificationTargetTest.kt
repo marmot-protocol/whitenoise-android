@@ -382,6 +382,7 @@ class NotificationTargetTest {
         trigger: NotificationTriggerFfi = NotificationTriggerFfi.NEW_MESSAGE,
     ): NotificationUpdateFfi =
         NotificationUpdateFfi(
+            isMention = false,
             notificationKey = "key-1",
             conversationKey = "conv-1",
             trigger = trigger,

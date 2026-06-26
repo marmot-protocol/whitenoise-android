@@ -172,6 +172,8 @@ class ChatListSortingTest {
         latestAt: ULong,
         unreadCount: ULong,
     ) = ChatListRowFfi(
+        unreadMentionCount = 0uL,
+        unreadMention = false,
         groupIdHex = groupId,
         archived = false,
         pendingConfirmation = false,
@@ -185,7 +187,7 @@ class ChatListSortingTest {
                 sender = "sender",
                 senderDisplayName = "Sender",
                 plaintext = preview,
-                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                 kind = 9uL,
                 timelineAt = latestAt,
                 deleted = false,
@@ -203,6 +205,8 @@ class ChatListSortingTest {
         title: String,
         updatedAt: ULong,
     ) = ChatListRowFfi(
+        unreadMentionCount = 0uL,
+        unreadMention = false,
         groupIdHex = groupId,
         archived = false,
         pendingConfirmation = false,
@@ -238,6 +242,7 @@ class ChatListSortingTest {
         pendingConfirmation = pending,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
     )
 
     private fun encryptedMedia() =
@@ -261,7 +266,7 @@ class ChatListSortingTest {
         groupIdHex = groupId,
         sender = "sender",
         plaintext = plaintext,
-        contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
         kind = 9uL,
         tags = tags,
         recordedAt = recordedAt,

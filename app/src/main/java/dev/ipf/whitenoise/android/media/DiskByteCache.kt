@@ -19,6 +19,13 @@ import java.security.MessageDigest
  * is `sha256(key).bin`; the original key is not recoverable from disk (no
  * stable account/group/messageId leak via `ls`).
  *
+ * An entry may carry an optional `.tag` sidecar holding the attachment's
+ * ciphertext SHA-256. It exists so the disappearing-message sweep can evict an
+ * expired attachment by ciphertext hash even when its message isn't currently
+ * loaded (the in-memory hash→key map only covers loaded rows). The tag is the
+ * ciphertext hash — not the cache key — so the "key not recoverable from disk"
+ * guarantee is preserved.
+ *
  * Synchronized on `this` because file I/O happens on whatever thread the
  * caller is on (typically `Dispatchers.IO` for `get`/`put`, main for
  * `clear` during sign-out).
@@ -102,6 +109,7 @@ class DiskByteCache(
                 if (index[hashed] === entry) {
                     index.remove(hashed)
                     residentBytes -= entry.size
+                    runCatching { tagFileFor(entry.file).delete() }
                 }
             }
             null
@@ -117,6 +125,7 @@ class DiskByteCache(
         key: String,
         bytes: ByteArray,
         expectedGeneration: Int,
+        ciphertextTag: String? = null,
     ) {
         if (bytes.isEmpty()) return
         // Reject a write whose session was wiped while it sat queued: clear()
@@ -129,6 +138,7 @@ class DiskByteCache(
         if (existing != null) {
             residentBytes -= existing.size
             runCatching { existing.file.delete() }
+            runCatching { tagFileFor(existing.file).delete() }
         }
         // Atomic write: write to a sibling `.tmp` file then rename onto the
         // final path. A power loss or kill mid-`writeBytes` would otherwise
@@ -139,18 +149,42 @@ class DiskByteCache(
         val tmp = File(cacheDir, "$hashed$TMP_SUFFIX")
         try {
             tmp.writeBytes(bytes)
-            if (!tmp.renameTo(file)) {
-                runCatching { tmp.delete() }
-                return
-            }
         } catch (_: IOException) {
             runCatching { tmp.delete() }
             // Disk full / permission error. L1 still holds the bytes; this
             // entry just won't survive restart. Silent fail is acceptable.
             return
         }
+        // When a ciphertext tag is required (disappearing-message media), it is
+        // the only thing that lets the expiry sweep wipe this entry by hash after
+        // a restart, so the write FAILS CLOSED on it: persist the `.tag`
+        // (atomically, temp + rename) BEFORE the `.bin` is renamed into place. A
+        // crash then leaves at most an orphan `.tag` (swept on rehydrate) or a
+        // complete pair — never a decrypted `.bin` without the tag that authorizes
+        // its later deletion. If the tag can't be persisted, drop the `.bin`.
+        if (ciphertextTag != null) {
+            val tagFile = tagFileFor(file)
+            val tagTmp = File(cacheDir, "${tagFile.name}$TMP_SUFFIX")
+            val tagPersisted =
+                runCatching {
+                    tagTmp.writeText(ciphertextTag)
+                    tagTmp.renameTo(tagFile)
+                }.getOrDefault(false)
+            if (!tagPersisted) {
+                runCatching { tagTmp.delete() }
+                runCatching { tmp.delete() }
+                return
+            }
+        }
+        if (!tmp.renameTo(file)) {
+            runCatching { tmp.delete() }
+            // Couldn't place the `.bin`; drop the tag we just wrote so no orphan
+            // sidecar points at a nonexistent entry.
+            if (ciphertextTag != null) runCatching { tagFileFor(file).delete() }
+            return
+        }
         val size = bytes.size
-        index[hashed] = Entry(file, size)
+        index[hashed] = Entry(file, size, ciphertextTag)
         residentBytes += size
         evictUntilUnderCap()
     }
@@ -163,6 +197,48 @@ class DiskByteCache(
         key: String,
         bytes: ByteArray,
     ) = put(key, bytes, generation)
+
+    /**
+     * Drop a single entry — delete its backing file and index row. Used by the
+     * disappearing-message sweep to evict an expired attachment's decrypted
+     * plaintext from disk once the engine reports it secure-deleted, so it isn't
+     * recoverable from the L2 cache after expiry. No-op if absent.
+     */
+    @Synchronized
+    fun remove(key: String) {
+        ensureHydrated()
+        val entry = index.remove(fileNameFor(key)) ?: return
+        residentBytes -= entry.size
+        runCatching { entry.file.delete() }
+        runCatching { tagFileFor(entry.file).delete() }
+    }
+
+    /**
+     * Evict every entry whose ciphertext tag is in [ciphertextTags] — deleting
+     * its backing file, sidecar, and index row. Unlike [remove], this matches
+     * by the persisted ciphertext hash rather than the cache key, so the
+     * disappearing-message sweep can wipe expired attachments from disk even
+     * when their message isn't currently loaded (and thus has no entry in the
+     * in-memory hash→key reference map). Returns the number of entries removed.
+     */
+    @Synchronized
+    fun removeByCiphertextTags(ciphertextTags: Set<String>): Int {
+        if (ciphertextTags.isEmpty()) return 0
+        ensureHydrated()
+        var removed = 0
+        val iterator = index.entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next().value
+            if (entry.tag != null && entry.tag in ciphertextTags) {
+                runCatching { entry.file.delete() }
+                runCatching { tagFileFor(entry.file).delete() }
+                residentBytes -= entry.size
+                iterator.remove()
+                removed++
+            }
+        }
+        return removed
+    }
 
     @Synchronized
     fun clear() {
@@ -177,7 +253,10 @@ class DiskByteCache(
         // is wiped. The #99 win — get() not holding the lock across readBytes —
         // is unaffected, since that's in get(), not here.
         ensureHydrated()
-        index.values.forEach { runCatching { it.file.delete() } }
+        index.values.forEach {
+            runCatching { it.file.delete() }
+            runCatching { tagFileFor(it.file).delete() }
+        }
         index.clear()
         residentBytes = 0L
         // Catch any orphans that aren't in the index — e.g. a prior crash
@@ -186,8 +265,10 @@ class DiskByteCache(
         cacheDir
             .listFiles()
             ?.asSequence()
-            ?.filter { it.isFile && (it.name.endsWith(SUFFIX) || it.name.endsWith(TMP_SUFFIX)) }
-            ?.forEach { runCatching { it.delete() } }
+            ?.filter {
+                it.isFile &&
+                    (it.name.endsWith(SUFFIX) || it.name.endsWith(TMP_SUFFIX) || it.name.endsWith(TAG_SUFFIX))
+            }?.forEach { runCatching { it.delete() } }
     }
 
     fun size(): Int =
@@ -208,6 +289,7 @@ class DiskByteCache(
         while (it.hasNext() && residentBytes > maxBytes) {
             val (_, entry) = it.next()
             runCatching { entry.file.delete() }
+            runCatching { tagFileFor(entry.file).delete() }
             residentBytes -= entry.size
             it.remove()
         }
@@ -232,15 +314,35 @@ class DiskByteCache(
             val size = file.length()
             if (size <= 0 || size > Int.MAX_VALUE) {
                 runCatching { file.delete() }
+                runCatching { tagFileFor(file).delete() }
                 continue
             }
-            index[file.name] = Entry(file, size.toInt())
+            // Recover the persisted ciphertext tag so hash-based eviction works
+            // for entries cached in a previous session.
+            val tag =
+                tagFileFor(file)
+                    .takeIf { it.exists() }
+                    ?.let { runCatching { it.readText() }.getOrNull() }
+                    ?.takeIf { it.isNotBlank() }
+            index[file.name] = Entry(file, size.toInt(), tag)
             residentBytes += size
         }
+        // Drop any orphaned `.tag` sidecar whose `.bin` is gone, so they don't
+        // accumulate after entries are evicted out-of-band.
+        allFiles
+            .filter { it.name.endsWith(TAG_SUFFIX) }
+            .forEach { tagFile ->
+                val binName = tagFile.name.removeSuffix(TAG_SUFFIX) + SUFFIX
+                if (!index.containsKey(binName)) runCatching { tagFile.delete() }
+            }
         // Hot-trim if total resident exceeds cap (e.g., cap was reduced
         // since the previous run; or disk filled out-of-band).
         evictUntilUnderCap()
     }
+
+    // Sibling sidecar that stores an entry's ciphertext tag: `<sha256>.tag`
+    // next to `<sha256>.bin`.
+    private fun tagFileFor(binFile: File): File = File(binFile.parentFile, binFile.name.removeSuffix(SUFFIX) + TAG_SUFFIX)
 
     private fun fileNameFor(key: String): String {
         val md = MessageDigest.getInstance("SHA-256")
@@ -257,11 +359,13 @@ class DiskByteCache(
     private data class Entry(
         val file: File,
         val size: Int,
+        val tag: String? = null,
     )
 
     private companion object {
         const val SUFFIX = ".bin"
         const val TMP_SUFFIX = ".tmp"
+        const val TAG_SUFFIX = ".tag"
         val HEX =
             charArrayOf(
                 '0',

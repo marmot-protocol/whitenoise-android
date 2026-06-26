@@ -182,6 +182,7 @@ class LocalNotificationPresenterDecisionTest {
         isDm: Boolean = false,
         reactionEmoji: String? = null,
     ) = NotificationUpdateFfi(
+        isMention = false,
         notificationKey = "message:$accountRef:message",
         conversationKey = "conversation:$accountRef:$groupIdHex",
         trigger = trigger,

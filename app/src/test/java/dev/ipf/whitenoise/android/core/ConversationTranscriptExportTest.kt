@@ -38,7 +38,7 @@ class ConversationTranscriptExportTest {
                     timelineAt = 2uL,
                     reactions =
                         TimelineReactionSummaryFfi(
-                            byEmoji = listOf(TimelineReactionEmojiFfi("👍", listOf("alice", "bob"))),
+                            byEmoji = listOf(TimelineReactionEmojiFfi("👍", 2u, listOf("alice", "bob"))),
                             userReactions =
                                 listOf(
                                     TimelineUserReactionFfi(
@@ -63,6 +63,8 @@ class ConversationTranscriptExportTest {
                             actorAccountIdHex = "alice",
                             subjectAccountIdHex = null,
                             name = "Hermes 2",
+                            oldRetentionSeconds = null,
+                            newRetentionSeconds = null,
                         ),
                 ),
             )
@@ -295,6 +297,7 @@ class ConversationTranscriptExportTest {
         pendingConfirmation = false,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
     )
 
     private fun timelineRecord(
@@ -314,7 +317,7 @@ class ConversationTranscriptExportTest {
         groupIdHex = "aa".repeat(32),
         sender = sender,
         plaintext = plaintext,
-        contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
         kind = kind,
         tags = tags,
         timelineAt = timelineAt,
@@ -322,6 +325,7 @@ class ConversationTranscriptExportTest {
         replyToMessageIdHex = null,
         replyPreview = null,
         mediaJson = null,
+        media = emptyList(),
         agentTextStreamJson = null,
         groupSystem = groupSystem,
         reactions = reactions,

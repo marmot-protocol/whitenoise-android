@@ -25,7 +25,7 @@ class DiagnosticFormatterTest {
                             sender = "0123456789abcdef",
                             senderDisplayName = null,
                             plaintext = "hello",
-                            contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                             kind = 9uL,
                             tags = emptyList(),
                             recordedAt = 1_779_926_400uL,

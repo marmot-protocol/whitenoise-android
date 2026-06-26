@@ -14,6 +14,10 @@ data class GroupSystemEvent(
     val actor: String?,
     val subject: String?,
     val name: String?,
+    // Disappearing-timer changes (kind:1210 `disappearing_timer_changed`): the
+    // previous and new per-group retention in seconds. 0 = off; null = absent.
+    val oldRetentionSeconds: ULong? = null,
+    val newRetentionSeconds: ULong? = null,
 )
 
 /**
@@ -54,6 +58,12 @@ data class GroupSystemCopy(
     val adminRemovedYouPassive: String,
     val youRenamedFormat: String,
     val youAvatarChanged: String,
+    val disappearingSetFormat: String,
+    val disappearingSetYouFormat: String,
+    val disappearingSetPassiveFormat: String,
+    val disappearingOffFormat: String,
+    val disappearingOffYou: String,
+    val disappearingOffPassive: String,
     val someone: String,
     val fallback: String,
 ) {
@@ -88,6 +98,12 @@ data class GroupSystemCopy(
                 adminRemovedYouPassive = "You are no longer an admin",
                 youRenamedFormat = "You renamed the group to “%1\$s”",
                 youAvatarChanged = "You changed the group avatar",
+                disappearingSetFormat = "%1\$s set messages to disappear after %2\$s",
+                disappearingSetYouFormat = "You set messages to disappear after %1\$s",
+                disappearingSetPassiveFormat = "Messages now disappear after %1\$s",
+                disappearingOffFormat = "%1\$s turned off disappearing messages",
+                disappearingOffYou = "You turned off disappearing messages",
+                disappearingOffPassive = "Disappearing messages are off",
                 someone = "Someone",
                 fallback = "Group updated",
             )
@@ -102,6 +118,7 @@ object GroupSystemEvents {
     private const val TypeAdminRemoved = "admin_removed"
     private const val TypeGroupRenamed = "group_renamed"
     private const val TypeGroupAvatarChanged = "group_avatar_changed"
+    private const val TypeDisappearingTimerChanged = "disappearing_timer_changed"
 
     /**
      * Parses kind-1210 JSON content. Null when [plaintext] isn't a group
@@ -119,6 +136,11 @@ object GroupSystemEvents {
                 actor = data?.optString("actor")?.takeIf { it.isNotBlank() },
                 subject = data?.optString("subject")?.takeIf { it.isNotBlank() },
                 name = data?.optString("name")?.takeIf { it.isNotBlank() },
+                // Only accept a real non-negative number; absent or malformed
+                // (non-numeric) stays null so it falls back rather than rendering
+                // as an authoritative "turned off" (which is only secs == 0).
+                oldRetentionSeconds = data?.optLong("old_retention_seconds", -1L)?.takeIf { it >= 0L }?.toULong(),
+                newRetentionSeconds = data?.optLong("new_retention_seconds", -1L)?.takeIf { it >= 0L }?.toULong(),
             )
         }.getOrNull()
 
@@ -129,6 +151,8 @@ object GroupSystemEvents {
             actor = ffi.actorAccountIdHex,
             subject = ffi.subjectAccountIdHex,
             name = ffi.name,
+            oldRetentionSeconds = ffi.oldRetentionSeconds,
+            newRetentionSeconds = ffi.newRetentionSeconds,
         )
 
     /** Prefer Marmot's structured projection; fall back to parsing kind-1210 JSON. */
@@ -163,6 +187,10 @@ object GroupSystemEvents {
         subjectName: String?,
         actorIsSelf: Boolean = false,
         subjectIsSelf: Boolean = false,
+        // Localized label for the new retention window (e.g. "7 days"), supplied
+        // by the caller that has the duration formatter. Only used by the
+        // disappearing-timer row's "set to …" forms.
+        retentionLabel: String? = null,
         copy: GroupSystemCopy = GroupSystemCopy.Default,
     ): String {
         val subject = subjectName ?: copy.someone
@@ -218,6 +246,23 @@ object GroupSystemEvents {
                     actorName != null -> String.format(copy.avatarChangedFormat, actorName)
                     else -> copy.avatarChangedPassive
                 }
+            TypeDisappearingTimerChanged -> {
+                // Off only when the new window is explicitly 0; a null (absent or
+                // malformed payload) must fall back, not render as "turned off".
+                val turnedOff = event.newRetentionSeconds == 0uL
+                when {
+                    turnedOff && actorIsSelf -> copy.disappearingOffYou
+                    turnedOff && actorName != null -> String.format(copy.disappearingOffFormat, actorName)
+                    turnedOff -> copy.disappearingOffPassive
+                    // Turned on / changed → "set to <duration>". retentionLabel is the
+                    // localized new-window label from the caller; without it (name-free
+                    // preview path) fall back rather than print raw seconds.
+                    retentionLabel == null -> copy.fallback
+                    actorIsSelf -> String.format(copy.disappearingSetYouFormat, retentionLabel)
+                    actorName != null -> String.format(copy.disappearingSetFormat, actorName, retentionLabel)
+                    else -> String.format(copy.disappearingSetPassiveFormat, retentionLabel)
+                }
+            }
             // Never render the embedded `text` for unknown (or malformed)
             // payloads: the system row visually presents content as a
             // state-derived fact, and `text` is peer-authored free text — an

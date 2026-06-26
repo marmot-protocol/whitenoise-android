@@ -19,7 +19,7 @@ class CompareTimelineMessagesTest {
                 groupIdHex = "g",
                 sender = "s",
                 plaintext = "",
-                contentTokens = MarkdownDocumentFfi(blocks = emptyList()),
+                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
                 kind = 9uL,
                 tags = emptyList(),
                 recordedAt = recordedAt,

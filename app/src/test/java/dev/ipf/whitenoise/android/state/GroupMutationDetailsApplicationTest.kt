@@ -94,6 +94,7 @@ class GroupMutationDetailsApplicationTest {
             pendingConfirmation = false,
             welcomerAccountIdHex = null,
             viaWelcomeMessageIdHex = null,
+            disappearingMessageSecs = 0uL,
         )
 
     private fun member(

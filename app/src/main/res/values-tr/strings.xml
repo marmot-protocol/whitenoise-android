@@ -732,4 +732,49 @@
     <string name="shared_media_saved">Kaydedildi</string>
     <string name="shared_media_save_failed">Dosya kaydedilemedi</string>
     <string name="shared_media_voice_failed">Sesli mesaj oynatılamadı</string>
+    <string name="disappearing_messages">Kaybolan mesajlar</string>
+    <string name="disappearing_off">Kapalı</string>
+    <string name="disappearing_1_day">1 gün</string>
+    <string name="disappearing_7_days">7 gün</string>
+    <string name="disappearing_30_days">30 gün</string>
+    <string name="disappearing_90_days">90 gün</string>
+    <string name="disappearing_custom">Özel süre</string>
+    <string name="disappearing_days_format">%1$d gün</string>
+    <string name="disappearing_hours_format">%1$d saat</string>
+    <string name="disappearing_minutes_format">%1$d dakika</string>
+    <string name="disappearing_unit_minutes">Dakika</string>
+    <string name="disappearing_unit_hours">Saat</string>
+    <string name="disappearing_unit_days">Gün</string>
+    <string name="disappearing_unit_weeks">Hafta</string>
+    <string name="disappearing_custom_amount_label">Miktar</string>
+    <string name="disappearing_row_hint_admin">Yeni mesajların ne kadar kalacağını ayarlamak için dokunun</string>
+    <string name="disappearing_row_hint_readonly">Bunu yalnızca yöneticiler değiştirebilir</string>
+    <string name="toast_disappearing_messages_updated">Kaybolan mesajlar güncellendi</string>
+    <string name="toast_couldnt_update_disappearing">Kaybolan mesajlar güncellenemedi</string>
+    <string name="save">Kaydet</string>
+
+    <string name="disappearing_confirm_title">Kaybolma zamanlayıcısı ayarlansın mı?</string>
+    <string name="disappearing_confirm_message">%1$s değerinden eski mesajlar herkes için kalıcı olarak silinecek.</string>
+    <string name="disappearing_confirm_button">Ayarla</string>
+
+    <string name="disappearing_tooltip_text">Bu sohbetteki mesajlar ayarladığınız süre sonunda kaybolur.</string>
+
+    <string name="group_system_disappearing_set">%1$s mesajların %2$s sonra kaybolmasını ayarladı</string>
+    <string name="group_system_disappearing_set_you">Mesajların %1$s sonra kaybolmasını ayarladın</string>
+    <string name="group_system_disappearing_set_passive">Mesajlar artık %1$s sonra kayboluyor</string>
+    <string name="group_system_disappearing_off">%1$s kaybolan mesajları kapattı</string>
+    <string name="group_system_disappearing_off_you">Kaybolan mesajları kapattın</string>
+    <string name="group_system_disappearing_off_passive">Kaybolan mesajlar kapalı</string>
+
+    <string name="disappearing_4_weeks">4 hafta</string>
+    <string name="disappearing_1_week">1 hafta</string>
+    <string name="disappearing_8_hours">8 saat</string>
+    <string name="disappearing_1_hour">1 saat</string>
+    <string name="disappearing_5_minutes">5 dakika</string>
+    <string name="disappearing_30_seconds">30 saniye</string>
+    <string name="disappearing_explainer">Etkinleştirildiğinde, bu sohbette gönderilen ve alınan yeni mesajlar görüldükten sonra kaybolur.</string>
+    <string name="disappearing_seconds_format">%1$d saniye</string>
+    <string name="disappearing_unit_seconds">Saniye</string>
+    <string name="disappearing_set">Ayarla</string>
+
 </resources>
