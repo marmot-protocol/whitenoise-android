@@ -357,6 +357,10 @@
     <string name="notification_channel_direct_messages_description">Messaggi delle conversazioni individuali</string>
     <string name="notification_channel_group_messages">Messaggi di gruppo</string>
     <string name="notification_channel_group_messages_description">Messaggi delle conversazioni di gruppo</string>
+    <string name="notification_channel_mentions">Menzioni</string>
+    <string name="notification_channel_mentions_description">Messaggi che ti menzionano</string>
+    <string name="chat_list_mention_badge">Contiene una menzione</string>
+    <string name="conversation_jump_to_mention">Vai alla menzione</string>
     <string name="notification_channel_reactions">Reazioni</string>
     <string name="notification_channel_reactions_description">Reazioni ai tuoi messaggi</string>
     <string name="notification_channel_invites">Inviti</string>

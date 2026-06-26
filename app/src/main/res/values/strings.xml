@@ -477,6 +477,10 @@
     <string name="notification_channel_direct_messages_description">One-to-one conversation messages</string>
     <string name="notification_channel_group_messages">Group messages</string>
     <string name="notification_channel_group_messages_description">Group conversation messages</string>
+    <string name="notification_channel_mentions">Mentions</string>
+    <string name="notification_channel_mentions_description">Messages that mention you</string>
+    <string name="chat_list_mention_badge">Includes a mention</string>
+    <string name="conversation_jump_to_mention">Jump to mention</string>
     <string name="notification_channel_reactions">Reactions</string>
     <string name="notification_channel_reactions_description">Reactions to your messages</string>
     <string name="notification_channel_invites">Invites</string>

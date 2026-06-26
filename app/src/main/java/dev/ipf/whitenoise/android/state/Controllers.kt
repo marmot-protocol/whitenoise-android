@@ -122,6 +122,10 @@ data class ChatListItem(
     val hasUnread: Boolean
         get() = projection?.hasUnread ?: false
 
+    /** At least one unread message in this chat mentions the active account. */
+    val unreadMention: Boolean
+        get() = projection?.unreadMention ?: false
+
     /**
      * Whether the active account is no longer a member of this group. Two
      * independent signals establish this:
@@ -639,9 +643,15 @@ internal fun optimisticMessageIdForProjection(
             val optimisticIsMediaPending = optimistic.record.tags.any { it.values.firstOrNull() == "_media_pending" }
             if (optimisticIsMediaPending && projectedIsMedia) return@firstOrNull true
 
-            // Standard match for text sends: plaintext + tags equal.
+            // Standard match for text sends: plaintext equal, and tags equal
+            // ignoring engine-derived `p` (mention) tags. The optimistic record is
+            // built from the typed text before the engine adds NIP-27 `p` tags for
+            // `@npub1…` mentions, so requiring full tag equality leaves the
+            // optimistic and projected copies unmatched — a transient double bubble
+            // until the confirmed id lands. Reply tags (e/q) still must match.
             optimistic.record.plaintext == projected.plaintext &&
-                optimistic.record.tags == projected.tags
+                optimistic.record.tags.filterNot { it.values.firstOrNull() == "p" } ==
+                projected.tags.filterNot { it.values.firstOrNull() == "p" }
         }?.record
         ?.messageIdHex
 }
@@ -761,6 +771,32 @@ internal fun countUnreadIncoming(
 // new chat. They never inflate unread counts and never block read-anchor
 // advancement.
 private fun isDerivedStateKind(kind: ULong): Boolean = kind == 1009uL || kind == 1210uL
+
+/**
+ * Message ids of unread received mentions in [timeline], oldest first — drives
+ * the in-conversation jump-to-mention chip. Same anchor semantics as
+ * [countUnreadIncoming]: a null [readAnchorMessageId], or one that has fallen out
+ * of the loaded window, counts from the first loaded row. Without a reliable
+ * ordering signal for an out-of-window watermark, counting (occasionally an
+ * already-read mention) is preferred over hiding genuinely-unread ones. Only
+ * kind-9 chat rows can be mentions; [mentionsActiveAccount] is passed in so this
+ * stays pure and the ui-layer NIP-27 detection isn't pulled into the state layer.
+ */
+internal fun unreadReceivedMentionIds(
+    timeline: List<TimelineMessage>,
+    readAnchorMessageId: String?,
+    mentionsActiveAccount: (TimelineMessage) -> Boolean,
+): List<String> {
+    if (timeline.isEmpty()) return emptyList()
+    val anchorIdx =
+        readAnchorMessageId?.let { id ->
+            timeline.indexOfFirst { it.record.messageIdHex == id }
+        } ?: -1
+    return timeline
+        .drop(anchorIdx + 1)
+        .filter { it.record.direction == "received" && it.record.kind == 9uL && mentionsActiveAccount(it) }
+        .mapNotNull { it.record.messageIdHex.takeIf { id -> id.isNotBlank() } }
+}
 
 /**
  * Monotonic read-anchor advance. Returns the candidate row's id (the row at
@@ -2059,8 +2095,11 @@ class ConversationController(
 
     // Last message id we successfully marked as read on the Rust side.
     // Dedupes scroll-driven [markReadUpTo] calls so settling on the same row
-    // doesn't issue redundant FFI hops.
-    private var lastReadMessageId: String? = null
+    // doesn't issue redundant FFI hops. Compose-observable so UI (the
+    // jump-to-mention chip) can derive unread state off the engine read
+    // watermark rather than the scroll position.
+    var lastReadMessageId: String? by mutableStateOf(null)
+        private set
 
     val title: String
         get() = title()

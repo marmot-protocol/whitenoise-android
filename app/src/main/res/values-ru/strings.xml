@@ -361,6 +361,10 @@
     <string name="notification_channel_direct_messages_description">Сообщения из личных переписок</string>
     <string name="notification_channel_group_messages">Групповые сообщения</string>
     <string name="notification_channel_group_messages_description">Сообщения из групповых переписок</string>
+    <string name="notification_channel_mentions">Упоминания</string>
+    <string name="notification_channel_mentions_description">Сообщения, в которых вас упоминают</string>
+    <string name="chat_list_mention_badge">Содержит упоминание</string>
+    <string name="conversation_jump_to_mention">Перейти к упоминанию</string>
     <string name="notification_channel_reactions">Реакции</string>
     <string name="notification_channel_reactions_description">Реакции на ваши сообщения</string>
     <string name="notification_channel_invites">Приглашения</string>

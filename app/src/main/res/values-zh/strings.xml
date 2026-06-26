@@ -356,6 +356,10 @@
     <string name="notification_channel_direct_messages_description">一对一会话消息</string>
     <string name="notification_channel_group_messages">群组消息</string>
     <string name="notification_channel_group_messages_description">群组会话消息</string>
+    <string name="notification_channel_mentions">提及</string>
+    <string name="notification_channel_mentions_description">提及你的消息</string>
+    <string name="chat_list_mention_badge">包含一条提及</string>
+    <string name="conversation_jump_to_mention">跳转到提及</string>
     <string name="notification_channel_reactions">回应</string>
     <string name="notification_channel_reactions_description">对你消息的回应</string>
     <string name="notification_channel_invites">邀请</string>

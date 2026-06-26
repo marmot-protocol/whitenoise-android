@@ -77,6 +77,36 @@ class NotificationChannelSpecTest {
     }
 
     @Test
+    fun mentionRoutesToTheMentionsChannelInAGroup() {
+        assertEquals(
+            NotificationChannelSpec.MENTIONS,
+            NotificationChannelSpec.forUpdate(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, isDm = false, isMention = true),
+            ),
+        )
+    }
+
+    @Test
+    fun mentionTakesPrecedenceOverTheDmChannel() {
+        assertEquals(
+            NotificationChannelSpec.MENTIONS,
+            NotificationChannelSpec.forUpdate(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, isDm = true, isMention = true),
+            ),
+        )
+    }
+
+    @Test
+    fun reactionTakesPrecedenceOverMention() {
+        assertEquals(
+            NotificationChannelSpec.REACTIONS,
+            NotificationChannelSpec.forUpdate(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, isDm = false, reactionEmoji = "👍", isMention = true),
+            ),
+        )
+    }
+
+    @Test
     fun inviteRoutesToTheInvitesChannel() {
         assertEquals(
             NotificationChannelSpec.INVITES,
@@ -93,6 +123,7 @@ class NotificationChannelSpecTest {
         // change a live channel's importance) with the old ID retired.
         assertEquals("messages_dm", NotificationChannelSpec.DIRECT_MESSAGES.id)
         assertEquals("messages_group", NotificationChannelSpec.GROUP_MESSAGES.id)
+        assertEquals("mentions", NotificationChannelSpec.MENTIONS.id)
         assertEquals("reactions_v2", NotificationChannelSpec.REACTIONS.id)
         assertEquals("invites_v2", NotificationChannelSpec.INVITES.id)
     }
@@ -101,8 +132,9 @@ class NotificationChannelSpecTest {
         trigger: NotificationTriggerFfi,
         isDm: Boolean = false,
         reactionEmoji: String? = null,
+        isMention: Boolean = false,
     ) = NotificationUpdateFfi(
-        isMention = false,
+        isMention = isMention,
         notificationKey = "key",
         conversationKey = "conversation",
         trigger = trigger,
