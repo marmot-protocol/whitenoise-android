@@ -257,6 +257,29 @@ class OptimisticMessageReconciliationTest {
         assertEquals(setOf("m98", "m99", "temp-pending"), messageById.keys)
     }
 
+    @Test
+    fun mentionProjectionMatchesOptimisticDespiteEngineAddedPTag() {
+        // #619: the engine derives a NIP-27 ["p", hex] tag from an @npub1… mention
+        // on send, so the projected copy carries a p-tag the typed-text optimistic
+        // lacks. Reconcile must still pair them (ignoring p-tags) or the sender sees
+        // a transient double bubble until the confirmed id lands.
+        val pending = timelineMessage("temp-id", MessageStatus.Pending, plaintext = "hi @npub1abc")
+        val projected =
+            AppMessageRecordFfi(
+                messageIdHex = "confirmed",
+                direction = "sent",
+                groupIdHex = "group",
+                sender = "alice",
+                plaintext = "hi @npub1abc",
+                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                kind = 9uL,
+                tags = listOf(dev.ipf.marmotkit.MessageTagFfi(listOf("p", "deadbeef"))),
+                recordedAt = 1uL,
+                receivedAt = 1uL,
+            )
+        assertEquals("temp-id", optimisticMessageIdForProjection(listOf(pending), projected))
+    }
+
     private fun mediaPending(
         id: String,
         filename: String,

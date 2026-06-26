@@ -256,6 +256,38 @@ class ConversationUnreadTest {
         assertEquals(0, countUnreadIncoming(grown, anchor))
     }
 
+    // ---- unreadReceivedMentionIds (jump-to-mention chip) --------------------
+
+    private val isMention: (TimelineMessage) -> Boolean = { it.record.messageIdHex.startsWith("m") }
+
+    @Test
+    fun mentions_nullAnchor_countsAllReceivedMentions() {
+        val timeline = listOf(received("m1"), received("r2"), received("m3"))
+        assertEquals(listOf("m1", "m3"), unreadReceivedMentionIds(timeline, null, isMention))
+    }
+
+    @Test
+    fun mentions_missingAnchor_fallsBackToCountingAll() {
+        // Watermark set but not in the loaded window (e.g. trimmed off the top):
+        // count from the window start rather than hiding the chip — same contract
+        // as countUnreadIncoming. Regression for the MEDIUM "hides unread mentions
+        // when the read watermark is outside the loaded window" finding.
+        val timeline = listOf(received("m1"), received("m2"))
+        assertEquals(listOf("m1", "m2"), unreadReceivedMentionIds(timeline, "not-in-window", isMention))
+    }
+
+    @Test
+    fun mentions_anchorSet_countsOnlyAfterAnchor() {
+        val timeline = listOf(received("m1"), received("r2"), received("m3"))
+        assertEquals(listOf("m3"), unreadReceivedMentionIds(timeline, "r2", isMention))
+    }
+
+    @Test
+    fun mentions_excludeSentNonMentionAndNonChatKinds() {
+        val timeline = listOf(received("m1"), sent("m2"), received("r3"), groupSystem("m4"))
+        assertEquals(listOf("m1"), unreadReceivedMentionIds(timeline, null, isMention))
+    }
+
     // ---- helpers ------------------------------------------------------------
 
     private fun received(

@@ -30,6 +30,13 @@ enum class NotificationChannelSpec(
     GROUP_MESSAGES("messages_group", ChannelImportance.HIGH),
 
     /**
+     * Messages that mention the local user. High importance and routed ahead of
+     * the DM/group split so the highest-signal unread can be muted and surfaced
+     * independently of ordinary conversation traffic.
+     */
+    MENTIONS("mentions", ChannelImportance.HIGH),
+
+    /**
      * Reactions to the local user's messages, on their own channel so they can
      * be muted independently. High importance so a reaction heads-up like a
      * message.
@@ -59,6 +66,9 @@ enum class NotificationChannelSpec(
                         // disagree and post a reaction on the REACTIONS channel
                         // while it reuses the message card's identity.
                         LocalNotificationFormatter.isReaction(update) -> REACTIONS
+                        // Mentions take precedence over the DM/group split: a
+                        // mention is the highest-signal message, on its own channel.
+                        update.isMention -> MENTIONS
                         update.isDm -> DIRECT_MESSAGES
                         else -> GROUP_MESSAGES
                     }
