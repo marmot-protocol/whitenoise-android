@@ -103,10 +103,23 @@ class VoiceRecordingController(
             resetRecordingUiState()
             restartJob =
                 scope.launch(Dispatchers.Main) {
-                    pending.join()
-                    restarting = false
-                    restartJob = null
-                    if (isRecording) beginRecording()
+                    try {
+                        pending.join()
+                        restarting = false
+                        restartJob = null
+                        if (isRecording) beginRecording()
+                    } finally {
+                        // The reused focus is handed to the new recorder once
+                        // beginRecording() opens it. If the restart was cancelled
+                        // during teardown (or begin failed), no recorder owns the
+                        // focus and the finalize tail already skipped its abandon
+                        // because `restarting` was set — release it here so it
+                        // isn't stranded. abandonRecordingFocus() is idempotent.
+                        if (recorder == null) {
+                            restarting = false
+                            abandonRecordingFocus()
+                        }
+                    }
                 }
             return true
         }
