@@ -228,6 +228,8 @@ class LocalizationResourceTest {
                 "nip_05",
                 "no",
                 "notification_channel_messages",
+                // "Mentions" is the same word in French as in English.
+                "notification_channel_mentions",
                 "notification_sender_in_group",
                 "notifications",
                 "online",
