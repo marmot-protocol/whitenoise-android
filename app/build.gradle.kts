@@ -56,10 +56,8 @@ fun environmentRuntimeConfigProperty(
     val keys =
         buildList {
             add("WHITENOISE_${environmentPrefix}_$suffix")
-            add("DARKMATTER_${environmentPrefix}_$suffix")
             if (includeGlobalFallbacks) {
                 add("WHITENOISE_$suffix")
-                add("DARKMATTER_$suffix")
             }
             addAll(extraKeys)
         }
@@ -86,25 +84,21 @@ val productionReleaseSigning =
             signingProperty(
                 "WHITENOISE_PRODUCTION_KEYSTORE_PATH",
                 "WHITENOISE_KEYSTORE_PATH",
-                "DARKMATTER_KEYSTORE_PATH",
             ),
         keystorePassword =
             signingProperty(
                 "WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD",
                 "WHITENOISE_KEYSTORE_PASSWORD",
-                "DARKMATTER_KEYSTORE_PASSWORD",
             ),
         keyAlias =
             signingProperty(
                 "WHITENOISE_PRODUCTION_KEY_ALIAS",
                 "WHITENOISE_KEY_ALIAS",
-                "DARKMATTER_KEY_ALIAS",
             ),
         keyPassword =
             signingProperty(
                 "WHITENOISE_PRODUCTION_KEY_PASSWORD",
                 "WHITENOISE_KEY_PASSWORD",
-                "DARKMATTER_KEY_PASSWORD",
             ),
     )
 val stagingReleaseSigning =
@@ -120,11 +114,11 @@ val hasStagingReleaseSigning = stagingReleaseSigning.isConfigured()
 // Escape hatch for the unsigned-release guard below. Off by default: a release
 // build without signing must fail rather than emit an uninstallable artifact.
 val allowUnsignedRelease =
-    runtimeConfigProperty(listOf("WHITENOISE_ALLOW_UNSIGNED_RELEASE", "DARKMATTER_ALLOW_UNSIGNED_RELEASE"), "false")
+    runtimeConfigProperty("WHITENOISE_ALLOW_UNSIGNED_RELEASE", "false")
         .equals("true", ignoreCase = true)
 
 android {
-    namespace = "dev.ipf.darkmatter"
+    namespace = "dev.ipf.whitenoise.android"
     compileSdk {
         version = release(37)
     }
@@ -169,12 +163,12 @@ android {
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-dev".asBuildConfigString())
             buildConfigField(
                 "String",
-                "DARKMATTER_OTLP_ENDPOINT",
+                "WHITENOISE_OTLP_ENDPOINT",
                 environmentRuntimeConfigProperty("dev", "OTLP_ENDPOINT").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_OTLP_AUTH_TOKEN",
+                "WHITENOISE_OTLP_AUTH_TOKEN",
                 environmentRuntimeConfigProperty(
                     environment = "dev",
                     suffix = "OTLP_AUTH_TOKEN",
@@ -183,32 +177,32 @@ android {
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_AUDIT_LOG_ENDPOINT",
+                "WHITENOISE_AUDIT_LOG_ENDPOINT",
                 environmentRuntimeConfigProperty("dev", "AUDIT_LOG_ENDPOINT").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_AUDIT_LOG_AUTH_TOKEN",
+                "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
                 environmentRuntimeConfigProperty("dev", "AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
             )
-            buildConfigField("String", "DARKMATTER_DEPLOYMENT_ENVIRONMENT", "dev".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "dev".asBuildConfigString())
             buildConfigField(
                 "String",
-                "DARKMATTER_TELEMETRY_TENANT",
+                "WHITENOISE_TELEMETRY_TENANT",
                 environmentRuntimeConfigProperty(
                     environment = "dev",
                     suffix = "TELEMETRY_TENANT",
-                    defaultValue = "whitenoise-rs-android-dev",
+                    defaultValue = "whitenoise-android-dev",
                 ).asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_PUSH_SERVER_PUBKEY_HEX",
+                "WHITENOISE_PUSH_SERVER_PUBKEY_HEX",
                 environmentRuntimeConfigProperty("dev", "PUSH_SERVER_PUBKEY_HEX").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_PUSH_RELAY_HINT",
+                "WHITENOISE_PUSH_RELAY_HINT",
                 environmentRuntimeConfigProperty("dev", "PUSH_RELAY_HINT").asBuildConfigString(),
             )
         }
@@ -223,7 +217,7 @@ android {
 
             buildConfigField(
                 "String",
-                "DARKMATTER_OTLP_ENDPOINT",
+                "WHITENOISE_OTLP_ENDPOINT",
                 environmentRuntimeConfigProperty(
                     environment = "production",
                     suffix = "OTLP_ENDPOINT",
@@ -232,17 +226,17 @@ android {
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_OTLP_AUTH_TOKEN",
+                "WHITENOISE_OTLP_AUTH_TOKEN",
                 environmentRuntimeConfigProperty(
                     environment = "production",
                     suffix = "OTLP_AUTH_TOKEN",
                     includeGlobalFallbacks = true,
-                    extraKeys = listOf("OTLP_TOKEN_WHITENOISE_ANDROID", "OTLP_TOKEN_DARKMATTER_ANDROID"),
+                    extraKeys = listOf("OTLP_TOKEN_WHITENOISE_ANDROID"),
                 ).asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_AUDIT_LOG_ENDPOINT",
+                "WHITENOISE_AUDIT_LOG_ENDPOINT",
                 environmentRuntimeConfigProperty(
                     environment = "production",
                     suffix = "AUDIT_LOG_ENDPOINT",
@@ -255,21 +249,21 @@ android {
             // authenticating against the wrong API with the OTLP token.
             buildConfigField(
                 "String",
-                "DARKMATTER_AUDIT_LOG_AUTH_TOKEN",
+                "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
                 environmentRuntimeConfigProperty(
                     environment = "production",
                     suffix = "AUDIT_LOG_AUTH_TOKEN",
                     includeGlobalFallbacks = true,
                 ).asBuildConfigString(),
             )
-            buildConfigField("String", "DARKMATTER_DEPLOYMENT_ENVIRONMENT", "production".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "production".asBuildConfigString())
             buildConfigField(
                 "String",
-                "DARKMATTER_TELEMETRY_TENANT",
+                "WHITENOISE_TELEMETRY_TENANT",
                 environmentRuntimeConfigProperty(
                     environment = "production",
                     suffix = "TELEMETRY_TENANT",
-                    defaultValue = "whitenoise-rs-android",
+                    defaultValue = "whitenoise-android",
                     includeGlobalFallbacks = true,
                 ).asBuildConfigString(),
             )
@@ -281,7 +275,7 @@ android {
             // attempting to register against a default server.
             buildConfigField(
                 "String",
-                "DARKMATTER_PUSH_SERVER_PUBKEY_HEX",
+                "WHITENOISE_PUSH_SERVER_PUBKEY_HEX",
                 environmentRuntimeConfigProperty(
                     environment = "production",
                     suffix = "PUSH_SERVER_PUBKEY_HEX",
@@ -290,7 +284,7 @@ android {
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_PUSH_RELAY_HINT",
+                "WHITENOISE_PUSH_RELAY_HINT",
                 environmentRuntimeConfigProperty(
                     environment = "production",
                     suffix = "PUSH_RELAY_HINT",
@@ -311,12 +305,12 @@ android {
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-staging".asBuildConfigString())
             buildConfigField(
                 "String",
-                "DARKMATTER_OTLP_ENDPOINT",
+                "WHITENOISE_OTLP_ENDPOINT",
                 environmentRuntimeConfigProperty("staging", "OTLP_ENDPOINT").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_OTLP_AUTH_TOKEN",
+                "WHITENOISE_OTLP_AUTH_TOKEN",
                 environmentRuntimeConfigProperty(
                     environment = "staging",
                     suffix = "OTLP_AUTH_TOKEN",
@@ -325,32 +319,32 @@ android {
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_AUDIT_LOG_ENDPOINT",
+                "WHITENOISE_AUDIT_LOG_ENDPOINT",
                 environmentRuntimeConfigProperty("staging", "AUDIT_LOG_ENDPOINT").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_AUDIT_LOG_AUTH_TOKEN",
+                "WHITENOISE_AUDIT_LOG_AUTH_TOKEN",
                 environmentRuntimeConfigProperty("staging", "AUDIT_LOG_AUTH_TOKEN").asBuildConfigString(),
             )
-            buildConfigField("String", "DARKMATTER_DEPLOYMENT_ENVIRONMENT", "staging".asBuildConfigString())
+            buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "staging".asBuildConfigString())
             buildConfigField(
                 "String",
-                "DARKMATTER_TELEMETRY_TENANT",
+                "WHITENOISE_TELEMETRY_TENANT",
                 environmentRuntimeConfigProperty(
                     environment = "staging",
                     suffix = "TELEMETRY_TENANT",
-                    defaultValue = "whitenoise-rs-android-staging",
+                    defaultValue = "whitenoise-android-staging",
                 ).asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_PUSH_SERVER_PUBKEY_HEX",
+                "WHITENOISE_PUSH_SERVER_PUBKEY_HEX",
                 environmentRuntimeConfigProperty("staging", "PUSH_SERVER_PUBKEY_HEX").asBuildConfigString(),
             )
             buildConfigField(
                 "String",
-                "DARKMATTER_PUSH_RELAY_HINT",
+                "WHITENOISE_PUSH_RELAY_HINT",
                 environmentRuntimeConfigProperty("staging", "PUSH_RELAY_HINT").asBuildConfigString(),
             )
         }
@@ -439,7 +433,7 @@ fun releaseSigningHintForPackageTask(taskName: String): String =
     when {
         taskName.contains("ProductionRelease") ->
             "WHITENOISE_PRODUCTION_KEYSTORE_PATH/PASSWORD/KEY_ALIAS/KEY_PASSWORD " +
-                "(or WHITENOISE_KEYSTORE_* / DARKMATTER_KEYSTORE_* fallback)"
+                "(or WHITENOISE_KEYSTORE_* fallback)"
 
         taskName.contains("StagingRelease") ->
             "WHITENOISE_STAGING_KEYSTORE_PATH/PASSWORD/KEY_ALIAS/KEY_PASSWORD"

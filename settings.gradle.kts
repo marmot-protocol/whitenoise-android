@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "whitenoise-rs"
+rootProject.name = "whitenoise-android"
 include(":app")

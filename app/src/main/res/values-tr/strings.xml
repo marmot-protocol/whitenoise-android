@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
-    <string name="dark_matter_couldnt_start">White Noise başlatılamadı</string>
+    <string name="white_noise_couldnt_start">White Noise başlatılamadı</string>
     <string name="refresh">Dökümü yenile</string>
     <string name="retry">Tekrar dene</string>
-    <string name="dark_matter_shield">White Noise kalkan</string>
+    <string name="white_noise_shield">White Noise kalkan</string>
     <string name="onboarding_tagline">Uçtan uca şifreli grup mesajlaşması.</string>
     <string name="creating_identity">Kimlik oluşturma</string>
     <string name="creating_identity_title">Kimlik Oluşturuluyor</string>
     <string name="create_new_identity">Yeni Kimlik Oluştur</string>
     <string name="sign_in">Giriş Yap</string>
-    <string name="sign_in_to_dark_matter">White Noise’a giriş yap</string>
+    <string name="sign_in_to_white_noise">White Noise’a giriş yap</string>
     <string name="sign_in_secret_key_help">Bu cihazda mevcut bir kimliği kullanmak için Nostr gizli anahtarınızı girin.</string>
     <string name="nostr_nsec">Özel anahtarınızı girin</string>
     <string name="back">Geri dön</string>
@@ -58,7 +58,7 @@
     <string name="no_chats_yet">Henüz sohbet yok</string>
     <string name="empty_chats_invite_npub">Birisini npub ile davet ederek bir sohbet başlatın.</string>
     <string name="new_chat">Yeni sohbet</string>
-    <string name="error_not_dark_matter_profile_qr">Bu QR kodu bir White Noise profili değil.</string>
+    <string name="error_not_white_noise_profile_qr">Bu QR kodu bir White Noise profili değil.</string>
     <string name="error_valid_recipient_reference">Geçerli bir npub, profil bağlantısı veya hex genel anahtarı girin.</string>
     <string name="error_missing_key_package">Bu hesabın henüz yayınlanmış bir anahtar paketi yok. Onlardan White Noise açmalarını isteyin ve tekrar deneyin.</string>
     <string name="error_missing_key_package_for">%1$s için henüz yayınlanmış bir anahtar paketi yok. Onlardan White Noise açmalarını isteyin ve tekrar deneyin.</string>

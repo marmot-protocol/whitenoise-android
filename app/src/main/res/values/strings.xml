@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
-    <string name="dark_matter_couldnt_start">White Noise couldn\'t start</string>
+    <string name="white_noise_couldnt_start">White Noise couldn\'t start</string>
     <string name="refresh">Refresh</string>
     <string name="retry">Retry</string>
-    <string name="dark_matter_shield">White Noise shield</string>
+    <string name="white_noise_shield">White Noise shield</string>
     <string name="onboarding_tagline">End-to-end encrypted group messaging.</string>
     <string name="creating_identity">Creating identity</string>
     <string name="creating_identity_title">Creating Identity</string>
     <string name="create_new_identity">Create New Identity</string>
     <string name="sign_in">Sign in</string>
-    <string name="sign_in_to_dark_matter">Sign in to White Noise</string>
+    <string name="sign_in_to_white_noise">Sign in to White Noise</string>
     <string name="sign_in_secret_key_help">Enter your Nostr secret key to use an existing identity on this device.</string>
     <string name="nostr_nsec">Nostr nsec</string>
     <string name="back">Back</string>
@@ -59,7 +59,7 @@
     <string name="no_chats_yet">No chats yet</string>
     <string name="empty_chats_invite_npub">Start a conversation by inviting someone with their npub.</string>
     <string name="new_chat">New Chat</string>
-    <string name="error_not_dark_matter_profile_qr">That QR code is not a White Noise profile.</string>
+    <string name="error_not_white_noise_profile_qr">That QR code is not a White Noise profile.</string>
     <string name="error_valid_recipient_reference">Enter a valid npub, profile link, or hex public key.</string>
     <string name="error_missing_key_package">That account does not have a published key package yet. Ask them to open White Noise, then try again.</string>
     <string name="error_missing_key_package_for">%1$s does not have a published key package yet. Ask them to open White Noise, then try again.</string>

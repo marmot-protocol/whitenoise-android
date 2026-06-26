@@ -13,7 +13,7 @@ export JAVA_HOME := env_var_or_default("JAVA_HOME", "/Applications/Android Studi
 DEV_PKG := "dev.ipf.whitenoise.android.dev"
 PRODUCTION_PKG := "dev.ipf.whitenoise.android"
 STAGING_PKG := "dev.ipf.whitenoise.android.staging"
-MAIN_ACTIVITY := "dev.ipf.darkmatter.MainActivity"
+MAIN_ACTIVITY := "dev.ipf.whitenoise.android.MainActivity"
 PRODUCTION_APK_DIR := "app/build/outputs/apk/production/release"
 STAGING_APK_DIR := "app/build/outputs/apk/staging/release"
 
@@ -30,8 +30,8 @@ install-debug:
     ./gradlew :app:installDevDebug
 
 # Launch the installed dev variant. Uses the activity FQN because
-# applicationId no longer matches the namespace (dev.ipf.darkmatter), so
-# `pkg/.MainActivity` shorthand doesn't resolve.
+# Dev/staging application IDs include flavor suffixes, so `pkg/.MainActivity`
+# shorthand doesn't resolve consistently.
 launch-debug:
     adb shell am start -n {{DEV_PKG}}/{{MAIN_ACTIVITY}}
 
@@ -157,9 +157,9 @@ keystore-fingerprint flavor="production":
         }; \
         case "$flavor" in \
             production) \
-                path=$(require_prop KEYSTORE_PATH WHITENOISE_PRODUCTION_KEYSTORE_PATH WHITENOISE_KEYSTORE_PATH DARKMATTER_KEYSTORE_PATH); \
-                pw=$(require_prop KEYSTORE_PASSWORD WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD WHITENOISE_KEYSTORE_PASSWORD DARKMATTER_KEYSTORE_PASSWORD); \
-                key_alias=$(require_prop KEY_ALIAS WHITENOISE_PRODUCTION_KEY_ALIAS WHITENOISE_KEY_ALIAS DARKMATTER_KEY_ALIAS); \
+                path=$(require_prop KEYSTORE_PATH WHITENOISE_PRODUCTION_KEYSTORE_PATH WHITENOISE_KEYSTORE_PATH); \
+                pw=$(require_prop KEYSTORE_PASSWORD WHITENOISE_PRODUCTION_KEYSTORE_PASSWORD WHITENOISE_KEYSTORE_PASSWORD); \
+                key_alias=$(require_prop KEY_ALIAS WHITENOISE_PRODUCTION_KEY_ALIAS WHITENOISE_KEY_ALIAS); \
                 ;; \
             staging) \
                 path=$(require_prop KEYSTORE_PATH WHITENOISE_STAGING_KEYSTORE_PATH); \

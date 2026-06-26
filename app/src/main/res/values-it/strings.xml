@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
-    <string name="dark_matter_couldnt_start">Impossibile avviare White Noise</string>
+    <string name="white_noise_couldnt_start">Impossibile avviare White Noise</string>
     <string name="refresh">Aggiorna dump</string>
     <string name="retry">Riprova</string>
-    <string name="dark_matter_shield">White Noise scudo</string>
+    <string name="white_noise_shield">White Noise scudo</string>
     <string name="onboarding_tagline">Messaggistica di gruppo con crittografia end-to-end.</string>
     <string name="creating_identity">Creare identità</string>
     <string name="creating_identity_title">Creazione identità</string>
     <string name="create_new_identity">Crea nuova identità</string>
     <string name="sign_in">Accedi</string>
-    <string name="sign_in_to_dark_matter">Accedi a White Noise</string>
+    <string name="sign_in_to_white_noise">Accedi a White Noise</string>
     <string name="sign_in_secret_key_help">Inserisci la tua chiave segreta Nostr per utilizzare un’identità esistente su questo dispositivo.</string>
     <string name="nostr_nsec">Inserisci la tua chiave privata</string>
     <string name="back">Torna indietro</string>
@@ -58,7 +58,7 @@
     <string name="no_chats_yet">Ancora nessuna chat</string>
     <string name="empty_chats_invite_npub">Inizia una conversazione invitando qualcuno con il suo npub.</string>
     <string name="new_chat">Nuova chat</string>
-    <string name="error_not_dark_matter_profile_qr">Quel codice QR non è un profilo White Noise.</string>
+    <string name="error_not_white_noise_profile_qr">Quel codice QR non è un profilo White Noise.</string>
     <string name="error_valid_recipient_reference">Inserisci un npub valido, un collegamento al profilo o una chiave pubblica hex.</string>
     <string name="error_missing_key_package">Per quell’account non è ancora stato pubblicato un pacchetto di chiavi. Chiedi loro di aprire White Noise, quindi riprova.</string>
     <string name="error_missing_key_package_for">Per %1$s non è ancora stato pubblicato un pacchetto di chiavi. Chiedi loro di aprire White Noise, quindi riprova.</string>

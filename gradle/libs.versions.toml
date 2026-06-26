@@ -11,7 +11,7 @@ kotlin = "2.4.0"
 composeBom = "2026.06.00"
 # material3 is deliberately pinned ABOVE the version the Compose BOM supplies
 # (compose-bom 2026.05.01 -> material3 1.4.0 stable). The QuickActionFabMenu in
-# DarkMatterApp.kt uses the Material 3 expressive FAB-menu APIs
+# WhiteNoiseApp.kt uses the Material 3 expressive FAB-menu APIs
 # (FloatingActionButtonMenu / FloatingActionButtonMenuItem /
 # ToggleFloatingActionButton / ToggleFloatingActionButtonDefaults.animateIcon),
 # which do not exist in any stable or -rc material3 release yet (latest stable

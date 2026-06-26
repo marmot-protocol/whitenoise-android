@@ -54,7 +54,7 @@ keytool -genkeypair \
 
 # Write/update local.properties
 touch "$LOCAL_PROPS"
-grep -v -E "^(WHITENOISE|DARKMATTER)_(KEYSTORE_|KEY_)" "$LOCAL_PROPS" > "$LOCAL_PROPS.tmp" || true
+grep -v -E "^WHITENOISE_(KEYSTORE_|KEY_)" "$LOCAL_PROPS" > "$LOCAL_PROPS.tmp" || true
 mv "$LOCAL_PROPS.tmp" "$LOCAL_PROPS"
 {
   echo ""

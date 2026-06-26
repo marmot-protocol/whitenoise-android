@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
-    <string name="dark_matter_couldnt_start">White Noise 無法啟動</string>
+    <string name="white_noise_couldnt_start">White Noise 無法啟動</string>
     <string name="refresh">重新整理傾印</string>
     <string name="retry">重試</string>
-    <string name="dark_matter_shield">White Noise 盾牌</string>
+    <string name="white_noise_shield">White Noise 盾牌</string>
     <string name="onboarding_tagline">端對端加密群組訊息。</string>
     <string name="creating_identity">創造身份</string>
     <string name="creating_identity_title">正在建立身分</string>
     <string name="create_new_identity">建立新身分</string>
     <string name="sign_in">登入</string>
-    <string name="sign_in_to_dark_matter">登入 White Noise</string>
+    <string name="sign_in_to_white_noise">登入 White Noise</string>
     <string name="sign_in_secret_key_help">輸入您的 Nostr 金鑰以使用此裝置上的現有身分。</string>
     <string name="nostr_nsec">輸入您的私鑰</string>
     <string name="back">返回</string>
@@ -57,7 +57,7 @@
     <string name="no_chats_yet">尚無聊天</string>
     <string name="empty_chats_invite_npub">透過邀請某人及其 npub 來開始對話。</string>
     <string name="new_chat">新聊天</string>
-    <string name="error_not_dark_matter_profile_qr">該 QR 程式碼不是 White Noise 設定檔。</string>
+    <string name="error_not_white_noise_profile_qr">該 QR 程式碼不是 White Noise 設定檔。</string>
     <string name="error_valid_recipient_reference">輸入有效的 npub、設定檔連結或 hex 公鑰。</string>
     <string name="error_missing_key_package">該帳戶尚未發布密鑰包。請他們打開 White Noise，然後再試一次。</string>
     <string name="error_missing_key_package_for">%1$s 尚未發布密鑰包。請他們打開 White Noise，然後再試一次。</string>

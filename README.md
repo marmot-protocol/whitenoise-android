@@ -1,12 +1,12 @@
 # White Noise Android
 
-Android client for White Noise, backed by the Dark Matter Marmot bindings.
+Android client for White Noise, backed by the Marmot bindings.
 
 ## Project Shape
 
-The app is a Kotlin/Jetpack Compose Android app backed by the Dark Matter Marmot bindings. Dark Matter owns protocol data and stores it in SQLite. The Android app should render that data, manage Android platform behavior, and keep UI lifecycle state.
+The app is a Kotlin/Jetpack Compose Android app backed by the Marmot bindings. The native protocol layer owns protocol data and stores it in SQLite. The Android app should render that data, manage Android platform behavior, and keep UI lifecycle state.
 
-The Android app should not become a second database for Dark Matter data. If a screen is slow because a query or projection is expensive, prefer improving the Dark Matter API or SQLite-backed projection over adding an Android cache.
+The Android app should not become a second database for White Noise protocol data. If a screen is slow because a query or projection is expensive, prefer improving the native API or SQLite-backed projection over adding an Android cache.
 
 ## Common Commands
 
@@ -109,8 +109,8 @@ a broken layout (issue #551). The tests render real composables on the JVM via
 Robolectric — no emulator — so they add no device-test runtime. The pilot
 covers two surfaces:
 
-- `DarkMatterThemeScreenshotTest` — a representative swatch through
-  `DarkMatterTheme` in light, dark, and AMOLED, guarding the theme color roles
+- `WhiteNoiseThemeScreenshotTest` — a representative swatch through
+  `WhiteNoiseTheme` in light, dark, and AMOLED, guarding the theme color roles
   (e.g. the AMOLED true-black audit, #446/#495).
 - `OnboardingContentScreenshotTest` — the onboarding entry screen, light theme.
 
@@ -146,8 +146,6 @@ Production also accepts global signing values as fallbacks:
 - `WHITENOISE_KEY_ALIAS`
 - `WHITENOISE_KEY_PASSWORD`
 
-Legacy `DARKMATTER_KEYSTORE_*` names are still accepted as fallbacks.
-
 Staging release builds use staging-only signing values:
 
 - `WHITENOISE_STAGING_KEYSTORE_PATH`
@@ -167,7 +165,7 @@ Runtime configuration is also read from `local.properties` or environment variab
 - `WHITENOISE_DEV_OTLP_AUTH_TOKEN`
 - `WHITENOISE_DEV_AUDIT_LOG_ENDPOINT`
 - `WHITENOISE_DEV_AUDIT_LOG_AUTH_TOKEN`
-- `WHITENOISE_DEV_TELEMETRY_TENANT` (defaults to `whitenoise-rs-android-dev`)
+- `WHITENOISE_DEV_TELEMETRY_TENANT` (defaults to `whitenoise-android-dev`)
 
 Dev also accepts `OTLP_TOKEN_WHITENOISE_ANDROID_DEV` as an OTLP auth-token alias.
 
@@ -182,9 +180,9 @@ Dev also accepts `OTLP_TOKEN_WHITENOISE_ANDROID_DEV` as an OTLP auth-token alias
 - `WHITENOISE_PRODUCTION_OTLP_AUTH_TOKEN`
 - `WHITENOISE_PRODUCTION_AUDIT_LOG_ENDPOINT`
 - `WHITENOISE_PRODUCTION_AUDIT_LOG_AUTH_TOKEN`
-- `WHITENOISE_PRODUCTION_TELEMETRY_TENANT` (defaults to `whitenoise-rs-android`)
+- `WHITENOISE_PRODUCTION_TELEMETRY_TENANT` (defaults to `whitenoise-android`)
 
-Production also accepts `OTLP_TOKEN_WHITENOISE_ANDROID` as an OTLP auth-token alias. Legacy global `DARKMATTER_*` runtime names and `OTLP_TOKEN_DARKMATTER_ANDROID` are accepted as production fallbacks.
+Production also accepts `OTLP_TOKEN_WHITENOISE_ANDROID` as an OTLP auth-token alias. Global `WHITENOISE_*` runtime names are accepted as production fallbacks.
 
 **Production push (MIP-05):**
 
@@ -197,7 +195,7 @@ Production also accepts `OTLP_TOKEN_WHITENOISE_ANDROID` as an OTLP auth-token al
 - `WHITENOISE_STAGING_OTLP_AUTH_TOKEN`
 - `WHITENOISE_STAGING_AUDIT_LOG_ENDPOINT`
 - `WHITENOISE_STAGING_AUDIT_LOG_AUTH_TOKEN`
-- `WHITENOISE_STAGING_TELEMETRY_TENANT` (defaults to `whitenoise-rs-android-staging`)
+- `WHITENOISE_STAGING_TELEMETRY_TENANT` (defaults to `whitenoise-android-staging`)
 
 Staging also accepts `OTLP_TOKEN_WHITENOISE_ANDROID_STAGING` as an OTLP auth-token alias.
 
@@ -228,7 +226,7 @@ Builds the signed staging `arm64-v8a` APK. The output filename is `whitenoise-st
 just release
 ```
 
-Builds all signed production and staging APKs (per-ABI + universal) and rebuilds the Marmot bindings. Assumes a sibling checkout of the `darkmatter` Rust workspace at `../darkmatter`; override with `DARKMATTER_MARMOT_DIR`.
+Builds all signed production and staging APKs (per-ABI + universal) and rebuilds the Marmot bindings. Set `WHITENOISE_MARMOT_DIR` to the Marmot binding workspace before running this command.
 
 ```bash
 just release-fast
@@ -250,6 +248,6 @@ Avoid `connectedDevDebugAndroidTest` on Jeff's Pixel unless he asks for it, beca
 
 Keep Compose work cheap. Do not call slow binding, database, or network paths from composition or from the main thread.
 
-Use Dark Matter streams and SQLite-backed projections as the fast path. If Android needs a shape that is expensive to assemble, add or improve the Dark Matter projection rather than storing a duplicate copy in the Android app.
+Use White Noise streams and SQLite-backed projections as the fast path. If Android needs a shape that is expensive to assemble, add or improve the native projection rather than storing a duplicate copy in the Android app.
 
 Close native subscriptions when screens or services stop using them.

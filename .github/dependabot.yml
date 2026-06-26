@@ -1,4 +1,4 @@
-# Dependabot configuration for darkmatter-android.
+# Dependabot configuration for whitenoise-android.
 #
 # Scope is deliberately narrow: keep GitHub Actions and the hand-pinned gradle
 # deps in gradle/libs.versions.toml current, and stay out of the way of the

@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
-    <string name="dark_matter_couldnt_start">White Noise n’a pas pu démarrer</string>
+    <string name="white_noise_couldnt_start">White Noise n’a pas pu démarrer</string>
     <string name="refresh">Actualiser l’export</string>
     <string name="retry">Réessayer</string>
-    <string name="dark_matter_shield">Bouclier White Noise</string>
+    <string name="white_noise_shield">Bouclier White Noise</string>
     <string name="onboarding_tagline">Messagerie de groupe chiffrée de bout en bout.</string>
     <string name="creating_identity">Créer une identité</string>
     <string name="creating_identity_title">Création de l’identité</string>
     <string name="create_new_identity">Créer une nouvelle identité</string>
     <string name="sign_in">Connexion</string>
-    <string name="sign_in_to_dark_matter">Se connecter à White Noise</string>
+    <string name="sign_in_to_white_noise">Se connecter à White Noise</string>
     <string name="sign_in_secret_key_help">Saisissez votre clé secrète Nostr pour utiliser une identité existante sur cet appareil.</string>
     <string name="nostr_nsec">Entrez votre clé privée</string>
     <string name="back">Retour</string>
@@ -58,7 +58,7 @@
     <string name="no_chats_yet">Pas encore de discussions</string>
     <string name="empty_chats_invite_npub">Démarrez une conversation en invitant quelqu’un avec son npub.</string>
     <string name="new_chat">Nouveau chat</string>
-    <string name="error_not_dark_matter_profile_qr">Ce code QR n’est pas un profil White Noise.</string>
+    <string name="error_not_white_noise_profile_qr">Ce code QR n’est pas un profil White Noise.</string>
     <string name="error_valid_recipient_reference">Entrez un npub valide, un lien de profil ou une clé publique hex.</string>
     <string name="error_missing_key_package">Ce compte n’a pas encore de package de clés publié. Demandez-leur d’ouvrir White Noise, puis réessayez.</string>
     <string name="error_missing_key_package_for">%1$s n’a pas encore de package de clés publié. Demandez-leur d’ouvrir White Noise, puis réessayez.</string>
