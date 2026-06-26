@@ -250,11 +250,42 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun taggedPut_failsClosed_whenTagCannotBePersisted() {
+        // The ciphertext tag authorizes hash-based expiry deletion, so a tagged
+        // write must fail closed: if the tag can't land, no decrypted .bin may
+        // survive untagged. Force the failure by occupying the tag's temp path
+        // with a non-empty directory (writeText to a dir throws), mirroring the
+        // on-disk naming sha256(key).tag.tmp.
+        val key = "acct|grp|msg|0"
+        File(dir, sha256Hex(key) + ".tag.tmp").apply {
+            mkdirs()
+            File(this, "occupied").writeText("x") // non-empty so the tmp-sweep can't delete it
+        }
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        cache.put(key, ByteArray(40) { 1 }, cache.generation(), "the-hash")
+        assertNull("a tagged write whose tag failed must not be readable", cache.get(key))
+        assertEquals(0, cache.size())
+        assertEquals(0L, cache.residentBytes())
+        assertTrue(
+            "no decrypted .bin may linger when its required tag could not be written",
+            dir.listFiles()?.none { it.isFile && it.name.endsWith(".bin") } ?: true,
+        )
+    }
+
+    @Test
     fun removeByCiphertextTags_emptySet_isNoOp() {
         val cache = DiskByteCache(dir, maxBytes = 1024)
         cache.put("k", ByteArray(30), cache.generation(), "h")
         assertEquals(0, cache.removeByCiphertextTags(emptySet()))
         assertNotNull(cache.get("k"))
+    }
+
+    private fun sha256Hex(value: String): String {
+        val digest =
+            java.security.MessageDigest
+                .getInstance("SHA-256")
+                .digest(value.toByteArray())
+        return digest.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
     }
 
     @Test

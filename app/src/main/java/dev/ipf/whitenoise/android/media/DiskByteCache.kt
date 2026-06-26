@@ -149,22 +149,39 @@ class DiskByteCache(
         val tmp = File(cacheDir, "$hashed$TMP_SUFFIX")
         try {
             tmp.writeBytes(bytes)
-            if (!tmp.renameTo(file)) {
-                runCatching { tmp.delete() }
-                return
-            }
         } catch (_: IOException) {
             runCatching { tmp.delete() }
             // Disk full / permission error. L1 still holds the bytes; this
             // entry just won't survive restart. Silent fail is acceptable.
             return
         }
-        // Persist the ciphertext tag as a sidecar so it survives a process
-        // restart (the in-memory Entry alone wouldn't), letting the expiry
-        // sweep evict by hash across sessions. Best-effort: a missing tag only
-        // costs the loaded-row eviction fallback.
+        // When a ciphertext tag is required (disappearing-message media), it is
+        // the only thing that lets the expiry sweep wipe this entry by hash after
+        // a restart, so the write FAILS CLOSED on it: persist the `.tag`
+        // (atomically, temp + rename) BEFORE the `.bin` is renamed into place. A
+        // crash then leaves at most an orphan `.tag` (swept on rehydrate) or a
+        // complete pair — never a decrypted `.bin` without the tag that authorizes
+        // its later deletion. If the tag can't be persisted, drop the `.bin`.
         if (ciphertextTag != null) {
-            runCatching { tagFileFor(file).writeText(ciphertextTag) }
+            val tagFile = tagFileFor(file)
+            val tagTmp = File(cacheDir, "${tagFile.name}$TMP_SUFFIX")
+            val tagPersisted =
+                runCatching {
+                    tagTmp.writeText(ciphertextTag)
+                    tagTmp.renameTo(tagFile)
+                }.getOrDefault(false)
+            if (!tagPersisted) {
+                runCatching { tagTmp.delete() }
+                runCatching { tmp.delete() }
+                return
+            }
+        }
+        if (!tmp.renameTo(file)) {
+            runCatching { tmp.delete() }
+            // Couldn't place the `.bin`; drop the tag we just wrote so no orphan
+            // sidecar points at a nonexistent entry.
+            if (ciphertextTag != null) runCatching { tagFileFor(file).delete() }
+            return
         }
         val size = bytes.size
         index[hashed] = Entry(file, size, ciphertextTag)
