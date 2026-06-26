@@ -5821,7 +5821,7 @@ private fun MediaVoiceBubble(
                                     if (file == null) return@launch
                                     localFile = file
                                     dev.ipf.whitenoise.android.audio.VoicePlaybackController
-                                        .play(pillKey, file)
+                                        .play(pillKey, file, ownerKey = controller.group.groupIdHex)
                                 }
                             },
                         ),
@@ -8430,50 +8430,52 @@ private fun ConversationScreen(
     // not skip past unrelated messages to find a later voice note — that
     // would jump the user past content they hadn't consumed.
     DisposableEffect(controller, chat.id) {
-        dev.ipf.whitenoise.android.audio.VoicePlaybackController.onCompletion = { completedKey ->
-            val completedMsgId = completedKey.substringBefore('#')
-            val completedIdx = controller.timeline.indexOfFirst { it.record.messageIdHex == completedMsgId }
-            if (completedIdx >= 0) {
-                // Walk forward only as long as the next item is a derived-
-                // state row (edit / group system) — those are invisible to
-                // the user, so skipping them doesn't violate "immediate
-                // neighbor" semantics.
-                var nextIdx = completedIdx + 1
-                while (nextIdx < controller.timeline.size &&
-                    MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)
-                ) {
-                    nextIdx++
-                }
-                val nextMsg = controller.timeline.getOrNull(nextIdx)
-                val refs = nextMsg?.let { controller.mediaReferences[it.record.messageIdHex] }
-                val audioEntry =
-                    refs?.withIndex()?.firstOrNull { (_, r) ->
-                        r.mediaType.startsWith("audio/", ignoreCase = true)
+        val ownerKey = controller.group.groupIdHex
+        val unregister =
+            dev.ipf.whitenoise.android.audio.VoicePlaybackController.registerCompletionCallback(ownerKey) { completedKey ->
+                val completedMsgId = completedKey.substringBefore('#')
+                val completedIdx = controller.timeline.indexOfFirst { it.record.messageIdHex == completedMsgId }
+                if (completedIdx >= 0) {
+                    // Walk forward only as long as the next item is a derived-
+                    // state row (edit / group system) — those are invisible to
+                    // the user, so skipping them doesn't violate "immediate
+                    // neighbor" semantics.
+                    var nextIdx = completedIdx + 1
+                    while (nextIdx < controller.timeline.size &&
+                        MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)
+                    ) {
+                        nextIdx++
                     }
-                if (nextMsg != null && audioEntry != null) {
-                    val idx = audioEntry.index
-                    val ref = audioEntry.value
-                    scope.launch {
-                        val mine = nextMsg.record.direction != "received"
-                        val file =
-                            runCatching {
-                                materializeVoiceAttachment(
-                                    context = context,
-                                    controller = controller,
-                                    messageIdHex = nextMsg.record.messageIdHex,
-                                    attachmentIndex = idx,
-                                    reference = ref,
-                                    mine = mine,
-                                )
-                            }.getOrNull() ?: return@launch
-                        dev.ipf.whitenoise.android.audio.VoicePlaybackController
-                            .play("${nextMsg.record.messageIdHex}#$idx", file)
+                    val nextMsg = controller.timeline.getOrNull(nextIdx)
+                    val refs = nextMsg?.let { controller.mediaReferences[it.record.messageIdHex] }
+                    val audioEntry =
+                        refs?.withIndex()?.firstOrNull { (_, r) ->
+                            r.mediaType.startsWith("audio/", ignoreCase = true)
+                        }
+                    if (nextMsg != null && audioEntry != null) {
+                        val idx = audioEntry.index
+                        val ref = audioEntry.value
+                        scope.launch {
+                            val mine = nextMsg.record.direction != "received"
+                            val file =
+                                runCatching {
+                                    materializeVoiceAttachment(
+                                        context = context,
+                                        controller = controller,
+                                        messageIdHex = nextMsg.record.messageIdHex,
+                                        attachmentIndex = idx,
+                                        reference = ref,
+                                        mine = mine,
+                                    )
+                                }.getOrNull() ?: return@launch
+                            dev.ipf.whitenoise.android.audio.VoicePlaybackController
+                                .play("${nextMsg.record.messageIdHex}#$idx", file, ownerKey = ownerKey)
+                        }
                     }
                 }
             }
-        }
         onDispose {
-            dev.ipf.whitenoise.android.audio.VoicePlaybackController.onCompletion = null
+            unregister()
         }
     }
 

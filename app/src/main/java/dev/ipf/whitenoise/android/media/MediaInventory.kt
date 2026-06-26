@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MessageTagFfi
 
 /**
  * Pure, framework-free helper that classifies a conversation's local timeline
@@ -14,10 +15,13 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
  * Everything is derived from data already on the message record — the `imeta`
  * attachment tags ([MediaReferenceParser]) and the parsed markdown body
  * ([AppMessageRecordFfi.contentTokens]) — so there is no new FFI or transport.
- * The sweep is O(N) over the records and allocation-light; callers cache the
- * result and rebuild on new-message arrival rather than per frame.
+ * The sweep is O(N) over the records and allocation-light; per-record parsing
+ * is cached across rebuilds so a new message does not force old `imeta` tags
+ * and markdown links to be re-walked every time.
  */
 object MediaInventory {
+    private const val RECORD_CACHE_MAX_ENTRIES = 512
+
     enum class Kind { IMAGE, VIDEO, VOICE, FILE }
 
     /** Where a media entry came from: an encrypted attachment, or a bare link in the body. */
@@ -45,6 +49,22 @@ object MediaInventory {
         val recordedAt: ULong,
         val url: String,
     )
+
+    private data class RecordCacheKey(
+        val messageIdHex: String,
+        val tags: List<MessageTagFfi>,
+        val contentTokens: MarkdownDocumentFfi,
+    )
+
+    private data class RecordInventory(
+        val media: List<MediaEntry>,
+        val urls: List<UrlEntry>,
+    )
+
+    private val recordCache =
+        object : LinkedHashMap<RecordCacheKey, RecordInventory>(RECORD_CACHE_MAX_ENTRIES + 1, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<RecordCacheKey, RecordInventory>?): Boolean = size > RECORD_CACHE_MAX_ENTRIES
+        }
 
     /**
      * Typed buckets in timeline order (oldest first, as supplied). Videos,
@@ -84,20 +104,43 @@ object MediaInventory {
         val files = ArrayList<MediaEntry>()
         val urls = ArrayList<UrlEntry>()
         for (record in records) {
-            for (reference in MediaReferenceParser.parseAllImetaTags(record.tags)) {
-                val kind = classify(reference)
-                val entry = MediaEntry(record.messageIdHex, record.sender, record.recordedAt, kind, Source.Attachment(reference))
+            val recordInventory = cachedRecordInventory(record)
+            for (entry in recordInventory.media) {
+                val kind = entry.kind
                 bucketFor(kind, images, videos, voice, files).add(entry)
             }
-            for (url in collectHttpUrls(record.contentTokens)) {
-                if (isImageUrl(url)) {
-                    images.add(MediaEntry(record.messageIdHex, record.sender, record.recordedAt, Kind.IMAGE, Source.LinkedUrl(url)))
-                } else {
-                    urls.add(UrlEntry(record.messageIdHex, record.sender, record.recordedAt, url))
-                }
-            }
+            urls.addAll(recordInventory.urls)
         }
         return Inventory(images, videos, voice, files, urls)
+    }
+
+    private fun cachedRecordInventory(record: AppMessageRecordFfi): RecordInventory {
+        val key = RecordCacheKey(record.messageIdHex, record.tags, record.contentTokens)
+        synchronized(recordCache) {
+            recordCache[key]?.let { return it }
+        }
+        val computed = buildRecordInventory(record)
+        synchronized(recordCache) {
+            recordCache[key] = computed
+        }
+        return computed
+    }
+
+    private fun buildRecordInventory(record: AppMessageRecordFfi): RecordInventory {
+        val media = ArrayList<MediaEntry>()
+        val urls = ArrayList<UrlEntry>()
+        for (reference in MediaReferenceParser.parseAllImetaTags(record.tags)) {
+            val kind = classify(reference)
+            media.add(MediaEntry(record.messageIdHex, record.sender, record.recordedAt, kind, Source.Attachment(reference)))
+        }
+        for (url in collectHttpUrls(record.contentTokens)) {
+            if (isImageUrl(url)) {
+                media.add(MediaEntry(record.messageIdHex, record.sender, record.recordedAt, Kind.IMAGE, Source.LinkedUrl(url)))
+            } else {
+                urls.add(UrlEntry(record.messageIdHex, record.sender, record.recordedAt, url))
+            }
+        }
+        return RecordInventory(media, urls)
     }
 
     private fun classify(reference: MediaAttachmentReferenceFfi): Kind =
