@@ -217,6 +217,47 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun removeByCiphertextTags_evictsTaggedEntriesOnly() {
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        cache.put("acct|grp|msg-1|0", ByteArray(30), cache.generation(), "hash-a")
+        cache.put("acct|grp|msg-2|0", ByteArray(30), cache.generation(), "hash-b")
+        cache.put("acct|grp|msg-3|0", ByteArray(30)) // untagged
+        val removed = cache.removeByCiphertextTags(setOf("hash-a"))
+        assertEquals(1, removed)
+        assertNull(cache.get("acct|grp|msg-1|0"))
+        assertNotNull(cache.get("acct|grp|msg-2|0"))
+        assertNotNull(cache.get("acct|grp|msg-3|0"))
+        assertEquals(60L, cache.residentBytes())
+    }
+
+    @Test
+    fun removeByCiphertextTags_worksAfterRehydrate_forUnloadedMedia() {
+        // The #334 crux: media cached in a prior session must still be evictable
+        // by ciphertext hash after a process restart, when nothing in memory maps
+        // the hash to its cache key. Proven by tagging, dropping the instance, and
+        // evicting purely by hash from a fresh instance over the same dir.
+        // generation 0 is the initial generation of a fresh instance.
+        DiskByteCache(dir, maxBytes = 1024)
+            .put("acct|grp|old-msg|0", ByteArray(40) { 5 }, 0, "expired-hash")
+        val rehydrated = DiskByteCache(dir, maxBytes = 1024)
+        assertNotNull("entry should survive the restart", rehydrated.get("acct|grp|old-msg|0"))
+        val removed = rehydrated.removeByCiphertextTags(setOf("expired-hash"))
+        assertEquals("the persisted tag must drive eviction across sessions", 1, removed)
+        assertNull(rehydrated.get("acct|grp|old-msg|0"))
+        assertEquals(0L, rehydrated.residentBytes())
+        // The sidecar must be gone too, not orphaned.
+        assertTrue(dir.listFiles()?.none { it.name.endsWith(".tag") } ?: true)
+    }
+
+    @Test
+    fun removeByCiphertextTags_emptySet_isNoOp() {
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        cache.put("k", ByteArray(30), cache.generation(), "h")
+        assertEquals(0, cache.removeByCiphertextTags(emptySet()))
+        assertNotNull(cache.get("k"))
+    }
+
+    @Test
     fun differentKeys_collideToDifferentFiles() {
         // Defense against hash collision oversight — two keys must map to
         // two distinct files. (sha256 makes real collisions improbable; this

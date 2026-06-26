@@ -2172,8 +2172,15 @@ class ConversationController(
                     while (isActive) {
                         if (group.disappearingMessageSecs > 0uL) {
                             runCatching { appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) } }
-                                .onSuccess { evictExpiredMediaCaches(account, it.mediaCiphertextSha256.toSet()) }
-                                .onFailure { it.rethrowIfCancellation() }
+                                .onSuccess { result ->
+                                    // When the engine actually pruned rows, clear the
+                                    // conversation's accumulating tray card so it can't
+                                    // keep pointing at a now-vanished message. #333.
+                                    if (result.prunedMessages > 0uL) {
+                                        appState.dismissConversationNotifications(account, group.groupIdHex)
+                                    }
+                                    evictExpiredMediaCaches(account, result.mediaCiphertextSha256.toSet())
+                                }.onFailure { it.rethrowIfCancellation() }
                             publishTimelineFromIndexes()
                         }
                         delay(60_000L)
@@ -3302,18 +3309,28 @@ class ConversationController(
         expiredCiphertextSha256: Set<String>,
     ) {
         if (expiredCiphertextSha256.isEmpty()) return
-        val keys =
+        // Map expired hashes to cache keys via the loaded references. Covers the
+        // in-memory tiers (L1 plaintext + decoded thumbnails, keyed by cache key
+        // and session-scoped, so anything resident is in mediaReferences) and the
+        // on-disk entries for loaded messages — including untagged ones such as
+        // self-sent media seeded at send time before its ciphertext hash existed.
+        val loadedKeys =
             mediaReferences.flatMap { (messageIdHex, refs) ->
                 refs.mapIndexedNotNull { index, ref ->
                     if (ref.ciphertextSha256 in expiredCiphertextSha256) mediaCacheKey(account, messageIdHex, index) else null
                 }
             }
-        if (keys.isEmpty()) return
-        keys.forEach { key ->
+        loadedKeys.forEach { key ->
             appState.mediaPlaintextCache.remove(key)
             appState.mediaThumbnailCache.remove(key)
         }
-        withContext(Dispatchers.IO) { keys.forEach { appState.diskMediaCache.remove(it) } }
+        withContext(Dispatchers.IO) {
+            loadedKeys.forEach { appState.diskMediaCache.remove(it) }
+            // Plus any disk entry stamped with an expired ciphertext tag — the
+            // only path that reaches media whose message isn't currently loaded
+            // (no mediaReferences entry), including across process restarts. #674 review.
+            appState.diskMediaCache.removeByCiphertextTags(expiredCiphertextSha256)
+        }
     }
 
     /**
@@ -3393,8 +3410,12 @@ class ConversationController(
                     appState.mediaPlaintextCache.put(cacheKey, result.plaintext)
                     val plaintext = result.plaintext
                     // Persist to L2 still on this background scope (same
-                    // lifetime as the FFI fetch).
-                    withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, plaintext, cacheGeneration) }
+                    // lifetime as the FFI fetch). Tag the entry with the
+                    // attachment's ciphertext hash so the expiry sweep can wipe
+                    // it from disk later even if its message isn't loaded then.
+                    withContext(Dispatchers.IO) {
+                        appState.diskMediaCache.put(cacheKey, plaintext, cacheGeneration, reference.ciphertextSha256)
+                    }
                 }
                 result.plaintext
             }
