@@ -70,6 +70,18 @@ class AvatarImageLoaderTest {
     }
 
     @Test
+    fun avatarFailureExpiryCacheDropsExpiredEntriesBeforeCapacity() {
+        val failures = AvatarFailureExpiryCache(maxEntries = 3)
+        failures.recordFailure(url = "https://example.com/stale.png", expiresAtMillis = 1_000L, nowMillis = 0L)
+
+        failures.recordFailure(url = "https://example.com/fresh.png", expiresAtMillis = 3_000L, nowMillis = 2_000L)
+
+        assertEquals(1, failures.size)
+        assertEquals(false, failures.isFresh(url = "https://example.com/stale.png", nowMillis = 2_500L))
+        assertEquals(true, failures.isFresh(url = "https://example.com/fresh.png", nowMillis = 2_500L))
+    }
+
+    @Test
     fun avatarFailureExpiryCacheEvictsOldestEntriesWhenFailuresRemainFresh() {
         val failures = AvatarFailureExpiryCache(maxEntries = 3)
         (1..5).forEach { index ->

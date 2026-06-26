@@ -45,7 +45,13 @@ object ChatListMessageSearch {
     fun bodyMatches(
         plaintext: String,
         ciNeedle: String,
-    ): Boolean = ciNeedle.isNotEmpty() && plaintext.lowercase(Locale.ROOT).contains(ciNeedle)
+    ): Boolean {
+        val normalizedNeedle = normalizeWhitespace(ciNeedle)
+        if (normalizedNeedle.isEmpty()) return false
+        return normalizeWhitespace(plaintext)
+            .lowercase(Locale.ROOT)
+            .contains(normalizedNeedle.lowercase(Locale.ROOT))
+    }
 
     /**
      * Whether a row's match is fully explained by its title, last-message
@@ -95,10 +101,12 @@ object ChatListMessageSearch {
         // locating the needle, so the index we compute lines up with the
         // single-line snippet the UI renders. Don't trim mid-string -- only the
         // window edges get ellipsized.
-        val normalized = WHITESPACE_RUN.replace(plaintext, " ").trim()
-        val matchStart = normalized.lowercase(Locale.ROOT).indexOf(needle.lowercase(Locale.ROOT))
+        val normalized = normalizeWhitespace(plaintext)
+        val normalizedNeedle = normalizeWhitespace(needle)
+        if (normalizedNeedle.isEmpty()) return null
+        val matchStart = normalized.lowercase(Locale.ROOT).indexOf(normalizedNeedle.lowercase(Locale.ROOT))
         if (matchStart < 0) return null
-        val matchEnd = matchStart + needle.length
+        val matchEnd = matchStart + normalizedNeedle.length
 
         // No clipping needed: short body fits whole.
         if (normalized.length <= maxLength) {
@@ -143,6 +151,8 @@ object ChatListMessageSearch {
             highlightEnd = hlEnd,
         )
     }
+
+    private fun normalizeWhitespace(value: String): String = WHITESPACE_RUN.replace(value, " ").trim()
 
     /**
      * The minimal view of a timeline record this object needs to pick a body

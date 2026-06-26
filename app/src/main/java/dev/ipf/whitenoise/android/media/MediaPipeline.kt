@@ -1122,21 +1122,7 @@ object MediaPipeline {
                         THUMBNAIL_MAX_EDGE_PX,
                         THUMBNAIL_MAX_EDGE_PX,
                     )
-                val thumbhash =
-                    poster?.let { bm ->
-                        // ThumbHash needs an opaque RGB bitmap; matches the
-                        // image-pipeline convention.
-                        val opaque =
-                            Bitmap.createBitmap(bm.width, bm.height, Bitmap.Config.ARGB_8888).apply {
-                                val canvas = Canvas(this)
-                                canvas.drawColor(Color.BLACK)
-                                canvas.drawBitmap(bm, 0f, 0f, null)
-                            }
-                        runCatching { Thumbhash.encodeFromBitmap(opaque) }
-                            .also { opaque.recycle() }
-                            .getOrNull()
-                    }
-                poster?.recycle()
+                val thumbhash = posterThumbhash(poster)
                 val bytes = runCatching { readFileBytesExact(tmp) }.getOrElse { return VideoReadResult.Failed }
                 return VideoReadResult.Success(
                     VideoForUpload(
@@ -1153,6 +1139,31 @@ object MediaPipeline {
             }
         } finally {
             runCatching { tmp.delete() }
+        }
+    }
+
+    private fun posterThumbhash(poster: Bitmap?): String? {
+        if (poster == null) return null
+        return try {
+            // ThumbHash needs an opaque RGB bitmap; matches the image-pipeline
+            // convention. Keep the allocation inside the guard: some codecs ignore
+            // getScaledFrameAtTime's cap and can hand back a very large frame.
+            var opaque: Bitmap? = null
+            try {
+                opaque = Bitmap.createBitmap(poster.width, poster.height, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(opaque)
+                canvas.drawColor(Color.BLACK)
+                canvas.drawBitmap(poster, 0f, 0f, null)
+                Thumbhash.encodeFromBitmap(opaque)
+            } finally {
+                opaque?.recycle()
+            }
+        } catch (_: OutOfMemoryError) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        } finally {
+            poster.recycle()
         }
     }
 
