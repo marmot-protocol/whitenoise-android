@@ -576,9 +576,9 @@ private fun rememberConversationControllerCopy(): ConversationControllerCopy =
 private fun rememberRelativeTimeCopy(): dev.ipf.whitenoise.android.core.RelativeTimeCopy {
     val future = stringResource(R.string.relative_time_future)
     val now = stringResource(R.string.relative_time_now)
-    // Resolve plural-aware unit strings through getQuantityString so inflected
-    // locales (Russian one/few/many, etc.) render the correct grammatical form
-    // for the count. The Resources handle comes from the Compose LocalContext.
+    // Resolve the sub-hour unit string through getQuantityString so inflected
+    // locales render the correct grammatical form for the count. Past an hour,
+    // IdentityFormatter intentionally switches to exact clock/date labels.
     val resources = LocalContext.current.resources
     return remember(future, now, resources) {
         dev.ipf.whitenoise.android.core.RelativeTimeCopy(
@@ -586,12 +586,6 @@ private fun rememberRelativeTimeCopy(): dev.ipf.whitenoise.android.core.Relative
             now = now,
             minutes = { count ->
                 resources.getQuantityString(R.plurals.relative_time_minutes, count, count)
-            },
-            hours = { count ->
-                resources.getQuantityString(R.plurals.relative_time_hours, count, count)
-            },
-            days = { count ->
-                resources.getQuantityString(R.plurals.relative_time_days, count, count)
             },
         )
     }
@@ -9949,8 +9943,16 @@ private fun ConversationScreen(
                                 // Rendered inside the slot, not as its own item, so
                                 // the anchor index math stays intact.
                                 val older = renderedTimeline.getOrNull(index - 1)
-                                if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
-                                    DaySeparator(messageDayLabel(item.record.recordedAt, transcriptLocale))
+                                val daySeparatorLabel =
+                                    remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale) {
+                                        if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
+                                            messageDayLabel(item.record.recordedAt, transcriptLocale)
+                                        } else {
+                                            null
+                                        }
+                                    }
+                                if (daySeparatorLabel != null) {
+                                    DaySeparator(daySeparatorLabel)
                                 }
                                 if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
                                     UnreadMessagesDivider(count = entryUnreadCount)
@@ -17532,7 +17534,10 @@ private fun ProfileSheet(
     // The existing 1:1 DM with this person, if any — the confirmed two-member
     // group with them. Drives the Message button: open it when present,
     // otherwise start a new DM.
-    val directMessageGroup = appState.existingDirectChat(npub)
+    val directMessageGroup =
+        remember(npub, appState.chatListItems) {
+            appState.existingDirectChat(npub)
+        }
     // True while a brand-new DM is being created+published, so the Message
     // button shows progress and we don't dismiss into a blank gap before the
     // conversation opens.

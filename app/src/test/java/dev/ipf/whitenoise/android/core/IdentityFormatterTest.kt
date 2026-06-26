@@ -184,8 +184,6 @@ class IdentityFormatterTest {
                 future = "FUT",
                 now = "NOW",
                 minutes = { count -> "min=$count" },
-                hours = { count -> "hr=$count" },
-                days = { count -> "day=$count" },
             )
 
         assertEquals("min=45", IdentityFormatter.relativeTime(fortyFiveMinutesAgo, copy, Locale.US))

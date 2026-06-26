@@ -525,6 +525,28 @@ internal fun canAcceptTextSend(
 internal const val SEND_RETRY_ATTEMPTS: Int = 3
 internal val SEND_RETRY_BACKOFF_MS: Long = 700L
 
+private const val AGENT_STREAM_PREVIEW_MAX_CHARS = 16 * 1024
+
+internal fun appendCappedAgentStreamPreview(
+    text: StringBuilder,
+    chunk: String,
+    maxChars: Int = AGENT_STREAM_PREVIEW_MAX_CHARS,
+) {
+    if (maxChars <= 0) {
+        text.clear()
+        return
+    }
+    if (chunk.length >= maxChars) {
+        text.clear()
+        text.append(chunk.takeLast(maxChars))
+        return
+    }
+    text.append(chunk)
+    if (text.length > maxChars) {
+        text.delete(0, text.length - maxChars)
+    }
+}
+
 /**
  * Whether [throwable] is a relay-connectivity failure that proves the event was
  * **never transmitted to any relay**, and is therefore safe to re-send by
@@ -5195,7 +5217,7 @@ class ConversationController(
                 appendStreamDebugEvent(streamId, update)
                 when (update) {
                     is AgentStreamUpdateFfi.Chunk -> {
-                        text.append(update.text)
+                        appendCappedAgentStreamPreview(text, update.text)
                         updateStreamPreview(streamId, text.toString(), MessageStatus.Streaming)
                     }
                     is AgentStreamUpdateFfi.Finished -> {

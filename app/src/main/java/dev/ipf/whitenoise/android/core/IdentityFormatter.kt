@@ -136,20 +136,15 @@ object IdentityFormatter {
 /**
  * Copy used by [IdentityFormatter.relativeTime].
  *
- * The unit branches (minutes / hours / days) are resolved through plural-aware
- * callbacks rather than `String.format` against a flat `<string>`. This lets the
- * Compose layer back each callback with `Resources.getQuantityString(...)` so
- * inflected locales (Russian one/few/many, Polish, Arabic, ...) render the
- * grammatically correct form for the count. Keeping the callbacks here — instead
- * of threading a `Context` into [IdentityFormatter] — preserves the formatter as
- * a pure, JVM-testable function with no Android dependency.
+ * The sub-hour unit branch is resolved through a plural-aware callback rather
+ * than `String.format` against a flat `<string>`. This lets the Compose layer
+ * back the callback with `Resources.getQuantityString(...)` so inflected locales
+ * render the grammatically correct form while keeping [IdentityFormatter] pure.
  */
 data class RelativeTimeCopy(
     val future: String,
     val now: String,
     val minutes: (count: Int) -> String,
-    val hours: (count: Int) -> String,
-    val days: (count: Int) -> String,
 ) {
     companion object {
         /**
@@ -162,8 +157,6 @@ data class RelativeTimeCopy(
                 future = "future",
                 now = "now",
                 minutes = { count -> "${count}m" },
-                hours = { count -> "${count}h" },
-                days = { count -> "${count}d" },
             )
     }
 }

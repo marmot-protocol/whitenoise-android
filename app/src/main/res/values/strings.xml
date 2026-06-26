@@ -708,14 +708,6 @@
         <item quantity="one">%1$dm</item>
         <item quantity="other">%1$dm</item>
     </plurals>
-    <plurals name="relative_time_hours">
-        <item quantity="one">%1$dh</item>
-        <item quantity="other">%1$dh</item>
-    </plurals>
-    <plurals name="relative_time_days">
-        <item quantity="one">%1$dd</item>
-        <item quantity="other">%1$dd</item>
-    </plurals>
     <string name="media_attachment_add_more">Add more</string>
     <string name="media_attachment_remove">Remove attachment</string>
     <string name="voice_message_record">Hold to record voice message</string>

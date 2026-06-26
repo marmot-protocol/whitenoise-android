@@ -69,14 +69,21 @@ class MainActivity : ComponentActivity() {
      * already-queued target/link intact (see [routeInboundIntent]).
      */
     private fun consumeIntent(intent: Intent?) {
+        val parsedTarget = NotificationNavigation.parse(intent)
         val routing =
             routeInboundIntent(
-                parsedTarget = NotificationNavigation.parse(intent),
+                parsedTarget = parsedTarget,
                 dataString = intent?.dataString,
                 current = InboundIntentRouting(inboundNotificationTarget, inboundProfilePayload),
             )
         inboundNotificationTarget = routing.notificationTarget
         inboundProfilePayload = routing.profilePayload
+        if (parsedTarget != null) {
+            // Notification taps are one-shot navigation requests. Replace the
+            // stored intent after parsing so activity recreation cannot replay
+            // the same target after the UI has already consumed it.
+            setIntent(Intent(this, MainActivity::class.java))
+        }
     }
 
     override fun onStart() {
