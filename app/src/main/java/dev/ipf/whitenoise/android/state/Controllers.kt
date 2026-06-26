@@ -2989,8 +2989,14 @@ class ConversationController(
                             ?.let { appState.mediaThumbnailCache.put(confirmedKey, it) }
                         val bytesToPersist = attachment.plaintextBytes
                         val cacheGeneration = appState.diskMediaCache.generation()
+                        // Tag with the uploaded blob's ciphertext hash so the
+                        // expiry sweep can wipe this self-sent entry from disk by
+                        // hash even after a restart / when its row isn't loaded.
+                        val ciphertextTag = references.getOrNull(index)?.ciphertextSha256
                         appState.launchMutation {
-                            withContext(Dispatchers.IO) { appState.diskMediaCache.put(confirmedKey, bytesToPersist, cacheGeneration) }
+                            withContext(Dispatchers.IO) {
+                                appState.diskMediaCache.put(confirmedKey, bytesToPersist, cacheGeneration, ciphertextTag)
+                            }
                         }
                     }
                 }
@@ -3472,8 +3478,13 @@ class ConversationController(
                 ?.let { appState.mediaThumbnailCache.put(cacheKey, it) }
             val bytesToPersist = attachment.plaintextBytes
             val cacheGeneration = appState.diskMediaCache.generation()
+            // Tag with the uploaded blob's ciphertext hash (captured at upload)
+            // so hash-based expiry eviction reaches this entry across sessions.
+            val ciphertextTag = retained.uploadedReferences?.getOrNull(index)?.ciphertextSha256
             appState.launchMutation {
-                withContext(Dispatchers.IO) { appState.diskMediaCache.put(cacheKey, bytesToPersist, cacheGeneration) }
+                withContext(Dispatchers.IO) {
+                    appState.diskMediaCache.put(cacheKey, bytesToPersist, cacheGeneration, ciphertextTag)
+                }
             }
         }
     }
