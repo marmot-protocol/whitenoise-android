@@ -343,6 +343,7 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MissingRelayListKindFfi
 import dev.ipf.marmotkit.RelayHealthFfi
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -19476,10 +19477,29 @@ private fun PublishedRelayLists(lists: AccountRelayListsFfi?) {
         if (lists.complete) {
             Text(stringResource(R.string.all_relay_lists_published), color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            Text(stringResource(R.string.missing_relay_lists, lists.missing.joinToString(", ")), color = MaterialTheme.colorScheme.error)
+            Text(
+                stringResource(R.string.missing_relay_lists, missingRelayListLabels(lists.missing)),
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }
+
+@Composable
+private fun missingRelayListLabels(missing: List<MissingRelayListKindFfi>): String {
+    val labels = mutableListOf<String>()
+    for (kind in missing) {
+        labels += stringResource(kind.labelRes)
+    }
+    return labels.joinToString(", ")
+}
+
+internal val MissingRelayListKindFfi.labelRes: Int
+    get() =
+        when (this) {
+            MissingRelayListKindFfi.NIP65 -> R.string.nip_65
+            MissingRelayListKindFfi.INBOX -> R.string.inbox
+        }
 
 @Composable
 private fun RelayListRow(
