@@ -1871,7 +1871,11 @@ private inline fun chatsDebug(
     error: Throwable,
     message: () -> String,
 ) {
-    Log.e("DMChats", message(), error)
+    if (BuildConfig.DEBUG) {
+        Log.e("DMChats", message(), error)
+    } else {
+        Log.e("DMChats", "operation failed: ${error.javaClass.simpleName}")
+    }
 }
 
 private val ConversationTimelinePageLimit = 50u

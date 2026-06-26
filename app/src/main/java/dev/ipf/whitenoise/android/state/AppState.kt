@@ -3343,7 +3343,11 @@ private inline fun appStateDebug(
     error: Throwable,
     message: () -> String,
 ) {
-    Log.e("DMAppState", message(), error)
+    if (BuildConfig.DEBUG) {
+        Log.e("DMAppState", message(), error)
+    } else {
+        Log.e("DMAppState", "operation failed: ${error.javaClass.simpleName}")
+    }
 }
 
 private fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
