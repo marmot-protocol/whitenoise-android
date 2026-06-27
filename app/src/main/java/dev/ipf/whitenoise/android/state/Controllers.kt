@@ -1739,7 +1739,8 @@ class ChatsController(
         // shared-groups list can resolve from local snapshots.
         schedulePendingMemberFetches()
         // Likewise, fan out off-main markdown parses for any preview text we
-        // haven't tokenized yet; each completion folds back via recompute().
+        // haven't tokenized yet; each completion folds back via
+        // scheduleRecompute() so a burst coalesces into one rebuild.
         schedulePendingPreviewParses()
         schedulePendingInviteAutoAccepts()
     }
@@ -1747,8 +1748,9 @@ class ChatsController(
     /**
      * Walk the current chat rows and, for any group without cached members or
      * an in-flight fetch, kick off a `groupMembers` FFI call. On success the
-     * cache updates and `recompute()` runs again so row titles and profile-sheet
-     * shared-group intersections see the local member snapshot.
+     * cache updates and `scheduleRecompute()` runs so row titles and
+     * profile-sheet shared-group intersections see the local member snapshot,
+     * with a burst of completions coalesced into one rebuild.
      */
     private fun schedulePendingMemberFetches() {
         val account = accountRef ?: return
@@ -1785,7 +1787,10 @@ class ChatsController(
                             ) {
                                 removedGroupIds = removedGroupIds + groupIdHex
                             }
-                            recompute()
+                            // Coalesce: a burst of member-fetch completions on
+                            // account open/switch would otherwise drive N
+                            // un-debounced full recomputes. Defer into one.
+                            scheduleRecompute()
                         }
                     }
                 } catch (e: CancellationException) {
@@ -1808,8 +1813,9 @@ class ChatsController(
     /**
      * Walk the current chat rows and, for any preview plaintext without
      * cached tokens or an in-flight parse, kick off the `parseMarkdown` FFI
-     * call off-main. On completion the cache updates and `recompute()` runs
-     * again so the row re-emits with its styled preview. List emission never
+     * call off-main. On completion the cache updates and `scheduleRecompute()`
+     * runs so the row re-emits with its styled preview (a burst of completions
+     * coalescing into one rebuild). List emission never
      * waits on a parse: rows surface immediately with plaintext and upgrade
      * when the tokens land. Failures cache the empty document (renders as
      * plaintext, no retry storm). The cache is pruned to the texts still on
@@ -1834,7 +1840,10 @@ class ChatsController(
                     val tokens = appState.parseMarkdownOrEmpty(text)
                     if (bindEpoch != epoch) return@launchMutation
                     previewTokensByText = previewTokensByText + (text to tokens)
-                    recompute()
+                    // Coalesce: a burst of preview-parse completions on account
+                    // open/switch would otherwise drive N un-debounced full
+                    // recomputes. Defer into one.
+                    scheduleRecompute()
                 } finally {
                     // Same epoch discipline as the member fetches: a later
                     // bind() already cleared the set, so only the owning
