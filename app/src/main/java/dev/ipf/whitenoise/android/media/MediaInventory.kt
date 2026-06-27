@@ -5,7 +5,6 @@ import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.marmotkit.MessageTagFfi
 
 /**
  * Pure, framework-free helper that classifies a conversation's local timeline
@@ -52,8 +51,8 @@ object MediaInventory {
 
     private data class RecordCacheKey(
         val messageIdHex: String,
-        val tags: List<MessageTagFfi>,
-        val contentTokens: MarkdownDocumentFfi,
+        val recordedAt: ULong,
+        val receivedAt: ULong,
     )
 
     private data class RecordInventory(
@@ -65,6 +64,12 @@ object MediaInventory {
         object : LinkedHashMap<RecordCacheKey, RecordInventory>(RECORD_CACHE_MAX_ENTRIES + 1, 0.75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<RecordCacheKey, RecordInventory>?): Boolean = size > RECORD_CACHE_MAX_ENTRIES
         }
+
+    fun clear() {
+        synchronized(recordCache) {
+            recordCache.clear()
+        }
+    }
 
     /**
      * Typed buckets in timeline order (oldest first, as supplied). Videos,
@@ -91,8 +96,10 @@ object MediaInventory {
 
     // True when the URL's path component (not its query/fragment) ends in a
     // known image extension. Unparseable or path-less URLs are not images.
-    private fun isImageUrl(url: String): Boolean {
-        val path = runCatching { java.net.URI(url).path }.getOrNull()
+    private fun isLoadableImageUrl(url: String): Boolean {
+        val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return false
+        if (!uri.scheme.equals("https", ignoreCase = true)) return false
+        val path = uri.path
         if (path.isNullOrEmpty()) return false
         return IMAGE_URL_EXTENSION.containsMatchIn(path)
     }
@@ -115,7 +122,7 @@ object MediaInventory {
     }
 
     private fun cachedRecordInventory(record: AppMessageRecordFfi): RecordInventory {
-        val key = RecordCacheKey(record.messageIdHex, record.tags, record.contentTokens)
+        val key = RecordCacheKey(record.messageIdHex, record.recordedAt, record.receivedAt)
         synchronized(recordCache) {
             recordCache[key]?.let { return it }
         }
@@ -134,7 +141,7 @@ object MediaInventory {
             media.add(MediaEntry(record.messageIdHex, record.sender, record.recordedAt, kind, Source.Attachment(reference)))
         }
         for (url in collectHttpUrls(record.contentTokens)) {
-            if (isImageUrl(url)) {
+            if (isLoadableImageUrl(url)) {
                 media.add(MediaEntry(record.messageIdHex, record.sender, record.recordedAt, Kind.IMAGE, Source.LinkedUrl(url)))
             } else {
                 urls.add(UrlEntry(record.messageIdHex, record.sender, record.recordedAt, url))

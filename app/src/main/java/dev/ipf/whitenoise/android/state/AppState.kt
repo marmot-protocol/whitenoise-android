@@ -48,6 +48,7 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
@@ -1481,6 +1482,7 @@ class WhiteNoiseAppState(
     private fun clearInMemoryMediaCaches() {
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
+        MediaInventory.clear()
         mediaUploadSessionEpoch.incrementAndGet()
         // Uploads run on the app-lifetime mutation scope so they can survive
         // conversation-screen disposal. Account switch/sign-out is different:

@@ -8,9 +8,15 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class MediaInventoryTest {
+    @Before
+    fun setUp() {
+        MediaInventory.clear()
+    }
+
     @Test
     fun classifiesAttachmentsByMimeIntoTypedBuckets() {
         val inventory =
@@ -57,6 +63,14 @@ class MediaInventoryTest {
     }
 
     @Test
+    fun cleartextBodyImageUrlStaysPlainUrl() {
+        val inventory = MediaInventory.build(listOf(record(id = "m", body = link("http://cdn.example.com/cat.JPG"))))
+
+        assertTrue(inventory.images.isEmpty())
+        assertEquals(listOf("http://cdn.example.com/cat.JPG"), inventory.urls.map { it.url })
+    }
+
+    @Test
     fun imageExtensionInQueryOnlyIsAUrlNotAnImage() {
         // The image extension is in the query, not the path — it's a normal link
         // and must stay in the URLs bucket, not be misread as an image.
@@ -90,8 +104,9 @@ class MediaInventoryTest {
     }
 
     @Test
-    fun cacheKeyIncludesBodySoEditedLinksRefresh() {
+    fun mediaInventoryClearDropsCachedRecordEntries() {
         val first = MediaInventory.build(listOf(record(id = "m", body = link("https://example.com/one"))))
+        MediaInventory.clear()
         val second = MediaInventory.build(listOf(record(id = "m", body = link("https://example.com/two"))))
 
         assertEquals(listOf("https://example.com/one"), first.urls.map { it.url })

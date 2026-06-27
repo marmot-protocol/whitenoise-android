@@ -32,11 +32,11 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       # AGP 9.x / Gradle 9.4.1 require JDK 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
         with:
           distribution: temurin
           java-version: '17'
@@ -44,7 +44,7 @@ jobs:
       # Configures the Gradle wrapper and caches dependencies + build state
       # across runs (read/write on master pushes, read-only on PRs).
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Compile (Kotlin)
         run: ./gradlew :app:compileDevDebugKotlin --no-daemon --stacktrace
@@ -80,7 +80,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: kover-coverage-report
           path: |
@@ -95,7 +95,7 @@ jobs:
       # workflow artifacts without re-running locally.
       - name: Upload reports
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: android-ci-reports
           path: |

@@ -6,6 +6,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QrCodeEncoderTest {
+    private val sampleNpub = "npub1" + "a".repeat(58)
+
     @Test
     fun rejectsOversizeDimensionBeforeAllocating() {
         // #169: a size whose square overflows Int (50_000² ≈ 2.5e9 > Int.MAX)
@@ -20,7 +22,7 @@ class QrCodeEncoderTest {
 
     @Test
     fun createsSquareQrMatricesForProfileLinks() {
-        val matrix = QrCodeEncoder.matrix(ProfileLink("npub1abc").uri, size = 128)
+        val matrix = QrCodeEncoder.matrix(ProfileLink(sampleNpub).uri, size = 128)
 
         assertEquals(128, matrix.width)
         assertEquals(128, matrix.height)
@@ -31,7 +33,7 @@ class QrCodeEncoderTest {
     fun createsPackedQrPixelsForBitmapRendering() {
         val pixels =
             QrCodeEncoder.pixels(
-                content = ProfileLink("npub1abc").uri,
+                content = ProfileLink(sampleNpub).uri,
                 size = 128,
                 onColor = 1,
                 offColor = 0,
