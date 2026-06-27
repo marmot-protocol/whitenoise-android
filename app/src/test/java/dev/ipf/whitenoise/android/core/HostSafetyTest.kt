@@ -29,6 +29,18 @@ class HostSafetyTest {
     }
 
     @Test
+    fun additionalSpecialUseIpv4RangesAreFlagged() {
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("192.0.0.9"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("192.88.99.1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("198.18.0.1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("198.19.255.255"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("224.0.0.1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("239.255.255.255"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("240.0.0.1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("255.255.255.255"))
+    }
+
+    @Test
     fun publicIpv4IsAllowed() {
         assertFalse(HostSafety.isPrivateOrLoopbackHost("8.8.8.8"))
         assertFalse(HostSafety.isPrivateOrLoopbackHost("1.1.1.1"))
@@ -82,6 +94,13 @@ class HostSafetyTest {
     fun publicIpv6IsAllowed() {
         assertFalse(HostSafety.isPrivateOrLoopbackHost("2001:4860:4860::8888"))
         assertFalse(HostSafety.isPrivateOrLoopbackHost("fbff::1"))
+    }
+
+    @Test
+    fun documentationAndDiscardOnlyIpv6AreFlagged() {
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("100::"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("100::1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("2001:db8::1"))
     }
 
     @Test
@@ -173,6 +192,15 @@ class HostSafetyTest {
     }
 
     @Test
+    fun resolvedAdditionalSpecialUseIpv4AddressesAreFlagged() {
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(192, 0, 0, 9)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(192, 88, 99, 1)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(198, 18, 0, 1)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(224, 0, 0, 1)))
+        assertTrue(HostSafety.isPrivateOrLoopbackAddress(ipv4(240, 0, 0, 1)))
+    }
+
+    @Test
     fun resolvedPublicAddressesAreAllowed() {
         assertFalse(HostSafety.isPrivateOrLoopbackAddress(ipv4(8, 8, 8, 8)))
         assertFalse(HostSafety.isPrivateOrLoopbackAddress(ipv4(1, 1, 1, 1)))
@@ -219,6 +247,20 @@ class HostSafetyTest {
         assertFalse(
             HostSafety.isPrivateOrLoopbackAddress(
                 ipv6(0x20, 0x01, 0x48, 0x60, 0x48, 0x60, 0, 0, 0, 0, 0, 0, 0, 0, 0x88, 0x88),
+            ),
+        )
+    }
+
+    @Test
+    fun resolvedDocumentationAndDiscardOnlyIpv6AreFlagged() {
+        assertTrue(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            ),
+        )
+        assertTrue(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0x20, 0x01, 0x0D, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             ),
         )
     }

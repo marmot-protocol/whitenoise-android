@@ -98,8 +98,9 @@ object HostSafety {
                 ) {
                     isPrivateIpv4(toUnsignedOctets(bytes.copyOfRange(12, 16)))
                 } else {
-                    // fc00::/7 unique-local — not covered by the JDK helpers.
-                    (bytes.firstOrNull()?.toInt()?.and(0xFE)) == 0xFC
+                    // fc00::/7 unique-local, documentation/discard-only, and
+                    // other special-use ranges not covered by the JDK helpers.
+                    isPrivateIpv6Groups(hextets(bytes))
                 }
             }
             else -> false
@@ -188,8 +189,13 @@ object HostSafety {
             a == 10 -> true // RFC 1918
             a == 172 && b in 16..31 -> true // RFC 1918
             a == 192 && b == 168 -> true // RFC 1918
+            a == 192 && b == 0 -> true // IETF protocol assignments
+            a == 192 && b == 88 && octets[2] == 99 -> true // deprecated 6to4 relay anycast
+            a == 198 && b in 18..19 -> true // benchmarking
             a == 169 && b == 254 -> true // link-local
             a == 100 && b in 64..127 -> true // RFC 6598 carrier-grade NAT
+            a in 224..239 -> true // multicast
+            a >= 240 -> true // reserved / future use
             else -> false
         }
     }
@@ -213,14 +219,26 @@ object HostSafety {
                 if (embedded != null && isPrivateIpv4(embedded)) return true
                 expandIpv6(address)
             } ?: return false
+        return isPrivateIpv6Groups(groups)
+    }
+
+    private fun isPrivateIpv6Groups(groups: IntArray): Boolean {
         val first = groups[0]
-        // fc00::/7 unique-local, fe80::/10 link-local, and fec0::/10 site-local.
-        // Classify the parsed first hextet instead of the textual prefix so
-        // non-canonical but accepted IPv6 spellings are handled too.
+        val isDiscardOnly = first == 0x0100 && groups[1] == 0 && groups[2] == 0 && groups[3] == 0
+        val isDocumentation = first == 0x2001 && groups[1] == 0x0DB8
+        // fc00::/7 unique-local, fe80::/10 link-local, fec0::/10 site-local,
+        // 100::/64 discard-only, and 2001:db8::/32 documentation.
         return (first and 0xFE00) == 0xFC00 ||
             (first and 0xFFC0) == 0xFE80 ||
-            (first and 0xFFC0) == 0xFEC0
+            (first and 0xFFC0) == 0xFEC0 ||
+            isDiscardOnly ||
+            isDocumentation
     }
+
+    private fun hextets(bytes: ByteArray): IntArray =
+        IntArray(8) { index ->
+            ((bytes[index * 2].toInt() and 0xFF) shl 8) or (bytes[index * 2 + 1].toInt() and 0xFF)
+        }
 
     private fun expandIpv6WithEmbeddedIpv4(
         address: String,

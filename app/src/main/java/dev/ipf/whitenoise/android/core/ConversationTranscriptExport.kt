@@ -115,6 +115,7 @@ object ConversationTranscriptExport {
     ): File {
         val dir = File(cacheDir, CacheDirName).apply { mkdirs() }
         val file = File.createTempFile(fileNamePrefix(groupIdHex, exportedAt), ".json", dir)
+        file.deleteOnExit()
         file.writeBytes(data)
         file.setExecutable(false, false)
         return file

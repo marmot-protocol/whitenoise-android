@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
  * is the last element.
  */
 data class EditVersion(
+    val messageIdHex: String,
     val text: String,
     val recordedAt: ULong,
 )
@@ -56,11 +57,11 @@ fun aggregateEdits(records: List<AppMessageRecordFfi>): Map<String, EditState> {
         if (record.plaintext.isBlank()) continue
         versionsByTarget
             .getOrPut(target) { mutableListOf() }
-            .add(EditVersion(text = record.plaintext, recordedAt = record.recordedAt))
+            .add(EditVersion(messageIdHex = record.messageIdHex, text = record.plaintext, recordedAt = record.recordedAt))
     }
     val result = LinkedHashMap<String, EditState>(versionsByTarget.size)
     for ((target, raw) in versionsByTarget) {
-        val sorted = raw.sortedBy { it.recordedAt }
+        val sorted = raw.sortedWith(compareBy<EditVersion> { it.recordedAt }.thenBy { it.messageIdHex })
         result[target] =
             EditState(
                 latestText = sorted.last().text,

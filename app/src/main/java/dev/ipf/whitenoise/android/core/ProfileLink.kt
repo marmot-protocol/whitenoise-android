@@ -6,6 +6,10 @@ import java.net.URI
 data class ProfileLink(
     val npub: String,
 ) {
+    init {
+        require(isLikelyNpub(npub)) { "invalid npub" }
+    }
+
     val uri: String = "${BuildConfig.WHITENOISE_DEEP_LINK_SCHEME}://profile/$npub"
 
     companion object {

@@ -7105,10 +7105,10 @@ internal fun saveVideoToGallery(
     }
 }
 
-internal fun shareConversationTranscript(
+internal fun conversationTranscriptShareIntent(
     context: Context,
     file: java.io.File,
-): Boolean {
+): Intent {
     val uri = fileProviderUri(context, file)
     val intent =
         Intent(Intent.ACTION_SEND).apply {
@@ -7118,15 +7118,8 @@ internal fun shareConversationTranscript(
             putExtra(Intent.EXTRA_TITLE, file.name)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-    return try {
-        context.startActivity(
-            Intent.createChooser(intent, null).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            },
-        )
-        true
-    } catch (_: ActivityNotFoundException) {
-        false
+    return Intent.createChooser(intent, null).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 }
 
@@ -10546,6 +10539,12 @@ private fun GroupDetailsScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var transcriptExportInFlight by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var pendingTranscriptShareFile by remember(controller.group.groupIdHex) { mutableStateOf<java.io.File?>(null) }
+    val transcriptShareLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            pendingTranscriptShareFile?.delete()
+            pendingTranscriptShareFile = null
+        }
     val clipboard = LocalClipboardManager.current
     val inviteLabelText = stringResource(R.string.invite)
     val noShareTargetText = stringResource(R.string.no_share_target_available)
@@ -10607,11 +10606,20 @@ private fun GroupDetailsScreen(
         appState.launchMutation {
             try {
                 val file = controller.exportConversationTranscriptFile(context.cacheDir) ?: return@launchMutation
-                if (!shareConversationTranscript(context, file)) {
+                pendingTranscriptShareFile = file
+                try {
+                    withContext(Dispatchers.Main) {
+                        transcriptShareLauncher.launch(conversationTranscriptShareIntent(context, file))
+                    }
+                } catch (_: ActivityNotFoundException) {
+                    pendingTranscriptShareFile = null
+                    file.delete()
                     appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(noShareTargetText))
                 }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
+                pendingTranscriptShareFile?.delete()
+                pendingTranscriptShareFile = null
                 appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(error.message ?: error.javaClass.simpleName))
             } finally {
                 transcriptExportInFlight = false
