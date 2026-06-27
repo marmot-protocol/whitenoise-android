@@ -1045,14 +1045,7 @@ class ChatsController(
         chatsDebug { "bind account=${accountRef?.take(8)}" }
         this.accountRef = accountRef
         this.boundAccountRef = accountRef
-        chatRows = emptyList()
-        groupRecordsById = emptyMap()
-        memberCacheByGroup = emptyMap()
-        removedGroupIds = emptySet()
-        inFlightMemberFetches.clear()
-        previewTokensByText = emptyMap()
-        inFlightPreviewParses.clear()
-        inFlightInviteAutoAccepts.clear()
+        resetBackingState()
         bindEpoch += 1L
         recompute()
         error = null
@@ -1668,6 +1661,17 @@ class ChatsController(
                 bindJob.also { bindJob = null }
             }
         jobToCancel?.cancel()
+        resetBackingState()
+        items = emptyList()
+        archivedItems = emptyList()
+        isLoading = false
+        error = null
+        pendingRecompute = false
+        recomputeScheduled = false
+        recomputeScope.cancel()
+    }
+
+    private fun resetBackingState() {
         chatRows = emptyList()
         groupRecordsById = emptyMap()
         memberCacheByGroup = emptyMap()
@@ -1676,13 +1680,6 @@ class ChatsController(
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
         inFlightInviteAutoAccepts.clear()
-        items = emptyList()
-        archivedItems = emptyList()
-        isLoading = false
-        error = null
-        pendingRecompute = false
-        recomputeScheduled = false
-        recomputeScope.cancel()
     }
 
     private fun isActiveBindEpoch(epoch: Long): Boolean = !isCleared && bindEpoch == epoch && accountRef != null
