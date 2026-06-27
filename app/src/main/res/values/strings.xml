@@ -44,6 +44,13 @@
     <string name="chat_row_action_archive">Archive</string>
     <string name="chat_row_action_unarchive">Unarchive</string>
     <string name="chat_row_action_mark_read">Mark as read</string>
+    <string name="chat_row_action_delete_group">Delete group</string>
+    <string name="delete_group_dialog_title">Delete group?</string>
+    <string name="delete_group_dialog_message_member">You\'re still in this group — deleting will leave the group first, then remove it from this device.</string>
+    <string name="delete_group_dialog_message_left">Delete this group from your device? Its messages and history will be removed locally.</string>
+    <string name="delete_group_confirm">Delete</string>
+    <string name="toast_chat_deleted_local">Chat deleted from this device</string>
+    <string name="toast_couldnt_delete_chat">Couldn\'t delete chat</string>
     <string name="chat_row_action_leave">Leave group</string>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d chat</item>

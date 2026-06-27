@@ -43,6 +43,13 @@
     <string name="chat_row_action_archive">Arşivle</string>
     <string name="chat_row_action_unarchive">Arşivden çıkar</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
+    <string name="chat_row_action_delete_group">Grubu sil</string>
+    <string name="delete_group_dialog_title">Grup silinsin mi?</string>
+    <string name="delete_group_dialog_message_member">Hâlâ bu gruptasınız — silmek önce gruptan çıkmanızı sağlar, sonra bu cihazdan kaldırır.</string>
+    <string name="delete_group_dialog_message_left">Bu grup cihazınızdan silinsin mi? Mesajları ve geçmişi yerel olarak kaldırılır.</string>
+    <string name="delete_group_confirm">Sil</string>
+    <string name="toast_chat_deleted_local">Sohbet bu cihazdan silindi</string>
+    <string name="toast_couldnt_delete_chat">Sohbet silinemedi</string>
     <string name="chat_row_action_leave">Gruptan ayrıl</string>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d sohbet</item>

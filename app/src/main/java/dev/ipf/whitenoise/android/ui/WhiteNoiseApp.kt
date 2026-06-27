@@ -1689,6 +1689,7 @@ private fun ChatsScreen(
     var newChatDirect by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
     var quickActionsExpanded by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<ChatListItem?>(null) }
     // Search expand/collapse + live query. The search input is anchored in
     // the top bar; tapping the magnifier swaps the chrome (account avatar
     // + nav icons) for a TextField that filters in real time on title +
@@ -2069,6 +2070,7 @@ private fun ChatsScreen(
                                     onMarkRead = {
                                         appState.launchMutation { controller.markAllRead(item) }
                                     },
+                                    onDelete = { pendingDelete = item },
                                 )
                             }
                         }
@@ -2171,6 +2173,30 @@ private fun ChatsScreen(
                     appState.presentProfile(scanned.npub)
                 }
             },
+        )
+    }
+    pendingDelete?.let { item ->
+        val alreadyLeft = item.removedFromGroup(appState.activeAccount?.accountIdHex)
+        ConfirmDialog(
+            title = stringResource(R.string.delete_group_dialog_title),
+            message =
+                stringResource(
+                    if (alreadyLeft) {
+                        R.string.delete_group_dialog_message_left
+                    } else {
+                        R.string.delete_group_dialog_message_member
+                    },
+                ),
+            confirmLabel = stringResource(R.string.delete_group_confirm),
+            destructive = true,
+            onConfirm = {
+                val groupId = item.group.groupIdHex
+                pendingDelete = null
+                appState.launchMutation {
+                    controller.deleteGroupFromChatList(groupId, leaveFirst = !alreadyLeft)
+                }
+            },
+            onDismiss = { pendingDelete = null },
         )
     }
 }
@@ -3131,6 +3157,7 @@ private fun ChatRowWithMenu(
     onOpen: () -> Unit,
     onMenuArchiveToggle: () -> Unit,
     onMarkRead: () -> Unit,
+    onDelete: () -> Unit,
     // Non-null when this row matched the chat-list search on a message body
     // (issue #290); drives the highlighted snippet line under the row.
     bodyMatch: MessageBodyMatch? = null,
@@ -3183,11 +3210,25 @@ private fun ChatRowWithMenu(
                     },
                 )
             }
-            // Leave-group is reachable from the conversation Details
-            // screen, which carries the sole-admin guard + confirmation
-            // context in one place. The chat-list menu stays focused on
-            // archive + mark-as-read for now; Pin / Mute slot in here
-            // once the FFI exposes them.
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(R.string.chat_row_action_delete_group),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                },
+                onClick = {
+                    menuOpen = false
+                    onDelete()
+                },
+            )
         }
     }
 }

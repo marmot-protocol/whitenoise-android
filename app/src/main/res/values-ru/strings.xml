@@ -43,6 +43,13 @@
     <string name="chat_row_action_archive">Архивировать</string>
     <string name="chat_row_action_unarchive">Восстановить</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
+    <string name="chat_row_action_delete_group">Удалить группу</string>
+    <string name="delete_group_dialog_title">Удалить группу?</string>
+    <string name="delete_group_dialog_message_member">Вы всё ещё в этой группе — при удалении вы сначала покинете группу, затем она будет удалена с этого устройства.</string>
+    <string name="delete_group_dialog_message_left">Удалить эту группу с устройства? Её сообщения и история будут удалены локально.</string>
+    <string name="delete_group_confirm">Удалить</string>
+    <string name="toast_chat_deleted_local">Чат удалён с этого устройства</string>
+    <string name="toast_couldnt_delete_chat">Не удалось удалить чат</string>
     <string name="chat_row_action_leave">Выйти из группы</string>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d чат</item>

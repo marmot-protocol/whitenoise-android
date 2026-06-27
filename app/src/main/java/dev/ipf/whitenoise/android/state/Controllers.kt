@@ -1568,6 +1568,34 @@ class ChatsController(
     }
 
     /**
+     * When [leaveFirst] (the user is still a member), leave the group first and
+     * abort the wipe if the leave fails; a left group wipes directly. The wipe is
+     * local-only and never touches MLS state, so the row can reappear from a later
+     * message while the user remains a member.
+     */
+    suspend fun deleteGroupFromChatList(
+        groupIdHex: String,
+        leaveFirst: Boolean,
+    ): Boolean {
+        val account = accountRef ?: return false
+        if (leaveFirst && !leaveGroup(groupIdHex)) return false
+        val wiped =
+            runCatching { appState.marmotIo { deleteGroupLocal(account, groupIdHex) } }
+                .onFailure {
+                    if (it is CancellationException) throw it
+                    appState.present(
+                        R.string.toast_couldnt_delete_chat,
+                        AppText.Plain(it.message ?: it.javaClass.simpleName),
+                    )
+                }.getOrDefault(false)
+        if (wiped) {
+            removeChatRow(groupIdHex)
+            appState.present(R.string.toast_chat_deleted_local)
+        }
+        return wiped
+    }
+
+    /**
      * Mark the chat's unread count to zero by advancing the read pointer to
      * its latest projected message. No-op when the chat has no unread or no
      * known last-message id. Called from the long-press "Mark as read"
