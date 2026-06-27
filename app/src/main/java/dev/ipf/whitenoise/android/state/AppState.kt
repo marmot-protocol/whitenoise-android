@@ -34,6 +34,7 @@ import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.SignOutOutcomeFfi
+import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
@@ -2108,9 +2109,10 @@ class WhiteNoiseAppState(
      * scrub), evict the on-disk media cache by the pruned ciphertext tags
      * (#334 — works regardless of load state), and dismiss the conversation's
      * notification when rows were actually pruned. Groups with the timer off
-     * are skipped per [DisappearingMessageSweep.shouldSweepGroup]. The engine
-     * is the source of truth for "expired"; Android adds nothing but the
-     * cadence and the client-side media wipe.
+     * are skipped per [DisappearingMessageSweep.shouldSweepGroup]. The FFI
+     * prune call uses the engine's raw current-time cutoff, so Android first
+     * scans the local timeline with [DisappearingMessageSweep.expiryCutoffSeconds]
+     * and defers any group with a raw-expired row still inside the skew window.
      *
      * Best-effort and per-group isolated: a failure on one account/group is
      * logged (cancellation re-thrown) and the sweep moves on, so one bad group
@@ -2155,6 +2157,16 @@ class WhiteNoiseAppState(
                 ?: return
         // No-op for groups with the timer off (acceptance criterion).
         if (!DisappearingMessageSweep.shouldSweepGroup(retentionSecs)) return
+        if (
+            !shouldInvokeBackgroundSecureDelete(
+                accountRef,
+                groupIdHex,
+                retentionSecs,
+                System.currentTimeMillis(),
+            )
+        ) {
+            return
+        }
         runCatching { marmotIo { secureDeleteExpired(accountRef, groupIdHex) } }
             .onSuccess { result ->
                 // Match the foreground sweep: when the engine actually pruned
@@ -2169,6 +2181,79 @@ class WhiteNoiseAppState(
                 rethrowIfCancellation(it)
                 appStateDebug(it) { "sweep secureDeleteExpired failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
             }
+    }
+
+    /**
+     * Gate the raw engine prune so the background sweep honors the #745 clock
+     * skew tolerance in the real deletion path. `secureDeleteExpired` does not
+     * accept a cutoff parameter; it would prune everything before
+     * `now - retention`. Before invoking it, scan the local timeline newest to
+     * oldest and defer the group if any row falls in the interval that the raw
+     * engine cutoff would delete but the skew-adjusted cutoff would keep.
+     */
+    private suspend fun shouldInvokeBackgroundSecureDelete(
+        accountRef: String,
+        groupIdHex: String,
+        retentionSecs: ULong,
+        nowMillis: Long,
+    ): Boolean {
+        val rawCutoffSeconds = DisappearingMessageSweep.rawExpiryCutoffSeconds(nowMillis, retentionSecs) ?: return false
+        val skewCutoffSeconds = DisappearingMessageSweep.expiryCutoffSeconds(nowMillis, retentionSecs) ?: return false
+        if (rawCutoffSeconds == 0uL) return false
+
+        var before: ULong? = null
+        var beforeMessageId: String? = null
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val page =
+                runCatching {
+                    marmotIo {
+                        timelineMessages(
+                            accountRef,
+                            TimelineMessageQueryFfi(
+                                groupIdHex = groupIdHex,
+                                search = null,
+                                before = before,
+                                beforeMessageId = beforeMessageId,
+                                after = null,
+                                afterMessageId = null,
+                                limit = DisappearingMessageSweep.TIMELINE_SCAN_PAGE_LIMIT,
+                            ),
+                        )
+                    }
+                }.onFailure {
+                    rethrowIfCancellation(it)
+                    appStateDebug(it) {
+                        "sweep timeline scan failed group=${groupIdHex.take(8)}: ${it.readableMessage()}"
+                    }
+                }.getOrNull()
+                    ?: return false
+
+            if (
+                page.messages.any {
+                    DisappearingMessageSweep.isWithinSkewWindow(
+                        timelineAtSeconds = it.timelineAt,
+                        rawCutoffSeconds = rawCutoffSeconds,
+                        skewCutoffSeconds = skewCutoffSeconds,
+                    )
+                }
+            ) {
+                appStateDebug { "sweep deferred inside clock-skew window group=${groupIdHex.take(8)}" }
+                return false
+            }
+
+            if (page.messages.any { DisappearingMessageSweep.isExpiredBeyondSkew(it.timelineAt, skewCutoffSeconds) }) {
+                return true
+            }
+
+            if (!page.hasMoreBefore || page.messages.isEmpty()) return false
+            val oldest = page.messages.minWith(compareBy({ it.timelineAt }, { it.messageIdHex }))
+            val nextBefore = oldest.timelineAt
+            val nextBeforeMessageId = oldest.messageIdHex
+            if (before == nextBefore && beforeMessageId == nextBeforeMessageId) return false
+            before = nextBefore
+            beforeMessageId = nextBeforeMessageId
+        }
     }
 
     /**
