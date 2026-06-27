@@ -43,6 +43,12 @@
     <string name="chat_row_action_archive">归档</string>
     <string name="chat_row_action_unarchive">取消归档</string>
     <string name="chat_row_action_mark_read">标记为已读</string>
+    <string name="chat_row_action_delete_group">删除群组</string>
+    <string name="delete_group_dialog_title">删除群组？</string>
+    <string name="delete_group_dialog_message">从此设备移除此群组？如果你仍是成员，将先退出群组。</string>
+    <string name="delete_group_confirm">删除</string>
+    <string name="toast_chat_deleted_local">已从此设备删除聊天</string>
+    <string name="toast_couldnt_delete_chat">无法删除聊天</string>
     <string name="chat_row_action_leave">退出群组</string>
     <plurals name="archived_chats_count">
         <item quantity="other">%1$d 个聊天</item>
