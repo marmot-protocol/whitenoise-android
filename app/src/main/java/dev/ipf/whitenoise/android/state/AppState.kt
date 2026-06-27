@@ -659,6 +659,16 @@ class WhiteNoiseAppState(
         java.util.concurrent.atomic
             .AtomicInteger(0)
     private var notificationJob: Job? = null
+
+    // Coalesces per-account unread refreshes across a notification burst so a
+    // catch-up flood drains to one expensive (chat-list + per-group roster)
+    // refresh per account per window instead of one per update (#729). Holds
+    // only short-lived lifecycle state; the count still comes from the
+    // suppression-preserving refreshAccountUnreadCount source of truth.
+    private val unreadRefreshScheduler =
+        UnreadRefreshScheduler(scope = notificationScope) { accountRef ->
+            refreshAccountUnreadCount(accountRef)
+        }
     private var appInForeground = false
 
     @Volatile
@@ -3090,7 +3100,11 @@ class WhiteNoiseAppState(
                 groupInviteAutoAccepted = autoAcceptedInvite != null,
             )
         }
-        refreshAccountUnreadCount(update.accountRef)
+        // Coalesce the unread refresh across a burst instead of paying the
+        // chat-list + per-group roster cost once per update. The scheduler
+        // drains pending accounts off the subscription loop, so the loop stays
+        // free to process the next update (#729).
+        unreadRefreshScheduler.schedule(update.accountRef)
     }
 
     private fun launchGroupInviteNotificationHandler(update: NotificationUpdateFfi) {
