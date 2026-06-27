@@ -189,7 +189,7 @@ object HostSafety {
             a == 10 -> true // RFC 1918
             a == 172 && b in 16..31 -> true // RFC 1918
             a == 192 && b == 168 -> true // RFC 1918
-            a == 192 && b == 0 -> true // IETF protocol assignments
+            a == 192 && b == 0 && octets[2] == 0 -> true // IETF protocol assignments
             a == 192 && b == 88 && octets[2] == 99 -> true // deprecated 6to4 relay anycast
             a == 198 && b in 18..19 -> true // benchmarking
             a == 169 && b == 254 -> true // link-local

@@ -28,6 +28,9 @@ class NetworkSecurityConfigTest {
             assertTrue(text.contains("localhost"))
             assertTrue(text.contains("127.0.0.1"))
             assertTrue(text.contains("10.0.2.2"))
+            assertTrue(text.contains("""<domain includeSubdomains="false">localhost</domain>"""))
+            assertTrue(text.contains("""<domain includeSubdomains="false">127.0.0.1</domain>"""))
+            assertTrue(text.contains("""<domain includeSubdomains="false">10.0.2.2</domain>"""))
         }
     }
 }
