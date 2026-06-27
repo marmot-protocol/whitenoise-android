@@ -7139,10 +7139,10 @@ internal fun saveVideoToGallery(
     }
 }
 
-internal fun shareConversationTranscript(
+internal fun conversationTranscriptShareIntent(
     context: Context,
     file: java.io.File,
-): Boolean {
+): Intent {
     val uri = fileProviderUri(context, file)
     val intent =
         Intent(Intent.ACTION_SEND).apply {
@@ -7152,15 +7152,8 @@ internal fun shareConversationTranscript(
             putExtra(Intent.EXTRA_TITLE, file.name)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-    return try {
-        context.startActivity(
-            Intent.createChooser(intent, null).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            },
-        )
-        true
-    } catch (_: ActivityNotFoundException) {
-        false
+    return Intent.createChooser(intent, null).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 }
 
@@ -10580,6 +10573,12 @@ private fun GroupDetailsScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var transcriptExportInFlight by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var pendingTranscriptShareFile by remember(controller.group.groupIdHex) { mutableStateOf<java.io.File?>(null) }
+    val transcriptShareLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            pendingTranscriptShareFile?.delete()
+            pendingTranscriptShareFile = null
+        }
     val clipboard = LocalClipboardManager.current
     val inviteLabelText = stringResource(R.string.invite)
     val noShareTargetText = stringResource(R.string.no_share_target_available)
@@ -10639,13 +10638,30 @@ private fun GroupDetailsScreen(
         if (transcriptExportInFlight) return
         transcriptExportInFlight = true
         appState.launchMutation {
+            var shareSheetLaunched = false
             try {
                 val file = controller.exportConversationTranscriptFile(context.cacheDir) ?: return@launchMutation
-                if (!shareConversationTranscript(context, file)) {
+                pendingTranscriptShareFile = file
+                try {
+                    withContext(Dispatchers.Main) {
+                        transcriptShareLauncher.launch(conversationTranscriptShareIntent(context, file))
+                        shareSheetLaunched = true
+                    }
+                } catch (_: ActivityNotFoundException) {
+                    pendingTranscriptShareFile = null
+                    file.delete()
                     appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(noShareTargetText))
                 }
             } catch (error: Throwable) {
-                if (error is CancellationException) throw error
+                if (error is CancellationException) {
+                    if (!shareSheetLaunched) {
+                        pendingTranscriptShareFile?.delete()
+                        pendingTranscriptShareFile = null
+                    }
+                    throw error
+                }
+                pendingTranscriptShareFile?.delete()
+                pendingTranscriptShareFile = null
                 appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(error.message ?: error.javaClass.simpleName))
             } finally {
                 transcriptExportInFlight = false
@@ -17421,7 +17437,7 @@ private fun ProfileQrSheet(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val npub = appState.npub(accountIdHex)
-    val link = remember(npub) { ProfileLink(npub) }
+    val link = remember(npub) { ProfileLink.parse(npub) }
     var copied by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
     var scanError by remember { mutableStateOf<String?>(null) }
@@ -17457,7 +17473,7 @@ private fun ProfileQrSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(if (copied) stringResource(R.string.copied) else IdentityFormatter.short(npub, prefix = 16, suffix = 14))
             }
-            QrCodeImage(content = link.uri)
+            link?.let { QrCodeImage(content = it.uri) }
             scanError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
@@ -17465,7 +17481,7 @@ private fun ProfileQrSheet(
                         val sendIntent =
                             Intent(Intent.ACTION_SEND)
                                 .setType("text/plain")
-                                .putExtra(Intent.EXTRA_TEXT, link.uri)
+                                .putExtra(Intent.EXTRA_TEXT, link?.uri ?: npub)
                         context.startActivity(Intent.createChooser(sendIntent, shareProfileTitle))
                     },
                     modifier = Modifier.weight(1f),

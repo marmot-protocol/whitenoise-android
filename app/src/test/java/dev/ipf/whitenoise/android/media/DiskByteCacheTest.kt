@@ -43,6 +43,28 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun oversizedEntry_isNotPersistedOrReadBack() {
+        val cache = DiskByteCache(dir, maxBytes = 1024, maxEntryBytes = 64)
+        cache.put("too-large", ByteArray(65))
+
+        assertNull(cache.get("too-large"))
+        assertEquals(0, cache.size())
+        assertEquals(0L, cache.residentBytes())
+        assertTrue(dir.listFiles()?.none { it.name.endsWith(".bin") } ?: true)
+    }
+
+    @Test
+    fun rehydrateDropsOversizedEntryBeforeReadBytes() {
+        val writer = DiskByteCache(dir, maxBytes = 1024, maxEntryBytes = 128)
+        writer.put("large", ByteArray(120) { 1 })
+
+        val tighter = DiskByteCache(dir, maxBytes = 1024, maxEntryBytes = 64)
+        assertNull(tighter.get("large"))
+        assertEquals(0L, tighter.residentBytes())
+        assertTrue(dir.listFiles()?.none { it.name.endsWith(".bin") } ?: true)
+    }
+
+    @Test
     fun put_withStaleGeneration_isRejectedAfterClear() {
         val cache = DiskByteCache(dir, maxBytes = 1024)
         // Capture the generation a deferred write would have grabbed at
@@ -128,6 +150,18 @@ class DiskByteCacheTest {
         assertEquals(0L, cache.residentBytes())
         assertNull(cache.get("a"))
         // Directory remains but empty (orphan-sweep happens in clear).
+        assertEquals(0, dir.listFiles()?.size ?: 0)
+    }
+
+    @Test
+    fun clearBeforeHydrationSweepsOwnedFilesWithoutIndexScan() {
+        DiskByteCache(dir, maxBytes = 1024).put("a", ByteArray(30))
+        val fresh = DiskByteCache(dir, maxBytes = 1024)
+
+        fresh.clear()
+
+        assertEquals(0, fresh.size())
+        assertEquals(0L, fresh.residentBytes())
         assertEquals(0, dir.listFiles()?.size ?: 0)
     }
 

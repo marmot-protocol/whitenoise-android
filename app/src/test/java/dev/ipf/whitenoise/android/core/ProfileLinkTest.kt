@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.core
 import dev.ipf.whitenoise.android.BuildConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class ProfileLinkTest {
@@ -49,5 +50,15 @@ class ProfileLinkTest {
         // Garbage with the right prefix but wrong shape doesn't smuggle through.
         assertNull(ProfileLink.parse("nostr:npub1garbage"))
         assertNull(ProfileLink.parse("whitenoise://profile/npub1garbage"))
+    }
+
+    @Test
+    fun constructorRejectsMalformedNpubs() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ProfileLink("npub1abc")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ProfileLink("npub1" + "b".repeat(58))
+        }
     }
 }

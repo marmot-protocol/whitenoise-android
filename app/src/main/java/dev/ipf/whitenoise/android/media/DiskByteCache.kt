@@ -37,6 +37,7 @@ import java.security.MessageDigest
 class DiskByteCache(
     private val cacheDir: File,
     private val maxBytes: Long,
+    maxEntryBytes: Long = DEFAULT_MAX_ENTRY_BYTES,
 ) {
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
     private val index = LinkedHashMap<String, Entry>(8, 0.75f, true)
@@ -47,6 +48,7 @@ class DiskByteCache(
     // and is rejected if a wipe intervened, so decrypted plaintext from a
     // signed-out session can't be re-persisted after sign-out. See #154.
     private var generation = 0
+    private val entryByteLimit = minOf(maxBytes, maxEntryBytes).coerceAtLeast(1L)
 
     // No directory I/O in the constructor: the scan + per-file stat are
     // deferred to the first cache operation so they don't run on the main
@@ -68,8 +70,12 @@ class DiskByteCache(
     fun contains(key: String): Boolean {
         val hashed = fileNameFor(key)
         return synchronized(this) {
-            ensureHydrated()
-            index.containsKey(hashed)
+            if (hydrated) {
+                index.containsKey(hashed)
+            } else {
+                val file = File(cacheDir, hashed)
+                file.isFile && file.length() in 1..entryByteLimit
+            }
         }
     }
 
@@ -84,6 +90,17 @@ class DiskByteCache(
                 ensureHydrated()
                 (index[hashed] ?: return null) to generation
             }
+        if (entry.size.toLong() > entryByteLimit) {
+            synchronized(this) {
+                if (index[hashed] === entry) {
+                    index.remove(hashed)
+                    residentBytes -= entry.size
+                    runCatching { entry.file.delete() }
+                    runCatching { tagFileFor(entry.file).delete() }
+                }
+            }
+            return null
+        }
         return try {
             val bytes = entry.file.readBytes()
             synchronized(this) {
@@ -128,12 +145,14 @@ class DiskByteCache(
         ciphertextTag: String? = null,
     ) {
         if (bytes.isEmpty()) return
+        if (bytes.size.toLong() > entryByteLimit) return
         // Reject a write whose session was wiped while it sat queued: clear()
         // bumps `generation` under this same lock, so a put scheduled before
         // the wipe skips here and no plaintext lands after sign-out. See #154.
         if (expectedGeneration != generation) return
-        ensureHydrated()
+        cacheDir.mkdirs()
         val hashed = fileNameFor(key)
+        if (!hydrated) ensureHydrated()
         val existing = index.remove(hashed)
         if (existing != null) {
             residentBytes -= existing.size
@@ -252,16 +271,16 @@ class DiskByteCache(
         // guarantee that ALL of this account's media (including orphan `.bin`s)
         // is wiped. The #99 win — get() not holding the lock across readBytes —
         // is unaffected, since that's in get(), not here.
-        ensureHydrated()
-        index.values.forEach {
-            runCatching { it.file.delete() }
-            runCatching { tagFileFor(it.file).delete() }
+        index.values.forEach { entry ->
+            runCatching { entry.file.delete() }
+            runCatching { tagFileFor(entry.file).delete() }
         }
         index.clear()
         residentBytes = 0L
-        // Catch any orphans that aren't in the index — e.g. a prior crash
-        // mid-put left a `.tmp`, or an entry whose index row was lost. Scoped to
-        // OUR naming (`.bin` + `.tmp`) so a future co-tenant survives sign-out.
+        hydrated = true
+        // Sweep directly instead of calling ensureHydrated(): sign-out can run
+        // before the cache has ever been touched, and building the full index
+        // just to delete it causes avoidable main-thread directory work.
         cacheDir
             .listFiles()
             ?.asSequence()
@@ -312,7 +331,7 @@ class DiskByteCache(
                 .sortedBy { it.lastModified() }
         for (file in files) {
             val size = file.length()
-            if (size <= 0 || size > Int.MAX_VALUE) {
+            if (size <= 0 || size > Int.MAX_VALUE || size > entryByteLimit) {
                 runCatching { file.delete() }
                 runCatching { tagFileFor(file).delete() }
                 continue
@@ -366,6 +385,7 @@ class DiskByteCache(
         const val SUFFIX = ".bin"
         const val TMP_SUFFIX = ".tmp"
         const val TAG_SUFFIX = ".tag"
+        const val DEFAULT_MAX_ENTRY_BYTES: Long = 16L * 1024L * 1024L
         val HEX =
             charArrayOf(
                 '0',

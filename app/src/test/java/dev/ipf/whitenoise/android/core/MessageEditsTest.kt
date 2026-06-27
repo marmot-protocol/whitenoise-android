@@ -80,6 +80,20 @@ class MessageEditsTest {
     }
 
     @Test
+    fun equalTimestampEditsUseMessageIdTieBreak() {
+        val records =
+            listOf(
+                chat(id = "orig", sender = "alice", text = "v0", at = 1uL),
+                edit(id = "edit-b", sender = "alice", target = "orig", text = "b", at = 20uL),
+                edit(id = "edit-a", sender = "alice", target = "orig", text = "a", at = 20uL),
+            )
+        val state = aggregateEdits(records)["orig"]
+
+        assertEquals(listOf("a", "b"), state?.versions?.map { it.text })
+        assertEquals("b", state?.latestText)
+    }
+
+    @Test
     fun editsBySomeoneElseAreSilentlyDropped() {
         val records =
             listOf(
