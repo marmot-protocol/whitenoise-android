@@ -43,6 +43,12 @@
     <string name="chat_row_action_archive">Archivia</string>
     <string name="chat_row_action_unarchive">Ripristina</string>
     <string name="chat_row_action_mark_read">Segna come letto</string>
+    <string name="chat_row_action_delete_group">Elimina gruppo</string>
+    <string name="delete_group_dialog_title">Eliminare il gruppo?</string>
+    <string name="delete_group_dialog_message">Rimuovere questo gruppo da questo dispositivo? Se sei ancora un membro, uscirai prima dal gruppo.</string>
+    <string name="delete_group_confirm">Elimina</string>
+    <string name="toast_chat_deleted_local">Chat eliminata da questo dispositivo</string>
+    <string name="toast_couldnt_delete_chat">Impossibile eliminare la chat</string>
     <string name="chat_row_action_leave">Esci dal gruppo</string>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d chat</item>

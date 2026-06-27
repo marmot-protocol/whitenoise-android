@@ -609,6 +609,13 @@ internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
         ("no relay endpoints" in text)
 }
 
+internal fun mediaCacheKey(
+    account: String,
+    groupIdHex: String,
+    messageIdHex: String,
+    attachmentIndex: Int,
+): String = "$account|$groupIdHex|$messageIdHex|$attachmentIndex"
+
 internal fun optimisticMessageIdForProjection(
     optimisticMessages: Collection<TimelineMessage>,
     projected: AppMessageRecordFfi,
@@ -1565,6 +1572,60 @@ class ChatsController(
                 appState.present(R.string.toast_couldnt_leave_chat, errorText)
             }
         }.getOrDefault(false)
+    }
+
+    /**
+     * When [leaveFirst] (the user is still a member), leave the group first and
+     * abort the wipe if the leave fails; a left group wipes directly. The wipe is
+     * local-only and never touches MLS state, so the row can reappear from a later
+     * message while the user remains a member.
+     */
+    suspend fun deleteGroupFromChatList(
+        groupIdHex: String,
+        leaveFirstHint: Boolean,
+    ): Boolean {
+        val account = accountRef ?: return false
+        // Decide leave-first from the live roster, not the chat-list row's
+        // removed heuristic (which can lag a leave done elsewhere) — a genuinely
+        // left group then wipes directly instead of trying to re-leave. Fall back
+        // to the caller's hint only if the membership read fails.
+        val activeIdHex = appState.activeAccount?.accountIdHex
+        val stillMember =
+            runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }
+                .getOrNull()
+                ?.any { it.memberIdHex.equals(activeIdHex, ignoreCase = true) }
+                ?: leaveFirstHint
+        if (stillMember && !leaveGroup(groupIdHex)) return false
+        // Free the app's decrypted media caches (in-memory L1 + on-disk L2) before
+        // the engine wipe drops the reference mapping — deleteGroupLocal clears its
+        // own rows/secrets but not these client-side blobs, which would otherwise
+        // linger recoverable on disk.
+        runCatching { appState.marmotIo { listMedia(account, groupIdHex, null) } }
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { media ->
+                withContext(Dispatchers.IO) {
+                    media.forEach { rec ->
+                        val key = mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
+                        appState.mediaPlaintextCache.remove(key)
+                        appState.mediaThumbnailCache.remove(key)
+                        appState.diskMediaCache.remove(key)
+                    }
+                    val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
+                    if (tags.isNotEmpty()) appState.diskMediaCache.removeByCiphertextTags(tags)
+                }
+            }
+        val wipe = runCatching { appState.marmotIo { deleteGroupLocal(account, groupIdHex) } }
+        wipe.exceptionOrNull()?.let {
+            if (it is CancellationException) throw it
+            appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
+            return false
+        }
+        // A non-throwing wipe — whether it removed rows or found nothing to
+        // remove — means the chat is gone locally; drop the (possibly stale) row.
+        removeChatRow(groupIdHex)
+        appState.present(R.string.toast_chat_deleted_local)
+        return true
     }
 
     /**
@@ -3369,7 +3430,7 @@ class ConversationController(
         account: String,
         messageIdHex: String,
         attachmentIndex: Int,
-    ): String = "$account|${group.groupIdHex}|$messageIdHex|$attachmentIndex"
+    ): String = mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex)
 
     // Evict decrypted media (L1 plaintext, decoded thumbnails, L2 disk) for the
     // attachments the engine just secure-deleted on expiry, matched by ciphertext
