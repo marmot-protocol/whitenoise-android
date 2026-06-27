@@ -1575,24 +1575,31 @@ class ChatsController(
      */
     suspend fun deleteGroupFromChatList(
         groupIdHex: String,
-        leaveFirst: Boolean,
+        leaveFirstHint: Boolean,
     ): Boolean {
         val account = accountRef ?: return false
-        if (leaveFirst && !leaveGroup(groupIdHex)) return false
-        val wiped =
-            runCatching { appState.marmotIo { deleteGroupLocal(account, groupIdHex) } }
-                .onFailure {
-                    if (it is CancellationException) throw it
-                    appState.present(
-                        R.string.toast_couldnt_delete_chat,
-                        AppText.Plain(it.message ?: it.javaClass.simpleName),
-                    )
-                }.getOrDefault(false)
-        if (wiped) {
-            removeChatRow(groupIdHex)
-            appState.present(R.string.toast_chat_deleted_local)
+        // Decide leave-first from the live roster, not the chat-list row's
+        // removed heuristic (which can lag a leave done elsewhere) — a genuinely
+        // left group then wipes directly instead of trying to re-leave. Fall back
+        // to the caller's hint only if the membership read fails.
+        val activeIdHex = appState.activeAccount?.accountIdHex
+        val stillMember =
+            runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }
+                .getOrNull()
+                ?.any { it.memberIdHex.equals(activeIdHex, ignoreCase = true) }
+                ?: leaveFirstHint
+        if (stillMember && !leaveGroup(groupIdHex)) return false
+        val wipe = runCatching { appState.marmotIo { deleteGroupLocal(account, groupIdHex) } }
+        wipe.exceptionOrNull()?.let {
+            if (it is CancellationException) throw it
+            appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
+            return false
         }
-        return wiped
+        // A non-throwing wipe — whether it removed rows or found nothing to
+        // remove — means the chat is gone locally; drop the (possibly stale) row.
+        removeChatRow(groupIdHex)
+        appState.present(R.string.toast_chat_deleted_local)
+        return true
     }
 
     /**

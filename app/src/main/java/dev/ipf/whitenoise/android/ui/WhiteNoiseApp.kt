@@ -2193,7 +2193,7 @@ private fun ChatsScreen(
                 val groupId = item.group.groupIdHex
                 pendingDelete = null
                 appState.launchMutation {
-                    controller.deleteGroupFromChatList(groupId, leaveFirst = !alreadyLeft)
+                    controller.deleteGroupFromChatList(groupId, leaveFirstHint = !alreadyLeft)
                 }
             },
             onDismiss = { pendingDelete = null },
