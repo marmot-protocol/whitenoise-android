@@ -7996,6 +7996,7 @@ private fun ConversationScreen(
     // shell-level sheet's onOpenGroup exactly.
     onOpenProfileGroup: (ChatListItem, Boolean) -> Unit = { _, _ -> },
 ) {
+    WindowSecureFlag()
     // Push the global snackbar host above the conversation composer so
     // a toast (e.g. the post-invite-accept confirmation) doesn't
     // overlap and intercept touches on the message input. Resets to
