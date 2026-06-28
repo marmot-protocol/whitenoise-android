@@ -22,6 +22,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
+private const val ACTION_START = "dev.ipf.whitenoise.android.notifications.START_STREAM_FOREGROUND_SERVICE"
+private const val EXTRA_START_TRIGGER = "dev.ipf.whitenoise.android.notifications.EXTRA_START_TRIGGER"
+private const val START_TRIGGER_USER_TOGGLE = "user_toggle"
+private const val START_TRIGGER_PUSH_WAKE = "push_wake"
+private const val START_TRIGGER_SYSTEM_WAKE = "system_wake"
+
 class NotificationStreamForegroundService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var bootstrapJob: Job? = null
@@ -31,6 +37,7 @@ class NotificationStreamForegroundService : Service() {
         flags: Int,
         startId: Int,
     ): Int {
+        val trigger = foregroundStartTrigger(intent)
         // Android 14+ rejects a foreground-service start from a disallowed
         // context with ForegroundServiceStartNotAllowedException (an
         // IllegalStateException); a missing FGS grant throws SecurityException.
@@ -57,8 +64,13 @@ class NotificationStreamForegroundService : Service() {
                 // The enable path already optimistically persisted "background
                 // connection on" and got a `true` from start() (the intent was
                 // merely queued). Tell AppState the start actually failed so the
-                // toggle doesn't lie and the user sees why. See #164.
-                (application as? WhiteNoiseApplication)?.appState?.onBackgroundConnectionStartRejected()
+                // toggle doesn't lie and the user sees why. Push/boot wakes are
+                // not user-initiated toggles, so a rejected wake must not
+                // permanently disable the user's "Keep connected" preference.
+                // See #164 and #777.
+                if (shouldReconcileBackgroundConnectionRejection(trigger)) {
+                    (application as? WhiteNoiseApplication)?.appState?.onBackgroundConnectionStartRejected()
+                }
                 stopSelf(startId)
                 return START_NOT_STICKY
             }
@@ -89,15 +101,19 @@ class NotificationStreamForegroundService : Service() {
     override fun onBind(intent: Intent?) = null
 
     companion object {
-        private const val ACTION_START = "dev.ipf.whitenoise.android.notifications.START_STREAM_FOREGROUND_SERVICE"
         private const val NOTIFICATION_ID = 1001
 
-        fun start(context: Context): Boolean =
+        internal fun start(
+            context: Context,
+            trigger: ForegroundStartTrigger = ForegroundStartTrigger.UserToggle,
+        ): Boolean =
             runCatching {
                 val appContext = context.applicationContext
                 ContextCompat.startForegroundService(
                     appContext,
-                    Intent(appContext, NotificationStreamForegroundService::class.java).setAction(ACTION_START),
+                    Intent(appContext, NotificationStreamForegroundService::class.java)
+                        .setAction(ACTION_START)
+                        .putExtra(EXTRA_START_TRIGGER, trigger.extraValue),
                 )
                 true
             }.getOrElse {
@@ -116,6 +132,14 @@ class NotificationStreamForegroundService : Service() {
                 false
             }
     }
+}
+
+internal enum class ForegroundStartTrigger(
+    val extraValue: String,
+) {
+    UserToggle(START_TRIGGER_USER_TOGGLE),
+    PushWake(START_TRIGGER_PUSH_WAKE),
+    SystemWake(START_TRIGGER_SYSTEM_WAKE),
 }
 
 /**
@@ -149,6 +173,20 @@ internal fun decideForegroundStart(
         bootstrapInFlight -> ForegroundStartDecision.KeepRunningExistingBootstrap
         else -> ForegroundStartDecision.BootstrapAndKeep
     }
+
+internal fun shouldReconcileBackgroundConnectionRejection(trigger: ForegroundStartTrigger): Boolean = trigger == ForegroundStartTrigger.UserToggle
+
+private fun foregroundStartTrigger(intent: Intent?): ForegroundStartTrigger {
+    val raw = intent?.getStringExtra(EXTRA_START_TRIGGER)
+    return when (raw) {
+        START_TRIGGER_USER_TOGGLE -> ForegroundStartTrigger.UserToggle
+        START_TRIGGER_PUSH_WAKE -> ForegroundStartTrigger.PushWake
+        START_TRIGGER_SYSTEM_WAKE -> ForegroundStartTrigger.SystemWake
+        // Older ACTION_START intents were the explicit user-toggle/app path.
+        null -> if (intent?.action == ACTION_START) ForegroundStartTrigger.UserToggle else ForegroundStartTrigger.SystemWake
+        else -> ForegroundStartTrigger.SystemWake
+    }
+}
 
 private object BackgroundConnectionNotification {
     private const val CHANNEL_ID = "whitenoise.background_connection.v1"

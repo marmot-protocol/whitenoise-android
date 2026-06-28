@@ -8,6 +8,8 @@ import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
 import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DiagnosticFormatterTest {
@@ -60,5 +62,29 @@ class DiagnosticFormatterTest {
         )
         assertEquals("[alice] group state fedcba98...3210", DiagnosticFormatter.describe(group))
         assertEquals("[alice] projection aaaabbbb...dddd (0 messages)", DiagnosticFormatter.describe(projection))
+    }
+
+    @Test
+    fun accountErrorsScrubSecretsBeforeTruncating() {
+        val secretHex = "a".repeat(64)
+        val longHex = "b".repeat(128)
+        val event =
+            MarmotEventFfi.AccountError(
+                accountIdHex = "alice-account",
+                accountLabel = "alice",
+                message =
+                    "failed nsec1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq " +
+                        "token=abc123 https://user:pass@example.test $secretHex $longHex " +
+                        "while syncing a verbose diagnostics payload that should be truncated",
+            )
+        val described = DiagnosticFormatter.describe(event)
+
+        assertTrue(described.startsWith("[alice] error: failed [redacted] token=[redacted] https://[redacted]@example.test"))
+        assertTrue(described.endsWith("…"))
+        assertFalse(described.contains("nsec1"))
+        assertFalse(described.contains("abc123"))
+        assertFalse(described.contains("user:pass"))
+        assertFalse(described.contains(secretHex))
+        assertFalse(described.contains(longHex))
     }
 }

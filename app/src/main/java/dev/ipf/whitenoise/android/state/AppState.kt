@@ -2414,7 +2414,7 @@ class WhiteNoiseAppState(
                     // Shares the pending-clear bookkeeping: a failed rollback
                     // is queued for retry instead of stranding the account
                     // registered server-side.
-                    clearPushRegistrationForAccount(account)
+                    clearPushRegistrationForAccountLocked(account)
                 }
             }
         }.onFailure {
@@ -2467,6 +2467,12 @@ class WhiteNoiseAppState(
      * false locally and the sync loop would skip the account.
      */
     private suspend fun clearPushRegistrationForAccount(account: String) {
+        nativePushSyncMutex.withLock {
+            clearPushRegistrationForAccountLocked(account)
+        }
+    }
+
+    private suspend fun clearPushRegistrationForAccountLocked(account: String) {
         perAccountSyncedFingerprints.remove(account)
         runCatching { marmotIo { clearPushRegistration(account) } }
             .onSuccess { pushTokenStore.clearPending(account) }

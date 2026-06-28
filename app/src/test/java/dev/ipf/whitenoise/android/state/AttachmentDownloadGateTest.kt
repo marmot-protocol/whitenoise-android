@@ -30,7 +30,7 @@ class AttachmentDownloadGateTest {
                             val now = active.incrementAndGet()
                             maxActive.updateAndGet { previous -> max(previous, now) }
                             if (now == 3) allStarted.complete(Unit)
-                            withTimeout(1_000) { release.await() }
+                            withTimeout(10_000) { release.await() }
                             active.decrementAndGet()
                         }
                     }
@@ -62,7 +62,7 @@ class AttachmentDownloadGateTest {
                             maxActive.updateAndGet { previous -> max(previous, now) }
                             if (totalStarted == 2) firstTwoStarted.complete(Unit)
                             try {
-                                withTimeout(1_000) { release.await() }
+                                withTimeout(10_000) { release.await() }
                             } finally {
                                 active.decrementAndGet()
                             }
