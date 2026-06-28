@@ -304,6 +304,18 @@ class NotificationTargetTest {
         assertFalse(notificationReplyActionHandled(sent = false))
     }
 
+    @Test
+    fun replyActionBudget_reservesDismissHeadroomInsideGoAsyncBudget() {
+        // Use production defaults so this catches drift in the receiver's
+        // cooperative send/dismiss budget wiring, not just helper arithmetic.
+        val dismissBudget = notificationReplyDismissBudgetMs()
+        val sendBudget = notificationReplySendPhaseBudgetMs(dismissBudgetMs = dismissBudget)
+
+        assertEquals(950L, dismissBudget)
+        assertEquals(6_750L, sendBudget)
+        assertEquals(300L, 8_000L - sendBudget - dismissBudget)
+    }
+
     // ---- resolveNotificationNav (routing FSM) -------------------------------
 
     private val target = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.MESSAGE)

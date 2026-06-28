@@ -6,12 +6,16 @@ import android.content.Intent
 import android.util.Log
 import androidx.core.app.RemoteInput
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 class NotificationActionReceiver : BroadcastReceiver() {
@@ -59,96 +63,156 @@ class NotificationActionReceiver : BroadcastReceiver() {
     ) {
         val application = appContext as? WhiteNoiseApplication ?: return
         val appState = application.appState
-        appState.ensureNotificationRuntimeStarted()
-        // Set when a direct reply was sent, so the cancel below can clear the
-        // system's reply-lifetime-extension (a bare cancel can't dismiss it).
-        var sentReplyText: String? = null
-        val handled =
-            when (action.kind) {
-                NotificationActionKind.REPLY -> {
-                    val reply =
-                        RemoteInput
-                            .getResultsFromIntent(intent)
-                            ?.getCharSequence(NotificationActions.KEY_TEXT_REPLY)
-                            ?.toString()
-                            ?.trim()
-                            .orEmpty()
-                    if (reply.isBlank()) {
-                        false
-                    } else {
-                        val sent =
-                            appState.sendNotificationReply(
-                                accountRef = action.target.accountRef,
-                                groupIdHex = action.target.groupIdHex,
-                                text = reply,
-                            )
-                        if (sent) {
-                            sentReplyText = reply
-                            // mark-read is a best-effort UX nicety; a transient
-                            // failure (or thrown FFI/network error) must never keep
-                            // the notification alive, or its still-active inline
-                            // RemoteInput field would let the user re-send the same
-                            // reply and post a duplicate message to the group.
-                            val markReadResult =
-                                runCatching {
-                                    appState.markNotificationMessageRead(
-                                        accountRef = action.target.accountRef,
-                                        groupIdHex = action.target.groupIdHex,
-                                        messageIdHex = action.target.messageIdHex.orEmpty(),
-                                    )
-                                }
-                            // Log a thrown error AND a plain false return; the
-                            // latter (e.g. blank ids) would otherwise fail
-                            // silently and hide best-effort mark-read trouble.
-                            if (markReadResult.getOrNull() != true) {
-                                val message =
-                                    "reply sent but mark-read failed group=${action.target.groupIdHex.take(8)} " +
-                                        "message=${action.target.messageIdHex.orEmpty().take(8)}"
-                                val throwable = markReadResult.exceptionOrNull()
-                                if (throwable != null) {
-                                    Log.w("DMNotifyAction", message, throwable)
-                                } else {
-                                    Log.w("DMNotifyAction", message)
-                                }
-                            }
-                        }
-                        notificationReplyActionHandled(sent = sent)
-                    }
-                }
-
-                NotificationActionKind.MARK_READ ->
+        when (action.kind) {
+            NotificationActionKind.REPLY -> handleReplyAction(appContext, appState, action, intent)
+            NotificationActionKind.MARK_READ -> {
+                appState.ensureNotificationRuntimeStarted()
+                if (
                     appState.markNotificationMessageRead(
                         accountRef = action.target.accountRef,
                         groupIdHex = action.target.groupIdHex,
                         messageIdHex = action.target.messageIdHex.orEmpty(),
                     )
-            }
-
-        if (handled) {
-            val presenter = LocalNotificationPresenter(appContext)
-            val reply = sentReplyText
-            if (reply != null) {
-                // A sent direct reply leaves the notification lifetime-extended
-                // by the system; a bare cancel() can't dismiss it. Signal
-                // "reply handled" (setRemoteInputHistory) to clear the
-                // extension, then cancel. The extension is applied a beat after
-                // the broadcast fires, so retry the re-post until the live
-                // notification appears, then let NMS settle before cancelling.
-                var resolved = false
-                repeat(REPLY_DISMISS_RETRIES) {
-                    if (!resolved) {
-                        resolved = presenter.markDirectReplyHandled(action.notificationTag, action.notificationId, reply)
-                        if (!resolved) delay(REPLY_DISMISS_RETRY_DELAY_MS)
-                    }
+                ) {
+                    LocalNotificationPresenter(appContext).cancel(action.notificationTag, action.notificationId)
                 }
-                if (resolved) delay(REPLY_DISMISS_SETTLE_MS)
             }
-            presenter.cancel(action.notificationTag, action.notificationId)
+        }
+    }
+
+    private suspend fun handleReplyAction(
+        appContext: Context,
+        appState: WhiteNoiseAppState,
+        action: NotificationAction,
+        intent: Intent,
+    ) {
+        val reply =
+            RemoteInput
+                .getResultsFromIntent(intent)
+                ?.getCharSequence(NotificationActions.KEY_TEXT_REPLY)
+                ?.toString()
+                ?.trim()
+                .orEmpty()
+        if (reply.isBlank()) return
+
+        // Set as soon as the FFI send reports success. The finally block below
+        // then owns RemoteInput cleanup even if best-effort mark-read stalls or
+        // the reserved send/bootstrap phase times out after the send completed.
+        var sentReplyText: String? = null
+        try {
+            val completed =
+                // This timeout is cooperative: slow JNI/Binder work can run past
+                // it until the next suspension point. The split still reserves a
+                // best-effort dismiss window after a successful send, trading a
+                // shorter cold-start send phase for lower duplicate-send risk.
+                withTimeoutOrNull(REPLY_SEND_PHASE_BUDGET_MS) {
+                    appState.ensureNotificationRuntimeStarted()
+                    val sent =
+                        appState.sendNotificationReply(
+                            accountRef = action.target.accountRef,
+                            groupIdHex = action.target.groupIdHex,
+                            text = reply,
+                        )
+                    if (sent) {
+                        sentReplyText = reply
+                        // mark-read is a best-effort UX nicety; a transient
+                        // failure (or thrown FFI/network error) must never keep
+                        // the notification alive, or its still-active inline
+                        // RemoteInput field would let the user re-send the same
+                        // reply and post a duplicate message to the group.
+                        val markReadFailureMessage =
+                            "reply sent but mark-read failed group=${action.target.groupIdHex.take(8)} " +
+                                "message=${action.target.messageIdHex.orEmpty().take(8)}"
+                        val markReadResult =
+                            try {
+                                appState.markNotificationMessageRead(
+                                    accountRef = action.target.accountRef,
+                                    groupIdHex = action.target.groupIdHex,
+                                    messageIdHex = action.target.messageIdHex.orEmpty(),
+                                )
+                            } catch (throwable: Throwable) {
+                                if (throwable is CancellationException) throw throwable
+                                Log.w("DMNotifyAction", markReadFailureMessage, throwable)
+                                null
+                            }
+                        // Log a thrown error AND a plain false return; the
+                        // latter (e.g. blank ids) would otherwise fail
+                        // silently and hide best-effort mark-read trouble.
+                        if (markReadResult == false) {
+                            Log.w("DMNotifyAction", markReadFailureMessage)
+                        }
+                    }
+                    notificationReplyActionHandled(sent = sent)
+                }
+            if (completed == null) {
+                Log.w(
+                    "DMNotifyAction",
+                    "notification reply send phase timed out group=${action.target.groupIdHex.take(8)}",
+                )
+            }
+        } finally {
+            sentReplyText?.let {
+                dismissSentReplyNotification(appContext, action, it)
+            }
+        }
+    }
+
+    private suspend fun dismissSentReplyNotification(
+        appContext: Context,
+        action: NotificationAction,
+        reply: String,
+    ) {
+        val presenter = LocalNotificationPresenter(appContext)
+        withContext(NonCancellable) {
+            try {
+                val completed =
+                    // Also cooperative: re-post/cancel are Binder-facing and may
+                    // only observe timeout at suspension points between retries.
+                    withTimeoutOrNull(REPLY_DISMISS_BUDGET_MS) {
+                        // A sent direct reply leaves the notification
+                        // lifetime-extended by the system; a bare cancel() can't
+                        // dismiss it. Signal "reply handled"
+                        // (setRemoteInputHistory) to clear the extension, then
+                        // cancel. The extension is applied a beat after the
+                        // broadcast fires, so retry the re-post until the live
+                        // notification appears, then let NMS settle before
+                        // cancelling.
+                        var resolved = false
+                        repeat(REPLY_DISMISS_RETRIES) {
+                            if (!resolved) {
+                                resolved = presenter.markDirectReplyHandled(action.notificationTag, action.notificationId, reply)
+                                if (!resolved) delay(REPLY_DISMISS_RETRY_DELAY_MS)
+                            }
+                        }
+                        if (resolved) delay(REPLY_DISMISS_SETTLE_MS)
+                        true
+                    }
+                if (completed == null) {
+                    Log.w(
+                        "DMNotifyAction",
+                        "notification reply dismiss timed out group=${action.target.groupIdHex.take(8)}",
+                    )
+                }
+            } finally {
+                presenter.cancel(action.notificationTag, action.notificationId)
+            }
         }
     }
 }
 
 internal fun notificationReplyActionHandled(sent: Boolean): Boolean = sent
+
+internal fun notificationReplyDismissBudgetMs(
+    retries: Int = REPLY_DISMISS_RETRIES,
+    retryDelayMs: Long = REPLY_DISMISS_RETRY_DELAY_MS,
+    settleMs: Long = REPLY_DISMISS_SETTLE_MS,
+): Long = retries * retryDelayMs + settleMs
+
+internal fun notificationReplySendPhaseBudgetMs(
+    goAsyncBudgetMs: Long = GO_ASYNC_BUDGET_MS,
+    dismissBudgetMs: Long = notificationReplyDismissBudgetMs(),
+    finishMarginMs: Long = GO_ASYNC_FINISH_MARGIN_MS,
+): Long = (goAsyncBudgetMs - dismissBudgetMs - finishMarginMs).coerceAtLeast(1L)
 
 // The system applies FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY a beat after the
 // reply broadcast fires, so the live notification may not be in the active set
@@ -157,6 +221,9 @@ internal fun notificationReplyActionHandled(sent: Boolean): Boolean = sent
 // Keep under the manifest receiver's ~10s goAsync() deadline, leaving margin for
 // pending.finish() so a slow/cold send can't get the process killed mid-reply.
 private const val GO_ASYNC_BUDGET_MS = 8_000L
+private const val GO_ASYNC_FINISH_MARGIN_MS = 300L
+private val REPLY_DISMISS_BUDGET_MS = notificationReplyDismissBudgetMs()
+private val REPLY_SEND_PHASE_BUDGET_MS = notificationReplySendPhaseBudgetMs()
 private const val REPLY_DISMISS_RETRIES = 6
 private const val REPLY_DISMISS_RETRY_DELAY_MS = 100L
 private const val REPLY_DISMISS_SETTLE_MS = 350L
