@@ -1201,7 +1201,10 @@ private fun MainShell(
 
     DisposableEffect(chatsController) {
         appState.attachChatsController(chatsController)
-        onDispose { appState.attachChatsController(null) }
+        onDispose {
+            appState.attachChatsController(null)
+            chatsController.onCleared()
+        }
     }
 
     LaunchedEffect(chatsController, appState.activeAccountRef, appState.runtimeGeneration) {

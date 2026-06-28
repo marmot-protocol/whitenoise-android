@@ -1014,6 +1014,7 @@ class ChatsController(
     // longer matches and the job drops its result instead of poisoning
     // the new account's cache with stale members.
     private var bindEpoch: Long = 0L
+    private var isCleared = false
 
     private val liveSubscriptionLock = Any()
     private var activeChatListSubscription: ChatListSubscription? = null
@@ -1045,19 +1046,13 @@ class ChatsController(
     }
 
     suspend fun bind(accountRef: String?) {
+        if (isCleared) return
         val currentBindJob = coroutineContext[Job]
         synchronized(liveSubscriptionLock) { bindJob = currentBindJob }
         chatsDebug { "bind account=${accountRef?.take(8)}" }
         this.accountRef = accountRef
         this.boundAccountRef = accountRef
-        chatRows = emptyList()
-        groupRecordsById = emptyMap()
-        memberCacheByGroup = emptyMap()
-        removedGroupIds = emptySet()
-        inFlightMemberFetches.clear()
-        previewTokensByText = emptyMap()
-        inFlightPreviewParses.clear()
-        inFlightInviteAutoAccepts.clear()
+        resetBackingState()
         bindEpoch += 1L
         recompute()
         error = null
@@ -1679,6 +1674,7 @@ class ChatsController(
      * recompute is paused while hidden and flushed once on return. See #6.
      */
     fun setChatListVisible(visible: Boolean) {
+        if (isCleared) return
         if (visible == chatListVisible) return
         chatListVisible = visible
         if (visible && pendingRecompute) recompute()
@@ -1694,7 +1690,7 @@ class ChatsController(
     // projection rebuild one frame so a burst collapses into a single recompute,
     // mirroring the conversation timeline's coalescing.
     private fun scheduleRecompute() {
-        if (recomputeScheduled) return
+        if (isCleared || recomputeScheduled) return
         recomputeScheduled = true
         recomputeScope.launch {
             try {
@@ -1706,7 +1702,51 @@ class ChatsController(
         }
     }
 
+    /**
+     * Dispose every reference this controller owns. The chat-list screen calls
+     * this once when it disposes the controller, which happens on every account
+     * switch and [WhiteNoiseAppState.runtimeGeneration] bump (sign-out,
+     * destructive wipe). Without it the controller-owned jobs — and the
+     * [ChatsController] state they keep alive, whose projection holds decrypted
+     * message previews — would leak for the process lifetime. Mirrors
+     * [ConversationController.onCleared].
+     */
+    fun onCleared() {
+        if (isCleared) return
+        isCleared = true
+        bindEpoch += 1L
+        val jobToCancel =
+            synchronized(liveSubscriptionLock) {
+                accountRef = null
+                boundAccountRef = null
+                bindJob.also { bindJob = null }
+            }
+        jobToCancel?.cancel()
+        resetBackingState()
+        items = emptyList()
+        archivedItems = emptyList()
+        isLoading = false
+        error = null
+        pendingRecompute = false
+        recomputeScheduled = false
+        recomputeScope.cancel()
+    }
+
+    private fun resetBackingState() {
+        chatRows = emptyList()
+        groupRecordsById = emptyMap()
+        memberCacheByGroup = emptyMap()
+        removedGroupIds = emptySet()
+        inFlightMemberFetches.clear()
+        previewTokensByText = emptyMap()
+        inFlightPreviewParses.clear()
+        inFlightInviteAutoAccepts.clear()
+    }
+
+    private fun isActiveBindEpoch(epoch: Long): Boolean = !isCleared && bindEpoch == epoch && accountRef != null
+
     private fun recompute() {
+        if (isCleared) return
         val unreadAccountRef = accountRef
         // Project once and reuse for both the per-account aggregate and the
         // visible list, so the aggregate sees the same removed-group
@@ -1765,12 +1805,12 @@ class ChatsController(
         if (pending.isEmpty()) return
         inFlightMemberFetches.addAll(pending)
         pending.forEach { groupIdHex ->
-            appState.launchMutation {
+            recomputeScope.launch {
                 try {
                     memberFetchGate.withPermit {
-                        if (bindEpoch != epoch) return@withPermit
+                        if (!isActiveBindEpoch(epoch)) return@withPermit
                         val members = appState.marmotIo { groupMembers(account, groupIdHex) }
-                        if (bindEpoch == epoch) {
+                        if (isActiveBindEpoch(epoch)) {
                             members
                                 .map { it.memberIdHex }
                                 .filter { it.isNotBlank() }
@@ -1804,7 +1844,7 @@ class ChatsController(
                     // belongs to the current bind. A later bind() has
                     // already cleared the set; removing again would be
                     // a no-op but obscures the invariant.
-                    if (bindEpoch == epoch) inFlightMemberFetches.remove(groupIdHex)
+                    if (isActiveBindEpoch(epoch)) inFlightMemberFetches.remove(groupIdHex)
                 }
             }
         }
@@ -1835,10 +1875,11 @@ class ChatsController(
         if (pending.isEmpty()) return
         inFlightPreviewParses.addAll(pending)
         pending.forEach { text ->
-            appState.launchMutation {
+            recomputeScope.launch {
                 try {
+                    if (!isActiveBindEpoch(epoch)) return@launch
                     val tokens = appState.parseMarkdownOrEmpty(text)
-                    if (bindEpoch != epoch) return@launchMutation
+                    if (!isActiveBindEpoch(epoch)) return@launch
                     previewTokensByText = previewTokensByText + (text to tokens)
                     // Coalesce: a burst of preview-parse completions on account
                     // open/switch would otherwise drive N un-debounced full
@@ -1848,7 +1889,7 @@ class ChatsController(
                     // Same epoch discipline as the member fetches: a later
                     // bind() already cleared the set, so only the owning
                     // epoch may mutate it.
-                    if (bindEpoch == epoch) inFlightPreviewParses.remove(text)
+                    if (isActiveBindEpoch(epoch)) inFlightPreviewParses.remove(text)
                 }
             }
         }
@@ -1867,15 +1908,16 @@ class ChatsController(
         inFlightInviteAutoAccepts.addAll(pending)
         pending.forEach { groupIdHex ->
             val inviter = groupRecordsById[groupIdHex]?.welcomerAccountIdHex
-            appState.launchMutation {
+            recomputeScope.launch {
                 try {
+                    if (!isActiveBindEpoch(epoch)) return@launch
                     appState.autoAcceptGroupInvite(
                         accountRef = account,
                         groupIdHex = groupIdHex,
                         inviterAccountIdHex = inviter,
                     )
                 } finally {
-                    if (bindEpoch == epoch) inFlightInviteAutoAccepts.remove(groupIdHex)
+                    if (isActiveBindEpoch(epoch)) inFlightInviteAutoAccepts.remove(groupIdHex)
                 }
             }
         }
