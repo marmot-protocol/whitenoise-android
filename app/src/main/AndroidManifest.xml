@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature
         android:name="android.hardware.camera"
@@ -52,7 +53,11 @@
         <service
             android:name=".notifications.NotificationStreamForegroundService"
             android:exported="false"
-            android:foregroundServiceType="remoteMessaging" />
+            android:foregroundServiceType="remoteMessaging|specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="@string/background_connection_special_use_subtype" />
+        </service>
         <service
             android:name=".notifications.MarmotFirebaseMessagingService"
             android:exported="false">

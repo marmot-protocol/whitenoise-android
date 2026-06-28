@@ -53,7 +53,7 @@ class NotificationStreamForegroundService : Service() {
                 startForeground(
                     NOTIFICATION_ID,
                     BackgroundConnectionNotification.build(this),
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
+                    foregroundServiceTypeForTrigger(trigger),
                 )
             }.onFailure {
                 foregroundServiceDebug(it) { "startForeground rejected" }
@@ -271,6 +271,19 @@ internal fun decideForegroundStart(
     }
 
 internal fun shouldReconcileBackgroundConnectionRejection(trigger: ForegroundStartTrigger): Boolean = trigger == ForegroundStartTrigger.UserToggle
+
+internal fun foregroundServiceTypeForTrigger(trigger: ForegroundStartTrigger): Int =
+    when (trigger) {
+        // Android 14+ forbids BOOT_COMPLETED / MY_PACKAGE_REPLACED starts for
+        // remoteMessaging foreground services. The user-enabled persistent
+        // encrypted-message connection still needs to come back after those
+        // system wakes, so only that path uses the manifest-declared specialUse
+        // type; user and FCM starts keep the narrower remoteMessaging type.
+        ForegroundStartTrigger.SystemWake -> ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        ForegroundStartTrigger.UserToggle,
+        ForegroundStartTrigger.PushWake,
+        -> ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+    }
 
 private fun foregroundStartTrigger(intent: Intent?): ForegroundStartTrigger {
     val raw = intent?.getStringExtra(EXTRA_START_TRIGGER)

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.content.pm.ServiceInfo
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -171,6 +172,26 @@ class ForegroundStartDecisionTest {
                 syncRequested = false,
                 backgroundConnectionEnabled = false,
             ),
+        )
+    }
+
+    @Test
+    fun systemWakeUsesBootPermittedForegroundServiceType() {
+        assertEquals(
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            foregroundServiceTypeForTrigger(ForegroundStartTrigger.SystemWake),
+        )
+    }
+
+    @Test
+    fun userAndPushStartsUseRemoteMessagingForegroundServiceType() {
+        assertEquals(
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
+            foregroundServiceTypeForTrigger(ForegroundStartTrigger.UserToggle),
+        )
+        assertEquals(
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
+            foregroundServiceTypeForTrigger(ForegroundStartTrigger.PushWake),
         )
     }
 }

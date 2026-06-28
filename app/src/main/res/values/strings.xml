@@ -510,6 +510,7 @@
     <string name="background_connection_notification_hint">Long-press to hide this notification</string>
     <string name="notification_channel_background_connection">Background connection</string>
     <string name="notification_channel_background_connection_description">Keeps White Noise connected for local notifications</string>
+    <string name="background_connection_special_use_subtype" translatable="false">Restart the user-enabled encrypted message background connection after device boot or app update.</string>
     <string name="toast_restarting">Restarting</string>
     <string name="toast_identity_created">Identity created</string>
     <string name="toast_couldnt_create_identity">Couldn\'t create identity</string>
