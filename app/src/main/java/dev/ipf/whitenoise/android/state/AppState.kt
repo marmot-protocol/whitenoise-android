@@ -21,6 +21,7 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
 import dev.ipf.marmotkit.AuditLogUploadSourceFfi
@@ -1297,9 +1298,8 @@ class WhiteNoiseAppState(
                     client ?: MarmotClient(appContext).also { client = it }
                 }
             appStateDebug { "bootstrap root=${opened.rootPath}" }
-            val accountLabelForRuntime = activeAccountRef
             withContext(Dispatchers.IO) {
-                opened.marmot.configurePrivacyRuntime(accountLabelForRuntime)
+                opened.marmot.configurePrivacyRuntime()
                 opened.marmot.start()
             }
             appStateDebug { "marmot started" }
@@ -1930,7 +1930,16 @@ class WhiteNoiseAppState(
             // in place via a recorder hot-swap (enable → live recorder,
             // disable → flush + close); no session reopen or runtime restart
             // required on the host side.
-            val updated = marmotIo { setAuditLogSettings(AuditLogSettingsFfi(enabled = enabled)) }
+            // Full-data mode: when an operator opts into audit logging they want
+            // complete forensic detail (decrypted content, full identifiers), not
+            // the obfuscated safety posture. Account identity is added by the core
+            // into the JSONL source context, so the host no longer supplies it.
+            val updated =
+                marmotIo {
+                    setAuditLogSettings(
+                        AuditLogSettingsFfi(enabled = enabled, dataMode = AuditDataModeFfi.FULL_DATA),
+                    )
+                }
             auditLogSettings = updated
             present(R.string.toast_security_privacy_updated)
             true
@@ -3164,10 +3173,9 @@ class WhiteNoiseAppState(
     }
 
     private suspend fun configurePrivacyRuntime() {
-        val accountLabelForRuntime = activeAccountRef
         runCatching {
             withContext(Dispatchers.IO) {
-                marmot().configurePrivacyRuntime(accountLabelForRuntime)
+                marmot().configurePrivacyRuntime()
             }
         }.onFailure {
             if (it is CancellationException) throw it
@@ -3175,7 +3183,7 @@ class WhiteNoiseAppState(
         }
     }
 
-    private suspend fun Marmot.configurePrivacyRuntime(accountLabel: String?) {
+    private suspend fun Marmot.configurePrivacyRuntime() {
         val installId = runCatching { telemetryInstallId() }.getOrNull().orEmpty()
         setRelayTelemetryRuntimeConfig(
             RelayTelemetryRuntimeConfigFfi(
@@ -3199,7 +3207,6 @@ class WhiteNoiseAppState(
                 authorizationBearerToken = BuildConfig.WHITENOISE_AUDIT_LOG_AUTH_TOKEN.nonBlankOrNull(),
                 source =
                     AuditLogUploadSourceFfi(
-                        accountLabel = accountLabel.nonBlankOrNull(),
                         deviceLabel = Build.MODEL.nonBlankOrNull(),
                         platform = "android",
                         appVersion = BuildConfig.VERSION_NAME,
