@@ -34,6 +34,26 @@ class PushTokenStoreTest {
     }
 
     @Test
+    fun nativePushRegistrationSyncPendingDefaultsToFalse() {
+        assertEquals(false, store().nativePushRegistrationSyncPending())
+    }
+
+    @Test
+    fun recordPendingNativePushRegistrationSyncSetsTheDurableFlag() {
+        val store = store()
+        store.recordPendingNativePushRegistrationSync()
+        assertEquals(true, store.nativePushRegistrationSyncPending())
+    }
+
+    @Test
+    fun clearPendingNativePushRegistrationSyncResetsTheDurableFlag() {
+        val store = store()
+        store.recordPendingNativePushRegistrationSync()
+        store.clearPendingNativePushRegistrationSync()
+        assertEquals(false, store.nativePushRegistrationSyncPending())
+    }
+
+    @Test
     fun recordPendingClearAddsTheRef() {
         val store = store()
         store.recordPendingClear("npub-a")
@@ -282,7 +302,7 @@ class PushTokenStoreTest {
         override fun getBoolean(
             key: String?,
             defValue: Boolean,
-        ): Boolean = defValue
+        ): Boolean = (values[key] as? Boolean) ?: defValue
 
         override fun contains(key: String?): Boolean = values.containsKey(key)
 

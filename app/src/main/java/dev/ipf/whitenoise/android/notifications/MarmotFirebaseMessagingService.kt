@@ -23,10 +23,26 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         fcmDebug { "FCM token rotated (${token.length} chars)" }
         val app = applicationContext as? WhiteNoiseApplication
-        if (app != null) {
-            app.appState.onPushTokenRotated(token)
-        } else {
-            PushTokenStore.create(applicationContext).setToken(token)
+        when (decidePushTokenRotation(appRuntimeReachable = app != null)) {
+            // AppState.onPushTokenRotated persists the token AND schedules a
+            // native-push re-sync atomically, so route the whole rotation through it.
+            PushTokenRotationDispatch.ToAppRuntime -> app!!.appState.onPushTokenRotated(token)
+            // Fallback for when applicationContext can't resolve to
+            // WhiteNoiseApplication (early process init, restricted context,
+            // teardown): persist the token *and* nudge the runtime to
+            // re-register. #755 — persisting alone left the MIP-05 server on a
+            // stale token until a later foreground sync. Starting the
+            // foreground stream service bootstraps AppState off this Firebase
+            // background thread; that bootstrap runs
+            // syncNativePushRegistrationIfEnabled() so the rotated token reaches
+            // the push server.
+            PushTokenRotationDispatch.PersistAndScheduleReRegistration -> {
+                PushTokenStore.create(applicationContext).setToken(token)
+                val scheduled = NotificationStreamForegroundService.syncNativePushRegistration(applicationContext)
+                if (!scheduled) {
+                    fcmDebug { "Native-push registration sync start rejected; durable retry recorded" }
+                }
+            }
         }
     }
 
@@ -63,6 +79,52 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
         private const val TAG = "MarmotFcmService"
     }
 }
+
+/**
+ * How [MarmotFirebaseMessagingService.onNewToken] should handle a rotated FCM
+ * token, derived only from whether the app runtime ([WhiteNoiseApplication]) is
+ * reachable from `applicationContext`. Each value couples token persistence
+ * with scheduling native push re-registration so the two can never diverge.
+ * Keeping this side-effect-free makes the #755 invariant testable without an
+ * Android context. See [decidePushTokenRotation].
+ */
+internal sealed interface PushTokenRotationDispatch {
+    /** True iff this dispatch persists the rotated token (every variant must). */
+    val persistsToken: Boolean
+
+    /** True iff this dispatch schedules native push re-registration (every variant must). */
+    val schedulesReRegistration: Boolean
+
+    /** Runtime reachable → AppState.onPushTokenRotated persists + schedules atomically. */
+    data object ToAppRuntime : PushTokenRotationDispatch {
+        override val persistsToken = true
+        override val schedulesReRegistration = true
+    }
+
+    /**
+     * Runtime unreachable → persist the token locally AND start the foreground
+     * stream service, whose bootstrap re-syncs native push. #755: the old
+     * fallback persisted only, stranding the MIP-05 server on a stale token.
+     */
+    data object PersistAndScheduleReRegistration : PushTokenRotationDispatch {
+        override val persistsToken = true
+        override val schedulesReRegistration = true
+    }
+}
+
+/**
+ * Pure mapping from "is the app runtime reachable?" to a
+ * [PushTokenRotationDispatch]. Extracted from [MarmotFirebaseMessagingService.onNewToken]
+ * so the #755 contract — token persistence is always coupled with scheduling
+ * re-registration — is pinned by [dev.ipf.whitenoise.android.notifications.PushTokenRotationDispatchTest]
+ * and cannot silently regress to a persist-only fallback.
+ */
+internal fun decidePushTokenRotation(appRuntimeReachable: Boolean): PushTokenRotationDispatch =
+    if (appRuntimeReachable) {
+        PushTokenRotationDispatch.ToAppRuntime
+    } else {
+        PushTokenRotationDispatch.PersistAndScheduleReRegistration
+    }
 
 private inline fun fcmDebug(message: () -> String) {
     // Debug-only so operational push logs don't ship in release logcat. See #39.

@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,6 +24,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 private const val ACTION_START = "dev.ipf.whitenoise.android.notifications.START_STREAM_FOREGROUND_SERVICE"
+private const val ACTION_SYNC_NATIVE_PUSH_REGISTRATION =
+    "dev.ipf.whitenoise.android.notifications.SYNC_NATIVE_PUSH_REGISTRATION"
 private const val EXTRA_START_TRIGGER = "dev.ipf.whitenoise.android.notifications.EXTRA_START_TRIGGER"
 private const val START_TRIGGER_USER_TOGGLE = "user_toggle"
 private const val START_TRIGGER_PUSH_WAKE = "push_wake"
@@ -31,6 +34,7 @@ private const val START_TRIGGER_SYSTEM_WAKE = "system_wake"
 class NotificationStreamForegroundService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var bootstrapJob: Job? = null
+    private var pendingNativePushRegistrationSync = false
 
     override fun onStartCommand(
         intent: Intent?,
@@ -54,13 +58,16 @@ class NotificationStreamForegroundService : Service() {
             }.onFailure {
                 foregroundServiceDebug(it) { "startForeground rejected" }
             }.isSuccess
+        val syncNativePushRegistration = shouldSyncNativePushRegistration(intent?.action)
+        if (syncNativePushRegistration) pendingNativePushRegistrationSync = true
         when (
             decideForegroundStart(
                 startForegroundSucceeded = startedForeground,
                 bootstrapInFlight = bootstrapJob?.isActive == true,
+                syncNativePushRegistrationRequested = syncNativePushRegistration,
             )
         ) {
-            ForegroundStartDecision.RejectAndStop -> {
+            ForegroundStartDecision.RejectBackgroundConnectionStartAndStop -> {
                 // The enable path already optimistically persisted "background
                 // connection on" and got a `true` from start() (the intent was
                 // merely queued). Tell AppState the start actually failed so the
@@ -74,22 +81,71 @@ class NotificationStreamForegroundService : Service() {
                 stopSelf(startId)
                 return START_NOT_STICKY
             }
+            ForegroundStartDecision.RejectNativePushSyncAndStop -> {
+                // A one-shot native-push sync nudge is not a Keep Connected
+                // request. The durable pending flag was recorded before the
+                // start intent was queued, so stop without flipping the user's
+                // background-connection preference or showing the #164 toast.
+                stopSelf(startId)
+                return START_NOT_STICKY
+            }
             ForegroundStartDecision.BootstrapAndKeep -> {
                 bootstrapJob =
                     serviceScope.launch {
+                        val stopAfterSync =
+                            shouldStopAfterNativePushRegistrationSync(
+                                syncRequested = syncNativePushRegistration,
+                                backgroundConnectionEnabled = BackgroundConnectionPreferences.isEnabled(applicationContext),
+                            )
                         runCatching {
-                            (application as WhiteNoiseApplication).appState.ensureNotificationRuntimeStarted()
+                            val appState = (application as WhiteNoiseApplication).appState
+                            appState.ensureNotificationRuntimeStarted()
+                            drainPendingNativePushRegistrationSync(appState)
                         }.onFailure {
                             foregroundServiceDebug(it) { "notification runtime failed" }
                         }
+                        if (stopAfterSync) stopSelf(startId)
                     }
             }
             // Repeated onStartCommand calls (Android may redeliver) must not
             // stack notification-runtime bootstraps — an idempotency contract.
-            ForegroundStartDecision.KeepRunningExistingBootstrap -> Unit
+            ForegroundStartDecision.KeepRunningExistingBootstrap -> {
+                if (syncNativePushRegistration) {
+                    val inFlightBootstrap = bootstrapJob
+                    val stopAfterSync =
+                        shouldStopAfterNativePushRegistrationSync(
+                            syncRequested = true,
+                            backgroundConnectionEnabled = BackgroundConnectionPreferences.isEnabled(applicationContext),
+                        )
+                    serviceScope.launch {
+                        runCatching {
+                            inFlightBootstrap?.join()
+                            drainPendingNativePushRegistrationSync((application as WhiteNoiseApplication).appState)
+                        }.onFailure {
+                            foregroundServiceDebug(it) { "notification runtime native-push sync failed" }
+                        }
+                        // A one-shot sync nudge that raced an existing bootstrap must not
+                        // keep the foreground service (and its notification) alive unless
+                        // the user enabled Keep Connected — same rule as BootstrapAndKeep.
+                        if (stopAfterSync) stopSelf(startId)
+                    }
+                }
+            }
         }
         foregroundServiceDebug { "started" }
         return START_STICKY
+    }
+
+    private suspend fun drainPendingNativePushRegistrationSync(appState: WhiteNoiseAppState) {
+        val store = PushTokenStore.create(applicationContext)
+        if (!pendingNativePushRegistrationSync && !store.nativePushRegistrationSyncPending()) return
+        pendingNativePushRegistrationSync = false
+        // The FCM token-rotation fallback (#755) starts this service to
+        // re-register native push when it can't reach AppState directly.
+        // ensureNotificationRuntimeStarted() alone does not push the rotated
+        // token to the MIP-05 server, so sync explicitly here. Idempotent: a
+        // no-op when the token/server/relay fingerprint is unchanged.
+        appState.syncNativePushRegistrationIfEnabled()
     }
 
     override fun onDestroy() {
@@ -107,14 +163,32 @@ class NotificationStreamForegroundService : Service() {
             context: Context,
             trigger: ForegroundStartTrigger = ForegroundStartTrigger.UserToggle,
         ): Boolean =
+            startForegroundServiceSafely(context) { appContext ->
+                Intent(appContext, NotificationStreamForegroundService::class.java)
+                    .setAction(ACTION_START)
+                    .putExtra(EXTRA_START_TRIGGER, trigger.extraValue)
+            }
+
+        // #755 fallback: record the durable pending-sync flag, then nudge this
+        // service to re-register native push. Carries no start-trigger extra, so
+        // foregroundStartTrigger() classifies it as a SystemWake and a rejected
+        // start never disables the user's Keep Connected preference.
+        fun syncNativePushRegistration(context: Context): Boolean {
+            val appContext = context.applicationContext
+            PushTokenStore.create(appContext).recordPendingNativePushRegistrationSync()
+            return startForegroundServiceSafely(appContext) { ctx ->
+                Intent(ctx, NotificationStreamForegroundService::class.java)
+                    .setAction(ACTION_SYNC_NATIVE_PUSH_REGISTRATION)
+            }
+        }
+
+        private fun startForegroundServiceSafely(
+            context: Context,
+            buildIntent: (Context) -> Intent,
+        ): Boolean =
             runCatching {
                 val appContext = context.applicationContext
-                ContextCompat.startForegroundService(
-                    appContext,
-                    Intent(appContext, NotificationStreamForegroundService::class.java)
-                        .setAction(ACTION_START)
-                        .putExtra(EXTRA_START_TRIGGER, trigger.extraValue),
-                )
+                ContextCompat.startForegroundService(appContext, buildIntent(appContext))
                 true
             }.getOrElse {
                 foregroundServiceDebug(it) { "start rejected" }
@@ -142,11 +216,25 @@ internal enum class ForegroundStartTrigger(
     SystemWake(START_TRIGGER_SYSTEM_WAKE),
 }
 
+/** True only for a one-shot native-push registration sync start (#755). */
+internal fun shouldSyncNativePushRegistration(action: String?): Boolean = action == ACTION_SYNC_NATIVE_PUSH_REGISTRATION
+
+/**
+ * A token-rotation fallback should not turn a one-shot re-registration nudge
+ * into a persistent background connection notification unless the user already
+ * enabled keep-connected. Existing stream starts keep their prior behavior.
+ */
+internal fun shouldStopAfterNativePushRegistrationSync(
+    syncRequested: Boolean,
+    backgroundConnectionEnabled: Boolean,
+): Boolean = syncRequested && !backgroundConnectionEnabled
+
 /**
  * The pure decision about how [NotificationStreamForegroundService.onStartCommand] should proceed,
- * derived only from whether the foreground start succeeded and whether a bootstrap is already in
- * flight. Each value maps 1:1 to an action in onStartCommand; keeping this side-effect-free makes
- * the truth table testable without an Android context. See #164 and #158.
+ * derived only from whether the foreground start succeeded, whether a bootstrap
+ * is already in flight, and whether this intent is a one-shot native-push sync.
+ * Each value maps 1:1 to an action in onStartCommand; keeping this side-effect-free
+ * makes the truth table testable without an Android context. See #164 and #158.
  */
 internal sealed interface ForegroundStartDecision {
     /** start-foreground succeeded, no bootstrap in flight → launch a new bootstrap, START_STICKY. */
@@ -155,21 +243,29 @@ internal sealed interface ForegroundStartDecision {
     /** start-foreground succeeded, bootstrap already active → do nothing extra, START_STICKY. */
     data object KeepRunningExistingBootstrap : ForegroundStartDecision
 
-    /** start-foreground rejected → notify AppState, stopSelf, START_NOT_STICKY. */
-    data object RejectAndStop : ForegroundStartDecision
+    /** Background-connection foreground start rejected → notify AppState, stopSelf, START_NOT_STICKY. */
+    data object RejectBackgroundConnectionStartAndStop : ForegroundStartDecision
+
+    /** One-shot native-push sync foreground start rejected → stopSelf only, START_NOT_STICKY. */
+    data object RejectNativePushSyncAndStop : ForegroundStartDecision
 }
 
 /**
- * Pure mapping from the two observable booleans to a [ForegroundStartDecision]. Extracted from
- * onStartCommand so the rejection-notification contract (#164) and the bootstrap-dedupe idempotency
- * contract are pinned by [ForegroundStartDecisionTest] and cannot silently regress in a refactor.
+ * Pure mapping from the observable start state to a [ForegroundStartDecision].
+ * Extracted from onStartCommand so the rejection-notification contract (#164),
+ * the sync-only rejection contract (#755), and the bootstrap-dedupe idempotency
+ * contract are pinned by [ForegroundStartDecisionTest] and cannot silently
+ * regress in a refactor.
  */
 internal fun decideForegroundStart(
     startForegroundSucceeded: Boolean,
     bootstrapInFlight: Boolean,
+    syncNativePushRegistrationRequested: Boolean,
 ): ForegroundStartDecision =
     when {
-        !startForegroundSucceeded -> ForegroundStartDecision.RejectAndStop
+        !startForegroundSucceeded && syncNativePushRegistrationRequested ->
+            ForegroundStartDecision.RejectNativePushSyncAndStop
+        !startForegroundSucceeded -> ForegroundStartDecision.RejectBackgroundConnectionStartAndStop
         bootstrapInFlight -> ForegroundStartDecision.KeepRunningExistingBootstrap
         else -> ForegroundStartDecision.BootstrapAndKeep
     }
