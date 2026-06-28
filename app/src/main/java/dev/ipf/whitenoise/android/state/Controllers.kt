@@ -1624,6 +1624,34 @@ class ChatsController(
     }
 
     /**
+     * Flip the chat-list row for [groupIdHex] to its left state after a leave
+     * initiated from another surface (the conversation Details screen), where
+     * the engine pushes no chat-list update for a self-leave so the row would
+     * otherwise stay active until the next bind (issue #767).
+     *
+     * Mirrors the row-state updates the chat-list [leaveGroup] makes itself:
+     * fold the group into [removedGroupIds] (the authoritative removal marker
+     * [ChatListItem.removedFromGroup] honours regardless of the cached roster)
+     * and, when a roster is already cached, drop self from it so the snapshot
+     * agrees, then [recompute] so the row re-projects immediately. No-op when
+     * no account is bound or the group isn't on this controller's chat list.
+     */
+    fun markGroupLeft(groupIdHex: String) {
+        if (accountRef == null) return
+        if (chatRows.none { it.groupIdHex == groupIdHex }) return
+        val activeAccountIdHex = appState.activeAccount?.accountIdHex
+        memberCacheByGroup[groupIdHex]?.let { cached ->
+            if (activeAccountIdHex != null) {
+                memberCacheByGroup =
+                    memberCacheByGroup +
+                    (groupIdHex to GroupProjector.membersWithoutActiveAccount(cached, activeAccountIdHex))
+            }
+        }
+        removedGroupIds = removedGroupIds + groupIdHex
+        recompute()
+    }
+
+    /**
      * Mark the chat's unread count to zero by advancing the read pointer to
      * its latest projected message. No-op when the chat has no unread or no
      * known last-message id. Called from the long-press "Mark as read"
@@ -3930,6 +3958,13 @@ class ConversationController(
                 // UI navigates back and disposes this controller, so this is the
                 // authoritative invalidation.
                 appState.removeActiveAccountFromGroupMemberSnapshot(account, group.groupIdHex)
+                // Flip the chat-list row to its left state too: the engine
+                // pushes no chat-list update for a self-leave, and the
+                // chat-list controller's removedGroupIds/memberCache (which
+                // drive the row's left state) are only updated by its own
+                // leaveGroup, not this Details path — so without this the row
+                // stays active until the next bind (issue #767).
+                appState.markGroupLeftOnChatList(account, group.groupIdHex)
                 val name = displayName?.takeIf { it.isNotBlank() }
                 if (name != null) {
                     appState.presentText(AppText.Resource(R.string.toast_left_named, listOf(name)))

@@ -177,6 +177,47 @@ class ChatListProjectionReducerTest {
         assertNull(item.memberSnapshot)
     }
 
+    // ---- removed-group marker (drives the left-state row) -------------------
+
+    @Test
+    fun removedFlagFlipsRemovedFromGroupEvenWhileTheRosterStillContainsSelf() {
+        // markGroupLeft (and the chat-list leaveGroup) flip a row to its left
+        // state by adding the group to ChatsController.removedGroupIds, which
+        // surfaces here as removed = true. That marker must win even when the
+        // cached roster still lists self -- the engine pushes no chat-list
+        // update for a self-leave, so the roster can lag (issue #767).
+        val me = "me-acc"
+        val item =
+            chatListItemFromProjection(
+                row(groupId = "g1", rawTitle = "Marmot Lab", unreadCount = 7uL, hasUnread = true),
+                group = group(name = "Marmot Lab"),
+                activeAccountIdHex = me,
+                members = listOf(member(me, local = true), member("peer-acc", local = false)),
+                removed = true,
+            )
+
+        assertTrue(item.removedFromGroup(me))
+        assertEquals(0uL, item.effectiveUnreadCount(me))
+    }
+
+    @Test
+    fun withoutRemovedFlagAStaleSelfIncludingRosterStaysActive() {
+        // Guards the other half of the contract: absent the removed marker, a
+        // roster that still includes self reads as active, so the Details-path
+        // fix genuinely depends on markGroupLeft setting removed.
+        val me = "me-acc"
+        val item =
+            chatListItemFromProjection(
+                row(groupId = "g1", rawTitle = "Marmot Lab"),
+                group = group(name = "Marmot Lab"),
+                activeAccountIdHex = me,
+                members = listOf(member(me, local = true), member("peer-acc", local = false)),
+                removed = false,
+            )
+
+        assertEquals(false, item.removedFromGroup(me))
+    }
+
     // ---- projection + preview-token passthrough -----------------------------
 
     @Test
@@ -295,6 +336,8 @@ class ChatListProjectionReducerTest {
         pendingConfirmation: Boolean = false,
         preview: ChatListMessagePreviewFfi? = preview(),
         updatedAt: ULong = 1uL,
+        unreadCount: ULong = 0uL,
+        hasUnread: Boolean = false,
     ) = ChatListRowFfi(
         unreadMentionCount = 0uL,
         unreadMention = false,
@@ -306,8 +349,8 @@ class ChatListProjectionReducerTest {
         avatarUrl = null,
         avatar = null,
         lastMessage = preview,
-        unreadCount = 0uL,
-        hasUnread = false,
+        unreadCount = unreadCount,
+        hasUnread = hasUnread,
         firstUnreadMessageIdHex = null,
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
