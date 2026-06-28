@@ -147,6 +147,15 @@ class HostSafetyTest {
     }
 
     @Test
+    fun multipleTrailingRootDotsStillResolveToLoopbackAndAreFlagged() {
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("127.0.0.1.."))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("localhost.."))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("192.168.0.1。．"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("localhost。．"))
+        assertFalse(HostSafety.isPrivateOrLoopbackHost("relay.example.."))
+    }
+
+    @Test
     fun nonDottedPublicIpv4IsStillDecodedAndAllowed() {
         // Proves the decoder classifies rather than blanket-blocking numerics:
         // 134744072 == 8.8.8.8 (public) must remain allowed.

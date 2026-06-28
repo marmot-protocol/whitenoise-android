@@ -48,7 +48,7 @@ object ChatListMessageSearch {
     ): Boolean {
         val normalizedNeedle = normalizeWhitespace(ciNeedle)
         if (normalizedNeedle.isEmpty()) return false
-        return normalizeWhitespace(plaintext)
+        return normalizeSearchBody(plaintext)
             .lowercase(Locale.ROOT)
             .contains(normalizedNeedle.lowercase(Locale.ROOT))
     }
@@ -101,7 +101,7 @@ object ChatListMessageSearch {
         // locating the needle, so the index we compute lines up with the
         // single-line snippet the UI renders. Don't trim mid-string -- only the
         // window edges get ellipsized.
-        val normalized = normalizeWhitespace(plaintext)
+        val normalized = normalizeSearchBody(plaintext)
         val normalizedNeedle = normalizeWhitespace(needle)
         if (normalizedNeedle.isEmpty()) return null
         val matchStart = normalized.lowercase(Locale.ROOT).indexOf(normalizedNeedle.lowercase(Locale.ROOT))
@@ -152,6 +152,8 @@ object ChatListMessageSearch {
         )
     }
 
+    private fun normalizeSearchBody(value: String): String = normalizeWhitespace(value.take(BODY_SEARCH_SCAN_LIMIT))
+
     private fun normalizeWhitespace(value: String): String = WHITESPACE_RUN.replace(value, " ").trim()
 
     /**
@@ -191,6 +193,7 @@ object ChatListMessageSearch {
         }
 
     const val DEFAULT_SNIPPET_LENGTH: Int = 80
+    private const val BODY_SEARCH_SCAN_LIMIT = 4096
     private const val ELLIPSIS = "\u2026"
     private val WHITESPACE_RUN = Regex("\\s+")
 }
