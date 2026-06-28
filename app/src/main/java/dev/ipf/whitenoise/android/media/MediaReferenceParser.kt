@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.core.HostSafety
+import java.net.InetAddress
 import java.net.URI
 
 /**
@@ -29,6 +30,7 @@ object MediaReferenceParser {
     private const val TAG_NAME = "imeta"
     private const val VERSION_VALUE = "encrypted-media-v1"
     private const val BLOSSOM_LOCATOR_KIND = "blossom-v1"
+    private const val MALFORMED_LOCATOR_HOST = "<malformed-locator>"
     private const val SHA256_HEX_LEN = 64 // 32 bytes
     private const val NONCE_HEX_LEN = 24 // 12 bytes
     private const val HEX_CHARS = "0123456789abcdefABCDEF"
@@ -146,6 +148,48 @@ object MediaReferenceParser {
         val host = uri.host ?: return false
         if (host.isBlank()) return false
         return !HostSafety.isPrivateOrLoopbackHost(host)
+    }
+
+    /**
+     * The first **fetchable** (blossom-v1) locator host in [locators] that fails
+     * the SSRF gate — a literal private/loopback host, a public-looking name that
+     * [resolve]s to a private/loopback address, or a malformed/hostless locator
+     * (fail closed) — or null when every fetchable locator is safe (or there are
+     * none).
+     *
+     * Non-fetchable locator kinds are ignored: the engine only fetches the
+     * supported kind, so a stale/unsupported/private entry of another kind must
+     * not block an otherwise-downloadable attachment. Within the fetchable kind
+     * the check stays strict (any unsafe entry blocks) so a safe decoy locator
+     * can't smuggle a private one past the gate before the engine's own
+     * resolve-time guard lands.
+     *
+     * [resolve] is injected (production passes `InetAddress.getAllByName` on an
+     * IO dispatcher) so the resolve-time decision is unit-testable without a
+     * network. A null/empty resolution is treated as unsafe: we can't prove the
+     * target is public, so it isn't handed to the native fetch.
+     */
+    internal fun firstUnsafeFetchableLocatorHost(
+        locators: List<MediaLocatorFfi>,
+        resolve: (String) -> List<InetAddress>?,
+    ): String? {
+        for (locator in locators) {
+            // The engine only fetches the supported kind; ignore others so one
+            // unsupported/private entry can't block a valid attachment.
+            if (locator.kind != BLOSSOM_LOCATOR_KIND) continue
+            // Fail closed: a locator whose host we can't parse must not reach the
+            // native fetch — the native URL parser could still extract a host we
+            // never validated — so treat it as unsafe rather than skipping it.
+            val host =
+                runCatching { URI(locator.value.trim()).host }
+                    .getOrNull()
+                    ?.takeIf { it.isNotBlank() }
+                    ?: return MALFORMED_LOCATOR_HOST
+            if (HostSafety.isPrivateOrLoopbackHost(host)) return host
+            val resolved = resolve(host)
+            if (resolved.isNullOrEmpty() || resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }) return host
+        }
+        return null
     }
 
     /** True iff [s] has [requiredLength] characters, all hex. */

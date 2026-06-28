@@ -9,6 +9,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.InetAddress
 
 class MediaReferenceParserTest {
     @Test
@@ -278,6 +279,120 @@ class MediaReferenceParserTest {
             dim = "640x480",
             thumbhash = THUMBHASH,
         )
+
+    // ---- firstUnsafeLocatorHost (resolve-time SSRF gate) -------------------
+
+    @Test
+    fun firstUnsafeLocatorHost_allowsPublicNameResolvingToPublicAddress() {
+        val unsafe =
+            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://media.example/blob"))) {
+                listOf(addr(93, 184, 216, 34))
+            }
+        assertNull(unsafe)
+    }
+
+    @Test
+    fun firstUnsafeLocatorHost_blocksPublicNameResolvingToLoopback() {
+        // The core gap: a public-looking host whose A-record points at loopback
+        // passes the literal check but must be blocked at resolve time.
+        val unsafe =
+            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://attacker.example/blob"))) {
+                listOf(addr(127, 0, 0, 1))
+            }
+        assertEquals("attacker.example", unsafe)
+    }
+
+    @Test
+    fun firstUnsafeLocatorHost_blocksPublicNameResolvingToRfc1918() {
+        val unsafe =
+            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://attacker.example/blob"))) {
+                listOf(addr(10, 0, 0, 5))
+            }
+        assertEquals("attacker.example", unsafe)
+    }
+
+    @Test
+    fun firstUnsafeLocatorHost_blocksLiteralPrivateHostWithoutResolving() {
+        var resolverCalled = false
+        val unsafe =
+            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://127.0.0.1/blob"))) {
+                resolverCalled = true
+                listOf(addr(8, 8, 8, 8))
+            }
+        assertEquals("127.0.0.1", unsafe)
+        // Literal check short-circuits before any DNS work.
+        assertFalse(resolverCalled)
+    }
+
+    @Test
+    fun firstUnsafeLocatorHost_blocksWhenResolutionFails() {
+        // Can't prove the target is public, so don't hand it to the native fetch.
+        val unsafe =
+            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://attacker.example/blob"))) { null }
+        assertEquals("attacker.example", unsafe)
+    }
+
+    @Test
+    fun firstUnsafeLocatorHost_blocksWhenAnyLocatorIsUnsafe() {
+        val unsafe =
+            MediaReferenceParser.firstUnsafeFetchableLocatorHost(
+                listOf(blossom("https://good.example/a"), blossom("https://attacker.example/b")),
+            ) { host -> if (host == "good.example") listOf(addr(93, 184, 216, 34)) else listOf(addr(192, 168, 1, 9)) }
+        assertEquals("attacker.example", unsafe)
+    }
+
+    @Test
+    fun firstUnsafeLocatorHost_failsClosedOnMalformedLocator() {
+        // A locator whose host can't be parsed must be treated as unsafe, not
+        // skipped — otherwise it would reach the native fetch unchecked.
+        var resolverCalled = false
+        val unsafe =
+            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("not a url"))) {
+                resolverCalled = true
+                listOf(addr(8, 8, 8, 8))
+            }
+        assertNotNull(unsafe)
+        assertFalse(resolverCalled)
+    }
+
+    @Test
+    fun firstUnsafeFetchableLocatorHost_ignoresUnsupportedKindAndAllowsSafeBlossom() {
+        // The engine never fetches a non-blossom locator, so an unsafe entry of
+        // another kind must not block an otherwise-downloadable attachment.
+        val unsafe =
+            MediaReferenceParser.firstUnsafeFetchableLocatorHost(
+                listOf(
+                    locator(kind = "ipfs-v1", url = "https://127.0.0.1/blob"),
+                    blossom("https://media.example/blob"),
+                ),
+            ) { listOf(addr(93, 184, 216, 34)) }
+        assertNull(unsafe)
+    }
+
+    @Test
+    fun firstUnsafeFetchableLocatorHost_ignoresUnsupportedKindWithNoFetchableLocator() {
+        // No fetchable locator at all → nothing for the engine to fetch, so the
+        // preflight has nothing to block (the engine no-ops on its own).
+        var resolverCalled = false
+        val unsafe =
+            MediaReferenceParser.firstUnsafeFetchableLocatorHost(
+                listOf(locator(kind = "ipfs-v1", url = "https://127.0.0.1/blob")),
+            ) {
+                resolverCalled = true
+                listOf(addr(8, 8, 8, 8))
+            }
+        assertNull(unsafe)
+        assertFalse(resolverCalled)
+    }
+
+    private fun blossom(url: String) = MediaLocatorFfi(kind = "blossom-v1", value = url)
+
+    private fun locator(
+        kind: String,
+        url: String,
+    ) = MediaLocatorFfi(kind = kind, value = url)
+
+    private fun addr(vararg octets: Int): InetAddress = InetAddress.getByAddress(ByteArray(octets.size) { octets[it].toByte() })
 
     private companion object {
         const val URL = "https://blossom.primal.net/abcdef.bin"

@@ -72,6 +72,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.net.InetAddress
 import java.util.UUID
 import kotlin.coroutines.coroutineContext
 
@@ -3612,6 +3613,22 @@ class ConversationController(
         return appState.diskMediaCache.contains(cacheKey)
     }
 
+    // Resolve-time SSRF guard before the native Blossom fetch. The imeta gate
+    // only validates the literal host, so an attacker's public-looking locator
+    // name can still resolve to loopback / RFC-1918. The native fetch re-resolves,
+    // so this blocks the common static case (not an active mid-connection
+    // rebind), matching the avatar/profile fetchers. The decision lives in
+    // MediaReferenceParser so it's unit-testable with an injected resolver.
+    private suspend fun assertMediaLocatorsResolveSafe(reference: MediaAttachmentReferenceFfi) {
+        val unsafeHost =
+            withContext(Dispatchers.IO) {
+                MediaReferenceParser.firstUnsafeFetchableLocatorHost(reference.locators) { host ->
+                    runCatching { InetAddress.getAllByName(host).toList() }.getOrNull()
+                }
+            }
+        if (unsafeHost != null) error("blocked private/loopback media locator")
+    }
+
     /**
      * Fetch and decrypt a Blossom-stored attachment. Backed by the app-level
      * LRU ([WhiteNoiseAppState.mediaPlaintextCache], keyed via [mediaCacheKey])
@@ -3648,6 +3665,7 @@ class ConversationController(
                 val cacheGeneration = appState.diskMediaCache.generation()
                 val result =
                     runCatching {
+                        assertMediaLocatorsResolveSafe(reference)
                         appState.marmotIo { downloadMedia(account, groupIdHex, reference) }
                     }.onFailure {
                         if (it is CancellationException) throw it
