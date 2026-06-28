@@ -427,6 +427,7 @@ import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.formatExactTimestamp
 import dev.ipf.whitenoise.android.state.isAcceptableRelayUrl
 import dev.ipf.whitenoise.android.state.labelFor
+import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.nextReadAnchor
 import dev.ipf.whitenoise.android.state.outgoingIndicator
 import dev.ipf.whitenoise.android.state.shortHex
@@ -1407,7 +1408,10 @@ private fun MainShell(
     // Saveable) for the previous-ref tracker: a fresh composition after process
     // death must report `previous == null` so the saved screen/conversation is
     // restored, not popped (issue #386 guard, encoded in
-    // shouldResetNavOnAccountChange).
+    // shouldResetNavOnAccountChange). The tracker is advanced via
+    // nextNavAccountRef so the transient null the destructive wipe sets while
+    // draining the wiped account's streams (#610) doesn't poison the comparison
+    // and swallow the pop onto the next account (regression of #547).
     var previousActiveAccountRef by remember { mutableStateOf(appState.activeAccountRef) }
     LaunchedEffect(appState.activeAccountRef) {
         val current = appState.activeAccountRef
@@ -1418,7 +1422,7 @@ private fun MainShell(
             sectionName = MainSection.Chats.name
             settingsDetailName = null
         }
-        previousActiveAccountRef = current
+        previousActiveAccountRef = nextNavAccountRef(previousActiveAccountRef, current)
     }
 
     // Navigate the shell to a (possibly different) group when a profile sheet's

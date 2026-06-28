@@ -273,6 +273,26 @@ internal fun shouldResetNavOnAccountChange(
 ): Boolean = previous != null && current != null && previous != current
 
 /**
+ * The account ref the main shell should remember as "previous" after observing
+ * [current], for the next [shouldResetNavOnAccountChange] comparison.
+ *
+ * Destructive Sign Out & Wipe drains the wiped account's live streams first,
+ * which transiently sets activeAccountRef to null *before* it lands on the next
+ * account (issue #610). If the shell adopted that intermediate null as its
+ * previous ref, the eventual switch to the next account would look like a
+ * null -> account transition — treated as a fresh composition — and the now-
+ * deleted account's Identity & Keys screen would never be popped (regression of
+ * #547). Keep the last real (non-null) account across the transient null so the
+ * settle onto the next account is still seen as a distinct-account change. A
+ * settle onto null is the no-accounts case, which AppPhase.Onboarding tears the
+ * shell down for anyway, so retaining the old ref is harmless.
+ */
+internal fun nextNavAccountRef(
+    previous: String?,
+    current: String?,
+): String? = current ?: previous
+
+/**
  * Next exponential-backoff delay: double [current], clamped to [maxMillis].
  * Guards the multiply so a near-`Long.MAX_VALUE` input can't overflow to a
  * negative value below the clamp (returns [maxMillis] once at/over the cap).
