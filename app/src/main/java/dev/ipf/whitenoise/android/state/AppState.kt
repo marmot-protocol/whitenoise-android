@@ -943,6 +943,23 @@ class WhiteNoiseAppState(
         chatsController?.applyLocalGroupUpdate(record)
     }
 
+    // A self-leave stops that group's subscription, so the engine pushes no
+    // chat-list update to flip the row to its left state. The chat-list
+    // leaveGroup updates its own row state inline, but a leave from the
+    // conversation Details screen runs on a different controller; forward the
+    // removal here so the active ChatsController flips the row immediately
+    // regardless of which surface initiated the leave (issue #767). Scoped to
+    // the leaving account so a switch mid-leave can't flip the row on a
+    // controller that has since rebound to a different account.
+    fun markGroupLeftOnChatList(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.markGroupLeft(groupIdHex)
+    }
+
     /**
      * Confirmed chats the active account can forward a message into, recent
      * first. Empty when no chats controller is attached yet (the chat-list
