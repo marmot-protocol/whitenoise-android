@@ -376,6 +376,8 @@
     <string name="notification_joined_group_from_sender">Du wurdest von %1$s eingeladen</string>
     <string name="notification_group_invite">Du wurdest zu einem sicheren Chat eingeladen</string>
     <string name="notification_new_message">Neue Nachricht</string>
+    <string name="notification_group_renamed">Gruppe umbenannt</string>
+    <string name="notification_group_renamed_body">%1$s: „%2$s“ → „%3$s“</string>
     <string name="notification_sent_picture">hat ein Foto gesendet</string>
     <string name="notification_sent_video">hat ein Video gesendet</string>
     <string name="notification_sent_voice_message">hat eine Sprachnachricht gesendet</string>
@@ -596,6 +598,8 @@
     <string name="group_system_admin_removed_passive">%1$s ist kein Admin mehr</string>
     <string name="group_system_renamed">%1$s hat die Gruppe in „%2$s“ umbenannt</string>
     <string name="group_system_renamed_passive">Die Gruppe wurde in „%1$s“ umbenannt</string>
+    <string name="group_system_renamed_diff">%1$s hat die Gruppe von „%2$s“ in „%3$s“ umbenannt</string>
+    <string name="group_system_renamed_diff_passive">Die Gruppe wurde von „%1$s“ in „%2$s“ umbenannt</string>
     <string name="group_system_avatar_changed">%1$s hat das Gruppenbild geändert</string>
     <string name="group_system_avatar_changed_passive">Das Gruppenbild wurde geändert</string>
     <string name="group_system_someone">Jemand</string>
@@ -614,6 +618,7 @@
     <string name="group_system_admin_removed_you">%1$s hat dich als Admin entfernt</string>
     <string name="group_system_admin_removed_you_passive">Du bist kein Admin mehr</string>
     <string name="group_system_you_renamed">Du hast die Gruppe in „%1$s“ umbenannt</string>
+    <string name="group_system_you_renamed_diff">Du hast die Gruppe von „%1$s“ in „%2$s“ umbenannt</string>
     <string name="group_system_you_avatar_changed">Du hast das Gruppenbild geändert</string>
     <string name="media_attachment_add_more">Mehr hinzufügen</string>
     <string name="media_attachment_remove">Anhang entfernen</string>

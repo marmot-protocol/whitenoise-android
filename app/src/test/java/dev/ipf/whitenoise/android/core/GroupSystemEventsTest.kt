@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.marmotkit.GroupSystemEventFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -97,6 +98,193 @@ class GroupSystemEventsTest {
             "Group updated",
             GroupSystemEvents.summary(event, actorName = null, subjectName = null),
         )
+    }
+
+    @Test
+    fun parsesOldNameFromRenamePayload() {
+        val json =
+            """{"v":1,"system_type":"group_renamed","text":"Group renamed",""" +
+                """"data":{"actor":"$actorHex","name":"Marmot Protocol","old_name":"Marmot Lab"}}"""
+
+        val event = GroupSystemEvents.parse(json)!!
+
+        assertEquals("Marmot Protocol", event.name)
+        assertEquals("Marmot Lab", event.oldName)
+    }
+
+    @Test
+    fun summaryRendersRenameDiffWhenOldNameIsKnown() {
+        val event =
+            GroupSystemEvent(
+                systemType = "group_renamed",
+                text = "",
+                actor = "d9",
+                subject = null,
+                name = "Marmot Protocol",
+                oldName = "Marmot Lab",
+            )
+
+        assertEquals(
+            "alice renamed the group from “Marmot Lab” to “Marmot Protocol”",
+            GroupSystemEvents.summary(event, actorName = "alice", subjectName = null),
+        )
+    }
+
+    @Test
+    fun summaryRendersRenameDiffPassiveFormForNotifications() {
+        // The name-free passive form is what feeds chat-list previews and
+        // notification bodies; it must carry the diff too when old name is known.
+        val event =
+            GroupSystemEvent(
+                systemType = "group_renamed",
+                text = "",
+                actor = null,
+                subject = null,
+                name = "Marmot Protocol",
+                oldName = "Marmot Lab",
+            )
+
+        assertEquals(
+            "The group was renamed from “Marmot Lab” to “Marmot Protocol”",
+            GroupSystemEvents.summary(event, actorName = null, subjectName = null),
+        )
+    }
+
+    @Test
+    fun summaryRendersSelfRenameDiff() {
+        val event =
+            GroupSystemEvent(
+                systemType = "group_renamed",
+                text = "",
+                actor = "d9",
+                subject = null,
+                name = "Marmot Protocol",
+                oldName = "Marmot Lab",
+            )
+
+        assertEquals(
+            "You renamed the group from “Marmot Lab” to “Marmot Protocol”",
+            GroupSystemEvents.summary(event, actorName = "Zoe", subjectName = null, actorIsSelf = true),
+        )
+    }
+
+    @Test
+    fun summaryFallsBackToNewNameWhenOldNameAbsent() {
+        // No old name: keep the existing new-name-only behavior, never an
+        // "Unknown → New" diff.
+        val event =
+            GroupSystemEvent(
+                systemType = "group_renamed",
+                text = "",
+                actor = "d9",
+                subject = null,
+                name = "Marmot Protocol",
+                oldName = null,
+            )
+
+        assertEquals(
+            "alice renamed the group to “Marmot Protocol”",
+            GroupSystemEvents.summary(event, actorName = "alice", subjectName = null),
+        )
+    }
+
+    @Test
+    fun summaryDoesNotFakeADiffForFirstNameSet() {
+        // First-ever name set / blank old name must not synthesize a diff; it
+        // renders the plain new-name form.
+        val event =
+            GroupSystemEvent(
+                systemType = "group_renamed",
+                text = "",
+                actor = "d9",
+                subject = null,
+                name = "Marmot Lab",
+                oldName = "   ",
+            )
+
+        assertEquals(
+            "alice renamed the group to “Marmot Lab”",
+            GroupSystemEvents.summary(event, actorName = "alice", subjectName = null),
+        )
+    }
+
+    @Test
+    fun summaryDoesNotRenderNoOpWhitespaceOnlyRenameAsADiff() {
+        // A change that only adds/removes whitespace collapses to the same name
+        // after sanitization, so it falls back to the new-name form rather than
+        // creating a "old → new" surface where old and new look identical.
+        val event =
+            GroupSystemEvent(
+                systemType = "group_renamed",
+                text = "",
+                actor = "d9",
+                subject = null,
+                name = "Marmot Lab",
+                oldName = "Marmot   Lab",
+            )
+
+        assertEquals(
+            "alice renamed the group to “Marmot Lab”",
+            GroupSystemEvents.summary(event, actorName = "alice", subjectName = null),
+        )
+    }
+
+    @Test
+    fun summarySanitizesBothNamesInTheRenameDiff() {
+        // Both names are peer-supplied. Bidi overrides and zero-width chars must
+        // be stripped from old AND new before rendering, and the “ ” delimiters
+        // around each keep the names visually fenced from the row's own copy.
+        val event =
+            GroupSystemEvent(
+                systemType = "group_renamed",
+                text = "",
+                actor = "d9",
+                subject = null,
+                name = "New\u200bName\u2066",
+                oldName = "\u202EOld\u200dName",
+            )
+
+        assertEquals(
+            "alice renamed the group from “Old\u200dName” to “NewName”",
+            GroupSystemEvents.summary(event, actorName = "alice", subjectName = null),
+        )
+    }
+
+    @Test
+    fun renameDiffFlowsThroughPreviewTextWhenOldNameIsInPayload() {
+        val json =
+            """{"v":1,"system_type":"group_renamed",""" +
+                """"data":{"name":"Marmot Protocol","old_name":"Marmot Lab"}}"""
+
+        assertEquals(
+            "The group was renamed from “Marmot Lab” to “Marmot Protocol”",
+            GroupSystemEvents.previewText(json),
+        )
+    }
+
+    @Test
+    fun resolveBackfillsOldNameFromPayloadWhenStructuredProjectionOmitsIt() {
+        // The system row renders from the structured FFI projection, which does
+        // not carry a previous name yet. resolve() must still backfill old_name
+        // from the JSON payload so the diff shows on that path.
+        val structured =
+            GroupSystemEventFfi(
+                systemType = "group_renamed",
+                text = "Group renamed",
+                actorAccountIdHex = "alice",
+                subjectAccountIdHex = null,
+                name = "Marmot Protocol",
+                oldRetentionSeconds = null,
+                newRetentionSeconds = null,
+            )
+        val json =
+            """{"v":1,"system_type":"group_renamed",""" +
+                """"data":{"name":"Marmot Protocol","old_name":"Marmot Lab"}}"""
+
+        val event = GroupSystemEvents.resolve(json, structured)!!
+
+        assertEquals("Marmot Protocol", event.name)
+        assertEquals("Marmot Lab", event.oldName)
     }
 
     @Test

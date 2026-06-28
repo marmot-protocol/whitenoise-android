@@ -380,6 +380,8 @@
     <string name="notification_joined_group_from_sender">Вас пригласил(а) %1$s</string>
     <string name="notification_group_invite">Вы были приглашены в безопасный чат</string>
     <string name="notification_new_message">Новое сообщение</string>
+    <string name="notification_group_renamed">Группа переименована</string>
+    <string name="notification_group_renamed_body">%1$s: «%2$s» → «%3$s»</string>
     <string name="notification_sent_picture">Отправлено изображение</string>
     <string name="notification_sent_video">Отправлено видео</string>
     <string name="notification_sent_voice_message">Отправлено голосовое сообщение</string>
@@ -606,6 +608,8 @@
     <string name="group_system_admin_removed_passive">%1$s больше не администратор</string>
     <string name="group_system_renamed">%1$s переименовал(а) группу в «%2$s»</string>
     <string name="group_system_renamed_passive">Группа переименована в «%1$s»</string>
+    <string name="group_system_renamed_diff">%1$s переименовал(а) группу из «%2$s» в «%3$s»</string>
+    <string name="group_system_renamed_diff_passive">Группа переименована из «%1$s» в «%2$s»</string>
     <string name="group_system_avatar_changed">%1$s изменил(а) аватар группы</string>
     <string name="group_system_avatar_changed_passive">Аватар группы изменён</string>
     <string name="group_system_someone">Кто-то</string>
@@ -624,6 +628,7 @@
     <string name="group_system_admin_removed_you">%1$s снял(а) вас с роли администратора</string>
     <string name="group_system_admin_removed_you_passive">Вы больше не администратор</string>
     <string name="group_system_you_renamed">Вы переименовали группу в «%1$s»</string>
+    <string name="group_system_you_renamed_diff">Вы переименовали группу из «%1$s» в «%2$s»</string>
     <string name="group_system_you_avatar_changed">Вы изменили аватар группы</string>
     <string name="media_attachment_add_more">Добавить ещё</string>
     <string name="media_attachment_remove">Удалить вложение</string>

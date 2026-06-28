@@ -376,6 +376,8 @@
     <string name="notification_joined_group_from_sender">Você foi convidado por %1$s</string>
     <string name="notification_group_invite">Você foi convidado para uma conversa segura</string>
     <string name="notification_new_message">Nova mensagem</string>
+    <string name="notification_group_renamed">Grupo renomeado</string>
+    <string name="notification_group_renamed_body">%1$s: “%2$s” → “%3$s”</string>
     <string name="notification_sent_picture">enviou uma foto</string>
     <string name="notification_sent_video">enviou um vídeo</string>
     <string name="notification_sent_voice_message">enviou uma mensagem de voz</string>
@@ -597,6 +599,8 @@
     <string name="group_system_admin_removed_passive">%1$s não é mais administrador</string>
     <string name="group_system_renamed">%1$s renomeou o grupo para “%2$s”</string>
     <string name="group_system_renamed_passive">O grupo foi renomeado para “%1$s”</string>
+    <string name="group_system_renamed_diff">%1$s renomeou o grupo de “%2$s” para “%3$s”</string>
+    <string name="group_system_renamed_diff_passive">O grupo foi renomeado de “%1$s” para “%2$s”</string>
     <string name="group_system_avatar_changed">%1$s alterou a imagem do grupo</string>
     <string name="group_system_avatar_changed_passive">A imagem do grupo foi alterada</string>
     <string name="group_system_someone">Alguém</string>
@@ -615,6 +619,7 @@
     <string name="group_system_admin_removed_you">%1$s removeu você como administrador</string>
     <string name="group_system_admin_removed_you_passive">Você não é mais administrador</string>
     <string name="group_system_you_renamed">Você renomeou o grupo para “%1$s”</string>
+    <string name="group_system_you_renamed_diff">Você renomeou o grupo de “%1$s” para “%2$s”</string>
     <string name="group_system_you_avatar_changed">Você alterou a imagem do grupo</string>
     <string name="media_attachment_add_more">Adicionar mais</string>
     <string name="media_attachment_remove">Remover anexo</string>
