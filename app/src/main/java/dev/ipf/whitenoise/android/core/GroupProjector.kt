@@ -173,6 +173,34 @@ object GroupProjector {
         activeAccountIdHex: String?,
     ): List<AppGroupMemberRecordFfi> = members.filterNot { isActiveAccountMember(it, activeAccountIdHex) }
 
+    /**
+     * Whether the active account should be treated as a member of [members].
+     *
+     * [selfLeft] is the controller's authoritative local self-leave latch
+     * (issue #787): once a self-leave (or engine eviction) is observed, the
+     * answer is false even if a transient roster round-trip still lists self,
+     * because that roster predates the engine eviction landing locally. While
+     * the latch is clear this is just [isActiveAccountMember] over the roster.
+     */
+    fun isSelfStillMember(
+        members: List<AppGroupMemberRecordFfi>,
+        activeAccountIdHex: String?,
+        selfLeft: Boolean,
+    ): Boolean = !selfLeft && members.any { isActiveAccountMember(it, activeAccountIdHex) }
+
+    /**
+     * The roster to commit from an authoritative group-details round-trip,
+     * honouring the local self-leave latch (issue #787). When [selfLeft] is
+     * set, self is stripped so a details read that still predates the engine
+     * eviction cannot re-add self (reviving the member count and composer right
+     * after a leave). Otherwise the roster is taken as-is.
+     */
+    fun rosterHonoringSelfLeft(
+        members: List<AppGroupMemberRecordFfi>,
+        activeAccountIdHex: String?,
+        selfLeft: Boolean,
+    ): List<AppGroupMemberRecordFfi> = if (selfLeft) membersWithoutActiveAccount(members, activeAccountIdHex) else members
+
     fun canLeaveGroup(
         group: AppGroupRecordFfi,
         activeAccountIdHex: String?,

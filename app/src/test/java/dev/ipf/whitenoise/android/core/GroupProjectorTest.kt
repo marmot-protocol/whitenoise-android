@@ -376,6 +376,52 @@ class GroupProjectorTest {
         assertEquals(roster, GroupProjector.membersWithoutActiveAccount(roster, activeAccountIdHex = ""))
     }
 
+    @Test
+    fun selfStillMemberReadsRosterWhenNotLeft() {
+        // Latch clear → ordinary roster membership check.
+        val self = member(memberId = "alice", account = "alice", local = true)
+        val other = member(memberId = "bob", account = "bob", local = false)
+        val roster = listOf(self, other)
+
+        assertTrue(GroupProjector.isSelfStillMember(roster, activeAccountIdHex = "alice", selfLeft = false))
+        assertFalse(GroupProjector.isSelfStillMember(listOf(other), activeAccountIdHex = "alice", selfLeft = false))
+    }
+
+    @Test
+    fun selfStillMemberHonoursLocalSelfLeftLatch() {
+        // #787: right after a self-leave the engine eviction may not have landed,
+        // so a transient roster round-trip can still list self. The latch must
+        // win so the composer stays blocked and the count excludes self.
+        val self = member(memberId = "alice", account = "alice", local = true)
+        val other = member(memberId = "bob", account = "bob", local = false)
+        val rosterStillIncludingSelf = listOf(self, other)
+
+        assertFalse(
+            GroupProjector.isSelfStillMember(rosterStillIncludingSelf, activeAccountIdHex = "alice", selfLeft = true),
+        )
+    }
+
+    @Test
+    fun rosterHonoringSelfLeftStripsSelfOnlyWhenLatched() {
+        // #787: applyGroupDetails commits this roster. With the latch set, a
+        // pre-eviction details read that still lists self must not re-add self
+        // (which would revive the member count and re-enable the composer).
+        val self = member(memberId = "alice", account = "alice", local = true)
+        val other = member(memberId = "bob", account = "bob", local = false)
+        val rosterFromDetails = listOf(self, other)
+
+        // Latch clear: details roster is taken as-is.
+        assertEquals(
+            rosterFromDetails,
+            GroupProjector.rosterHonoringSelfLeft(rosterFromDetails, activeAccountIdHex = "alice", selfLeft = false),
+        )
+        // Latch set: self is stripped, leaving the rest of the roster intact.
+        assertEquals(
+            listOf(other),
+            GroupProjector.rosterHonoringSelfLeft(rosterFromDetails, activeAccountIdHex = "alice", selfLeft = true),
+        )
+    }
+
     private fun member(
         memberId: String,
         account: String?,
