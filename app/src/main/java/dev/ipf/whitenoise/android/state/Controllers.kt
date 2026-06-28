@@ -1038,8 +1038,6 @@ class ChatsController(
     // preview plaintext: pending → in flight (here) → cached.
     private val inFlightPreviewParses = mutableSetOf<String>()
 
-    private val inFlightInviteAutoAccepts = mutableSetOf<String>()
-
     // Monotonically increments on every `bind()`. Captured by each
     // [schedulePendingMemberFetches] job; once a later bind has happened
     // (account switch, sign-out, or re-bind), the captured epoch no
@@ -1798,7 +1796,6 @@ class ChatsController(
         inFlightMemberFetches.clear()
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
-        inFlightInviteAutoAccepts.clear()
     }
 
     private fun isActiveBindEpoch(epoch: Long): Boolean = !isCleared && bindEpoch == epoch && accountRef != null
@@ -1840,7 +1837,6 @@ class ChatsController(
         // haven't tokenized yet; each completion folds back via
         // scheduleRecompute() so a burst coalesces into one rebuild.
         schedulePendingPreviewParses()
-        schedulePendingInviteAutoAccepts()
     }
 
     /**
@@ -1948,34 +1944,6 @@ class ChatsController(
                     // bind() already cleared the set, so only the owning
                     // epoch may mutate it.
                     if (isActiveBindEpoch(epoch)) inFlightPreviewParses.remove(text)
-                }
-            }
-        }
-    }
-
-    private fun schedulePendingInviteAutoAccepts() {
-        val account = accountRef ?: return
-        val epoch = bindEpoch
-        val pending =
-            (
-                chatRows.filter { it.pendingConfirmation }.map { it.groupIdHex } +
-                    groupRecordsById.values.filter { it.pendingConfirmation }.map { it.groupIdHex }
-            ).distinct()
-                .filterNot { it in inFlightInviteAutoAccepts }
-        if (pending.isEmpty()) return
-        inFlightInviteAutoAccepts.addAll(pending)
-        pending.forEach { groupIdHex ->
-            val inviter = groupRecordsById[groupIdHex]?.welcomerAccountIdHex
-            recomputeScope.launch {
-                try {
-                    if (!isActiveBindEpoch(epoch)) return@launch
-                    appState.autoAcceptGroupInvite(
-                        accountRef = account,
-                        groupIdHex = groupIdHex,
-                        inviterAccountIdHex = inviter,
-                    )
-                } finally {
-                    if (isActiveBindEpoch(epoch)) inFlightInviteAutoAccepts.remove(groupIdHex)
                 }
             }
         }
@@ -4060,60 +4028,55 @@ class ConversationController(
             }
         }
 
-    suspend fun acceptInvite(
-        notify: Boolean = true,
-        autoAccepted: Boolean = false,
-    ): Boolean {
-        val account = conversationAccountRef ?: return false
-        return runCatching {
-            group =
-                if (autoAccepted) {
-                    appState.autoAcceptGroupInvite(
-                        accountRef = account,
-                        groupIdHex = group.groupIdHex,
-                        inviterAccountIdHex = group.welcomerAccountIdHex,
-                    ) ?: return false
-                } else {
-                    appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) }
-                }
-            appState.applyLocalGroupUpdate(group)
-            appState.dismissConversationNotifications(account, group.groupIdHex)
-            // Accepting an invite (re-)joins the group, so clear any stale
-            // local self-left latch before refreshMembers() so applyGroupDetails
-            // is allowed to add self back to the roster (issue #787).
-            selfMembership.clearSelfLeft()
-            refreshMembers()
-            refreshCurrentTimeline(account).forEach { streamId ->
-                if (activeStreamIds.add(streamId)) {
-                    inviteStreamScope.launch { watchAgentTextStream(account, streamId) }
-                }
-            }
-            initializeReadState(account)
-            if (notify) appState.present(R.string.toast_invite_accepted)
-            true
-        }.getOrElse {
-            it.rethrowIfCancellation()
-            appState.present(R.string.toast_couldnt_accept_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
-            false
-        }
+    fun dismissConversationNotifications() {
+        val account = conversationAccountRef ?: return
+        appState.dismissConversationNotifications(account, group.groupIdHex)
     }
 
-    suspend fun declineInvite(): Boolean {
-        val account = conversationAccountRef ?: return false
-        return runCatching {
-            appState.marmotIo { declineGroupInvite(account, group.groupIdHex) }
-            appState.dismissConversationNotifications(account, group.groupIdHex)
-            group = group.copy(pendingConfirmation = false, archived = true)
-            appState.forgetAutoAcceptedInvite(group.groupIdHex)
-            appState.applyLocalGroupUpdate(group)
-            appState.present(R.string.toast_invite_declined)
-            true
-        }.getOrElse {
-            it.rethrowIfCancellation()
-            appState.present(R.string.toast_couldnt_decline_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
-            false
+    suspend fun acceptInvite(notify: Boolean = true): Boolean =
+        withMutationLockResult(false) {
+            val account = conversationAccountRef ?: return@withMutationLockResult false
+            runCatching {
+                group = appState.marmotIo { acceptGroupInvite(account, group.groupIdHex) }
+                appState.applyLocalGroupUpdate(group)
+                appState.dismissConversationNotifications(account, group.groupIdHex)
+                // Accepting an invite (re-)joins the group, so clear any stale
+                // local self-left latch before refreshMembers() so applyGroupDetails
+                // is allowed to add self back to the roster (issue #787).
+                selfMembership.clearSelfLeft()
+                refreshMembers()
+                refreshCurrentTimeline(account).forEach { streamId ->
+                    if (activeStreamIds.add(streamId)) {
+                        inviteStreamScope.launch { watchAgentTextStream(account, streamId) }
+                    }
+                }
+                initializeReadState(account)
+                if (notify) appState.present(R.string.toast_invite_accepted)
+                true
+            }.getOrElse {
+                it.rethrowIfCancellation()
+                appState.present(R.string.toast_couldnt_accept_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
+                false
+            }
         }
-    }
+
+    suspend fun declineInvite(): Boolean =
+        withMutationLockResult(false) {
+            val account = conversationAccountRef ?: return@withMutationLockResult false
+            runCatching {
+                appState.marmotIo { declineGroupInvite(account, group.groupIdHex) }
+                appState.dismissConversationNotifications(account, group.groupIdHex)
+                group = group.copy(pendingConfirmation = false, archived = true)
+                appState.forgetAutoAcceptedInvite(group.groupIdHex)
+                appState.applyLocalGroupUpdate(group)
+                appState.present(R.string.toast_invite_declined)
+                true
+            }.getOrElse {
+                it.rethrowIfCancellation()
+                appState.present(R.string.toast_couldnt_decline_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
+                false
+            }
+        }
 
     suspend fun setArchived(archived: Boolean): Boolean =
         withMutationLockResult(false) {

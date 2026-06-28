@@ -6,25 +6,42 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Pins the conversation bottom-bar membership-display gate (issues #545 and
- * #623). The gate must never paint a state it doesn't actually know during the
- * brief window before `refreshMembers()` confirms the roster:
+ * Pins the conversation bottom-bar membership-display gate (issues #545, #623,
+ * and #802). The gate must never paint a state it doesn't actually know during
+ * the brief window before `refreshMembers()` confirms the roster:
  *
  * - #545: a group the user LEFT must not flash the active composer.
  * - #623 (inverse): a group the user IS a member of — especially an admin
  *   re-entering their own group — must not flash the "no longer a member"
  *   notice.
+ * - #802: a pending invite must show explicit Join/Decline actions instead of
+ *   auto-accepting or exposing the active composer.
  *
  * [ComposerGate.COMPOSER] → active composer; [ComposerGate.NOTICE] →
- * RemovedMemberComposerNotice; [ComposerGate.PENDING] → render nothing and wait
- * for the confirmed result.
+ * RemovedMemberComposerNotice; [ComposerGate.INVITE] → invite action bar;
+ * [ComposerGate.PENDING] → render nothing and wait for the confirmed result.
  */
 class ConversationComposerGateTest {
+    @Test
+    fun pendingInviteShowsInviteActionsBeforeMembershipGate() {
+        assertEquals(
+            ComposerGate.INVITE,
+            conversationComposerGate(
+                pendingInvite = true,
+                membersLoaded = true,
+                isSelfMember = true,
+                seededSelfMember = true,
+                seededMembershipKnown = true,
+            ),
+        )
+    }
+
     @Test
     fun confirmedNotMemberShowsNotice() {
         assertEquals(
             ComposerGate.NOTICE,
             conversationComposerGate(
+                pendingInvite = false,
                 membersLoaded = true,
                 isSelfMember = false,
                 seededSelfMember = false,
@@ -38,6 +55,7 @@ class ConversationComposerGateTest {
         assertEquals(
             ComposerGate.COMPOSER,
             conversationComposerGate(
+                pendingInvite = false,
                 membersLoaded = true,
                 isSelfMember = true,
                 seededSelfMember = false,
@@ -53,6 +71,7 @@ class ConversationComposerGateTest {
         assertEquals(
             ComposerGate.COMPOSER,
             conversationComposerGate(
+                pendingInvite = false,
                 membersLoaded = false,
                 isSelfMember = false,
                 seededSelfMember = true,
@@ -69,6 +88,7 @@ class ConversationComposerGateTest {
         assertEquals(
             ComposerGate.NOTICE,
             conversationComposerGate(
+                pendingInvite = false,
                 membersLoaded = false,
                 isSelfMember = false,
                 seededSelfMember = false,
@@ -87,6 +107,7 @@ class ConversationComposerGateTest {
         assertEquals(
             ComposerGate.PENDING,
             conversationComposerGate(
+                pendingInvite = false,
                 membersLoaded = false,
                 isSelfMember = false,
                 seededSelfMember = false,
@@ -102,6 +123,7 @@ class ConversationComposerGateTest {
         assertEquals(
             ComposerGate.COMPOSER,
             conversationComposerGate(
+                pendingInvite = false,
                 membersLoaded = true,
                 isSelfMember = true,
                 seededSelfMember = false,
@@ -154,6 +176,7 @@ class ConversationComposerGateTest {
         assertEquals(
             ComposerGate.NOTICE,
             conversationComposerGate(
+                pendingInvite = false,
                 membersLoaded = false,
                 isSelfMember = false,
                 seededSelfMember = seededAfterLeave,

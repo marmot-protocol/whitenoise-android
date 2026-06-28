@@ -99,6 +99,9 @@
     <string name="invited_to_this_chat">Вас пригласили в этот чат.</string>
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>
+    <string name="join_group">Вступить в группу</string>
+    <string name="invited_to_this_group">Вас пригласили в эту группу.</string>
+    <string name="invite_preview_with_inviter">%1$s пригласил(а) вас в эту группу.</string>
     <string name="profile">Профиль</string>
     <string name="profile_no_bio">Биографии пока нет.</string>
     <string name="profile_shared_groups">Общие группы</string>

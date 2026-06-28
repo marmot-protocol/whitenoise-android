@@ -97,6 +97,9 @@
     <string name="invited_to_this_chat">Você foi convidado para este bate-papo.</string>
     <string name="decline">Recusar</string>
     <string name="accept">Aceitar</string>
+    <string name="join_group">Entrar no grupo</string>
+    <string name="invited_to_this_group">Você foi convidado para este grupo.</string>
+    <string name="invite_preview_with_inviter">%1$s convidou você para este grupo.</string>
     <string name="profile">Perfil</string>
     <string name="profile_no_bio">Ainda sem bio.</string>
     <string name="profile_shared_groups">Grupos compartilhados</string>

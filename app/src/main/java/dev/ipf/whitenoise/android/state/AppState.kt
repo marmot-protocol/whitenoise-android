@@ -62,7 +62,6 @@ import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -84,7 +83,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.net.IDN
 import java.net.URI
 import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 
 sealed interface AppPhase {
@@ -572,8 +570,6 @@ class WhiteNoiseAppState(
         private set
 
     private var autoAcceptedInviteRevision by mutableStateOf(0)
-
-    private val autoAcceptingInviteJobs = ConcurrentHashMap<String, Deferred<AppGroupRecordFfi?>>()
 
     private var defaultNotificationsEnableAttempted by mutableStateOf(
         preferences.getBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, false),
@@ -1097,45 +1093,6 @@ class WhiteNoiseAppState(
         }
     }
 
-    internal suspend fun autoAcceptGroupInvite(
-        accountRef: String,
-        groupIdHex: String,
-        inviterAccountIdHex: String? = null,
-    ): AppGroupRecordFfi? {
-        val account = accountRef.takeIf { it.isNotBlank() } ?: return null
-        val groupId = groupIdHex.takeIf { it.isNotBlank() } ?: return null
-        val key = "$account\u0000$groupId"
-        val job =
-            mutationsScope.async(start = CoroutineStart.LAZY) {
-                runCatching {
-                    val accepted = marmotIo { acceptGroupInvite(account, groupId) }
-                    val acceptedGroupId = accepted.groupIdHex.takeIf { it.isNotBlank() } ?: groupId
-                    val inviter = accepted.welcomerAccountIdHex?.takeIf { it.isNotBlank() } ?: inviterAccountIdHex?.takeIf { it.isNotBlank() }
-                    rememberAutoAcceptedInvite(
-                        accountRef = account,
-                        groupIdHex = acceptedGroupId,
-                        inviterAccountIdHex = inviter,
-                    )
-                    inviter?.let(::requestProfile)
-                    if (account == activeAccountRef) applyLocalGroupUpdate(accepted)
-                    accepted
-                }.onFailure {
-                    rethrowIfCancellation(it)
-                    appStateDebug(it) { "auto-accept invite failed group=${groupId.take(8)}: ${it.readableMessage()}" }
-                }.getOrNull()
-            }
-        val existing = autoAcceptingInviteJobs.putIfAbsent(key, job)
-        if (existing != null) {
-            return existing.await()
-        }
-        job.start()
-        return try {
-            job.await()
-        } finally {
-            autoAcceptingInviteJobs.remove(key, job)
-        }
-    }
-
     private fun autoAcceptedInviteMarker(
         accountRef: String?,
         groupIdHex: String,
@@ -1145,24 +1102,6 @@ class WhiteNoiseAppState(
             accountRef = accountRef,
             groupIdHex = groupIdHex,
         )
-
-    private fun rememberAutoAcceptedInvite(
-        accountRef: String,
-        groupIdHex: String,
-        inviterAccountIdHex: String?,
-    ) {
-        val opened = isActiveConversation(accountRef, groupIdHex)
-        updateAutoAcceptedInviteMarkers {
-            AutoAcceptedInviteMarkers.upsert(
-                encoded = it,
-                accountRef = accountRef,
-                groupIdHex = groupIdHex,
-                invitedAtMs = System.currentTimeMillis(),
-                inviterAccountIdHex = inviterAccountIdHex,
-                opened = opened,
-            )
-        }
-    }
 
     private fun isActiveConversation(
         accountRef: String,
@@ -3371,13 +3310,7 @@ class WhiteNoiseAppState(
     private fun launchGroupInviteNotificationHandler(update: NotificationUpdateFfi) {
         notificationScope.launch {
             runCatching {
-                val autoAcceptedInvite =
-                    autoAcceptGroupInvite(
-                        accountRef = update.accountRef,
-                        groupIdHex = update.groupIdHex,
-                        inviterAccountIdHex = update.sender.accountIdHex,
-                    )
-                postNotificationUpdate(update, autoAcceptedInvite)
+                postNotificationUpdate(update)
             }.onFailure {
                 rethrowIfCancellation(it)
                 appStateDebug(it) {
@@ -3405,8 +3338,8 @@ class WhiteNoiseAppState(
                                 val update = marmotIo { subscription.next() } ?: break
                                 backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
                                 if (update.trigger == NotificationTriggerFfi.GROUP_INVITE) {
-                                    // Accept + title resolution can perform MLS/network work. Run it
-                                    // off the subscription loop so one slow invite does not hold back
+                                    // Formatting/posting can touch notification state. Run it off the
+                                    // subscription loop so one slow invite does not hold back
                                     // subsequent notification updates.
                                     launchGroupInviteNotificationHandler(update)
                                 } else {

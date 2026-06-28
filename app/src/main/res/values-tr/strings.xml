@@ -97,6 +97,9 @@
     <string name="invited_to_this_chat">Bu sohbete davet edildiniz.</string>
     <string name="decline">Reddet</string>
     <string name="accept">Kabul et</string>
+    <string name="join_group">Gruba katıl</string>
+    <string name="invited_to_this_group">Bu gruba davet edildiniz.</string>
+    <string name="invite_preview_with_inviter">%1$s sizi bu gruba davet etti.</string>
     <string name="profile">Profil</string>
     <string name="profile_no_bio">Henüz biyografi yok.</string>
     <string name="profile_shared_groups">Ortak gruplar</string>

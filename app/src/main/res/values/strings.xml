@@ -109,6 +109,9 @@
     <string name="invited_to_this_chat">You were invited to this chat.</string>
     <string name="decline">Decline</string>
     <string name="accept">Accept</string>
+    <string name="join_group">Join group</string>
+    <string name="invited_to_this_group">You were invited to this group.</string>
+    <string name="invite_preview_with_inviter">%1$s invited you to this group.</string>
     <string name="profile">Profile</string>
     <string name="profile_no_bio">No bio yet.</string>
     <string name="profile_shared_groups">Shared groups</string>

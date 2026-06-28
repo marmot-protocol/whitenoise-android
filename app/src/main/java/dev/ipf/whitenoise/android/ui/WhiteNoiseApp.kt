@@ -3461,7 +3461,7 @@ private fun ChatRow(
                 if (autoInviteBadgeVisible) {
                     Badge { Text(stringResource(R.string.invited)) }
                 } else if (item.group.pendingConfirmation) {
-                    Badge { Text(stringResource(R.string.invite)) }
+                    Badge { Text(stringResource(R.string.invited)) }
                 } else if (rowHasUnread) {
                     // Surface the highest-signal unread: an @ badge beside the
                     // count when one of the unread messages mentions you (#611).
@@ -3715,9 +3715,10 @@ internal fun canInviteFromEmptyGroup(
         memberCount == 1
 
 /**
- * The three things the conversation bottom bar can render for the membership
+ * The four things the conversation bottom bar can render for the membership
  * gate. Pulled out of Compose as a pure decision so [conversationComposerGate]
- * can be unit-tested and pinned against regression (issues #545 and #623).
+ * can be unit-tested and pinned against regression (issues #545, #623, and
+ * #802).
  */
 internal enum class ComposerGate {
     /** Active composer — self is (believed to be) a member. */
@@ -3725,6 +3726,9 @@ internal enum class ComposerGate {
 
     /** "You are no longer a member of this group" notice. */
     NOTICE,
+
+    /** Pending invite preview — read-only transcript with explicit Join/Decline. */
+    INVITE,
 
     /**
      * Membership is not yet known locally: render NOTHING this frame and wait
@@ -3738,18 +3742,10 @@ internal enum class ComposerGate {
  * Decide what the conversation bottom bar renders for the membership gate,
  * given only what is known synchronously at (and shortly after) first paint.
  *
- * The two prior bugs were symmetric flashes during the brief window before
- * `refreshMembers()` confirms the roster:
- *
- * - #545: a group the user LEFT opened showing the active composer for ~1s
- *   before flipping to the notice (the old gate defaulted to the composer while
- *   loading).
- * - #623 (inverse): a group the user IS a member of — especially an admin
- *   re-entering their own group — opened showing the notice for ~1s before
- *   flipping to the composer (the #545 fix overcorrected to defaulting to the
- *   notice while loading).
- *
- * The fix for both is to never paint a state we don't actually know:
+ * Pending invites are a separate, explicit state: opening the conversation must
+ * not auto-accept the MLS welcome and must not expose the live composer until
+ * the user taps Join group (#802). For already-joined or left groups, the older
+ * membership flash rules still apply:
  *
  * - Confirmed member (`isSelfMember`) → [ComposerGate.COMPOSER].
  * - Confirmed not-member (`membersLoaded && !isSelfMember`) → [ComposerGate.NOTICE].
@@ -3769,12 +3765,14 @@ internal enum class ComposerGate {
  * which stays guarded by `canSendMessages` / [canAcceptTextSend] (issue #264).
  */
 internal fun conversationComposerGate(
+    pendingInvite: Boolean,
     membersLoaded: Boolean,
     isSelfMember: Boolean,
     seededSelfMember: Boolean,
     seededMembershipKnown: Boolean,
 ): ComposerGate =
     when {
+        pendingInvite -> ComposerGate.INVITE
         isSelfMember -> ComposerGate.COMPOSER
         membersLoaded -> ComposerGate.NOTICE
         seededMembershipKnown -> if (seededSelfMember) ComposerGate.COMPOSER else ComposerGate.NOTICE
@@ -8993,7 +8991,7 @@ private fun ConversationScreen(
     }
     LaunchedEffect(controller.group.pendingConfirmation, controller.group.groupIdHex) {
         if (controller.group.pendingConfirmation) {
-            controller.acceptInvite(notify = false, autoAccepted = true)
+            controller.dismissConversationNotifications()
         }
     }
     // inviteStreamScope outlives a single start() — acceptInvite() launches into
@@ -9758,7 +9756,7 @@ private fun ConversationScreen(
                         onPrev = { navigateToSearchMatch(forward = false) },
                         onNext = { navigateToSearchMatch(forward = true) },
                     )
-                controller.error != null || controller.group.pendingConfirmation -> Unit
+                controller.error != null -> Unit
                 // Membership-display gate (issues #545 and #623). During the
                 // brief window before refreshMembers() confirms the roster we
                 // must not flash a state we don't actually know: a left group
@@ -9774,6 +9772,7 @@ private fun ConversationScreen(
                 else ->
                     when (
                         conversationComposerGate(
+                            pendingInvite = controller.group.pendingConfirmation,
                             membersLoaded = controller.membersLoaded,
                             isSelfMember = controller.isSelfMember,
                             seededSelfMember = controller.seededSelfMember,
@@ -9782,6 +9781,16 @@ private fun ConversationScreen(
                     ) {
                         ComposerGate.PENDING -> Unit
                         ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                        ComposerGate.INVITE ->
+                            InvitePreviewActionBar(
+                                mutationInFlight = controller.mutationInFlight,
+                                onJoin = { appState.launchMutation { controller.acceptInvite() } },
+                                onDecline = {
+                                    appState.launchMutation {
+                                        if (controller.declineInvite()) onBack()
+                                    }
+                                },
+                            )
                         ComposerGate.COMPOSER -> {
                             val groupIdHex = controller.group.groupIdHex
                             val editingRecord =
@@ -9891,7 +9900,11 @@ private fun ConversationScreen(
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
                 controller.error != null -> ErrorContent(stringResource(R.string.couldnt_load_conversation), controller.error.orEmpty())
-                controller.group.pendingConfirmation -> LoadingScreen()
+                controller.group.pendingConfirmation && renderedTimeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted ->
+                    InvitePreviewPlaceholder(
+                        inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
+                    )
+                controller.group.pendingConfirmation && renderedTimeline.isEmpty() -> LoadingScreen()
                 controller.timeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted -> {
                     if (
                         canInviteFromEmptyGroup(
@@ -10043,6 +10056,7 @@ private fun ConversationScreen(
                                     // change. See #110.
                                     onReactionEmojiPicked = { recordReactionEmoji(it) },
                                     onReplyPreviewClick = { navigateToReplyTarget(it) },
+                                    readOnly = controller.group.pendingConfirmation,
                                 )
                             }
                             // Kept minimal (matches the top-spacer) so the last
@@ -10301,6 +10315,80 @@ private fun AutoAcceptedInviteBanner(
                     Icons.Default.Close,
                     contentDescription = stringResource(R.string.auto_invite_banner_dismiss),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InvitePreviewPlaceholder(inviterName: String?) {
+    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(
+                Icons.Default.Group,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text =
+                    inviterName
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { stringResource(R.string.invite_preview_with_inviter, it) }
+                        ?: stringResource(R.string.invited_to_this_group),
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun InvitePreviewActionBar(
+    mutationInFlight: Boolean,
+    onJoin: () -> Unit,
+    onDecline: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .navigationBarsPadding(),
+        color = MaterialTheme.colorScheme.surface,
+        border = amoledSurfaceBorderStroke(),
+        tonalElevation = 3.dp,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedButton(
+                onClick = onDecline,
+                modifier = Modifier.weight(1f),
+                enabled = !mutationInFlight,
+            ) {
+                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.decline))
+            }
+            Button(
+                onClick = onJoin,
+                modifier = Modifier.weight(1f),
+                enabled = !mutationInFlight,
+            ) {
+                if (mutationInFlight) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                } else {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.join_group))
             }
         }
     }
@@ -10584,6 +10672,7 @@ private fun GroupDetailsScreen(
             pendingTranscriptShareFile = null
         }
     val clipboard = LocalClipboardManager.current
+    val readOnlyInvite = controller.group.pendingConfirmation
     val inviteLabelText = stringResource(R.string.invite)
     val noShareTargetText = stringResource(R.string.no_share_target_available)
     val groupTitleCopy = rememberGroupTitleCopy()
@@ -10726,11 +10815,13 @@ private fun GroupDetailsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.actions))
+                    if (!readOnlyInvite) {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.actions))
+                        }
                     }
                     KeyboardPreservingDropdownMenu(
-                        expanded = menuOpen,
+                        expanded = menuOpen && !readOnlyInvite,
                         onDismissRequest = { menuOpen = false },
                         shape = RoundedCornerShape(20.dp),
                         // Match the conversation top-bar menu exactly: inset from
@@ -10738,7 +10829,7 @@ private fun GroupDetailsScreen(
                         offset = DpOffset(x = (-8).dp, y = 0.dp),
                         modifier = Modifier.widthIn(min = 232.dp),
                     ) {
-                        if (controller.isSelfMember && controller.isSelfAdmin) {
+                        if (!readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin) {
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -10754,31 +10845,33 @@ private fun GroupDetailsScreen(
                                 },
                             )
                         }
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(
-                                        when {
-                                            activeMutation?.action == GroupMutationAction.Archive && controller.group.archived -> R.string.restoring_chat
-                                            activeMutation?.action == GroupMutationAction.Archive -> R.string.archiving_chat
-                                            controller.group.archived -> R.string.unarchive_chat
-                                            else -> R.string.archive_chat
-                                        },
-                                    ),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            },
-                            contentPadding = conversationMenuItemPadding,
-                            enabled = activeMutation == null && !controller.mutationInFlight,
-                            onClick = {
-                                menuOpen = false
-                                runGroupMutation(
-                                    action = GroupMutationAction.Archive,
-                                    mutation = { controller.setArchived(!controller.group.archived) },
-                                )
-                            },
-                        )
-                        if (controller.isSelfMember) {
+                        if (!readOnlyInvite) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(
+                                            when {
+                                                activeMutation?.action == GroupMutationAction.Archive && controller.group.archived -> R.string.restoring_chat
+                                                activeMutation?.action == GroupMutationAction.Archive -> R.string.archiving_chat
+                                                controller.group.archived -> R.string.unarchive_chat
+                                                else -> R.string.archive_chat
+                                            },
+                                        ),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                },
+                                contentPadding = conversationMenuItemPadding,
+                                enabled = activeMutation == null && !controller.mutationInFlight,
+                                onClick = {
+                                    menuOpen = false
+                                    runGroupMutation(
+                                        action = GroupMutationAction.Archive,
+                                        mutation = { controller.setArchived(!controller.group.archived) },
+                                    )
+                                },
+                            )
+                        }
+                        if (!readOnlyInvite && controller.isSelfMember) {
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -10853,7 +10946,7 @@ private fun GroupDetailsScreen(
             )
 
             SectionCard(title = stringResource(R.string.disappearing_messages)) {
-                val canEdit = controller.isSelfMember && controller.isSelfAdmin
+                val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin
                 val inProgress = activeMutation?.action == GroupMutationAction.DisappearingMessages
                 ListItem(
                     modifier =
@@ -10927,7 +11020,7 @@ private fun GroupDetailsScreen(
             SectionCardWithAction(
                 title = "${stringResource(R.string.members)} · ${controller.members.size}",
                 action = {
-                    if (controller.isSelfMember && controller.isSelfAdmin) {
+                    if (!readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin) {
                         TextButton(
                             onClick = {
                                 pendingMemberError = null
@@ -12668,6 +12761,7 @@ private fun MessageBubble(
     onActionMenuOpenChange: (Boolean) -> Unit,
     onReactionEmojiPicked: (String) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
+    readOnly: Boolean = false,
 ) {
     val amoledSurfaceTheme = isAmoledSurfaceTheme()
     val record = item.record
@@ -12807,6 +12901,7 @@ private fun MessageBubble(
     }
 
     fun beginReply() {
+        if (readOnly) return
         controller.replyingTo = record
         onActionMenuOpenChange(false)
     }
@@ -12820,7 +12915,7 @@ private fun MessageBubble(
         // Chokepoint guard: never react to a deleted message, whatever path
         // (menu, emoji picker) called in — even if that surface was open when
         // the delete landed.
-        if (deleted) return
+        if (deleted || readOnly) return
         onReactionEmojiPicked(emoji)
         // Route via launchMutation: same survives-navigation rationale as delete/send.
         appState.launchMutation { controller.toggleReaction(emoji, record) }
@@ -12865,7 +12960,7 @@ private fun MessageBubble(
                     .then(
                         // A deleted message has no actionable content, so
                         // disable swipe-to-reply entirely: no drag, no trigger.
-                        if (deleted) {
+                        if (deleted || readOnly) {
                             Modifier
                         } else {
                             Modifier.pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
@@ -13727,9 +13822,11 @@ private fun MessageBubble(
                     expanded = isActionMenuOpen && !deleted,
                     anchorWindowYPx = longPressWindowY,
                     alignEnd = mine,
-                    canDelete = mine && record.messageIdHex.isNotBlank() && !deleted,
-                    canEdit = mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
-                    canForward = forwardBody != null,
+                    canReply = !readOnly,
+                    canReact = !readOnly,
+                    canDelete = !readOnly && mine && record.messageIdHex.isNotBlank() && !deleted,
+                    canEdit = !readOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
+                    canForward = !readOnly && forwardBody != null,
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
@@ -13772,14 +13869,18 @@ private fun MessageBubble(
                         timeText = rememberedClockTime(record.recordedAt),
                         showStatus = mine && !deleted && !invalidated,
                         status = item.status,
-                        canDelete = mine && record.messageIdHex.isNotBlank() && !deleted,
+                        canReply = !readOnly,
+                        canReact = !readOnly,
+                        canDelete = !readOnly && mine && record.messageIdHex.isNotBlank() && !deleted,
                         onReply = {
                             expandedFullView = false
                             beginReply()
                         },
                         onReact = {
-                            expandedFullView = false
-                            emojiPickerOpen = true
+                            if (!readOnly) {
+                                expandedFullView = false
+                                emojiPickerOpen = true
+                            }
                         },
                         onCopy = ::copyMessageText,
                         onDelete = {
@@ -13789,7 +13890,7 @@ private fun MessageBubble(
                         onDismiss = { expandedFullView = false },
                     )
                 }
-                if (emojiPickerOpen) {
+                if (emojiPickerOpen && !readOnly) {
                     EmojiPickerSheet(
                         onDismissRequest = { emojiPickerOpen = false },
                         onEmojiPicked = { emoji ->
@@ -13871,7 +13972,12 @@ private fun MessageBubble(
                         ReactionDetailsSheet(
                             participants = participants,
                             appState = appState,
-                            onRemoveOwnReaction = { emoji -> appState.launchMutation { controller.toggleReaction(emoji, record) } },
+                            onRemoveOwnReaction =
+                                if (readOnly) {
+                                    null
+                                } else {
+                                    { emoji -> appState.launchMutation { controller.toggleReaction(emoji, record) } }
+                                },
                             onDismissRequest = { reactionSheetOpen = false },
                         )
                     }
@@ -13896,6 +14002,8 @@ private fun MessageFullScreenView(
     timeText: String,
     showStatus: Boolean,
     status: MessageStatus,
+    canReply: Boolean,
+    canReact: Boolean,
     canDelete: Boolean,
     onReply: () -> Unit,
     onReact: () -> Unit,
@@ -13966,22 +14074,26 @@ private fun MessageFullScreenView(
                             shape = MenuDefaults.shape,
                             border = amoledSurfaceBorderStroke(),
                         ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.reply)) },
-                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null) },
-                                onClick = {
-                                    overflowOpen = false
-                                    onReply()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.message_react)) },
-                                leadingIcon = { Icon(Icons.Default.EmojiEmotions, contentDescription = null) },
-                                onClick = {
-                                    overflowOpen = false
-                                    onReact()
-                                },
-                            )
+                            if (canReply) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.reply)) },
+                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null) },
+                                    onClick = {
+                                        overflowOpen = false
+                                        onReply()
+                                    },
+                                )
+                            }
+                            if (canReact) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.message_react)) },
+                                    leadingIcon = { Icon(Icons.Default.EmojiEmotions, contentDescription = null) },
+                                    onClick = {
+                                        overflowOpen = false
+                                        onReact()
+                                    },
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.copy_text)) },
                                 leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
@@ -14089,7 +14201,7 @@ private fun ReactionSummaryChip(
 private fun ReactionDetailsSheet(
     participants: List<ReactionParticipant>,
     appState: WhiteNoiseAppState,
-    onRemoveOwnReaction: (String) -> Unit,
+    onRemoveOwnReaction: ((String) -> Unit)?,
     onDismissRequest: () -> Unit,
 ) {
     var selectedEmoji by remember(participants) { mutableStateOf<String?>(null) }
@@ -14149,7 +14261,7 @@ private fun ReactionDetailsSheet(
                         participant = participant,
                         appState = appState,
                         mine = isMine,
-                        onRemove = if (isMine) ({ onRemoveOwnReaction(participant.emoji) }) else null,
+                        onRemove = if (isMine && onRemoveOwnReaction != null) ({ onRemoveOwnReaction(participant.emoji) }) else null,
                     )
                 }
             }
@@ -14413,6 +14525,8 @@ private fun MessageActionMenu(
     expanded: Boolean,
     anchorWindowYPx: Float?,
     alignEnd: Boolean,
+    canReply: Boolean,
+    canReact: Boolean,
     canDelete: Boolean,
     canEdit: Boolean,
     canForward: Boolean,
@@ -14522,9 +14636,14 @@ private fun MessageActionMenu(
         val estimatedPopupHeightPx =
             with(density) {
                 val actionButtonCount =
-                    3 + (if (canEdit) 1 else 0) + (if (canForward) 1 else 0) + (if (canDelete) 1 else 0)
-                val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1) * 2).dp
-                val totalHeight = (8.dp + 8.dp) + (8.dp + 8.dp) + 36.dp + 1.dp + actionsColumnHeight
+                    2 +
+                        (if (canReply) 1 else 0) +
+                        (if (canEdit) 1 else 0) +
+                        (if (canForward) 1 else 0) +
+                        (if (canDelete) 1 else 0)
+                val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1).coerceAtLeast(0) * 2).dp
+                val reactionSectionHeight = if (canReact) 36.dp + 1.dp + 8.dp else 0.dp
+                val totalHeight = (8.dp + 8.dp) + 8.dp + reactionSectionHeight + actionsColumnHeight
                 totalHeight.roundToPx()
             }
         val positionProvider =
@@ -14591,38 +14710,42 @@ private fun MessageActionMenu(
                     modifier = Modifier.padding(8.dp).widthIn(min = 292.dp, max = 328.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        quickReactionEmojis.forEach { emoji ->
-                            EmojiActionButton(
-                                emoji = emoji,
-                                onClick = { onReact(emoji) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        IconButton(
-                            onClick = onOpenEmojiPicker,
-                            modifier = Modifier.size(36.dp),
+                    if (canReact) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                Icons.Default.EmojiEmotions,
-                                contentDescription = stringResource(R.string.open_emoji_picker),
-                            )
+                            quickReactionEmojis.forEach { emoji ->
+                                EmojiActionButton(
+                                    emoji = emoji,
+                                    onClick = { onReact(emoji) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            IconButton(
+                                onClick = onOpenEmojiPicker,
+                                modifier = Modifier.size(36.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.EmojiEmotions,
+                                    contentDescription = stringResource(R.string.open_emoji_picker),
+                                )
+                            }
                         }
+                        HorizontalDivider()
                     }
-                    HorizontalDivider()
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        MessageActionButton(
-                            label = stringResource(R.string.reply),
-                            icon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = onReply,
-                        )
+                        if (canReply) {
+                            MessageActionButton(
+                                label = stringResource(R.string.reply),
+                                icon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                onClick = onReply,
+                            )
+                        }
                         if (canEdit) {
                             MessageActionButton(
                                 label = stringResource(R.string.edit),

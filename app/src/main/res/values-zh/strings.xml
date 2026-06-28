@@ -96,6 +96,9 @@
     <string name="invited_to_this_chat">您被邀请参加此聊天。</string>
     <string name="decline">拒绝</string>
     <string name="accept">接受</string>
+    <string name="join_group">加入群组</string>
+    <string name="invited_to_this_group">你已受邀加入此群组。</string>
+    <string name="invite_preview_with_inviter">%1$s 邀请你加入此群组。</string>
     <string name="profile">个人资料</string>
     <string name="profile_no_bio">还没有简介。</string>
     <string name="profile_shared_groups">共同群组</string>
