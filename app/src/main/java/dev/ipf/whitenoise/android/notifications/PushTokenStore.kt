@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 
@@ -32,6 +33,32 @@ class PushTokenStore(
     fun clear() {
         synchronized(LOCK) {
             preferences.edit().remove(KEY_FCM_TOKEN).apply()
+        }
+    }
+
+    /**
+     * True when a rotated token was persisted while the app runtime could not
+     * be reached and the best-effort foreground-service nudge has not yet been
+     * confirmed by a native-push registration sync. This is intentionally
+     * process-durable: if Android rejects the service start, the next AppState
+     * sync trigger can still drain the work instead of silently falling back to
+     * "persist only". See #755.
+     */
+    fun nativePushRegistrationSyncPending(): Boolean = preferences.getBoolean(KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, false)
+
+    // commit() (not apply()) so the #755 retry marker is durable before the
+    // token-rotation fallback starts a foreground service that may itself be
+    // killed/rejected — an async apply() could lose the flag on process death.
+    @SuppressLint("ApplySharedPref")
+    fun recordPendingNativePushRegistrationSync() {
+        synchronized(LOCK) {
+            preferences.edit().putBoolean(KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, true).commit()
+        }
+    }
+
+    fun clearPendingNativePushRegistrationSync() {
+        synchronized(LOCK) {
+            preferences.edit().remove(KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC).apply()
         }
     }
 
@@ -96,6 +123,8 @@ class PushTokenStore(
         private val LOCK = Any()
         private const val PREFS_NAME = "whitenoise.push.tokens"
         private const val KEY_FCM_TOKEN = "fcm_token"
+        private const val KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC =
+            "pending_native_push_registration_sync"
         private const val KEY_PENDING_CLEARS = "pending_clears"
         private const val KEY_PENDING_DISABLES = "pending_native_push_disables"
 

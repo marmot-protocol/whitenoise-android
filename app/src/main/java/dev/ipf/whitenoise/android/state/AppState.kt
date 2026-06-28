@@ -1313,6 +1313,7 @@ class WhiteNoiseAppState(
     suspend fun ensureNotificationRuntimeStarted() {
         if (client == null) {
             bootstrap()
+            if (client != null) drainPendingNativePushRegistrationSyncIfNeeded()
             return
         }
         localNotificationPresenter.ensureChannels()
@@ -1320,6 +1321,13 @@ class WhiteNoiseAppState(
         startNotificationListener()
         if (accounts.isEmpty()) refreshAccounts()
         refreshLocalNotificationSettings()
+        drainPendingNativePushRegistrationSyncIfNeeded()
+    }
+
+    private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
+        if (pushTokenStore.nativePushRegistrationSyncPending()) {
+            syncNativePushRegistrationIfEnabled()
+        }
     }
 
     suspend fun createIdentity() {
@@ -2316,11 +2324,24 @@ class WhiteNoiseAppState(
         val config = PushServerConfig.current() ?: return
         if (!isNativePushAvailable(config)) return
         val accountRefs = accounts.map { it.label }
-        if (accountRefs.isEmpty()) return
+        if (accountRefs.isEmpty()) {
+            // Only clear the durable #755 retry flag when the account list is
+            // authoritative. setAppInForeground() can trigger this before
+            // bootstrap/refreshAccounts() has loaded accounts; clearing then
+            // would strand a signed-in device on a stale push token.
+            if (client == null) return
+            refreshAccounts()
+            if (accounts.isEmpty()) {
+                pushTokenStore.clearPendingNativePushRegistrationSync()
+            }
+            return
+        }
         val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return
         for (account in accountRefs) {
-            syncPushForAccount(account, config, token)
+            val synced = syncPushForAccount(account, config, token)
+            if (!synced) return
         }
+        pushTokenStore.clearPendingNativePushRegistrationSync()
     }
 
     /**
@@ -2367,12 +2388,12 @@ class WhiteNoiseAppState(
         account: String,
         config: PushServerConfig,
         token: String,
-    ) {
-        val settings = runCatching { marmotIo { notificationSettings(account) } }.getOrNull() ?: return
+    ): Boolean {
+        val settings = runCatching { marmotIo { notificationSettings(account) } }.getOrNull() ?: return false
         if (account == activeAccountRef) localNotificationSettings = settings
         // Skip accounts with a queued sign-out disable so a stale enabled flag can't re-register them.
-        if (account in pushTokenStore.pendingDisables()) return
-        if (!settings.nativePushEnabled) return
+        if (account in pushTokenStore.pendingDisables()) return true
+        if (!settings.nativePushEnabled) return true
         val fingerprint =
             PushFingerprint(
                 platform = PushPlatformFfi.FCM,
@@ -2380,8 +2401,8 @@ class WhiteNoiseAppState(
                 serverPubkeyHex = config.serverPubkeyHex,
                 relayHint = config.relayHint,
             )
-        if (perAccountSyncedFingerprints[account] == fingerprint) return
-        runCatching {
+        if (perAccountSyncedFingerprints[account] == fingerprint) return true
+        return runCatching {
             marmotIo {
                 upsertPushRegistration(
                     accountRef = account,
@@ -2404,10 +2425,13 @@ class WhiteNoiseAppState(
                 // the fingerprint write so the next sync re-verifies instead
                 // of trusting a state we couldn't confirm.
                 settingsAfter == null ->
-                    appStateDebug { "push settings re-read failed; keeping registration account=${account.take(8)}" }
+                    false.also {
+                        appStateDebug { "push settings re-read failed; keeping registration account=${account.take(8)}" }
+                    }
                 settingsAfter.nativePushEnabled -> {
                     perAccountSyncedFingerprints[account] = fingerprint
                     appStateDebug { "push registration synced account=${account.take(8)}" }
+                    true
                 }
                 else -> {
                     appStateDebug { "push registration raced disable; rolling back account=${account.take(8)}" }
@@ -2415,14 +2439,16 @@ class WhiteNoiseAppState(
                     // is queued for retry instead of stranding the account
                     // registered server-side.
                     clearPushRegistrationForAccountLocked(account)
+                    true
                 }
             }
-        }.onFailure {
+        }.getOrElse {
             rethrowIfCancellation(it)
             // Drop the fingerprint on failure so the next sync retries
             // rather than assuming the registration is fresh.
             perAccountSyncedFingerprints.remove(account)
             appStateDebug { "push registration sync failed: ${it.readableMessage()}" }
+            false
         }
     }
 
