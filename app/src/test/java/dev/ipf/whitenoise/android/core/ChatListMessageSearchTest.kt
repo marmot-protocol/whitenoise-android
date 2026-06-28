@@ -57,6 +57,12 @@ class ChatListMessageSearchTest {
     }
 
     @Test
+    fun bodyMatchesBoundsVeryLargeBodies() {
+        val body = "a".repeat(5_000) + " marmot"
+        assertFalse(ChatListMessageSearch.bodyMatches(body, "marmot"))
+    }
+
+    @Test
     fun blankNeedleNeverMatches() {
         assertFalse(ChatListMessageSearch.bodyMatches("anything", ""))
         assertFalse(ChatListMessageSearch.bodyMatches("anything", " \n\t "))
@@ -96,6 +102,12 @@ class ChatListMessageSearchTest {
         val s = ChatListMessageSearch.buildSnippet("before foo bar after", "foo\n\n   bar")!!
         assertEquals("before foo bar after", s.text)
         assertEquals("foo bar", s.text.substring(s.highlightStart, s.highlightEnd))
+    }
+
+    @Test
+    fun snippetSearchBoundsVeryLargeBodies() {
+        val body = "a".repeat(5_000) + " marmot"
+        assertNull(ChatListMessageSearch.buildSnippet(body, "marmot"))
     }
 
     @Test

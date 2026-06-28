@@ -79,4 +79,11 @@ class ForegroundStartDecisionTest {
             )
         }
     }
+
+    @Test
+    fun onlyUserToggleRejectionReconcilesBackgroundConnectionPreference() {
+        assertEquals(true, shouldReconcileBackgroundConnectionRejection(ForegroundStartTrigger.UserToggle))
+        assertEquals(false, shouldReconcileBackgroundConnectionRejection(ForegroundStartTrigger.PushWake))
+        assertEquals(false, shouldReconcileBackgroundConnectionRejection(ForegroundStartTrigger.SystemWake))
+    }
 }

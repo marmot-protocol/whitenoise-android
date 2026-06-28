@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
-import android.content.Intent
 import android.util.Log
-import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dev.ipf.whitenoise.android.BuildConfig
@@ -52,8 +50,10 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
 
     private fun wakeForegroundStream() {
         try {
-            val intent = Intent(applicationContext, NotificationStreamForegroundService::class.java)
-            ContextCompat.startForegroundService(applicationContext, intent)
+            val started = NotificationStreamForegroundService.start(applicationContext, ForegroundStartTrigger.PushWake)
+            if (!started) {
+                Log.w(TAG, "Failed to start foreground stream from push wake")
+            }
         } catch (error: Exception) {
             Log.w(TAG, "Failed to start foreground stream from push wake", error)
         }

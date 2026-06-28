@@ -953,7 +953,12 @@ class ChatsController(
         private set
 
     private var accountRef: String? = null
-    private var chatRows = listOf<ChatListRowFfi>()
+
+    private fun chatRowKey(groupIdHex: String): String = groupIdHex.lowercase()
+
+    private val chatRowsByGroup = LinkedHashMap<String, ChatListRowFfi>()
+    private val chatRows: Collection<ChatListRowFfi>
+        get() = chatRowsByGroup.values
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
 
     // Whether the chat list is on screen. While a conversation is foregrounded
@@ -1097,10 +1102,11 @@ class ChatsController(
                             activeChatsSubscription = chatStream
                         }
                     }
-                    chatRows =
+                    replaceChatRows(
                         withContext(Dispatchers.IO) {
                             chatListStream.snapshot()
-                        }
+                        },
+                    )
                     chatRows.forEach(::requestChatRowProfiles)
                     groupRecordsById =
                         withContext(Dispatchers.IO) {
@@ -1203,7 +1209,7 @@ class ChatsController(
                     bindJob = null
                 }
             }
-            chatsDebug { "unbind account=${accountRef?.take(8) ?: "<none>"} (chat-list + chats subscriptions closed)" }
+            chatsDebug { "unbind account=${accountRef.take(8)} (chat-list + chats subscriptions closed)" }
         }
     }
 
@@ -1219,22 +1225,19 @@ class ChatsController(
     // here via AppState so the chat list reflects the new archived flag.
     fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
         if (accountRef == null) return
-        if (groupRecordsById[record.groupIdHex] == null && chatRows.none { it.groupIdHex == record.groupIdHex }) return
+        val rowKey = chatRowKey(record.groupIdHex)
+        if (groupRecordsById[record.groupIdHex] == null && !chatRowsByGroup.containsKey(rowKey)) return
         // chatListItemFromProjection reads row.archived / row.pendingConfirmation
         // (not just the group record), so patch both the chat row and the group
         // record to keep them consistent.
-        chatRows =
-            chatRows.map { row ->
-                if (row.groupIdHex == record.groupIdHex) {
-                    row.copy(
-                        archived = record.archived,
-                        pendingConfirmation = record.pendingConfirmation,
-                        groupName = record.name.ifBlank { row.groupName },
-                    )
-                } else {
-                    row
-                }
-            }
+        chatRowsByGroup[rowKey]?.let { row ->
+            chatRowsByGroup[rowKey] =
+                row.copy(
+                    archived = record.archived,
+                    pendingConfirmation = record.pendingConfirmation,
+                    groupName = record.name.ifBlank { row.groupName },
+                )
+        }
         foldGroup(record)
     }
 
@@ -1288,7 +1291,7 @@ class ChatsController(
     // projection. awaitChatListItem's poll loop uses this to test whether a
     // freshly created group has surfaced yet without rebuilding the whole
     // projected list on every 50ms tick.
-    fun containsGroup(groupIdHex: String): Boolean = chatRows.any { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+    fun containsGroup(groupIdHex: String): Boolean = chatRowsByGroup.containsKey(chatRowKey(groupIdHex))
 
     /**
      * Chats the active account can forward a message into, recent first.
@@ -1309,17 +1312,17 @@ class ChatsController(
         )
 
     private fun foldChatRow(row: ChatListRowFfi) {
-        chatRows =
-            if (chatRows.any { it.groupIdHex == row.groupIdHex }) {
-                chatRows.map { if (it.groupIdHex == row.groupIdHex) row else it }
-            } else {
-                chatRows + row
-            }
+        chatRowsByGroup[chatRowKey(row.groupIdHex)] = row
         scheduleRecompute()
     }
 
+    private fun replaceChatRows(rows: List<ChatListRowFfi>) {
+        chatRowsByGroup.clear()
+        rows.forEach { row -> chatRowsByGroup[chatRowKey(row.groupIdHex)] = row }
+    }
+
     private fun removeChatRow(groupIdHex: String) {
-        chatRows = chatRows.filterNot { it.groupIdHex == groupIdHex }
+        chatRowsByGroup.remove(chatRowKey(groupIdHex))
         scheduleRecompute()
     }
 
@@ -1733,7 +1736,7 @@ class ChatsController(
     }
 
     private fun resetBackingState() {
-        chatRows = emptyList()
+        replaceChatRows(emptyList())
         groupRecordsById = emptyMap()
         memberCacheByGroup = emptyMap()
         removedGroupIds = emptySet()
@@ -4729,13 +4732,25 @@ class ConversationController(
         val account = conversationAccountRef ?: return
         val previous = lastReadMessageId
         lastReadMessageId = trimmed
+        val markReadFailure =
+            runCatching {
+                appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, trimmed) }
+            }.exceptionOrNull()
+        if (markReadFailure != null) {
+            if (lastReadMessageId == trimmed) lastReadMessageId = previous
+            if (markReadFailure is CancellationException) throw markReadFailure
+            Log.w(
+                "DMConversation",
+                "mark read failed for ${group.groupIdHex.take(8)} message=${trimmed.take(8)}",
+                markReadFailure,
+            )
+            return
+        }
         runCatching {
-            appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, trimmed) }
             appState.dismissConversationNotifications(account, group.groupIdHex)
         }.onFailure {
-            lastReadMessageId = previous
             if (it is CancellationException) throw it
-            Log.w("DMConversation", "mark read failed for ${group.groupIdHex.take(8)} message=${trimmed.take(8)}", it)
+            Log.w("DMConversation", "dismiss read notifications failed for ${group.groupIdHex.take(8)}", it)
         }
     }
 

@@ -38,11 +38,11 @@ object HostSafety {
                 ?.trim()
                 ?.removeSurrounding("[", "]")
                 ?.let(::canonicalizeHostLiteral)
-                // Drop a single rooting dot first: `127.0.0.1.` and `localhost.`
-                // still resolve to loopback, but the trailing empty label would
-                // otherwise make the IPv4 decode (5 parts) and the localhost
-                // check both miss. See #153.
-                ?.removeSuffix(".")
+                // Drop any rooting dots first: `127.0.0.1.` / `localhost.`
+                // and their multi-dot / unicode-dot variants still resolve to
+                // loopback, but trailing empty labels would otherwise make the
+                // IPv4 decode and localhost check miss. See #153 and #781.
+                ?.trimEnd('.')
                 ?.lowercase(Locale.ROOT)
                 .orEmpty()
         if (normalized.isEmpty()) return true
