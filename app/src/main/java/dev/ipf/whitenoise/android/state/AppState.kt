@@ -598,17 +598,17 @@ class WhiteNoiseAppState(
      */
     val profileRevisionForCompose: Int
         get() = profileRevision
-    private val profilePresentations = mutableMapOf<String, ProfilePresentation>()
+    private val profilePresentations = BoundedEntryCache<String, ProfilePresentation>(MAX_PROFILE_PRESENTATION_CACHE_ENTRIES)
 
     // Materialized profile metadata, populated off-main by [refreshProfile].
     // Read accessors serve from here so composition never crosses the FFI.
-    private val userProfiles = mutableMapOf<String, UserProfileMetadataFfi>()
+    private val userProfiles = BoundedEntryCache<String, UserProfileMetadataFfi>(MAX_USER_PROFILE_CACHE_ENTRIES)
 
     // Ids with an in-flight local materialization, so a cache miss launches at
     // most one local read per id. Distinct from the relay-refresh cooldown gate.
     private val materializingProfiles = mutableSetOf<String>()
     private val profilePresentationLock = Any()
-    private val groupMemberSnapshots = mutableMapOf<String, GroupMemberSnapshot>()
+    private val groupMemberSnapshots = BoundedEntryCache<String, GroupMemberSnapshot>(MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES)
     private val groupMemberSnapshotLock = Any()
     private val conversationStateLock = Any()
     private val optimisticMessagesByConversation = mutableMapOf<String, SnapshotStateMap<String, TimelineMessage>>()
@@ -722,8 +722,13 @@ class WhiteNoiseAppState(
     // Serializes commit-producing FFI calls for the same (account, group) across
     // ChatsController and ConversationController so concurrent mutations don't race
     // the per-account actor and surface PendingPublish as a generic toast.
-    // Mutex entries are not evicted — bounded by distinct groups touched in-process.
-    private val groupCommitLocks = ConcurrentHashMap<String, Mutex>()
+    private class GroupCommitLockEntry {
+        val mutex = Mutex()
+        var users = 0
+    }
+
+    private val groupCommitLocks = mutableMapOf<String, GroupCommitLockEntry>()
+    private val groupCommitLocksLock = Any()
 
     suspend fun <T> withGroupCommitLock(
         accountRef: String,
@@ -731,8 +736,26 @@ class WhiteNoiseAppState(
         block: suspend () -> T,
     ): T {
         val key = "$accountRef|$groupIdHex"
-        val mutex = groupCommitLocks.computeIfAbsent(key) { Mutex() }
-        return mutex.withLock { block() }
+        val entry =
+            synchronized(groupCommitLocksLock) {
+                groupCommitLocks.getOrPut(key) { GroupCommitLockEntry() }.also { it.users += 1 }
+            }
+        try {
+            return entry.mutex.withLock { block() }
+        } finally {
+            synchronized(groupCommitLocksLock) {
+                entry.users -= 1
+                if (entry.users == 0 && !entry.mutex.isLocked && groupCommitLocks[key] === entry) {
+                    groupCommitLocks.remove(key)
+                }
+            }
+        }
+    }
+
+    private fun pruneIdleGroupCommitLocks() {
+        synchronized(groupCommitLocksLock) {
+            groupCommitLocks.entries.removeAll { (_, entry) -> entry.users == 0 && !entry.mutex.isLocked }
+        }
     }
 
     internal fun optimisticMessages(
@@ -1614,6 +1637,7 @@ class WhiteNoiseAppState(
             materializingProfiles.clear()
         }
         synchronized(groupMemberSnapshotLock) { groupMemberSnapshots.clear() }
+        pruneIdleGroupCommitLocks()
         profileRevision += 1
     }
 
@@ -2734,7 +2758,7 @@ class WhiteNoiseAppState(
         val snapshot = GroupMemberSnapshot(members)
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return snapshot
         synchronized(groupMemberSnapshotLock) {
-            groupMemberSnapshots[key] = snapshot
+            groupMemberSnapshots.put(key, snapshot)
         }
         return snapshot
     }
@@ -2755,10 +2779,12 @@ class WhiteNoiseAppState(
         val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {
             val current = groupMemberSnapshots[key] ?: return
-            groupMemberSnapshots[key] =
+            groupMemberSnapshots.put(
+                key,
                 GroupMemberSnapshot(
                     GroupProjector.membersWithoutActiveAccount(current.members, activeAccountIdHex),
-                )
+                ),
+            )
         }
     }
 
@@ -2805,7 +2831,7 @@ class WhiteNoiseAppState(
             // while this refresh was in flight, so we don't repopulate them with
             // the previous account's data.
             if (profileCacheEpoch.get() == epoch) {
-                synchronized(profilePresentationLock) { userProfiles[accountIdHex] = profile }
+                synchronized(profilePresentationLock) { userProfiles.put(accountIdHex, profile) }
                 applyProfilePresentation(accountIdHex, presentation)
             }
         }
@@ -3318,7 +3344,7 @@ class WhiteNoiseAppState(
                 avatarUrl = ProfileSanitizer.imageUrl(profile?.picture),
             )
         if (profileCacheEpoch.get() == epoch) {
-            synchronized(profilePresentationLock) { profile?.let { userProfiles[id] = it } }
+            synchronized(profilePresentationLock) { profile?.let { userProfiles.put(id, it) } }
             applyProfilePresentation(id, presentation)
         }
     }
@@ -3393,6 +3419,9 @@ class WhiteNoiseAppState(
         private const val DISK_MEDIA_CACHE_MAX_BYTES: Long = 256L * 1024L * 1024L
         private const val LANGUAGE_TAG_KEY = "language_tag"
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
+        private const val MAX_PROFILE_PRESENTATION_CACHE_ENTRIES = 4096
+        private const val MAX_USER_PROFILE_CACHE_ENTRIES = 4096
+        private const val MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES = 1024
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
         private const val MAX_RETAINED_CONVERSATION_STATES = 32
