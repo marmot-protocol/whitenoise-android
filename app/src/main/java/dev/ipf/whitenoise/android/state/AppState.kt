@@ -34,6 +34,7 @@ import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.SignOutOutcomeFfi
+import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
@@ -2129,6 +2130,183 @@ class WhiteNoiseAppState(
             localNotificationPresenter.dismissConversationMessages(accountRef, groupIdHex)
         }.onFailure {
             appStateDebug { "notification dismiss failed group=${groupIdHex.take(8)}" }
+        }
+    }
+
+    /**
+     * Background disappearing-message sweep across every signed-in account
+     * (#745). The in-conversation sweep ([ConversationController.start]) only
+     * runs while a chat is open; this is the closed-conversation counterpart,
+     * driven on a coarse cadence by [DisappearingMessageSweepWorker] so a
+     * message that expires while its conversation is closed is still pruned,
+     * its decrypted L2 media still secure-deleted, and a stale tray card still
+     * cleared — without waiting for the user to reopen the chat.
+     *
+     * For each group with a retention window set it performs the same work as
+     * the foreground sweep: `secureDeleteExpired` (engine prune + plaintext
+     * scrub), evict the on-disk media cache by the pruned ciphertext tags
+     * (#334 — works regardless of load state), and dismiss the conversation's
+     * notification when rows were actually pruned. Groups with the timer off
+     * are skipped per [DisappearingMessageSweep.shouldSweepGroup]. The FFI
+     * prune call uses the engine's raw current-time cutoff, so Android first
+     * scans the local timeline with [DisappearingMessageSweep.expiryCutoffSeconds]
+     * and defers any group with a raw-expired row still inside the skew window.
+     *
+     * Best-effort and per-group isolated: a failure on one account/group is
+     * logged (cancellation re-thrown) and the sweep moves on, so one bad group
+     * can't starve the rest. Bootstraps the runtime first so the worker can run
+     * after a process death with no UI attached.
+     */
+    suspend fun sweepExpiredDisappearingMessages() {
+        ensureNotificationRuntimeStarted()
+        if (client == null) return
+        val signedInAccounts = accounts.filter { it.localSigning && !it.signedOut && it.label.isNotBlank() }
+        for (account in signedInAccounts) {
+            currentCoroutineContext().ensureActive()
+            sweepExpiredForAccount(account.label)
+        }
+    }
+
+    private suspend fun sweepExpiredForAccount(accountRef: String) {
+        val rows =
+            runCatching { marmotIo { chatList(accountRef, includeArchived = true) } }
+                .onFailure {
+                    rethrowIfCancellation(it)
+                    appStateDebug(it) { "sweep chat-list load failed account=${accountRef.take(8)}: ${it.readableMessage()}" }
+                }.getOrNull()
+                ?: return
+        for (row in rows) {
+            currentCoroutineContext().ensureActive()
+            val groupIdHex = row.groupIdHex.takeIf { it.isNotBlank() } ?: continue
+            sweepExpiredForGroup(accountRef, groupIdHex)
+        }
+    }
+
+    private suspend fun sweepExpiredForGroup(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        val retentionSecs =
+            runCatching { marmotIo { groupDetails(accountRef, groupIdHex) }.group.disappearingMessageSecs }
+                .onFailure {
+                    rethrowIfCancellation(it)
+                    appStateDebug(it) { "sweep retention read failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
+                }.getOrNull()
+                ?: return
+        // No-op for groups with the timer off (acceptance criterion).
+        if (!DisappearingMessageSweep.shouldSweepGroup(retentionSecs)) return
+        if (
+            !shouldInvokeBackgroundSecureDelete(
+                accountRef,
+                groupIdHex,
+                retentionSecs,
+                System.currentTimeMillis(),
+            )
+        ) {
+            return
+        }
+        runCatching { marmotIo { secureDeleteExpired(accountRef, groupIdHex) } }
+            .onSuccess { result ->
+                // Match the foreground sweep: when the engine actually pruned
+                // rows, clear the conversation's tray card so it can't keep
+                // pointing at a now-vanished message, and wipe the pruned
+                // attachments' decrypted bytes from the on-disk cache.
+                if (result.prunedMessages > 0uL) {
+                    dismissConversationNotifications(accountRef, groupIdHex)
+                }
+                evictExpiredDiskMediaCaches(result.mediaCiphertextSha256.toSet())
+            }.onFailure {
+                rethrowIfCancellation(it)
+                appStateDebug(it) { "sweep secureDeleteExpired failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
+            }
+    }
+
+    /**
+     * Gate the raw engine prune so the background sweep honors the #745 clock
+     * skew tolerance in the real deletion path. `secureDeleteExpired` does not
+     * accept a cutoff parameter; it would prune everything before
+     * `now - retention`. Before invoking it, scan the local timeline newest to
+     * oldest and defer the group if any row falls in the interval that the raw
+     * engine cutoff would delete but the skew-adjusted cutoff would keep.
+     */
+    private suspend fun shouldInvokeBackgroundSecureDelete(
+        accountRef: String,
+        groupIdHex: String,
+        retentionSecs: ULong,
+        nowMillis: Long,
+    ): Boolean {
+        val rawCutoffSeconds = DisappearingMessageSweep.rawExpiryCutoffSeconds(nowMillis, retentionSecs) ?: return false
+        val skewCutoffSeconds = DisappearingMessageSweep.expiryCutoffSeconds(nowMillis, retentionSecs) ?: return false
+        if (rawCutoffSeconds == 0uL) return false
+
+        var before: ULong? = null
+        var beforeMessageId: String? = null
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val page =
+                runCatching {
+                    marmotIo {
+                        timelineMessages(
+                            accountRef,
+                            TimelineMessageQueryFfi(
+                                groupIdHex = groupIdHex,
+                                search = null,
+                                before = before,
+                                beforeMessageId = beforeMessageId,
+                                after = null,
+                                afterMessageId = null,
+                                limit = DisappearingMessageSweep.TIMELINE_SCAN_PAGE_LIMIT,
+                            ),
+                        )
+                    }
+                }.onFailure {
+                    rethrowIfCancellation(it)
+                    appStateDebug(it) {
+                        "sweep timeline scan failed group=${groupIdHex.take(8)}: ${it.readableMessage()}"
+                    }
+                }.getOrNull()
+                    ?: return false
+
+            if (
+                page.messages.any {
+                    DisappearingMessageSweep.isWithinSkewWindow(
+                        timelineAtSeconds = it.timelineAt,
+                        rawCutoffSeconds = rawCutoffSeconds,
+                        skewCutoffSeconds = skewCutoffSeconds,
+                    )
+                }
+            ) {
+                appStateDebug { "sweep deferred inside clock-skew window group=${groupIdHex.take(8)}" }
+                return false
+            }
+
+            if (page.messages.any { DisappearingMessageSweep.isExpiredBeyondSkew(it.timelineAt, skewCutoffSeconds) }) {
+                return true
+            }
+
+            if (!page.hasMoreBefore || page.messages.isEmpty()) return false
+            val oldest = page.messages.minWith(compareBy({ it.timelineAt }, { it.messageIdHex }))
+            val nextBefore = oldest.timelineAt
+            val nextBeforeMessageId = oldest.messageIdHex
+            if (before == nextBefore && beforeMessageId == nextBeforeMessageId) return false
+            before = nextBefore
+            beforeMessageId = nextBeforeMessageId
+        }
+    }
+
+    /**
+     * Evict the on-disk (L2) decrypted-media entries stamped with any of
+     * [expiredCiphertextSha256]. This is the load-state-independent media wipe
+     * (#334): the closed-conversation path has no loaded `mediaReferences`
+     * map, so it can't resolve in-memory cache keys — but disk entries carry
+     * their ciphertext tag, so they're evicted directly. The session-scoped
+     * L1/thumbnail caches only hold media for conversations opened this
+     * session, where the foreground sweep already covers eviction.
+     */
+    private suspend fun evictExpiredDiskMediaCaches(expiredCiphertextSha256: Set<String>) {
+        if (expiredCiphertextSha256.isEmpty()) return
+        withContext(Dispatchers.IO) {
+            diskMediaCache.removeByCiphertextTags(expiredCiphertextSha256)
         }
     }
 
