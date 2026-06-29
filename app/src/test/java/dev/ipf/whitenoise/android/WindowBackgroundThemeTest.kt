@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Color
 import android.util.TypedValue
 import android.view.ContextThemeWrapper
@@ -23,6 +24,16 @@ class WindowBackgroundThemeTest {
             style = R.style.Theme_WhiteNoise,
             expectedColor = PreComposeLightBackground,
             lightSystemBars = true,
+        )
+    }
+
+    @Test
+    fun launcherThemeUsesDarkFallbackInNightMode() {
+        assertThemeFallback(
+            style = R.style.Theme_WhiteNoise,
+            expectedColor = PreComposeDarkBackground,
+            lightSystemBars = false,
+            nightMode = true,
         )
     }
 
@@ -67,8 +78,9 @@ class WindowBackgroundThemeTest {
         style: Int,
         expectedColor: Int,
         lightSystemBars: Boolean,
+        nightMode: Boolean = false,
     ) {
-        val context = ContextThemeWrapper(RuntimeEnvironment.getApplication(), style)
+        val context = ContextThemeWrapper(RuntimeEnvironment.getApplication().withNightMode(nightMode), style)
         assertEquals(expectedColor, context.resolveColorAttr(android.R.attr.windowBackground))
         assertEquals(expectedColor, context.resolveColorAttr(android.R.attr.colorBackground))
         assertEquals(expectedColor, context.resolveColorAttr(android.R.attr.windowSplashScreenBackground))
@@ -91,6 +103,18 @@ class WindowBackgroundThemeTest {
     }
 
     private fun Context.resolveBooleanAttr(attr: Int): Boolean = resolveAttr(attr).data != 0
+
+    private fun Context.withNightMode(nightMode: Boolean): Context {
+        val nightFlag =
+            if (nightMode) {
+                Configuration.UI_MODE_NIGHT_YES
+            } else {
+                Configuration.UI_MODE_NIGHT_NO
+            }
+        val config = Configuration(resources.configuration)
+        config.uiMode = (config.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or nightFlag
+        return createConfigurationContext(config)
+    }
 
     private fun Context.resolveAttr(attr: Int): TypedValue {
         val value = TypedValue()

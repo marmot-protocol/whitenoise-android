@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,9 +31,13 @@ class MainActivity : ComponentActivity() {
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
     private lateinit var appState: WhiteNoiseAppState
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        setTheme(preComposeThemeFor(readPersistedThemeMode(), newBase.resources.configuration.isNightModeActive))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val initialSystemDarkTheme = resources.configuration.isNightModeActive
-        setTheme(preComposeThemeFor(readPersistedThemeMode(), initialSystemDarkTheme))
         super.onCreate(savedInstanceState)
         appState = (application as WhiteNoiseApplication).appState
         consumeIntent(intent)
@@ -46,8 +51,11 @@ class MainActivity : ComponentActivity() {
             // the system is light), so the pre-Compose fallback and system-bar
             // icons must follow the resolved app theme. Left on the edge-to-edge
             // default, dark icons land on a black background and disappear.
-            SideEffect {
+            DisposableEffect(state.themeMode, systemDarkTheme) {
                 applyPreComposeWindowBackground(state.themeMode, systemDarkTheme)
+                onDispose { }
+            }
+            SideEffect {
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
                 controller.isAppearanceLightStatusBars = !darkTheme
                 controller.isAppearanceLightNavigationBars = !darkTheme
