@@ -8037,6 +8037,14 @@ private fun ConversationScreen(
     // a shared-group tap from a profile opened on this group's details page)
     // lands on the conversation, not the new chat's details page.
     var showDetails by remember(chat.id) { mutableStateOf(false) }
+    // Notification suppression must follow the visible *timeline*, not merely an
+    // open chat. While group details/settings (and its sub-screens) are up, the
+    // user can't see incoming messages, so those must notify — lift the
+    // active-conversation suppression for the group while details are showing
+    // and restore it on return to the timeline.
+    LaunchedEffect(chat.group.groupIdHex, showDetails) {
+        appState.setActiveConversation(if (showDetails) null else chat.group.groupIdHex)
+    }
     var confirmLeaveFromTopBar by remember { mutableStateOf(false) }
     // Sole-admin Leave gate: a sole admin with other members can't leave until
     // they hand admin to someone else. Instead of the old toast-only dead end,
