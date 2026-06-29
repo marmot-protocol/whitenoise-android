@@ -3220,17 +3220,17 @@ class WhiteNoiseAppState(
         requestProfile(accountIdHex)
     }
 
-    // Resolve the incoming sender's name the same way chat surfaces do:
-    // cached profile / contact display name first, then an npub. The FFI
-    // notification payload's own displayName is frequently null even when
-    // the app already has a name cached for that pubkey, which is what made
-    // notifications fall back to a raw hex key (#206). chatMemberTitle never
-    // returns raw hex — it ends at shortNpub — so a hex key can no longer
-    // leak into a notification when any name or npub is resolvable.
-    private fun notificationSenderName(update: NotificationUpdateFfi): String? {
+    // A notification renders once and never recomposes, so resolve the name via
+    // the awaited directory lookup (it spans every signed-in account) rather than
+    // the in-memory cache, which is cold right after an FCM wake.
+    private suspend fun notificationSenderName(update: NotificationUpdateFfi): String? {
         val senderIdHex = update.sender.accountIdHex
         if (senderIdHex.isBlank()) return null
-        return runCatching { chatMemberTitle(senderIdHex) }.getOrNull()
+        val resolvedName =
+            runCatching {
+                marmotIo { runCatching { marmot().displayName(senderIdHex) }.getOrNull() }
+            }.getOrNull()?.let { ProfileSanitizer.displayName(it) }
+        return resolvedName ?: runCatching { shortNpub(senderIdHex) }.getOrNull()
     }
 
     // Resolve a mention for a one-shot notification. Unlike the Compose bubble
