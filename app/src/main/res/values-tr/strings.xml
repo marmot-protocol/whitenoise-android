@@ -376,7 +376,7 @@
     <string name="notification_group_invite">Güvenli bir sohbete davet edildiniz</string>
     <string name="notification_new_message">Yeni mesaj</string>
     <string name="notification_group_renamed">Grup yeniden adlandırıldı</string>
-    <string name="notification_group_renamed_body">%1$s: “%2$s” → “%3$s”</string>
+    <string name="notification_group_renamed_body">%1$s yeniden adlandırdı: “%2$s” → “%3$s”</string>
     <string name="notification_sent_picture">bir fotoğraf gönderdi</string>
     <string name="notification_sent_video">bir video gönderdi</string>
     <string name="notification_sent_voice_message">bir sesli mesaj gönderdi</string>

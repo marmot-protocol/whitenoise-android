@@ -376,7 +376,7 @@
     <string name="notification_group_invite">Sei stato invitato a una chat sicura</string>
     <string name="notification_new_message">Nuovo messaggio</string>
     <string name="notification_group_renamed">Gruppo rinominato</string>
-    <string name="notification_group_renamed_body">%1$s: “%2$s” → “%3$s”</string>
+    <string name="notification_group_renamed_body">%1$s ha rinominato: “%2$s” → “%3$s”</string>
     <string name="notification_sent_picture">ha inviato una foto</string>
     <string name="notification_sent_video">ha inviato un video</string>
     <string name="notification_sent_voice_message">ha inviato un messaggio vocale</string>

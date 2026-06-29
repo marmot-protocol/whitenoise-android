@@ -375,7 +375,7 @@
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新消息</string>
     <string name="notification_group_renamed">群组已重命名</string>
-    <string name="notification_group_renamed_body">%1$s：“%2$s” → “%3$s”</string>
+    <string name="notification_group_renamed_body">%1$s 重命名：“%2$s” → “%3$s”</string>
     <string name="notification_sent_picture">发送了一张图片</string>
     <string name="notification_sent_video">发送了一段视频</string>
     <string name="notification_sent_voice_message">发送了一条语音消息</string>

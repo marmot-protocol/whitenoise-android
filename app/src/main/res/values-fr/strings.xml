@@ -376,7 +376,7 @@
     <string name="notification_group_invite">Vous avez été invité à une discussion sécurisée</string>
     <string name="notification_new_message">Nouveau message</string>
     <string name="notification_group_renamed">Groupe renommé</string>
-    <string name="notification_group_renamed_body">%1$s : « %2$s » → « %3$s »</string>
+    <string name="notification_group_renamed_body">%1$s a renommé : « %2$s » → « %3$s »</string>
     <string name="notification_sent_picture">a envoyé une photo</string>
     <string name="notification_sent_video">a envoyé une vidéo</string>
     <string name="notification_sent_voice_message">a envoyé un message vocal</string>

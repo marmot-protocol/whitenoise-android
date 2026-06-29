@@ -380,7 +380,7 @@
     <string name="notification_group_invite">Вы были приглашены в безопасный чат</string>
     <string name="notification_new_message">Новое сообщение</string>
     <string name="notification_group_renamed">Группа переименована</string>
-    <string name="notification_group_renamed_body">%1$s: «%2$s» → «%3$s»</string>
+    <string name="notification_group_renamed_body">%1$s переименовал(а): «%2$s» → «%3$s»</string>
     <string name="notification_sent_picture">Отправлено изображение</string>
     <string name="notification_sent_video">Отправлено видео</string>
     <string name="notification_sent_voice_message">Отправлено голосовое сообщение</string>
