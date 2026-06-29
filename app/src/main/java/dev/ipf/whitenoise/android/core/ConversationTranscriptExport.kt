@@ -107,6 +107,20 @@ object ConversationTranscriptExport {
 
     fun encodeJson(document: JSONObject): ByteArray = (document.toString(2) + "\n").toByteArray(StandardCharsets.UTF_8)
 
+    /**
+     * Delete any transcript files left in [transcriptsDir] from earlier exports.
+     * The share flow already deletes its file deterministically once the share
+     * sheet returns, so this only reaps an export orphaned by a process kill
+     * mid-share — bounding the decrypted-transcript cache to at most the current
+     * export instead of waiting on a later age-based startup sweep. Returns the
+     * number of files removed. Best-effort: unreadable/locked entries are skipped.
+     */
+    fun sweepStaleTranscripts(transcriptsDir: File): Int =
+        transcriptsDir
+            .listFiles()
+            .orEmpty()
+            .count { it.isFile && runCatching { it.delete() }.getOrDefault(false) }
+
     fun writeTemporaryFile(
         cacheDir: File,
         data: ByteArray,
@@ -114,8 +128,13 @@ object ConversationTranscriptExport {
         exportedAt: Instant = Instant.now(),
     ): File {
         val dir = File(cacheDir, CacheDirName).apply { mkdirs() }
+        // Reap any earlier decrypted transcript before writing a new one. The
+        // exports are serialized behind a modal share sheet, so a leftover file
+        // here is a prior export's orphan, never one being actively shared.
+        // (No deleteOnExit fallback: its JVM shutdown hook effectively never
+        // runs on a process-killed Android app, so it left cleartext behind.)
+        sweepStaleTranscripts(dir)
         val file = File.createTempFile(fileNamePrefix(groupIdHex, exportedAt), ".json", dir)
-        file.deleteOnExit()
         file.writeBytes(data)
         file.setExecutable(false, false)
         return file

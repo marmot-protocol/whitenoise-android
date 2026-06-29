@@ -270,6 +270,58 @@ class ConversationTranscriptExportTest {
         }
     }
 
+    @Test
+    fun writeTemporaryFileReapsAnEarlierTranscriptSoCleartextDoesNotAccumulate() {
+        // A prior export orphaned by a process kill mid-share must not survive
+        // alongside a fresh one: each export leaves at most its own decrypted
+        // transcript in cache (#841).
+        val root =
+            kotlin.io.path
+                .createTempDirectory("wn-transcript-test-")
+                .toFile()
+        try {
+            val first =
+                ConversationTranscriptExport.writeTemporaryFile(
+                    cacheDir = root,
+                    data = "{\"old\":true}\n".toByteArray(StandardCharsets.UTF_8),
+                    groupIdHex = "ab".repeat(32),
+                    exportedAt = Instant.parse("2023-11-14T22:13:20Z"),
+                )
+            val second =
+                ConversationTranscriptExport.writeTemporaryFile(
+                    cacheDir = root,
+                    data = "{\"new\":true}\n".toByteArray(StandardCharsets.UTF_8),
+                    groupIdHex = "cd".repeat(32),
+                    exportedAt = Instant.parse("2023-11-15T22:13:20Z"),
+                )
+
+            assertFalse("earlier transcript should be reaped", first.exists())
+            assertTrue(second.exists())
+            assertEquals(listOf(second.name), second.parentFile?.listFiles()?.map { it.name })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun sweepStaleTranscriptsRemovesEveryFileAndReportsTheCount() {
+        val dir =
+            kotlin.io.path
+                .createTempDirectory("wn-transcript-sweep-")
+                .toFile()
+        try {
+            java.io.File(dir, "whitenoise-transcript-a.json").writeText("{}")
+            java.io.File(dir, "whitenoise-transcript-b.json").writeText("{}")
+
+            assertEquals(2, ConversationTranscriptExport.sweepStaleTranscripts(dir))
+            assertEquals(emptyList<String>(), dir.listFiles()?.map { it.name })
+            // A missing directory is a no-op, not a crash.
+            assertEquals(0, ConversationTranscriptExport.sweepStaleTranscripts(java.io.File(dir, "missing")))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
     private fun testExportGroup(
         name: String,
         groupIdHex: String = "aa".repeat(32),
