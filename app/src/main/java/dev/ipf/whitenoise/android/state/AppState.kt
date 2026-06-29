@@ -148,6 +148,31 @@ internal fun shouldAcceptMediaUploadForAccount(
         conversationAccountRef == activeAccountRef &&
         capturedMediaUploadSessionEpoch == currentMediaUploadSessionEpoch
 
+internal data class ConversationNotificationTarget(
+    val accountRef: String,
+    val groupIdHex: String,
+)
+
+/**
+ * The conversation whose pending tray cards should be cleared when a chat is
+ * opened, or null when there's nothing concrete to dismiss.
+ *
+ * Opening a conversation must clear its notifications on the first open,
+ * independent of whether the read watermark advances (issue #803). The
+ * mark-read path can be deduped/swallowed or race a not-yet-ready read anchor
+ * on a cold open, so this gives [WhiteNoiseAppState.setActiveConversation] a
+ * target it can dismiss immediately and unconditionally. Returns a target only
+ * when both the active account and the opened group are nonblank.
+ */
+internal fun conversationOpenDismissalTarget(
+    activeAccountRef: String?,
+    groupIdHex: String?,
+): ConversationNotificationTarget? {
+    val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return null
+    val group = groupIdHex?.takeIf { it.isNotBlank() } ?: return null
+    return ConversationNotificationTarget(account, group)
+}
+
 internal class InFlightMediaUploads {
     private val lock = Any()
     private val jobs = mutableMapOf<String, Job>()
@@ -2151,6 +2176,16 @@ class WhiteNoiseAppState(
             markAutoAcceptedInviteOpened(groupIdHex)
             synchronized(conversationStateLock) {
                 promoteConversationState(activeConversationAccountRef, groupIdHex)
+            }
+            // Clear the conversation's tray cards on the first open, regardless
+            // of whether mark-read later advances the read watermark. The
+            // mark-read-driven dismissal in the conversation controllers stays
+            // as-is; this is additive defense against the cold-open race where
+            // the read anchor isn't ready yet or the mark-read is deduped, so a
+            // reaction/message notification could otherwise survive until the
+            // second open (issue #803).
+            conversationOpenDismissalTarget(activeConversationAccountRef, groupIdHex)?.let { target ->
+                dismissConversationNotifications(target.accountRef, target.groupIdHex)
             }
         }
         appStateDebug {
