@@ -41,6 +41,7 @@ import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.HostSafety
@@ -1712,7 +1713,9 @@ class WhiteNoiseAppState(
             marmotIo { revealNsec(accountRef) }
         }.onFailure {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_export_nsec, AppText.Plain(it.readableMessage()))
+            // Secret-key export holds the nsec in hand and the toast is not
+            // behind FLAG_SECURE — scrub the FFI message before showing it (#846).
+            present(R.string.toast_couldnt_export_nsec, AppText.Plain(DiagnosticFormatter.redactError(it.readableMessage())))
         }.getOrNull()
     }
 
@@ -1722,7 +1725,7 @@ class WhiteNoiseAppState(
             marmotIo { exportEncryptedSecretKey(accountRef, passphrase) }
         }.onFailure {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_export_encrypted_secret, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_export_encrypted_secret, AppText.Plain(DiagnosticFormatter.redactError(it.readableMessage())))
         }.getOrNull()
     }
 
@@ -1787,7 +1790,7 @@ class WhiteNoiseAppState(
             present(R.string.toast_encrypted_backup_created)
         }.onFailure {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_create_encrypted_backup, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_create_encrypted_backup, AppText.Plain(DiagnosticFormatter.redactError(it.readableMessage())))
         }.getOrNull()
     }
 

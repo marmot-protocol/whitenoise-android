@@ -42,7 +42,14 @@ object DiagnosticFormatter {
     private val CREDENTIALS_IN_URL = Regex("(?i)([a-z][a-z0-9+.-]*://)[^\\s/@:]+:[^\\s/@]+@")
     private val TOKEN_ASSIGNMENT = Regex("(?i)\\b(authorization|bearer|token|auth[_-]?token|password|secret)=([^\\s&]+)")
 
-    private fun redactError(message: String): String {
+    /**
+     * Scrub secret-shaped substrings (nsec, long hex, URL credentials, token
+     * assignments) and clamp length before an FFI error string reaches any
+     * user-facing surface. Public so the highest-sensitivity callers (secret-key
+     * export / encrypted backup toasts, which are not behind FLAG_SECURE) can
+     * reuse the same scrubber instead of presenting raw FFI text (#846).
+     */
+    fun redactError(message: String): String {
         val scrubbed =
             message
                 .replace(CREDENTIALS_IN_URL) { "${it.groupValues[1]}$REDACTED@" }
