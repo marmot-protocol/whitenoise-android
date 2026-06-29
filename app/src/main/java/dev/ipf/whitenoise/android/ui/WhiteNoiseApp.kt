@@ -20207,14 +20207,11 @@ internal fun Avatar(
     val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
     // already-loaded avatar immediately, with no placeholder flash and no
-    // re-fetch. See #31.
+    // re-fetch. produceState retains `value` across key changes, so re-seed for
+    // the current url — otherwise a reused slot (e.g. a different account's
+    // avatar in the top bar) keeps the previous url's bitmap.
     val image by produceState(AvatarImageLoader.peek(pictureUrl), pictureUrl) {
-        val url =
-            pictureUrl ?: run {
-                value = null
-                return@produceState
-            }
-        if (value == null) value = AvatarImageLoader.load(url)
+        value = pictureUrl?.let { url -> AvatarImageLoader.peek(url) ?: AvatarImageLoader.load(url) }
     }
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(color),
