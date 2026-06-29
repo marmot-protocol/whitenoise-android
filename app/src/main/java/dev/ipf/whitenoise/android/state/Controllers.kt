@@ -108,14 +108,28 @@ data class ChatListItem(
         get() = projection?.title?.takeIf { it.isNotBlank() }
 
     val latestAt: ULong?
-        // Prefer the last message's timeline timestamp. A freshly-created chat
-        // has no message yet, so fall back to the projection's `updatedAt`
-        // (set to `now` when the engine first projects the row on group create
-        // — see storage-sqlite chat_list `rebuild_chat_list_row_for_group_tx`,
-        // same unix-seconds unit as `timelineAt`). Without this fallback a new
-        // DM/group would sort with `0uL` and land at the bottom of the chat
-        // list instead of the top (issue #321).
-        get() = projection?.lastMessage?.timelineAt ?: projection?.updatedAt ?: latest?.recordedAt
+        // Prefer the last message's timeline timestamp. When a chat has no last
+        // message, fall back to the last *read* timeline position before the
+        // projection's `updatedAt`:
+        //
+        //   - `lastReadTimelineAt` is sourced from the read state, not the
+        //     message store (see storage-sqlite chat_list
+        //     `rebuild_chat_list_row_for_group_tx`), so it survives a
+        //     disappearing-message prune that empties the chat. Keying on it
+        //     keeps an all-expired chat sorted where its last visible message
+        //     sat instead of jumping to the top (issue #849).
+        //   - `updatedAt` is a cache-version field bumped to `now` on *every*
+        //     row rebuild — including a prune — so it must not be the primary
+        //     sort fallback. It still backs a genuinely new chat that has no
+        //     message and no read state yet: there it equals the group-create
+        //     time, sorting the new DM/group to the top (issue #321).
+        //
+        // All three are the same unix-seconds unit as `timelineAt`.
+        get() =
+            projection?.lastMessage?.timelineAt
+                ?: projection?.lastReadTimelineAt
+                ?: projection?.updatedAt
+                ?: latest?.recordedAt
 
     val unreadCount: ULong
         get() = projection?.unreadCount ?: 0uL

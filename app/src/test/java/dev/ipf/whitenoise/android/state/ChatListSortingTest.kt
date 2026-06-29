@@ -152,6 +152,39 @@ class ChatListSortingTest {
         assertEquals(50uL, item.latestAt)
     }
 
+    @Test
+    fun allExpiredChatSortsByLastReadNotThePruneBumpedUpdatedAt() {
+        // A disappearing-messages chat whose messages have all expired has no
+        // last message, and the prune rebuilds its projection row with
+        // `updatedAt` ≈ now. It must sort by its retained last-read timeline
+        // position — where its last visible message sat — rather than jumping
+        // to the top on the prune-bumped `updatedAt` (issue #849).
+        val activeChat =
+            chatListItemFromProjection(
+                row(
+                    groupId = "active",
+                    title = "Active",
+                    preview = "recent",
+                    latestAt = 100uL,
+                    unreadCount = 0uL,
+                ),
+            )
+        val allExpired =
+            chatListItemFromProjection(
+                noMessageRow(
+                    groupId = "all-expired",
+                    title = "Expired",
+                    updatedAt = 999uL,
+                    lastReadTimelineAt = 10uL,
+                ),
+            )
+
+        // latestAt keys on the read position (10), not the prune-bumped 999.
+        assertEquals(10uL, allExpired.latestAt)
+        val sorted = sortChatListItems(listOf(allExpired, activeChat))
+        assertEquals(listOf("active", "all-expired"), sorted.map { it.id })
+    }
+
     private fun item(
         id: String,
         latestAt: ULong?,
@@ -204,6 +237,7 @@ class ChatListSortingTest {
         groupId: String,
         title: String,
         updatedAt: ULong,
+        lastReadTimelineAt: ULong? = null,
     ) = ChatListRowFfi(
         unreadMentionCount = 0uL,
         unreadMention = false,
@@ -219,7 +253,7 @@ class ChatListSortingTest {
         hasUnread = false,
         firstUnreadMessageIdHex = null,
         lastReadMessageIdHex = null,
-        lastReadTimelineAt = null,
+        lastReadTimelineAt = lastReadTimelineAt,
         updatedAt = updatedAt,
     )
 
