@@ -11051,7 +11051,6 @@ private fun GroupDetailsScreen(
             SectionCard(title = stringResource(R.string.info)) {
                 CopyableValueRow(
                     label = stringResource(R.string.group_id),
-                    display = IdentityFormatter.short(controller.group.groupIdHex),
                     value = controller.group.groupIdHex,
                     clipboard = clipboard,
                     appState = appState,
@@ -17652,7 +17651,6 @@ private fun ProfileSheet(
             }
             CopyableValueRow(
                 label = "npub",
-                display = IdentityFormatter.short(npub, prefix = 16, suffix = 14),
                 value = npub,
                 clipboard = clipboard,
                 appState = appState,
@@ -18771,14 +18769,12 @@ private fun IdentityScreen(
                         DiagnosticRow(stringResource(R.string.display_name), appState.displayName(active.accountIdHex))
                         CopyableValueRow(
                             label = stringResource(R.string.public_key),
-                            display = IdentityFormatter.short(active.accountIdHex),
                             value = active.accountIdHex,
                             clipboard = clipboard,
                             appState = appState,
                         )
                         CopyableValueRow(
                             label = "npub",
-                            display = appState.shortNpub(active.accountIdHex),
                             value = appState.npub(active.accountIdHex),
                             clipboard = clipboard,
                             appState = appState,
@@ -19368,23 +19364,32 @@ private fun WipeBullet(text: String) {
 @Composable
 private fun CopyableValueRow(
     label: String,
-    display: String,
     value: String,
     clipboard: androidx.compose.ui.platform.ClipboardManager,
     appState: WhiteNoiseAppState,
 ) {
-    Row(
-        Modifier.fillMaxWidth().clickable {
-            clipboard.setText(AnnotatedString(value))
-            appState.presentText(AppText.Resource(R.string.toast_copied_value, listOf(label)))
-        },
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+    // Identifier rows (npub, group id, public key) put the full value on its
+    // own line(s) below the label, wrapping cleanly with a trailing copy icon
+    // (the #295 shape). The value is never middle-ellipsized nor wrapped
+    // mid-string, so the complete identifier is always visible (#793, #799).
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable {
+                clipboard.setText(AnnotatedString(value))
+                appState.presentText(AppText.Resource(R.string.toast_copied_value, listOf(label)))
+            },
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(display, fontFamily = FontFamily.Monospace)
-            Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+            Text(value, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
+            Icon(
+                Icons.Default.ContentCopy,
+                contentDescription = stringResource(R.string.copy),
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -20082,6 +20087,11 @@ private fun DiagnosticRow(
                     value,
                     fontFamily = FontFamily.Monospace,
                     textAlign = TextAlign.End,
+                    // The displayed value is already abbreviated by the caller; keep
+                    // it (and the trailing copy icon) on a single line so a long ID
+                    // never line-breaks with a stray character on a second row (#799).
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
                 Icon(
