@@ -42,6 +42,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.GroupProjector
+import dev.ipf.whitenoise.android.core.GroupRenamePreviousName
+import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.HostSafety
 import dev.ipf.whitenoise.android.core.IdentityFormatter
@@ -133,6 +135,11 @@ internal suspend fun resolveNotificationPreviewText(
 internal data class SignOutOutcome(
     val nextActiveRef: String?,
     val phase: AppPhase,
+)
+
+private data class NotificationSystemText(
+    val title: String,
+    val body: String,
 )
 
 internal fun shouldAcceptMediaUploadForAccount(
@@ -675,6 +682,7 @@ class WhiteNoiseAppState(
     private val profilePresentationLock = Any()
     private val groupMemberSnapshots = BoundedEntryCache<String, GroupMemberSnapshot>(MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES)
     private val groupMemberSnapshotLock = Any()
+    private val groupRenameNameSnapshots = GroupRenameNameSnapshots()
     private val conversationStateLock = Any()
     private val optimisticMessagesByConversation = mutableMapOf<String, SnapshotStateMap<String, TimelineMessage>>()
     private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
@@ -1028,8 +1036,38 @@ class WhiteNoiseAppState(
     // stream can lag behind local mutations and we forward the accepted/archived
     // group record so rows stop rendering stale pending/archived state.
     fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
+        activeAccountRef?.let { account -> recordGroupNameSnapshot(account, record.groupIdHex, record.name) }
         chatsController?.applyLocalGroupUpdate(record)
     }
+
+    internal fun rememberGroupNameSnapshot(
+        accountRef: String?,
+        groupIdHex: String?,
+        name: String?,
+    ) {
+        groupRenameNameSnapshots.remember(accountRef, groupIdHex, name)
+    }
+
+    internal fun setGroupNameSnapshot(
+        accountRef: String?,
+        groupIdHex: String?,
+        name: String?,
+    ) {
+        groupRenameNameSnapshots.setCurrent(accountRef, groupIdHex, name)
+    }
+
+    internal fun recordGroupNameSnapshot(
+        accountRef: String?,
+        groupIdHex: String?,
+        name: String,
+    ): GroupRenamePreviousName? = groupRenameNameSnapshots.record(accountRef, groupIdHex, name)
+
+    internal fun previousGroupRenameName(
+        accountRef: String?,
+        groupIdHex: String?,
+        newName: String?,
+        eventId: String? = null,
+    ): GroupRenamePreviousName? = groupRenameNameSnapshots.previousFor(accountRef, groupIdHex, newName, eventId)
 
     // A self-leave stops that group's subscription, so the engine pushes no
     // chat-list update to flip the row to its left state. The chat-list
@@ -3223,21 +3261,73 @@ class WhiteNoiseAppState(
             mentionDisplayName = { notificationMentionDisplayName(it) },
         )
 
+    private suspend fun notificationMessageRecord(update: NotificationUpdateFfi) =
+        update.messageIdHex?.let { messageId ->
+            // A small recent tail; the just-arrived message is within it, and a
+            // miss simply falls back to the generic notification body.
+            runCatching { marmotIo { messages(update.accountRef, update.groupIdHex, 30u) } }
+                .getOrNull()
+                ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
+        }
+
+    private suspend fun notificationTimelineRecord(update: NotificationUpdateFfi) =
+        update.messageIdHex?.let { messageId ->
+            runCatching {
+                marmotIo {
+                    timelineMessages(
+                        update.accountRef,
+                        TimelineMessageQueryFfi(
+                            groupIdHex = update.groupIdHex,
+                            search = null,
+                            before = null,
+                            beforeMessageId = null,
+                            after = null,
+                            afterMessageId = null,
+                            limit = 30u,
+                        ),
+                    ).messages
+                }
+            }.getOrNull()
+                ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
+        }
+
+    private suspend fun notificationGroupSystemText(
+        update: NotificationUpdateFfi,
+        senderName: String?,
+    ): NotificationSystemText? {
+        val record = notificationTimelineRecord(update) ?: return null
+        val baseEvent = GroupSystemEvents.resolve(record.plaintext, record.groupSystem) ?: return null
+        val localPreviousName =
+            GroupSystemEvents.renameNewName(baseEvent)?.let { newName ->
+                if (baseEvent.oldNameKnown) {
+                    setGroupNameSnapshot(update.accountRef, update.groupIdHex, newName)
+                    null
+                } else {
+                    recordGroupNameSnapshot(update.accountRef, update.groupIdHex, newName)
+                        ?: previousGroupRenameName(update.accountRef, update.groupIdHex, newName, record.messageIdHex)
+                }
+            }
+        val event = localPreviousName?.let { GroupSystemEvents.withLocalRenamePreviousName(baseEvent, it) } ?: baseEvent
+        val diff = GroupSystemEvents.renameDiffNames(event) ?: return null
+        val actorHex = GroupSystemEvents.actorHex(event, record.sender)
+        val actorName =
+            when {
+                GroupSystemEvents.isSelf(update.accountIdHex, actorHex) -> appContext.getString(R.string.you)
+                !actorHex.isNullOrBlank() -> runCatching { chatMemberTitle(actorHex) }.getOrNull()
+                else -> null
+            } ?: senderName ?: appContext.getString(R.string.group_system_someone)
+        return NotificationSystemText(
+            title = appContext.getString(R.string.notification_group_renamed),
+            body = appContext.getString(R.string.notification_group_renamed_body, actorName, diff.oldName, diff.newName),
+        )
+    }
+
     // Classify a captionless incoming message so its notification body can name
     // the attachment type. The runtime payload carries no content type, so read
     // the stored record (recent history tail) and match by id; a miss or a
     // non-media record yields None and the generic "New message" body stands.
-    private suspend fun notificationMediaKind(update: NotificationUpdateFfi): ReplyMediaKind {
-        val messageId = update.messageIdHex ?: return ReplyMediaKind.None
-        val record =
-            // A small recent tail; the just-arrived message is within it, and a
-            // miss simply falls back to the generic body.
-            runCatching { marmotIo { messages(update.accountRef, update.groupIdHex, 30u) } }
-                .getOrNull()
-                ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
-                ?: return ReplyMediaKind.None
-        return MessageProjector.mediaKind(record)
-    }
+    private suspend fun notificationMediaKind(update: NotificationUpdateFfi): ReplyMediaKind =
+        notificationMessageRecord(update)?.let(MessageProjector::mediaKind) ?: ReplyMediaKind.None
 
     // Resolve the conversation title for a notification the same way the chat
     // list does, since the runtime payload's group name is empty for unnamed
@@ -3274,6 +3364,7 @@ class WhiteNoiseAppState(
         )
 
     private suspend fun postNotificationUpdate(update: NotificationUpdateFfi) {
+        rememberGroupNameSnapshot(update.accountRef, update.groupIdHex, update.groupName)
         val activeConversation = activeConversationGroupIdHex
         val shouldPost =
             LocalNotificationPolicy.shouldPost(
@@ -3289,8 +3380,10 @@ class WhiteNoiseAppState(
                 "updateAccount=${update.accountRef.take(8)} post=$shouldPost"
         }
         if (shouldPost) {
+            val senderNameOverride = notificationSenderName(update)
+            val systemText = notificationGroupSystemText(update, senderNameOverride)
             val previewTextOverride =
-                if (LocalNotificationFormatter.needsPreviewTextResolution(update)) {
+                systemText?.body ?: if (LocalNotificationFormatter.needsPreviewTextResolution(update)) {
                     notificationPreviewText(update.previewText)
                 } else {
                     null
@@ -3305,15 +3398,15 @@ class WhiteNoiseAppState(
             // attachment, so classify just those (a single history read) to name
             // the media type in the body. Text messages never reach the fetch.
             val mediaKind =
-                if (LocalNotificationFormatter.needsPreviewTextResolution(update) && previewTextOverride.isNullOrBlank()) {
+                if (systemText == null && LocalNotificationFormatter.needsPreviewTextResolution(update) && previewTextOverride.isNullOrBlank()) {
                     notificationMediaKind(update)
                 } else {
                     ReplyMediaKind.None
                 }
             localNotificationPresenter.show(
                 update,
-                notificationConversationTitle(update),
-                notificationSenderName(update),
+                systemText?.title ?: notificationConversationTitle(update),
+                senderNameOverride,
                 previewTextOverride,
                 reactedToPreviewOverride,
                 mediaKind,

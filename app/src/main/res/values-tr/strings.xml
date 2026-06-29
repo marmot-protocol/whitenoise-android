@@ -375,6 +375,8 @@
     <string name="notification_channel_invites_description">Grup davetleri ve karşılamalar</string>
     <string name="notification_group_invite">Güvenli bir sohbete davet edildiniz</string>
     <string name="notification_new_message">Yeni mesaj</string>
+    <string name="notification_group_renamed">Grup yeniden adlandırıldı</string>
+    <string name="notification_group_renamed_body">%1$s: “%2$s” → “%3$s”</string>
     <string name="notification_sent_picture">bir fotoğraf gönderdi</string>
     <string name="notification_sent_video">bir video gönderdi</string>
     <string name="notification_sent_voice_message">bir sesli mesaj gönderdi</string>
@@ -600,6 +602,10 @@
     <string name="group_system_admin_removed_passive">%1$s artık yönetici değil</string>
     <string name="group_system_renamed">%1$s grubun adını “%2$s” olarak değiştirdi</string>
     <string name="group_system_renamed_passive">Grubun adı “%1$s” olarak değiştirildi</string>
+    <string name="group_system_renamed_diff">%1$s grubun adını “%2$s” iken “%3$s” olarak değiştirdi</string>
+    <string name="group_system_renamed_diff_passive">Grubun adı “%1$s” iken “%2$s” olarak değiştirildi</string>
+    <string name="group_system_named">%1$s gruba “%2$s” adını verdi</string>
+    <string name="group_system_named_passive">Gruba “%1$s” adı verildi</string>
     <string name="group_system_avatar_changed">%1$s grup avatarını değiştirdi</string>
     <string name="group_system_avatar_changed_passive">Grup avatarı değiştirildi</string>
     <string name="group_system_someone">Birisi</string>
@@ -618,6 +624,8 @@
     <string name="group_system_admin_removed_you">%1$s yöneticiliğinizi kaldırdı</string>
     <string name="group_system_admin_removed_you_passive">Artık yönetici değilsiniz</string>
     <string name="group_system_you_renamed">Grubun adını “%1$s” olarak değiştirdiniz</string>
+    <string name="group_system_you_renamed_diff">Grubun adını “%1$s” iken “%2$s” olarak değiştirdiniz</string>
+    <string name="group_system_you_named">Gruba “%1$s” adını verdiniz</string>
     <string name="group_system_you_avatar_changed">Grup avatarını değiştirdiniz</string>
     <string name="media_attachment_add_more">Daha fazla ekle</string>
     <string name="media_attachment_remove">Eki kaldır</string>

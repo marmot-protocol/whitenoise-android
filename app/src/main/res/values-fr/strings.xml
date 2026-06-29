@@ -375,6 +375,8 @@
     <string name="notification_channel_invites_description">Invitations de groupe et bienvenues</string>
     <string name="notification_group_invite">Vous avez été invité à une discussion sécurisée</string>
     <string name="notification_new_message">Nouveau message</string>
+    <string name="notification_group_renamed">Groupe renommé</string>
+    <string name="notification_group_renamed_body">%1$s : « %2$s » → « %3$s »</string>
     <string name="notification_sent_picture">a envoyé une photo</string>
     <string name="notification_sent_video">a envoyé une vidéo</string>
     <string name="notification_sent_voice_message">a envoyé un message vocal</string>
@@ -602,6 +604,10 @@
     <string name="group_system_admin_removed_passive">%1$s n\'est plus admin</string>
     <string name="group_system_renamed">%1$s a renommé le groupe en « %2$s »</string>
     <string name="group_system_renamed_passive">Le groupe a été renommé en « %1$s »</string>
+    <string name="group_system_renamed_diff">%1$s a renommé le groupe de « %2$s » en « %3$s »</string>
+    <string name="group_system_renamed_diff_passive">Le groupe a été renommé de « %1$s » en « %2$s »</string>
+    <string name="group_system_named">%1$s a nommé le groupe « %2$s »</string>
+    <string name="group_system_named_passive">Le groupe a été nommé « %1$s »</string>
     <string name="group_system_avatar_changed">%1$s a changé l\'avatar du groupe</string>
     <string name="group_system_avatar_changed_passive">L\'avatar du groupe a changé</string>
     <string name="group_system_someone">Quelqu\'un</string>
@@ -620,6 +626,8 @@
     <string name="group_system_admin_removed_you">%1$s vous a retiré des admins</string>
     <string name="group_system_admin_removed_you_passive">Vous n\'êtes plus admin</string>
     <string name="group_system_you_renamed">Vous avez renommé le groupe en « %1$s »</string>
+    <string name="group_system_you_renamed_diff">Vous avez renommé le groupe de « %1$s » en « %2$s »</string>
+    <string name="group_system_you_named">Vous avez nommé le groupe « %1$s »</string>
     <string name="group_system_you_avatar_changed">Vous avez changé l\'avatar du groupe</string>
     <string name="media_attachment_add_more">Ajouter plus</string>
     <string name="media_attachment_remove">Retirer la pièce jointe</string>

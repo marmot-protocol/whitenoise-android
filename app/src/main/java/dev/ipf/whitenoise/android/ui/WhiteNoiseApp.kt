@@ -362,6 +362,7 @@ import dev.ipf.whitenoise.android.core.ENCRYPTED_BACKUP_MIN_PASSPHRASE_LENGTH
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.EncryptedBackupPassphraseStrength
 import dev.ipf.whitenoise.android.core.GroupProjector
+import dev.ipf.whitenoise.android.core.GroupRenamePreviousName
 import dev.ipf.whitenoise.android.core.GroupSystemCopy
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
@@ -546,6 +547,10 @@ private fun rememberGroupSystemCopy(): GroupSystemCopy =
         adminRemovedPassiveFormat = stringResource(R.string.group_system_admin_removed_passive),
         renamedFormat = stringResource(R.string.group_system_renamed),
         renamedPassiveFormat = stringResource(R.string.group_system_renamed_passive),
+        renamedDiffFormat = stringResource(R.string.group_system_renamed_diff),
+        renamedDiffPassiveFormat = stringResource(R.string.group_system_renamed_diff_passive),
+        namedFormat = stringResource(R.string.group_system_named),
+        namedPassiveFormat = stringResource(R.string.group_system_named_passive),
         avatarChangedFormat = stringResource(R.string.group_system_avatar_changed),
         avatarChangedPassive = stringResource(R.string.group_system_avatar_changed_passive),
         youMemberAddedFormat = stringResource(R.string.group_system_you_member_added),
@@ -562,6 +567,8 @@ private fun rememberGroupSystemCopy(): GroupSystemCopy =
         adminRemovedYouFormat = stringResource(R.string.group_system_admin_removed_you),
         adminRemovedYouPassive = stringResource(R.string.group_system_admin_removed_you_passive),
         youRenamedFormat = stringResource(R.string.group_system_you_renamed),
+        youRenamedDiffFormat = stringResource(R.string.group_system_you_renamed_diff),
+        youNamedFormat = stringResource(R.string.group_system_you_named),
         youAvatarChanged = stringResource(R.string.group_system_you_avatar_changed),
         disappearingSetFormat = stringResource(R.string.group_system_disappearing_set),
         disappearingSetYouFormat = stringResource(R.string.group_system_disappearing_set_you),
@@ -7684,9 +7691,13 @@ private fun GroupSystemRow(
     record: AppMessageRecordFfi,
     appState: WhiteNoiseAppState,
     groupSystem: GroupSystemEventFfi? = null,
+    localPreviousName: GroupRenamePreviousName? = null,
 ) {
     val copy = rememberGroupSystemCopy()
-    val event = remember(record.plaintext, groupSystem) { GroupSystemEvents.resolve(record.plaintext, groupSystem) }
+    val event =
+        remember(record.plaintext, groupSystem, localPreviousName) {
+            GroupSystemEvents.resolve(record.plaintext, groupSystem, localPreviousName)
+        }
     // Localized new-window label for the disappearing-timer "set to …" rows; null
     // when the event isn't a timer-on change (off/other rows need no duration).
     val retentionLabel = event?.newRetentionSeconds?.takeIf { it > 0uL }?.let { disappearingMessagesLabel(it.toLong()) }
@@ -10074,6 +10085,7 @@ private fun ConversationScreen(
                                             record = item.record,
                                             appState = appState,
                                             groupSystem = item.projected?.groupSystem,
+                                            localPreviousName = item.localGroupRenamePreviousName,
                                         )
                                         return@itemsIndexed
                                     }

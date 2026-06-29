@@ -374,6 +374,8 @@
     <string name="notification_channel_invites_description">群組邀請和歡迎</string>
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新訊息</string>
+    <string name="notification_group_renamed">群組已重新命名</string>
+    <string name="notification_group_renamed_body">%1$s：「%2$s」 → 「%3$s」</string>
     <string name="notification_sent_picture">傳送了一張圖片</string>
     <string name="notification_sent_video">傳送了一段影片</string>
     <string name="notification_sent_voice_message">傳送了一則語音訊息</string>
@@ -595,6 +597,10 @@
     <string name="group_system_admin_removed_passive">%1$s 不再是管理員</string>
     <string name="group_system_renamed">%1$s 將群組名稱改為「%2$s」</string>
     <string name="group_system_renamed_passive">群組名稱已改為「%1$s」</string>
+    <string name="group_system_renamed_diff">%1$s 將群組名稱從「%2$s」改為「%3$s」</string>
+    <string name="group_system_renamed_diff_passive">群組名稱已從「%1$s」改為「%2$s」</string>
+    <string name="group_system_named">%1$s 將群組命名為「%2$s」</string>
+    <string name="group_system_named_passive">群組已命名為「%1$s」</string>
     <string name="group_system_avatar_changed">%1$s 更換了群組頭像</string>
     <string name="group_system_avatar_changed_passive">群組頭像已更換</string>
     <string name="group_system_someone">有人</string>
@@ -613,6 +619,8 @@
     <string name="group_system_admin_removed_you">%1$s 取消了你的管理員身分</string>
     <string name="group_system_admin_removed_you_passive">你不再是管理員</string>
     <string name="group_system_you_renamed">你將群組名稱改為「%1$s」</string>
+    <string name="group_system_you_renamed_diff">你將群組名稱從「%1$s」改為「%2$s」</string>
+    <string name="group_system_you_named">你將群組命名為「%1$s」</string>
     <string name="group_system_you_avatar_changed">你更換了群組頭像</string>
     <string name="media_attachment_add_more">新增更多</string>
     <string name="media_attachment_remove">移除附件</string>

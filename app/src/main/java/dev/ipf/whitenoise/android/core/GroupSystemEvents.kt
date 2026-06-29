@@ -14,10 +14,29 @@ data class GroupSystemEvent(
     val actor: String?,
     val subject: String?,
     val name: String?,
+    // Rename changes (kind:1210 `group_renamed`): the previous group name, when
+    // the payload carries it (`data.old_name`). null = absent, in which case the
+    // row falls back to the new-name-only form rather than faking an "Unknown →"
+    // diff. Peer-supplied, so it is sanitized at render time like `name`.
+    val oldName: String? = null,
+    // True when the previous-name source explicitly says what the old name was,
+    // even if that value was blank (first-ever name set). This distinguishes
+    // "old name unknown" from "known unnamed group" without rendering a fake
+    // diff.
+    val oldNameKnown: Boolean = oldName != null,
     // Disappearing-timer changes (kind:1210 `disappearing_timer_changed`): the
     // previous and new per-group retention in seconds. 0 = off; null = absent.
     val oldRetentionSeconds: ULong? = null,
     val newRetentionSeconds: ULong? = null,
+)
+
+data class GroupRenamePreviousName(
+    val name: String?,
+)
+
+data class GroupRenameDiffNames(
+    val oldName: String,
+    val newName: String,
 )
 
 /**
@@ -38,6 +57,14 @@ data class GroupSystemCopy(
     val adminRemovedPassiveFormat: String,
     val renamedFormat: String,
     val renamedPassiveFormat: String,
+    // Rename diff forms used when the previous name is known. %1$s = actor,
+    // %2$s = old name, %3$s = new name (active); %1$s = old, %2$s = new
+    // (passive). Both names are sanitized and rendered inside explicit visual
+    // delimiters so peer-supplied text can't impersonate the surrounding row.
+    val renamedDiffFormat: String,
+    val renamedDiffPassiveFormat: String,
+    val namedFormat: String,
+    val namedPassiveFormat: String,
     val avatarChangedFormat: String,
     val avatarChangedPassive: String,
     // Dedicated self forms rather than substituting a pronoun into the name
@@ -57,6 +84,9 @@ data class GroupSystemCopy(
     val adminRemovedYouFormat: String,
     val adminRemovedYouPassive: String,
     val youRenamedFormat: String,
+    // Self rename diff: %1$s = old name, %2$s = new name.
+    val youRenamedDiffFormat: String,
+    val youNamedFormat: String,
     val youAvatarChanged: String,
     val disappearingSetFormat: String,
     val disappearingSetYouFormat: String,
@@ -81,6 +111,10 @@ data class GroupSystemCopy(
                 adminRemovedPassiveFormat = "%1\$s is no longer an admin",
                 renamedFormat = "%1\$s renamed the group to “%2\$s”",
                 renamedPassiveFormat = "The group was renamed to “%1\$s”",
+                renamedDiffFormat = "%1\$s renamed the group from “%2\$s” to “%3\$s”",
+                renamedDiffPassiveFormat = "The group was renamed from “%1\$s” to “%2\$s”",
+                namedFormat = "%1\$s named the group “%2\$s”",
+                namedPassiveFormat = "The group was named “%1\$s”",
                 avatarChangedFormat = "%1\$s changed the group avatar",
                 avatarChangedPassive = "The group avatar changed",
                 youMemberAddedFormat = "You added %1\$s",
@@ -97,6 +131,8 @@ data class GroupSystemCopy(
                 adminRemovedYouFormat = "%1\$s removed you as admin",
                 adminRemovedYouPassive = "You are no longer an admin",
                 youRenamedFormat = "You renamed the group to “%1\$s”",
+                youRenamedDiffFormat = "You renamed the group from “%1\$s” to “%2\$s”",
+                youNamedFormat = "You named the group “%1\$s”",
                 youAvatarChanged = "You changed the group avatar",
                 disappearingSetFormat = "%1\$s set messages to disappear after %2\$s",
                 disappearingSetYouFormat = "You set messages to disappear after %1\$s",
@@ -130,12 +166,18 @@ object GroupSystemEvents {
             val json = JSONObject(plaintext)
             val systemType = json.optString("system_type").takeIf { it.isNotBlank() } ?: return null
             val data = json.optJSONObject("data")
+            val hasOldName = data?.has("old_name") == true
             GroupSystemEvent(
                 systemType = systemType,
                 text = json.optString("text"),
                 actor = data?.optString("actor")?.takeIf { it.isNotBlank() },
                 subject = data?.optString("subject")?.takeIf { it.isNotBlank() },
                 name = data?.optString("name")?.takeIf { it.isNotBlank() },
+                // Previous group name for a rename diff, when the peer includes
+                // it. Absent stays null so the row falls back to the new-name
+                // form rather than rendering a fake "Unknown → New" diff.
+                oldName = data?.optString("old_name")?.takeIf { it.isNotBlank() },
+                oldNameKnown = hasOldName,
                 // Only accept a real non-negative number; absent or malformed
                 // (non-numeric) stays null so it falls back rather than rendering
                 // as an authoritative "turned off" (which is only secs == 0).
@@ -151,15 +193,54 @@ object GroupSystemEvents {
             actor = ffi.actorAccountIdHex,
             subject = ffi.subjectAccountIdHex,
             name = ffi.name,
+            // The structured projection does not expose a previous name yet, so
+            // `oldName` stays null here and the rename row falls back to the
+            // new-name-only form. When Marmot adds a field, surface it here.
+            oldName = null,
+            oldNameKnown = false,
             oldRetentionSeconds = ffi.oldRetentionSeconds,
             newRetentionSeconds = ffi.newRetentionSeconds,
         )
 
-    /** Prefer Marmot's structured projection; fall back to parsing kind-1210 JSON. */
+    /**
+     * Prefer Marmot's structured projection; fall back to parsing kind-1210
+     * JSON. The structured projection does not yet carry a previous group name,
+     * so when it is used we still backfill `oldName` from the JSON payload's
+     * `data.old_name` (when present) so the rename row can render the diff
+     * without inventing an Android-owned cache.
+     */
     fun resolve(
         plaintext: String,
         structured: GroupSystemEventFfi? = null,
-    ): GroupSystemEvent? = structured?.let { fromFfi(it) } ?: parse(plaintext)
+        localPreviousName: GroupRenamePreviousName? = null,
+    ): GroupSystemEvent? {
+        val event =
+            structured?.let { ffi ->
+                val structuredEvent = fromFfi(ffi)
+                val parsed = parse(plaintext)
+                if (structuredEvent.oldName == null && parsed?.oldNameKnown == true) {
+                    structuredEvent.copy(oldName = parsed.oldName, oldNameKnown = true)
+                } else {
+                    structuredEvent
+                }
+            } ?: parse(plaintext)
+        return event?.let { resolved ->
+            localPreviousName?.let { withLocalRenamePreviousName(resolved, it) } ?: resolved
+        }
+    }
+
+    fun withLocalRenamePreviousName(
+        event: GroupSystemEvent,
+        previousName: GroupRenamePreviousName,
+    ): GroupSystemEvent =
+        if (event.systemType == TypeGroupRenamed && !event.oldNameKnown) {
+            event.copy(
+                oldName = previousName.name?.takeIf { it.isNotBlank() },
+                oldNameKnown = true,
+            )
+        } else {
+            event
+        }
 
     /**
      * The hex pubkey to attribute the change to: the payload's `actor` when
@@ -172,6 +253,25 @@ object GroupSystemEvents {
         event: GroupSystemEvent,
         senderHex: String,
     ): String? = event.actor ?: senderHex.takeIf { it.isNotBlank() }
+
+    /** Sanitized old/new rename names when a real previous name is known. */
+    fun renameDiffNames(event: GroupSystemEvent): GroupRenameDiffNames? =
+        if (event.systemType == TypeGroupRenamed) {
+            ProfileSanitizer.displayName(event.name)?.let { name -> renameDiffNames(event, name) }
+        } else {
+            null
+        }
+
+    fun renameNewName(event: GroupSystemEvent): String? = if (event.systemType == TypeGroupRenamed) event.name else null
+
+    private fun renameDiffNames(
+        event: GroupSystemEvent,
+        newName: String,
+    ): GroupRenameDiffNames? =
+        ProfileSanitizer
+            .displayName(event.oldName)
+            ?.takeIf { it != newName }
+            ?.let { oldName -> GroupRenameDiffNames(oldName = oldName, newName = newName) }
 
     /**
      * One-line summary rendered from `system_type` + `data` per the spec —
@@ -234,7 +334,24 @@ object GroupSystemEvents {
                 }
             TypeGroupRenamed ->
                 ProfileSanitizer.displayName(event.name)?.let { name ->
+                    // Both names are peer-supplied; sanitize the old name the
+                    // same way (strip bidi/zero-width, NFKC-fold, cap length)
+                    // before comparing or rendering. Only show the "old → new"
+                    // diff when a real previous name survives sanitization AND
+                    // differs from the new one. A known blank previous name is a
+                    // first-ever name set and gets dedicated "named the group"
+                    // copy; an unknown previous name still falls back to the
+                    // new-name-only form, never a fake "Unknown → New".
+                    val diff = renameDiffNames(event, name)
+                    val firstNameSet = event.oldNameKnown && ProfileSanitizer.displayName(event.oldName) == null
                     when {
+                        diff != null && actorIsSelf -> String.format(copy.youRenamedDiffFormat, diff.oldName, diff.newName)
+                        diff != null && actorName != null ->
+                            String.format(copy.renamedDiffFormat, actorName, diff.oldName, diff.newName)
+                        diff != null -> String.format(copy.renamedDiffPassiveFormat, diff.oldName, diff.newName)
+                        firstNameSet && actorIsSelf -> String.format(copy.youNamedFormat, name)
+                        firstNameSet && actorName != null -> String.format(copy.namedFormat, actorName, name)
+                        firstNameSet -> String.format(copy.namedPassiveFormat, name)
                         actorIsSelf -> String.format(copy.youRenamedFormat, name)
                         actorName != null -> String.format(copy.renamedFormat, actorName, name)
                         else -> String.format(copy.renamedPassiveFormat, name)

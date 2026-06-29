@@ -212,6 +212,10 @@
     <string name="group_system_admin_removed_passive">%1$s is no longer an admin</string>
     <string name="group_system_renamed">%1$s renamed the group to “%2$s”</string>
     <string name="group_system_renamed_passive">The group was renamed to “%1$s”</string>
+    <string name="group_system_renamed_diff">%1$s renamed the group from “%2$s” to “%3$s”</string>
+    <string name="group_system_renamed_diff_passive">The group was renamed from “%1$s” to “%2$s”</string>
+    <string name="group_system_named">%1$s named the group “%2$s”</string>
+    <string name="group_system_named_passive">The group was named “%1$s”</string>
     <string name="group_system_avatar_changed">%1$s changed the group avatar</string>
     <string name="group_system_avatar_changed_passive">The group avatar changed</string>
     <string name="group_system_you_member_added">You added %1$s</string>
@@ -228,6 +232,8 @@
     <string name="group_system_admin_removed_you">%1$s removed you as admin</string>
     <string name="group_system_admin_removed_you_passive">You are no longer an admin</string>
     <string name="group_system_you_renamed">You renamed the group to “%1$s”</string>
+    <string name="group_system_you_renamed_diff">You renamed the group from “%1$s” to “%2$s”</string>
+    <string name="group_system_you_named">You named the group “%1$s”</string>
     <string name="group_system_you_avatar_changed">You changed the group avatar</string>
     <string name="group_system_someone">Someone</string>
     <string name="group_system_fallback">Group updated</string>
@@ -495,6 +501,8 @@
     <string name="notification_channel_invites_description">Group invites and welcomes</string>
     <string name="notification_group_invite">Group invite</string>
     <string name="notification_new_message">New message</string>
+    <string name="notification_group_renamed">Group renamed</string>
+    <string name="notification_group_renamed_body">%1$s renamed “%2$s” → “%3$s”</string>
     <string name="notification_sent_picture">sent a picture</string>
     <string name="notification_sent_video">sent a video</string>
     <string name="notification_sent_voice_message">sent a voice message</string>

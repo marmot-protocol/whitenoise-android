@@ -375,6 +375,8 @@
     <string name="notification_channel_invites_description">Inviti ai gruppi e messaggi di benvenuto</string>
     <string name="notification_group_invite">Sei stato invitato a una chat sicura</string>
     <string name="notification_new_message">Nuovo messaggio</string>
+    <string name="notification_group_renamed">Gruppo rinominato</string>
+    <string name="notification_group_renamed_body">%1$s: “%2$s” → “%3$s”</string>
     <string name="notification_sent_picture">ha inviato una foto</string>
     <string name="notification_sent_video">ha inviato un video</string>
     <string name="notification_sent_voice_message">ha inviato un messaggio vocale</string>
@@ -602,6 +604,10 @@
     <string name="group_system_admin_removed_passive">%1$s non è più amministratore</string>
     <string name="group_system_renamed">%1$s ha rinominato il gruppo in “%2$s”</string>
     <string name="group_system_renamed_passive">Il gruppo è stato rinominato in “%1$s”</string>
+    <string name="group_system_renamed_diff">%1$s ha rinominato il gruppo da “%2$s” a “%3$s”</string>
+    <string name="group_system_renamed_diff_passive">Il gruppo è stato rinominato da “%1$s” a “%2$s”</string>
+    <string name="group_system_named">%1$s ha chiamato il gruppo “%2$s”</string>
+    <string name="group_system_named_passive">Il gruppo è stato chiamato “%1$s”</string>
     <string name="group_system_avatar_changed">%1$s ha cambiato l\'immagine del gruppo</string>
     <string name="group_system_avatar_changed_passive">L\'immagine del gruppo è cambiata</string>
     <string name="group_system_someone">Qualcuno</string>
@@ -620,6 +626,8 @@
     <string name="group_system_admin_removed_you">%1$s ti ha rimosso come amministratore</string>
     <string name="group_system_admin_removed_you_passive">Non sei più amministratore</string>
     <string name="group_system_you_renamed">Hai rinominato il gruppo in “%1$s”</string>
+    <string name="group_system_you_renamed_diff">Hai rinominato il gruppo da “%1$s” a “%2$s”</string>
+    <string name="group_system_you_named">Hai chiamato il gruppo “%1$s”</string>
     <string name="group_system_you_avatar_changed">Hai cambiato l\'immagine del gruppo</string>
     <string name="media_attachment_add_more">Aggiungi altro</string>
     <string name="media_attachment_remove">Rimuovi allegato</string>
