@@ -1895,7 +1895,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_retry_hydrate_quarantined_group() != 51443.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_reveal_nsec() != 4639.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_reveal_nsec() != 63603.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_secure_delete_expired() != 16091.toShort()) {
@@ -4215,9 +4215,12 @@ public interface MarmotInterface {
      * SENSITIVE: revealing the raw key is logged to the per-account audit log
      * and permanently marks the account's NIP-49 KEY_SECURITY_BYTE as 0x00
      * ("handled insecurely"). The returned string is computed on demand and is
-     * never cached by the engine; the caller should display it transiently and
-     * drop it. Refuses unknown / public-only / cross-account refs via the
-     * existing keystore validation.
+     * never cached by the engine. The Rust runtime keeps the nsec in
+     * `Zeroizing<String>` until this UniFFI return boundary. UniFFI can lower
+     * only a plain `String`, so the final clone here is the intentional point
+     * where Rust's zeroizing guarantee stops; the caller should display the
+     * host-owned string transiently and drop it. Refuses unknown / public-only
+     * / cross-account refs via the existing keystore validation.
      */
     fun `revealNsec`(`accountRef`: kotlin.String): kotlin.String
     
@@ -6052,9 +6055,12 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * SENSITIVE: revealing the raw key is logged to the per-account audit log
      * and permanently marks the account's NIP-49 KEY_SECURITY_BYTE as 0x00
      * ("handled insecurely"). The returned string is computed on demand and is
-     * never cached by the engine; the caller should display it transiently and
-     * drop it. Refuses unknown / public-only / cross-account refs via the
-     * existing keystore validation.
+     * never cached by the engine. The Rust runtime keeps the nsec in
+     * `Zeroizing<String>` until this UniFFI return boundary. UniFFI can lower
+     * only a plain `String`, so the final clone here is the intentional point
+     * where Rust's zeroizing guarantee stops; the caller should display the
+     * host-owned string transiently and drop it. Refuses unknown / public-only
+     * / cross-account refs via the existing keystore validation.
      */
     @Throws(MarmotKitException::class)override fun `revealNsec`(`accountRef`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
@@ -9434,6 +9440,7 @@ data class GroupSystemEventFfi (
     var `actorAccountIdHex`: kotlin.String?, 
     var `subjectAccountIdHex`: kotlin.String?, 
     var `name`: kotlin.String?, 
+    var `oldName`: kotlin.String?, 
     /**
      * Previous disappearing-message retention in seconds; `0` means off.
      */
@@ -9458,6 +9465,7 @@ public object FfiConverterTypeGroupSystemEventFfi: FfiConverterRustBuffer<GroupS
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterOptionalULong.read(buf),
             FfiConverterOptionalULong.read(buf),
         )
@@ -9469,6 +9477,7 @@ public object FfiConverterTypeGroupSystemEventFfi: FfiConverterRustBuffer<GroupS
             FfiConverterOptionalString.allocationSize(value.`actorAccountIdHex`) +
             FfiConverterOptionalString.allocationSize(value.`subjectAccountIdHex`) +
             FfiConverterOptionalString.allocationSize(value.`name`) +
+            FfiConverterOptionalString.allocationSize(value.`oldName`) +
             FfiConverterOptionalULong.allocationSize(value.`oldRetentionSeconds`) +
             FfiConverterOptionalULong.allocationSize(value.`newRetentionSeconds`)
     )
@@ -9479,6 +9488,7 @@ public object FfiConverterTypeGroupSystemEventFfi: FfiConverterRustBuffer<GroupS
             FfiConverterOptionalString.write(value.`actorAccountIdHex`, buf)
             FfiConverterOptionalString.write(value.`subjectAccountIdHex`, buf)
             FfiConverterOptionalString.write(value.`name`, buf)
+            FfiConverterOptionalString.write(value.`oldName`, buf)
             FfiConverterOptionalULong.write(value.`oldRetentionSeconds`, buf)
             FfiConverterOptionalULong.write(value.`newRetentionSeconds`, buf)
     }
