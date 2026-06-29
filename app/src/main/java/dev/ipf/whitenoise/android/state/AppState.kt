@@ -173,6 +173,16 @@ internal fun conversationOpenDismissalTarget(
     return ConversationNotificationTarget(account, group)
 }
 
+internal fun dismissConversationNotificationsOnOpen(
+    activeAccountRef: String?,
+    groupIdHex: String?,
+    dismissConversationNotifications: (String, String) -> Unit,
+) {
+    conversationOpenDismissalTarget(activeAccountRef, groupIdHex)?.let { target ->
+        dismissConversationNotifications(target.accountRef, target.groupIdHex)
+    }
+}
+
 internal class InFlightMediaUploads {
     private val lock = Any()
     private val jobs = mutableMapOf<String, Job>()
@@ -2184,9 +2194,7 @@ class WhiteNoiseAppState(
             // the read anchor isn't ready yet or the mark-read is deduped, so a
             // reaction/message notification could otherwise survive until the
             // second open (issue #803).
-            conversationOpenDismissalTarget(activeConversationAccountRef, groupIdHex)?.let { target ->
-                dismissConversationNotifications(target.accountRef, target.groupIdHex)
-            }
+            dismissConversationNotificationsOnOpen(activeConversationAccountRef, groupIdHex, ::dismissConversationNotifications)
         }
         appStateDebug {
             "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
