@@ -113,6 +113,29 @@ class MediaInventoryTest {
         assertEquals(listOf("https://example.com/two"), second.urls.map { it.url })
     }
 
+    @Test
+    fun deeplyNestedBlockQuotesDoNotOverflowTheStack() {
+        var block: MarkdownBlockFfi = MarkdownBlockFfi.Paragraph(inlines = emptyList())
+        repeat(10_000) { block = MarkdownBlockFfi.BlockQuote(listOf(block)) }
+        val body = MarkdownDocumentFfi(truncated = false, blocks = listOf(block))
+
+        val inventory = MediaInventory.build(listOf(record(id = "deep-quotes", body = body)))
+
+        assertTrue(inventory.urls.isEmpty())
+    }
+
+    @Test
+    fun deeplyNestedInlineEmphasisDoesNotOverflowTheStack() {
+        var inline: MarkdownInlineFfi = MarkdownInlineFfi.Text("x")
+        repeat(10_000) { inline = MarkdownInlineFfi.Emph(listOf(inline)) }
+        val body =
+            MarkdownDocumentFfi(truncated = false, blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(inline))))
+
+        val inventory = MediaInventory.build(listOf(record(id = "deep-emph", body = body)))
+
+        assertTrue(inventory.urls.isEmpty())
+    }
+
     // --- builders ---
 
     private fun attachment(

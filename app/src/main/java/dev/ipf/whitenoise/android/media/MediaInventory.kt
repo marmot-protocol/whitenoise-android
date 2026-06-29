@@ -5,6 +5,8 @@ import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.ui.markdownDepthExceeded
+import dev.ipf.whitenoise.android.ui.markdownInlineDepthExceeded
 
 /**
  * Pure, framework-free helper that classifies a conversation's local timeline
@@ -178,22 +180,30 @@ object MediaInventory {
     // at metadata-fetch time, not here — listing a URL is harmless.
     private fun collectHttpUrls(document: MarkdownDocumentFfi): List<String> {
         val out = ArrayList<String>()
-        document.blocks.forEach { collectFromBlock(it, out) }
+        // Backstop below the depth caps: untrusted nesting must never crash the
+        // process, even if a walker arm is later missed.
+        try {
+            document.blocks.forEach { collectFromBlock(it, out, depth = 0) }
+        } catch (_: StackOverflowError) {
+            // Keep whatever resolved before the overflow.
+        }
         return out
     }
 
     private fun collectFromBlock(
         block: MarkdownBlockFfi,
         out: MutableList<String>,
+        depth: Int,
     ) {
+        if (markdownDepthExceeded(depth)) return
         when (block) {
-            is MarkdownBlockFfi.Paragraph -> block.inlines.forEach { collectFromInline(it, out) }
-            is MarkdownBlockFfi.Heading -> block.inlines.forEach { collectFromInline(it, out) }
-            is MarkdownBlockFfi.BlockQuote -> block.blocks.forEach { collectFromBlock(it, out) }
-            is MarkdownBlockFfi.ListBlock -> block.items.forEach { item -> item.blocks.forEach { collectFromBlock(it, out) } }
+            is MarkdownBlockFfi.Paragraph -> block.inlines.forEach { collectFromInline(it, out, depth = 0) }
+            is MarkdownBlockFfi.Heading -> block.inlines.forEach { collectFromInline(it, out, depth = 0) }
+            is MarkdownBlockFfi.BlockQuote -> block.blocks.forEach { collectFromBlock(it, out, depth + 1) }
+            is MarkdownBlockFfi.ListBlock -> block.items.forEach { item -> item.blocks.forEach { collectFromBlock(it, out, depth + 1) } }
             is MarkdownBlockFfi.Table -> {
-                block.header.forEach { cell -> cell.inlines.forEach { collectFromInline(it, out) } }
-                block.rows.forEach { row -> row.forEach { cell -> cell.inlines.forEach { collectFromInline(it, out) } } }
+                block.header.forEach { cell -> cell.inlines.forEach { collectFromInline(it, out, depth = 0) } }
+                block.rows.forEach { row -> row.forEach { cell -> cell.inlines.forEach { collectFromInline(it, out, depth = 0) } } }
             }
             else -> Unit
         }
@@ -202,16 +212,18 @@ object MediaInventory {
     private fun collectFromInline(
         inline: MarkdownInlineFfi,
         out: MutableList<String>,
+        depth: Int,
     ) {
+        if (markdownInlineDepthExceeded(depth)) return
         when (inline) {
             is MarkdownInlineFfi.Link -> {
                 addIfHttp(inline.dest, out)
-                inline.children.forEach { collectFromInline(it, out) }
+                inline.children.forEach { collectFromInline(it, out, depth + 1) }
             }
             is MarkdownInlineFfi.Autolink -> addIfHttp(inline.url, out)
-            is MarkdownInlineFfi.Emph -> inline.children.forEach { collectFromInline(it, out) }
-            is MarkdownInlineFfi.Strong -> inline.children.forEach { collectFromInline(it, out) }
-            is MarkdownInlineFfi.Strikethrough -> inline.children.forEach { collectFromInline(it, out) }
+            is MarkdownInlineFfi.Emph -> inline.children.forEach { collectFromInline(it, out, depth + 1) }
+            is MarkdownInlineFfi.Strong -> inline.children.forEach { collectFromInline(it, out, depth + 1) }
+            is MarkdownInlineFfi.Strikethrough -> inline.children.forEach { collectFromInline(it, out, depth + 1) }
             else -> Unit
         }
     }
