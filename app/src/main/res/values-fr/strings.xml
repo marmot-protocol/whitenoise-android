@@ -586,6 +586,12 @@
         <item quantity="many">%1$d min</item>
         <item quantity="other">%1$d min</item>
     </plurals>
+    <plurals name="relative_time_hours">
+        <item quantity="one">%1$d h</item>
+        <item quantity="many">%1$d h</item>
+        <item quantity="other">%1$d h</item>
+    </plurals>
+    <string name="relative_time_yesterday">Hier</string>
     <string name="group_system_member_added">%1$s a ajouté %2$s</string>
     <string name="group_system_member_added_passive">%1$s a été ajouté</string>
     <string name="group_system_member_removed">%1$s a retiré %2$s</string>

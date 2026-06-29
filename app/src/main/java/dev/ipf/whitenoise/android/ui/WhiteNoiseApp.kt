@@ -578,16 +578,21 @@ private fun rememberConversationControllerCopy(): ConversationControllerCopy =
 private fun rememberRelativeTimeCopy(): dev.ipf.whitenoise.android.core.RelativeTimeCopy {
     val future = stringResource(R.string.relative_time_future)
     val now = stringResource(R.string.relative_time_now)
-    // Resolve the sub-hour unit string through getQuantityString so inflected
-    // locales render the correct grammatical form for the count. Past an hour,
-    // IdentityFormatter intentionally switches to exact clock/date labels.
+    val yesterday = stringResource(R.string.relative_time_yesterday)
+    // Resolve the sub-day unit strings through getQuantityString so inflected
+    // locales render the correct grammatical form for the count. Past 24h,
+    // IdentityFormatter switches to localized day/date labels with no time.
     val resources = LocalContext.current.resources
-    return remember(future, now, resources) {
+    return remember(future, now, yesterday, resources) {
         dev.ipf.whitenoise.android.core.RelativeTimeCopy(
             future = future,
             now = now,
+            yesterday = yesterday,
             minutes = { count ->
                 resources.getQuantityString(R.plurals.relative_time_minutes, count, count)
+            },
+            hours = { count ->
+                resources.getQuantityString(R.plurals.relative_time_hours, count, count)
             },
         )
     }

@@ -4,7 +4,8 @@ import java.text.BreakIterator
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
+import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 object IdentityFormatter {
@@ -103,29 +104,25 @@ object IdentityFormatter {
             // grammatical form (e.g. Russian one/few/many) for the count, clamped
             // to a non-negative Int (the sub-hour delta makes the conversion safe).
             delta < 3_600 -> copy.minutes((delta / 60).toInt())
-            // Past an hour the clock is more informative than "N hours ago": show
-            // the localized time, prefixed with the localized date once the
-            // instant falls on an earlier day.
+            // Within the first day the elapsed hour count is the useful signal.
+            delta < 86_400 -> copy.hours((delta / 3_600).toInt())
+            // Past 24h the clock time is noise on a chat-list row (#848): the day
+            // name (within the past week) or a date carries "when did this thread
+            // last move" without the minute. No time component at any rung here.
             else -> {
                 val zone = ZoneId.systemDefault()
                 runCatching {
-                    val time =
-                        DateTimeFormatter
-                            .ofLocalizedTime(FormatStyle.SHORT)
-                            .withLocale(locale)
-                            .withZone(zone)
-                            .format(instant)
-                    if (instant.atZone(zone).toLocalDate() == now.atZone(zone).toLocalDate()) {
-                        time
-                    } else {
-                        // Day + month, no year — the year is noise on a chat-list
-                        // row (e.g. "14 Jun 08:14").
-                        val date =
-                            DateTimeFormatter
-                                .ofPattern("d MMM", locale)
-                                .withZone(zone)
-                                .format(instant)
-                        "$date $time"
+                    val messageDate = instant.atZone(zone).toLocalDate()
+                    val days = ChronoUnit.DAYS.between(messageDate, now.atZone(zone).toLocalDate())
+                    when {
+                        // >=24h elapsed always crosses a midnight, so the message is
+                        // at least the previous calendar day.
+                        days <= 1L -> copy.yesterday
+                        days < 7L -> messageDate.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
+                        // Day + month, no year (e.g. "14 Jun").
+                        days < 365L -> DateTimeFormatter.ofPattern("d MMM", locale).format(messageDate)
+                        // Two-digit year past a year old (e.g. "14 May '25").
+                        else -> DateTimeFormatter.ofPattern("d MMM ''yy", locale).format(messageDate)
                     }
                 }.getOrDefault(copy.now)
             }
@@ -136,27 +133,33 @@ object IdentityFormatter {
 /**
  * Copy used by [IdentityFormatter.relativeTime].
  *
- * The sub-hour unit branch is resolved through a plural-aware callback rather
- * than `String.format` against a flat `<string>`. This lets the Compose layer
- * back the callback with `Resources.getQuantityString(...)` so inflected locales
- * render the grammatically correct form while keeping [IdentityFormatter] pure.
+ * The sub-day unit branches ([minutes], [hours]) are resolved through
+ * plural-aware callbacks rather than `String.format` against a flat `<string>`.
+ * This lets the Compose layer back them with `Resources.getQuantityString(...)`
+ * so inflected locales render the grammatically correct form while keeping
+ * [IdentityFormatter] pure. [yesterday] is a flat localized string; the weekday
+ * and date rungs are produced from the locale directly and need no copy.
  */
 data class RelativeTimeCopy(
     val future: String,
     val now: String,
+    val yesterday: String,
     val minutes: (count: Int) -> String,
+    val hours: (count: Int) -> String,
 ) {
     companion object {
         /**
          * Locale-agnostic fallback used as the default argument and in pure unit
-         * tests. Renders compact non-pluralized forms (e.g. "2m", "3h", "5d").
-         * Real UI supplies plural-aware callbacks via the Compose layer.
+         * tests. Renders compact non-pluralized forms (e.g. "2m", "3h"). Real UI
+         * supplies plural-aware callbacks and a localized "yesterday" via Compose.
          */
         val Default =
             RelativeTimeCopy(
                 future = "future",
                 now = "now",
+                yesterday = "yesterday",
                 minutes = { count -> "${count}m" },
+                hours = { count -> "${count}h" },
             )
     }
 }
