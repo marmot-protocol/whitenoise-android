@@ -2316,10 +2316,11 @@ class ConversationController(
     private val liveSubscriptionLock = Any()
     private var groupStateSubscription: GroupStateSubscription? = null
     private var startJob: Job? = null
-    private var disappearingSweepJob: Job? = null
     private var conversationScope: CoroutineScope? = null
     private var accountTeardownRequested = false
     private val activeStreamIds = mutableSetOf<String>()
+    private val foregroundSweepScheduleSignals = Channel<Unit>(Channel.CONFLATED)
+    private var lastForegroundSecureDeleteAtMillis = 0L
 
     // Transient streaming-debug rows keyed by their synthetic timeline id.
     // Lifecycle-scoped UI state for the live agent-stream watch — NOT a
@@ -2464,11 +2465,16 @@ class ConversationController(
                     // group-state + timeline subscriptions below still fold in
                     // peer commits as they arrive.
                     launch { appState.catchUpAccounts() }
-                    startDisappearingMessageSweepIfNeeded(account)
+                    // Local NIP-40 enforcement (#333) + secure delete (#334): on open
+                    // and then at the next loaded row's expiry boundary, securely wipe
+                    // plaintext past the retention window via the engine and re-publish
+                    // so rows leave the open timeline while the user is still watching.
+                    // The timer is lifecycle-bound to this conversation and is
+                    // rescheduled by timeline/group-state publishes; when there is no
+                    // loaded row near expiry it falls back to the old slow cadence.
+                    launch { runForegroundDisappearingMessageSweep(account) }
                     runConversationSubscriptionLoop(account)
                 } finally {
-                    disappearingSweepJob?.cancel()
-                    disappearingSweepJob = null
                     conversationScope = null
                 }
             }
@@ -2487,8 +2493,6 @@ class ConversationController(
             isLoading = false
             error = throwable.message ?: throwable.javaClass.simpleName
         } finally {
-            disappearingSweepJob?.cancel()
-            disappearingSweepJob = null
             conversationScope = null
             cleanupConversationSubscriptions()
             synchronized(liveSubscriptionLock) {
@@ -2497,6 +2501,76 @@ class ConversationController(
                 }
             }
         }
+    }
+
+    private suspend fun runForegroundDisappearingMessageSweep(account: String) {
+        while (coroutineContext.isActive) {
+            if (group.disappearingMessageSecs > 0uL) {
+                lastForegroundSecureDeleteAtMillis = System.currentTimeMillis()
+                runCatching {
+                    appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) }
+                }.onSuccess { result ->
+                    // When the engine actually pruned rows, clear the
+                    // conversation's accumulating tray card so it can't keep
+                    // pointing at a now-vanished message. #333.
+                    if (result.prunedMessages > 0uL) {
+                        appState.dismissConversationNotifications(account, group.groupIdHex)
+                    }
+                    evictExpiredMediaCaches(account, result.mediaCiphertextSha256.toSet())
+                }.onFailure { it.rethrowIfCancellation() }
+                publishTimelineFromIndexes()
+            }
+            awaitForegroundDisappearingSweepSchedule()
+        }
+    }
+
+    private suspend fun awaitForegroundDisappearingSweepSchedule() {
+        while (coroutineContext.isActive) {
+            while (foregroundSweepScheduleSignals.tryReceive().isSuccess) {
+                // Drop stale self-signals before sleeping; the next timeout is
+                // based on the timeline/group state that is current right now.
+            }
+            val wasRescheduled =
+                withTimeoutOrNull(foregroundDisappearingSweepDelayMillis()) {
+                    foregroundSweepScheduleSignals.receive()
+                    true
+                }
+            if (wasRescheduled != true) return
+            if (shouldSweepAfterForegroundReschedule()) return
+        }
+    }
+
+    private fun foregroundDisappearingSweepDelayMillis(): Long =
+        DisappearingMessageSweep.nextForegroundSweepDelayMillis(
+            nowMillis = System.currentTimeMillis(),
+            disappearingMessageSecs = group.disappearingMessageSecs,
+            timelineAtSeconds = foregroundSweepTimelineAtSeconds(),
+        )
+
+    private fun foregroundSweepTimelineAtSeconds(): List<ULong> =
+        buildList {
+            optimisticMessages.values.forEach { add(it.record.recordedAt) }
+            timelineItemsById.values.forEach { add(it.record.recordedAt) }
+        }
+
+    private fun shouldSweepAfterForegroundReschedule(): Boolean {
+        val window = group.disappearingMessageSecs
+        if (window == 0uL) return false
+        val nowMillis = System.currentTimeMillis()
+        val recentlySwept =
+            nowMillis - lastForegroundSecureDeleteAtMillis < DisappearingMessageSweep.FOREGROUND_EXPIRED_RETRY_DELAY_MS
+        if (recentlySwept) return false
+        return foregroundSweepTimelineAtSeconds().any {
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = nowMillis,
+                disappearingMessageSecs = window,
+                timelineAtSeconds = it,
+            )
+        }
+    }
+
+    private fun signalForegroundSweepScheduleChanged() {
+        foregroundSweepScheduleSignals.trySend(Unit)
     }
 
     suspend fun closeLiveSubscriptionsForAccountTeardown(accountRef: String) {
@@ -2654,48 +2728,7 @@ class ConversationController(
         group = update
         if (previousRetention != update.disappearingMessageSecs) {
             publishTimelineFromIndexes()
-            handleRetentionTransition(previousRetention, update.disappearingMessageSecs)
         }
-    }
-
-    private fun handleRetentionTransition(
-        previousRetention: ULong,
-        currentRetention: ULong,
-    ) {
-        val account = conversationAccountRef ?: return
-        when {
-            previousRetention == 0uL && currentRetention > 0uL -> startDisappearingMessageSweepIfNeeded(account)
-            previousRetention > 0uL && currentRetention == 0uL -> {
-                disappearingSweepJob?.cancel()
-                disappearingSweepJob = null
-            }
-        }
-    }
-
-    // Local NIP-40 enforcement (#333) + secure delete (#334): when retention is
-    // enabled, wipe plaintext past the retention window on open and then on a
-    // slow cadence. The job is deliberately absent while retention is off (#844).
-    private fun startDisappearingMessageSweepIfNeeded(account: String) {
-        if (group.disappearingMessageSecs == 0uL) return
-        if (disappearingSweepJob?.isActive == true) return
-        val scope = conversationScope ?: return
-        disappearingSweepJob =
-            scope.launch {
-                while (isActive) {
-                    runCatching { appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) } }
-                        .onSuccess { result ->
-                            // When the engine actually pruned rows, clear the
-                            // conversation's accumulating tray card so it can't
-                            // keep pointing at a now-vanished message. #333.
-                            if (result.prunedMessages > 0uL) {
-                                appState.dismissConversationNotifications(account, group.groupIdHex)
-                            }
-                            evictExpiredMediaCaches(account, result.mediaCiphertextSha256.toSet())
-                        }.onFailure { it.rethrowIfCancellation() }
-                    publishTimelineFromIndexes()
-                    delay(60_000L)
-                }
-            }
     }
 
     private suspend fun runGroupStateSubscriptionLoop(groupStream: GroupStateSubscription) {
@@ -4395,7 +4428,6 @@ class ConversationController(
                 appState.marmotIo { updateMessageRetention(account, group.groupIdHex, disappearingMessageSecs) }
                 val previousRetention = group.disappearingMessageSecs
                 group = group.copy(disappearingMessageSecs = disappearingMessageSecs)
-                handleRetentionTransition(previousRetention, disappearingMessageSecs)
                 // The engine prunes plaintext older than the new window during the
                 // call above. Reload the open timeline so the admin who just set
                 // the timer sees the pruned state immediately, instead of only
@@ -5177,8 +5209,14 @@ class ConversationController(
             if (window == 0uL) {
                 optimisticMessages.values + projected
             } else {
-                val nowSecs = (System.currentTimeMillis() / 1000L).toULong()
-                (optimisticMessages.values + projected).filter { it.record.recordedAt + window > nowSecs }
+                val nowMillis = System.currentTimeMillis()
+                (optimisticMessages.values + projected).filter {
+                    !DisappearingMessageSweep.isLocallyExpired(
+                        nowMillis = nowMillis,
+                        disappearingMessageSecs = window,
+                        timelineAtSeconds = it.record.recordedAt,
+                    )
+                }
             }
         val aggregated = aggregateEdits(live.map { it.record })
         // Drop any optimistic edit the real kind-1009 has now caught up to:
@@ -5195,6 +5233,7 @@ class ConversationController(
                 .distinctBy { it.id }
                 .sortedWith(::compareTimelineMessages)
         editsByTarget = applyOptimisticEdits(aggregated)
+        signalForegroundSweepScheduleChanged()
     }
 
     /**
@@ -5499,7 +5538,6 @@ class ConversationController(
         group = applied.group
         if (previousRetention != group.disappearingMessageSecs) {
             publishTimelineFromIndexes()
-            handleRetentionTransition(previousRetention, group.disappearingMessageSecs)
         }
         // Once a self-leave has been recorded locally, refuse to re-add self
         // from a details round-trip that still predates the engine eviction —

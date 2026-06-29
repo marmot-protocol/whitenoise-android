@@ -29,7 +29,17 @@ object DisappearingMessageSweep {
     /** Page size for the bounded local timeline scan that gates the raw engine prune. */
     val TIMELINE_SCAN_PAGE_LIMIT: UInt = 200u
 
+    /**
+     * Slow-path cap for the in-conversation sweep when no loaded row is about
+     * to expire.
+     */
+    const val FOREGROUND_SWEEP_MAX_DELAY_MS: Long = 60_000L
+
+    /** Retry cadence for rows already hidden locally but not yet engine-pruned. */
+    const val FOREGROUND_EXPIRED_RETRY_DELAY_MS: Long = 1_000L
+
     private const val MILLIS_PER_SECOND = 1_000L
+    private val maxSecondsAsMillis = (Long.MAX_VALUE / MILLIS_PER_SECOND).toULong()
 
     /**
      * Whether a group with the given retention should be swept. `0` means the
@@ -38,6 +48,22 @@ object DisappearingMessageSweep {
      * `group.disappearingMessageSecs > 0uL`.
      */
     fun shouldSweepGroup(disappearingMessageSecs: ULong): Boolean = disappearingMessageSecs > 0uL
+
+    /**
+     * Mirrors the foreground timeline filter: a loaded row is hidden once its
+     * local expiry second is less than or equal to the current wall-clock second.
+     */
+    fun isLocallyExpired(
+        nowMillis: Long,
+        disappearingMessageSecs: ULong,
+        timelineAtSeconds: ULong,
+    ): Boolean {
+        if (!shouldSweepGroup(disappearingMessageSecs)) return false
+        val expirySeconds = timelineAtSeconds.saturatingPlus(disappearingMessageSecs)
+        if (expirySeconds > maxSecondsAsMillis) return false
+        val nowSeconds = (nowMillis.coerceAtLeast(0L) / MILLIS_PER_SECOND).toULong()
+        return expirySeconds <= nowSeconds
+    }
 
     /**
      * The device-clock instant the sweep should treat as "now" when reasoning
@@ -87,6 +113,40 @@ object DisappearingMessageSweep {
             timelineAtSeconds >= skewCutoffSeconds &&
             timelineAtSeconds < rawCutoffSeconds
 
+    /**
+     * Delay until the next foreground conversation sweep should run. Unlike the
+     * coarse background pass, an open chat must re-publish at the first loaded
+     * row's local expiry boundary so the bubble disappears while the user is
+     * watching. Rows that are already past that boundary get a short retry delay:
+     * the local filter has hidden them, but the engine's strict cutoff may need
+     * the next wall-clock second before `secureDeleteExpired` physically prunes
+     * and reports their media tags.
+     */
+    fun nextForegroundSweepDelayMillis(
+        nowMillis: Long,
+        disappearingMessageSecs: ULong,
+        timelineAtSeconds: Iterable<ULong>,
+    ): Long {
+        if (!shouldSweepGroup(disappearingMessageSecs)) return FOREGROUND_SWEEP_MAX_DELAY_MS
+        val safeNowMillis = nowMillis.coerceAtLeast(0L)
+        var bestDelay = FOREGROUND_SWEEP_MAX_DELAY_MS
+        for (timelineAt in timelineAtSeconds) {
+            val expirySeconds = timelineAt.saturatingPlus(disappearingMessageSecs)
+            if (expirySeconds > maxSecondsAsMillis) continue
+            val expiryMillis = expirySeconds.toLong() * MILLIS_PER_SECOND
+            val delay = expiryMillis - safeNowMillis
+            val candidate =
+                when {
+                    delay > 0L -> delay.coerceAtMost(FOREGROUND_SWEEP_MAX_DELAY_MS)
+                    safeNowMillis - expiryMillis < FOREGROUND_EXPIRED_RETRY_DELAY_MS ->
+                        FOREGROUND_EXPIRED_RETRY_DELAY_MS
+                    else -> FOREGROUND_SWEEP_MAX_DELAY_MS
+                }
+            if (candidate < bestDelay) bestDelay = candidate
+        }
+        return bestDelay
+    }
+
     private fun expiryCutoffSeconds(
         nowMillis: Long,
         disappearingMessageSecs: ULong,
@@ -100,4 +160,6 @@ object DisappearingMessageSweep {
     }
 
     private fun ULong.saturatingMinus(value: ULong): ULong = if (this > value) this - value else 0uL
+
+    private fun ULong.saturatingPlus(value: ULong): ULong = if (ULong.MAX_VALUE - this < value) ULong.MAX_VALUE else this + value
 }
