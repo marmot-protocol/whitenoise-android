@@ -156,6 +156,42 @@ class IdentityFormatterTest {
     }
 
     @Test
+    fun relativeTimeShowsCompactHoursForSameDateAcrossDstFallBack() {
+        val zone = ZoneId.of("America/New_York")
+        val now = Instant.parse("2025-11-03T04:30:00Z") // 2025-11-02 23:30:00-05:00
+        val message = now.minusSeconds(86_400L) // 2025-11-02 00:30:00-04:00
+
+        assertEquals(
+            "24h",
+            IdentityFormatter.relativeTime(
+                message.epochSecond.toULong(),
+                RelativeTimeCopy.Default,
+                Locale.US,
+                now = now,
+                zone = zone,
+            ),
+        )
+    }
+
+    @Test
+    fun relativeTimeShowsYesterdayForPreviousDateAcrossDstFallBack() {
+        val zone = ZoneId.of("America/New_York")
+        val now = Instant.parse("2025-11-03T04:30:00Z") // 2025-11-02 23:30:00-05:00
+        val message = Instant.parse("2025-11-02T03:30:00Z") // 2025-11-01 23:30:00-04:00
+
+        assertEquals(
+            "yesterday",
+            IdentityFormatter.relativeTime(
+                message.epochSecond.toULong(),
+                RelativeTimeCopy.Default,
+                Locale.US,
+                now = now,
+                zone = zone,
+            ),
+        )
+    }
+
+    @Test
     fun relativeTimePassesCountToPluralCallback() {
         // The unit callbacks must receive the integer count so a real
         // getQuantityString-backed callback can pick the correct plural form.
@@ -210,7 +246,7 @@ class IdentityFormatterTest {
         val messageDate = instant.atZone(zone).toLocalDate()
         val days = ChronoUnit.DAYS.between(messageDate, now.atZone(zone).toLocalDate())
         val expected =
-            if (days <= 1L) {
+            if (days == 1L) {
                 "yesterday"
             } else {
                 messageDate.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.US)
