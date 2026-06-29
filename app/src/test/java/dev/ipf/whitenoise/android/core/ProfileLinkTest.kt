@@ -28,6 +28,27 @@ class ProfileLinkTest {
     }
 
     @Test
+    fun generatedLinkAlwaysRoundTripsThroughParse() {
+        // The generator emits from BuildConfig.WHITENOISE_DEEP_LINK_SCHEME while
+        // parse() recognizes the PROFILE_SCHEMES set. #847: the set now always
+        // includes the BuildConfig scheme, so a self-generated link can never
+        // fail to be recognized even if a future flavor adds a new scheme.
+        val generated = ProfileLink(sampleNpub).uri
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse(generated))
+    }
+
+    @Test
+    fun parsesOpaqueSchemeSpecificPartLinks() {
+        // Opaque form `scheme:profile/npub…` (no `//`): host/path are null, npub
+        // lives in schemeSpecificPart. Externally-authored, but should resolve (#847).
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise:profile/$sampleNpub"))
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise:$sampleNpub"))
+        // Opaque payload that isn't an npub still rejects.
+        assertNull(ProfileLink.parse("whitenoise:profile/not-a-profile"))
+        assertNull(ProfileLink.parse("whitenoise:profile/"))
+    }
+
+    @Test
     fun rejectsNonProfilePayloads() {
         assertNull(ProfileLink.parse("https://example.com/$sampleNpub"))
         assertNull(ProfileLink.parse("whitenoise://profile/not-a-profile"))

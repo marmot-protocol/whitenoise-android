@@ -18568,7 +18568,10 @@ private fun ProfileEditScreen(
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp))
                         }
-                        Text(stringResource(R.string.publish_to_relays))
+                        // Profile edit's primary action is conceptually "save" to the
+                        // user; the relay-publish mechanics are an implementation detail
+                        // that only the failure surface needs to name (#834).
+                        Text(stringResource(R.string.save))
                     }
                 }
             }
