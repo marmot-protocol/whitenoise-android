@@ -3309,6 +3309,7 @@ class WhiteNoiseAppState(
         GroupTitleCopy(
             inviteFromFormat = appContext.getString(R.string.group_title_invite_from),
             groupOfPeopleFormat = appContext.getString(R.string.group_title_people_count),
+            unknownTitle = appContext.getString(R.string.unknown),
         )
 
     private suspend fun postNotificationUpdate(

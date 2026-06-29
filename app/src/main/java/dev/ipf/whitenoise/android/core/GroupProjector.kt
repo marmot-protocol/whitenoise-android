@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 data class GroupTitleCopy(
     val inviteFromFormat: String,
     val groupOfPeopleFormat: String,
+    val unknownTitle: String,
 ) {
     fun inviteFrom(name: String): String = String.format(inviteFromFormat, name)
 
@@ -16,6 +17,7 @@ data class GroupTitleCopy(
             GroupTitleCopy(
                 inviteFromFormat = "Invite from %1\$s",
                 groupOfPeopleFormat = "Group of %1\$d people",
+                unknownTitle = "Unknown",
             )
     }
 }
@@ -43,7 +45,8 @@ object GroupProjector {
      * [AppGroupRecordFfi] (e.g. the notification pipeline, which only has the
      * group id + members) resolve exactly the same title the chat list shows:
      * the group name when set, an invite line when pending, "Group of N people"
-     * for larger unnamed groups, the other member for a pair, else a short id.
+     * for larger unnamed groups, the other member for a pair, else an Unknown
+     * fallback — never the group id hex, which is opaque to users.
      */
     fun displayTitle(
         name: String,
@@ -63,7 +66,9 @@ object GroupProjector {
         if (memberCount == 2) {
             otherMemberAccount?.takeIf { it.isNotBlank() }?.let { return memberTitle(it) }
         }
-        return IdentityFormatter.short(groupIdHex)
+        // An unresolved roster (e.g. a DM whose peer snapshot is still empty)
+        // must not leak the opaque group id hex as a title.
+        return copy.unknownTitle
     }
 
     fun inviteAccount(

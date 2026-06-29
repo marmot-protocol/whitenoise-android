@@ -32,6 +32,7 @@ class ChatListTitleTest {
         GroupTitleCopy(
             inviteFromFormat = "Invite from %1\$s",
             groupOfPeopleFormat = "Group of %1\$d people",
+            unknownTitle = "Unknown",
         )
 
     @Test
@@ -142,6 +143,62 @@ class ChatListTitleTest {
                 copy = copy,
             )
         assertEquals("Alice", title)
+    }
+
+    @Test
+    fun bothMembersLocallySignedInStillResolvesThePeerTitle() {
+        // Two accounts signed in on the same device share a DM: both members
+        // carry local = true. The peer must still resolve from memberIdHex
+        // (active-account comparison), not collapse to the hex fallback.
+        val me = "me-acc"
+        val peer = "peer-acc"
+        val item =
+            chatListItemFromProjection(
+                row = row(groupId = "test-group", rawTitle = "00deadbeef".repeat(6)),
+                group = group(name = ""),
+                activeAccountIdHex = me,
+                members = listOf(member(me, local = true), member(peer, local = true)),
+            )
+
+        assertEquals(2, item.memberCount)
+        assertEquals(peer, item.otherMemberAccount)
+
+        val title =
+            GroupProjector.displayTitle(
+                group = item.group,
+                otherMemberAccount = item.otherMemberAccount,
+                memberCount = item.memberCount,
+                memberTitle = { id -> if (id == peer) "Alice" else "Self" },
+                copy = copy,
+            )
+        assertEquals("Alice", title)
+    }
+
+    @Test
+    fun unresolvedRosterFallsBackToUnknownNeverGroupHex() {
+        // When the peer can't be resolved (empty/unloaded roster — e.g. the
+        // snapshot was cleared after a wipe), the title must degrade to the
+        // Unknown copy, never the opaque group id hex.
+        val groupId = "00deadbeef".repeat(6)
+        val emptyRoster =
+            GroupProjector.displayTitle(
+                group = group(name = "", groupId = groupId),
+                otherMemberAccount = null,
+                memberCount = 0,
+                memberTitle = { "unused" },
+                copy = copy,
+            )
+        val twoMemberNoPeer =
+            GroupProjector.displayTitle(
+                group = group(name = "", groupId = groupId),
+                otherMemberAccount = null,
+                memberCount = 2,
+                memberTitle = { "unused" },
+                copy = copy,
+            )
+
+        assertEquals("Unknown", emptyRoster)
+        assertEquals("Unknown", twoMemberNoPeer)
     }
 
     @Test
