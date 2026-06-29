@@ -63,6 +63,7 @@ class ConversationTranscriptExportTest {
                             actorAccountIdHex = "alice",
                             subjectAccountIdHex = null,
                             name = "Hermes 2",
+                            oldName = null,
                             oldRetentionSeconds = null,
                             newRetentionSeconds = null,
                         ),
