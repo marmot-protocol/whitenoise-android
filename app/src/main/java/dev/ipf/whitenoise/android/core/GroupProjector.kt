@@ -103,6 +103,37 @@ object GroupProjector {
     ): Boolean = !mine && memberCount > 2
 
     /**
+     * The account whose *profile* avatar should back a conversation surface
+     * (chat-list row leading icon, conversation top bar) when the conversation
+     * has no group avatar of its own. Shared by both surfaces so they never
+     * disagree about the same peer (issue #837): the chat-list row had a
+     * member-derived fallback the conversation top bar lacked, leaving the bar
+     * blank for a peer the row drew correctly.
+     *
+     * - A pending invite resolves to the inviter, mirroring [displayTitle]'s
+     *   "Invite from …" line, so the row/bar shows who invited you.
+     * - Any two-member conversation resolves to the other member, so a 1:1
+     *   shows the peer's avatar. This deliberately covers a *renamed* 1:1
+     *   (two members, group name set): the peer avatar is still the right
+     *   default, and an explicit group avatar — which the caller layers on
+     *   top via [AppGroupRecordFfi.avatarUrl] — wins when one exists.
+     * - Larger groups have no single peer, so this is null and the surface
+     *   falls back to the group avatar / initials.
+     *
+     * Returns only an account id; resolving it to an avatar URL stays with the
+     * caller's existing profile-presentation read (`appState.avatarUrl`), the
+     * same already-hydrated source the chat-list row uses.
+     */
+    fun dmPeerAvatarAccount(
+        pendingInviteAccount: String?,
+        otherMemberAccount: String?,
+        memberCount: Int,
+    ): String? {
+        pendingInviteAccount?.takeIf { it.isNotBlank() }?.let { return it }
+        return otherMemberAccount?.takeIf { it.isNotBlank() && memberCount == 2 }
+    }
+
+    /**
      * A conversation is a DM when it has exactly two members **and** no group
      * name. A named two-member group is still a group, and anything larger is
      * always a group regardless of name. (The core's canonical `isDm` isn't

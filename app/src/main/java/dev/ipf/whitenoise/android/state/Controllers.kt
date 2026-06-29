@@ -2355,6 +2355,28 @@ class ConversationController(
             return GroupProjector.inviteAccount(group, other)
         }
 
+    /**
+     * Avatar URL for the conversation top bar, resolved the same way the
+     * chat-list row resolves its leading avatar (issue #837). The group's own
+     * avatar wins; otherwise a 1:1 falls back to the peer's profile avatar via
+     * the shared [GroupProjector.dmPeerAvatarAccount] path and the same
+     * already-hydrated [WhiteNoiseAppState.avatarUrl] source the row reads, so
+     * the bar no longer renders blank for a peer the row drew correctly.
+     */
+    val avatarUrl: String?
+        get() {
+            group.avatarUrl?.takeIf { it.isNotBlank() }?.let { return it }
+            val me = conversationAccountIdHex
+            val other = GroupProjector.otherMemberAccount(members, me)
+            val peer =
+                GroupProjector.dmPeerAvatarAccount(
+                    pendingInviteAccount = GroupProjector.inviteAccount(group, other),
+                    otherMemberAccount = other,
+                    memberCount = members.size,
+                )
+            return peer?.let { appState.avatarUrl(it) }
+        }
+
     // A nameless two-member conversation, classified the same way the chat list
     // and notifications do. The header title is already the counterparty's name,
     // so the "2 members" subtitle is redundant noise here.

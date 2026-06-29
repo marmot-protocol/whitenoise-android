@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -300,6 +301,79 @@ class GroupProjectorTest {
             )
 
         assertEquals("bob", GroupProjector.otherMemberAccount(members, activeAccountIdHex = "alice"))
+    }
+
+    @Test
+    fun dmPeerAvatarAccountResolvesPeerForOneToOne() {
+        // #837: the conversation top bar must seed its avatar from the same
+        // peer the chat-list row does. Any two-member conversation → the other
+        // member. memberCount drives classification regardless of the group
+        // name, so a *renamed* 1:1 still resolves to the peer's avatar by
+        // default (#837 fix 3); the caller layers an explicit group avatar over
+        // this when one exists, so a real group avatar still wins.
+        assertEquals(
+            "bob",
+            GroupProjector.dmPeerAvatarAccount(
+                pendingInviteAccount = null,
+                otherMemberAccount = "bob",
+                memberCount = 2,
+            ),
+        )
+    }
+
+    @Test
+    fun dmPeerAvatarAccountPrefersInviterWhilePending() {
+        // Mirrors displayTitle's "Invite from …" line: a pending invite shows
+        // the inviter, even if otherMemberAccount differs.
+        assertEquals(
+            "welcomer",
+            GroupProjector.dmPeerAvatarAccount(
+                pendingInviteAccount = "welcomer",
+                otherMemberAccount = "bob",
+                memberCount = 2,
+            ),
+        )
+        // A blank inviter is ignored and falls back to the peer.
+        assertEquals(
+            "bob",
+            GroupProjector.dmPeerAvatarAccount(
+                pendingInviteAccount = "  ",
+                otherMemberAccount = "bob",
+                memberCount = 2,
+            ),
+        )
+    }
+
+    @Test
+    fun dmPeerAvatarAccountIsNullForLargerGroups() {
+        // A real group has no single peer avatar: the surface falls back to the
+        // group avatar / initials instead.
+        assertNull(
+            GroupProjector.dmPeerAvatarAccount(
+                pendingInviteAccount = null,
+                otherMemberAccount = "bob",
+                memberCount = 3,
+            ),
+        )
+    }
+
+    @Test
+    fun dmPeerAvatarAccountIsNullWithoutAPeer() {
+        // No resolved peer and no inviter → nothing to seed from.
+        assertNull(
+            GroupProjector.dmPeerAvatarAccount(
+                pendingInviteAccount = null,
+                otherMemberAccount = null,
+                memberCount = 2,
+            ),
+        )
+        assertNull(
+            GroupProjector.dmPeerAvatarAccount(
+                pendingInviteAccount = null,
+                otherMemberAccount = "  ",
+                memberCount = 2,
+            ),
+        )
     }
 
     @Test

@@ -3349,8 +3349,11 @@ private fun ChatRow(
     val timestampAt = bodyMatch?.timelineAt ?: item.latestAt ?: 0uL
     val inviteAccount = GroupProjector.inviteAccount(item.group, item.otherMemberAccount)
     val avatarAccount =
-        inviteAccount
-            ?: item.otherMemberAccount.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
+        GroupProjector.dmPeerAvatarAccount(
+            pendingInviteAccount = inviteAccount,
+            otherMemberAccount = item.otherMemberAccount,
+            memberCount = item.memberCount,
+        )
     val openableDmAvatarAccount =
         avatarAccount
             ?.takeIf { GroupProjector.isDm(memberCount = item.memberCount, name = item.group.name) }
@@ -9594,7 +9597,11 @@ private fun ConversationScreen(
                                 title = controller.title(groupTitleCopy),
                                 seed = controller.group.groupIdHex,
                                 size = 36.dp,
-                                pictureUrl = controller.group.avatarUrl,
+                                // Resolve the avatar through the same shared
+                                // path the chat-list row uses so a 1:1 peer's
+                                // avatar shows here too, not just a blank
+                                // placeholder (issue #837).
+                                pictureUrl = controller.avatarUrl,
                             )
                             Column {
                                 Text(
