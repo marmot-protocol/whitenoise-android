@@ -90,11 +90,12 @@ object IdentityFormatter {
         epochSeconds: ULong,
         copy: RelativeTimeCopy = RelativeTimeCopy.Default,
         locale: Locale = Locale.getDefault(),
+        now: Instant = Instant.now(),
+        zone: ZoneId = ZoneId.systemDefault(),
     ): String {
         if (epochSeconds == 0uL) return ""
         val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
         val instant = runCatching { Instant.ofEpochSecond(seconds) }.getOrNull() ?: return copy.now
-        val now = Instant.now()
         val delta = now.epochSecond - instant.epochSecond
         return when {
             // Clock skew within tolerance reads as "now", not "future".
@@ -110,14 +111,16 @@ object IdentityFormatter {
             // name (within the past week) or a date carries "when did this thread
             // last move" without the minute. No time component at any rung here.
             else -> {
-                val zone = ZoneId.systemDefault()
                 runCatching {
                     val messageDate = instant.atZone(zone).toLocalDate()
                     val days = ChronoUnit.DAYS.between(messageDate, now.atZone(zone).toLocalDate())
                     when {
-                        // >=24h elapsed always crosses a midnight, so the message is
-                        // at least the previous calendar day.
-                        days <= 1L -> copy.yesterday
+                        // A DST fall-back civil day can be 25 hours long. A >=24h
+                        // elapsed delta can still be on today's local date, so keep
+                        // same-date rows on the compact-hour rung instead of
+                        // incorrectly labeling them as yesterday (#862).
+                        days == 0L -> copy.hours((delta / 3_600).toInt())
+                        days == 1L -> copy.yesterday
                         days < 7L -> messageDate.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
                         // Day + month, no year (e.g. "14 Jun").
                         days < 365L -> DateTimeFormatter.ofPattern("d MMM", locale).format(messageDate)
