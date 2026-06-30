@@ -2282,6 +2282,7 @@ class ConversationController(
     }
 
     private val conversationAccountRef = appState.activeAccountRef
+
     private val mediaUploadSessionEpoch = appState.mediaUploadSessionEpoch()
     private val messageById = linkedMapOf<String, AppMessageRecordFfi>()
     private val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
@@ -4205,13 +4206,15 @@ class ConversationController(
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
+            val updatedName = name.trim().takeIf { it.isNotEmpty() }
+            val updatedDescription = description.trim().takeIf { it.isNotEmpty() }
             runCatching {
                 appState.marmotIo {
                     updateGroupProfile(
                         account,
                         group.groupIdHex,
-                        name.trim().takeIf { it.isNotEmpty() },
-                        description.trim().takeIf { it.isNotEmpty() },
+                        updatedName,
+                        updatedDescription,
                     )
                 }
                 appState.present(R.string.toast_group_updated)

@@ -196,6 +196,25 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun renameSystemRowBodyUsesResolvedDiffPreviewText() {
+        // A kind:1210 rename surfaces through the same preview-text path as a
+        // normal message: the caller resolves the "old → new" diff string and
+        // it must render verbatim as the body without special casing.
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    groupName = "Marmot Protocol",
+                    previewText = "The group was renamed from “Marmot Lab” to “Marmot Protocol”",
+                    sender = user(displayName = "Alice"),
+                ),
+                previewTextOverride = "Alice renamed “Marmot Lab” → “Marmot Protocol”",
+            )
+
+        assertEquals("Alice renamed “Marmot Lab” → “Marmot Protocol”", content?.body)
+    }
+
+    @Test
     fun reactionBodyUsesCallerResolvedReactedToPreview() {
         val content =
             LocalNotificationFormatter.content(
