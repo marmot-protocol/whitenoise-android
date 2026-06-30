@@ -41,6 +41,23 @@ class NotificationTargetTest {
     }
 
     @Test
+    fun routeInboundIntent_notificationUriWithoutTargetIsConsumedNotProfilePayload() {
+        val pending =
+            InboundIntentRouting(
+                NotificationTarget("old", "old-group", null, NotificationTargetKind.MESSAGE),
+                "whitenoise://profile/old",
+            )
+        val routed =
+            routeInboundIntent(
+                parsedTarget = null,
+                dataString = NotificationNavigation.targetUriString("membership-removal|acct-a|group-1"),
+                current = pending,
+            )
+        assertNull(routed.notificationTarget)
+        assertNull(routed.profilePayload)
+    }
+
+    @Test
     fun routeInboundIntent_datalessNonNotificationIntentPreservesPendingDeepLink() {
         // Regression for #67: a bare relaunch intent (no data, not a
         // notification) must not silently discard a queued profile deep link.
@@ -126,6 +143,29 @@ class NotificationTargetTest {
                 "INVITE",
             )
         assertNull(target?.messageIdHex)
+    }
+
+    @Test
+    fun parseExtras_chatListTargetIgnoresMessageId() {
+        val target =
+            NotificationNavigation.parseExtras(
+                NotificationNavigation.ACTION_OPEN,
+                "acct-a",
+                "group-1",
+                "m1",
+                "CHAT_LIST",
+            )
+        assertEquals(NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.CHAT_LIST), target)
+    }
+
+    @Test
+    fun chatListTarget_requiresAccountAndGroup() {
+        assertEquals(
+            NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.CHAT_LIST),
+            NotificationNavigation.chatListTarget("acct-a", "group-1"),
+        )
+        assertNull(NotificationNavigation.chatListTarget("", "group-1"))
+        assertNull(NotificationNavigation.chatListTarget("acct-a", ""))
     }
 
     // ---- PendingIntent identity --------------------------------------------
@@ -357,6 +397,19 @@ class NotificationTargetTest {
                 availableGroupIds = setOf("group-1"),
             )
         assertEquals(NotificationNavStep.OpenConversation("group-1"), step)
+    }
+
+    @Test
+    fun nav_chatListTargetOpensChatListEvenWhenGroupExists() {
+        val step =
+            resolveNotificationNav(
+                NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.CHAT_LIST),
+                knownAccountRefs = setOf("acct-a"),
+                activeAccountRef = "acct-a",
+                chatListReady = true,
+                availableGroupIds = setOf("group-1"),
+            )
+        assertEquals(NotificationNavStep.OpenChatList, step)
     }
 
     @Test

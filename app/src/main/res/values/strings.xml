@@ -499,6 +499,11 @@
     <string name="notification_channel_reactions_description">Reactions to your messages</string>
     <string name="notification_channel_invites">Invites</string>
     <string name="notification_channel_invites_description">Group invites and welcomes</string>
+    <string name="notification_channel_membership_changes">Membership changes</string>
+    <string name="notification_channel_membership_changes_description">Group removals and membership updates</string>
+    <string name="notification_removed_from_group_title">Removed from group</string>
+    <string name="notification_removed_from_group_body">You were removed from %1$s</string>
+    <string name="notification_removed_from_group_body_fallback">You were removed from a group</string>
     <string name="notification_group_invite">Group invite</string>
     <string name="notification_new_message">New message</string>
     <string name="notification_group_renamed">Group renamed</string>

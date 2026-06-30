@@ -373,6 +373,11 @@
     <string name="notification_channel_reactions_description">Reazioni ai tuoi messaggi</string>
     <string name="notification_channel_invites">Inviti</string>
     <string name="notification_channel_invites_description">Inviti ai gruppi e messaggi di benvenuto</string>
+    <string name="notification_channel_membership_changes">Modifiche all’appartenenza</string>
+    <string name="notification_channel_membership_changes_description">Rimozioni dai gruppi e aggiornamenti dell’appartenenza</string>
+    <string name="notification_removed_from_group_title">Rimosso dal gruppo</string>
+    <string name="notification_removed_from_group_body">Sei stato rimosso da %1$s</string>
+    <string name="notification_removed_from_group_body_fallback">Sei stato rimosso da un gruppo</string>
     <string name="notification_group_invite">Sei stato invitato a una chat sicura</string>
     <string name="notification_new_message">Nuovo messaggio</string>
     <string name="notification_group_renamed">Gruppo rinominato</string>

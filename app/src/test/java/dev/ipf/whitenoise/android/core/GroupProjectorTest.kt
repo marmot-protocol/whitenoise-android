@@ -430,6 +430,20 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun membersWithoutActiveAccountStripsTheSpecifiedAccountOnly() {
+        // Multi-account eviction handling must scrub the event account, not the
+        // currently active global account. The projector itself is explicit: the
+        // caller chooses which local account id is removed from the snapshot.
+        val accountA = member(memberId = "account-a", account = "account-a", local = true)
+        val accountB = member(memberId = "ACCOUNT-B", account = "account-b", local = true)
+        val peer = member(memberId = "peer", account = "peer", local = false)
+        val roster = listOf(accountA, accountB, peer)
+
+        assertEquals(listOf(accountB, peer), GroupProjector.membersWithoutActiveAccount(roster, "account-a"))
+        assertEquals(listOf(accountA, peer), GroupProjector.membersWithoutActiveAccount(roster, "account-b"))
+    }
+
+    @Test
     fun selfStillMemberHonoursLocalSelfLeftLatch() {
         // #787: right after a self-leave the engine eviction may not have landed,
         // so a transient roster round-trip can still list self. The latch must

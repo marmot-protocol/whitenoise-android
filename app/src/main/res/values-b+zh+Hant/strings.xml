@@ -372,6 +372,11 @@
     <string name="notification_channel_reactions_description">對你訊息的回應</string>
     <string name="notification_channel_invites">邀請</string>
     <string name="notification_channel_invites_description">群組邀請和歡迎</string>
+    <string name="notification_channel_membership_changes">成員變更</string>
+    <string name="notification_channel_membership_changes_description">群組移除和成員更新</string>
+    <string name="notification_removed_from_group_title">已從群組移除</string>
+    <string name="notification_removed_from_group_body">您已被從 %1$s 移除</string>
+    <string name="notification_removed_from_group_body_fallback">您已被從某個群組移除</string>
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新訊息</string>
     <string name="notification_group_renamed">群組已重新命名</string>

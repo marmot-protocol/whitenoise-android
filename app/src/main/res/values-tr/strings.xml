@@ -373,6 +373,11 @@
     <string name="notification_channel_reactions_description">Mesajlarınıza verilen tepkiler</string>
     <string name="notification_channel_invites">Davetler</string>
     <string name="notification_channel_invites_description">Grup davetleri ve karşılamalar</string>
+    <string name="notification_channel_membership_changes">Üyelik değişiklikleri</string>
+    <string name="notification_channel_membership_changes_description">Gruptan çıkarılmalar ve üyelik güncellemeleri</string>
+    <string name="notification_removed_from_group_title">Gruptan çıkarıldınız</string>
+    <string name="notification_removed_from_group_body">%1$s grubundan çıkarıldınız</string>
+    <string name="notification_removed_from_group_body_fallback">Bir gruptan çıkarıldınız</string>
     <string name="notification_group_invite">Güvenli bir sohbete davet edildiniz</string>
     <string name="notification_new_message">Yeni mesaj</string>
     <string name="notification_group_renamed">Grup yeniden adlandırıldı</string>

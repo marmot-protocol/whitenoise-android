@@ -29,6 +29,11 @@ class LocalNotificationPresenter(
 ) {
     private val redactedPublicVersions = ConcurrentHashMap<String, Notification>()
 
+    private companion object {
+        const val GROUP_REMOVAL_NOTIFICATION_ID = 2
+        const val GROUP_REMOVAL_TAG_PREFIX = "membership-removal|"
+    }
+
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)
     }
@@ -54,10 +59,16 @@ class LocalNotificationPresenter(
         val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
         manager.cancel(message.tag, message.id)
         manager.cancel(reaction.tag, reaction.id)
+        manager.cancel(groupRemovalNotificationTag(accountRef, groupIdHex), GROUP_REMOVAL_NOTIFICATION_ID)
         dismissInvitesForGroup(accountRef, groupIdHex)
         notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
         return true
     }
+
+    private fun groupRemovalNotificationTag(
+        accountRef: String,
+        groupIdHex: String,
+    ): String = GROUP_REMOVAL_TAG_PREFIX + LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex).tag
 
     // Invite cards carry no per-conversation tag, so match them by the account +
     // group stamped into their extras and cancel each by its own (tag, id). Both
@@ -83,6 +94,42 @@ class LocalNotificationPresenter(
                 val compat = NotificationManagerCompat.from(context)
                 inviteNotifications.forEach { compat.cancel(it.tag, it.id) }
             }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun showGroupRemoval(
+        accountRef: String,
+        groupIdHex: String,
+        groupTitle: String?,
+        timestampMs: Long = System.currentTimeMillis(),
+    ): Boolean {
+        if (accountRef.isBlank() || groupIdHex.isBlank() || !canPostNotifications()) return false
+        val notificationTag = groupRemovalNotificationTag(accountRef, groupIdHex)
+        val body =
+            groupTitle
+                ?.takeIf { it.isNotBlank() }
+                ?.let { context.getString(R.string.notification_removed_from_group_body, it) }
+                ?: context.getString(R.string.notification_removed_from_group_body_fallback)
+        val channelId = NotificationChannelSpec.MEMBERSHIP_CHANGES.id
+        val category = NotificationCompat.CATEGORY_EVENT
+        val notification =
+            NotificationCompat
+                .Builder(context, channelId)
+                .setSmallIcon(R.drawable.ic_stat_whitenoise)
+                .setContentIntent(openAppPendingIntent(notificationTag, accountRef, groupIdHex))
+                .setCategory(category)
+                .setWhen(timestampMs)
+                .setShowWhen(true)
+                .setAutoCancel(true)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setPublicVersion(redactedPublicVersion(channelId, category))
+                .setContentTitle(context.getString(R.string.notification_removed_from_group_title))
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .build()
+        NotificationManagerCompat.from(context).notify(notificationTag, GROUP_REMOVAL_NOTIFICATION_ID, notification)
+        notificationDebug { "posted group-removal tag=${notificationTag.take(16)} group=${groupIdHex.take(8)}" }
+        return true
     }
 
     @SuppressLint("MissingPermission")
@@ -361,6 +408,29 @@ class LocalNotificationPresenter(
             NotificationActions.requestCode(kind, actionTarget.notificationTag),
             actionIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag,
+        )
+    }
+
+    private fun openAppPendingIntent(
+        notificationTag: String,
+        accountRef: String,
+        groupIdHex: String,
+    ): PendingIntent {
+        val tapIntent =
+            Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                // A removal notification should land on the chat list, not deep-link
+                // into the dead group. Still set unique data so Android doesn't
+                // collapse distinct membership cards into one PendingIntent.
+                NotificationNavigation.chatListTarget(accountRef, groupIdHex)?.let { target ->
+                    NotificationNavigation.applyToIntent(this, target, notificationTag)
+                }
+            }
+        return PendingIntent.getActivity(
+            context,
+            NotificationNavigation.requestCode(notificationTag),
+            tapIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 

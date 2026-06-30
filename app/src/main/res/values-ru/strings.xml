@@ -377,6 +377,11 @@
     <string name="notification_channel_reactions_description">Реакции на ваши сообщения</string>
     <string name="notification_channel_invites">Приглашения</string>
     <string name="notification_channel_invites_description">Приглашения в группы и приветствия</string>
+    <string name="notification_channel_membership_changes">Изменения участия</string>
+    <string name="notification_channel_membership_changes_description">Удаления из групп и обновления участия</string>
+    <string name="notification_removed_from_group_title">Удалено из группы</string>
+    <string name="notification_removed_from_group_body">Вас удалили из %1$s</string>
+    <string name="notification_removed_from_group_body_fallback">Вас удалили из группы</string>
     <string name="notification_group_invite">Вы были приглашены в безопасный чат</string>
     <string name="notification_new_message">Новое сообщение</string>
     <string name="notification_group_renamed">Группа переименована</string>

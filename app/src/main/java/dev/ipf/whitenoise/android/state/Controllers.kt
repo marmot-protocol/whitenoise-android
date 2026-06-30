@@ -624,6 +624,22 @@ internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
         ("no relay endpoints" in text)
 }
 
+internal fun Throwable.isUseAfterEvictionError(): Boolean {
+    // Stopgap until Marmot exposes a typed UniFFI error/code for
+    // GroupStateError::UseAfterEviction. Keep this in sync with the Rust
+    // OpenMLS group-state error variant name.
+    val text =
+        generateSequence(this) { it.cause }
+            .joinToString(separator = "\n") { error ->
+                listOfNotNull(error.message, error.javaClass.simpleName).joinToString(" ")
+            }
+    return "UseAfterEviction" in text || ("GroupStateError" in text && "eviction" in text.lowercase())
+}
+
+internal fun shouldRefreshMembersForChatListUpdate(trigger: ChatListUpdateTriggerFfi): Boolean =
+    trigger == ChatListUpdateTriggerFfi.MEMBERSHIP_CHANGED ||
+        trigger == ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH
+
 internal fun mediaCacheKey(
     account: String,
     groupIdHex: String,
@@ -1177,6 +1193,9 @@ class ChatsController(
                                                 "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
                                             }
                                             foldChatRow(row)
+                                            if (shouldRefreshMembersForChatListUpdate(update.trigger)) {
+                                                scheduleMemberFetch(row.groupIdHex, forceMlsReplay = true)
+                                            }
                                         }
                                         is ChatListSubscriptionUpdateFfi.RemoveRow -> {
                                             chatsDebug {
@@ -1612,7 +1631,13 @@ class ChatsController(
                     demotedBeforeLeave = true
                     appState.applyLocalGroupUpdate(demoteResult.details.group)
                 }
-                appState.marmotIo { leaveGroup(account, groupIdHex) }
+                appState.recordLocalGroupRemoval(account, groupIdHex)
+                try {
+                    appState.marmotIo { leaveGroup(account, groupIdHex) }
+                } catch (throwable: Throwable) {
+                    appState.clearLocalGroupRemoval(account, groupIdHex)
+                    throw throwable
+                }
             }
             // Invalidate both snapshot sources that seed the next
             // ConversationController so re-opening the just-left group renders
@@ -1901,61 +1926,84 @@ class ChatsController(
      * with a burst of completions coalesced into one rebuild.
      */
     private fun schedulePendingMemberFetches() {
+        chatRows
+            .asSequence()
+            .map { it.groupIdHex }
+            .filterNot { memberCacheByGroup.containsKey(it) }
+            .forEach { scheduleMemberFetch(it) }
+    }
+
+    /**
+     * Refresh one group's roster. Membership-change chat-list updates can arrive
+     * after a snapshot that already cached the old roster; force a replay before
+     * reading members so a peer eviction flips the row to its removed state
+     * immediately instead of waiting for the user to hit send and surface the
+     * engine's UseAfterEviction safety net.
+     */
+    private fun scheduleMemberFetch(
+        groupIdHex: String,
+        forceMlsReplay: Boolean = false,
+    ) {
         val account = accountRef ?: return
         val epoch = bindEpoch
-        val pending =
-            chatRows
-                .asSequence()
-                .map { it.groupIdHex }
-                .filterNot { memberCacheByGroup.containsKey(it) }
-                .filterNot { it in inFlightMemberFetches }
-                .toList()
-        if (pending.isEmpty()) return
-        inFlightMemberFetches.addAll(pending)
-        pending.forEach { groupIdHex ->
-            recomputeScope.launch {
-                try {
-                    memberFetchGate.withPermit {
-                        if (!isActiveBindEpoch(epoch)) return@withPermit
-                        val members = appState.marmotIo { groupMembers(account, groupIdHex) }
-                        if (isActiveBindEpoch(epoch)) {
-                            members
-                                .map { it.memberIdHex }
-                                .filter { it.isNotBlank() }
-                                .forEach(appState::requestProfile)
-                            memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
-                            // A loaded roster that omits self is known removal
-                            // evidence (admin eviction / self-leave the engine
-                            // has already applied). Marking it makes an empty
-                            // self-only roster suppress the badge too, where the
-                            // snapshot path alone reads empty as ambiguous.
-                            val activeAccountIdHex = appState.activeAccount?.accountIdHex
-                            if (activeAccountIdHex != null &&
-                                members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                            ) {
-                                removedGroupIds = removedGroupIds + groupIdHex
-                            }
-                            // Coalesce: a burst of member-fetch completions on
-                            // account open/switch would otherwise drive N
-                            // un-debounced full recomputes. Defer into one.
-                            scheduleRecompute()
-                        }
+        if (!inFlightMemberFetches.add(groupIdHex)) return
+        if (forceMlsReplay) {
+            memberCacheByGroup = memberCacheByGroup - groupIdHex
+            scheduleRecompute()
+        }
+        recomputeScope.launch {
+            try {
+                memberFetchGate.withPermit {
+                    if (!isActiveBindEpoch(epoch)) return@withPermit
+                    if (forceMlsReplay) {
+                        appState.marmotIo { groupMlsState(account, groupIdHex) }
                     }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (_: Throwable) {
-                    // Best-effort. Leave the cache empty so a future
-                    // bind retries; the row falls back to the short
-                    // hex projector branch until then.
-                } finally {
-                    // Only mutate the in-flight set if this job still
-                    // belongs to the current bind. A later bind() has
-                    // already cleared the set; removing again would be
-                    // a no-op but obscures the invariant.
-                    if (isActiveBindEpoch(epoch)) inFlightMemberFetches.remove(groupIdHex)
+                    val members = appState.marmotIo { groupMembers(account, groupIdHex) }
+                    if (isActiveBindEpoch(epoch)) applyLoadedMemberSnapshot(groupIdHex, members)
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                if (e.isUseAfterEvictionError() && isActiveBindEpoch(epoch)) {
+                    appState.removeActiveAccountFromGroupMemberSnapshot(account, groupIdHex)
+                    markGroupLeft(groupIdHex)
+                }
+                // Otherwise best-effort. Leave the cache empty so a future bind
+                // retries; the row falls back to the short hex projector branch.
+            } finally {
+                // Only mutate the in-flight set if this job still belongs to the
+                // current bind. A later bind() has already cleared the set.
+                if (isActiveBindEpoch(epoch)) inFlightMemberFetches.remove(groupIdHex)
             }
         }
+    }
+
+    private fun applyLoadedMemberSnapshot(
+        groupIdHex: String,
+        members: List<AppGroupMemberRecordFfi>,
+    ) {
+        members
+            .map { it.memberIdHex }
+            .filter { it.isNotBlank() }
+            .forEach(appState::requestProfile)
+        memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
+        // A loaded roster that omits self is known removal evidence (admin
+        // eviction / self-leave the engine has already applied). Marking it makes
+        // an empty self-only roster suppress the badge too, where the snapshot
+        // path alone reads empty as ambiguous. If self is present again (re-add),
+        // clear the marker so the row recovers.
+        val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
+        removedGroupIds =
+            if (activeAccountIdHex != null &&
+                members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+            ) {
+                removedGroupIds + groupIdHex
+            } else {
+                removedGroupIds - groupIdHex
+            }
+        // Coalesce: a burst of member-fetch completions on account open/switch
+        // would otherwise drive N un-debounced full recomputes. Defer into one.
+        scheduleRecompute()
     }
 
     /**
@@ -2478,7 +2526,7 @@ class ConversationController(
             // error.
             throw cancel
         } catch (throwable: Throwable) {
-            if (throwable.isUseAfterEviction()) {
+            if (throwable.isUseAfterEvictionError()) {
                 markActiveAccountRemovedFromMembers(account)
                 isLoading = false
                 error = null
@@ -2628,7 +2676,7 @@ class ConversationController(
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
-            if (throwable.isUseAfterEviction()) {
+            if (throwable.isUseAfterEvictionError()) {
                 markActiveAccountRemovedFromMembers(account)
                 isLoading = false
                 error = null
@@ -4087,7 +4135,13 @@ class ConversationController(
                         demotedBeforeLeave = true
                         applyMutationDetails(account, demoteResult.details)
                     }
-                    appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+                    appState.recordLocalGroupRemoval(account, group.groupIdHex)
+                    try {
+                        appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+                    } catch (throwable: Throwable) {
+                        appState.clearLocalGroupRemoval(account, group.groupIdHex)
+                        throw throwable
+                    }
                 }
                 // Authoritative local self-leave: record it before the
                 // synchronous snapshot drop so any subsequent
@@ -5399,7 +5453,7 @@ class ConversationController(
             applyGroupDetails(account, details)
         }.onFailure {
             if (it is CancellationException) throw it
-            if (it.isUseAfterEviction()) {
+            if (it.isUseAfterEvictionError()) {
                 markActiveAccountRemovedFromMembers(account)
                 return
             }
@@ -5450,6 +5504,15 @@ class ConversationController(
         }
     }
 
+    fun markActiveAccountRemovedByPeer(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        if (conversationAccountRef != accountRef) return
+        if (!group.groupIdHex.equals(groupIdHex, ignoreCase = true)) return
+        markActiveAccountRemovedFromMembers(accountRef)
+    }
+
     private fun markActiveAccountRemovedFromMembers(account: String) {
         val activeAccountIdHex = conversationAccountIdHex ?: return
         // Engine-confirmed removal (UseAfterEviction). Record the same
@@ -5476,18 +5539,6 @@ class ConversationController(
      */
     private fun recordSelfLeft() {
         selfMembership.recordSelfLeft()
-    }
-
-    private fun Throwable.isUseAfterEviction(): Boolean {
-        // Stopgap until Marmot exposes a typed UniFFI error/code for
-        // GroupStateError::UseAfterEviction. Keep this in sync with the Rust
-        // OpenMLS group-state error variant name.
-        val text =
-            generateSequence(this) { it.cause }
-                .joinToString(separator = "\n") { error ->
-                    listOfNotNull(error.message, error.javaClass.simpleName).joinToString(" ")
-                }
-        return "UseAfterEviction" in text || ("GroupStateError" in text && "eviction" in text.lowercase())
     }
 
     private fun applyGroupDetails(

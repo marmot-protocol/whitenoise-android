@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
@@ -216,6 +217,13 @@ class ChatListProjectionReducerTest {
             )
 
         assertEquals(false, item.removedFromGroup(me))
+    }
+
+    @Test
+    fun membershipChatListUpdatesForceMemberSnapshotRefresh() {
+        assertTrue(shouldRefreshMembersForChatListUpdate(ChatListUpdateTriggerFfi.MEMBERSHIP_CHANGED))
+        assertTrue(shouldRefreshMembersForChatListUpdate(ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH))
+        assertEquals(false, shouldRefreshMembersForChatListUpdate(ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE))
     }
 
     // ---- projection + preview-token passthrough -----------------------------

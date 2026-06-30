@@ -45,6 +45,9 @@ enum class NotificationChannelSpec(
 
     /** Welcomes and group-join events. High importance so an invite heads-up. */
     INVITES("invites_v2", ChannelImportance.HIGH),
+
+    /** Peer-driven membership changes such as being removed from a group. */
+    MEMBERSHIP_CHANGES("membership_changes_v1", ChannelImportance.HIGH),
     ;
 
     companion object {

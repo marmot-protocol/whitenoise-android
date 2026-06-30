@@ -25,8 +25,10 @@ import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
 import dev.ipf.marmotkit.AuditLogUploadSourceFfi
+import dev.ipf.marmotkit.GroupEventKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.PushPlatformFfi
@@ -730,6 +732,9 @@ class WhiteNoiseAppState(
         java.util.concurrent.atomic
             .AtomicInteger(0)
     private var notificationJob: Job? = null
+    private var membershipEventJob: Job? = null
+    private val groupRemovalNotificationKeys = mutableSetOf<String>()
+    private val locallyRemovedGroupKeys = mutableSetOf<String>()
 
     // Coalesces per-account unread refreshes across a notification burst so a
     // catch-up flood drains to one expensive (chat-list + per-group roster)
@@ -975,8 +980,9 @@ class WhiteNoiseAppState(
         synchronized(conversationControllerLock) { conversationControllers.remove(controller) }
     }
 
-    private fun conversationControllersForAccountTeardown(): List<ConversationController> =
-        synchronized(conversationControllerLock) { conversationControllers.toList() }
+    private fun conversationControllersForAccountTeardown(): List<ConversationController> = conversationControllersSnapshot()
+
+    private fun conversationControllersSnapshot(): List<ConversationController> = synchronized(conversationControllerLock) { conversationControllers.toList() }
 
     private fun destructiveWipeRuntimeState(): DestructiveAccountWipeRuntimeState =
         DestructiveAccountWipeRuntimeState(
@@ -1022,9 +1028,12 @@ class WhiteNoiseAppState(
     }
 
     private suspend fun stopNotificationListenerForAccountTeardown() {
-        val job = notificationJob
+        val notification = notificationJob
+        val membership = membershipEventJob
         notificationJob = null
-        job?.cancelAndJoin()
+        membershipEventJob = null
+        notification?.cancelAndJoin()
+        membership?.cancelAndJoin()
         unreadRefreshScheduler.cancelAndClear()
     }
 
@@ -2922,28 +2931,39 @@ class WhiteNoiseAppState(
     }
 
     /**
-     * Synchronously drop the active account from the cached member snapshot for
-     * [groupIdHex] after a successful leave (issue #545). The snapshot seeds the
-     * next [ConversationController]'s `seededSelfMember`; without this, a stale
-     * positive snapshot would still place self in the group and flash the active
-     * composer when the just-left conversation is re-opened. No-op when there is
-     * no cached entry — the seed then falls back to a fresh roster fetch.
+     * Synchronously drop [accountIdHex] from the cached member snapshot for
+     * [groupIdHex]. The snapshot seeds the next [ConversationController]'s
+     * `seededSelfMember`; without this, a stale positive snapshot would still
+     * place self in the group and flash the active composer when the just-left
+     * conversation is re-opened. No-op when there is no cached entry — the seed
+     * then falls back to a fresh roster fetch.
      */
-    fun removeActiveAccountFromGroupMemberSnapshot(
+    fun removeAccountFromGroupMemberSnapshot(
         accountRef: String?,
         groupIdHex: String,
+        accountIdHex: String?,
     ) {
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
-        val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {
             val current = groupMemberSnapshots[key] ?: return
             groupMemberSnapshots.put(
                 key,
                 GroupMemberSnapshot(
-                    GroupProjector.membersWithoutActiveAccount(current.members, activeAccountIdHex),
+                    GroupProjector.membersWithoutActiveAccount(current.members, accountIdHex),
                 ),
             )
         }
+    }
+
+    /**
+     * Convenience wrapper for UI-initiated local leaves, where the account being
+     * removed is the currently active local account.
+     */
+    fun removeActiveAccountFromGroupMemberSnapshot(
+        accountRef: String?,
+        groupIdHex: String,
+    ) {
+        removeAccountFromGroupMemberSnapshot(accountRef, groupIdHex, activeAccount?.accountIdHex)
     }
 
     suspend fun refreshProfile(
@@ -3376,7 +3396,155 @@ class WhiteNoiseAppState(
         unreadRefreshScheduler.schedule(update.accountRef)
     }
 
+    private fun groupRemovalNotificationKey(
+        accountRef: String,
+        groupIdHex: String,
+    ): String = "$accountRef|$groupIdHex"
+
+    internal fun recordLocalGroupRemoval(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        if (accountRef.isBlank() || groupIdHex.isBlank()) return
+        locallyRemovedGroupKeys.add(groupRemovalNotificationKey(accountRef, groupIdHex))
+    }
+
+    internal fun clearLocalGroupRemoval(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        if (accountRef.isBlank() || groupIdHex.isBlank()) return
+        locallyRemovedGroupKeys.remove(groupRemovalNotificationKey(accountRef, groupIdHex))
+    }
+
+    private suspend fun removedRosterAfterMembershipEvent(event: MarmotEventFfi.GroupEvent): List<AppGroupMemberRecordFfi>? {
+        val accountRef = event.accountLabel.takeIf { it.isNotBlank() } ?: return null
+        val accountIdHex = event.accountIdHex.takeIf { it.isNotBlank() } ?: return null
+        val groupIdHex = event.groupIdHex.takeIf { it.isNotBlank() } ?: return null
+        val key = groupRemovalNotificationKey(accountRef, groupIdHex)
+        val stateChange = event.event as? GroupEventKindFfi.GroupStateChanged ?: return null
+        if (stateChange.actorIdHex?.equals(accountIdHex, ignoreCase = true) == true) {
+            // Local self-leaves are already surfaced by the initiating UI. Drop
+            // the temporary suppression key now so a later re-add + peer removal
+            // can notify normally.
+            locallyRemovedGroupKeys.remove(key)
+            return null
+        }
+
+        val replay = runCatching { marmotIo { groupMlsState(accountRef, groupIdHex) } }
+        replay.exceptionOrNull()?.let { error ->
+            rethrowIfCancellation(error)
+            if (error.isUseAfterEvictionError()) {
+                if (locallyRemovedGroupKeys.remove(key)) return null
+                return emptyList()
+            }
+            appStateDebug(error) { "membership replay failed account=${accountRef.take(8)} group=${groupIdHex.take(8)}: ${error.readableMessage()}" }
+            return null
+        }
+
+        val members =
+            runCatching { marmotIo { groupMembers(accountRef, groupIdHex) } }
+                .getOrElse { error ->
+                    rethrowIfCancellation(error)
+                    if (error.isUseAfterEvictionError()) {
+                        if (locallyRemovedGroupKeys.remove(key)) return null
+                        return emptyList()
+                    }
+                    appStateDebug(error) {
+                        "membership roster refresh failed account=${accountRef.take(8)} " +
+                            "group=${groupIdHex.take(8)}: ${error.readableMessage()}"
+                    }
+                    return null
+                }
+        val removed = members.none { GroupProjector.isActiveAccountMember(it, accountIdHex) }
+        if (!removed) {
+            groupRemovalNotificationKeys.remove(key)
+            locallyRemovedGroupKeys.remove(key)
+            return null
+        }
+        if (locallyRemovedGroupKeys.remove(key)) return null
+        return members
+    }
+
+    private suspend fun handleMembershipEvent(event: MarmotEventFfi.GroupEvent) {
+        val removedMembers = removedRosterAfterMembershipEvent(event) ?: return
+        val accountRef = event.accountLabel
+        val accountIdHex = event.accountIdHex
+        val groupIdHex = event.groupIdHex
+        removeAccountFromGroupMemberSnapshot(accountRef, groupIdHex, accountIdHex)
+        markGroupLeftOnChatList(accountRef, groupIdHex)
+        conversationControllersSnapshot().forEach { controller ->
+            controller.markActiveAccountRemovedByPeer(accountRef, groupIdHex)
+        }
+        unreadRefreshScheduler.schedule(accountRef)
+        maybePostGroupRemovalNotification(accountRef, accountIdHex, groupIdHex, removedMembers)
+    }
+
+    private suspend fun maybePostGroupRemovalNotification(
+        accountRef: String,
+        accountIdHex: String,
+        groupIdHex: String,
+        members: List<AppGroupMemberRecordFfi>,
+    ) {
+        val key = groupRemovalNotificationKey(accountRef, groupIdHex)
+        val notificationsEnabled =
+            runCatching { marmotIo { notificationSettings(accountRef).localNotificationsEnabled } }
+                .getOrElse { error ->
+                    rethrowIfCancellation(error)
+                    localNotificationSettings
+                        ?.takeIf { it.accountRef == accountRef }
+                        ?.localNotificationsEnabled
+                        ?: true
+                }
+        if (!notificationsEnabled) return
+        if (!groupRemovalNotificationKeys.add(key)) return
+        val posted =
+            localNotificationPresenter.showGroupRemoval(
+                accountRef = accountRef,
+                groupIdHex = groupIdHex,
+                groupTitle = removedGroupNotificationTitle(accountRef, accountIdHex, groupIdHex, members),
+            )
+        if (!posted) groupRemovalNotificationKeys.remove(key)
+    }
+
+    private suspend fun removedGroupNotificationTitle(
+        accountRef: String,
+        accountIdHex: String,
+        groupIdHex: String,
+        members: List<AppGroupMemberRecordFfi>,
+    ): String? {
+        runCatching { marmotIo { chatList(accountRef, includeArchived = true) } }
+            .getOrNull()
+            ?.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+            ?.groupName
+            ?.let { ProfileSanitizer.displayName(it) }
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return it }
+        runCatching { marmotIo { groupDetails(accountRef, groupIdHex).group.name } }
+            .getOrNull()
+            ?.let { ProfileSanitizer.displayName(it) }
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return it }
+        if (members.isEmpty()) return null
+        val title =
+            GroupProjector.displayTitle(
+                name = "",
+                pendingInviteAccount = null,
+                groupIdHex = groupIdHex,
+                otherMemberAccount = GroupProjector.otherMemberAccount(members, accountIdHex),
+                memberCount = members.size,
+                memberTitle = { chatMemberTitle(it) },
+                copy = notificationGroupTitleCopy(),
+            )
+        return title.takeUnless { it == appContext.getString(R.string.unknown) }
+    }
+
     private fun startNotificationListener() {
+        startNotificationUpdateListener()
+        startMembershipEventListener()
+    }
+
+    private fun startNotificationUpdateListener() {
         if (notificationJob?.isActive == true) return
         notificationJob =
             notificationScope.launch {
@@ -3407,6 +3575,43 @@ class WhiteNoiseAppState(
                     } catch (throwable: Throwable) {
                         appStateDebug(throwable) {
                             "notification listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"
+                        }
+                    }
+                    if (!isActive) break
+                    delay(backoffMillis)
+                    backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
+                }
+            }
+    }
+
+    private fun startMembershipEventListener() {
+        if (membershipEventJob?.isActive == true) return
+        membershipEventJob =
+            notificationScope.launch {
+                var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                while (isActive) {
+                    try {
+                        val subscription = marmotIo { subscribeEvents() }
+                        try {
+                            while (isActive) {
+                                val event = marmotIo { subscription.next() } ?: break
+                                backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                                if (event is MarmotEventFfi.GroupEvent) {
+                                    handleMembershipEvent(event)
+                                }
+                            }
+                        } finally {
+                            runCatching {
+                                withContext(NonCancellable + Dispatchers.IO) {
+                                    subscription.close()
+                                }
+                            }
+                        }
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (throwable: Throwable) {
+                        appStateDebug(throwable) {
+                            "membership event listener error; retrying in ${backoffMillis}ms: ${throwable.readableMessage()}"
                         }
                     }
                     if (!isActive) break
