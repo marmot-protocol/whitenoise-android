@@ -909,35 +909,39 @@ private fun FailureScreen(
     }
 }
 
+// Single in-flight onboarding action so the two buttons can never both read as
+// busy: each button's spinner keys off its own action, and the shared value
+// disables the other while one runs.
+private enum class OnboardingAction { Idle, Creating, Importing }
+
 @Composable
 private fun OnboardingScreen(appState: WhiteNoiseAppState) {
     var identity by remember { mutableStateOf("") }
-    var creatingIdentity by remember { mutableStateOf(false) }
-    var signingInBusy by remember { mutableStateOf(false) }
+    var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     val scope = rememberCoroutineScope()
 
     OnboardingContent(
         identity = identity,
-        creatingIdentity = creatingIdentity,
-        signingInBusy = signingInBusy,
+        creatingIdentity = inFlightAction == OnboardingAction.Creating,
+        signingInBusy = inFlightAction == OnboardingAction.Importing,
         onIdentityChange = { identity = it },
         onCreateIdentity = {
-            creatingIdentity = true
+            inFlightAction = OnboardingAction.Creating
             scope.launch {
                 try {
                     appState.createIdentity()
                 } finally {
-                    creatingIdentity = false
+                    inFlightAction = OnboardingAction.Idle
                 }
             }
         },
         onImportIdentity = { value ->
-            signingInBusy = true
+            inFlightAction = OnboardingAction.Importing
             scope.launch {
                 try {
                     appState.importIdentity(value)
                 } finally {
-                    signingInBusy = false
+                    inFlightAction = OnboardingAction.Idle
                 }
             }
         },
@@ -18721,8 +18725,10 @@ private fun AddIdentitySheet(
 ) {
     WindowSecureFlag()
     var identity by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
+    var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
+    val busy = inFlightAction != OnboardingAction.Idle
     val creatingIdentityDescription = stringResource(R.string.creating_identity)
+    val importingDescription = stringResource(R.string.import_existing_identity)
 
     // ModalBottomSheet renders in its own window on Android, separate from
     // the host activity window — `WindowSecureFlag()` (which flags the
@@ -18738,19 +18744,19 @@ private fun AddIdentitySheet(
             Text(stringResource(R.string.add_account), style = MaterialTheme.typography.titleLarge)
             Button(
                 onClick = {
-                    busy = true
+                    inFlightAction = OnboardingAction.Creating
                     appState.launchMutation {
                         try {
                             appState.createIdentity()
                         } finally {
-                            busy = false
+                            inFlightAction = OnboardingAction.Idle
                         }
                     }
                 },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (busy) {
+                if (inFlightAction == OnboardingAction.Creating) {
                     CircularProgressIndicator(
                         modifier =
                             Modifier
@@ -18762,7 +18768,7 @@ private fun AddIdentitySheet(
                     Icon(Icons.Default.Key, contentDescription = null)
                 }
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(if (busy) R.string.creating_identity_title else R.string.create_new_identity))
+                Text(stringResource(if (inFlightAction == OnboardingAction.Creating) R.string.creating_identity_title else R.string.create_new_identity))
             }
             // Mask unless the value is unambiguously a public npub.
             // Treats partial / empty / unprefixed input as potentially secret,
@@ -18788,12 +18794,12 @@ private fun AddIdentitySheet(
                 keyboardActions =
                     KeyboardActions(
                         onDone = {
-                            busy = true
+                            inFlightAction = OnboardingAction.Importing
                             appState.launchMutation {
                                 try {
                                     appState.importIdentity(identity)
                                 } finally {
-                                    busy = false
+                                    inFlightAction = OnboardingAction.Idle
                                 }
                             }
                         },
@@ -18801,19 +18807,29 @@ private fun AddIdentitySheet(
             )
             OutlinedButton(
                 onClick = {
-                    busy = true
+                    inFlightAction = OnboardingAction.Importing
                     appState.launchMutation {
                         try {
                             appState.importIdentity(identity)
                         } finally {
-                            busy = false
+                            inFlightAction = OnboardingAction.Idle
                         }
                     }
                 },
                 enabled = !busy && identity.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Default.Person, contentDescription = null)
+                if (inFlightAction == OnboardingAction.Importing) {
+                    CircularProgressIndicator(
+                        modifier =
+                            Modifier
+                                .size(18.dp)
+                                .semantics { contentDescription = importingDescription },
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.Default.Person, contentDescription = null)
+                }
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.import_existing_identity))
             }
