@@ -3,12 +3,8 @@ package dev.ipf.whitenoise.android.core
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.IOException
-import java.io.InputStream
-import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import java.util.Locale
 
 /**
@@ -50,8 +46,6 @@ object Nip05Resolver {
     // canonicalise the name. A local part outside this set can't be a NIP-05
     // identifier, so we reject rather than send it upstream.
     private val LOCAL_PART = Regex("^[a-z0-9._-]+$")
-
-    private const val MAX_REDIRECT_HOPS = 5
 
     // A well-known nostr.json is a small JSON map; 1 MiB is generous headroom.
     private const val MAX_BODY_BYTES = 1 * 1024 * 1024
@@ -95,91 +89,21 @@ object Nip05Resolver {
     }
 
     /**
-     * Manual-redirect GET that re-validates HTTPS and host safety at EVERY hop.
-     * Returns the decoded body (UTF-8) or null on any non-2xx, oversize body,
-     * downgrade, private-host hop, or IO error.
+     * NIP-05 well-known fetch via the shared [SafeHttpsGet] (HTTPS-only, port
+     * 443, per-hop revalidation, bounded body). Returns the decoded body (UTF-8)
+     * or null on any downgrade, private-host hop, oversize body, or IO error.
      */
     private fun httpGetString(
         initial: URL,
         timeoutMillis: Int,
-    ): String? {
-        var currentSpec = initial.toString()
-        var hops = 0
-        while (true) {
-            val parsed = runCatching { URL(currentSpec) }.getOrNull() ?: return null
-            if (parsed.protocol?.lowercase(Locale.ROOT) != "https") return null
-            val host = parsed.host ?: return null
-            if (!parsed.userInfo.isNullOrEmpty()) return null
-            // NIP-05 well-known docs are served on the default HTTPS port. An
-            // explicit port is a non-standard authority trick (and a way to
-            // reach an unintended internal service), so reject anything but the
-            // implicit default (-1) or an explicit 443.
-            if (parsed.port != -1 && parsed.port != 443) return null
-            if (host.isBlank() || HostSafety.isPrivateOrLoopbackHost(host)) return null
-            // Resolve-time SSRF check: a public hostname can still resolve to a
-            // private/loopback/link-local address (DNS rebinding). Resolve the
-            // host here on the IO dispatcher and reject if ANY resolved address
-            // is internal, before we ever openConnection().
-            val resolved =
-                runCatching { java.net.InetAddress.getAllByName(host) }.getOrNull()
-            if (resolved.isNullOrEmpty() ||
-                resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }
-            ) {
-                return null
-            }
-
-            val connection = (parsed.openConnection() as? HttpURLConnection) ?: return null
-            try {
-                connection.connectTimeout = timeoutMillis
-                connection.readTimeout = timeoutMillis
-                connection.instanceFollowRedirects = false
-                connection.requestMethod = "GET"
-                connection.setRequestProperty("Accept", "application/json")
-                val code = connection.responseCode
-                when {
-                    code in 300..399 -> {
-                        if (hops >= MAX_REDIRECT_HOPS) return null
-                        val location = connection.getHeaderField("Location") ?: return null
-                        currentSpec = runCatching { URL(parsed, location).toString() }.getOrNull() ?: return null
-                        hops += 1
-                        // Loop re-validates the post-redirect URL with the same
-                        // HTTPS + host-safety checks as the initial request.
-                    }
-                    code !in 200..299 -> return null
-                    else -> {
-                        if (connection.contentLengthLong > MAX_BODY_BYTES) return null
-                        return connection.inputStream.use { readBounded(it, MAX_BODY_BYTES) }
-                    }
-                }
-            } catch (_: IOException) {
-                return null
-            } finally {
-                connection.disconnect()
-            }
-        }
-    }
-
-    /**
-     * Read at most [limit] bytes and decode as UTF-8, or null if the stream
-     * exceeds the cap (a declared Content-Length can lie, so the read loop
-     * enforces the bound regardless).
-     */
-    private fun readBounded(
-        input: InputStream,
-        limit: Int,
-    ): String? {
-        val output = java.io.ByteArrayOutputStream()
-        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-        var total = 0
-        while (true) {
-            val read = input.read(buffer)
-            if (read == -1) break
-            total += read
-            if (total > limit) return null
-            output.write(buffer, 0, read)
-        }
-        return output.toByteArray().toString(StandardCharsets.UTF_8)
-    }
+    ): String? =
+        SafeHttpsGet.getUtf8(
+            url = initial.toString(),
+            maxBodyBytes = MAX_BODY_BYTES,
+            connectTimeoutMillis = timeoutMillis,
+            readTimeoutMillis = timeoutMillis,
+            requestHeaders = mapOf("Accept" to "application/json"),
+        )
 
     /**
      * Pull the hex pubkey for [local] out of a nostr.json body. The document

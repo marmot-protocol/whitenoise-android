@@ -142,7 +142,10 @@ object HostSafety {
         if (parts.isEmpty() || parts.size > 4) return null
         val values = LongArray(parts.size)
         for (i in parts.indices) {
-            values[i] = parseRadixPart(parts[i]) ?: return null
+            // An empty label decodes to 0, matching inet_aton, so a literal like
+            // `127..1` is still recognized as loopback instead of slipping
+            // through to the hostname path. A non-numeric part still bails.
+            values[i] = if (parts[i].isEmpty()) 0L else (parseRadixPart(parts[i]) ?: return null)
         }
         // Each leading part is exactly one octet; the final part absorbs the
         // remaining low-order bytes for short forms.

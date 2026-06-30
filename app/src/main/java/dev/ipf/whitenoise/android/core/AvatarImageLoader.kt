@@ -10,10 +10,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
-import java.net.HttpURLConnection
-import java.net.InetAddress
-import java.net.URL
 import java.util.LinkedHashMap
 
 object AvatarImageLoader {
@@ -21,10 +17,6 @@ object AvatarImageLoader {
     private const val READ_TIMEOUT_MS = 10_000
     private const val MAX_AVATAR_BYTES = 2 * 1024 * 1024
     private const val MAX_AVATAR_DIMENSION = 512
-
-    // Bounded redirect chain so a malicious peer can't redirect-loop us.
-    // Real avatar CDNs rarely exceed 1-2 hops; 5 is generous.
-    private const val MAX_REDIRECT_HOPS = 5
 
     // Byte-budgeted cache. With ~1MB worst-case decoded avatar and typical
     // <400KB, this holds dozens of avatars without unbounded memory growth.
@@ -126,73 +118,18 @@ object AvatarImageLoader {
     ): Boolean = failureExpiresAt.isFresh(url, nowMillis)
 
     private fun fetch(url: String): ImageBitmap? {
-        // Manual redirect handling so we can validate the HTTPS scheme on
-        // EVERY hop. `HttpURLConnection.url` returns the original constructor
-        // URL — not the post-redirect URL — so `instanceFollowRedirects=true`
-        // silently follows an https→http downgrade and the protocol check
-        // afterward is a no-op. Avatar URLs come from remote profile records;
-        // a malicious peer can publish an https URL that 301s to http.
-        var current = url
-        var hops = 0
-        while (true) {
-            val parsed = runCatching { URL(current) }.getOrNull() ?: return null
-            if (parsed.protocol != "https") return null
-            // Reject embedded credentials (https://user:pass@host/). They'd be
-            // sent to the host on connect, and the authority parsing differs
-            // from a server's — a parser-confusion gap the other URL guards
-            // already close.
-            if (!parsed.userInfo.isNullOrEmpty()) return null
-            // SSRF: validate the host on EVERY hop, not just the first. A
-            // public https URL can 30x-redirect to https://127.0.0.1/ (or any
-            // private/loopback literal, including the non-dotted encodings
-            // HostSafety now decodes); without a per-hop host check the manual
-            // follow below would happily connect to it. See #129.
-            if (HostSafety.isPrivateOrLoopbackHost(parsed.host)) return null
-            // Resolve-time check narrows the DNS-rebinding window the literal-host
-            // check leaves open. HttpURLConnection re-resolves at connect, so this
-            // is a mitigation, not a full close (matches Nip05Resolver).
-            val resolved = runCatching { InetAddress.getAllByName(parsed.host) }.getOrNull()
-            if (resolved.isNullOrEmpty() || resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }) return null
-            val connection = parsed.openConnection() as? HttpURLConnection ?: return null
-            try {
-                connection.instanceFollowRedirects = false
-                connection.connectTimeout = CONNECT_TIMEOUT_MS
-                connection.readTimeout = READ_TIMEOUT_MS
-                connection.connect()
-                val code = connection.responseCode
-                when {
-                    code in 300..399 -> {
-                        if (hops >= MAX_REDIRECT_HOPS) return null
-                        val location = connection.getHeaderField("Location") ?: return null
-                        current = runCatching { URL(parsed, location).toString() }.getOrNull() ?: return null
-                        hops += 1
-                        // fall through to disconnect + loop continuation
-                    }
-                    code !in 200..299 -> return null
-                    else -> {
-                        val contentLength = connection.contentLengthLong
-                        if (contentLength > MAX_AVATAR_BYTES) return null
-                        val bytes =
-                            connection.inputStream.use { input ->
-                                val output = ByteArrayOutputStream()
-                                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                                var total = 0
-                                while (true) {
-                                    val read = input.read(buffer)
-                                    if (read == -1) break
-                                    total += read
-                                    if (total > MAX_AVATAR_BYTES) return null
-                                    output.write(buffer, 0, read)
-                                }
-                                output.toByteArray()
-                            }
-                        return decode(bytes)?.asImageBitmap()
-                    }
-                }
-            } finally {
-                connection.disconnect()
-            }
-        }
+        // Avatar URLs come from remote profile records, so a malicious peer can
+        // publish an https URL that 30x-redirects to http or a private host.
+        // SafeHttpsGet re-validates scheme/host/port at every hop and bounds the
+        // body; we only have to decode the result.
+        val bytes =
+            SafeHttpsGet.get(
+                url = url,
+                maxBodyBytes = MAX_AVATAR_BYTES,
+                connectTimeoutMillis = CONNECT_TIMEOUT_MS,
+                readTimeoutMillis = READ_TIMEOUT_MS,
+            ) ?: return null
+        return decode(bytes)?.asImageBitmap()
     }
 
     private fun decode(bytes: ByteArray): android.graphics.Bitmap? {
