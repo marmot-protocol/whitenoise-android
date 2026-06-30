@@ -734,16 +734,24 @@ class WhiteNoiseAppState(
         UnreadRefreshScheduler(scope = notificationScope) { accountRef ->
             refreshAccountUnreadCount(accountRef)
         }
-    private var appInForeground = false
 
     @Volatile
     private var isForegroundCatchUpRunning = false
-    private var activeConversationGroupIdHex: String? = null
 
-    // The account that has the active conversation on screen, captured when the
-    // chat opens. Notification suppression is scoped to this account so viewing
-    // a shared group under one account doesn't mute the other account's alerts.
-    private var activeConversationAccountRef: String? = null
+    // Single source of truth for notification suppression: whether an Activity
+    // is on screen, plus the conversation that will be suppressed only while it
+    // is foreground-visible. The active conversation is scoped to its account so
+    // viewing a shared group under one account doesn't mute the other account's
+    // alerts. Lifecycle transitions (foreground/background/task-removed) live
+    // on the value type so the foreground gate and active-chat reset cannot
+    // drift across the separate places that update them (issue #821).
+    private var suppression = NotificationSuppression()
+    private val appInForeground: Boolean
+        get() = suppression.inForeground
+    private val activeConversationGroupIdHex: String?
+        get() = suppression.activeConversationGroupIdHex
+    private val activeConversationAccountRef: String?
+        get() = suppression.activeConversationAccountRef
     private val profileRefreshGate = ProfileRefreshGate(PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS)
     private var chatsController: ChatsController? = null
     private val conversationControllerLock = Any()
@@ -982,8 +990,11 @@ class WhiteNoiseAppState(
 
     private fun applyDestructiveWipeRuntimeState(state: DestructiveAccountWipeRuntimeState) {
         activeAccountRef = state.activeAccountRef
-        activeConversationAccountRef = state.activeConversationAccountRef
-        activeConversationGroupIdHex = state.activeConversationGroupIdHex
+        suppression =
+            suppression.copy(
+                activeConversationAccountRef = state.activeConversationAccountRef,
+                activeConversationGroupIdHex = state.activeConversationGroupIdHex,
+            )
         runtimeGeneration = state.runtimeGeneration
     }
 
@@ -2088,7 +2099,13 @@ class WhiteNoiseAppState(
     }
 
     fun setAppInForeground(foreground: Boolean) {
-        appInForeground = foreground
+        // Backgrounding flips off suppression without forgetting the still-open
+        // chat; returning to the same Activity then resumes foreground
+        // suppression without waiting for an unchanged Compose effect to re-run.
+        // Task removal is the destructive lifecycle edge that clears the open
+        // chat entirely, via onTaskRemoved(), so a foreground-service-kept
+        // process cannot keep silencing that chat after the UI is gone (#821).
+        suppression = if (foreground) suppression.onForeground() else suppression.onBackground()
         if (foreground) {
             refreshLocalNotificationPermission()
             notificationScope.launch { catchUpAfterForegroundActivation() }
@@ -2097,11 +2114,21 @@ class WhiteNoiseAppState(
         if (foreground) notificationScope.launch { syncNativePushRegistrationIfEnabled() }
     }
 
+    /**
+     * Reset the in-memory foreground/visible-conversation suppression state when
+     * the app's task is swiped away from recents. A running foreground service
+     * keeps the process (and this state) alive across task removal, and
+     * Activity `onStop` is not guaranteed on that path, so without this an
+     * open chat's suppression could persist after the UI is gone (issue #821).
+     */
+    fun onTaskRemoved() {
+        suppression = suppression.onTaskRemoved()
+    }
+
     fun setActiveConversation(groupIdHex: String?) {
-        activeConversationGroupIdHex = groupIdHex
         // The chat screen always runs under the active account, so capture it
-        // now; clear it when the conversation closes.
-        activeConversationAccountRef = if (groupIdHex != null) activeAccountRef else null
+        // when opening; closing (null) clears both halves via the transition.
+        suppression = suppression.onActiveConversation(groupIdHex, accountRef = if (groupIdHex != null) activeAccountRef else null)
         if (groupIdHex != null) {
             synchronized(conversationStateLock) {
                 promoteConversationState(activeConversationAccountRef, groupIdHex)

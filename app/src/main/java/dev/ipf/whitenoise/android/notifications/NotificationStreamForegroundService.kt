@@ -151,6 +151,18 @@ class NotificationStreamForegroundService : Service() {
         appState.syncNativePushRegistrationIfEnabled()
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // Swiping the app from recents removes the task but, because this
+        // foreground service keeps the process alive, the singleton AppState
+        // (and its in-memory foreground / visible-conversation suppression
+        // state) survives. Activity onStop is not guaranteed on this path, so
+        // reset that state here; otherwise a chat that was on screen at
+        // swipe-away keeps silencing its own notifications (issue #821).
+        (application as? WhiteNoiseApplication)?.appState?.onTaskRemoved()
+        foregroundServiceDebug { "task removed" }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         serviceScope.cancel()
         foregroundServiceDebug { "destroyed" }
