@@ -3,7 +3,10 @@ package dev.ipf.whitenoise.android.core
 import java.text.BreakIterator
 import java.time.Instant
 import java.time.ZoneId
+import java.time.chrono.IsoChronology
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatterBuilder
+import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -123,15 +126,55 @@ object IdentityFormatter {
                         days == 0L -> copy.hours((delta / 3_600).toInt())
                         days == 1L -> copy.yesterday
                         days < 7L -> messageDate.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
-                        // Day + month, no year (e.g. "14 Jun").
-                        days < 365L -> DateTimeFormatter.ofPattern("d MMM", locale).format(messageDate)
-                        // Two-digit year past a year old (e.g. "14 May '25").
-                        else -> DateTimeFormatter.ofPattern("d MMM ''yy", locale).format(messageDate)
+                        days < 365L -> localizedDateWithoutYearFormatter(locale).format(messageDate)
+                        else -> DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale).format(messageDate)
                     }
                 }.getOrDefault(copy.now)
             }
         }
     }
+
+    private fun localizedDateWithoutYearFormatter(locale: Locale): DateTimeFormatter {
+        val localizedPattern =
+            DateTimeFormatterBuilder.getLocalizedDateTimePattern(
+                FormatStyle.MEDIUM,
+                null,
+                IsoChronology.INSTANCE,
+                locale,
+            )
+        val pattern = stripYearFromLocalizedDatePattern(localizedPattern)
+        return DateTimeFormatter.ofPattern(pattern.ifBlank { "d MMM" }, locale)
+    }
+
+    internal fun stripYearFromLocalizedDatePattern(pattern: String): String {
+        val chars = pattern.toMutableList()
+        var index = 0
+        var inQuote = false
+        while (index < chars.size) {
+            val char = chars[index]
+            if (char == '\'') {
+                inQuote = !inQuote
+                index += 1
+                continue
+            }
+            if (!inQuote && char == 'y') {
+                val start = index
+                while (index < chars.size && chars[index] == 'y') index += 1
+                chars.subList(start, index).clear()
+                index = start
+                while (index < chars.size && chars[index].isYearSeparator()) chars.removeAt(index)
+                while (index > 0 && chars[index - 1].isYearSeparator()) {
+                    chars.removeAt(index - 1)
+                    index -= 1
+                }
+            } else {
+                index += 1
+            }
+        }
+        return chars.joinToString("").trim().trim(',', '.', '/', '-', ' ')
+    }
+
+    private fun Char.isYearSeparator(): Boolean = this.isWhitespace() || this in setOf(',', '.', '/', '-', '年')
 }
 
 /**

@@ -953,7 +953,7 @@ fun OnboardingContent(
     onCreateIdentity: () -> Unit,
     onImportIdentity: (String) -> Unit,
 ) {
-    var signingIn by remember { mutableStateOf(false) }
+    var signingIn by remember { mutableStateOf(signingInBusy) }
     val busy = creatingIdentity || signingInBusy
     val creatingIdentityDescription = stringResource(R.string.creating_identity)
 
@@ -1037,6 +1037,7 @@ private fun SignInContent(
 ) {
     WindowSecureFlag()
     val canSignIn = identity.isNotBlank() && !busy
+    val signInDescription = stringResource(R.string.sign_in)
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -1085,7 +1086,17 @@ private fun SignInContent(
             modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
         ) {
-            Icon(Icons.Default.Person, contentDescription = null)
+            if (busy) {
+                CircularProgressIndicator(
+                    modifier =
+                        Modifier
+                            .size(20.dp)
+                            .semantics { contentDescription = signInDescription },
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(Icons.Default.Person, contentDescription = null)
+            }
             Spacer(Modifier.width(10.dp))
             Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
@@ -5225,7 +5236,7 @@ private fun MediaFileBubble(
         border = amoledSurfaceBorderStroke(),
         modifier =
             Modifier
-                .fillMaxWidth()
+                .widthIn(max = 360.dp)
                 .combinedClickable(
                     enabled = !inFlight,
                     onLongClick = onLongPress,
@@ -5295,7 +5306,7 @@ private fun MediaFileBubble(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(28.dp),
             )
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f, fill = false)) {
                 Text(
                     MediaPipeline.safeDisplayName(reference.fileName),
                     style = MaterialTheme.typography.bodyMedium,
@@ -15429,7 +15440,12 @@ private fun BoxScope.StickyDayRibbon(
 ) {
     val label by labelState
     val alpha by animateFloatAsState(
-        targetValue = if (listState.isScrollInProgress && label.isNotEmpty()) 1f else 0f,
+        targetValue =
+            if (shouldShowStickyDayRibbon(listState.isScrollInProgress, listState.canScrollBackward || listState.canScrollForward, label)) {
+                1f
+            } else {
+                0f
+            },
         label = "stickyDayRibbon",
     )
     if (alpha > 0.01f) {
@@ -15449,6 +15465,12 @@ private fun BoxScope.StickyDayRibbon(
         )
     }
 }
+
+internal fun shouldShowStickyDayRibbon(
+    isScrollInProgress: Boolean,
+    canScrollContent: Boolean,
+    label: String,
+): Boolean = isScrollInProgress && canScrollContent && label.isNotEmpty()
 
 /** Time (+ outgoing status) overlaid on the bottom-right of a visual-media bubble. */
 @Composable

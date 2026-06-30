@@ -117,4 +117,24 @@ class ByteSizeLruCacheTest {
         assertTrue("resident should be bounded by cap", cache.residentBytes() <= 3L)
         assertTrue("size should be bounded by cap", cache.size() <= 3)
     }
+
+    @Test
+    fun evictedRemovedAndClearedEntriesInvokeRemovalCallback() {
+        val removed = mutableListOf<String>()
+        val cache =
+            ByteSizeLruCache<String, String>(
+                maxBytes = 6,
+                sizeOf = { it.length },
+                onEntryRemoved = { removed += it },
+            )
+
+        cache.put("a", "aaa")
+        cache.put("b", "bbb")
+        cache.put("c", "ccc")
+        cache.remove("b")
+        cache.put("d", "ddd")
+        cache.clear()
+
+        assertEquals(listOf("aaa", "bbb", "ccc", "ddd"), removed)
+    }
 }

@@ -203,8 +203,33 @@ object AvatarImageLoader {
             BitmapFactory.Options().apply {
                 inSampleSize = avatarDecodeSampleSize(bounds.outWidth, bounds.outHeight, MAX_AVATAR_DIMENSION)
             }
-        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
+        return scaleAvatarBitmapToMaxDimension(decoded, MAX_AVATAR_DIMENSION)
     }
+}
+
+internal fun scaleAvatarBitmapToMaxDimension(
+    bitmap: android.graphics.Bitmap,
+    maxDimension: Int,
+): android.graphics.Bitmap {
+    val width = bitmap.width
+    val height = bitmap.height
+    val (targetWidth, targetHeight) = avatarScaledDimensions(width, height, maxDimension)
+    if (targetWidth == width && targetHeight == height) return bitmap
+    val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+    if (scaled !== bitmap && !bitmap.isRecycled) bitmap.recycle()
+    return scaled
+}
+
+internal fun avatarScaledDimensions(
+    width: Int,
+    height: Int,
+    maxDimension: Int,
+): Pair<Int, Int> {
+    val longEdge = maxOf(width, height)
+    if (longEdge <= maxDimension) return width to height
+    val scale = maxDimension.toFloat() / longEdge.toFloat()
+    return (width * scale).toInt().coerceAtLeast(1) to (height * scale).toInt().coerceAtLeast(1)
 }
 
 internal fun isAvatarFailureFresh(

@@ -74,4 +74,24 @@ class OnboardingContentTest {
         composeRule.onNodeWithText("Creating Identity").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Creating identity").assertIsDisplayed()
     }
+
+    @Test
+    fun signInButtonShowsProgressWhileImporting() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                var identity by remember { mutableStateOf("nsec1example") }
+                OnboardingContent(
+                    identity = identity,
+                    creatingIdentity = false,
+                    signingInBusy = true,
+                    onIdentityChange = { identity = it },
+                    onCreateIdentity = {},
+                    onImportIdentity = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Sign in").performClick()
+        composeRule.onNodeWithContentDescription("Sign in").assertIsDisplayed()
+    }
 }

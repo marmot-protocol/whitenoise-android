@@ -444,6 +444,7 @@ class WhiteNoiseAppState(
         dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, android.graphics.Bitmap>(
             maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
             sizeOf = { it.allocationByteCount },
+            onEntryRemoved = { if (!it.isRecycled) it.recycle() },
         )
 
     /**

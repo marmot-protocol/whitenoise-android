@@ -176,6 +176,24 @@ class ForegroundStartDecisionTest {
     }
 
     @Test
+    fun oneShotPushWakeStopsUnlessKeepConnectedIsEnabled() {
+        assertEquals(
+            true,
+            shouldStopAfterOneShotForegroundStart(
+                oneShotRequested = true,
+                backgroundConnectionEnabled = false,
+            ),
+        )
+        assertEquals(
+            false,
+            shouldStopAfterOneShotForegroundStart(
+                oneShotRequested = true,
+                backgroundConnectionEnabled = true,
+            ),
+        )
+    }
+
+    @Test
     fun systemWakeUsesBootPermittedForegroundServiceType() {
         assertEquals(
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,

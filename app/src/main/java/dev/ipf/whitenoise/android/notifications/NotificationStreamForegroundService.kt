@@ -93,8 +93,8 @@ class NotificationStreamForegroundService : Service() {
                 bootstrapJob =
                     serviceScope.launch {
                         val stopAfterSync =
-                            shouldStopAfterNativePushRegistrationSync(
-                                syncRequested = syncNativePushRegistration,
+                            shouldStopAfterOneShotForegroundStart(
+                                oneShotRequested = syncNativePushRegistration || trigger == ForegroundStartTrigger.PushWake,
                                 backgroundConnectionEnabled = BackgroundConnectionPreferences.isEnabled(applicationContext),
                             )
                         runCatching {
@@ -113,8 +113,8 @@ class NotificationStreamForegroundService : Service() {
                 if (syncNativePushRegistration) {
                     val inFlightBootstrap = bootstrapJob
                     val stopAfterSync =
-                        shouldStopAfterNativePushRegistrationSync(
-                            syncRequested = true,
+                        shouldStopAfterOneShotForegroundStart(
+                            oneShotRequested = true,
                             backgroundConnectionEnabled = BackgroundConnectionPreferences.isEnabled(applicationContext),
                         )
                     serviceScope.launch {
@@ -227,7 +227,16 @@ internal fun shouldSyncNativePushRegistration(action: String?): Boolean = action
 internal fun shouldStopAfterNativePushRegistrationSync(
     syncRequested: Boolean,
     backgroundConnectionEnabled: Boolean,
-): Boolean = syncRequested && !backgroundConnectionEnabled
+): Boolean =
+    shouldStopAfterOneShotForegroundStart(
+        oneShotRequested = syncRequested,
+        backgroundConnectionEnabled = backgroundConnectionEnabled,
+    )
+
+internal fun shouldStopAfterOneShotForegroundStart(
+    oneShotRequested: Boolean,
+    backgroundConnectionEnabled: Boolean,
+): Boolean = oneShotRequested && !backgroundConnectionEnabled
 
 /**
  * The pure decision about how [NotificationStreamForegroundService.onStartCommand] should proceed,

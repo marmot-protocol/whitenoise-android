@@ -56,6 +56,14 @@ class AvatarImageLoaderTest {
     }
 
     @Test
+    fun scaleAvatarBitmapClampsLongEdgeExactly() {
+        assertEquals(512 to 256, avatarScaledDimensions(width = 900, height = 450, maxDimension = 512))
+        assertEquals(256 to 512, avatarScaledDimensions(width = 450, height = 900, maxDimension = 512))
+        assertEquals(512 to 512, avatarScaledDimensions(width = 700, height = 700, maxDimension = 512))
+        assertEquals(128 to 256, avatarScaledDimensions(width = 128, height = 256, maxDimension = 512))
+    }
+
+    @Test
     fun avatarFailureExpiryCacheDropsExpiredEntriesWhenFull() {
         val failures = AvatarFailureExpiryCache(maxEntries = 3)
         failures.recordFailure(url = "https://example.com/stale-1.png", expiresAtMillis = 1_000L, nowMillis = 0L)
