@@ -15491,7 +15491,7 @@ private fun ComposerEmojiPickerPane(
 }
 
 internal val ComposerEmojiPickerFallbackHeight = 320.dp
-internal val ComposerEmojiPickerSearchExtraHeight = 56.dp
+internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
 
 internal fun composerEmojiPaneTargetHeight(
     currentImeHeight: Dp,
@@ -16811,7 +16811,6 @@ private fun ComposerBar(
                 onEmojiPicked = { emoji ->
                     val updated = insertComposerEmoji(textFieldValue, emoji)
                     applyComposerFieldValue(updated)
-                    restoreKeyboardFromEmojiPane()
                 },
                 onBackspace = ::deleteFromComposer,
                 onSearchActiveChange = {

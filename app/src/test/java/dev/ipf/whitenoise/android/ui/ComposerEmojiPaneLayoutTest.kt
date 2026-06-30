@@ -117,6 +117,6 @@ class ComposerEmojiPaneLayoutTest {
 
     @Test
     fun searchModeAddsRoomForTheSearchFieldAndResults() {
-        assertEquals(376.dp, ComposerEmojiPickerFallbackHeight + ComposerEmojiPickerSearchExtraHeight)
+        assertEquals(432.dp, ComposerEmojiPickerFallbackHeight + ComposerEmojiPickerSearchExtraHeight)
     }
 }
