@@ -1,5 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.WhiteNoise" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.WhiteNoise.Base" parent="android:style/Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.WhiteNoise" parent="Theme.WhiteNoise.Base">
+        <!--
+            Android draws the activity theme's window background while resuming
+            from Recents when FLAG_SECURE has blocked the task snapshot. Keep
+            that fallback aligned with the resolved app theme so secure routes
+            do not flash a contrasting frame before Compose submits its first
+            resumed frame. The generic launcher theme follows day/night
+            resources; MainActivity selects one of the explicit variants below
+            when the user has persisted a Light/Dark/AMOLED override.
+        -->
+        <item name="android:windowBackground">@color/pre_compose_window_background</item>
+        <item name="android:colorBackground">@color/pre_compose_window_background</item>
+        <item name="android:windowSplashScreenBackground">@color/pre_compose_window_background</item>
+        <!-- Pre-Compose fallback only; enableEdgeToEdge/Compose own live bars. -->
+        <item name="android:statusBarColor">@color/pre_compose_window_background</item>
+        <item name="android:navigationBarColor">@color/pre_compose_window_background</item>
+        <item name="android:windowLightStatusBar">@bool/pre_compose_light_system_bars</item>
+        <item name="android:windowLightNavigationBar">@bool/pre_compose_light_system_bars</item>
+    </style>
+
+    <style name="Theme.WhiteNoise.Light" parent="Theme.WhiteNoise.Base">
+        <item name="android:windowBackground">@color/pre_compose_window_background_light</item>
+        <item name="android:colorBackground">@color/pre_compose_window_background_light</item>
+        <item name="android:windowSplashScreenBackground">@color/pre_compose_window_background_light</item>
+        <item name="android:statusBarColor">@color/pre_compose_window_background_light</item>
+        <item name="android:navigationBarColor">@color/pre_compose_window_background_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <style name="Theme.WhiteNoise.Dark" parent="Theme.WhiteNoise.Base">
+        <item name="android:windowBackground">@color/pre_compose_window_background_dark</item>
+        <item name="android:colorBackground">@color/pre_compose_window_background_dark</item>
+        <item name="android:windowSplashScreenBackground">@color/pre_compose_window_background_dark</item>
+        <item name="android:statusBarColor">@color/pre_compose_window_background_dark</item>
+        <item name="android:navigationBarColor">@color/pre_compose_window_background_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="Theme.WhiteNoise.Amoled" parent="Theme.WhiteNoise.Base">
+        <item name="android:windowBackground">@color/pre_compose_window_background_amoled</item>
+        <item name="android:colorBackground">@color/pre_compose_window_background_amoled</item>
+        <item name="android:windowSplashScreenBackground">@color/pre_compose_window_background_amoled</item>
+        <item name="android:statusBarColor">@color/pre_compose_window_background_amoled</item>
+        <item name="android:navigationBarColor">@color/pre_compose_window_background_amoled</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
 </resources>
