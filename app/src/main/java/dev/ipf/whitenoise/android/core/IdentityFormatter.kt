@@ -162,11 +162,8 @@ object IdentityFormatter {
                 while (index < chars.size && chars[index] == 'y') index += 1
                 chars.subList(start, index).clear()
                 index = start
-                while (index < chars.size && chars[index].isYearSeparator()) chars.removeAt(index)
-                while (index > 0 && chars[index - 1].isYearSeparator()) {
-                    chars.removeAt(index - 1)
-                    index -= 1
-                }
+                index = removeYearAffixAfter(chars, index)
+                index = removeYearAffixBefore(chars, index)
             } else {
                 index += 1
             }
@@ -175,6 +172,44 @@ object IdentityFormatter {
     }
 
     private fun Char.isYearSeparator(): Boolean = this.isWhitespace() || this in setOf(',', '.', '/', '-', '年')
+
+    private fun removeYearAffixAfter(
+        chars: MutableList<Char>,
+        index: Int,
+    ): Int {
+        while (index < chars.size && chars[index].isYearSeparator()) chars.removeAt(index)
+        if (index < chars.size && chars[index] == '\'') {
+            val close = chars.withIndex().firstOrNull { it.index > index && it.value == '\'' }?.index ?: -1
+            if (close > index) {
+                chars.subList(index, close + 1).clear()
+                while (index < chars.size && chars[index].isYearSeparator()) chars.removeAt(index)
+            }
+        }
+        return index
+    }
+
+    private fun removeYearAffixBefore(
+        chars: MutableList<Char>,
+        startIndex: Int,
+    ): Int {
+        var index = startIndex
+        while (index > 0 && chars[index - 1].isYearSeparator()) {
+            chars.removeAt(index - 1)
+            index -= 1
+        }
+        if (index > 0 && chars[index - 1] == '\'') {
+            val open = chars.subList(0, index - 1).lastIndexOf('\'')
+            if (open >= 0) {
+                chars.subList(open, index).clear()
+                index = open
+                while (index > 0 && chars[index - 1].isYearSeparator()) {
+                    chars.removeAt(index - 1)
+                    index -= 1
+                }
+            }
+        }
+        return index
+    }
 }
 
 /**

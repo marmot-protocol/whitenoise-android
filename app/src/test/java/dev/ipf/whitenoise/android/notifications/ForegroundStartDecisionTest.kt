@@ -194,6 +194,13 @@ class ForegroundStartDecisionTest {
     }
 
     @Test
+    fun pushWakeAndNativePushSyncAreOneShotForegroundStarts() {
+        assertEquals(true, isOneShotForegroundStart(syncNativePushRegistrationRequested = false, ForegroundStartTrigger.PushWake))
+        assertEquals(true, isOneShotForegroundStart(syncNativePushRegistrationRequested = true, ForegroundStartTrigger.SystemWake))
+        assertEquals(false, isOneShotForegroundStart(syncNativePushRegistrationRequested = false, ForegroundStartTrigger.UserToggle))
+    }
+
+    @Test
     fun systemWakeUsesBootPermittedForegroundServiceType() {
         assertEquals(
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,

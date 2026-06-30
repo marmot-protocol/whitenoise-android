@@ -299,5 +299,6 @@ class IdentityFormatterTest {
         assertEquals("MMM d", IdentityFormatter.stripYearFromLocalizedDatePattern("MMM d, y"))
         assertEquals("d MMM", IdentityFormatter.stripYearFromLocalizedDatePattern("d MMM y"))
         assertEquals("M月d日", IdentityFormatter.stripYearFromLocalizedDatePattern("y年M月d日"))
+        assertEquals("d MMM", IdentityFormatter.stripYearFromLocalizedDatePattern("d MMM 'de' y"))
     }
 }

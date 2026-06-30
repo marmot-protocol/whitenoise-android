@@ -60,6 +60,7 @@ class AvatarImageLoaderTest {
         assertEquals(512 to 256, avatarScaledDimensions(width = 900, height = 450, maxDimension = 512))
         assertEquals(256 to 512, avatarScaledDimensions(width = 450, height = 900, maxDimension = 512))
         assertEquals(512 to 512, avatarScaledDimensions(width = 700, height = 700, maxDimension = 512))
+        assertEquals(512 to 256, avatarScaledDimensions(width = 564, height = 282, maxDimension = 512))
         assertEquals(128 to 256, avatarScaledDimensions(width = 128, height = 256, maxDimension = 512))
     }
 

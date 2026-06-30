@@ -2434,15 +2434,21 @@ class ConversationController(
         try {
             coroutineScope {
                 conversationScope = this
-                // Converge workers in the background so the first timeline
-                // snapshot is not gated on a global, all-accounts relay
-                // round-trip (#441). Lifecycle-bound to this conversation:
-                // cancelled when start() is cancelled (user leaves). The live
-                // group-state + timeline subscriptions below still fold in
-                // peer commits as they arrive.
-                launch { appState.catchUpAccounts() }
-                startDisappearingMessageSweepIfNeeded(account)
-                runConversationSubscriptionLoop(account)
+                try {
+                    // Converge workers in the background so the first timeline
+                    // snapshot is not gated on a global, all-accounts relay
+                    // round-trip (#441). Lifecycle-bound to this conversation:
+                    // cancelled when start() is cancelled (user leaves). The live
+                    // group-state + timeline subscriptions below still fold in
+                    // peer commits as they arrive.
+                    launch { appState.catchUpAccounts() }
+                    startDisappearingMessageSweepIfNeeded(account)
+                    runConversationSubscriptionLoop(account)
+                } finally {
+                    disappearingSweepJob?.cancel()
+                    disappearingSweepJob = null
+                    conversationScope = null
+                }
             }
         } catch (cancel: CancellationException) {
             // Expected when the conversation screen leaves the composition.
@@ -5464,8 +5470,13 @@ class ConversationController(
         account: String,
         details: GroupDetailsFfi,
     ) {
+        val previousRetention = group.disappearingMessageSecs
         val applied = applyAuthoritativeGroupDetails(details)
         group = applied.group
+        if (previousRetention != group.disappearingMessageSecs) {
+            publishTimelineFromIndexes()
+            handleRetentionTransition(previousRetention, group.disappearingMessageSecs)
+        }
         // Once a self-leave has been recorded locally, refuse to re-add self
         // from a details round-trip that still predates the engine eviction —
         // otherwise the full roster (self included) would restore the member

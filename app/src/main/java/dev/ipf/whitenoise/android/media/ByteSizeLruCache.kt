@@ -19,6 +19,7 @@ package dev.ipf.whitenoise.android.media
 class ByteSizeLruCache<K : Any, V : Any>(
     private val maxBytes: Long,
     private val sizeOf: (V) -> Int,
+    private val maxEntryBytes: Long? = null,
     private val onEntryRemoved: (V) -> Unit = {},
 ) {
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
@@ -41,12 +42,22 @@ class ByteSizeLruCache<K : Any, V : Any>(
         key: K,
         value: V,
     ): V? {
+        val valueCharge = chargeOf(value)
+        val entryCap = maxEntryBytes
+        if (entryCap != null && valueCharge > entryCap) {
+            val removed = entries.remove(key)
+            if (removed != null) {
+                residentBytes -= chargeOf(removed)
+                onEntryRemoved(removed)
+            }
+            return removed
+        }
         val previous = entries.put(key, value)
         if (previous != null) {
             residentBytes -= chargeOf(previous)
-            onEntryRemoved(previous)
+            if (previous !== value) onEntryRemoved(previous)
         }
-        residentBytes += chargeOf(value)
+        residentBytes += valueCharge
         evictUntilUnderCap()
         return previous
     }

@@ -228,8 +228,11 @@ internal fun avatarScaledDimensions(
 ): Pair<Int, Int> {
     val longEdge = maxOf(width, height)
     if (longEdge <= maxDimension) return width to height
-    val scale = maxDimension.toFloat() / longEdge.toFloat()
-    return (width * scale).toInt().coerceAtLeast(1) to (height * scale).toInt().coerceAtLeast(1)
+    return if (width >= height) {
+        maxDimension to ((height.toLong() * maxDimension) / width).toInt().coerceAtLeast(1)
+    } else {
+        ((width.toLong() * maxDimension) / height).toInt().coerceAtLeast(1) to maxDimension
+    }
 }
 
 internal fun isAvatarFailureFresh(

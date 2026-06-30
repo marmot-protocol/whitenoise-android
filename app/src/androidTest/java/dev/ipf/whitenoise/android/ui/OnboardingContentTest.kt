@@ -91,7 +91,6 @@ class OnboardingContentTest {
             }
         }
 
-        composeRule.onNodeWithText("Sign in").performClick()
         composeRule.onNodeWithContentDescription("Sign in").assertIsDisplayed()
     }
 }

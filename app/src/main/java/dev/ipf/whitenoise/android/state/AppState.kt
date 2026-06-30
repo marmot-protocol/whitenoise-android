@@ -431,6 +431,7 @@ class WhiteNoiseAppState(
     internal val mediaPlaintextCache =
         dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, ByteArray>(
             maxBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
+            maxEntryBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
             sizeOf = { it.size },
         )
 
@@ -443,8 +444,8 @@ class WhiteNoiseAppState(
     internal val mediaThumbnailCache =
         dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, android.graphics.Bitmap>(
             maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
+            maxEntryBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
             sizeOf = { it.allocationByteCount },
-            onEntryRemoved = { if (!it.isRecycled) it.recycle() },
         )
 
     /**
