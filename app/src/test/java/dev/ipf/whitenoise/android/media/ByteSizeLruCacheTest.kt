@@ -117,4 +117,62 @@ class ByteSizeLruCacheTest {
         assertTrue("resident should be bounded by cap", cache.residentBytes() <= 3L)
         assertTrue("size should be bounded by cap", cache.size() <= 3)
     }
+
+    @Test
+    fun evictedRemovedAndClearedEntriesInvokeRemovalCallback() {
+        val removed = mutableListOf<String>()
+        val cache =
+            ByteSizeLruCache<String, String>(
+                maxBytes = 6,
+                sizeOf = { it.length },
+                onEntryRemoved = { removed += it },
+            )
+
+        cache.put("a", "aaa")
+        cache.put("b", "bbb")
+        cache.put("c", "ccc")
+        cache.remove("b")
+        cache.put("d", "ddd")
+        cache.clear()
+
+        assertEquals(listOf("aaa", "bbb", "ccc", "ddd"), removed)
+    }
+
+    @Test
+    fun sameInstanceReplaceDoesNotInvokeRemovalCallback() {
+        val removed = mutableListOf<String>()
+        val value = "same"
+        val cache =
+            ByteSizeLruCache<String, String>(
+                maxBytes = 100,
+                sizeOf = { it.length },
+                onEntryRemoved = { removed += it },
+            )
+
+        cache.put("k", value)
+        cache.put("k", value)
+
+        assertEquals(value, cache.get("k"))
+        assertEquals(4L, cache.residentBytes())
+        assertEquals(emptyList<String>(), removed)
+    }
+
+    @Test
+    fun oversizedEntryIsNotCachedAndRemovesPreviousValue() {
+        val removed = mutableListOf<String>()
+        val cache =
+            ByteSizeLruCache<String, String>(
+                maxBytes = 100,
+                maxEntryBytes = 10,
+                sizeOf = { it.length },
+                onEntryRemoved = { removed += it },
+            )
+
+        cache.put("k", "small")
+        cache.put("k", "this value is too large")
+
+        assertNull(cache.get("k"))
+        assertEquals(0L, cache.residentBytes())
+        assertEquals(listOf("small"), removed)
+    }
 }

@@ -19,6 +19,8 @@ package dev.ipf.whitenoise.android.media
 class ByteSizeLruCache<K : Any, V : Any>(
     private val maxBytes: Long,
     private val sizeOf: (V) -> Int,
+    private val maxEntryBytes: Long? = null,
+    private val onEntryRemoved: (V) -> Unit = {},
 ) {
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
     private val entries = LinkedHashMap<K, V>(8, 0.75f, true)
@@ -40,9 +42,22 @@ class ByteSizeLruCache<K : Any, V : Any>(
         key: K,
         value: V,
     ): V? {
+        val valueCharge = chargeOf(value)
+        val entryCap = maxEntryBytes
+        if (entryCap != null && valueCharge > entryCap) {
+            val removed = entries.remove(key)
+            if (removed != null) {
+                residentBytes -= chargeOf(removed)
+                onEntryRemoved(removed)
+            }
+            return removed
+        }
         val previous = entries.put(key, value)
-        if (previous != null) residentBytes -= chargeOf(previous)
-        residentBytes += chargeOf(value)
+        if (previous != null) {
+            residentBytes -= chargeOf(previous)
+            if (previous !== value) onEntryRemoved(previous)
+        }
+        residentBytes += valueCharge
         evictUntilUnderCap()
         return previous
     }
@@ -50,11 +65,15 @@ class ByteSizeLruCache<K : Any, V : Any>(
     /** Removes [key] if present, updating byte accounting. Returns the value. */
     fun remove(key: K): V? {
         val removed = entries.remove(key)
-        if (removed != null) residentBytes -= chargeOf(removed)
+        if (removed != null) {
+            residentBytes -= chargeOf(removed)
+            onEntryRemoved(removed)
+        }
         return removed
     }
 
     fun clear() {
+        entries.values.forEach(onEntryRemoved)
         entries.clear()
         residentBytes = 0L
     }
@@ -81,6 +100,7 @@ class ByteSizeLruCache<K : Any, V : Any>(
         while (it.hasNext() && residentBytes > maxBytes) {
             val eldest = it.next()
             residentBytes -= chargeOf(eldest.value)
+            onEntryRemoved(eldest.value)
             it.remove()
         }
     }
