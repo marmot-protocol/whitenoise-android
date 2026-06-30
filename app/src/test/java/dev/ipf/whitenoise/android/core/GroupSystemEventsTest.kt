@@ -289,34 +289,6 @@ class GroupSystemEventsTest {
     }
 
     @Test
-    fun resolveUsesLocalPreviousNameForCurrentProjectionShape() {
-        // Current Marmot group-rename rows expose only data.name / FFI.name. The
-        // Android local snapshot supplies the previous name without requiring a
-        // hypothetical data.old_name field.
-        val structured =
-            GroupSystemEventFfi(
-                systemType = "group_renamed",
-                text = "Group renamed",
-                actorAccountIdHex = "alice",
-                subjectAccountIdHex = null,
-                name = "Marmot Protocol",
-                oldName = null,
-                oldRetentionSeconds = null,
-                newRetentionSeconds = null,
-            )
-        val json =
-            """{"v":1,"system_type":"group_renamed",""" +
-                """"data":{"name":"Marmot Protocol"}}"""
-
-        val event = GroupSystemEvents.resolve(json, structured, GroupRenamePreviousName("Marmot Lab"))!!
-
-        assertEquals(
-            "alice renamed the group from “Marmot Lab” to “Marmot Protocol”",
-            GroupSystemEvents.summary(event, actorName = "alice", subjectName = null),
-        )
-    }
-
-    @Test
     fun renamedWithoutNameRendersFallbackNotText() {
         val event =
             GroupSystemEvent(

@@ -30,10 +30,6 @@ data class GroupSystemEvent(
     val newRetentionSeconds: ULong? = null,
 )
 
-data class GroupRenamePreviousName(
-    val name: String?,
-)
-
 data class GroupRenameDiffNames(
     val oldName: String,
     val newName: String,
@@ -208,35 +204,16 @@ object GroupSystemEvents {
     fun resolve(
         plaintext: String,
         structured: GroupSystemEventFfi? = null,
-        localPreviousName: GroupRenamePreviousName? = null,
-    ): GroupSystemEvent? {
-        val event =
-            structured?.let { ffi ->
-                val structuredEvent = fromFfi(ffi)
-                val parsed = parse(plaintext)
-                if (!structuredEvent.oldNameKnown && parsed?.oldNameKnown == true) {
-                    structuredEvent.copy(oldName = parsed.oldName, oldNameKnown = true)
-                } else {
-                    structuredEvent
-                }
-            } ?: parse(plaintext)
-        return event?.let { resolved ->
-            localPreviousName?.let { withLocalRenamePreviousName(resolved, it) } ?: resolved
-        }
-    }
-
-    fun withLocalRenamePreviousName(
-        event: GroupSystemEvent,
-        previousName: GroupRenamePreviousName,
-    ): GroupSystemEvent =
-        if (event.systemType == TypeGroupRenamed && !event.oldNameKnown) {
-            event.copy(
-                oldName = previousName.name?.takeIf { it.isNotBlank() },
-                oldNameKnown = true,
-            )
-        } else {
-            event
-        }
+    ): GroupSystemEvent? =
+        structured?.let { ffi ->
+            val structuredEvent = fromFfi(ffi)
+            val parsed = parse(plaintext)
+            if (!structuredEvent.oldNameKnown && parsed?.oldNameKnown == true) {
+                structuredEvent.copy(oldName = parsed.oldName, oldNameKnown = true)
+            } else {
+                structuredEvent
+            }
+        } ?: parse(plaintext)
 
     /**
      * The hex pubkey to attribute the change to: the payload's `actor` when
@@ -257,8 +234,6 @@ object GroupSystemEvents {
         } else {
             null
         }
-
-    fun renameNewName(event: GroupSystemEvent): String? = if (event.systemType == TypeGroupRenamed) event.name else null
 
     private fun renameDiffNames(
         event: GroupSystemEvent,

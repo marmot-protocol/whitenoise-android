@@ -362,7 +362,6 @@ import dev.ipf.whitenoise.android.core.ENCRYPTED_BACKUP_MIN_PASSPHRASE_LENGTH
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.EncryptedBackupPassphraseStrength
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.GroupRenamePreviousName
 import dev.ipf.whitenoise.android.core.GroupSystemCopy
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
@@ -7691,12 +7690,11 @@ private fun GroupSystemRow(
     record: AppMessageRecordFfi,
     appState: WhiteNoiseAppState,
     groupSystem: GroupSystemEventFfi? = null,
-    localPreviousName: GroupRenamePreviousName? = null,
 ) {
     val copy = rememberGroupSystemCopy()
     val event =
-        remember(record.plaintext, groupSystem, localPreviousName) {
-            GroupSystemEvents.resolve(record.plaintext, groupSystem, localPreviousName)
+        remember(record.plaintext, groupSystem) {
+            GroupSystemEvents.resolve(record.plaintext, groupSystem)
         }
     // Localized new-window label for the disappearing-timer "set to …" rows; null
     // when the event isn't a timer-on change (off/other rows need no duration).
@@ -10085,7 +10083,6 @@ private fun ConversationScreen(
                                             record = item.record,
                                             appState = appState,
                                             groupSystem = item.projected?.groupSystem,
-                                            localPreviousName = item.localGroupRenamePreviousName,
                                         )
                                         return@itemsIndexed
                                     }

@@ -40,7 +40,6 @@ import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.GroupRenamePreviousName
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -440,7 +439,6 @@ data class TimelineMessage(
     val status: MessageStatus,
     val projected: TimelineMessageRecordFfi? = null,
     val timelineOrder: ULong = 0uL,
-    val localGroupRenamePreviousName: GroupRenamePreviousName? = null,
 )
 
 /**
@@ -1153,10 +1151,7 @@ class ChatsController(
                         withContext(Dispatchers.IO) {
                             chatStream.snapshot()
                         }.associateBy { it.groupIdHex }
-                    groupRecordsById.values.forEach { record ->
-                        requestGroupProfiles(record)
-                        appState.rememberGroupNameSnapshot(accountRef, record.groupIdHex, record.name)
-                    }
+                    groupRecordsById.values.forEach(::requestGroupProfiles)
                     chatsDebug {
                         "snapshot account=${accountRef.take(8)} rows=${chatRows.size} groups=${groupRecordsById.size} " +
                             "${chatRows.map { it.debugSummary() }}"
@@ -1258,7 +1253,6 @@ class ChatsController(
     }
 
     private fun foldGroup(record: AppGroupRecordFfi) {
-        appState.recordGroupNameSnapshot(accountRef, record.groupIdHex, record.name)
         groupRecordsById = groupRecordsById + (record.groupIdHex to record)
         scheduleRecompute()
     }
@@ -2289,10 +2283,6 @@ class ConversationController(
 
     private val conversationAccountRef = appState.activeAccountRef
 
-    init {
-        appState.rememberGroupNameSnapshot(conversationAccountRef, initialGroup.groupIdHex, initialGroup.name)
-    }
-
     private val mediaUploadSessionEpoch = appState.mediaUploadSessionEpoch()
     private val messageById = linkedMapOf<String, AppMessageRecordFfi>()
     private val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
@@ -2661,9 +2651,8 @@ class ConversationController(
     // the next 60s sweep, flashing expired messages for up to a minute (#674).
     private fun applyGroupState(update: AppGroupRecordFfi) {
         val previousRetention = group.disappearingMessageSecs
-        val renamePreviousName = appState.recordGroupNameSnapshot(conversationAccountRef, update.groupIdHex, update.name)
         group = update
-        if (previousRetention != update.disappearingMessageSecs || renamePreviousName != null) {
+        if (previousRetention != update.disappearingMessageSecs) {
             publishTimelineFromIndexes()
             handleRetentionTransition(previousRetention, update.disappearingMessageSecs)
         }
@@ -4228,7 +4217,6 @@ class ConversationController(
                         updatedDescription,
                     )
                 }
-                updatedName?.let { appState.recordGroupNameSnapshot(account, group.groupIdHex, it) }
                 appState.present(R.string.toast_group_updated)
                 true
             }.onFailure {
@@ -5191,7 +5179,7 @@ class ConversationController(
             } else {
                 val nowSecs = (System.currentTimeMillis() / 1000L).toULong()
                 (optimisticMessages.values + projected).filter { it.record.recordedAt + window > nowSecs }
-            }.map { it.withLocalGroupRenamePreviousName() }
+            }
         val aggregated = aggregateEdits(live.map { it.record })
         // Drop any optimistic edit the real kind-1009 has now caught up to:
         // once `aggregateEdits` reports the same latest text, the overlay is
@@ -5248,27 +5236,6 @@ class ConversationController(
             MessageStatus.Failed -> copy(status = MessageStatus.Failed)
             else -> this
         }
-    }
-
-    private fun TimelineMessage.withLocalGroupRenamePreviousName(): TimelineMessage {
-        if (!MessageProjector.isGroupSystem(record)) {
-            return if (localGroupRenamePreviousName == null) this else copy(localGroupRenamePreviousName = null)
-        }
-        val event = GroupSystemEvents.resolve(record.plaintext, projected?.groupSystem)
-        val previousName =
-            if (event != null && event.oldNameKnown) {
-                null
-            } else if (event != null) {
-                appState.previousGroupRenameName(
-                    conversationAccountRef,
-                    record.groupIdHex,
-                    GroupSystemEvents.renameNewName(event),
-                    record.messageIdHex,
-                )
-            } else {
-                null
-            }
-        return if (previousName == localGroupRenamePreviousName) this else copy(localGroupRenamePreviousName = previousName)
     }
 
     private fun nextOptimisticTimelineOrder(): ULong =
