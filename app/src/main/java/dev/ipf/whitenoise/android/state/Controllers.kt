@@ -2365,6 +2365,27 @@ class ConversationController(
             return GroupProjector.inviteAccount(group, other)
         }
 
+    /**
+     * The peer account whose profile picture stands in for a 1:1 conversation's
+     * avatar, mirroring the chat-list row (#837): the inviter for a pending
+     * invite, otherwise the lone counterparty of an unnamed two-member chat.
+     * Null for multi-member or named groups, which use their own group avatar.
+     */
+    val avatarAccount: String?
+        get() {
+            val me = conversationAccountIdHex
+            val other = GroupProjector.otherMemberAccount(members, me)
+            return GroupProjector.avatarAccount(group, other, members.size)
+        }
+
+    /**
+     * Avatar URL for the conversation top bar. A group's own avatar wins; a 1:1
+     * DM falls back to the peer's profile picture so the top bar matches the
+     * chat-list row instead of showing a blank/initials placeholder (#837).
+     */
+    val avatarUrl: String?
+        get() = group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) }
+
     // A nameless two-member conversation, classified the same way the chat list
     // and notifications do. The header title is already the counterparty's name,
     // so the "2 members" subtitle is redundant noise here.
