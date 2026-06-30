@@ -14068,15 +14068,18 @@ private fun MessageBubble(
                     )
                 }
                 if (customizeReactionsOpen) {
+                    fun closeCustomizeToReactionSheet() {
+                        customizeReactionsOpen = false
+                        emojiPickerOpen = true
+                    }
                     CustomizeReactionsDialog(
                         quickReactionEmojis = quickReactionEmojis,
-                        onDismiss = { customizeReactionsOpen = false },
+                        onDismiss = ::closeCustomizeToReactionSheet,
                         onSave = { choices ->
                             onQuickReactionsSave(choices)
+                            closeCustomizeToReactionSheet()
                         },
-                        onReset = {
-                            onQuickReactionsReset()
-                        },
+                        onReset = onQuickReactionsReset,
                     )
                 }
                 if (editHistoryOpen && editState != null) {
@@ -15421,6 +15424,7 @@ private fun EmojiPickerSheet(
             onEmojiPicked = onEmojiPicked,
             recordRecentPicks = recordRecentPicks,
             onCustomizeReactions = onCustomizeReactions,
+            searchFieldAlwaysVisible = true,
             searchStartsOpen = false,
             modifier =
                 Modifier
@@ -15441,6 +15445,7 @@ private fun EmojiPickerContent(
     onBackspace: (() -> Unit)? = null,
     onCustomizeReactions: (() -> Unit)? = null,
     searchStartsOpen: Boolean = false,
+    searchFieldAlwaysVisible: Boolean = false,
     onSearchActiveChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -15516,15 +15521,20 @@ private fun EmojiPickerContent(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (searchOpen) {
+        if (searchFieldAlwaysVisible || searchOpen) {
             EmojiSearchField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = {
+                    if (searchFieldAlwaysVisible) searchOpen = true
+                    searchQuery = it
+                },
                 onClose = {
                     searchOpen = false
                     keyboardController?.hide()
                 },
+                onSearchIntent = { searchOpen = true },
                 focusRequester = searchFocusRequester,
+                showBackButton = !searchFieldAlwaysVisible,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -15580,7 +15590,7 @@ private fun EmojiPickerContent(
                 scope.launch { gridState.scrollToItem(sectionHeaderIndex[group]) }
             },
             onBackspace = onBackspace,
-            modifier = Modifier.fillMaxWidth().height(44.dp),
+            modifier = Modifier.fillMaxWidth().height(42.dp),
         )
     }
 }
@@ -15590,29 +15600,36 @@ private fun EmojiSearchField(
     value: String,
     onValueChange: (String) -> Unit,
     onClose: () -> Unit,
+    onSearchIntent: () -> Unit,
     focusRequester: FocusRequester,
+    showBackButton: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.heightIn(min = 44.dp),
+        modifier = modifier.height(42.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(22.dp),
         border = amoledSurfaceBorderStroke(),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             IconButton(
-                onClick = onClose,
+                onClick = if (showBackButton) onClose else onSearchIntent,
                 modifier = Modifier.size(32.dp),
             ) {
                 Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.back),
+                    if (showBackButton) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.Search,
+                    contentDescription =
+                        if (showBackButton) {
+                            stringResource(R.string.back)
+                        } else {
+                            stringResource(R.string.emoji_search_hint)
+                        },
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(18.dp),
                 )
             }
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
@@ -15623,18 +15640,24 @@ private fun EmojiSearchField(
                     textStyle =
                         LocalTextStyle.current.copy(
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 16.sp,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
                         ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .focusRequester(focusRequester),
+                            .focusRequester(focusRequester)
+                            .onFocusChanged { if (it.isFocused) onSearchIntent() },
                 )
                 if (value.isEmpty()) {
                     Text(
                         stringResource(R.string.emoji_search_hint),
-                        style = LocalTextStyle.current.copy(fontSize = 16.sp),
+                        style =
+                            LocalTextStyle.current.copy(
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                            ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                     )
                 }
@@ -15696,7 +15719,7 @@ private fun EmojiSearchResultCell(
                 .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(emoji, style = MaterialTheme.typography.headlineSmall)
+        Text(emoji, style = MaterialTheme.typography.headlineMedium)
     }
 }
 
@@ -15722,31 +15745,31 @@ private fun EmojiCategoryRail(
             EmojiRailIconButton(
                 onClick = onCustomizeReactions,
                 selected = false,
-                modifier = Modifier.weight(1f).height(40.dp),
+                modifier = Modifier.weight(1f).height(38.dp),
             ) {
                 Icon(
                     Icons.Default.Settings,
                     contentDescription = stringResource(R.string.customize_reactions),
-                    modifier = Modifier.size(21.dp),
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
         EmojiRailIconButton(
             onClick = onSearch,
             selected = searchSelected,
-            modifier = Modifier.weight(1f).height(40.dp),
+            modifier = Modifier.weight(1f).height(38.dp),
         ) {
             Icon(
                 Icons.Default.Search,
                 contentDescription = stringResource(R.string.emoji_search_hint),
-                modifier = Modifier.size(21.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
         if (showRecents) {
             EmojiCategoryTab(
                 icon = "🕘",
                 selected = recentsSelected,
-                modifier = Modifier.weight(1f).height(40.dp),
+                modifier = Modifier.weight(1f).height(38.dp),
                 onClick = onRecents,
             )
         }
@@ -15754,7 +15777,7 @@ private fun EmojiCategoryRail(
             EmojiCategoryTab(
                 icon = icon,
                 selected = selectedGroup == group,
-                modifier = Modifier.weight(1f).height(40.dp),
+                modifier = Modifier.weight(1f).height(38.dp),
                 onClick = { onGroup(group) },
             )
         }
@@ -15762,12 +15785,12 @@ private fun EmojiCategoryRail(
             EmojiRailIconButton(
                 onClick = onBackspace,
                 selected = false,
-                modifier = Modifier.weight(1f).height(40.dp),
+                modifier = Modifier.weight(1f).height(38.dp),
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Backspace,
                     contentDescription = stringResource(R.string.emoji_backspace),
-                    modifier = Modifier.size(21.dp),
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
@@ -15782,8 +15805,8 @@ private fun EmojiRailIconButton(
     content: @Composable () -> Unit,
 ) {
     Surface(
-        modifier = modifier.padding(horizontal = 1.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.padding(horizontal = 1.dp).clip(RoundedCornerShape(11.dp)).clickable(onClick = onClick),
+        shape = RoundedCornerShape(11.dp),
         color =
             if (selected) {
                 MaterialTheme.colorScheme.secondaryContainer
@@ -15815,7 +15838,11 @@ private fun EmojiCategoryTab(
         selected = selected,
         modifier = modifier,
     ) {
-        Text(icon, style = MaterialTheme.typography.titleMedium)
+        Text(
+            icon,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+        )
     }
 }
 
@@ -15823,8 +15850,9 @@ private fun EmojiCategoryTab(
 private fun EmojiSectionHeader(title: String) {
     Text(
         text = title,
-        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 10.dp, bottom = 4.dp),
-        style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 10.dp, bottom = 6.dp),
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
