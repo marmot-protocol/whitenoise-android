@@ -405,6 +405,7 @@ import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
@@ -1228,6 +1229,14 @@ private fun MainShell(
     // open path (row tap, notification, new-chat), which lands at the normal
     // unread/newest anchor.
     var selectedChatFocusMessageId by remember { mutableStateOf<String?>(null) }
+    // Whether the focused message also gets the brief highlight flash. Search
+    // hits highlight; a notification tap scrolls to it without the color flash.
+    var selectedChatFocusHighlight by remember { mutableStateOf(true) }
+    // True only when `selectedChat` was opened by tapping a message notification.
+    // A message notification implies current group membership, so the composer
+    // shows immediately instead of a placeholder while membership verification
+    // catches up after the account switch.
+    var selectedChatOpenedFromNotification by remember { mutableStateOf(false) }
     // True only when `selectedChat` was opened straight off a just-completed
     // New Chat / Create Group flow (issue #321), so ConversationScreen raises
     // the composer + keyboard once on entry. Plain `remember` (not
@@ -1343,7 +1352,13 @@ private fun MainShell(
                 allChats
                     .firstOrNull { it.group.groupIdHex == step.groupIdHex }
                     ?.let {
-                        selectedChatFocusMessageId = null
+                        // Scroll to the notified message, reusing the search-hit
+                        // focus path (#832). MESSAGE targets only — invites carry
+                        // no message. No highlight flash on a notification tap.
+                        selectedChatFocusMessageId =
+                            target.messageIdHex?.takeIf { target.kind == NotificationTargetKind.MESSAGE }
+                        selectedChatFocusHighlight = false
+                        selectedChatOpenedFromNotification = true
                         // Notification routing is never a just-created open, so
                         // clear any stale justCreated flag carried over from a
                         // prior New Chat / Create Group flow before showing the
@@ -1392,6 +1407,7 @@ private fun MainShell(
                 .firstOrNull { it.group.groupIdHex == savedGroupId }
                 ?.let {
                     selectedChatFocusMessageId = null
+                    selectedChatOpenedFromNotification = false
                     selectedChat = it
                 }
         }
@@ -1450,6 +1466,7 @@ private fun MainShell(
     // both surfaces behave identically.
     val openGroupFromProfile: (ChatListItem, Boolean) -> Unit = { item, justCreated ->
         selectedChatFocusMessageId = null
+        selectedChatOpenedFromNotification = false
         selectedChatJustCreated = justCreated
         selectedChat = item
         appState.clearPresentedProfile()
@@ -1476,6 +1493,8 @@ private fun MainShell(
             appState = appState,
             chat = selectedChat!!,
             focusMessageId = selectedChatFocusMessageId,
+            highlightFocusMessage = selectedChatFocusHighlight,
+            openedFromNotification = selectedChatOpenedFromNotification,
             justCreated = selectedChatJustCreated,
             onBack = {
                 selectedChat = null
@@ -1507,6 +1526,8 @@ private fun MainShell(
                 },
                 onOpenGroup = { item, focusMessageId, justCreated ->
                     selectedChatFocusMessageId = focusMessageId
+                    selectedChatFocusHighlight = true
+                    selectedChatOpenedFromNotification = false
                     selectedChatJustCreated = justCreated
                     selectedChat = item
                 },
@@ -3809,16 +3830,26 @@ internal enum class ComposerGate {
  */
 internal fun conversationComposerGate(
     pendingInvite: Boolean,
-    membersLoaded: Boolean,
+    membersVerified: Boolean,
     isSelfMember: Boolean,
     seededSelfMember: Boolean,
     seededMembershipKnown: Boolean,
+    assumeMemberUntilVerified: Boolean,
 ): ComposerGate =
     when {
         pendingInvite -> ComposerGate.INVITE
         isSelfMember -> ComposerGate.COMPOSER
-        membersLoaded -> ComposerGate.NOTICE
-        seededMembershipKnown -> if (seededSelfMember) ComposerGate.COMPOSER else ComposerGate.NOTICE
+        // Removed-member notice only once refreshMembers() has VERIFIED the
+        // roster. An unverified roster that merely omits self — e.g. a stale or
+        // cross-account snapshot right after tapping another account's
+        // notification — must not flash the notice; wait instead.
+        membersVerified -> ComposerGate.NOTICE
+        seededMembershipKnown && seededSelfMember -> ComposerGate.COMPOSER
+        // Opened from a message notification: receiving a message for a group
+        // implies current membership, so show the composer immediately rather
+        // than a placeholder while verification catches up. A genuine removal
+        // still wins above via membersVerified once refreshMembers() confirms.
+        assumeMemberUntilVerified -> ComposerGate.COMPOSER
         else -> ComposerGate.PENDING
     }
 
@@ -8073,6 +8104,13 @@ private fun ConversationScreen(
     // matched message id to scroll to and briefly highlight once the timeline
     // has paged it in. Null for every normal open path.
     focusMessageId: String? = null,
+    // Whether [focusMessageId] also gets the brief highlight flash. Search hits
+    // do; a notification tap scrolls without the color flash.
+    highlightFocusMessage: Boolean = true,
+    // True when opened by tapping a message notification: receiving a message
+    // implies current membership, so the composer shows immediately rather than
+    // a placeholder while membership verification catches up after the switch.
+    openedFromNotification: Boolean = false,
     // True only when this conversation was just created in the same navigation
     // step (issue #321) — drives a one-shot composer focus + keyboard raise so
     // the user can type the first message without an extra tap. False for row
@@ -9551,10 +9589,12 @@ private fun ConversationScreen(
         val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
         // Center the match so prior + subsequent context is visible (#595).
         centerTimelineItemAt(1 + olderMessagesHeaderCount + timelineIndex)
-        highlightedMessageId = target
-        delay(1_500L)
-        if (highlightedMessageId == target) {
-            highlightedMessageId = null
+        if (highlightFocusMessage) {
+            highlightedMessageId = target
+            delay(1_500L)
+            if (highlightedMessageId == target) {
+                highlightedMessageId = null
+            }
         }
     }
 
@@ -9860,13 +9900,29 @@ private fun ConversationScreen(
                     when (
                         conversationComposerGate(
                             pendingInvite = controller.group.pendingConfirmation,
-                            membersLoaded = controller.membersLoaded,
+                            membersVerified = controller.membersVerified,
                             isSelfMember = controller.isSelfMember,
                             seededSelfMember = controller.seededSelfMember,
                             seededMembershipKnown = controller.seededMembershipKnown,
+                            assumeMemberUntilVerified = openedFromNotification,
                         )
                     ) {
-                        ComposerGate.PENDING -> Unit
+                        // Reserve the composer's resting height while membership
+                        // is still unknown (e.g. right after an account switch),
+                        // so the bottom inset is stable and the composer doesn't
+                        // pop in over the last message once it resolves. Matches
+                        // ComposerBar's resting height (the 44.dp pill plus its
+                        // Column's 10.dp vertical padding top and bottom). Kept
+                        // transparent so no surface colour flashes before the
+                        // composer or notice resolves.
+                        ComposerGate.PENDING ->
+                            Spacer(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding()
+                                    .imePadding()
+                                    .height(64.dp),
+                            )
                         ComposerGate.NOTICE -> RemovedMemberComposerNotice()
                         ComposerGate.INVITE ->
                             InvitePreviewActionBar(
