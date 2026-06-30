@@ -91,12 +91,12 @@
     <string name="jump_to_newest">Zum Neuesten springen</string>
     <string name="scroll_to_top">Nach oben scrollen</string>
     <string name="discard_failed_message">Fehlgeschlagene Nachricht verwerfen</string>
-    <string name="auto_invite_banner_with_inviter">Du wurdest von %1$s eingeladen. Verlasse die Gruppe, wenn du nicht hier sein möchtest.</string>
-    <string name="auto_invite_banner_unknown">Du wurdest zu dieser Gruppe eingeladen. Verlasse die Gruppe, wenn du nicht hier sein möchtest.</string>
-    <string name="auto_invite_banner_dismiss">Einladungsbanner schließen</string>
     <string name="invited_to_this_chat">Sie wurden zu diesem Chat eingeladen.</string>
     <string name="decline">Ablehnen</string>
     <string name="accept">Annehmen</string>
+    <string name="join_group">Gruppe beitreten</string>
+    <string name="invited_to_this_group">Du wurdest in diese Gruppe eingeladen.</string>
+    <string name="invite_preview_with_inviter">%1$s hat dich in diese Gruppe eingeladen.</string>
     <string name="profile">Profil</string>
     <string name="profile_no_bio">Noch keine Bio.</string>
     <string name="profile_shared_groups">Gemeinsame Gruppen</string>
@@ -371,9 +371,6 @@
     <string name="notification_channel_reactions_description">Reaktionen auf deine Nachrichten</string>
     <string name="notification_channel_invites">Einladungen</string>
     <string name="notification_channel_invites_description">Gruppeneinladungen und Willkommensnachrichten</string>
-    <string name="notification_joined_group">%1$s beigetreten</string>
-    <string name="notification_joined_new_group">Einer neuen Gruppe beigetreten</string>
-    <string name="notification_joined_group_from_sender">Du wurdest von %1$s eingeladen</string>
     <string name="notification_group_invite">Du wurdest zu einem sicheren Chat eingeladen</string>
     <string name="notification_new_message">Neue Nachricht</string>
     <string name="notification_sent_picture">hat ein Foto gesendet</string>

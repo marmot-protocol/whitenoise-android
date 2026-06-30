@@ -93,12 +93,12 @@
     <string name="jump_to_newest">К новым</string>
     <string name="scroll_to_top">Прокрутить вверх</string>
     <string name="discard_failed_message">Удалить неотправленное сообщение</string>
-    <string name="auto_invite_banner_with_inviter">Вас пригласил(а) %1$s. Покиньте группу, если не хотите здесь быть.</string>
-    <string name="auto_invite_banner_unknown">Вас пригласили в эту группу. Покиньте группу, если не хотите здесь быть.</string>
-    <string name="auto_invite_banner_dismiss">Закрыть баннер приглашения</string>
     <string name="invited_to_this_chat">Вас пригласили в этот чат.</string>
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>
+    <string name="join_group">Вступить в группу</string>
+    <string name="invited_to_this_group">Вас пригласили в эту группу.</string>
+    <string name="invite_preview_with_inviter">%1$s пригласил(а) вас в эту группу.</string>
     <string name="profile">Профиль</string>
     <string name="profile_no_bio">Биографии пока нет.</string>
     <string name="profile_shared_groups">Общие группы</string>
@@ -375,9 +375,6 @@
     <string name="notification_channel_reactions_description">Реакции на ваши сообщения</string>
     <string name="notification_channel_invites">Приглашения</string>
     <string name="notification_channel_invites_description">Приглашения в группы и приветствия</string>
-    <string name="notification_joined_group">Вы присоединились к %1$s</string>
-    <string name="notification_joined_new_group">Вы присоединились к новой группе</string>
-    <string name="notification_joined_group_from_sender">Вас пригласил(а) %1$s</string>
     <string name="notification_group_invite">Вы были приглашены в безопасный чат</string>
     <string name="notification_new_message">Новое сообщение</string>
     <string name="notification_sent_picture">Отправлено изображение</string>

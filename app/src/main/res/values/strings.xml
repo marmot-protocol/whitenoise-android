@@ -103,12 +103,12 @@
     <string name="jump_to_newest">Jump to newest</string>
     <string name="scroll_to_top">Scroll to top</string>
     <string name="discard_failed_message">Discard failed message</string>
-    <string name="auto_invite_banner_with_inviter">You were invited by %1$s. Leave group if you don\'t want to be here.</string>
-    <string name="auto_invite_banner_unknown">You were invited to this group. Leave group if you don\'t want to be here.</string>
-    <string name="auto_invite_banner_dismiss">Dismiss invite banner</string>
     <string name="invited_to_this_chat">You were invited to this chat.</string>
     <string name="decline">Decline</string>
     <string name="accept">Accept</string>
+    <string name="join_group">Join group</string>
+    <string name="invited_to_this_group">You were invited to this group.</string>
+    <string name="invite_preview_with_inviter">%1$s invited you to this group.</string>
     <string name="profile">Profile</string>
     <string name="profile_no_bio">No bio yet.</string>
     <string name="profile_shared_groups">Shared groups</string>
@@ -491,9 +491,6 @@
     <string name="notification_channel_reactions_description">Reactions to your messages</string>
     <string name="notification_channel_invites">Invites</string>
     <string name="notification_channel_invites_description">Group invites and welcomes</string>
-    <string name="notification_joined_group">Joined %1$s</string>
-    <string name="notification_joined_new_group">Joined a new group</string>
-    <string name="notification_joined_group_from_sender">You were invited by %1$s</string>
     <string name="notification_group_invite">Group invite</string>
     <string name="notification_new_message">New message</string>
     <string name="notification_sent_picture">sent a picture</string>

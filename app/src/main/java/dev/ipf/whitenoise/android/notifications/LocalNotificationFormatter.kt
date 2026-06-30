@@ -105,7 +105,6 @@ object LocalNotificationFormatter {
         // message". None for text messages and for media that carries a caption
         // (the caption is shown verbatim via the preview overrides).
         mediaKind: ReplyMediaKind = ReplyMediaKind.None,
-        groupInviteAutoAccepted: Boolean = false,
         conversationTitleOverride: String? = null,
     ): LocalNotificationContent? {
         if (update.isFromSelf) return null
@@ -113,12 +112,12 @@ object LocalNotificationFormatter {
         val title =
             when (update.trigger) {
                 NotificationTriggerFfi.NEW_MESSAGE -> messageTitle(update, context, senderName)
-                NotificationTriggerFfi.GROUP_INVITE -> inviteTitle(update, context, groupInviteAutoAccepted, conversationTitleOverride)
+                NotificationTriggerFfi.GROUP_INVITE -> inviteTitle(context)
             }
         val body =
             when (update.trigger) {
                 NotificationTriggerFfi.NEW_MESSAGE -> messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
-                NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context, senderName, groupInviteAutoAccepted)
+                NotificationTriggerFfi.GROUP_INVITE -> inviteBody(update, context, senderName)
             }
         return LocalNotificationContent(
             // Messages from one conversation share a per-account, per-group tag
@@ -200,28 +199,13 @@ object LocalNotificationFormatter {
             ReplyMediaKind.None -> null
         }
 
-    private fun inviteTitle(
-        update: NotificationUpdateFfi,
-        context: Context?,
-        autoAccepted: Boolean,
-        conversationTitleOverride: String?,
-    ): String {
-        if (!autoAccepted) return text(context, R.string.notification_group_invite, "Group invite")
-        val group = clean(conversationTitleOverride) ?: clean(update.groupName)
-        return if (group == null) {
-            text(context, R.string.notification_joined_new_group, "Joined a new group")
-        } else {
-            text(context, R.string.notification_joined_group, "Joined %1\$s", group)
-        }
-    }
+    private fun inviteTitle(context: Context?): String = text(context, R.string.notification_group_invite, "Group invite")
 
     private fun inviteBody(
         update: NotificationUpdateFfi,
         context: Context?,
         sender: String,
-        autoAccepted: Boolean,
     ): String {
-        if (autoAccepted) return text(context, R.string.notification_joined_group_from_sender, "You were invited by %1\$s", sender)
         val group = clean(update.groupName)
         return if (group == null) {
             text(context, R.string.notification_invite_from_sender, "Invite from %1\$s", sender)

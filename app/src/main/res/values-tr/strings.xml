@@ -91,12 +91,12 @@
     <string name="jump_to_newest">En yeniye atla</string>
     <string name="scroll_to_top">Başa kaydır</string>
     <string name="discard_failed_message">Başarısız mesajı sil</string>
-    <string name="auto_invite_banner_with_inviter">%1$s sizi davet etti. Burada olmak istemiyorsanız gruptan ayrılın.</string>
-    <string name="auto_invite_banner_unknown">Bu gruba davet edildiniz. Burada olmak istemiyorsanız gruptan ayrılın.</string>
-    <string name="auto_invite_banner_dismiss">Davet bandını kapat</string>
     <string name="invited_to_this_chat">Bu sohbete davet edildiniz.</string>
     <string name="decline">Reddet</string>
     <string name="accept">Kabul et</string>
+    <string name="join_group">Gruba katıl</string>
+    <string name="invited_to_this_group">Bu gruba davet edildiniz.</string>
+    <string name="invite_preview_with_inviter">%1$s sizi bu gruba davet etti.</string>
     <string name="profile">Profil</string>
     <string name="profile_no_bio">Henüz biyografi yok.</string>
     <string name="profile_shared_groups">Ortak gruplar</string>
@@ -371,9 +371,6 @@
     <string name="notification_channel_reactions_description">Mesajlarınıza verilen tepkiler</string>
     <string name="notification_channel_invites">Davetler</string>
     <string name="notification_channel_invites_description">Grup davetleri ve karşılamalar</string>
-    <string name="notification_joined_group">%1$s grubuna katıldınız</string>
-    <string name="notification_joined_new_group">Yeni bir gruba katıldınız</string>
-    <string name="notification_joined_group_from_sender">%1$s sizi davet etti</string>
     <string name="notification_group_invite">Güvenli bir sohbete davet edildiniz</string>
     <string name="notification_new_message">Yeni mesaj</string>
     <string name="notification_sent_picture">bir fotoğraf gönderdi</string>

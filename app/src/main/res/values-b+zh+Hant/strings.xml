@@ -90,12 +90,12 @@
     <string name="jump_to_newest">跳至最新</string>
     <string name="scroll_to_top">捲動到頂部</string>
     <string name="discard_failed_message">捨棄發送失敗的訊息</string>
-    <string name="auto_invite_banner_with_inviter">你由 %1$s 邀請加入。如果不想留在這裡，可以離開群組。</string>
-    <string name="auto_invite_banner_unknown">你已受邀加入這個群組。如果不想留在這裡，可以離開群組。</string>
-    <string name="auto_invite_banner_dismiss">關閉邀請橫幅</string>
     <string name="invited_to_this_chat">您被邀請參加此聊天。</string>
     <string name="decline">拒絕</string>
     <string name="accept">接受</string>
+    <string name="join_group">加入群組</string>
+    <string name="invited_to_this_group">你已受邀加入此群組。</string>
+    <string name="invite_preview_with_inviter">%1$s 邀請你加入此群組。</string>
     <string name="profile">個人檔案</string>
     <string name="profile_no_bio">尚無簡介。</string>
     <string name="profile_shared_groups">共同群組</string>
@@ -370,9 +370,6 @@
     <string name="notification_channel_reactions_description">對你訊息的回應</string>
     <string name="notification_channel_invites">邀請</string>
     <string name="notification_channel_invites_description">群組邀請和歡迎</string>
-    <string name="notification_joined_group">已加入 %1$s</string>
-    <string name="notification_joined_new_group">已加入新群組</string>
-    <string name="notification_joined_group_from_sender">你由 %1$s 邀請加入</string>
     <string name="notification_group_invite">您已受邀加入安全聊天</string>
     <string name="notification_new_message">新訊息</string>
     <string name="notification_sent_picture">傳送了一張圖片</string>

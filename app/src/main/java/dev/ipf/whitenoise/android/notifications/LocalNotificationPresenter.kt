@@ -93,7 +93,6 @@ class LocalNotificationPresenter(
         previewTextOverride: String? = null,
         reactedToPreviewOverride: String? = null,
         mediaKind: ReplyMediaKind = ReplyMediaKind.None,
-        groupInviteAutoAccepted: Boolean = false,
     ): Boolean {
         val content =
             LocalNotificationFormatter.content(
@@ -103,7 +102,6 @@ class LocalNotificationPresenter(
                 previewTextOverride = previewTextOverride,
                 reactedToPreviewOverride = reactedToPreviewOverride,
                 mediaKind = mediaKind,
-                groupInviteAutoAccepted = groupInviteAutoAccepted,
                 conversationTitleOverride = conversationTitleOverride,
             )
         val formatterReturnedContent = content != null
