@@ -244,6 +244,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -19394,6 +19395,7 @@ private fun EncryptedBackupPassphraseFields(
     val strength = encryptedBackupPassphraseStrength(passphrase)
     val mismatch = confirmation.isNotEmpty() && passphrase != confirmation
     val visualTransformation = if (revealPassphrase) VisualTransformation.None else PasswordVisualTransformation()
+    val focusManager = LocalFocusManager.current
     val keyboardOptions =
         KeyboardOptions(
             capitalization = KeyboardCapitalization.None,
@@ -19407,7 +19409,10 @@ private fun EncryptedBackupPassphraseFields(
         label = { Text(stringResource(R.string.encrypted_backup_passphrase_label)) },
         singleLine = true,
         visualTransformation = visualTransformation,
-        keyboardOptions = keyboardOptions,
+        // Enter advances to the Confirm field with the keyboard up, instead of
+        // dismissing it and stranding the user on field one.
+        keyboardOptions = keyboardOptions.copy(imeAction = ImeAction.Next),
+        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
         trailingIcon = {
             TextButton(onClick = onRevealToggle) {
                 Text(stringResource(if (revealPassphrase) R.string.hide else R.string.show))
@@ -19438,7 +19443,8 @@ private fun EncryptedBackupPassphraseFields(
         singleLine = true,
         isError = mismatch,
         visualTransformation = visualTransformation,
-        keyboardOptions = keyboardOptions,
+        keyboardOptions = keyboardOptions.copy(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
         supportingText = {
             if (mismatch) {
                 Text(stringResource(R.string.encrypted_backup_mismatch))
