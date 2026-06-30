@@ -1206,10 +1206,10 @@ private fun MainShell(
     // the sync effect below owns the saved id and this stays true.
     var hasRestoredSelectedChat by remember { mutableStateOf(false) }
     // When a conversation is opened from a chat-list message-body search hit
-    // (issue #290), this carries the matched message id so ConversationScreen
-    // can scroll to and briefly highlight it on open. Null for every other
-    // open path (row tap, notification, new-chat), which lands at the normal
-    // unread/newest anchor.
+    // (issue #290) or a tapped message notification (#832), this carries the
+    // matched/notified message id so ConversationScreen can scroll to and
+    // briefly highlight it on open. Null for every other open path (row tap,
+    // new-chat), which lands at the normal unread/newest anchor.
     var selectedChatFocusMessageId by remember { mutableStateOf<String?>(null) }
     // True only when `selectedChat` was opened straight off a just-completed
     // New Chat / Create Group flow (issue #321), so ConversationScreen raises
@@ -1326,7 +1326,7 @@ private fun MainShell(
                 allChats
                     .firstOrNull { it.group.groupIdHex == step.groupIdHex }
                     ?.let {
-                        selectedChatFocusMessageId = null
+                        selectedChatFocusMessageId = step.focusMessageIdHex
                         // Notification routing is never a just-created open, so
                         // clear any stale justCreated flag carried over from a
                         // prior New Chat / Create Group flow before showing the
@@ -8044,9 +8044,9 @@ private fun ConversationScreen(
     appState: WhiteNoiseAppState,
     chat: ChatListItem,
     onBack: () -> Unit,
-    // When opened from a chat-list message-body search hit (issue #290), the
-    // matched message id to scroll to and briefly highlight once the timeline
-    // has paged it in. Null for every normal open path.
+    // When opened from a chat-list message-body search hit (issue #290) or a
+    // tapped message notification (#832), the message id to scroll to and
+    // briefly highlight once the timeline has paged it in. Null for normal opens.
     focusMessageId: String? = null,
     // True only when this conversation was just created in the same navigation
     // step (issue #321) — drives a one-shot composer focus + keyboard raise so
@@ -9498,7 +9498,8 @@ private fun ConversationScreen(
         }
     }
 
-    // Scroll-to-message for a chat-list message-body search hit (issue #290).
+    // Scroll-to-message for a chat-list message-body search hit (issue #290) or
+    // tapped message notification (#832).
     // Waits for the first-open anchor to settle, then pages the local timeline
     // back until the matched message is materialized and scrolls to it with a
     // brief highlight — the same affordance the reply-jump uses. Fires once

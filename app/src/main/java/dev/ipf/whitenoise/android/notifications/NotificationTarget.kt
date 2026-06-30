@@ -30,9 +30,10 @@ sealed interface NotificationNavStep {
     /** Right account is active but its chat list hasn't loaded yet — wait. */
     data object AwaitChatList : NotificationNavStep
 
-    /** Ready: open this conversation. */
+    /** Ready: open this conversation, optionally focused on the tapped message. */
     data class OpenConversation(
         val groupIdHex: String,
+        val focusMessageIdHex: String?,
     ) : NotificationNavStep
 
     /** Target account no longer exists locally — fall back to the chat list. */
@@ -50,7 +51,8 @@ sealed interface NotificationNavStep {
  *  - background account → [NotificationNavStep.SwitchAccount] (no switch when
  *    already active)
  *  - active account, chat list not ready → [NotificationNavStep.AwaitChatList]
- *  - ready + group present → [NotificationNavStep.OpenConversation]
+ *  - ready + group present → [NotificationNavStep.OpenConversation], carrying
+ *    a message id for message notifications so the conversation can scroll to it
  *  - ready + group absent → [NotificationNavStep.MissingConversation]
  *
  * @param chatListReady true only when the chat list is bound to [target]'s
@@ -67,7 +69,12 @@ fun resolveNotificationNav(
     if (target.accountRef !in knownAccountRefs) return NotificationNavStep.MissingAccount
     if (target.accountRef != activeAccountRef) return NotificationNavStep.SwitchAccount(target.accountRef)
     if (!chatListReady) return NotificationNavStep.AwaitChatList
-    if (target.groupIdHex in availableGroupIds) return NotificationNavStep.OpenConversation(target.groupIdHex)
+    if (target.groupIdHex in availableGroupIds) {
+        val focusMessageIdHex =
+            target.messageIdHex
+                ?.takeIf { it.isNotBlank() && target.kind == NotificationTargetKind.MESSAGE }
+        return NotificationNavStep.OpenConversation(target.groupIdHex, focusMessageIdHex)
+    }
     return NotificationNavStep.MissingConversation
 }
 
