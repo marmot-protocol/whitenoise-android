@@ -66,6 +66,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10078,6 +10079,10 @@ private fun ConversationScreen(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
+                                    // The composer bottomBar owns the IME inset via its
+                                    // imePadding(); consume it here so the transcript does
+                                    // not count the keyboard a second time (#895).
+                                    .consumeWindowInsets(WindowInsets.ime)
                                     .padding(horizontal = 12.dp)
                                     .alpha(if (initialTimelineAnchored) 1f else 0f),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
