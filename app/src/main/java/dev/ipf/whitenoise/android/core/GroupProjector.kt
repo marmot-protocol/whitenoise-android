@@ -80,6 +80,22 @@ object GroupProjector {
             ?: otherMemberAccount?.takeIf { it.isNotBlank() }
     }
 
+    /**
+     * The peer account whose profile picture stands in for a 1:1 conversation's
+     * avatar: the inviter while a welcome is pending, otherwise the lone
+     * counterparty of an unnamed two-member chat. Null for multi-member or named
+     * groups, which render their own group avatar instead. Shared by the
+     * chat-list row and the conversation top bar so both surfaces resolve a DM's
+     * avatar from the same rule (#837).
+     */
+    fun avatarAccount(
+        group: AppGroupRecordFfi,
+        otherMemberAccount: String?,
+        memberCount: Int,
+    ): String? =
+        inviteAccount(group, otherMemberAccount)
+            ?: otherMemberAccount?.takeIf { group.name.isBlank() && memberCount == 2 }
+
     fun otherMemberAccount(
         members: List<AppGroupMemberRecordFfi>,
         activeAccountIdHex: String?,

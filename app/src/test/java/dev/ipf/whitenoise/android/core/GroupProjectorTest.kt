@@ -263,6 +263,48 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun avatarAccountResolvesPeerForUnnamedTwoMemberDm() {
+        // The conversation top bar and the chat-list row must agree on the peer
+        // whose picture stands in for a DM (#837).
+        assertEquals(
+            "bob",
+            GroupProjector.avatarAccount(group(name = ""), otherMemberAccount = "bob", memberCount = 2),
+        )
+    }
+
+    @Test
+    fun avatarAccountIsNullForNamedTwoMemberGroup() {
+        // A named two-member conversation is a group; its own avatar wins, so no
+        // peer account is resolved.
+        assertEquals(
+            null,
+            GroupProjector.avatarAccount(group(name = "Project"), otherMemberAccount = "bob", memberCount = 2),
+        )
+    }
+
+    @Test
+    fun avatarAccountIsNullForMultiMemberGroup() {
+        assertEquals(
+            null,
+            GroupProjector.avatarAccount(group(name = ""), otherMemberAccount = "bob", memberCount = 3),
+        )
+    }
+
+    @Test
+    fun avatarAccountUsesWelcomerForPendingInviteBeforeRosterLoads() {
+        // On a pending invite the roster isn't loaded yet, so the inviter is the
+        // peer whose avatar the top bar should show.
+        assertEquals(
+            "alice",
+            GroupProjector.avatarAccount(
+                group(name = "", pending = true, welcomer = "alice"),
+                otherMemberAccount = null,
+                memberCount = 0,
+            ),
+        )
+    }
+
+    @Test
     fun transcriptSenderAvatarOnlyShowsForOtherMembersInLargerGroups() {
         assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(memberCount = 2, mine = false))
         assertFalse(GroupProjector.shouldShowTranscriptSenderAvatar(memberCount = 3, mine = true))
