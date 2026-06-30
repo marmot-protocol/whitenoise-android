@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.notifications
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.whitenoise.android.state.NotificationSuppression
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -57,6 +58,54 @@ class LocalNotificationPolicyTest {
             ),
         )
     }
+
+    // End-to-end lifecycle checks (issue #821): drive the suppression state
+    // through the reported sequences and assert the post decision, so the policy
+    // and the lifecycle transitions are pinned together.
+
+    @Test
+    fun chatBackgroundedThenSwipedAwayStillNotifiesThatChat() {
+        // Open chat A → background → swipe-away from recents.
+        val state =
+            NotificationSuppression()
+                .onForeground()
+                .onActiveConversation(groupIdHex = "active-group", accountRef = "account-a")
+                .onBackground()
+                .onTaskRemoved()
+        assertTrue(post(state, groupIdHex = "active-group", accountRef = "account-a"))
+    }
+
+    @Test
+    fun chatBackgroundedThenSwipedAwayStillNotifiesOtherChat() {
+        val state =
+            NotificationSuppression()
+                .onForeground()
+                .onActiveConversation(groupIdHex = "active-group", accountRef = "account-a")
+                .onBackground()
+                .onTaskRemoved()
+        assertTrue(post(state, groupIdHex = "other-group", accountRef = "account-a"))
+    }
+
+    @Test
+    fun foregroundedChatStillSuppressesItsOwnMessages() {
+        val state =
+            NotificationSuppression()
+                .onForeground()
+                .onActiveConversation(groupIdHex = "active-group", accountRef = "account-a")
+        assertFalse(post(state, groupIdHex = "active-group", accountRef = "account-a"))
+    }
+
+    private fun post(
+        state: NotificationSuppression,
+        groupIdHex: String,
+        accountRef: String,
+    ): Boolean =
+        LocalNotificationPolicy.shouldPost(
+            update(groupIdHex = groupIdHex, accountRef = accountRef),
+            appInForeground = state.inForeground,
+            activeConversationGroupIdHex = state.activeConversationGroupIdHex,
+            activeConversationAccountRef = state.activeConversationAccountRef,
+        )
 
     private fun update(
         groupIdHex: String,
