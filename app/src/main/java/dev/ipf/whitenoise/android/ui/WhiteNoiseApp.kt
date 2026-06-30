@@ -16216,13 +16216,23 @@ private fun BubbleFooterLayout(
         val lastRight = (lastLineWidth ?: contentPlaceable.width).coerceIn(0, contentPlaceable.width)
         val inline = lastRight + gap + footerPlaceable.width <= constraints.maxWidth
         if (inline) {
-            val width = maxOf(contentPlaceable.width, lastRight + gap + footerPlaceable.width)
+            val width =
+                bubbleFooterInlineWidth(
+                    contentWidth = contentPlaceable.width,
+                    lastLineRight = lastRight,
+                    footerWidth = footerPlaceable.width,
+                    minWidth = constraints.minWidth,
+                    maxWidth = constraints.maxWidth,
+                    gap = gap,
+                )
             layout(width, contentPlaceable.height) {
                 contentPlaceable.place(0, 0)
                 footerPlaceable.place(width - footerPlaceable.width, contentPlaceable.height - footerPlaceable.height)
             }
         } else {
-            val width = maxOf(contentPlaceable.width, footerPlaceable.width).coerceAtMost(constraints.maxWidth)
+            val width =
+                maxOf(contentPlaceable.width, footerPlaceable.width, constraints.minWidth)
+                    .coerceAtMost(constraints.maxWidth)
             layout(width, contentPlaceable.height + footerPlaceable.height) {
                 contentPlaceable.place(0, 0)
                 footerPlaceable.place(width - footerPlaceable.width, contentPlaceable.height)
@@ -16230,6 +16240,17 @@ private fun BubbleFooterLayout(
         }
     }
 }
+
+internal fun bubbleFooterInlineWidth(
+    contentWidth: Int,
+    lastLineRight: Int,
+    footerWidth: Int,
+    minWidth: Int,
+    maxWidth: Int,
+    gap: Int,
+): Int =
+    maxOf(contentWidth, lastLineRight + gap + footerWidth, minWidth)
+        .coerceAtMost(maxWidth)
 
 @Composable
 private fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
