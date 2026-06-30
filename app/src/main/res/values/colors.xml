@@ -7,4 +7,9 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- Matches MaterialTheme.colorScheme.background for the pre-Compose frame. -->
+    <color name="pre_compose_window_background">#FFECEEEE</color>
+    <color name="pre_compose_window_background_light">#FFECEEEE</color>
+    <color name="pre_compose_window_background_dark">#FF0F1112</color>
+    <color name="pre_compose_window_background_amoled">#FF000000</color>
 </resources>
