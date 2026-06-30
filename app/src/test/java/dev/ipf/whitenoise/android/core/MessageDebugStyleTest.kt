@@ -57,6 +57,33 @@ class MessageDebugStyleTest {
     }
 
     @Test
+    fun groupSystemRowStaysSummaryEvenWithDebugOn() {
+        // #857: a kind-1210 state-change row must render its one-line summary
+        // (GroupSystem) regardless of the streaming-debug toggle — never the raw
+        // MLS dump as the default. The dump is reachable per-row behind a tap.
+        val record = message(id = "gs", plaintext = "{}", kind = 1210uL)
+
+        assertEquals(TimelineRowKind.GroupSystem, timelineRowKind(record, streamingDebugEnabled = false))
+        assertEquals(TimelineRowKind.GroupSystem, timelineRowKind(record, streamingDebugEnabled = true))
+    }
+
+    @Test
+    fun reactionBecomesDebugRowOnlyWhenDebugOn() {
+        val record = reaction(id = "r1", sender = "alice", target = "m1", emoji = "👍", at = 1u)
+
+        assertEquals(TimelineRowKind.Bubble, timelineRowKind(record, streamingDebugEnabled = false))
+        assertEquals(TimelineRowKind.DebugRow, timelineRowKind(record, streamingDebugEnabled = true))
+    }
+
+    @Test
+    fun chatRowIsBubbleRegardlessOfDebug() {
+        val record = message(id = "m1", plaintext = "hi", kind = 9uL)
+
+        assertEquals(TimelineRowKind.Bubble, timelineRowKind(record, streamingDebugEnabled = false))
+        assertEquals(TimelineRowKind.Bubble, timelineRowKind(record, streamingDebugEnabled = true))
+    }
+
+    @Test
     fun tagsSummaryIsNoneWhenEmptyAndMultiLineOtherwise() {
         val empty = MessageDebugClassifier.debugStyle(message(id = "m", plaintext = "hi", tags = emptyList()))
         val tagged =

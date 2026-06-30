@@ -229,6 +229,8 @@
     <string name="developer_mode_subtitle">Mostra diagnósticos e componentes internos do MLS.</string>
     <string name="diagnostics">Diagnóstico</string>
     <string name="diagnostics_settings_subtitle">Integridade do relé e componentes internos do MLS</string>
+    <string name="group_system_show_details">Mostrar detalhes</string>
+    <string name="group_system_hide_details">Ocultar detalhes</string>
     <string name="local_notifications">Notificações</string>
     <string name="local_notifications_subtitle">Mostrar alertas de mensagens e convites enquanto White Noise está em execução.</string>
     <string name="keep_connected">Manter conectado</string>

@@ -233,6 +233,8 @@
     <string name="developer_mode_subtitle">Показывает диагностику и внутренние компоненты MLS.</string>
     <string name="diagnostics">Диагностика</string>
     <string name="diagnostics_settings_subtitle">Состояние реле и внутреннее устройство MLS</string>
+    <string name="group_system_show_details">Показать подробности</string>
+    <string name="group_system_hide_details">Скрыть подробности</string>
     <string name="local_notifications">Уведомления</string>
     <string name="local_notifications_subtitle">Показывать уведомления о сообщениях и приглашениях во время работы White Noise.</string>
     <string name="keep_connected">Оставаться на связи</string>

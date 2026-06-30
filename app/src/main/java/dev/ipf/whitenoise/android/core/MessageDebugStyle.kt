@@ -39,6 +39,38 @@ data class MessageDebugStyle(
 }
 
 /**
+ * Which row a timeline record renders as. Group-system state-change rows
+ * ([GroupSystem]) always render as their one-line summary — even in developer
+ * mode the raw MLS dump is tucked behind a per-row tap, never the default
+ * (#857). [DebugRow] is reserved for the other non-user-visible signaling
+ * kinds (reactions, deletes, agent-stream-start, unknown) when streaming debug
+ * is on; [Bubble] is the ordinary chat bubble.
+ */
+enum class TimelineRowKind {
+    GroupSystem,
+    DebugRow,
+    Bubble,
+}
+
+/**
+ * Pure rendering decision for a non-synthetic timeline record, factored out of
+ * the conversation Compose loop so the "group-system stays a one-line summary
+ * even with debug on" invariant (#857) is unit-testable. Group-system is
+ * checked before the debug-row path so its summary is the default; the MLS dump
+ * is reachable per-row behind a tap instead.
+ */
+fun timelineRowKind(
+    record: AppMessageRecordFfi,
+    streamingDebugEnabled: Boolean,
+): TimelineRowKind =
+    when {
+        MessageProjector.isGroupSystem(record) -> TimelineRowKind.GroupSystem
+        streamingDebugEnabled && !MessageDebugClassifier.debugStyle(record).isUserVisibleBubble ->
+            TimelineRowKind.DebugRow
+        else -> TimelineRowKind.Bubble
+    }
+
+/**
  * Classifies a timeline [AppMessageRecordFfi] into a [MessageDebugStyle] for the
  * inline streaming-debug row. Pure projection over [MessageProjector] predicates,
  * dependency-free apart from android-bundled `org.json` for the JSON pretty

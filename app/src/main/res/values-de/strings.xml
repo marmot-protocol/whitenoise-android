@@ -229,6 +229,8 @@
     <string name="developer_mode_subtitle">Zeigt Diagnosen und MLS-Interna an.</string>
     <string name="diagnostics">Diagnose</string>
     <string name="diagnostics_settings_subtitle">Relay-Zustand und MLS-Interna</string>
+    <string name="group_system_show_details">Details anzeigen</string>
+    <string name="group_system_hide_details">Details ausblenden</string>
     <string name="local_notifications">Benachrichtigungen</string>
     <string name="local_notifications_subtitle">Zeigen Sie Nachrichten- und Einladungsbenachrichtigungen an, während White Noise ausgeführt wird.</string>
     <string name="keep_connected">Verbunden bleiben</string>

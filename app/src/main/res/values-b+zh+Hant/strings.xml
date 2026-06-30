@@ -228,6 +228,8 @@
     <string name="developer_mode_subtitle">顯示診斷和 MLS 內部結構。</string>
     <string name="diagnostics">診斷</string>
     <string name="diagnostics_settings_subtitle">繼電器健康狀況和 MLS 內部結構</string>
+    <string name="group_system_show_details">顯示詳情</string>
+    <string name="group_system_hide_details">隱藏詳情</string>
     <string name="local_notifications">通知</string>
     <string name="local_notifications_subtitle">在 White Noise 執行時顯示訊息並邀請警報。</string>
     <string name="keep_connected">保持連線</string>

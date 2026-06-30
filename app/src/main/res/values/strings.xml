@@ -295,6 +295,8 @@
     <string name="diagnostics_settings_subtitle">Relay health and MLS internals</string>
     <string name="streaming_debug" translatable="false">Streaming debug</string>
     <string name="streaming_debug_subtitle" translatable="false">Show agent-stream and MLS signaling events inline in conversations</string>
+    <string name="group_system_show_details">Show details</string>
+    <string name="group_system_hide_details">Hide details</string>
     <string name="local_notifications">Local notifications</string>
     <string name="local_notifications_subtitle">Show message and invite alerts while White Noise is running.</string>
     <string name="keep_connected">Keep connected</string>

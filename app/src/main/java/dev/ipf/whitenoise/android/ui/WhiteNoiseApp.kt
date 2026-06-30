@@ -127,6 +127,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Image
@@ -385,10 +386,12 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.ReplySwipe
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseInputsValid
 import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseStrength
 import dev.ipf.whitenoise.android.core.groupedEncryptedBackup
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
+import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.media.DuckDuckGoImageSearchClient
 import dev.ipf.whitenoise.android.media.ImageSearchClient
 import dev.ipf.whitenoise.android.media.ImageSearchException
@@ -7682,12 +7685,12 @@ private fun GroupSystemRow(
         } else {
             copy.fallback
         }
-    Box(
+    Column(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(vertical = 6.dp),
-        contentAlignment = Alignment.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text = summary,
@@ -7701,6 +7704,45 @@ private fun GroupSystemRow(
                         shape = RoundedCornerShape(12.dp),
                     ).padding(horizontal = 10.dp, vertical = 4.dp),
         )
+        // Developer-mode only: keep the one-line summary as the default and tuck
+        // the MLS commit dump behind a per-row tap (#857). Saveable row-keyed UI
+        // state lets an expanded row survive lazy-list disposal without leaking to others.
+        if (appState.streamingDebugEnabled) {
+            var detailsExpanded by rememberSaveable(record.messageIdHex) { mutableStateOf(false) }
+            val debugStyle = remember(record) { MessageDebugClassifier.debugStyle(record) }
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { detailsExpanded = !detailsExpanded }
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text =
+                        stringResource(
+                            if (detailsExpanded) {
+                                R.string.group_system_hide_details
+                            } else {
+                                R.string.group_system_show_details
+                            },
+                        ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Icon(
+                    imageVector = if (detailsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+            if (detailsExpanded) {
+                Spacer(Modifier.height(4.dp))
+                MessageDebugRow(style = debugStyle, record = record)
+            }
+        }
     }
 }
 
@@ -9991,29 +10033,32 @@ private fun ConversationScreen(
                                     }
                                     return@itemsIndexed
                                 }
-                                // When the developer toggle is on, render
-                                // non-user-visible signaling kinds (reactions, deletes,
-                                // group-system, agent-stream-start, unknown) as a debug
-                                // row instead of their normal rendering. Gated behind
-                                // streamingDebugEnabled, so the timeline is byte-identical
-                                // to today when the toggle is off.
-                                if (appState.streamingDebugEnabled) {
-                                    val debugStyle = MessageDebugClassifier.debugStyle(item.record)
-                                    if (!debugStyle.isUserVisibleBubble) {
-                                        MessageDebugRow(style = debugStyle, record = item.record)
+                                // One decision point for which row a record renders
+                                // as. Group-system (kind 1210) rows are derived state
+                                // facts, not chat: they render the centered one-line
+                                // summary, never a raw-JSON bubble — and that summary
+                                // stays the default even in developer mode, with the
+                                // MLS dump reachable per-row behind a tap (#857). The
+                                // debug-row path covers the other non-user-visible
+                                // signaling kinds only when streaming debug is on, so
+                                // the timeline is byte-identical to today when off.
+                                when (timelineRowKind(item.record, appState.streamingDebugEnabled)) {
+                                    TimelineRowKind.GroupSystem -> {
+                                        GroupSystemRow(
+                                            record = item.record,
+                                            appState = appState,
+                                            groupSystem = item.projected?.groupSystem,
+                                        )
                                         return@itemsIndexed
                                     }
-                                }
-                                // Group system rows (kind 1210) are derived state
-                                // facts, not chat: render the centered summary row,
-                                // never a bubble with the raw JSON content.
-                                if (MessageProjector.isGroupSystem(item.record)) {
-                                    GroupSystemRow(
-                                        record = item.record,
-                                        appState = appState,
-                                        groupSystem = item.projected?.groupSystem,
-                                    )
-                                    return@itemsIndexed
+                                    TimelineRowKind.DebugRow -> {
+                                        MessageDebugRow(
+                                            style = MessageDebugClassifier.debugStyle(item.record),
+                                            record = item.record,
+                                        )
+                                        return@itemsIndexed
+                                    }
+                                    TimelineRowKind.Bubble -> Unit
                                 }
                                 MessageBubble(
                                     item = item,

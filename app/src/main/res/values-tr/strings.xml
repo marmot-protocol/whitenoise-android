@@ -229,6 +229,8 @@
     <string name="developer_mode_subtitle">Teşhisleri ve MLS dahili bilgilerini gösterir.</string>
     <string name="diagnostics">Teşhis</string>
     <string name="diagnostics_settings_subtitle">Aktarma durumu ve MLS dahili bilgileri</string>
+    <string name="group_system_show_details">Ayrıntıları göster</string>
+    <string name="group_system_hide_details">Ayrıntıları gizle</string>
     <string name="local_notifications">Bildirimler</string>
     <string name="local_notifications_subtitle">White Noise çalışırken mesaj ve davet uyarılarını göster.</string>
     <string name="keep_connected">Bağlı kal</string>
