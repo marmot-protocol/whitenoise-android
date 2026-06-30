@@ -8,15 +8,15 @@ class ProfilePseudonymGeneratorTest {
     @Test
     fun seedDerivationMatchesMarmotCoreDefaultPseudonyms() {
         assertEquals(
-            "Agile Lynx",
+            "Solar Mallard",
             ProfilePseudonymGenerator.fromSeed("0".repeat(64)),
         )
         assertEquals(
-            "Silver Swan",
+            "Lively Crab",
             ProfilePseudonymGenerator.fromSeed("1".repeat(64)),
         )
         assertEquals(
-            "Swift Swan",
+            "Eager Heron",
             ProfilePseudonymGenerator.fromSeed("ab".repeat(32)),
         )
     }
@@ -35,10 +35,10 @@ class ProfilePseudonymGeneratorTest {
 
     @Test
     fun wordListsStayInLockstepWithMarmotCore() {
-        assertEquals(32, ProfilePseudonymGenerator.adjectiveCount)
-        assertEquals(32, ProfilePseudonymGenerator.nounCount)
+        assertEquals(128, ProfilePseudonymGenerator.adjectiveCount)
+        assertEquals(128, ProfilePseudonymGenerator.nounCount)
         assertEquals(
-            "749c028c82d85652c6078f5d4c3c42766fa5b64078d2422754d988dfd4aee4db",
+            "7b590b35e66471b78299ccc60cbf4710bddbe75c8d307c5324c5d8f9fa0c37d6",
             ProfilePseudonymGenerator.wordListFingerprint(),
         )
     }
@@ -54,7 +54,7 @@ class ProfilePseudonymGeneratorTest {
 
         assertEquals(
             ProfilePseudonymGenerator.fromEntropy(entropies[1]),
-            ProfilePseudonymGenerator.random(excluding = " Agile Lynx ") {
+            ProfilePseudonymGenerator.random(excluding = " Solar Mallard ") {
                 entropies[roll++]
             },
         )
@@ -66,8 +66,8 @@ class ProfilePseudonymGeneratorTest {
         var rollCount = 0
 
         assertEquals(
-            "Agile Moose",
-            ProfilePseudonymGenerator.random(excluding = "Agile Lynx") {
+            "Solar Manatee",
+            ProfilePseudonymGenerator.random(excluding = "Solar Mallard") {
                 rollCount += 1
                 ByteArray(32) { 0x00 }
             },
