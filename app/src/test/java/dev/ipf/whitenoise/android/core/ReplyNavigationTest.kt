@@ -59,6 +59,22 @@ class ReplyNavigationTest {
         )
     }
 
+    @Test
+    fun centeredScrollOffsetCentersTopWhenItemHeightIsUnknown() {
+        assertEquals(-500, ReplyNavigation.centeredScrollOffset(viewportHeightPx = 1_000))
+    }
+
+    @Test
+    fun centeredScrollOffsetCentersMeasuredItem() {
+        assertEquals(-350, ReplyNavigation.centeredScrollOffset(viewportHeightPx = 1_000, itemHeightPx = 300))
+    }
+
+    @Test
+    fun centeredScrollOffsetDoesNotPushOversizedItemPastViewportStart() {
+        assertEquals(0, ReplyNavigation.centeredScrollOffset(viewportHeightPx = 300, itemHeightPx = 500))
+        assertEquals(0, ReplyNavigation.centeredScrollOffset(viewportHeightPx = 0, itemHeightPx = 100))
+    }
+
     private fun message(tags: List<MessageTagFfi>) =
         AppMessageRecordFfi(
             messageIdHex = "reply",

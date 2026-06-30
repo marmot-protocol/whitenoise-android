@@ -181,6 +181,11 @@
     <string name="stream_failed_format">Échec du flux : %1$s</string>
     <string name="copy_text">Copier le texte</string>
     <string name="open_emoji_picker">Ouvrir le sélecteur d’émojis</string>
+    <string name="show_keyboard">Afficher le clavier</string>
+    <string name="emoji_backspace">Supprimer l’émoji</string>
+    <string name="customize_reactions">Personnaliser les réactions</string>
+    <string name="customize_reactions_hint">Touchez pour remplacer un émoji</string>
+    <string name="reset_reactions">Réinitialiser</string>
     <string name="emoji_search_hint">Rechercher des émojis</string>
     <string name="emoji_search_clear">Effacer la recherche d’émojis</string>
     <string name="emoji_search_no_results">Aucun émoji trouvé</string>

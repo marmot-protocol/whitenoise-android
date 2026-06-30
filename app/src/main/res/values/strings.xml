@@ -241,6 +241,11 @@
     <string name="stream_failed_format">Stream failed: %1$s</string>
     <string name="copy_text">Copy text</string>
     <string name="open_emoji_picker">Open emoji picker</string>
+    <string name="show_keyboard">Show keyboard</string>
+    <string name="emoji_backspace">Delete emoji</string>
+    <string name="customize_reactions">Customize reactions</string>
+    <string name="customize_reactions_hint">Tap to replace an emoji</string>
+    <string name="reset_reactions">Reset</string>
     <string name="emoji_search_hint">Search emoji</string>
     <string name="emoji_search_clear">Clear emoji search</string>
     <string name="emoji_search_no_results">No emoji found</string>

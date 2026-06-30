@@ -20,18 +20,30 @@ class RecentEmojiListTest {
         val choices =
             RecentEmojiList.quickChoices(
                 recent = listOf("🔥", "👍"),
-                defaults = listOf("👍", "❤️", "😂", "🎉", "😮"),
-                limit = 5,
+                defaults = listOf("👍", "❤️", "😂", "🎉", "😮", "😢"),
+                limit = 6,
             )
 
-        assertEquals(listOf("🔥", "👍", "❤️", "😂", "🎉"), choices)
+        assertEquals(listOf("🔥", "👍", "❤️", "😂", "🎉", "😮"), choices)
     }
 
     @Test
     fun quickChoicesUseCommonDefaultsWhenNoRecentsExist() {
         assertEquals(
-            listOf("👍", "❤️", "😂", "🎉", "😮"),
+            listOf("❤️", "👍", "👎", "😂", "😮", "😢"),
             RecentEmojiList.quickChoices(recent = emptyList()),
         )
+    }
+
+    @Test
+    fun normalizeQuickChoicesPadsAndDeduplicatesSavedChoices() {
+        val choices =
+            RecentEmojiList.normalizeQuickChoices(
+                choices = listOf("🚀", "👍", "🚀"),
+                defaults = listOf("👍", "❤️", "😂", "🎉", "😮", "😢"),
+                limit = 6,
+            )
+
+        assertEquals(listOf("🚀", "👍", "❤️", "😂", "🎉", "😮"), choices)
     }
 }

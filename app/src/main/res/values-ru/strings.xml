@@ -183,6 +183,11 @@
     <string name="stream_failed_format">Ошибка потока: %1$s</string>
     <string name="copy_text">Копировать текст</string>
     <string name="open_emoji_picker">Открыть выбор эмодзи</string>
+    <string name="show_keyboard">Показать клавиатуру</string>
+    <string name="emoji_backspace">Удалить эмодзи</string>
+    <string name="customize_reactions">Настроить реакции</string>
+    <string name="customize_reactions_hint">Нажмите, чтобы заменить эмодзи</string>
+    <string name="reset_reactions">Сбросить</string>
     <string name="emoji_search_hint">Поиск эмодзи</string>
     <string name="emoji_search_clear">Очистить поиск эмодзи</string>
     <string name="emoji_search_no_results">Эмодзи не найдены</string>

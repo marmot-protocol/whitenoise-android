@@ -1,10 +1,10 @@
 package dev.ipf.whitenoise.android.core
 
 object RecentEmojiList {
-    const val QuickLimit = 5
+    const val QuickLimit = 6
     const val StoredLimit = 24
 
-    val DefaultQuickChoices = listOf("👍", "❤️", "😂", "🎉", "😮")
+    val DefaultQuickChoices = listOf("❤️", "👍", "👎", "😂", "😮", "😢")
 
     fun recordPicked(
         existing: List<String>,
@@ -23,9 +23,15 @@ object RecentEmojiList {
         recent: List<String>,
         defaults: List<String> = DefaultQuickChoices,
         limit: Int = QuickLimit,
+    ): List<String> = normalizeQuickChoices(recent + defaults, defaults, limit)
+
+    fun normalizeQuickChoices(
+        choices: List<String>,
+        defaults: List<String> = DefaultQuickChoices,
+        limit: Int = QuickLimit,
     ): List<String> {
         if (limit <= 0) return emptyList()
-        return (recent + defaults)
+        return (choices + defaults)
             .filter { it.isNotBlank() }
             .distinctBy { emojiIdentity(it) }
             .take(limit)

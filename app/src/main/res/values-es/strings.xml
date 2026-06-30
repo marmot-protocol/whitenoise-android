@@ -181,6 +181,11 @@
     <string name="stream_failed_format">Error en el flujo: %1$s</string>
     <string name="copy_text">Copiar texto</string>
     <string name="open_emoji_picker">Abrir selector de emojis</string>
+    <string name="show_keyboard">Mostrar teclado</string>
+    <string name="emoji_backspace">Borrar emoji</string>
+    <string name="customize_reactions">Personalizar reacciones</string>
+    <string name="customize_reactions_hint">Toca para reemplazar un emoji</string>
+    <string name="reset_reactions">Restablecer</string>
     <string name="emoji_search_hint">Buscar emojis</string>
     <string name="emoji_search_clear">Borrar búsqueda de emojis</string>
     <string name="emoji_search_no_results">No se encontraron emojis</string>

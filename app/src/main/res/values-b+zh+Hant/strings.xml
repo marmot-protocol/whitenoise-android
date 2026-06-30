@@ -180,6 +180,11 @@
     <string name="stream_failed_format">串流失敗：%1$s</string>
     <string name="copy_text">複製文字</string>
     <string name="open_emoji_picker">開啟表情符號選擇器</string>
+    <string name="show_keyboard">顯示鍵盤</string>
+    <string name="emoji_backspace">刪除表情符號</string>
+    <string name="customize_reactions">自訂回應</string>
+    <string name="customize_reactions_hint">點按即可替換表情符號</string>
+    <string name="reset_reactions">重設</string>
     <string name="emoji_search_hint">搜尋表情符號</string>
     <string name="emoji_search_clear">清除表情符號搜尋</string>
     <string name="emoji_search_no_results">找不到表情符號</string>

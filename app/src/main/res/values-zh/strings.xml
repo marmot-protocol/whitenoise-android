@@ -180,6 +180,11 @@
     <string name="stream_failed_format">流失败：%1$s</string>
     <string name="copy_text">复制文本</string>
     <string name="open_emoji_picker">打开表情选择器</string>
+    <string name="show_keyboard">显示键盘</string>
+    <string name="emoji_backspace">删除表情</string>
+    <string name="customize_reactions">自定义回应</string>
+    <string name="customize_reactions_hint">点按以替换表情</string>
+    <string name="reset_reactions">重置</string>
     <string name="emoji_search_hint">搜索表情符号</string>
     <string name="emoji_search_clear">清除表情符号搜索</string>
     <string name="emoji_search_no_results">未找到表情符号</string>
