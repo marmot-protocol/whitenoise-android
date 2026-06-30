@@ -23,3 +23,5 @@ app/google-services.json
 
 # Kotlin incremental/compile artifacts
 .kotlin/
+
+.env
