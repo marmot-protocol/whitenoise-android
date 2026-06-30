@@ -405,7 +405,6 @@
     <string name="toast_couldnt_sign_out">Couldn\'t sign out</string>
     <string name="toast_couldnt_sign_in_account">Couldn\'t sign in to account</string>
     <string name="toast_couldnt_export_nsec">Couldn\'t export secret key</string>
-    <string name="toast_couldnt_export_encrypted_secret">Couldn\'t export encrypted secret key</string>
     <string name="wipe">Wipe</string>
     <string name="toast_signed_out_and_wiped">Account wiped from this device</string>
     <string name="toast_couldnt_wipe_account">Couldn\'t wipe account</string>

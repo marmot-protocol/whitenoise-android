@@ -692,7 +692,6 @@
     <string name="toast_couldnt_sign_out">No se pudo cerrar sesión</string>
     <string name="toast_couldnt_sign_in_account">No se pudo iniciar sesión en la cuenta</string>
     <string name="toast_couldnt_export_nsec">No se pudo exportar la clave secreta</string>
-    <string name="toast_couldnt_export_encrypted_secret">No se pudo exportar la clave secreta cifrada</string>
     <string name="sign_out_and_wipe_confirm_instruction">Escribe %1$s para confirmar.</string>
     <string name="sign_out_and_wipe_confirm_title">¿Borrar esta cuenta?</string>
     <string name="sign_out_and_wipe_sheet_destroyed_db">La base de datos local de mensajes y el estado del grupo de MLS de esta cuenta.</string>

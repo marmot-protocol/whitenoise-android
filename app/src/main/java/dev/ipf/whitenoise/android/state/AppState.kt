@@ -1680,20 +1680,6 @@ class WhiteNoiseAppState(
         }.getOrNull()
     }
 
-    suspend fun exportActiveAccountEncryptedSecretKey(passphrase: String): String? {
-        val accountRef = activeAccountRef ?: return null
-        return runCatching {
-            marmotIo { exportEncryptedSecretKey(accountRef, passphrase) }
-        }.onFailure {
-            rethrowIfCancellation(it)
-            // The caller-supplied passphrase can be echoed in the FFI error, and a
-            // short one slips through shape-based redaction — show only the generic
-            // toast and keep the error type (never the message) for diagnosis.
-            appStateDebug { "encrypted secret export failed: ${it.javaClass.simpleName}" }
-            present(R.string.toast_couldnt_export_encrypted_secret)
-        }.getOrNull()
-    }
-
     /**
      * Destructive sign-out: leave MLS groups, delete relay KeyPackages, and
      * wipe all local state for the active account via Marmot's

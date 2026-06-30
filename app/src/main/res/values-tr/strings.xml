@@ -690,7 +690,6 @@
     <string name="toast_couldnt_sign_out">Oturum kapatılamadı</string>
     <string name="toast_couldnt_sign_in_account">Hesaba giriş yapılamadı</string>
     <string name="toast_couldnt_export_nsec">Gizli anahtar dışa aktarılamadı</string>
-    <string name="toast_couldnt_export_encrypted_secret">Şifreli gizli anahtar dışa aktarılamadı</string>
     <string name="sign_out_and_wipe_confirm_instruction">Onaylamak için %1$s yazın.</string>
     <string name="sign_out_and_wipe_confirm_title">Bu hesap silinsin mi?</string>
     <string name="sign_out_and_wipe_sheet_destroyed_db">Bu hesaba ait yerel mesaj veritabanı ve MLS grup durumu.</string>

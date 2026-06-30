@@ -702,7 +702,6 @@
     <string name="toast_couldnt_sign_out">Не удалось выйти</string>
     <string name="toast_couldnt_sign_in_account">Не удалось войти в аккаунт</string>
     <string name="toast_couldnt_export_nsec">Не удалось экспортировать секретный ключ</string>
-    <string name="toast_couldnt_export_encrypted_secret">Не удалось экспортировать зашифрованный секретный ключ</string>
     <string name="sign_out_and_wipe_confirm_instruction">Введите %1$s для подтверждения.</string>
     <string name="sign_out_and_wipe_confirm_title">Стереть этот аккаунт?</string>
     <string name="sign_out_and_wipe_sheet_destroyed_db">Локальная база данных сообщений и состояние группы MLS для этого аккаунта.</string>

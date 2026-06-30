@@ -690,7 +690,6 @@
     <string name="toast_couldnt_sign_out">Abmeldung fehlgeschlagen</string>
     <string name="toast_couldnt_sign_in_account">Anmeldung am Konto fehlgeschlagen</string>
     <string name="toast_couldnt_export_nsec">Geheimschlüssel konnte nicht exportiert werden</string>
-    <string name="toast_couldnt_export_encrypted_secret">Verschlüsselter Geheimschlüssel konnte nicht exportiert werden</string>
     <string name="sign_out_and_wipe_confirm_instruction">Gib zur Bestätigung %1$s ein.</string>
     <string name="sign_out_and_wipe_confirm_title">Dieses Konto löschen?</string>
     <string name="sign_out_and_wipe_sheet_destroyed_db">Die lokale Nachrichtendatenbank und der MLS-Gruppenstatus für dieses Konto.</string>
