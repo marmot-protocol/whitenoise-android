@@ -406,7 +406,6 @@ import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
-import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
@@ -1354,10 +1353,9 @@ private fun MainShell(
                     .firstOrNull { it.group.groupIdHex == step.groupIdHex }
                     ?.let {
                         // Scroll to the notified message, reusing the search-hit
-                        // focus path (#832). MESSAGE targets only — invites carry
-                        // no message. No highlight flash on a notification tap.
-                        selectedChatFocusMessageId =
-                            target.messageIdHex?.takeIf { target.kind == NotificationTargetKind.MESSAGE }
+                        // focus path. The id is resolved (and MESSAGE-gated) in
+                        // the nav FSM. No highlight flash on a notification tap.
+                        selectedChatFocusMessageId = step.focusMessageIdHex
                         selectedChatFocusHighlight = false
                         selectedChatOpenedFromNotification = true
                         // Notification routing is never a just-created open, so
