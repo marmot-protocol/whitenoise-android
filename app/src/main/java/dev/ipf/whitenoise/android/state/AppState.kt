@@ -1686,7 +1686,11 @@ class WhiteNoiseAppState(
             marmotIo { exportEncryptedSecretKey(accountRef, passphrase) }
         }.onFailure {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_export_encrypted_secret, AppText.Plain(DiagnosticFormatter.redactError(it.readableMessage())))
+            // The caller-supplied passphrase can be echoed in the FFI error, and a
+            // short one slips through shape-based redaction — show only the generic
+            // toast and keep the error type (never the message) for diagnosis.
+            appStateDebug { "encrypted secret export failed: ${it.javaClass.simpleName}" }
+            present(R.string.toast_couldnt_export_encrypted_secret)
         }.getOrNull()
     }
 
@@ -1751,7 +1755,8 @@ class WhiteNoiseAppState(
             present(R.string.toast_encrypted_backup_created)
         }.onFailure {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_create_encrypted_backup, AppText.Plain(DiagnosticFormatter.redactError(it.readableMessage())))
+            appStateDebug { "encrypted backup failed: ${it.javaClass.simpleName}" }
+            present(R.string.toast_couldnt_create_encrypted_backup)
         }.getOrNull()
     }
 
