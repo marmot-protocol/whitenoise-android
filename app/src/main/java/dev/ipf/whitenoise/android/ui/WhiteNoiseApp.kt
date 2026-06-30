@@ -165,6 +165,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
@@ -178,6 +179,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
@@ -427,6 +429,7 @@ import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.formatExactTimestamp
 import dev.ipf.whitenoise.android.state.isAcceptableRelayUrl
 import dev.ipf.whitenoise.android.state.labelFor
+import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.nextReadAnchor
 import dev.ipf.whitenoise.android.state.outgoingIndicator
 import dev.ipf.whitenoise.android.state.shortHex
@@ -1407,7 +1410,10 @@ private fun MainShell(
     // Saveable) for the previous-ref tracker: a fresh composition after process
     // death must report `previous == null` so the saved screen/conversation is
     // restored, not popped (issue #386 guard, encoded in
-    // shouldResetNavOnAccountChange).
+    // shouldResetNavOnAccountChange). The tracker is advanced via
+    // nextNavAccountRef so the transient null the destructive wipe sets while
+    // draining the wiped account's streams (#610) doesn't poison the comparison
+    // and swallow the pop onto the next account (regression of #547).
     var previousActiveAccountRef by remember { mutableStateOf(appState.activeAccountRef) }
     LaunchedEffect(appState.activeAccountRef) {
         val current = appState.activeAccountRef
@@ -1418,7 +1424,7 @@ private fun MainShell(
             sectionName = MainSection.Chats.name
             settingsDetailName = null
         }
-        previousActiveAccountRef = current
+        previousActiveAccountRef = nextNavAccountRef(previousActiveAccountRef, current)
     }
 
     // Navigate the shell to a (possibly different) group when a profile sheet's
@@ -18836,7 +18842,7 @@ private fun AddIdentitySheet(
  */
 private const val WIPE_ENGINE_FFI_AVAILABLE = true
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun IdentityScreen(
     appState: WhiteNoiseAppState,
@@ -18991,14 +18997,42 @@ private fun IdentityScreen(
         SignOutSheet(
             onConfirm = {
                 showSignOutSheet = false
-                scope.launch {
-                    if (appState.signOutActiveAccount() != null) {
-                        appState.present(R.string.toast_signed_out)
+                appState.signOutInProgress = true
+                // Mutation scope, not the screen scope: signOutActiveAccount()
+                // flips activeAccountRef before its disk-media wipe / push
+                // cleanup finishes, and the account-change nav reset pops this
+                // screen — a screen-scoped job would be cancelled mid-teardown.
+                appState.launchMutation {
+                    try {
+                        if (appState.signOutActiveAccount() != null) {
+                            appState.present(R.string.toast_signed_out)
+                        }
+                    } finally {
+                        appState.signOutInProgress = false
                     }
                 }
             },
             onDismiss = { showSignOutSheet = false },
         )
+    }
+
+    // Block the screen with a spinner while a sign-out / wipe teardown runs, so
+    // the confirm doesn't leave the user staring at an unchanged screen until
+    // navigation resets. Non-dismissible — the teardown can't be cancelled.
+    if (appState.signOutInProgress) {
+        Dialog(
+            onDismissRequest = {},
+            properties =
+                DialogProperties(
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false,
+                    usePlatformDefaultWidth = false,
+                ),
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                LoadingIndicator()
+            }
+        }
     }
 
     if (WIPE_ENGINE_FFI_AVAILABLE && showWipeSheet) {
@@ -19060,12 +19094,17 @@ private fun IdentityScreen(
                         // reset in MainShell then pops IdentityScreen out of composition,
                         // which would cancel a screen-scoped coroutine before the wipe
                         // finishes and before the success toast is presented (#547).
+                        appState.signOutInProgress = true
                         appState.launchMutation {
-                            val outcome = appState.signOutAndWipeActiveAccount()
-                            if (outcome != null) {
-                                appState.present(R.string.toast_signed_out_and_wiped)
-                            } else {
-                                appState.present(R.string.toast_couldnt_wipe_account)
+                            try {
+                                val outcome = appState.signOutAndWipeActiveAccount()
+                                if (outcome != null) {
+                                    appState.present(R.string.toast_signed_out_and_wiped)
+                                } else {
+                                    appState.present(R.string.toast_couldnt_wipe_account)
+                                }
+                            } finally {
+                                appState.signOutInProgress = false
                             }
                         }
                     },

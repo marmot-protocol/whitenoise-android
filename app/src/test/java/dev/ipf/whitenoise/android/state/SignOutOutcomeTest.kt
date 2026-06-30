@@ -62,3 +62,35 @@ class ShouldResetNavOnAccountChangeTest {
         assertFalse(shouldResetNavOnAccountChange(previous = "alice", current = null))
     }
 }
+
+class NextNavAccountRefTest {
+    @Test
+    fun keepsLastRealRefAcrossWipeTeardownNull() {
+        // #807 regression: Sign Out & Wipe drains the wiped account's streams
+        // first, transiently nulling activeAccountRef (#610) before it lands on
+        // the next account. The shell's previous-ref tracker must retain the
+        // last real account across that null so the eventual settle onto the
+        // next account is still seen as a distinct-account change and the
+        // now-deleted account's Identity & Keys screen is popped (#547).
+        val afterTeardown = nextNavAccountRef(previous = "alice", current = null)
+        assertEquals("alice", afterTeardown)
+        // Settling onto the next account is now a real alice -> bob change.
+        assertTrue(shouldResetNavOnAccountChange(previous = afterTeardown, current = "bob"))
+    }
+
+    @Test
+    fun adoptsTheSettledAccount() {
+        // Once an account is active, the tracker advances to it so an unrelated
+        // recomposition with the same ref doesn't pop the current screen.
+        assertEquals("bob", nextNavAccountRef(previous = "alice", current = "bob"))
+        assertEquals("alice", nextNavAccountRef(previous = null, current = "alice"))
+    }
+
+    @Test
+    fun retainsRefWhenDroppingToNoAccounts() {
+        // Dropping to no accounts (last sign-out / single-account wipe) settles
+        // on null. The shell tears down at AppPhase.Onboarding regardless, so
+        // retaining the old ref here is harmless and avoids a spurious null.
+        assertEquals("alice", nextNavAccountRef(previous = "alice", current = null))
+    }
+}
