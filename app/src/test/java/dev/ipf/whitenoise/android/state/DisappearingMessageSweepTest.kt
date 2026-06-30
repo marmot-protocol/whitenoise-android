@@ -88,6 +88,195 @@ class DisappearingMessageSweepTest {
     }
 
     @Test
+    fun foregroundLocalExpiryMatchesPublishFilterBoundary() {
+        assertFalse(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 999_999L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = 940uL,
+            ),
+        )
+        assertTrue(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 1_000_000L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = 940uL,
+            ),
+        )
+        assertFalse(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 1_000_000L,
+                disappearingMessageSecs = 0uL,
+                timelineAtSeconds = 940uL,
+            ),
+        )
+    }
+
+    @Test
+    fun foregroundSweepDelayIgnoresTimerOffAndEmptyWindows() {
+        assertEquals(
+            DisappearingMessageSweep.FOREGROUND_SWEEP_MAX_DELAY_MS,
+            DisappearingMessageSweep.nextForegroundSweepDelayMillis(
+                nowMillis = 1_000_000L,
+                disappearingMessageSecs = 0uL,
+                timelineAtSeconds = listOf(940uL),
+            ),
+        )
+        assertEquals(
+            DisappearingMessageSweep.FOREGROUND_SWEEP_MAX_DELAY_MS,
+            DisappearingMessageSweep.nextForegroundSweepDelayMillis(
+                nowMillis = 1_000_000L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = emptyList(),
+            ),
+        )
+    }
+
+    @Test
+    fun foregroundSweepDelayTargetsEarliestLoadedExpiry() {
+        // 940s + 60s retention expires at 1_000_000ms, sooner than 980s + 60s.
+        assertEquals(
+            750L,
+            DisappearingMessageSweep.nextForegroundSweepDelayMillis(
+                nowMillis = 999_250L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = listOf(980uL, 940uL),
+            ),
+        )
+    }
+
+    @Test
+    fun foregroundSweepTimeoutTargetsLoadedExpiryBoundary() {
+        // The await loop uses this delay as its timeout; when it elapses the
+        // caller immediately runs the foreground secure-delete/publish sweep.
+        assertEquals(
+            1L,
+            DisappearingMessageSweep.nextForegroundSweepDelayMillis(
+                nowMillis = 999_999L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = listOf(940uL),
+            ),
+        )
+        assertTrue(
+            DisappearingMessageSweep.shouldRunForegroundSweepAfterWake(
+                wakeSignalReceived = false,
+                nowMillis = 1_000_000L,
+                lastSweepStartedAtMillis = 999_000L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = listOf(940uL),
+            ),
+        )
+        assertTrue(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 1_000_000L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = 940uL,
+            ),
+        )
+    }
+
+    @Test
+    fun foregroundSweepDelayCapsFarFutureExpiry() {
+        assertEquals(
+            DisappearingMessageSweep.FOREGROUND_SWEEP_MAX_DELAY_MS,
+            DisappearingMessageSweep.nextForegroundSweepDelayMillis(
+                nowMillis = 1_000_000L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = listOf(10_000uL),
+            ),
+        )
+    }
+
+    @Test
+    fun foregroundSweepDelayRetriesOnlyNearBoundaryExpiredRows() {
+        assertEquals(
+            DisappearingMessageSweep.FOREGROUND_EXPIRED_RETRY_DELAY_MS,
+            DisappearingMessageSweep.nextForegroundSweepDelayMillis(
+                nowMillis = 1_000_000L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = listOf(940uL),
+            ),
+        )
+        assertEquals(
+            DisappearingMessageSweep.FOREGROUND_SWEEP_MAX_DELAY_MS,
+            DisappearingMessageSweep.nextForegroundSweepDelayMillis(
+                nowMillis = 1_001_000L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = listOf(940uL),
+            ),
+        )
+    }
+
+    @Test
+    fun foregroundRescheduleSignalSweepsNewlyExpiredLoadedRow() {
+        assertTrue(
+            DisappearingMessageSweep.shouldRunForegroundSweepAfterWake(
+                wakeSignalReceived = true,
+                nowMillis = 1_000_000L,
+                lastSweepStartedAtMillis = 998_999L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = listOf(940uL),
+            ),
+        )
+    }
+
+    @Test
+    fun foregroundRescheduleSignalOnlyReschedulesWhenNoLoadedRowExpired() {
+        assertFalse(
+            DisappearingMessageSweep.shouldRunForegroundSweepAfterWake(
+                wakeSignalReceived = true,
+                nowMillis = 1_000_000L,
+                lastSweepStartedAtMillis = 998_999L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = listOf(941uL),
+            ),
+        )
+        assertFalse(
+            DisappearingMessageSweep.shouldRunForegroundSweepAfterWake(
+                wakeSignalReceived = true,
+                nowMillis = 1_000_000L,
+                lastSweepStartedAtMillis = 998_999L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = emptyList(),
+            ),
+        )
+    }
+
+    @Test
+    fun foregroundRescheduleSignalRespectsNearBoundaryRetryGuard() {
+        assertFalse(
+            DisappearingMessageSweep.shouldRunForegroundSweepAfterWake(
+                wakeSignalReceived = true,
+                nowMillis = 1_000_000L,
+                lastSweepStartedAtMillis = 999_001L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = listOf(940uL),
+            ),
+        )
+        assertTrue(
+            DisappearingMessageSweep.shouldRunForegroundSweepAfterWake(
+                wakeSignalReceived = true,
+                nowMillis = 1_000_000L,
+                lastSweepStartedAtMillis = 999_000L,
+                disappearingMessageSecs = 60uL,
+                timelineAtSeconds = listOf(940uL),
+            ),
+        )
+    }
+
+    @Test
+    fun foregroundSweepDelayIgnoresExpiryThatCannotFitInMillis() {
+        assertEquals(
+            DisappearingMessageSweep.FOREGROUND_SWEEP_MAX_DELAY_MS,
+            DisappearingMessageSweep.nextForegroundSweepDelayMillis(
+                nowMillis = 1_000_000L,
+                disappearingMessageSecs = ULong.MAX_VALUE,
+                timelineAtSeconds = listOf(940uL),
+            ),
+        )
+    }
+
+    @Test
     fun skewToleranceIsSmallButNonZero() {
         // Coarse cadence, small tolerance: enough to absorb device-clock jitter
         // without meaningfully extending the retention window.
