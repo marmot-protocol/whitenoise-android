@@ -14073,11 +14073,9 @@ private fun MessageBubble(
                         onDismiss = { customizeReactionsOpen = false },
                         onSave = { choices ->
                             onQuickReactionsSave(choices)
-                            customizeReactionsOpen = false
                         },
                         onReset = {
                             onQuickReactionsReset()
-                            customizeReactionsOpen = false
                         },
                     )
                 }
@@ -15331,6 +15329,7 @@ private fun CustomizeReactionsDialog(
                     Modifier
                         .fillMaxSize()
                         .padding(padding)
+                        .navigationBarsPadding()
                         .padding(horizontal = 24.dp, vertical = 18.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -15375,7 +15374,12 @@ private fun CustomizeReactionsDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onReset) {
+                    TextButton(
+                        onClick = {
+                            draft = RecentEmojiList.DefaultQuickChoices
+                            onReset()
+                        },
+                    ) {
                         Text(stringResource(R.string.reset_reactions))
                     }
                     Button(onClick = { onSave(draft) }) {
