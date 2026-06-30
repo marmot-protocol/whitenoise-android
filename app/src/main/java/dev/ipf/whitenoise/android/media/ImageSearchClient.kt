@@ -1,16 +1,13 @@
 package dev.ipf.whitenoise.android.media
 
-import dev.ipf.whitenoise.android.core.HostSafety
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.core.SafeHttpsGet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.InetAddress
 import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
 /** Maximum manual-redirect hops the image-search client will follow before
  *  bailing. Matches `AvatarImageLoader`'s cap. */
@@ -22,32 +19,11 @@ private const val MAX_IMAGE_SEARCH_REDIRECT_HOPS = 5
 private const val MAX_IMAGE_SEARCH_BODY_BYTES = 4 * 1024 * 1024
 
 /**
- * Single source of truth for "is this raw string an avatar-safe HTTPS URL".
- *
- * Returns the normalized form on success, null on rejection. Rules:
- *  - non-blank after trim
- *  - scheme `https` (with a `//host/path` shorthand auto-upgraded to https)
- *  - host non-empty and NOT a private / loopback address (defense in depth
- *    against SSRF via a crafted result that resolves to RFC-1918 / 127/8)
- *
- * Shared between the search client (filtering decoded results) and the
- * sheet's live preview avatar so the two cannot drift on policy.
+ * Avatar-safe HTTPS URL check for the media layer (filtering decoded search
+ * results, the sheet's preview avatar). Delegates to the single canonical
+ * implementation [ProfileSanitizer.imageUrl] so the two cannot drift on policy.
  */
-fun sanitizeHttpsAvatarUrl(raw: String?): String? {
-    if (raw.isNullOrBlank()) return null
-    var candidate = raw.trim()
-    if (candidate.startsWith("//")) candidate = "https:$candidate"
-    val parsed = runCatching { URI(candidate) }.getOrNull() ?: return null
-    val scheme = parsed.scheme?.lowercase() ?: return null
-    if (scheme != "https") return null
-    val host = parsed.host ?: return null
-    if (host.isBlank()) return null
-    // Reject embedded credentials: `user@` can mask the real authority and the
-    // userinfo can leak to the host.
-    if (!parsed.rawUserInfo.isNullOrEmpty()) return null
-    if (HostSafety.isPrivateOrLoopbackHost(host)) return null
-    return candidate
-}
+fun sanitizeHttpsAvatarUrl(raw: String?): String? = ProfileSanitizer.imageUrl(raw)
 
 /**
  * Search handshake fetches carry the user's query and the DDG vqd token. They
@@ -141,90 +117,32 @@ class DuckDuckGoImageSearchClient(
         }
 
     /**
-     * Manual-redirect GET that re-validates HTTPS, host safety, and the
-     * DuckDuckGo host pin at EVERY hop. `HttpURLConnection.instanceFollowRedirects = true`
-     * would silently follow an https→http downgrade or a DDG→third-party hop
-     * (leaking the user's query/token), so we hop ourselves with a bounded
-     * counter and a per-hop validator.
+     * Handshake/results GET via the shared [SafeHttpsGet]. Handshake fetches
+     * carry the user's query and the vqd token, so every hop is pinned to a
+     * DuckDuckGo-controlled host (via [hostAllowed]) on top of the shared
+     * downgrade / private-host / port guards. Returns the body or null.
      */
-    private fun httpGetString(initial: URL): String? {
-        var currentSpec = initial.toString()
-        var hops = 0
-        while (true) {
-            val safeSpec = sanitizeDuckDuckGoFetchUrl(currentSpec) ?: return null
-            val parsed = runCatching { URL(safeSpec) }.getOrNull() ?: return null
-            // Re-validate the authority on the URL we actually open: URI (used by
-            // the sanitizer) and URL can parse the authority differently, so guard
-            // the host we connect to rather than trusting the URI's view.
-            val host = parsed.host ?: return null
-            if (!parsed.userInfo.isNullOrEmpty()) return null
-            if (host.isBlank() || HostSafety.isPrivateOrLoopbackHost(host) || !isDuckDuckGoFetchHost(host)) {
-                return null
-            }
-            // Resolve-time check narrows the DNS-rebinding window the literal-host
-            // check leaves open. HttpURLConnection re-resolves at connect, so this
-            // is a mitigation, not a full close (matches Nip05Resolver).
-            val resolved = runCatching { InetAddress.getAllByName(host) }.getOrNull()
-            if (resolved.isNullOrEmpty() || resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }) {
-                return null
-            }
-            val connection = (parsed.openConnection() as? HttpURLConnection) ?: return null
-            try {
-                connection.connectTimeout = timeoutMillis
-                connection.readTimeout = timeoutMillis
-                connection.instanceFollowRedirects = false
-                connection.requestMethod = "GET"
-                // Browser-shaped headers — without these DuckDuckGo's HTML
-                // landing page short-circuits to an empty body and the vqd
-                // token can't be extracted.
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-                connection.setRequestProperty("Accept", "application/json,text/html;q=0.9,*/*;q=0.8")
-                val code = connection.responseCode
-                when {
-                    code in 300..399 -> {
-                        if (hops >= MAX_IMAGE_SEARCH_REDIRECT_HOPS) return null
-                        val location = connection.getHeaderField("Location") ?: return null
-                        currentSpec = runCatching { URL(parsed, location).toString() }.getOrNull() ?: return null
-                        hops += 1
-                        // Loop continues; the next iteration re-validates the
-                        // post-redirect URL with the same sanitizer used for
-                        // the initial request.
-                    }
-                    code !in 200..299 -> return null
-                    else -> {
-                        if (connection.contentLengthLong > MAX_IMAGE_SEARCH_BODY_BYTES) return null
-                        return connection.inputStream.use { readBounded(it, MAX_IMAGE_SEARCH_BODY_BYTES) }
-                    }
-                }
-            } catch (_: IOException) {
-                return null
-            } finally {
-                connection.disconnect()
-            }
-        }
-    }
-
-    /**
-     * Read at most [limit] bytes from [input] and decode as UTF-8, or null if
-     * the stream exceeds the cap (declared Content-Length can lie, so the read
-     * loop enforces the bound regardless). See #144.
-     */
-    private fun readBounded(
-        input: java.io.InputStream,
-        limit: Int,
-    ): String? {
-        val output = java.io.ByteArrayOutputStream()
-        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-        var total = 0
-        while (true) {
-            val read = input.read(buffer)
-            if (read == -1) break
-            total += read
-            if (total > limit) return null
-            output.write(buffer, 0, read)
-        }
-        return output.toByteArray().toString(StandardCharsets.UTF_8)
-    }
+    private fun httpGetString(initial: URL): String? =
+        SafeHttpsGet.getUtf8(
+            url = initial.toString(),
+            maxBodyBytes = MAX_IMAGE_SEARCH_BODY_BYTES,
+            connectTimeoutMillis = timeoutMillis,
+            readTimeoutMillis = timeoutMillis,
+            // Browser-shaped headers — without these DuckDuckGo's HTML landing
+            // page short-circuits to an empty body and the vqd token can't be
+            // extracted.
+            requestHeaders =
+                mapOf(
+                    "User-Agent" to "Mozilla/5.0",
+                    "Accept" to "application/json,text/html;q=0.9,*/*;q=0.8",
+                ),
+            maxRedirectHops = MAX_IMAGE_SEARCH_REDIRECT_HOPS,
+            // Handshake fetches carry the user's query and the vqd token, so pin
+            // every hop to DuckDuckGo-controlled hosts. The shared guard already
+            // blocks downgrades, embedded credentials, private hosts, and
+            // non-443 ports.
+            hostAllowed = { isDuckDuckGoFetchHost(it.host) },
+        )
 
     private fun decodeResults(body: String): List<ImageSearchResult> {
         val json = JSONObject(body)

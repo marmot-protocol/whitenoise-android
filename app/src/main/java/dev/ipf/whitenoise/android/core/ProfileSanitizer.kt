@@ -19,19 +19,30 @@ object ProfileSanitizer {
         return safeTake(clamped, MAX_MESSAGE_LENGTH)
     }
 
+    /**
+     * The single avatar-URL sanitizer for the whole app (profile records, image
+     * search results, the avatar preview);
+     * [dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl] delegates here so
+     * the two can't drift on policy. Returns the sanitized https URL string, or
+     * null when it isn't an avatar-safe HTTPS URL.
+     */
     fun imageUrl(raw: String?): String? {
-        val trimmed = raw?.trim().orEmpty()
-        if (trimmed.isEmpty()) return null
-        val uri = runCatching { URI(trimmed) }.getOrNull() ?: return null
+        if (raw.isNullOrBlank()) return null
+        var candidate = raw.trim()
+        // Upgrade a scheme-relative `//host/path` to https so a record that omits
+        // the scheme still resolves to a safe absolute URL.
+        if (candidate.startsWith("//")) candidate = "https:$candidate"
+        val uri = runCatching { URI(candidate) }.getOrNull() ?: return null
         if (uri.scheme?.lowercase() != "https") return null
-        if (uri.host.isNullOrBlank()) return null
+        val host = uri.host
+        if (host.isNullOrBlank()) return null
         // Reject embedded credentials (`https://user:pass@host`): they can leak
         // to the host and let `user@` mask the real authority.
         if (!uri.rawUserInfo.isNullOrEmpty()) return null
         // SSRF guard: never let an avatar URL point the app at loopback or the
         // local network. See issue #89.
-        if (HostSafety.isPrivateOrLoopbackHost(uri.host)) return null
-        return uri.toString()
+        if (HostSafety.isPrivateOrLoopbackHost(host)) return null
+        return candidate
     }
 
     private fun singleLine(

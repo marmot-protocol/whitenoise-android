@@ -289,4 +289,15 @@ class HostSafetyTest {
             ),
         )
     }
+
+    @Test
+    fun emptyLabelsInNumericIpv4StillDecodeToLoopbackOrPrivate() {
+        // Empty labels decode to 0 (inet_aton-style) so these literals are still
+        // recognized as internal instead of slipping through as a hostname.
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("127..1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("127...1"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("10..0.1"))
+        // A non-numeric label still classifies as a hostname, not an IPv4 literal.
+        assertFalse(HostSafety.isPrivateOrLoopbackHost("example..com"))
+    }
 }
