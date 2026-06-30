@@ -685,7 +685,6 @@
     <string name="toast_couldnt_sign_out">无法退出登录</string>
     <string name="toast_couldnt_sign_in_account">无法登录该账户</string>
     <string name="toast_couldnt_export_nsec">无法导出密钥</string>
-    <string name="toast_couldnt_export_encrypted_secret">无法导出加密密钥</string>
     <string name="sign_out_and_wipe_confirm_instruction">输入 %1$s 以确认。</string>
     <string name="sign_out_and_wipe_confirm_title">要清除此账户吗？</string>
     <string name="sign_out_and_wipe_sheet_destroyed_db">该账户的本地消息数据库和 MLS 群组状态。</string>

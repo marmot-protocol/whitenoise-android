@@ -692,7 +692,6 @@
     <string name="toast_couldnt_sign_out">Não foi possível sair</string>
     <string name="toast_couldnt_sign_in_account">Não foi possível entrar na conta</string>
     <string name="toast_couldnt_export_nsec">Não foi possível exportar a chave secreta</string>
-    <string name="toast_couldnt_export_encrypted_secret">Não foi possível exportar a chave secreta cifrada</string>
     <string name="sign_out_and_wipe_confirm_instruction">Digite %1$s para confirmar.</string>
     <string name="sign_out_and_wipe_confirm_title">Apagar esta conta?</string>
     <string name="sign_out_and_wipe_sheet_destroyed_db">A base de dados local de mensagens e o estado do grupo MLS desta conta.</string>

@@ -692,7 +692,6 @@
     <string name="toast_couldnt_sign_out">Impossible de se déconnecter</string>
     <string name="toast_couldnt_sign_in_account">Impossible de se connecter au compte</string>
     <string name="toast_couldnt_export_nsec">Impossible d’exporter la clé secrète</string>
-    <string name="toast_couldnt_export_encrypted_secret">Impossible d’exporter la clé secrète chiffrée</string>
     <string name="sign_out_and_wipe_confirm_instruction">Saisissez %1$s pour confirmer.</string>
     <string name="sign_out_and_wipe_confirm_title">Effacer ce compte ?</string>
     <string name="sign_out_and_wipe_sheet_destroyed_db">La base de données locale des messages et l\'état du groupe MLS pour ce compte.</string>
