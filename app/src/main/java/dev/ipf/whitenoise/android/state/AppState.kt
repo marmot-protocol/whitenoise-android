@@ -3270,9 +3270,10 @@ class WhiteNoiseAppState(
         val actorName =
             when {
                 GroupSystemEvents.isSelf(update.accountIdHex, actorHex) -> appContext.getString(R.string.you)
+                !senderName.isNullOrBlank() -> senderName
                 !actorHex.isNullOrBlank() -> runCatching { chatMemberTitle(actorHex) }.getOrNull()
                 else -> null
-            } ?: senderName ?: appContext.getString(R.string.group_system_someone)
+            } ?: appContext.getString(R.string.group_system_someone)
         return NotificationSystemText(
             title = appContext.getString(R.string.notification_group_renamed),
             body = appContext.getString(R.string.notification_group_renamed_body, actorName, diff.oldName, diff.newName),
