@@ -165,6 +165,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
@@ -178,6 +179,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
@@ -18840,7 +18842,7 @@ private fun AddIdentitySheet(
  */
 private const val WIPE_ENGINE_FFI_AVAILABLE = true
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun IdentityScreen(
     appState: WhiteNoiseAppState,
@@ -18995,14 +18997,38 @@ private fun IdentityScreen(
         SignOutSheet(
             onConfirm = {
                 showSignOutSheet = false
+                appState.signOutInProgress = true
                 scope.launch {
-                    if (appState.signOutActiveAccount() != null) {
-                        appState.present(R.string.toast_signed_out)
+                    try {
+                        if (appState.signOutActiveAccount() != null) {
+                            appState.present(R.string.toast_signed_out)
+                        }
+                    } finally {
+                        appState.signOutInProgress = false
                     }
                 }
             },
             onDismiss = { showSignOutSheet = false },
         )
+    }
+
+    // Block the screen with a spinner while a sign-out / wipe teardown runs, so
+    // the confirm doesn't leave the user staring at an unchanged screen until
+    // navigation resets. Non-dismissible — the teardown can't be cancelled.
+    if (appState.signOutInProgress) {
+        Dialog(
+            onDismissRequest = {},
+            properties =
+                DialogProperties(
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false,
+                    usePlatformDefaultWidth = false,
+                ),
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                LoadingIndicator()
+            }
+        }
     }
 
     if (WIPE_ENGINE_FFI_AVAILABLE && showWipeSheet) {
@@ -19064,12 +19090,17 @@ private fun IdentityScreen(
                         // reset in MainShell then pops IdentityScreen out of composition,
                         // which would cancel a screen-scoped coroutine before the wipe
                         // finishes and before the success toast is presented (#547).
+                        appState.signOutInProgress = true
                         appState.launchMutation {
-                            val outcome = appState.signOutAndWipeActiveAccount()
-                            if (outcome != null) {
-                                appState.present(R.string.toast_signed_out_and_wiped)
-                            } else {
-                                appState.present(R.string.toast_couldnt_wipe_account)
+                            try {
+                                val outcome = appState.signOutAndWipeActiveAccount()
+                                if (outcome != null) {
+                                    appState.present(R.string.toast_signed_out_and_wiped)
+                                } else {
+                                    appState.present(R.string.toast_couldnt_wipe_account)
+                                }
+                            } finally {
+                                appState.signOutInProgress = false
                             }
                         }
                     },

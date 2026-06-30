@@ -566,6 +566,11 @@ class WhiteNoiseAppState(
     var streamingDebugMode by mutableStateOf(preferences.getBoolean(STREAMING_DEBUG_MODE_KEY, false))
         private set
 
+    // Set while a sign-out / sign-out-and-wipe teardown is running so the UI can
+    // show a blocking spinner. Lives here (not in the screen) because the wipe
+    // runs on the mutation scope and pops the identity screen mid-teardown.
+    var signOutInProgress by mutableStateOf(false)
+
     /**
      * True only when both developer mode and the streaming-debug toggle are on.
      * The conversation timeline must read this (never [streamingDebugMode]
