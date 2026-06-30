@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -11,10 +13,10 @@ import org.junit.Test
  */
 class ComposerEmojiPaneLayoutTest {
     @Test
-    fun openEmojiPaneUsesTheCurrentImeHeight() {
+    fun targetHeightUsesTheCurrentImeHeightAtSwapStart() {
         assertEquals(
             312.dp,
-            composerEmojiPaneHeight(
+            composerEmojiPaneTargetHeight(
                 currentImeHeight = 312.dp,
                 rememberedImeHeight = 0.dp,
             ),
@@ -22,10 +24,10 @@ class ComposerEmojiPaneLayoutTest {
     }
 
     @Test
-    fun emojiPaneKeepsTheRememberedImeHeightAfterTheKeyboardHides() {
+    fun targetHeightFallsBackToTheRememberedImeHeightAfterTheKeyboardHides() {
         assertEquals(
             284.dp,
-            composerEmojiPaneHeight(
+            composerEmojiPaneTargetHeight(
                 currentImeHeight = 0.dp,
                 rememberedImeHeight = 284.dp,
             ),
@@ -33,10 +35,10 @@ class ComposerEmojiPaneLayoutTest {
     }
 
     @Test
-    fun closedKeyboardUsesAFallbackPickerHeight() {
+    fun closedKeyboardWithoutHistoryUsesAFallbackPickerHeight() {
         assertEquals(
             ComposerEmojiPickerFallbackHeight,
-            composerEmojiPaneHeight(
+            composerEmojiPaneTargetHeight(
                 currentImeHeight = 0.dp,
                 rememberedImeHeight = 0.dp,
             ),
@@ -44,21 +46,71 @@ class ComposerEmojiPaneLayoutTest {
     }
 
     @Test
-    fun emojiPaneReplacesImePaddingInsteadOfStackingWithIt() {
+    fun openEmojiPaneKeepsTheLockedHeightWhileImeInsetsAnimateDown() {
+        val lockedHeight = 300.dp
+
+        listOf(300.dp, 200.dp, 100.dp, 0.dp).forEach { animatedImeHeight ->
+            assertEquals(
+                lockedHeight,
+                composerEmojiPaneHeight(
+                    lockedPaneHeight = lockedHeight,
+                    currentImeHeight = animatedImeHeight,
+                    rememberedImeHeight = lockedHeight,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun rememberedImeHeightDoesNotTrackInsetsWhileEmojiPaneOwnsBottomRegion() {
+        var rememberedImeHeight = 300.dp
+
+        listOf(200.dp, 100.dp, 0.dp).forEach { animatedImeHeight ->
+            rememberedImeHeight =
+                updatedComposerRememberedImeHeight(
+                    previousRememberedImeHeight = rememberedImeHeight,
+                    currentImeHeight = animatedImeHeight,
+                    freezeUpdates = true,
+                )
+            assertEquals(300.dp, rememberedImeHeight)
+        }
+    }
+
+    @Test
+    fun rememberedImeHeightTracksTheKeyboardWhenTheEmojiPaneIsNotOpen() {
         assertEquals(
-            300.dp,
-            composerBottomReservedHeight(
-                emojiPickerOpen = false,
-                currentImeHeight = 300.dp,
-                rememberedImeHeight = 300.dp,
+            276.dp,
+            updatedComposerRememberedImeHeight(
+                previousRememberedImeHeight = 0.dp,
+                currentImeHeight = 276.dp,
+                freezeUpdates = false,
             ),
         )
-        assertEquals(
-            300.dp,
-            composerBottomReservedHeight(
-                emojiPickerOpen = true,
-                currentImeHeight = 300.dp,
-                rememberedImeHeight = 300.dp,
+    }
+
+    @Test
+    fun restoreWaitsForTheStableTargetHeightInsteadOfTheFirstNonZeroImeInset() {
+        val targetHeight = 300.dp
+
+        assertFalse(
+            shouldSwapComposerEmojiPaneToIme(
+                keyboardRestorePending = true,
+                currentImeHeight = 1.dp,
+                targetImeHeight = targetHeight,
+            ),
+        )
+        assertFalse(
+            shouldSwapComposerEmojiPaneToIme(
+                keyboardRestorePending = true,
+                currentImeHeight = 254.dp,
+                targetImeHeight = targetHeight,
+            ),
+        )
+        assertTrue(
+            shouldSwapComposerEmojiPaneToIme(
+                keyboardRestorePending = true,
+                currentImeHeight = 255.dp,
+                targetImeHeight = targetHeight,
             ),
         )
     }

@@ -15716,11 +15716,11 @@ private fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
 internal val ComposerEmojiPickerFallbackHeight = 320.dp
 
 /**
- * Height reserved below the composer while the inline emoji picker is visible.
- * Prefer the live IME pane height, then the last keyboard height we saw; only
+ * Target height for the inline emoji picker when it opens. Prefer the live IME
+ * height at the instant of the swap, then the last keyboard height we saw; only
  * fall back when the picker is opened from a fully closed-keyboard state.
  */
-internal fun composerEmojiPaneHeight(
+internal fun composerEmojiPaneTargetHeight(
     currentImeHeight: Dp,
     rememberedImeHeight: Dp,
 ): Dp =
@@ -15731,28 +15731,40 @@ internal fun composerEmojiPaneHeight(
     }
 
 /**
- * Pure mirror of the bottom-reserve invariant for the composer: the inline
- * emoji picker replaces IME padding instead of stacking with it.
+ * Height reserved below the composer while the inline emoji picker is visible.
+ * Once the swap starts, [lockedPaneHeight] wins so animated IME insets cannot
+ * collapse the pane or make restore thresholds chase a moving target.
  */
-internal fun composerBottomReservedHeight(
-    emojiPickerOpen: Boolean,
+internal fun composerEmojiPaneHeight(
+    lockedPaneHeight: Dp,
     currentImeHeight: Dp,
     rememberedImeHeight: Dp,
 ): Dp =
-    if (emojiPickerOpen) {
-        composerEmojiPaneHeight(currentImeHeight, rememberedImeHeight)
+    if (lockedPaneHeight > 0.dp) {
+        lockedPaneHeight
     } else {
-        currentImeHeight
+        composerEmojiPaneTargetHeight(currentImeHeight, rememberedImeHeight)
     }
 
-private fun shouldSwapComposerEmojiPaneToIme(
+internal fun updatedComposerRememberedImeHeight(
+    previousRememberedImeHeight: Dp,
+    currentImeHeight: Dp,
+    freezeUpdates: Boolean,
+): Dp =
+    if (!freezeUpdates && currentImeHeight > 0.dp) {
+        currentImeHeight
+    } else {
+        previousRememberedImeHeight
+    }
+
+internal fun shouldSwapComposerEmojiPaneToIme(
     keyboardRestorePending: Boolean,
     currentImeHeight: Dp,
-    emojiPaneHeight: Dp,
+    targetImeHeight: Dp,
 ): Boolean =
     keyboardRestorePending &&
         currentImeHeight > 0.dp &&
-        currentImeHeight.value >= emojiPaneHeight.value * 0.85f
+        currentImeHeight.value >= targetImeHeight.value * 0.85f
 
 /**
  * Inserts an emoji at the composer's current selection, replacing any selected
@@ -15878,21 +15890,43 @@ private fun ComposerBar(
                 .toDp()
         }
     var rememberedImePaneHeight by remember { mutableStateOf(0.dp) }
-    LaunchedEffect(currentImePaneHeight) {
-        if (currentImePaneHeight > 0.dp) {
-            rememberedImePaneHeight = currentImePaneHeight
-        }
+    var lockedComposerEmojiPaneHeight by remember { mutableStateOf(0.dp) }
+    LaunchedEffect(currentImePaneHeight, composerEmojiPickerOpen) {
+        rememberedImePaneHeight =
+            updatedComposerRememberedImeHeight(
+                previousRememberedImeHeight = rememberedImePaneHeight,
+                currentImeHeight = currentImePaneHeight,
+                freezeUpdates = composerEmojiPickerOpen,
+            )
     }
-    val emojiPaneHeight = composerEmojiPaneHeight(currentImePaneHeight, rememberedImePaneHeight)
+    val emojiPaneHeight =
+        composerEmojiPaneHeight(
+            lockedPaneHeight = lockedComposerEmojiPaneHeight,
+            currentImeHeight = currentImePaneHeight,
+            rememberedImeHeight = rememberedImePaneHeight,
+        )
     val emojiPaneAlpha by animateFloatAsState(
         targetValue = if (composerEmojiPickerOpen) 1f else 0f,
         animationSpec = tween(durationMillis = 120),
         label = "composerEmojiPaneAlpha",
     )
     val showEmojiPane = composerEmojiPickerOpen || emojiPaneAlpha > 0.01f
+    val latestImePaneHeight by rememberUpdatedState(currentImePaneHeight)
+    LaunchedEffect(showEmojiPane) {
+        if (!showEmojiPane) {
+            lockedComposerEmojiPaneHeight = 0.dp
+        }
+    }
 
     fun restoreKeyboardFromEmojiPane() {
         if (!composerEmojiPickerOpen) return
+        if (lockedComposerEmojiPaneHeight == 0.dp) {
+            lockedComposerEmojiPaneHeight =
+                composerEmojiPaneTargetHeight(
+                    currentImeHeight = currentImePaneHeight,
+                    rememberedImeHeight = rememberedImePaneHeight,
+                )
+        }
         composerKeyboardRestorePending = true
         runCatching { composerFocus.requestFocus() }
         keyboardController?.show()
@@ -15903,7 +15937,7 @@ private fun ComposerBar(
             shouldSwapComposerEmojiPaneToIme(
                 keyboardRestorePending = composerKeyboardRestorePending,
                 currentImeHeight = currentImePaneHeight,
-                emojiPaneHeight = emojiPaneHeight,
+                targetImeHeight = emojiPaneHeight,
             )
         ) {
             composerKeyboardRestorePending = false
@@ -15914,9 +15948,9 @@ private fun ComposerBar(
     LaunchedEffect(composerKeyboardRestorePending) {
         if (composerKeyboardRestorePending) {
             delay(600L)
-            if (composerKeyboardRestorePending && currentImePaneHeight == 0.dp) {
+            if (composerKeyboardRestorePending && latestImePaneHeight == 0.dp) {
                 composerKeyboardRestorePending = false
-                composerEmojiPickerOpen = false
+                focusManager.clearFocus(force = true)
             }
         }
     }
@@ -16145,6 +16179,11 @@ private fun ComposerBar(
                                 restoreKeyboardFromEmojiPane()
                             } else {
                                 composerKeyboardRestorePending = false
+                                lockedComposerEmojiPaneHeight =
+                                    composerEmojiPaneTargetHeight(
+                                        currentImeHeight = currentImePaneHeight,
+                                        rememberedImeHeight = rememberedImePaneHeight,
+                                    )
                                 composerEmojiPickerOpen = true
                                 focusManager.clearFocus(force = true)
                                 keyboardController?.hide()
