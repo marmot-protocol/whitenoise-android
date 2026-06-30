@@ -1052,11 +1052,42 @@ private fun SignInContent(
     val canSignIn = identity.isNotBlank() && !busy
     val signInDescription = stringResource(R.string.sign_in)
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
+        bottomBar = {
+            StickyFormActionBar {
+                Button(
+                    onClick = onSignIn,
+                    enabled = canSignIn,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
+                ) {
+                    if (busy) {
+                        CircularProgressIndicator(
+                            modifier =
+                                Modifier
+                                    .size(20.dp)
+                                    .semantics { contentDescription = signInDescription },
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(Icons.Default.Person, contentDescription = null)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        },
+    ) { padding ->
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack, enabled = !busy) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
@@ -1092,26 +1123,6 @@ private fun SignInContent(
                         },
                     ),
             )
-        }
-        Button(
-            onClick = onSignIn,
-            enabled = canSignIn,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
-        ) {
-            if (busy) {
-                CircularProgressIndicator(
-                    modifier =
-                        Modifier
-                            .size(20.dp)
-                            .semantics { contentDescription = signInDescription },
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Icon(Icons.Default.Person, contentDescription = null)
-            }
-            Spacer(Modifier.width(10.dp))
-            Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -3933,7 +3944,12 @@ private fun NewChatSheet(
         modifier = amoledModalSheetModifier(),
     ) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
@@ -10432,6 +10448,35 @@ private fun EmptyGroupConversation(onAddMembers: () -> Unit) {
     }
 }
 
+/**
+ * Bottom action rail for form screens whose primary action must remain tappable
+ * while a text field owns the IME. The scrollable content lives above this in the
+ * Scaffold body; this bar follows navigation/IME insets like the composer.
+ */
+@Composable
+internal fun StickyFormActionBar(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        border = amoledSurfaceBorderStroke(),
+        tonalElevation = 3.dp,
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content,
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GroupEditScreen(
@@ -10451,6 +10496,23 @@ private fun GroupEditScreen(
     var saving by remember { mutableStateOf(false) }
     var imageSaving by remember { mutableStateOf(false) }
     val canEdit = controller.isSelfMember && controller.isSelfAdmin
+    val saveEnabled =
+        !saving &&
+            !controller.mutationInFlight &&
+            (name != controller.group.name || description != controller.group.description)
+
+    fun saveGroupProfile() {
+        if (!saveEnabled) return
+        saving = true
+        controller.clearLastMutationError()
+        appState.launchMutation {
+            try {
+                if (controller.updateGroupProfile(name, description)) onBack()
+            } finally {
+                saving = false
+            }
+        }
+    }
 
     // System back returns to Group Details, not all the way out to the
     // conversation. This composes after the details screen's own BackHandler
@@ -10469,13 +10531,32 @@ private fun GroupEditScreen(
                 },
             )
         },
+        bottomBar = {
+            if (canEdit) {
+                StickyFormActionBar {
+                    Button(
+                        onClick = { saveGroupProfile() },
+                        enabled = saveEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (saving) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(if (saving) R.string.saving_group else R.string.save_group))
+                    }
+                }
+            }
+        },
     ) { padding ->
         LazyColumn(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .imePadding()
-                .padding(Dimens.spaceLg),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            contentPadding = PaddingValues(Dimens.spaceLg),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
         ) {
             item {
@@ -10559,36 +10640,6 @@ private fun GroupEditScreen(
                         enabled = canEdit,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                }
-            }
-            if (canEdit) {
-                item {
-                    Button(
-                        onClick = {
-                            saving = true
-                            controller.clearLastMutationError()
-                            appState.launchMutation {
-                                try {
-                                    if (controller.updateGroupProfile(name, description)) onBack()
-                                } finally {
-                                    saving = false
-                                }
-                            }
-                        },
-                        enabled =
-                            !saving &&
-                                !controller.mutationInFlight &&
-                                (name != controller.group.name || description != controller.group.description),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (saving) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Check, contentDescription = null)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(if (saving) R.string.saving_group else R.string.save_group))
-                    }
                 }
             }
         }
@@ -18463,6 +18514,34 @@ private fun ProfileEditScreen(
     var showPictureSheet by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
+    val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
+    val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
+    val lud16Valid = ProfileFieldValidation.isAcceptableLud16(lud16)
+    val saveEnabled = !busy && active != null && pictureValid && nip05Valid && lud16Valid
+
+    fun saveProfile() {
+        if (!saveEnabled) return
+        busy = true
+        // Snapshot the field values now: the mutation outlives this composition,
+        // so reading them inside the lambda would publish whatever is on screen
+        // when it runs.
+        val metadata =
+            UserProfileMetadataFfi(
+                name = displayName.trim().ifBlank { null },
+                displayName = displayName.trim().ifBlank { null },
+                about = about.trim().ifBlank { null },
+                picture = picture.trim().ifBlank { null },
+                nip05 = nip05.trim().ifBlank { null },
+                lud16 = lud16.trim().ifBlank { null },
+            )
+        appState.launchMutation {
+            try {
+                appState.publishProfile(metadata)
+            } finally {
+                busy = false
+            }
+        }
+    }
 
     LaunchedEffect(active?.accountIdHex) {
         val profile = active?.accountIdHex?.let { appState.loadUserProfile(it) }
@@ -18486,13 +18565,33 @@ private fun ProfileEditScreen(
                 },
             )
         },
+        bottomBar = {
+            if (active != null) {
+                StickyFormActionBar {
+                    Button(
+                        onClick = { saveProfile() },
+                        enabled = saveEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (busy) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        // Profile edit's primary action is conceptually "save" to the
+                        // user; the relay-publish mechanics are an implementation detail
+                        // that only the failure surface needs to name (#834).
+                        Text(stringResource(R.string.save))
+                    }
+                }
+            }
+        },
     ) { padding ->
         LazyColumn(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .imePadding()
-                .padding(Dimens.spaceLg),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            contentPadding = PaddingValues(Dimens.spaceLg),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
         ) {
             item {
@@ -18643,9 +18742,6 @@ private fun ProfileEditScreen(
                     // edited via the avatar control above (no inline row), but
                     // the same guard still gates publish in case a bad value was
                     // pasted there. See #69, #286.
-                    val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
-                    val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
-                    val lud16Valid = ProfileFieldValidation.isAcceptableLud16(lud16)
                     TextField(
                         colors = profileFieldColors,
                         value = nip05,
@@ -18680,41 +18776,6 @@ private fun ProfileEditScreen(
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                     )
-                    Button(
-                        onClick = {
-                            busy = true
-                            // Snapshot the field values now: the mutation outlives
-                            // this composition, so reading them inside the lambda
-                            // would publish whatever is on screen when it runs.
-                            val metadata =
-                                UserProfileMetadataFfi(
-                                    name = displayName.trim().ifBlank { null },
-                                    displayName = displayName.trim().ifBlank { null },
-                                    about = about.trim().ifBlank { null },
-                                    picture = picture.trim().ifBlank { null },
-                                    nip05 = nip05.trim().ifBlank { null },
-                                    lud16 = lud16.trim().ifBlank { null },
-                                )
-                            appState.launchMutation {
-                                try {
-                                    appState.publishProfile(metadata)
-                                } finally {
-                                    busy = false
-                                }
-                            }
-                        },
-                        enabled = !busy && active != null && pictureValid && nip05Valid && lud16Valid,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (busy) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(8.dp))
-                        }
-                        // Profile edit's primary action is conceptually "save" to the
-                        // user; the relay-publish mechanics are an implementation detail
-                        // that only the failure surface needs to name (#834).
-                        Text(stringResource(R.string.save))
-                    }
                 }
             }
         }
@@ -18778,7 +18839,14 @@ private fun AddIdentitySheet(
         onDismissRequest = onDismiss,
         properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
     ) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             Text(stringResource(R.string.add_account), style = MaterialTheme.typography.titleLarge)
             Button(
                 onClick = {
