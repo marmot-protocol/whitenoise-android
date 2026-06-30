@@ -19617,25 +19617,35 @@ private fun CopyableValueRow(
     clipboard: androidx.compose.ui.platform.ClipboardManager,
     appState: WhiteNoiseAppState,
 ) {
-    // Identifier rows (npub, group id, public key) put the full value on its
-    // own line(s) below the label, wrapping cleanly with a trailing copy icon
-    // (the #295 shape). The value is never middle-ellipsized nor wrapped
-    // mid-string, so the complete identifier is always visible (#793, #799).
+    val copyLabel = stringResource(R.string.copy)
+    // Identifier rows (npub, group id, public key) keep the value and trailing
+    // copy icon on one line. The text may tail-ellipsize when space is tight,
+    // but it must never wrap a stray character onto a second row (#799).
     Column(
         Modifier
             .fillMaxWidth()
-            .clickable {
+            .clickable(
+                onClickLabel = copyLabel,
+                role = Role.Button,
+            ) {
                 clipboard.setText(AnnotatedString(value))
                 appState.presentText(AppText.Resource(R.string.toast_copied_value, listOf(label)))
             },
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
-            Text(value, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                value,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+                modifier = Modifier.weight(1f),
+            )
             Icon(
                 Icons.Default.ContentCopy,
-                contentDescription = stringResource(R.string.copy),
+                contentDescription = null,
                 modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
