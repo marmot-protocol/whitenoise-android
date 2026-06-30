@@ -195,6 +195,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
@@ -14069,7 +14070,6 @@ private fun MessageBubble(
                         },
                         onCustomizeReactions = { wasExpanded ->
                             restoreReactionPickerExpanded = wasExpanded
-                            emojiPickerOpen = false
                             customizeReactionsOpen = true
                         },
                     )
@@ -14077,7 +14077,6 @@ private fun MessageBubble(
                 if (customizeReactionsOpen) {
                     fun closeCustomizeToReactionSheet() {
                         customizeReactionsOpen = false
-                        emojiPickerOpen = true
                     }
                     CustomizeReactionsDialog(
                         quickReactionEmojis = quickReactionEmojis,
@@ -14135,6 +14134,7 @@ private fun MessageBubble(
                     Box(
                         modifier =
                             Modifier
+                                .fillMaxWidth()
                                 .padding(reactionChipPadding)
                                 .layout { measurable, constraints ->
                                     val placeable = measurable.measure(constraints)
@@ -14144,6 +14144,7 @@ private fun MessageBubble(
                                         placeable.place(0, -overlap)
                                     }
                                 },
+                        contentAlignment = if (mine) Alignment.TopEnd else Alignment.TopStart,
                     ) {
                         ReactionSummaryChip(
                             tallies = tallies,
@@ -15421,12 +15422,18 @@ private fun EmojiPickerSheet(
     restoreExpanded: Boolean = false,
     onCustomizeReactions: ((Boolean) -> Unit)? = null,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    LaunchedEffect(restoreExpanded, sheetState) {
+        if (restoreExpanded) {
+            runCatching { sheetState.expand() }
+        }
+    }
     ModalBottomSheet(
         modifier = amoledModalSheetModifier(),
         onDismissRequest = onDismissRequest,
-        // Open full-height so returning from Customize reactions lands back on
-        // the same expanded picker instead of dropping to the partial detent.
+        // Start at the partial detent, but keep the sheet composed under the
+        // customize screen so an expanded picker returns expanded without a
+        // visible collapse/re-expand.
         sheetState = sheetState,
     ) {
         EmojiPickerContent(
@@ -15434,14 +15441,14 @@ private fun EmojiPickerSheet(
             recordRecentPicks = recordRecentPicks,
             onCustomizeReactions =
                 onCustomizeReactions?.let { customize ->
-                    { customize(true) }
+                    { customize(sheetState.currentValue == SheetValue.Expanded) }
                 },
             searchFieldAlwaysVisible = true,
             searchStartsOpen = false,
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight()
+                    .fillMaxHeight(0.9f)
                     .navigationBarsPadding()
                     .imePadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
