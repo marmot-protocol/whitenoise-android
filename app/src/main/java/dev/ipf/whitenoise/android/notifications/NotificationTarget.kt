@@ -6,7 +6,7 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 
 /** What a tapped notification should open. */
-enum class NotificationTargetKind { MESSAGE, INVITE }
+enum class NotificationTargetKind { MESSAGE, INVITE, CHAT_LIST }
 
 /**
  * Navigation target carried by a notification's content intent. Built from a
@@ -35,6 +35,9 @@ sealed interface NotificationNavStep {
         val groupIdHex: String,
     ) : NotificationNavStep
 
+    /** Ready: open the chat-list root for the target account. */
+    data object OpenChatList : NotificationNavStep
+
     /** Target account no longer exists locally — fall back to the chat list. */
     data object MissingAccount : NotificationNavStep
 
@@ -50,8 +53,9 @@ sealed interface NotificationNavStep {
  *  - background account → [NotificationNavStep.SwitchAccount] (no switch when
  *    already active)
  *  - active account, chat list not ready → [NotificationNavStep.AwaitChatList]
- *  - ready + group present → [NotificationNavStep.OpenConversation]
- *  - ready + group absent → [NotificationNavStep.MissingConversation]
+ *  - chat-list targets → [NotificationNavStep.OpenChatList]
+ *  - conversation targets + group present → [NotificationNavStep.OpenConversation]
+ *  - conversation targets + group absent → [NotificationNavStep.MissingConversation]
  *
  * @param chatListReady true only when the chat list is bound to [target]'s
  *   account AND finished its initial load, so a not-yet-loaded list never
@@ -67,6 +71,7 @@ fun resolveNotificationNav(
     if (target.accountRef !in knownAccountRefs) return NotificationNavStep.MissingAccount
     if (target.accountRef != activeAccountRef) return NotificationNavStep.SwitchAccount(target.accountRef)
     if (!chatListReady) return NotificationNavStep.AwaitChatList
+    if (target.kind == NotificationTargetKind.CHAT_LIST) return NotificationNavStep.OpenChatList
     if (target.groupIdHex in availableGroupIds) return NotificationNavStep.OpenConversation(target.groupIdHex)
     return NotificationNavStep.MissingConversation
 }
@@ -83,7 +88,8 @@ data class InboundIntentRouting(
  * - a notification tap ([parsedTarget] non-null) wins and clears any pending
  *   profile link (the two are mutually exclusive);
  * - otherwise a White Noise data URI ([dataString]) becomes the profile
- *   payload;
+ *   payload unless it is one of our notification identity URIs without a valid
+ *   target, in which case it is consumed rather than misrouted as a profile;
  * - otherwise — a dataless, non-notification intent such as a bare launcher
  *   relaunch — the [current] target/link is left intact rather than being
  *   silently discarded. See issue #67.
@@ -95,6 +101,7 @@ fun routeInboundIntent(
 ): InboundIntentRouting =
     when {
         parsedTarget != null -> InboundIntentRouting(parsedTarget, null)
+        dataString != null && NotificationNavigation.isTargetUriString(dataString) -> InboundIntentRouting(null, null)
         dataString != null -> InboundIntentRouting(null, dataString)
         else -> current
     }
@@ -120,6 +127,9 @@ object NotificationNavigation {
     /** Stable request code per notification (belt-and-suspenders with the URI). */
     fun requestCode(notificationKey: String): Int = notificationKey.hashCode()
 
+    /** True when [dataString] is one of our PendingIntent identity URIs. */
+    fun isTargetUriString(dataString: String): Boolean = dataString.startsWith("$URI_SCHEME:", ignoreCase = true)
+
     /** Build a target from an FFI update, or null if required ids are missing. */
     fun fromUpdate(update: NotificationUpdateFfi): NotificationTarget? {
         val accountRef = update.accountRef.takeIf { it.isNotBlank() } ?: return null
@@ -134,6 +144,16 @@ object NotificationNavigation {
             update.messageIdHex
                 ?.takeIf { it.isNotBlank() && kind == NotificationTargetKind.MESSAGE }
         return NotificationTarget(accountRef, groupIdHex, messageIdHex, kind)
+    }
+
+    /** Build an explicit notification route that opens the chat-list root. */
+    fun chatListTarget(
+        accountRef: String,
+        groupIdHex: String,
+    ): NotificationTarget? {
+        val account = accountRef.takeIf { it.isNotBlank() } ?: return null
+        val group = groupIdHex.takeIf { it.isNotBlank() } ?: return null
+        return NotificationTarget(account, group, null, NotificationTargetKind.CHAT_LIST)
     }
 
     /**

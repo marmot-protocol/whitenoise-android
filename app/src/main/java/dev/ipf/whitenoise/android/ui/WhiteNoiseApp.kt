@@ -1318,6 +1318,11 @@ private fun MainShell(
                 appState.setActiveAccount(step.accountRef)
             }
             NotificationNavStep.AwaitChatList -> Unit // re-fires when list state settles
+            NotificationNavStep.OpenChatList -> {
+                routingNotification = false
+                fallBackToChatList()
+                onNotificationTargetHandled(target)
+            }
             is NotificationNavStep.OpenConversation -> {
                 // Ensure we're on the Chats section so back-from-conversation
                 // lands on the chat list, not whatever section was open.

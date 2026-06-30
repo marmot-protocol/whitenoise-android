@@ -2925,28 +2925,39 @@ class WhiteNoiseAppState(
     }
 
     /**
-     * Synchronously drop the active account from the cached member snapshot for
-     * [groupIdHex] after a successful leave (issue #545). The snapshot seeds the
-     * next [ConversationController]'s `seededSelfMember`; without this, a stale
-     * positive snapshot would still place self in the group and flash the active
-     * composer when the just-left conversation is re-opened. No-op when there is
-     * no cached entry — the seed then falls back to a fresh roster fetch.
+     * Synchronously drop [accountIdHex] from the cached member snapshot for
+     * [groupIdHex]. The snapshot seeds the next [ConversationController]'s
+     * `seededSelfMember`; without this, a stale positive snapshot would still
+     * place self in the group and flash the active composer when the just-left
+     * conversation is re-opened. No-op when there is no cached entry — the seed
+     * then falls back to a fresh roster fetch.
      */
-    fun removeActiveAccountFromGroupMemberSnapshot(
+    fun removeAccountFromGroupMemberSnapshot(
         accountRef: String?,
         groupIdHex: String,
+        accountIdHex: String?,
     ) {
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
-        val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {
             val current = groupMemberSnapshots[key] ?: return
             groupMemberSnapshots.put(
                 key,
                 GroupMemberSnapshot(
-                    GroupProjector.membersWithoutActiveAccount(current.members, activeAccountIdHex),
+                    GroupProjector.membersWithoutActiveAccount(current.members, accountIdHex),
                 ),
             )
         }
+    }
+
+    /**
+     * Convenience wrapper for UI-initiated local leaves, where the account being
+     * removed is the currently active local account.
+     */
+    fun removeActiveAccountFromGroupMemberSnapshot(
+        accountRef: String?,
+        groupIdHex: String,
+    ) {
+        removeAccountFromGroupMemberSnapshot(accountRef, groupIdHex, activeAccount?.accountIdHex)
     }
 
     suspend fun refreshProfile(
@@ -3410,7 +3421,7 @@ class WhiteNoiseAppState(
         val accountRef = event.accountLabel
         val accountIdHex = event.accountIdHex
         val groupIdHex = event.groupIdHex
-        removeActiveAccountFromGroupMemberSnapshot(accountRef, groupIdHex)
+        removeAccountFromGroupMemberSnapshot(accountRef, groupIdHex, accountIdHex)
         markGroupLeftOnChatList(accountRef, groupIdHex)
         conversationControllersSnapshot().forEach { controller ->
             controller.markActiveAccountRemovedByPeer(accountRef, groupIdHex)
@@ -3426,7 +3437,6 @@ class WhiteNoiseAppState(
         members: List<AppGroupMemberRecordFfi>,
     ) {
         val key = groupRemovalNotificationKey(accountRef, groupIdHex)
-        if (!groupRemovalNotificationKeys.add(key)) return
         val notificationsEnabled =
             runCatching { marmotIo { notificationSettings(accountRef).localNotificationsEnabled } }
                 .getOrElse { error ->
@@ -3437,11 +3447,14 @@ class WhiteNoiseAppState(
                         ?: true
                 }
         if (!notificationsEnabled) return
-        localNotificationPresenter.showGroupRemoval(
-            accountRef = accountRef,
-            groupIdHex = groupIdHex,
-            groupTitle = removedGroupNotificationTitle(accountRef, accountIdHex, groupIdHex, members),
-        )
+        if (!groupRemovalNotificationKeys.add(key)) return
+        val posted =
+            localNotificationPresenter.showGroupRemoval(
+                accountRef = accountRef,
+                groupIdHex = groupIdHex,
+                groupTitle = removedGroupNotificationTitle(accountRef, accountIdHex, groupIdHex, members),
+            )
+        if (!posted) groupRemovalNotificationKeys.remove(key)
     }
 
     private suspend fun removedGroupNotificationTitle(

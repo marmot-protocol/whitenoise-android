@@ -8,7 +8,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -60,10 +59,16 @@ class LocalNotificationPresenter(
         val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
         manager.cancel(message.tag, message.id)
         manager.cancel(reaction.tag, reaction.id)
+        manager.cancel(groupRemovalNotificationTag(accountRef, groupIdHex), GROUP_REMOVAL_NOTIFICATION_ID)
         dismissInvitesForGroup(accountRef, groupIdHex)
         notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
         return true
     }
+
+    private fun groupRemovalNotificationTag(
+        accountRef: String,
+        groupIdHex: String,
+    ): String = GROUP_REMOVAL_TAG_PREFIX + LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex).tag
 
     // Invite cards carry no per-conversation tag, so match them by the account +
     // group stamped into their extras and cancel each by its own (tag, id). Both
@@ -99,7 +104,7 @@ class LocalNotificationPresenter(
         timestampMs: Long = System.currentTimeMillis(),
     ): Boolean {
         if (accountRef.isBlank() || groupIdHex.isBlank() || !canPostNotifications()) return false
-        val notificationTag = GROUP_REMOVAL_TAG_PREFIX + LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex).tag
+        val notificationTag = groupRemovalNotificationTag(accountRef, groupIdHex)
         val body =
             groupTitle
                 ?.takeIf { it.isNotBlank() }
@@ -111,7 +116,7 @@ class LocalNotificationPresenter(
             NotificationCompat
                 .Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_stat_whitenoise)
-                .setContentIntent(openAppPendingIntent(notificationTag))
+                .setContentIntent(openAppPendingIntent(notificationTag, accountRef, groupIdHex))
                 .setCategory(category)
                 .setWhen(timestampMs)
                 .setShowWhen(true)
@@ -406,14 +411,20 @@ class LocalNotificationPresenter(
         )
     }
 
-    private fun openAppPendingIntent(notificationTag: String): PendingIntent {
+    private fun openAppPendingIntent(
+        notificationTag: String,
+        accountRef: String,
+        groupIdHex: String,
+    ): PendingIntent {
         val tapIntent =
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 // A removal notification should land on the chat list, not deep-link
                 // into the dead group. Still set unique data so Android doesn't
                 // collapse distinct membership cards into one PendingIntent.
-                data = Uri.parse(NotificationNavigation.targetUriString(notificationTag))
+                NotificationNavigation.chatListTarget(accountRef, groupIdHex)?.let { target ->
+                    NotificationNavigation.applyToIntent(this, target, notificationTag)
+                }
             }
         return PendingIntent.getActivity(
             context,
