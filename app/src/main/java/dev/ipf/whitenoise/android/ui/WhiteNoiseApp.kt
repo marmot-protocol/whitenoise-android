@@ -18998,7 +18998,11 @@ private fun IdentityScreen(
             onConfirm = {
                 showSignOutSheet = false
                 appState.signOutInProgress = true
-                scope.launch {
+                // Mutation scope, not the screen scope: signOutActiveAccount()
+                // flips activeAccountRef before its disk-media wipe / push
+                // cleanup finishes, and the account-change nav reset pops this
+                // screen — a screen-scoped job would be cancelled mid-teardown.
+                appState.launchMutation {
                     try {
                         if (appState.signOutActiveAccount() != null) {
                             appState.present(R.string.toast_signed_out)
