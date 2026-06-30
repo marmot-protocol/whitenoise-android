@@ -88,13 +88,15 @@ object HostSafety {
             is Inet4Address -> isPrivateIpv4(toUnsignedOctets(address.address))
             is Inet6Address -> {
                 val bytes = address.address
-                // IPv4-mapped (::ffff:a.b.c.d) carries the embedded IPv4 in the
-                // final four bytes with the preceding two set to 0xffff; follow
-                // it so a mapped private literal is rejected too.
+                // IPv4-mapped (::ffff:a.b.c.d) and IPv4-compatible (::a.b.c.d)
+                // carry an embedded IPv4 in the final four bytes; follow both
+                // forms so the resolve-time layer matches the literal-host layer.
                 if (bytes.size == 16 &&
                     (0 until 10).all { bytes[it].toInt() == 0 } &&
-                    bytes[10].toInt() and 0xFF == 0xFF &&
-                    bytes[11].toInt() and 0xFF == 0xFF
+                    (
+                        (bytes[10].toInt() and 0xFF == 0xFF && bytes[11].toInt() and 0xFF == 0xFF) ||
+                            (bytes[10].toInt() and 0xFF == 0 && bytes[11].toInt() and 0xFF == 0)
+                    )
                 ) {
                     isPrivateIpv4(toUnsignedOctets(bytes.copyOfRange(12, 16)))
                 } else {

@@ -909,35 +909,39 @@ private fun FailureScreen(
     }
 }
 
+// Single in-flight onboarding action so the two buttons can never both read as
+// busy: each button's spinner keys off its own action, and the shared value
+// disables the other while one runs.
+private enum class OnboardingAction { Idle, Creating, Importing }
+
 @Composable
 private fun OnboardingScreen(appState: WhiteNoiseAppState) {
     var identity by remember { mutableStateOf("") }
-    var creatingIdentity by remember { mutableStateOf(false) }
-    var signingInBusy by remember { mutableStateOf(false) }
+    var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     val scope = rememberCoroutineScope()
 
     OnboardingContent(
         identity = identity,
-        creatingIdentity = creatingIdentity,
-        signingInBusy = signingInBusy,
+        creatingIdentity = inFlightAction == OnboardingAction.Creating,
+        signingInBusy = inFlightAction == OnboardingAction.Importing,
         onIdentityChange = { identity = it },
         onCreateIdentity = {
-            creatingIdentity = true
+            inFlightAction = OnboardingAction.Creating
             scope.launch {
                 try {
                     appState.createIdentity()
                 } finally {
-                    creatingIdentity = false
+                    inFlightAction = OnboardingAction.Idle
                 }
             }
         },
         onImportIdentity = { value ->
-            signingInBusy = true
+            inFlightAction = OnboardingAction.Importing
             scope.launch {
                 try {
                     appState.importIdentity(value)
                 } finally {
-                    signingInBusy = false
+                    inFlightAction = OnboardingAction.Idle
                 }
             }
         },
@@ -953,7 +957,7 @@ fun OnboardingContent(
     onCreateIdentity: () -> Unit,
     onImportIdentity: (String) -> Unit,
 ) {
-    var signingIn by remember { mutableStateOf(false) }
+    var signingIn by remember { mutableStateOf(signingInBusy) }
     val busy = creatingIdentity || signingInBusy
     val creatingIdentityDescription = stringResource(R.string.creating_identity)
 
@@ -1037,6 +1041,7 @@ private fun SignInContent(
 ) {
     WindowSecureFlag()
     val canSignIn = identity.isNotBlank() && !busy
+    val signInDescription = stringResource(R.string.sign_in)
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -1085,7 +1090,17 @@ private fun SignInContent(
             modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
         ) {
-            Icon(Icons.Default.Person, contentDescription = null)
+            if (busy) {
+                CircularProgressIndicator(
+                    modifier =
+                        Modifier
+                            .size(20.dp)
+                            .semantics { contentDescription = signInDescription },
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(Icons.Default.Person, contentDescription = null)
+            }
             Spacer(Modifier.width(10.dp))
             Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
@@ -5225,7 +5240,7 @@ private fun MediaFileBubble(
         border = amoledSurfaceBorderStroke(),
         modifier =
             Modifier
-                .fillMaxWidth()
+                .widthIn(max = 360.dp)
                 .combinedClickable(
                     enabled = !inFlight,
                     onLongClick = onLongPress,
@@ -5295,7 +5310,7 @@ private fun MediaFileBubble(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(28.dp),
             )
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f, fill = false)) {
                 Text(
                     MediaPipeline.safeDisplayName(reference.fileName),
                     style = MaterialTheme.typography.bodyMedium,
@@ -15429,7 +15444,12 @@ private fun BoxScope.StickyDayRibbon(
 ) {
     val label by labelState
     val alpha by animateFloatAsState(
-        targetValue = if (listState.isScrollInProgress && label.isNotEmpty()) 1f else 0f,
+        targetValue =
+            if (shouldShowStickyDayRibbon(listState.isScrollInProgress, listState.canScrollBackward || listState.canScrollForward, label)) {
+                1f
+            } else {
+                0f
+            },
         label = "stickyDayRibbon",
     )
     if (alpha > 0.01f) {
@@ -15449,6 +15469,12 @@ private fun BoxScope.StickyDayRibbon(
         )
     }
 }
+
+internal fun shouldShowStickyDayRibbon(
+    isScrollInProgress: Boolean,
+    canScrollContent: Boolean,
+    label: String,
+): Boolean = isScrollInProgress && canScrollContent && label.isNotEmpty()
 
 /** Time (+ outgoing status) overlaid on the bottom-right of a visual-media bubble. */
 @Composable
@@ -18699,8 +18725,24 @@ private fun AddIdentitySheet(
 ) {
     WindowSecureFlag()
     var identity by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
+    var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
+    val busy = inFlightAction != OnboardingAction.Idle
     val creatingIdentityDescription = stringResource(R.string.creating_identity)
+    val importingDescription = stringResource(R.string.import_existing_identity)
+
+    // One guarded entry point for import so the button and the IME Done action
+    // share the same blank/busy guard.
+    fun startImport() {
+        if (inFlightAction != OnboardingAction.Idle || identity.isBlank()) return
+        inFlightAction = OnboardingAction.Importing
+        appState.launchMutation {
+            try {
+                appState.importIdentity(identity)
+            } finally {
+                inFlightAction = OnboardingAction.Idle
+            }
+        }
+    }
 
     // ModalBottomSheet renders in its own window on Android, separate from
     // the host activity window — `WindowSecureFlag()` (which flags the
@@ -18716,19 +18758,19 @@ private fun AddIdentitySheet(
             Text(stringResource(R.string.add_account), style = MaterialTheme.typography.titleLarge)
             Button(
                 onClick = {
-                    busy = true
+                    inFlightAction = OnboardingAction.Creating
                     appState.launchMutation {
                         try {
                             appState.createIdentity()
                         } finally {
-                            busy = false
+                            inFlightAction = OnboardingAction.Idle
                         }
                     }
                 },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (busy) {
+                if (inFlightAction == OnboardingAction.Creating) {
                     CircularProgressIndicator(
                         modifier =
                             Modifier
@@ -18740,7 +18782,7 @@ private fun AddIdentitySheet(
                     Icon(Icons.Default.Key, contentDescription = null)
                 }
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(if (busy) R.string.creating_identity_title else R.string.create_new_identity))
+                Text(stringResource(if (inFlightAction == OnboardingAction.Creating) R.string.creating_identity_title else R.string.create_new_identity))
             }
             // Mask unless the value is unambiguously a public npub.
             // Treats partial / empty / unprefixed input as potentially secret,
@@ -18763,35 +18805,24 @@ private fun AddIdentitySheet(
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Done,
                     ),
-                keyboardActions =
-                    KeyboardActions(
-                        onDone = {
-                            busy = true
-                            appState.launchMutation {
-                                try {
-                                    appState.importIdentity(identity)
-                                } finally {
-                                    busy = false
-                                }
-                            }
-                        },
-                    ),
+                keyboardActions = KeyboardActions(onDone = { startImport() }),
             )
             OutlinedButton(
-                onClick = {
-                    busy = true
-                    appState.launchMutation {
-                        try {
-                            appState.importIdentity(identity)
-                        } finally {
-                            busy = false
-                        }
-                    }
-                },
+                onClick = { startImport() },
                 enabled = !busy && identity.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Default.Person, contentDescription = null)
+                if (inFlightAction == OnboardingAction.Importing) {
+                    CircularProgressIndicator(
+                        modifier =
+                            Modifier
+                                .size(18.dp)
+                                .semantics { contentDescription = importingDescription },
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.Default.Person, contentDescription = null)
+                }
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.import_existing_identity))
             }

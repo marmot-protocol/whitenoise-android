@@ -431,6 +431,7 @@ class WhiteNoiseAppState(
     internal val mediaPlaintextCache =
         dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, ByteArray>(
             maxBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
+            maxEntryBytes = MEDIA_PLAINTEXT_CACHE_MAX_BYTES,
             sizeOf = { it.size },
         )
 
@@ -438,11 +439,19 @@ class WhiteNoiseAppState(
      * App-lifetime cache of *decoded* attachment thumbnails (sampled bitmaps),
      * keyed identically to [mediaPlaintextCache]. Lets a bubble render its
      * image on the first frame — no decode spinner — for anything already
-     * fetched/sent this session. Bounded by approximate pixel bytes.
+     * fetched/sent this session. Bounded by total and per-entry bytes.
+     *
+     * Evicted bitmaps are NOT recycle()'d on purpose: the cached instance is the
+     * same Bitmap the UI draws via `asImageBitmap()` (no copy), so recycling on
+     * evict/clear/replace would crash a still-composed bubble with "trying to
+     * use a recycled bitmap". On the minSdk bitmaps live on the native heap and
+     * are GC-reclaimed once unreferenced, so the caps bound retention and GC
+     * frees the rest — no recycle() needed, and adding one back is unsafe.
      */
     internal val mediaThumbnailCache =
         dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, android.graphics.Bitmap>(
             maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
+            maxEntryBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
             sizeOf = { it.allocationByteCount },
         )
 

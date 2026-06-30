@@ -93,8 +93,8 @@ class NotificationStreamForegroundService : Service() {
                 bootstrapJob =
                     serviceScope.launch {
                         val stopAfterSync =
-                            shouldStopAfterNativePushRegistrationSync(
-                                syncRequested = syncNativePushRegistration,
+                            shouldStopAfterOneShotForegroundStart(
+                                oneShotRequested = isOneShotForegroundStart(syncNativePushRegistration, trigger),
                                 backgroundConnectionEnabled = BackgroundConnectionPreferences.isEnabled(applicationContext),
                             )
                         runCatching {
@@ -110,19 +110,22 @@ class NotificationStreamForegroundService : Service() {
             // Repeated onStartCommand calls (Android may redeliver) must not
             // stack notification-runtime bootstraps — an idempotency contract.
             ForegroundStartDecision.KeepRunningExistingBootstrap -> {
-                if (syncNativePushRegistration) {
+                val oneShotRequested = isOneShotForegroundStart(syncNativePushRegistration, trigger)
+                if (oneShotRequested) {
                     val inFlightBootstrap = bootstrapJob
                     val stopAfterSync =
-                        shouldStopAfterNativePushRegistrationSync(
-                            syncRequested = true,
+                        shouldStopAfterOneShotForegroundStart(
+                            oneShotRequested = oneShotRequested,
                             backgroundConnectionEnabled = BackgroundConnectionPreferences.isEnabled(applicationContext),
                         )
                     serviceScope.launch {
                         runCatching {
                             inFlightBootstrap?.join()
-                            drainPendingNativePushRegistrationSync((application as WhiteNoiseApplication).appState)
+                            if (syncNativePushRegistration) {
+                                drainPendingNativePushRegistrationSync((application as WhiteNoiseApplication).appState)
+                            }
                         }.onFailure {
-                            foregroundServiceDebug(it) { "notification runtime native-push sync failed" }
+                            foregroundServiceDebug(it) { "notification runtime one-shot completion failed" }
                         }
                         // A one-shot sync nudge that raced an existing bootstrap must not
                         // keep the foreground service (and its notification) alive unless
@@ -227,7 +230,21 @@ internal fun shouldSyncNativePushRegistration(action: String?): Boolean = action
 internal fun shouldStopAfterNativePushRegistrationSync(
     syncRequested: Boolean,
     backgroundConnectionEnabled: Boolean,
-): Boolean = syncRequested && !backgroundConnectionEnabled
+): Boolean =
+    shouldStopAfterOneShotForegroundStart(
+        oneShotRequested = syncRequested,
+        backgroundConnectionEnabled = backgroundConnectionEnabled,
+    )
+
+internal fun shouldStopAfterOneShotForegroundStart(
+    oneShotRequested: Boolean,
+    backgroundConnectionEnabled: Boolean,
+): Boolean = oneShotRequested && !backgroundConnectionEnabled
+
+internal fun isOneShotForegroundStart(
+    syncNativePushRegistrationRequested: Boolean,
+    trigger: ForegroundStartTrigger,
+): Boolean = syncNativePushRegistrationRequested || trigger == ForegroundStartTrigger.PushWake
 
 /**
  * The pure decision about how [NotificationStreamForegroundService.onStartCommand] should proceed,

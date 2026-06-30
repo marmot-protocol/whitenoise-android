@@ -1302,10 +1302,34 @@ class ChatsController(
         return appState.accounts.firstOrNull { it.label == ref }?.accountIdHex
     }
 
+    private fun projectChatRow(
+        row: ChatListRowFfi,
+        activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
+    ): ChatListItem =
+        chatListItemFromProjection(
+            row = row,
+            group = groupRecordsById[row.groupIdHex],
+            activeAccountIdHex = activeAccountIdHex,
+            members = memberCacheByGroup[row.groupIdHex],
+            previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
+            removed = row.groupIdHex in removedGroupIds,
+        )
+
     fun sharedGroupsWith(
         accountIdHex: String,
         activeAccountIdHex: String?,
-    ): List<ChatListItem> = sharedChatListItemsWith(currentProjectedItems(), accountIdHex, activeAccountIdHex)
+    ): List<ChatListItem> {
+        val normalizedAccount = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return emptyList()
+        val normalizedActive = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() } ?: return emptyList()
+        return chatRows
+            .asSequence()
+            .filter { row ->
+                val members = memberCacheByGroup[row.groupIdHex] ?: return@filter false
+                members.any { it.memberIdHex.equals(normalizedAccount, ignoreCase = true) } &&
+                    members.any { it.memberIdHex.equals(normalizedActive, ignoreCase = true) }
+            }.map { projectChatRow(it, activeAccountIdHex) }
+            .toList()
+    }
 
     /**
      * The confirmed 1:1 DM with [reference] (npub or hex), or null. A 1:1 is a
@@ -1314,17 +1338,33 @@ class ChatsController(
      * Shared with the new-chat sheet so "open existing DM" and "don't create a
      * duplicate DM" agree on what counts as an existing one.
      */
-    fun existingDirectChat(reference: String): ChatListItem? =
-        currentProjectedItems().firstOrNull { chat ->
-            chat.memberCount == 2 &&
-                !chat.group.pendingConfirmation &&
-                chat.otherMemberAccount?.let { other ->
-                    other.equals(reference, ignoreCase = true) ||
-                        appState.npub(other).equals(reference, ignoreCase = true)
-                } == true
-        }
+    fun existingDirectChat(reference: String): ChatListItem? {
+        val normalizedReference = reference.trim().takeIf { it.isNotEmpty() } ?: return null
+        return chatRows
+            .asSequence()
+            .filter { !it.pendingConfirmation }
+            .firstNotNullOfOrNull { row ->
+                val members = memberCacheByGroup[row.groupIdHex] ?: return@firstNotNullOfOrNull null
+                if (members.size != 2) return@firstNotNullOfOrNull null
+                val other =
+                    GroupProjector.otherMemberAccount(
+                        members,
+                        boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
+                    ) ?: return@firstNotNullOfOrNull null
+                if (other.equals(normalizedReference, ignoreCase = true) ||
+                    appState.npub(other).equals(normalizedReference, ignoreCase = true)
+                ) {
+                    projectChatRow(row)
+                } else {
+                    null
+                }
+            }
+    }
 
-    fun chatItemForGroup(groupIdHex: String): ChatListItem? = currentProjectedItems().firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+    fun chatItemForGroup(groupIdHex: String): ChatListItem? {
+        val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+        return row?.let { projectChatRow(it) }
+    }
 
     // Lightweight membership probe over the raw rows — no per-row ChatListItem
     // projection. awaitChatListItem's poll loop uses this to test whether a
@@ -2275,6 +2315,8 @@ class ConversationController(
     private val liveSubscriptionLock = Any()
     private var groupStateSubscription: GroupStateSubscription? = null
     private var startJob: Job? = null
+    private var disappearingSweepJob: Job? = null
+    private var conversationScope: CoroutineScope? = null
     private var accountTeardownRequested = false
     private val activeStreamIds = mutableSetOf<String>()
 
@@ -2391,41 +2433,22 @@ class ConversationController(
         error = null
         try {
             coroutineScope {
-                // Converge workers in the background so the first timeline
-                // snapshot is not gated on a global, all-accounts relay
-                // round-trip (#441). Lifecycle-bound to this conversation:
-                // cancelled when start() is cancelled (user leaves). The live
-                // group-state + timeline subscriptions below still fold in
-                // peer commits as they arrive.
-                launch { appState.catchUpAccounts() }
-                // Local NIP-40 enforcement (#333) + secure delete (#334): on open
-                // and then on a slow cadence, securely wipe plaintext past the
-                // retention window via the engine, then re-publish so the pruned
-                // rows leave the open timeline without waiting for a sync or
-                // re-entry. Lifecycle-bound to this conversation; skipped while the
-                // timer is off. Coarse (60s) to tolerate clock skew and stay off the
-                // hot path. The secure-delete failure is swallowed — the local
-                // filter still hides expired rows even if the wipe transiently
-                // fails, and the next tick retries.
-                launch {
-                    while (isActive) {
-                        if (group.disappearingMessageSecs > 0uL) {
-                            runCatching { appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) } }
-                                .onSuccess { result ->
-                                    // When the engine actually pruned rows, clear the
-                                    // conversation's accumulating tray card so it can't
-                                    // keep pointing at a now-vanished message. #333.
-                                    if (result.prunedMessages > 0uL) {
-                                        appState.dismissConversationNotifications(account, group.groupIdHex)
-                                    }
-                                    evictExpiredMediaCaches(account, result.mediaCiphertextSha256.toSet())
-                                }.onFailure { it.rethrowIfCancellation() }
-                            publishTimelineFromIndexes()
-                        }
-                        delay(60_000L)
-                    }
+                conversationScope = this
+                try {
+                    // Converge workers in the background so the first timeline
+                    // snapshot is not gated on a global, all-accounts relay
+                    // round-trip (#441). Lifecycle-bound to this conversation:
+                    // cancelled when start() is cancelled (user leaves). The live
+                    // group-state + timeline subscriptions below still fold in
+                    // peer commits as they arrive.
+                    launch { appState.catchUpAccounts() }
+                    startDisappearingMessageSweepIfNeeded(account)
+                    runConversationSubscriptionLoop(account)
+                } finally {
+                    disappearingSweepJob?.cancel()
+                    disappearingSweepJob = null
+                    conversationScope = null
                 }
-                runConversationSubscriptionLoop(account)
             }
         } catch (cancel: CancellationException) {
             // Expected when the conversation screen leaves the composition.
@@ -2442,6 +2465,9 @@ class ConversationController(
             isLoading = false
             error = throwable.message ?: throwable.javaClass.simpleName
         } finally {
+            disappearingSweepJob?.cancel()
+            disappearingSweepJob = null
+            conversationScope = null
             cleanupConversationSubscriptions()
             synchronized(liveSubscriptionLock) {
                 if (startJob === currentStartJob) {
@@ -2606,7 +2632,48 @@ class ConversationController(
         group = update
         if (previousRetention != update.disappearingMessageSecs) {
             publishTimelineFromIndexes()
+            handleRetentionTransition(previousRetention, update.disappearingMessageSecs)
         }
+    }
+
+    private fun handleRetentionTransition(
+        previousRetention: ULong,
+        currentRetention: ULong,
+    ) {
+        val account = conversationAccountRef ?: return
+        when {
+            previousRetention == 0uL && currentRetention > 0uL -> startDisappearingMessageSweepIfNeeded(account)
+            previousRetention > 0uL && currentRetention == 0uL -> {
+                disappearingSweepJob?.cancel()
+                disappearingSweepJob = null
+            }
+        }
+    }
+
+    // Local NIP-40 enforcement (#333) + secure delete (#334): when retention is
+    // enabled, wipe plaintext past the retention window on open and then on a
+    // slow cadence. The job is deliberately absent while retention is off (#844).
+    private fun startDisappearingMessageSweepIfNeeded(account: String) {
+        if (group.disappearingMessageSecs == 0uL) return
+        if (disappearingSweepJob?.isActive == true) return
+        val scope = conversationScope ?: return
+        disappearingSweepJob =
+            scope.launch {
+                while (isActive) {
+                    runCatching { appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) } }
+                        .onSuccess { result ->
+                            // When the engine actually pruned rows, clear the
+                            // conversation's accumulating tray card so it can't
+                            // keep pointing at a now-vanished message. #333.
+                            if (result.prunedMessages > 0uL) {
+                                appState.dismissConversationNotifications(account, group.groupIdHex)
+                            }
+                            evictExpiredMediaCaches(account, result.mediaCiphertextSha256.toSet())
+                        }.onFailure { it.rethrowIfCancellation() }
+                    publishTimelineFromIndexes()
+                    delay(60_000L)
+                }
+            }
     }
 
     private suspend fun runGroupStateSubscriptionLoop(groupStream: GroupStateSubscription) {
@@ -4302,7 +4369,9 @@ class ConversationController(
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatching {
                 appState.marmotIo { updateMessageRetention(account, group.groupIdHex, disappearingMessageSecs) }
+                val previousRetention = group.disappearingMessageSecs
                 group = group.copy(disappearingMessageSecs = disappearingMessageSecs)
+                handleRetentionTransition(previousRetention, disappearingMessageSecs)
                 // The engine prunes plaintext older than the new window during the
                 // call above. Reload the open timeline so the admin who just set
                 // the timer sees the pruned state immediately, instead of only
@@ -5401,8 +5470,13 @@ class ConversationController(
         account: String,
         details: GroupDetailsFfi,
     ) {
+        val previousRetention = group.disappearingMessageSecs
         val applied = applyAuthoritativeGroupDetails(details)
         group = applied.group
+        if (previousRetention != group.disappearingMessageSecs) {
+            publishTimelineFromIndexes()
+            handleRetentionTransition(previousRetention, group.disappearingMessageSecs)
+        }
         // Once a self-leave has been recorded locally, refuse to re-add self
         // from a details round-trip that still predates the engine eviction —
         // otherwise the full roster (self included) would restore the member

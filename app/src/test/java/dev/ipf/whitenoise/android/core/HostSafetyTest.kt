@@ -251,6 +251,22 @@ class HostSafetyTest {
     }
 
     @Test
+    fun resolvedIpv4CompatiblePrivateAddressIsFlagged() {
+        // ::7f00:1 and ::0a00:1 carry 127.0.0.1 / 10.0.0.1 in the final
+        // two hextets; the resolve-time guard must match the literal-host guard.
+        assertTrue(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 1),
+            ),
+        )
+        assertTrue(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 1),
+            ),
+        )
+    }
+
+    @Test
     fun resolvedPublicIpv6IsAllowed() {
         // 2001:4860:4860::8888 (Google public DNS).
         assertFalse(

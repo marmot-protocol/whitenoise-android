@@ -6,6 +6,7 @@ import org.junit.Test
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -116,7 +117,8 @@ class IdentityFormatterTest {
         // two-digit-year date with no time component.
         val epochZeroFormatted =
             DateTimeFormatter
-                .ofPattern("d MMM ''yy", Locale.US)
+                .ofLocalizedDate(FormatStyle.SHORT)
+                .withLocale(Locale.US)
                 .format(Instant.ofEpochSecond(0).atZone(zone).toLocalDate())
 
         assertEquals(epochZeroFormatted, IdentityFormatter.relativeTime(ULong.MAX_VALUE, RelativeTimeCopy.Default, Locale.US))
@@ -211,14 +213,20 @@ class IdentityFormatterTest {
     @Test
     fun relativeTimeShowsDateWithoutTimeForOlderInstants() {
         // 8 days ago is past the weekday window: locale date, no year, no time.
-        val eightDaysAgo = Instant.now().minusSeconds(8 * 86_400L)
-        val zone = ZoneId.systemDefault()
-        val expected =
-            DateTimeFormatter
-                .ofPattern("d MMM", Locale.US)
-                .format(eightDaysAgo.atZone(zone).toLocalDate())
+        val zone = ZoneId.of("UTC")
+        val now = Instant.parse("2025-06-30T12:00:00Z")
+        val message = Instant.parse("2025-06-14T12:00:00Z")
 
-        assertEquals(expected, IdentityFormatter.relativeTime(eightDaysAgo.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))
+        assertEquals(
+            "Jun 14",
+            IdentityFormatter.relativeTime(
+                message.epochSecond.toULong(),
+                RelativeTimeCopy.Default,
+                Locale.US,
+                now = now,
+                zone = zone,
+            ),
+        )
     }
 
     @Test
@@ -261,9 +269,36 @@ class IdentityFormatterTest {
         val zone = ZoneId.systemDefault()
         val expected =
             DateTimeFormatter
-                .ofPattern("d MMM ''yy", Locale.US)
+                .ofLocalizedDate(FormatStyle.SHORT)
+                .withLocale(Locale.US)
                 .format(longAgo.atZone(zone).toLocalDate())
 
         assertEquals(expected, IdentityFormatter.relativeTime(longAgo.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))
+    }
+
+    @Test
+    fun relativeTimeUsesLocaleDateOrderingForCjkNoYearDates() {
+        val zone = ZoneId.of("UTC")
+        val now = Instant.parse("2025-06-30T12:00:00Z")
+        val message = Instant.parse("2025-06-14T12:00:00Z")
+
+        assertEquals(
+            "6月14日",
+            IdentityFormatter.relativeTime(
+                message.epochSecond.toULong(),
+                RelativeTimeCopy.Default,
+                Locale.CHINA,
+                now = now,
+                zone = zone,
+            ),
+        )
+    }
+
+    @Test
+    fun stripYearFromLocalizedPatternPreservesDateOrder() {
+        assertEquals("MMM d", IdentityFormatter.stripYearFromLocalizedDatePattern("MMM d, y"))
+        assertEquals("d MMM", IdentityFormatter.stripYearFromLocalizedDatePattern("d MMM y"))
+        assertEquals("M月d日", IdentityFormatter.stripYearFromLocalizedDatePattern("y年M月d日"))
+        assertEquals("d MMM", IdentityFormatter.stripYearFromLocalizedDatePattern("d MMM 'de' y"))
     }
 }
