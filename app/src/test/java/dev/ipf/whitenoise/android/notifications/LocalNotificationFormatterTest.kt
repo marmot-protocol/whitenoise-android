@@ -13,6 +13,14 @@ import org.junit.Test
 
 class LocalNotificationFormatterTest {
     @Test
+    fun recipientSubtextShownOnlyWhenMultipleAccountsSignedIn() {
+        assertNull(LocalNotificationFormatter.recipientAccountSubtext(signedInAccountCount = 1, recipientLabel = "Work"))
+        assertEquals("Work", LocalNotificationFormatter.recipientAccountSubtext(signedInAccountCount = 2, recipientLabel = "Work"))
+        assertNull(LocalNotificationFormatter.recipientAccountSubtext(signedInAccountCount = 3, recipientLabel = "  "))
+        assertNull(LocalNotificationFormatter.recipientAccountSubtext(signedInAccountCount = 3, recipientLabel = null))
+    }
+
+    @Test
     fun messageNotificationUsesSenderGroupAndPreviewText() {
         val content =
             LocalNotificationFormatter.content(

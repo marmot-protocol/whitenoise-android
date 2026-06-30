@@ -7,19 +7,22 @@ import org.junit.Test
 
 /**
  * Pins the conversation bottom-bar membership-display gate (issues #545, #623,
- * and #802). The gate must never paint a state it doesn't actually know during
- * the brief window before `refreshMembers()` confirms the roster:
+ * #802). The gate must never paint a state it doesn't actually know during the
+ * brief window before `refreshMembers()` confirms the roster:
  *
- * - #545: a group the user LEFT must not flash the active composer.
+ * - #545: a group the user LEFT must never flash the active composer.
  * - #623 (inverse): a group the user IS a member of — especially an admin
- *   re-entering their own group — must not flash the "no longer a member"
- *   notice.
- * - #802: a pending invite must show explicit Join/Decline actions instead of
- *   auto-accepting or exposing the active composer.
+ *   re-entering their own group, OR tapping another account's notification
+ *   while its roster is still stale/cross-account — must not flash the "no
+ *   longer a member" notice.
+ * - #802: a pending invite shows explicit Join/Decline actions.
  *
- * [ComposerGate.COMPOSER] → active composer; [ComposerGate.NOTICE] →
- * RemovedMemberComposerNotice; [ComposerGate.INVITE] → invite action bar;
- * [ComposerGate.PENDING] → render nothing and wait for the confirmed result.
+ * The removed-member notice is shown only once `membersVerified` — i.e.
+ * `refreshMembers()` has confirmed the roster. A merely-seeded roster that omits
+ * self is NOT enough (it can be a stale/cross-account snapshot), so the gate
+ * waits ([ComposerGate.PENDING]) — while a seed that positively contains self,
+ * or an open from a message notification (which implies membership), shows the
+ * composer immediately.
  */
 class ConversationComposerGateTest {
     @Test
@@ -28,24 +31,44 @@ class ConversationComposerGateTest {
             ComposerGate.INVITE,
             conversationComposerGate(
                 pendingInvite = true,
-                membersLoaded = true,
+                membersVerified = true,
                 isSelfMember = true,
                 seededSelfMember = true,
                 seededMembershipKnown = true,
+                assumeMemberUntilVerified = false,
             ),
         )
     }
 
     @Test
-    fun confirmedNotMemberShowsNotice() {
+    fun verifiedNotMemberShowsNotice() {
         assertEquals(
             ComposerGate.NOTICE,
             conversationComposerGate(
                 pendingInvite = false,
-                membersLoaded = true,
+                membersVerified = true,
                 isSelfMember = false,
                 seededSelfMember = false,
                 seededMembershipKnown = true,
+                assumeMemberUntilVerified = false,
+            ),
+        )
+    }
+
+    @Test
+    fun verifiedNotMemberWinsOverNotificationOptimism() {
+        // A stale notification for a group the user has since left: once
+        // refreshMembers() verifies non-membership, the notice wins even though
+        // the open came from a notification.
+        assertEquals(
+            ComposerGate.NOTICE,
+            conversationComposerGate(
+                pendingInvite = false,
+                membersVerified = true,
+                isSelfMember = false,
+                seededSelfMember = false,
+                seededMembershipKnown = true,
+                assumeMemberUntilVerified = true,
             ),
         )
     }
@@ -56,131 +79,141 @@ class ConversationComposerGateTest {
             ComposerGate.COMPOSER,
             conversationComposerGate(
                 pendingInvite = false,
-                membersLoaded = true,
+                membersVerified = true,
                 isSelfMember = true,
                 seededSelfMember = false,
                 seededMembershipKnown = false,
+                assumeMemberUntilVerified = false,
             ),
         )
     }
 
     @Test
     fun loadingKnownMemberShowsComposerWithoutFlash() {
-        // Seed positively places self in the roster → no blank-bar flash while
-        // refreshMembers() verifies (preserves the #264 intent).
+        // Seed positively places self in the roster → show the composer at once,
+        // no blank-bar flash while refreshMembers() verifies (#264 intent).
         assertEquals(
             ComposerGate.COMPOSER,
             conversationComposerGate(
                 pendingInvite = false,
-                membersLoaded = false,
+                membersVerified = false,
                 isSelfMember = false,
                 seededSelfMember = true,
                 seededMembershipKnown = true,
+                assumeMemberUntilVerified = false,
             ),
         )
     }
 
     @Test
-    fun loadingLeftGroupShowsNoticeImmediately() {
-        // #545: the left group's cached snapshot is present but has self removed
-        // (seededMembershipKnown = true, seededSelfMember = false), so the
-        // disabled notice renders at once instead of flashing the composer.
+    fun notificationOpenShowsComposerBeforeVerification() {
+        // Tapping a message notification implies membership of that group, so the
+        // composer shows immediately even with a stale/cross-account seed that
+        // omits self — no placeholder or removed-notice flash on the switch.
         assertEquals(
-            ComposerGate.NOTICE,
+            ComposerGate.COMPOSER,
             conversationComposerGate(
                 pendingInvite = false,
-                membersLoaded = false,
+                membersVerified = false,
                 isSelfMember = false,
                 seededSelfMember = false,
                 seededMembershipKnown = true,
+                assumeMemberUntilVerified = true,
+            ),
+        )
+    }
+
+    @Test
+    fun unverifiedSeedWithoutSelfWaitsInsteadOfFlashingNotice() {
+        // A seeded roster that omits self but is NOT yet verified, opened by a
+        // path other than a notification (so no membership implication). The gate
+        // waits rather than flashing the "removed" notice; it still never flashes
+        // the composer (the #545 harm). Resolves on verification.
+        assertEquals(
+            ComposerGate.PENDING,
+            conversationComposerGate(
+                pendingInvite = false,
+                membersVerified = false,
+                isSelfMember = false,
+                seededSelfMember = false,
+                seededMembershipKnown = true,
+                assumeMemberUntilVerified = false,
             ),
         )
     }
 
     @Test
     fun loadingColdOpenWaitsInsteadOfFlashing() {
-        // #623: no cached snapshot at all (first-ever open / fresh process / a
-        // chat-list row tapped before its background member fetch landed) →
-        // membership is unknown, so render NOTHING and upgrade on the confirmed
-        // result. The old gate defaulted this case to the notice, which flashed
-        // the "no longer a member" state for a member (the inverse of #545).
+        // #623: no cached snapshot at all → membership unknown → render nothing
+        // and upgrade on the confirmed result.
         assertEquals(
             ComposerGate.PENDING,
             conversationComposerGate(
                 pendingInvite = false,
-                membersLoaded = false,
+                membersVerified = false,
                 isSelfMember = false,
                 seededSelfMember = false,
                 seededMembershipKnown = false,
+                assumeMemberUntilVerified = false,
             ),
         )
     }
 
     @Test
     fun confirmedMembershipAlwaysWinsOverColdSeed() {
-        // Once refreshMembers() confirms self is a member, the composer shows
-        // regardless of the (now irrelevant) cold seed.
         assertEquals(
             ComposerGate.COMPOSER,
             conversationComposerGate(
                 pendingInvite = false,
-                membersLoaded = true,
+                membersVerified = true,
                 isSelfMember = true,
                 seededSelfMember = false,
                 seededMembershipKnown = false,
+                assumeMemberUntilVerified = false,
             ),
         )
     }
 
     /**
-     * Regression for the #545 adversarial-review blocking finding: the pure gate
-     * above only checks the decision given a `seededSelfMember` value — it does
-     * not prove the leave path actually produces a self-free seed.
-     *
-     * Before that fix, the successful-leave paths did not invalidate the cached
-     * member snapshot, so re-opening the just-left group seeded a roster that
-     * still contained self (`seededSelfMember == true`) and flashed the active
-     * composer.
-     *
-     * This pins the end-to-end invariant: a snapshot that DID contain self,
-     * after the leave transform [GroupProjector.membersWithoutActiveAccount],
-     * seeds `seededSelfMember == false` while staying a present (known) snapshot,
-     * so the gate renders the notice immediately during the membership-load
-     * window.
+     * The leave transform must produce a self-free seed (the #545 cache
+     * invalidation), so once membership is verified the gate shows the notice
+     * rather than the composer.
      */
     @Test
-    fun snapshotInvalidatedOnLeaveSeedsNoSelfMember() {
+    fun leaveTransformSeedsNoSelfMemberAndVerifiedShowsNotice() {
         val self = "aa11"
         val other = "bb22"
-        val rosterBeforeLeave =
-            listOf(
-                member(self),
-                member(other),
-            )
+        val rosterBeforeLeave = listOf(member(self), member(other))
 
-        // Sanity: pre-leave the seed would (correctly) place self in the group.
-        val seededBeforeLeave =
-            rosterBeforeLeave.any { GroupProjector.isActiveAccountMember(it, self) }
+        val seededBeforeLeave = rosterBeforeLeave.any { GroupProjector.isActiveAccountMember(it, self) }
         assertEquals(true, seededBeforeLeave)
 
-        // The successful-leave transform the cache-invalidation now applies.
-        val rosterAfterLeave =
-            GroupProjector.membersWithoutActiveAccount(rosterBeforeLeave, self)
-        val seededAfterLeave =
-            rosterAfterLeave.any { GroupProjector.isActiveAccountMember(it, self) }
-
+        val rosterAfterLeave = GroupProjector.membersWithoutActiveAccount(rosterBeforeLeave, self)
+        val seededAfterLeave = rosterAfterLeave.any { GroupProjector.isActiveAccountMember(it, self) }
         assertEquals(false, seededAfterLeave)
-        // The snapshot is still present (the row's roster is known), so the seed
-        // is authoritative: the gate shows the notice without an active-composer
-        // flash.
+
+        // Unverified, non-notification open: wait (no composer flash, no notice).
+        assertEquals(
+            ComposerGate.PENDING,
+            conversationComposerGate(
+                pendingInvite = false,
+                membersVerified = false,
+                isSelfMember = false,
+                seededSelfMember = seededAfterLeave,
+                seededMembershipKnown = true,
+                assumeMemberUntilVerified = false,
+            ),
+        )
+        // Verified not-member: notice.
         assertEquals(
             ComposerGate.NOTICE,
             conversationComposerGate(
                 pendingInvite = false,
-                membersLoaded = false,
+                membersVerified = true,
                 isSelfMember = false,
                 seededSelfMember = seededAfterLeave,
                 seededMembershipKnown = true,
+                assumeMemberUntilVerified = false,
             ),
         )
     }

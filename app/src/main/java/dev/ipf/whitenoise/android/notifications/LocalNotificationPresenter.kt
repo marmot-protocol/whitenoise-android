@@ -93,6 +93,7 @@ class LocalNotificationPresenter(
         previewTextOverride: String? = null,
         reactedToPreviewOverride: String? = null,
         mediaKind: ReplyMediaKind = ReplyMediaKind.None,
+        recipientAccountSubtext: String? = null,
     ): Boolean {
         val content =
             LocalNotificationFormatter.content(
@@ -138,6 +139,8 @@ class LocalNotificationPresenter(
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                 .setPublicVersion(redactedPublicVersion(decision.channelId, decision.category))
                 .setSilent(false)
+        // Name the recipient identity in the header when multi-account (#836).
+        if (!recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
 
         when (val style = decision.style) {
             // Reactions get their own self-contained card (own tag/id on the

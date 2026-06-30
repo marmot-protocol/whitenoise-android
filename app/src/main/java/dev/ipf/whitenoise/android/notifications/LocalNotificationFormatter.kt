@@ -86,6 +86,17 @@ object LocalNotificationFormatter {
     /** True when the caller should resolve [update.reactedToPreview] before formatting. */
     fun needsReactedToPreviewResolution(update: NotificationUpdateFfi): Boolean = isReaction(update)
 
+    /**
+     * The notification sub-text naming which signed-in identity received the
+     * event, or null. Shown only when more than one account is signed in (#836):
+     * a single-account user already knows who they are, so the label would be
+     * noise. Blank labels are dropped.
+     */
+    fun recipientAccountSubtext(
+        signedInAccountCount: Int,
+        recipientLabel: String?,
+    ): String? = recipientLabel?.takeIf { it.isNotBlank() && signedInAccountCount > 1 }
+
     fun content(
         update: NotificationUpdateFfi,
         context: Context? = null,

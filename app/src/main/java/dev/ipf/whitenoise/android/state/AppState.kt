@@ -3195,6 +3195,10 @@ class WhiteNoiseAppState(
         return resolvedName ?: runCatching { shortNpub(senderIdHex) }.getOrNull()
     }
 
+    // The recipient (own) identity's display name for the notification subtext,
+    // resolved the same way the rest of the UI labels the account.
+    private fun notificationRecipientName(accountRef: String): String? = accounts.firstOrNull { it.label == accountRef }?.let { displayName(it.accountIdHex) }
+
     // Resolve a mention for a one-shot notification. Unlike the Compose bubble
     // path, a notification will not recompose after requestProfile() finishes,
     // so do one local display-name read before falling back to shortened bech32.
@@ -3358,6 +3362,11 @@ class WhiteNoiseAppState(
                 previewTextOverride,
                 reactedToPreviewOverride,
                 mediaKind,
+                recipientAccountSubtext =
+                    LocalNotificationFormatter.recipientAccountSubtext(
+                        signedInAccountCount = accounts.count { it.localSigning && !it.signedOut && it.label.isNotBlank() },
+                        recipientLabel = notificationRecipientName(update.accountRef),
+                    ),
             )
         }
         // Coalesce the unread refresh across a burst instead of paying the

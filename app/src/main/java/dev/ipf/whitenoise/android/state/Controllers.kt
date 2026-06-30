@@ -2169,7 +2169,8 @@ class ConversationController(
     // with `missing encrypted media secret for epoch 0`.
     var mediaReferences: Map<String, List<MediaAttachmentReferenceFfi>> by mutableStateOf(emptyMap())
         private set
-    private var membersVerified by mutableStateOf(false)
+    var membersVerified by mutableStateOf(false)
+        private set
 
     // Authoritative local self-leave marker (issue #787). Short-lived lifecycle
     // state (lives only as long as this controller, never persisted —
