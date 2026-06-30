@@ -118,6 +118,7 @@
     <string name="add_member">Mitglieder hinzufügen</string>
     <string name="add_as_admin">Als Admin hinzufügen</string>
     <string name="adding_member">Mitglied wird hinzugefügt...</string>
+    <string name="add_member_already_in_group">%1$s ist bereits in dieser Gruppe</string>
     <string name="invite_pending">Einladung ausstehend: %1$s</string>
     <string name="latest_group_error">Letzter Gruppenfehler: %1$s</string>
     <string name="actions">Aktionen</string>
@@ -453,6 +454,7 @@
     <string name="toast_invite_sent">Einladung gesendet</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Einladung gesendet, aber Adminrechte konnten nicht hinzugefügt werden</string>
     <string name="toast_couldnt_add_members">Mitglieder konnten nicht hinzugefügt werden. Bitte erneut versuchen.</string>
+    <string name="toast_couldnt_add_member_duplicate_detail">%1$s konnte nicht hinzugefügt werden. Die Person ist bereits Mitglied oder ihr Signaturschlüssel steht im Konflikt mit dem eines vorhandenen Mitglieds.</string>
     <string name="toast_member_removed">Mitglied entfernt</string>
     <string name="toast_couldnt_remove_member">Mitglied konnte nicht entfernt werden. Bitte erneut versuchen.</string>
     <string name="toast_keep_one_admin">Behalten Sie einen Administrator</string>

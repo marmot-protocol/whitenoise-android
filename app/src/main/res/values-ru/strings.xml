@@ -120,6 +120,7 @@
     <string name="add_member">Добавить участников</string>
     <string name="add_as_admin">Добавить администратором</string>
     <string name="adding_member">Добавление участника...</string>
+    <string name="add_member_already_in_group">%1$s уже в этой группе</string>
     <string name="invite_pending">Приглашение ожидает: %1$s</string>
     <string name="latest_group_error">Последняя ошибка группы: %1$s</string>
     <string name="actions">Действия</string>
@@ -457,6 +458,7 @@
     <string name="toast_invite_sent">Приглашение отправлено</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Приглашение отправлено, но не удалось добавить администратора</string>
     <string name="toast_couldnt_add_members">Не удалось добавить участников. Попробуйте снова.</string>
+    <string name="toast_couldnt_add_member_duplicate_detail">Не удалось добавить %1$s. Этот участник уже в группе, либо его ключ подписи конфликтует с ключом существующего участника.</string>
     <string name="toast_member_removed">Участник удален</string>
     <string name="toast_couldnt_remove_member">Не удалось удалить участника. Попробуйте снова.</string>
     <string name="toast_keep_one_admin">Держите одного администратора</string>

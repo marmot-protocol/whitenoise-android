@@ -869,8 +869,12 @@ internal fun nextReadAnchor(
 data class ConversationControllerCopy(
     val waitingForStream: String = "Waiting for stream...",
     val streamFailedFormat: String = "Stream failed: %1\$s",
+    val couldntAddMemberDuplicateFormat: String =
+        "Couldn't add %1\$s. They're already a member, or their signing key conflicts with an existing member.",
 ) {
     fun streamFailed(message: String): String = String.format(streamFailedFormat, message)
+
+    fun couldntAddMemberDuplicate(name: String): String = String.format(couldntAddMemberDuplicateFormat, name)
 }
 
 internal data class AppliedGroupDetails(
@@ -890,6 +894,24 @@ internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGr
                 )
             },
     )
+
+/**
+ * Whether [detail] is the MLS "duplicate signature key" commit rejection
+ * (issue #899). The engine surfaces this as a raw enum path, e.g.
+ * `add_members: CreateCommitError(ProposalValidationError(DuplicateSignatureKey))`,
+ * which must never reach the user. In practice it means the proposed member
+ * already holds a seat (the common case), or their signing key collides with an
+ * existing member's; either way the add can't proceed. Callers map it to a
+ * plain-language, name-aware message instead of the raw backend string. Matched
+ * case-insensitively against the leaf enum name so it survives wrapper/format
+ * churn around it.
+ */
+internal fun isDuplicateSignatureKeyError(detail: String?): Boolean = detail?.contains("DuplicateSignatureKey", ignoreCase = true) == true
+
+internal fun duplicateSignatureKeyDisplayName(
+    refs: List<String>,
+    displayName: (String) -> String,
+): String = refs.firstOrNull()?.let(displayName).orEmpty()
 
 internal class ConversationSelfLeftState(
     seededMembershipKnown: Boolean,
@@ -4327,6 +4349,18 @@ class ConversationController(
                     lastMutationError = "Invite sent, but admin promotion failed: $message"
                     appState.present(R.string.toast_invite_sent_but_couldnt_add_admin, AppText.Plain(message))
                     true
+                } else if (isDuplicateSignatureKeyError(message)) {
+                    // MLS rejected the add commit because the proposed member
+                    // already holds a seat (or their signing key collides with
+                    // an existing member's). The UI pre-checks membership, but a
+                    // race or key collision can still land here — surface plain
+                    // language with the resolved name instead of the raw
+                    // CreateCommitError(ProposalValidationError(...)) enum (#899).
+                    val name = duplicateSignatureKeyDisplayName(refs, appState::displayName)
+                    val friendly = copy.couldntAddMemberDuplicate(name)
+                    lastMutationError = friendly
+                    appState.present(R.string.toast_couldnt_add_members, AppText.Plain(friendly))
+                    false
                 } else {
                     lastMutationError = message
                     appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message))

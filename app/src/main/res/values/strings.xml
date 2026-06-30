@@ -130,6 +130,7 @@
     <string name="add_member">Add Members</string>
     <string name="add_as_admin">Add as admin</string>
     <string name="adding_member">Adding member...</string>
+    <string name="add_member_already_in_group">%1$s is already in this group</string>
     <!-- @-mention composer picker (#414) -->
     <string name="mention_picker_title">Mention a member</string>
     <string name="mention_picker_member">Mention %1$s</string>
@@ -581,6 +582,7 @@
     <string name="toast_invite_sent">Invite sent</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Invite sent, but couldn\'t add admin</string>
     <string name="toast_couldnt_add_members">Couldn\'t add members</string>
+    <string name="toast_couldnt_add_member_duplicate_detail">Couldn\'t add %1$s. They\'re already a member, or their signing key conflicts with an existing member.</string>
     <string name="toast_member_removed">Member removed</string>
     <string name="toast_couldnt_remove_member">Couldn\'t remove member</string>
     <string name="toast_keep_one_admin">Keep one admin</string>

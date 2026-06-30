@@ -592,6 +592,7 @@ private fun rememberConversationControllerCopy(): ConversationControllerCopy =
     ConversationControllerCopy(
         waitingForStream = stringResource(R.string.waiting_for_stream),
         streamFailedFormat = stringResource(R.string.stream_failed_format),
+        couldntAddMemberDuplicateFormat = stringResource(R.string.toast_couldnt_add_member_duplicate_detail),
     )
 
 @Composable
@@ -3783,6 +3784,26 @@ internal fun canInviteFromEmptyGroup(
         isSelfAdmin &&
         membersLoaded &&
         memberCount == 1
+
+/**
+ * Whether the pubkey [resolvedHex] the Add Member preview settled on is already
+ * in the group's roster ([memberHexes]) — the cheap, source-of-truth pre-check
+ * for issue #899. MLS rejects the add commit with a raw
+ * `DuplicateSignatureKey` when the proposed member already holds a seat (the
+ * common case), so we catch it here against the group's own member records
+ * rather than letting the user fire a doomed invite and read a Rust enum path.
+ *
+ * Comparison is case-insensitive on the hex, matching every other roster check
+ * in this file. Returns false for a null/blank resolved key (nothing to add
+ * yet) so the gate never blocks an unresolved identifier on this basis.
+ */
+internal fun groupContainsResolvedMember(
+    memberHexes: List<String>,
+    resolvedHex: String?,
+): Boolean {
+    val target = resolvedHex?.trim()?.takeIf { it.isNotEmpty() } ?: return false
+    return memberHexes.any { it.equals(target, ignoreCase = true) }
+}
 
 /**
  * The four things the conversation bottom bar can render for the membership
@@ -11485,6 +11506,26 @@ private fun GroupDetailsScreen(
                     appState = appState,
                     onResolutionChanged = { pendingMemberPreview = it },
                 )
+                // Pre-check membership against the group's own roster (#899):
+                // if the resolved pubkey is already a member, MLS would reject
+                // the add commit with a raw DuplicateSignatureKey enum path. Say
+                // so inline on the resolved card and disable Add, rather than
+                // firing a doomed invite and surfacing the backend string.
+                val alreadyMember =
+                    groupContainsResolvedMember(
+                        memberHexes = controller.members.map { it.memberIdHex },
+                        resolvedHex = pendingMemberPreview.resolvedHex,
+                    )
+                if (alreadyMember) {
+                    val alreadyName =
+                        pendingMemberPreview.resolvedHex?.let { appState.displayName(it) }.orEmpty()
+                    Text(
+                        stringResource(R.string.add_member_already_in_group, alreadyName),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 // Plain-text name search over local chat-list contacts.
                 // The Create Group flow keeps every row addable (tapping fills
                 // the npub into the field), but still shows the "Already in
@@ -11539,10 +11580,14 @@ private fun GroupDetailsScreen(
                     // Gate on the preview resolution too (#631): keep the invite
                     // from firing on an unresolved/invalid identifier, while
                     // still allowing the loaded AND no-profile states through.
+                    // Also block when the resolved pubkey is already in the
+                    // group (#899) — adding them would fail with a raw
+                    // DuplicateSignatureKey error.
                     enabled =
                         pendingMember.isNotBlank() &&
                             activeMutation == null &&
                             !controller.mutationInFlight &&
+                            !alreadyMember &&
                             recipientPreviewAllowsSubmit(pendingMemberPreview.state),
                     modifier = Modifier.fillMaxWidth(),
                 ) {

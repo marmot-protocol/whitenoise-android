@@ -117,6 +117,7 @@
     <string name="add_member">添加成员</string>
     <string name="add_as_admin">以管理员身份添加</string>
     <string name="adding_member">正在添加成员...</string>
+    <string name="add_member_already_in_group">%1$s 已在此群组中</string>
     <string name="invite_pending">邀请待处理：%1$s</string>
     <string name="latest_group_error">最新群组错误：%1$s</string>
     <string name="actions">行动</string>
@@ -452,6 +453,7 @@
     <string name="toast_invite_sent">邀请已发送</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">邀请已发送，但无法添加管理员</string>
     <string name="toast_couldnt_add_members">添加成员失败。请重试。</string>
+    <string name="toast_couldnt_add_member_duplicate_detail">无法添加 %1$s。对方已是成员，或其签名密钥与现有成员冲突。</string>
     <string name="toast_member_removed">会员已删除</string>
     <string name="toast_couldnt_remove_member">移除成员失败。请重试。</string>
     <string name="toast_keep_one_admin">保留一名管理员</string>

@@ -118,6 +118,7 @@
     <string name="add_member">Ajouter des membres</string>
     <string name="add_as_admin">Ajouter comme administrateur</string>
     <string name="adding_member">Ajout du membre...</string>
+    <string name="add_member_already_in_group">%1$s est déjà dans ce groupe</string>
     <string name="invite_pending">Invitation en attente : %1$s</string>
     <string name="latest_group_error">Dernière erreur du groupe : %1$s</string>
     <string name="actions">Actions</string>
@@ -453,6 +454,7 @@
     <string name="toast_invite_sent">Invitation envoyée</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Invitation envoyée, mais impossible d’ajouter l’administrateur</string>
     <string name="toast_couldnt_add_members">Impossible d’ajouter des membres. Veuillez réessayer.</string>
+    <string name="toast_couldnt_add_member_duplicate_detail">Impossible d’ajouter %1$s. Cette personne est déjà membre, ou sa clé de signature entre en conflit avec celle d’un membre existant.</string>
     <string name="toast_member_removed">Membre supprimé</string>
     <string name="toast_couldnt_remove_member">Impossible de retirer le membre. Veuillez réessayer.</string>
     <string name="toast_keep_one_admin">Gardez un administrateur</string>

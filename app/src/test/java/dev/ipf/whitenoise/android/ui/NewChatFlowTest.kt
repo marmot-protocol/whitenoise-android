@@ -186,6 +186,31 @@ class NewChatFlowTest {
     }
 
     @Test
+    fun groupContainsResolvedMemberMatchesRosterCaseInsensitively() {
+        val alice = "a".repeat(64)
+        val bob = "b".repeat(64)
+        // The resolved pubkey already holds a seat -> pre-check trips (#899),
+        // so Add is disabled and the doomed DuplicateSignatureKey invite never
+        // fires. Hex comparison is case-insensitive, like every roster check.
+        assertTrue(
+            groupContainsResolvedMember(
+                memberHexes = listOf(alice, bob),
+                resolvedHex = alice.uppercase(),
+            ),
+        )
+        // Resolved to someone not in the group -> addable.
+        assertFalse(
+            groupContainsResolvedMember(
+                memberHexes = listOf(alice),
+                resolvedHex = bob,
+            ),
+        )
+        // Nothing resolved yet (null/blank) -> never blocks on this basis.
+        assertFalse(groupContainsResolvedMember(memberHexes = listOf(alice), resolvedHex = null))
+        assertFalse(groupContainsResolvedMember(memberHexes = listOf(alice), resolvedHex = "   "))
+    }
+
+    @Test
     fun recipientNip05VerifiedOnlyWhenItResolvesBackToThePubkey() {
         val pubkey = "b".repeat(64)
         // A declared kind:0 nip05 that resolves back to the same pubkey is the
