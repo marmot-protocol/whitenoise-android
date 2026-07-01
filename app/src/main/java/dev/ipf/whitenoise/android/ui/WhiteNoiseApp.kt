@@ -4293,11 +4293,6 @@ private val COMPOSER_SNACKBAR_INSET = 72.dp
 // snackbar reads as sitting *above* the FAB, per Material guidance.
 private val FAB_SNACKBAR_INSET = 80.dp
 
-// Android 12+ shows clipboard-access toasts in the bottom transient-overlay
-// band, roughly 64-80dp above the navigation inset. Keep primary form actions
-// above that band so a paste-triggered OS toast can't cover the next button.
-private val SYSTEM_TOAST_ACTION_CLEARANCE = 80.dp
-
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
 // first visible row index reaches SHOW, and only hides again once it falls back
 // to HIDE — the 3–4 dead band gives hysteresis so a quick scroll wiggle near
@@ -10687,7 +10682,7 @@ internal fun StickyFormActionBar(
                         start = Dimens.spaceLg,
                         top = Dimens.spaceMd,
                         end = Dimens.spaceLg,
-                        bottom = Dimens.spaceMd + SYSTEM_TOAST_ACTION_CLEARANCE,
+                        bottom = Dimens.spaceMd,
                     ),
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
             verticalAlignment = Alignment.CenterVertically,
