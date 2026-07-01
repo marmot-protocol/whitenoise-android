@@ -1803,16 +1803,18 @@ private fun ChatsScreen(
     val showArchived = filter == ChatListFilter.Archived
     val searchFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
+    val qrHex = appState.activeAccount?.accountIdHex
+    val fabSnackbarInset = if (qrHex != null) FAB_STACK_SNACKBAR_INSET else FAB_SNACKBAR_INSET
 
     // Lift the app-level toast host (it flows through WhiteNoiseSnackbarHost,
-    // which reads LocalSnackbarBottomInset) above the quick-action FAB so a
-    // toast — e.g. the archive confirmation — can't sit over the FAB and
-    // intercept its taps for the toast's duration — issue #352. Resets to
+    // which reads LocalSnackbarBottomInset) above the chat-list FAB column so a
+    // toast — e.g. the archive confirmation — can't sit over the FABs and
+    // intercept their taps for the toast's duration — issue #352. Resets to
     // zero on dispose so other surfaces aren't affected, mirroring
     // ConversationScreen's composer lift (#122).
     val snackbarBottomInset = LocalSnackbarBottomInset.current
-    DisposableEffect(Unit) {
-        snackbarBottomInset.value = FAB_SNACKBAR_INSET
+    DisposableEffect(fabSnackbarInset) {
+        snackbarBottomInset.value = fabSnackbarInset
         onDispose { snackbarBottomInset.value = 0.dp }
     }
 
@@ -2039,7 +2041,6 @@ private fun ChatsScreen(
         },
         floatingActionButton = {
             if (!searchOpen) {
-                val qrHex = appState.activeAccount?.accountIdHex
                 Column(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -2185,9 +2186,10 @@ private fun ChatsScreen(
                 // floats above the rows. Fades + slides in from the bottom-right
                 // when the user is scrolled deep, hides near the top — the
                 // `jumpToTopVisible` hysteresis above debounces threshold
-                // jitter. Lifted by FAB_SNACKBAR_INSET (the same clearance the
+                // jitter. Lifted by fabSnackbarInset (the same clearance the
                 // snackbar host uses, #352/#356) on top of the navigation-bar
-                // inset so it clears the quick-action FAB and the nav bar.
+                // inset so it clears the current chat-list FAB column and the
+                // nav bar.
                 // Fully-qualified so Kotlin binds the top-level overload rather
                 // than the ColumnScope extension (the outer Column is also an
                 // implicit receiver here) — the bottom-end alignment is carried
@@ -2204,7 +2206,7 @@ private fun ChatsScreen(
                             // lines up with the 56dp quick-action FAB above it,
                             // which the Scaffold insets 16dp from the edge:
                             // 24 + 40/2 == 16 + 56/2 (#451).
-                            .padding(end = 24.dp, bottom = FAB_SNACKBAR_INSET),
+                            .padding(end = 24.dp, bottom = fabSnackbarInset),
                 ) {
                     SmallFloatingActionButton(
                         onClick = {
@@ -4402,13 +4404,21 @@ private const val ConversationNearBottomItemSlack = 3
 private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 // Approximate clearance the chat-list quick-action FAB occupies above the
-// navigation bar. Used by ChatsScreen to push the global + chat-list snackbar
-// hosts above the FAB so a toast (e.g. "npub copied" from a profile sheet)
-// doesn't sit over the FAB and swallow its taps for the toast's duration —
-// issue #352. The toggle FAB is ~56.dp and the Scaffold floats it 16.dp above
-// the bottom inset; 80.dp clears that stack with a small gap so the lifted
-// snackbar reads as sitting *above* the FAB, per Material guidance.
+// navigation bar. Used by ChatsScreen to push the global snackbar host and
+// jump-to-top FAB above the chat-list FAB column so a toast (e.g. "npub
+// copied" from a profile sheet) doesn't sit over a FAB and swallow its taps
+// for the toast's duration — issue #352. The toggle FAB is ~56.dp and the
+// Scaffold floats it 16.dp above the bottom inset; 80.dp clears that single
+// FAB with a small gap so lifted chrome reads as sitting *above* the FAB, per
+// Material guidance.
 private val FAB_SNACKBAR_INSET = 80.dp
+
+// Clearance for the chat-list FAB column when the one-tap QR shortcut is
+// present above the quick-action FAB. That stack is approximately 40.dp (QR)
+// + 16.dp gap + 56.dp (quick action) + the Scaffold's 16.dp bottom inset; add
+// the same small gap as the single-FAB case so snackbars and jump-to-top never
+// overlap the QR shortcut.
+private val FAB_STACK_SNACKBAR_INSET = 136.dp
 
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
 // first visible row index reaches SHOW, and only hides again once it falls back
