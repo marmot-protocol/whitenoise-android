@@ -185,6 +185,39 @@ class OptimisticMessageReconciliationTest {
     }
 
     @Test
+    fun failedMessageMatchingIgnoresSenderHexCase() {
+        val invalidated =
+            timelineRecord(
+                messageIdHex = "invalidated",
+                plaintext = "case drift",
+                sender = "ALICE",
+                invalidationStatus = "LosingBranch",
+            )
+
+        assertEquals(
+            listOf("invalidated"),
+            invalidatedProjectionIdsMatchingMessage(
+                mapOf(invalidated.messageIdHex to invalidated),
+                message("confirmed", plaintext = "case drift", sender = "alice"),
+            ),
+        )
+    }
+
+    @Test
+    fun delayedMediaProjectionDoesNotShapeMatchWhenFailedSiblingIsAmbiguous() {
+        val failedA = mediaPending("temp-a", filename = "a.pdf").copy(status = MessageStatus.Failed)
+        val pendingB = mediaPending("temp-b", filename = "b.pdf")
+
+        assertNull(
+            optimisticMessageIdForProjection(
+                listOf(failedA, pendingB),
+                mediaProjection("confirmed-a"),
+                allowDelayedProjection = true,
+            ),
+        )
+    }
+
+    @Test
     fun historicalMatchingMessageIsNotReconciled() {
         val pending = timelineMessage("temp", MessageStatus.Pending)
 
@@ -450,13 +483,14 @@ class OptimisticMessageReconciliationTest {
         sourceMessageIdHex: String? = null,
         recordedAt: ULong = 1uL,
         invalidationStatus: String? = null,
+        sender: String = "alice",
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
             messageIdHex = messageIdHex,
             sourceMessageIdHex = sourceMessageIdHex,
             direction = "sent",
             groupIdHex = "group",
-            sender = "alice",
+            sender = sender,
             plaintext = plaintext,
             contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
             kind = 9uL,
@@ -494,12 +528,13 @@ class OptimisticMessageReconciliationTest {
         plaintext: String = "hello",
         recordedAt: ULong = 1uL,
         direction: String = "sent",
+        sender: String = "alice",
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = id,
             direction = direction,
             groupIdHex = "group",
-            sender = "alice",
+            sender = sender,
             plaintext = plaintext,
             contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
             kind = 9uL,

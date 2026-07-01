@@ -660,21 +660,17 @@ internal fun optimisticMessageIdForProjection(
     if (projectedIsMedia) {
         val pendingMediaCount =
             optimisticMessages.count {
-                it.status == MessageStatus.Pending &&
+                isSendableOptimisticStatus(it.status, allowDelayedProjection) &&
                     it.record.tags.any { tag -> tag.values.firstOrNull() == "_media_pending" }
             }
         if (pendingMediaCount > 1) return null
     }
     return optimisticMessages
         .firstOrNull { optimistic ->
-            val sendable =
-                optimistic.status == MessageStatus.Pending ||
-                    optimistic.status == MessageStatus.Sent ||
-                    (allowDelayedProjection && optimistic.status == MessageStatus.Failed)
-            if (!sendable) return@firstOrNull false
+            if (!isSendableOptimisticStatus(optimistic.status, allowDelayedProjection)) return@firstOrNull false
             if (optimistic.record.direction != projected.direction) return@firstOrNull false
             if (optimistic.record.groupIdHex != projected.groupIdHex) return@firstOrNull false
-            if (optimistic.record.sender != projected.sender) return@firstOrNull false
+            if (!optimistic.record.sender.equals(projected.sender, ignoreCase = true)) return@firstOrNull false
             if (optimistic.record.kind != projected.kind) return@firstOrNull false
             val timestampsOk =
                 timestampsAreNear(optimistic.record.recordedAt, projected.recordedAt) ||
@@ -704,6 +700,14 @@ internal fun optimisticMessageIdForProjection(
         ?.messageIdHex
 }
 
+private fun isSendableOptimisticStatus(
+    status: MessageStatus,
+    allowFailed: Boolean,
+): Boolean =
+    status == MessageStatus.Pending ||
+        status == MessageStatus.Sent ||
+        (allowFailed && status == MessageStatus.Failed)
+
 internal fun failedOptimisticMessageIdForInvalidatedProjection(
     optimisticMessages: Collection<TimelineMessage>,
     projected: AppMessageRecordFfi,
@@ -713,7 +717,7 @@ internal fun failedOptimisticMessageIdForInvalidatedProjection(
             if (optimistic.status != MessageStatus.Failed) return@firstOrNull false
             if (optimistic.record.direction != projected.direction) return@firstOrNull false
             if (optimistic.record.groupIdHex != projected.groupIdHex) return@firstOrNull false
-            if (optimistic.record.sender != projected.sender) return@firstOrNull false
+            if (!optimistic.record.sender.equals(projected.sender, ignoreCase = true)) return@firstOrNull false
             if (optimistic.record.kind != projected.kind) return@firstOrNull false
             optimistic.record.plaintext == projected.plaintext &&
                 optimistic.record.tags.filterNot { it.values.firstOrNull() == "p" } ==
@@ -757,7 +761,7 @@ private fun messagesHaveSameRenderableSendShape(
 ): Boolean {
     if (left.direction != right.direction) return false
     if (left.groupIdHex != right.groupIdHex) return false
-    if (left.sender != right.sender) return false
+    if (!left.sender.equals(right.sender, ignoreCase = true)) return false
     if (left.kind != right.kind) return false
     return left.plaintext == right.plaintext &&
         left.tags.filterNot { it.values.firstOrNull() == "p" } ==
@@ -882,13 +886,12 @@ private fun isDerivedStateKind(kind: ULong): Boolean = kind == 1009uL || kind ==
 
 /**
  * Message ids of unread received mentions in [timeline], oldest first — drives
- * the in-conversation jump-to-mention chip. Same anchor semantics as
- * [countUnreadIncoming]: a null [readAnchorMessageId], or one that has fallen out
- * of the loaded window, counts from the first loaded row. Without a reliable
- * ordering signal for an out-of-window watermark, counting (occasionally an
- * already-read mention) is preferred over hiding genuinely-unread ones. Only
- * kind-9 chat rows can be mentions; [mentionsActiveAccount] is passed in so this
- * stays pure and the ui-layer NIP-27 detection isn't pulled into the state layer.
+ * the in-conversation jump-to-mention chip. A null [readAnchorMessageId] counts
+ * from the first loaded row, but a non-null anchor that has fallen out of the
+ * loaded window returns no ids. For this chip, hiding is safer than resurrecting
+ * an already-read mention after a conversation is recreated. Only kind-9 chat
+ * rows can be mentions; [mentionsActiveAccount] is passed in so this stays pure
+ * and the ui-layer NIP-27 detection isn't pulled into the state layer.
  */
 internal fun unreadReceivedMentionIds(
     timeline: List<TimelineMessage>,
@@ -900,6 +903,7 @@ internal fun unreadReceivedMentionIds(
         readAnchorMessageId?.let { id ->
             timeline.indexOfFirst { it.record.messageIdHex == id }
         } ?: -1
+    if (readAnchorMessageId != null && anchorIdx < 0) return emptyList()
     return timeline
         .drop(anchorIdx + 1)
         .filter { it.record.direction == "received" && it.record.kind == 9uL && mentionsActiveAccount(it) }
@@ -5206,7 +5210,7 @@ class ConversationController(
         if (projectedIsMediaUpsert && !hasExactBridge && reconcileOptimistic) {
             val pendingMediaCount =
                 optimisticMessages.values.count {
-                    it.status == MessageStatus.Pending &&
+                    isSendableOptimisticStatus(it.status, allowDelayedProjection) &&
                         it.record.tags.any { tag -> tag.values.firstOrNull() == "_media_pending" }
                 }
             if (pendingMediaCount > 1) {
@@ -5219,6 +5223,13 @@ class ConversationController(
             record.invalidationStatus != null &&
             failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
         ) {
+            timelineRecords.remove(record.messageIdHex)
+            projectedMessageIds.remove(record.messageIdHex)
+            messageById.remove(record.messageIdHex)
+            if (previousItemId != null) {
+                timelineItemsById.remove(previousItemId)
+                timelineOrder.remove(previousItemId)
+            }
             return actionRecord
         }
         if (
@@ -6004,6 +6015,9 @@ class ConversationController(
             a.replyPreview == b.replyPreview &&
             a.mediaJson == b.mediaJson &&
             a.agentTextStreamJson == b.agentTextStreamJson &&
+            a.deleted == b.deleted &&
+            a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
+            a.invalidationStatus == b.invalidationStatus &&
             a.reactions == b.reactions
 
     companion object {
