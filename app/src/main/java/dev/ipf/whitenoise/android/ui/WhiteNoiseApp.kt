@@ -503,6 +503,13 @@ private data class LanguageOption(
     @param:StringRes val labelRes: Int,
 )
 
+private data class NewChatInitialMember(
+    val ref: String,
+    val title: String,
+    val seed: String,
+    val pictureUrl: String?,
+)
+
 private val languageOptions =
     listOf(
         LanguageOption("", R.string.language_system),
@@ -3702,11 +3709,12 @@ internal fun canSubmitNewChatSheet(
 internal fun newChatMemberRefs(
     directMessage: Boolean,
     normalizedPendingRecipients: List<String>,
+    initialMemberRefs: List<String> = emptyList(),
 ): List<String> =
     if (directMessage) {
         normalizedPendingRecipients.distinct().take(1)
     } else {
-        emptyList()
+        initialMemberRefs.map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }
     }
 
 /**
@@ -4020,6 +4028,7 @@ private fun NewChatSheet(
     appState: WhiteNoiseAppState,
     @StringRes titleRes: Int = R.string.new_chat,
     directMessage: Boolean = false,
+    initialMembers: List<NewChatInitialMember> = emptyList(),
     existingDirectChat: (String) -> ChatListItem? = { null },
     // (chat, justCreated): justCreated is true when this open follows a
     // brand-new group/DM create in the same step (issue #321) so the
@@ -4046,6 +4055,16 @@ private fun NewChatSheet(
     val notWhiteNoiseProfileQrError = stringResource(R.string.error_not_white_noise_profile_qr)
     val groupNameFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val groupInitialMembers =
+        remember(directMessage, initialMembers) {
+            if (directMessage) {
+                emptyList()
+            } else {
+                initialMembers
+                    .filter { it.ref.isNotBlank() }
+                    .distinctBy { it.ref.lowercase() }
+            }
+        }
 
     // Focus the name field and raise the IME as the sheet settles, exactly once
     // per open. The consumed flag is rememberSaveable so it survives Activity
@@ -4168,6 +4187,44 @@ private fun NewChatSheet(
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2,
                     )
+                    if (groupInitialMembers.isNotEmpty()) {
+                        // Initial members come from a profile-sheet action. They are
+                        // shown as fixed context here because removing them would turn
+                        // "Start new group with <user>" into the plain Create Group
+                        // flow, which already has its own entry point.
+                        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                Modifier.fillMaxWidth().padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Text(
+                                    stringResource(R.string.new_group_invited_members),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                groupInitialMembers.forEach { member ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        Avatar(
+                                            title = member.title,
+                                            seed = member.seed,
+                                            size = 36.dp,
+                                            pictureUrl = member.pictureUrl,
+                                        )
+                                        Text(
+                                            member.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 if (error != null) {
                     // Inline create/validation errors are selectable so the exact
@@ -4207,7 +4264,12 @@ private fun NewChatSheet(
                             } else {
                                 emptyList()
                             }
-                        val recipients = newChatMemberRefs(directMessage, normalizedPending)
+                        val recipients =
+                            newChatMemberRefs(
+                                directMessage,
+                                normalizedPending,
+                                initialMemberRefs = groupInitialMembers.map { it.ref },
+                            )
                         val account = appState.activeAccountRef ?: return@Button
                         // Reuse an existing 1:1 instead of creating a duplicate.
                         if (directMessage) {
@@ -4320,11 +4382,6 @@ private val COMPOSER_SNACKBAR_INSET = 72.dp
 // the bottom inset; 80.dp clears that stack with a small gap so the lifted
 // snackbar reads as sitting *above* the FAB, per Material guidance.
 private val FAB_SNACKBAR_INSET = 80.dp
-
-// Android 12+ shows clipboard-access toasts in the bottom transient-overlay
-// band, roughly 64-80dp above the navigation inset. Keep primary form actions
-// above that band so a paste-triggered OS toast can't cover the next button.
-private val SYSTEM_TOAST_ACTION_CLEARANCE = 80.dp
 
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
 // first visible row index reaches SHOW, and only hides again once it falls back
@@ -10741,7 +10798,7 @@ internal fun StickyFormActionBar(
                         start = Dimens.spaceLg,
                         top = Dimens.spaceMd,
                         end = Dimens.spaceLg,
-                        bottom = Dimens.spaceMd + SYSTEM_TOAST_ACTION_CLEARANCE,
+                        bottom = Dimens.spaceMd,
                     ),
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
             verticalAlignment = Alignment.CenterVertically,
@@ -18760,6 +18817,65 @@ private fun ProfileSheet(
     // button shows progress and we don't dismiss into a blank gap before the
     // conversation opens.
     var creatingChat by remember(npub) { mutableStateOf(false) }
+    var showStartGroup by remember(npub) { mutableStateOf(false) }
+    var showAddToGroups by remember(npub) { mutableStateOf(false) }
+    var addingToGroups by remember(npub) { mutableStateOf(false) }
+    val activeAccountHex = appState.activeAccount?.accountIdHex
+    // UI guard covers both profile actions, including "Start new group". The
+    // state-layer addable-groups helper still rejects self as a defensive check
+    // for the add-to-existing-groups path.
+    val targetIsSelf = hex?.let { activeAccountHex?.equals(it, ignoreCase = true) == true } == true
+    val addableGroups =
+        remember(hex, appState.chatListItems) {
+            hex?.let { appState.profileAddableGroups(it) }.orEmpty()
+        }
+
+    if (showStartGroup && hex != null) {
+        NewChatSheet(
+            appState = appState,
+            titleRes = R.string.new_group,
+            directMessage = false,
+            initialMembers =
+                listOf(
+                    NewChatInitialMember(
+                        ref = hex!!,
+                        title = title,
+                        seed = hex!!,
+                        pictureUrl = pictureUrl,
+                    ),
+                ),
+            onOpenConversation = { chat, justCreated -> onOpenGroup(chat, justCreated) },
+            onDismiss = { showStartGroup = false },
+        )
+        return
+    }
+
+    if (showAddToGroups && hex != null) {
+        ProfileAddToGroupsSheet(
+            appState = appState,
+            targetName = title,
+            groups = addableGroups,
+            busy = addingToGroups,
+            onDismiss = { if (!addingToGroups) showAddToGroups = false },
+            onAdd = { selected ->
+                if (addingToGroups) return@ProfileAddToGroupsSheet
+                addingToGroups = true
+                appState.launchMutation {
+                    try {
+                        val allAdded =
+                            appState.inviteProfileToGroups(
+                                targetRef = hex!!,
+                                targetGroupIds = selected.map { it.group.groupIdHex },
+                            )
+                        if (allAdded) showAddToGroups = false
+                    } finally {
+                        addingToGroups = false
+                    }
+                }
+            },
+        )
+        return
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -18870,6 +18986,28 @@ private fun ProfileSheet(
                     Text(stringResource(R.string.message))
                 }
             }
+            if (hex != null && !targetIsSelf) {
+                OutlinedButton(
+                    onClick = { showStartGroup = true },
+                    enabled = !creatingChat,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Group, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.profile_start_new_group_with, title))
+                }
+                if (addableGroups.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = { showAddToGroups = true },
+                        enabled = !creatingChat,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.profile_add_to_another_group))
+                    }
+                }
+            }
             // Group-admin moderation actions (issue #635). Only rendered when the
             // sheet was opened from inside a conversation (adminController != null)
             // AND the resolved user is a member of that group. The action set is
@@ -18892,6 +19030,138 @@ private fun ProfileSheet(
             title = title,
             pictureUrl = pictureUrl,
             onDismiss = { fullPictureOpen = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfileAddToGroupsSheet(
+    appState: WhiteNoiseAppState,
+    targetName: String,
+    groups: List<ChatListItem>,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onAdd: (List<ChatListItem>) -> Unit,
+) {
+    val groupTitleCopy = rememberGroupTitleCopy()
+    val selected = remember { mutableStateListOf<String>() }
+    var confirmSelection by remember { mutableStateOf<List<ChatListItem>?>(null) }
+    val titledGroups =
+        remember(groups, groupTitleCopy) {
+            groups.map { it to chatListItemDisplayTitle(it, appState, groupTitleCopy) }
+        }
+    LaunchedEffect(groups) {
+        val availableGroupIds = groups.mapTo(mutableSetOf()) { it.group.groupIdHex }
+        selected.removeAll { it !in availableGroupIds }
+    }
+    val selectedGroups = groups.filter { selected.contains(it.group.groupIdHex) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = amoledModalSheetModifier(),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(R.string.profile_add_to_groups_title, targetName),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                stringResource(R.string.profile_add_to_groups_description, targetName),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+            ) {
+                items(
+                    titledGroups,
+                    key = { (item, _) -> item.group.groupIdHex },
+                ) { (item, title) ->
+                    val groupId = item.group.groupIdHex
+                    val isSelected = selected.contains(groupId)
+
+                    fun toggle() {
+                        if (isSelected) selected.remove(groupId) else selected.add(groupId)
+                    }
+                    ListItem(
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                                .clickable(enabled = !busy, role = Role.Checkbox) { toggle() },
+                        leadingContent = {
+                            Avatar(
+                                title = title,
+                                seed = item.group.groupIdHex,
+                                size = 40.dp,
+                                pictureUrl = item.group.avatarUrl,
+                            )
+                        },
+                        headlineContent = {
+                            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        },
+                        supportingContent = {
+                            Text(
+                                stringResource(R.string.members_count, item.memberCount),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        trailingContent = {
+                            Checkbox(
+                                checked = isSelected,
+                                enabled = !busy,
+                                onCheckedChange = { toggle() },
+                            )
+                        },
+                    )
+                }
+            }
+            Button(
+                onClick = { confirmSelection = selectedGroups },
+                enabled = selectedGroups.isNotEmpty() && !busy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (busy) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.profile_add_to_groups_confirm_label))
+            }
+        }
+    }
+
+    confirmSelection?.let { targets ->
+        val groupNames =
+            targets.joinToString { item ->
+                chatListItemDisplayTitle(item, appState, groupTitleCopy)
+            }
+        ConfirmDialog(
+            title = stringResource(R.string.profile_add_to_groups_confirm_title),
+            message =
+                stringResource(
+                    R.string.profile_add_to_groups_confirm_message,
+                    targetName,
+                    groupNames,
+                ),
+            confirmLabel = stringResource(R.string.profile_add_to_groups_confirm_label),
+            onConfirm = {
+                confirmSelection = null
+                onAdd(targets)
+            },
+            onDismiss = { confirmSelection = null },
         )
     }
 }

@@ -105,6 +105,14 @@
     <string name="profile_no_bio">还没有简介。</string>
     <string name="profile_shared_groups">共同群组</string>
     <string name="profile_no_shared_groups">还没有共同群组。</string>
+    <string name="profile_start_new_group_with">与 %1$s 开始新群组</string>
+    <string name="profile_add_to_another_group">添加到另一个群组</string>
+    <string name="new_group_invited_members">已邀请成员</string>
+    <string name="profile_add_to_groups_title">将 %1$s 添加到群组</string>
+    <string name="profile_add_to_groups_description">选择你是管理员且 %1$s 尚未加入的群组。</string>
+    <string name="profile_add_to_groups_confirm_title">添加到所选群组？</string>
+    <string name="profile_add_to_groups_confirm_message">%1$s 将被添加到 %2$s。所有成员都能看到此操作。</string>
+    <string name="profile_add_to_groups_confirm_label">添加到群组</string>
     <string name="profile_view_picture">查看头像</string>
     <string name="dismiss">关闭</string>
     <string name="edit">编辑</string>
@@ -459,6 +467,8 @@
     <string name="toast_invite_sent_but_couldnt_add_admin">邀请已发送，但无法添加管理员</string>
     <string name="toast_couldnt_add_members">添加成员失败。请重试。</string>
     <string name="toast_couldnt_add_member_duplicate_detail">无法添加 %1$s。对方已是成员，或其签名密钥与现有成员冲突。</string>
+    <string name="toast_invites_sent_to_groups">邀请已发送到所选群组</string>
+    <string name="toast_invites_sent_to_groups_partial">邀请已发送到部分群组；有些失败了</string>
     <string name="toast_member_removed">会员已删除</string>
     <string name="toast_couldnt_remove_member">移除成员失败。请重试。</string>
     <string name="toast_keep_one_admin">保留一名管理员</string>

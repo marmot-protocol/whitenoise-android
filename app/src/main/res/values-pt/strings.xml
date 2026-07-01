@@ -107,6 +107,14 @@
     <string name="profile_no_bio">Ainda sem bio.</string>
     <string name="profile_shared_groups">Grupos compartilhados</string>
     <string name="profile_no_shared_groups">Ainda não há grupos compartilhados.</string>
+    <string name="profile_start_new_group_with">Iniciar novo grupo com %1$s</string>
+    <string name="profile_add_to_another_group">Adicionar a outro grupo</string>
+    <string name="new_group_invited_members">Membros convidados</string>
+    <string name="profile_add_to_groups_title">Adicionar %1$s a grupos</string>
+    <string name="profile_add_to_groups_description">Escolha grupos em que você é admin e %1$s ainda não é membro.</string>
+    <string name="profile_add_to_groups_confirm_title">Adicionar aos grupos selecionados?</string>
+    <string name="profile_add_to_groups_confirm_message">%1$s será adicionado a %2$s. Isso ficará visível para todos os membros.</string>
+    <string name="profile_add_to_groups_confirm_label">Adicionar a grupos</string>
     <string name="profile_view_picture">Ver foto do perfil</string>
     <string name="dismiss">Fechar</string>
     <string name="edit">Editar</string>
@@ -461,6 +469,8 @@
     <string name="toast_invite_sent_but_couldnt_add_admin">Convite enviado, mas não foi possível adicionar o administrador</string>
     <string name="toast_couldnt_add_members">Não foi possível adicionar membros. Tente novamente.</string>
     <string name="toast_couldnt_add_member_duplicate_detail">Não foi possível adicionar %1$s. Já é membro ou a chave de assinatura conflita com a de um membro existente.</string>
+    <string name="toast_invites_sent_to_groups">Convites enviados aos grupos selecionados</string>
+    <string name="toast_invites_sent_to_groups_partial">Convites enviados a alguns grupos; alguns falharam</string>
     <string name="toast_member_removed">Membro removido</string>
     <string name="toast_couldnt_remove_member">Não foi possível remover o membro. Tente novamente.</string>
     <string name="toast_keep_one_admin">Mantenha um administrador</string>

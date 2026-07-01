@@ -107,6 +107,14 @@
     <string name="profile_no_bio">Noch keine Bio.</string>
     <string name="profile_shared_groups">Gemeinsame Gruppen</string>
     <string name="profile_no_shared_groups">Noch keine gemeinsamen Gruppen.</string>
+    <string name="profile_start_new_group_with">Neue Gruppe mit %1$s starten</string>
+    <string name="profile_add_to_another_group">Zu einer anderen Gruppe hinzufügen</string>
+    <string name="new_group_invited_members">Eingeladene Mitglieder</string>
+    <string name="profile_add_to_groups_title">%1$s zu Gruppen hinzufügen</string>
+    <string name="profile_add_to_groups_description">Wähle Gruppen aus, in denen du Admin bist und %1$s noch kein Mitglied ist.</string>
+    <string name="profile_add_to_groups_confirm_title">Zu ausgewählten Gruppen hinzufügen?</string>
+    <string name="profile_add_to_groups_confirm_message">%1$s wird zu %2$s hinzugefügt. Das ist für alle Mitglieder sichtbar.</string>
+    <string name="profile_add_to_groups_confirm_label">Zu Gruppen hinzufügen</string>
     <string name="profile_view_picture">Profilbild ansehen</string>
     <string name="dismiss">Schließen</string>
     <string name="edit">Bearbeiten</string>
@@ -461,6 +469,8 @@
     <string name="toast_invite_sent_but_couldnt_add_admin">Einladung gesendet, aber Adminrechte konnten nicht hinzugefügt werden</string>
     <string name="toast_couldnt_add_members">Mitglieder konnten nicht hinzugefügt werden. Bitte erneut versuchen.</string>
     <string name="toast_couldnt_add_member_duplicate_detail">%1$s konnte nicht hinzugefügt werden. Die Person ist bereits Mitglied oder ihr Signaturschlüssel steht im Konflikt mit dem eines vorhandenen Mitglieds.</string>
+    <string name="toast_invites_sent_to_groups">Einladungen an ausgewählte Gruppen gesendet</string>
+    <string name="toast_invites_sent_to_groups_partial">Einladungen an einige Gruppen gesendet; einige sind fehlgeschlagen</string>
     <string name="toast_member_removed">Mitglied entfernt</string>
     <string name="toast_couldnt_remove_member">Mitglied konnte nicht entfernt werden. Bitte erneut versuchen.</string>
     <string name="toast_keep_one_admin">Behalten Sie einen Administrator</string>
