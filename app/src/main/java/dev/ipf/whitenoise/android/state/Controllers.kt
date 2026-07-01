@@ -22,6 +22,7 @@ import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupStateSubscription
+import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
@@ -102,6 +103,15 @@ data class ChatListItem(
      * removal while a null/failed-fetch empty roster stays non-removed.
      */
     val removed: Boolean = false,
+    /**
+     * Short-lived UI activity derived from an explicit membership/admin update.
+     * Marmot remains the source of truth: [ChatsController] fills this from the
+     * live subscription trigger plus a bounded timeline read, and clears it on
+     * bind/open/new-message reconciliation. It exists only to surface a state
+     * commit while the durable last-message projection still points at the prior
+     * content message.
+     */
+    val activitySignal: ChatListActivitySignal? = null,
 ) {
     val id: String = group.groupIdHex
 
@@ -127,7 +137,8 @@ data class ChatListItem(
         //
         // All three are the same unix-seconds unit as `timelineAt`.
         get() =
-            projection?.lastMessage?.timelineAt
+            activitySignal?.timelineAt
+                ?: projection?.lastMessage?.timelineAt
                 ?: projection?.lastReadTimelineAt
                 ?: projection?.updatedAt
                 ?: latest?.recordedAt
@@ -136,7 +147,7 @@ data class ChatListItem(
         get() = projection?.unreadCount ?: 0uL
 
     val hasUnread: Boolean
-        get() = projection?.hasUnread ?: false
+        get() = projection?.hasUnread == true || activitySignal != null
 
     /** At least one unread message in this chat mentions the active account. */
     val unreadMention: Boolean
@@ -173,15 +184,21 @@ data class ChatListItem(
      * reads as a stale alert; suppress it to zero so a removed group shows no
      * badge (#625).
      */
-    fun effectiveUnreadCount(activeAccountIdHex: String?): ULong = if (removedFromGroup(activeAccountIdHex)) 0uL else unreadCount
+    fun effectiveUnreadCount(activeAccountIdHex: String?): ULong =
+        when {
+            activitySignal != null -> unreadCount.takeIf { it > 0uL } ?: 1uL
+            removedFromGroup(activeAccountIdHex) -> 0uL
+            else -> unreadCount
+        }
 
     /** [hasUnread] with the removed-group suppression applied (#625). */
-    fun effectiveHasUnread(activeAccountIdHex: String?): Boolean = hasUnread && !removedFromGroup(activeAccountIdHex)
+    fun effectiveHasUnread(activeAccountIdHex: String?): Boolean = activitySignal != null || (hasUnread && !removedFromGroup(activeAccountIdHex))
 
     fun projectedPreviewText(
         copy: MessageTextCopy = MessageTextCopy.Default,
         empty: String = "No messages yet",
     ): String {
+        activitySignal?.let { return it.previewText(copy) }
         val preview = projection?.lastMessage ?: return MessageProjector.previewText(latest, copy, empty)
         return when {
             preview.deleted -> copy.deleted
@@ -245,6 +262,7 @@ internal fun chatListItemFromProjection(
     members: List<AppGroupMemberRecordFfi>? = null,
     previewTokens: MarkdownDocumentFfi? = null,
     removed: Boolean = false,
+    activitySignal: ChatListActivitySignal? = null,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
     val displayGroup =
@@ -284,6 +302,7 @@ internal fun chatListItemFromProjection(
         projection = row,
         previewTokens = previewTokens,
         removed = removed,
+        activitySignal = activitySignal,
     )
 }
 
@@ -1096,6 +1115,19 @@ internal class RetainedMediaUpload(
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null,
 )
 
+data class ChatListActivitySignal(
+    val plaintext: String?,
+    val structured: GroupSystemEventFfi?,
+    val timelineAt: ULong,
+    val messageIdHex: String?,
+) {
+    fun previewText(copy: MessageTextCopy): String =
+        plaintext
+            ?.let { GroupSystemEvents.previewText(it, copy.groupSystem, structured) }
+            ?.takeIf { it.isNotBlank() }
+            ?: copy.groupSystem.fallback
+}
+
 class ChatsController(
     private val appState: WhiteNoiseAppState,
 ) {
@@ -1142,6 +1174,12 @@ class ChatsController(
     // post-removal roster as real removal (a fetch-failure empty roster, which
     // never adds an id here, stays non-removed). Cleared on every bind.
     private var removedGroupIds: Set<String> = emptySet()
+
+    // Short-lived activity overlays for membership/admin commits whose
+    // ChatListRowFfi still carries the previous content message as lastMessage.
+    // Keyed like [chatRowsByGroup] and cleared on bind, on conversation open, or
+    // when a real last-message row catches up.
+    private var activitySignalsByGroup: Map<String, ChatListActivitySignal> = emptyMap()
 
     // Tracks groups whose member fetch is currently in flight, so we don't
     // fan out duplicate work for the same group. Invariant: an id sits in
@@ -1296,7 +1334,11 @@ class ChatsController(
                                             chatsDebug {
                                                 "chat list update account=${accountRef.take(8)} trigger=${update.trigger} ${row.debugSummary()}"
                                             }
-                                            foldChatRow(row)
+                                            foldChatRow(
+                                                row = row,
+                                                trigger = update.trigger,
+                                                activitySignal = membershipActivitySignalFor(row, update.trigger),
+                                            )
                                         }
                                         is ChatListSubscriptionUpdateFfi.RemoveRow -> {
                                             chatsDebug {
@@ -1391,12 +1433,14 @@ class ChatsController(
         preview: ChatListMessagePreviewFfi,
     ) {
         if (accountRef == null) return
-        val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: return
-        chatRowsByGroup[chatRowKey(groupIdHex)] =
+        val key = chatRowKey(groupIdHex)
+        val row = chatRowsByGroup[key] ?: return
+        chatRowsByGroup[key] =
             row.copy(
                 lastMessage = preview,
                 updatedAt = maxOf(row.updatedAt, preview.timelineAt),
             )
+        activitySignalsByGroup = activitySignalsByGroup - key
         scheduleRecompute()
     }
 
@@ -1445,6 +1489,7 @@ class ChatsController(
                 members = memberCacheByGroup[row.groupIdHex],
                 previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
                 removed = row.groupIdHex in removedGroupIds,
+                activitySignal = activitySignalsByGroup[chatRowKey(row.groupIdHex)],
             )
         }
 
@@ -1464,6 +1509,7 @@ class ChatsController(
             members = memberCacheByGroup[row.groupIdHex],
             previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
             removed = row.groupIdHex in removedGroupIds,
+            activitySignal = activitySignalsByGroup[chatRowKey(row.groupIdHex)],
         )
 
     fun sharedGroupsWith(
@@ -1533,6 +1579,13 @@ class ChatsController(
     // projected list on every 50ms tick.
     fun containsGroup(groupIdHex: String): Boolean = chatRowsByGroup.containsKey(chatRowKey(groupIdHex))
 
+    fun clearActivitySignal(groupIdHex: String) {
+        val key = chatRowKey(groupIdHex)
+        if (!activitySignalsByGroup.containsKey(key)) return
+        activitySignalsByGroup = activitySignalsByGroup - key
+        scheduleRecompute()
+    }
+
     /**
      * Chats the active account can forward a message into, recent first.
      *
@@ -1551,9 +1604,63 @@ class ChatsController(
             currentProjectedItems().filterNot { it.group.pendingConfirmation },
         )
 
-    private fun foldChatRow(row: ChatListRowFfi) {
-        chatRowsByGroup[chatRowKey(row.groupIdHex)] = row
+    private fun foldChatRow(
+        row: ChatListRowFfi,
+        trigger: ChatListUpdateTriggerFfi? = null,
+        activitySignal: ChatListActivitySignal? = null,
+    ) {
+        val key = chatRowKey(row.groupIdHex)
+        chatRowsByGroup[key] = row
+        when {
+            activitySignal != null -> activitySignalsByGroup = activitySignalsByGroup + (key to activitySignal)
+            trigger != null && trigger in ACTIVITY_SIGNAL_CLEARING_TRIGGERS -> activitySignalsByGroup = activitySignalsByGroup - key
+        }
         scheduleRecompute()
+    }
+
+    private suspend fun membershipActivitySignalFor(
+        row: ChatListRowFfi,
+        trigger: ChatListUpdateTriggerFfi,
+    ): ChatListActivitySignal? {
+        if (trigger != ChatListUpdateTriggerFfi.MEMBERSHIP_CHANGED) return null
+        val fallback = ChatListActivitySignal(plaintext = null, structured = null, timelineAt = row.updatedAt, messageIdHex = null)
+        val account = accountRef?.takeIf { it.isNotBlank() } ?: return fallback
+        return runCatching {
+            val records =
+                appState.marmotIo {
+                    timelineMessages(
+                        account,
+                        TimelineMessageQueryFfi(
+                            groupIdHex = row.groupIdHex,
+                            search = null,
+                            before = null,
+                            beforeMessageId = null,
+                            after = null,
+                            afterMessageId = null,
+                            limit = MEMBERSHIP_ACTIVITY_TIMELINE_LIMIT,
+                        ),
+                    ).messages
+                }
+            records
+                .firstOrNull { record ->
+                    MessageProjector.isGroupSystemKind(record.kind) &&
+                        GroupSystemEvents
+                            .resolve(record.plaintext, record.groupSystem)
+                            ?.let(GroupSystemEvents::isMembershipOrAdminActivity) == true
+                }?.let { record ->
+                    ChatListActivitySignal(
+                        plaintext = record.plaintext,
+                        structured = record.groupSystem,
+                        timelineAt = maxOf(row.updatedAt, record.timelineAt),
+                        messageIdHex = record.messageIdHex,
+                    )
+                }
+        }.onFailure { throwable ->
+            chatsDebug(throwable) {
+                "membership activity lookup failed account=${account.take(8)} group=${row.groupIdHex.take(8)}: " +
+                    (throwable.message ?: throwable.javaClass.simpleName)
+            }
+        }.getOrNull() ?: fallback
     }
 
     private fun replaceChatRows(rows: List<ChatListRowFfi>) {
@@ -1562,7 +1669,9 @@ class ChatsController(
     }
 
     private fun removeChatRow(groupIdHex: String) {
-        chatRowsByGroup.remove(chatRowKey(groupIdHex))
+        val key = chatRowKey(groupIdHex)
+        chatRowsByGroup.remove(key)
+        activitySignalsByGroup = activitySignalsByGroup - key
         scheduleRecompute()
     }
 
@@ -2016,6 +2125,7 @@ class ChatsController(
         groupRecordsById = emptyMap()
         memberCacheByGroup = emptyMap()
         removedGroupIds = emptySet()
+        activitySignalsByGroup = emptyMap()
         inFlightMemberFetches.clear()
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
@@ -2266,6 +2376,14 @@ private const val SEARCH_MAX_PAGES = 20
 // chat-list projection. Keeps large accounts from flooding IO at startup while
 // still letting shared-group snapshots materialize in the background.
 private const val MEMBER_FETCH_FANOUT = 4
+private val MEMBERSHIP_ACTIVITY_TIMELINE_LIMIT = 20u
+private val ACTIVITY_SIGNAL_CLEARING_TRIGGERS =
+    setOf(
+        ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
+        ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
+        ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH,
+        ChatListUpdateTriggerFfi.REMOVED,
+    )
 
 // Cap on how many subscription updates one coalesced batch can absorb. A
 // runaway producer shouldn't be able to wedge the UI behind an unbounded

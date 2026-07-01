@@ -235,6 +235,33 @@ object GroupSystemEvents {
             null
         }
 
+    /** True for visible membership/admin role changes that should bump chat-list activity. */
+    fun isMembershipOrAdminActivity(event: GroupSystemEvent): Boolean =
+        when (event.systemType) {
+            TypeMemberAdded,
+            TypeMemberRemoved,
+            TypeMemberLeft,
+            TypeAdminAdded,
+            TypeAdminRemoved,
+            -> true
+            else -> false
+        }
+
+    /**
+     * True when a membership/admin event should alert the current account: the
+     * current user is the subject, and the actor is someone else. Chat-list rows
+     * still treat every membership/admin event as activity; this narrower helper
+     * is for push/local notification noise control.
+     */
+    fun isSelfTargetedMembershipOrAdminActivity(
+        accountIdHex: String?,
+        event: GroupSystemEvent,
+        actorHex: String?,
+    ): Boolean =
+        isMembershipOrAdminActivity(event) &&
+            isSelf(accountIdHex, event.subject) &&
+            !isSelf(accountIdHex, actorHex)
+
     private fun renameDiffNames(
         event: GroupSystemEvent,
         newName: String,

@@ -2253,6 +2253,7 @@ class WhiteNoiseAppState(
             // reaction/message notification could otherwise survive until the
             // second open (issue #803).
             dismissConversationNotificationsOnOpen(activeConversationAccountRef, groupIdHex, ::dismissConversationNotifications)
+            chatsController?.clearActivitySignal(groupIdHex)
         }
         appStateDebug {
             "active conversation=${groupIdHex?.take(8) ?: "<none>"} account=${activeConversationAccountRef?.take(8) ?: "<none>"}"
@@ -3402,8 +3403,35 @@ class WhiteNoiseAppState(
     ): NotificationSystemText? {
         val record = notificationTimelineRecord(update) ?: return null
         val event = GroupSystemEvents.resolve(record.plaintext, record.groupSystem) ?: return null
-        val diff = GroupSystemEvents.renameDiffNames(event) ?: return null
         val actorHex = GroupSystemEvents.actorHex(event, record.sender)
+        val copy = appGroupSystemCopy()
+        if (GroupSystemEvents.isSelfTargetedMembershipOrAdminActivity(update.accountIdHex, event, actorHex)) {
+            val actorName =
+                when {
+                    !senderName.isNullOrBlank() -> senderName
+                    !actorHex.isNullOrBlank() -> runCatching { chatMemberTitle(actorHex) }.getOrNull()
+                    else -> null
+                }
+            return NotificationSystemText(
+                title =
+                    GroupSystemEvents.summary(
+                        event = event,
+                        actorName = null,
+                        subjectName = null,
+                        subjectIsSelf = true,
+                        copy = copy,
+                    ),
+                body =
+                    GroupSystemEvents.summary(
+                        event = event,
+                        actorName = actorName,
+                        subjectName = null,
+                        subjectIsSelf = true,
+                        copy = copy,
+                    ),
+            )
+        }
+        val diff = GroupSystemEvents.renameDiffNames(event) ?: return null
         val actorName =
             when {
                 GroupSystemEvents.isSelf(update.accountIdHex, actorHex) -> appContext.getString(R.string.you)
@@ -3456,6 +3484,52 @@ class WhiteNoiseAppState(
             inviteFromFormat = appContext.getString(R.string.group_title_invite_from),
             groupOfPeopleFormat = appContext.getString(R.string.group_title_people_count),
             unknownTitle = appContext.getString(R.string.unknown),
+        )
+
+    private fun appGroupSystemCopy() =
+        dev.ipf.whitenoise.android.core.GroupSystemCopy(
+            memberAddedFormat = appContext.getString(R.string.group_system_member_added),
+            memberAddedPassiveFormat = appContext.getString(R.string.group_system_member_added_passive),
+            memberRemovedFormat = appContext.getString(R.string.group_system_member_removed),
+            memberRemovedPassiveFormat = appContext.getString(R.string.group_system_member_removed_passive),
+            memberLeftFormat = appContext.getString(R.string.group_system_member_left),
+            adminAddedFormat = appContext.getString(R.string.group_system_admin_added),
+            adminAddedPassiveFormat = appContext.getString(R.string.group_system_admin_added_passive),
+            adminRemovedFormat = appContext.getString(R.string.group_system_admin_removed),
+            adminRemovedPassiveFormat = appContext.getString(R.string.group_system_admin_removed_passive),
+            renamedFormat = appContext.getString(R.string.group_system_renamed),
+            renamedPassiveFormat = appContext.getString(R.string.group_system_renamed_passive),
+            renamedDiffFormat = appContext.getString(R.string.group_system_renamed_diff),
+            renamedDiffPassiveFormat = appContext.getString(R.string.group_system_renamed_diff_passive),
+            namedFormat = appContext.getString(R.string.group_system_named),
+            namedPassiveFormat = appContext.getString(R.string.group_system_named_passive),
+            avatarChangedFormat = appContext.getString(R.string.group_system_avatar_changed),
+            avatarChangedPassive = appContext.getString(R.string.group_system_avatar_changed_passive),
+            youMemberAddedFormat = appContext.getString(R.string.group_system_you_member_added),
+            memberAddedYouFormat = appContext.getString(R.string.group_system_member_added_you),
+            memberAddedYouPassive = appContext.getString(R.string.group_system_member_added_you_passive),
+            youMemberRemovedFormat = appContext.getString(R.string.group_system_you_member_removed),
+            memberRemovedYouFormat = appContext.getString(R.string.group_system_member_removed_you),
+            memberRemovedYouPassive = appContext.getString(R.string.group_system_member_removed_you_passive),
+            youMemberLeft = appContext.getString(R.string.group_system_you_member_left),
+            youAdminAddedFormat = appContext.getString(R.string.group_system_you_admin_added),
+            adminAddedYouFormat = appContext.getString(R.string.group_system_admin_added_you),
+            adminAddedYouPassive = appContext.getString(R.string.group_system_admin_added_you_passive),
+            youAdminRemovedFormat = appContext.getString(R.string.group_system_you_admin_removed),
+            adminRemovedYouFormat = appContext.getString(R.string.group_system_admin_removed_you),
+            adminRemovedYouPassive = appContext.getString(R.string.group_system_admin_removed_you_passive),
+            youRenamedFormat = appContext.getString(R.string.group_system_you_renamed),
+            youRenamedDiffFormat = appContext.getString(R.string.group_system_you_renamed_diff),
+            youNamedFormat = appContext.getString(R.string.group_system_you_named),
+            youAvatarChanged = appContext.getString(R.string.group_system_you_avatar_changed),
+            disappearingSetFormat = appContext.getString(R.string.group_system_disappearing_set),
+            disappearingSetYouFormat = appContext.getString(R.string.group_system_disappearing_set_you),
+            disappearingSetPassiveFormat = appContext.getString(R.string.group_system_disappearing_set_passive),
+            disappearingOffFormat = appContext.getString(R.string.group_system_disappearing_off),
+            disappearingOffYou = appContext.getString(R.string.group_system_disappearing_off_you),
+            disappearingOffPassive = appContext.getString(R.string.group_system_disappearing_off_passive),
+            someone = appContext.getString(R.string.group_system_someone),
+            fallback = appContext.getString(R.string.group_system_fallback),
         )
 
     private suspend fun postNotificationUpdate(update: NotificationUpdateFfi) {

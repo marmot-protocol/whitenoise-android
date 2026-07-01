@@ -355,6 +355,46 @@ class GroupSystemEventsTest {
     }
 
     @Test
+    fun selfTargetedMembershipOrAdminActivityRequiresCurrentUserSubjectAndOtherActor() {
+        val promoted =
+            GroupSystemEvent(
+                systemType = "admin_added",
+                text = "",
+                actor = "alice",
+                subject = "me",
+                name = null,
+            )
+        val renamed = promoted.copy(systemType = "group_renamed")
+
+        assertEquals(true, GroupSystemEvents.isMembershipOrAdminActivity(promoted))
+        assertEquals(false, GroupSystemEvents.isMembershipOrAdminActivity(renamed))
+        assertEquals(
+            true,
+            GroupSystemEvents.isSelfTargetedMembershipOrAdminActivity(
+                accountIdHex = "ME",
+                event = promoted,
+                actorHex = "alice",
+            ),
+        )
+        assertEquals(
+            false,
+            GroupSystemEvents.isSelfTargetedMembershipOrAdminActivity(
+                accountIdHex = "me",
+                event = promoted.copy(actor = "me"),
+                actorHex = "me",
+            ),
+        )
+        assertEquals(
+            false,
+            GroupSystemEvents.isSelfTargetedMembershipOrAdminActivity(
+                accountIdHex = "me",
+                event = promoted.copy(subject = "bob"),
+                actorHex = "alice",
+            ),
+        )
+    }
+
+    @Test
     fun selfMatchingIsCaseInsensitive() {
         assertEquals(true, GroupSystemEvents.isSelf("AB12CD", "ab12cd"))
         assertEquals(false, GroupSystemEvents.isSelf("AB12CD", null))
