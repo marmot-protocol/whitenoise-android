@@ -52,6 +52,7 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -394,6 +395,7 @@ import dev.ipf.whitenoise.android.core.RecipientReference
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.ReplySwipe
+import dev.ipf.whitenoise.android.core.SafeHttpsGet
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.TimelineRowKind
@@ -1538,6 +1540,10 @@ private fun MainShell(
                     sectionName = MainSection.Settings.name
                     settingsDetailName = null
                 },
+                onOpenProfileEdit = {
+                    sectionName = MainSection.Settings.name
+                    settingsDetailName = SettingsDetail.Profile.name
+                },
                 onOpenGroup = { item, focusMessageId, justCreated ->
                     selectedChatFocusMessageId = focusMessageId
                     selectedChatFocusHighlight = true
@@ -1588,18 +1594,30 @@ fun AccountAvatarButton(
     // account's avatar when another signed-in account has unread. Hidden on
     // single-account devices (the caller passes false).
     showUnreadDot: Boolean = false,
+    onEditProfilePicture: (() -> Unit)? = null,
 ) {
     val openSettingsDescription = stringResource(R.string.open_settings)
+    val viewPictureDescription = stringResource(R.string.profile_view_picture)
     val otherAccountUnreadDescription =
         stringResource(R.string.other_account_unread_indicator)
+    val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
+    var viewerOpen by remember(safePictureUrl) { mutableStateOf(false) }
+    val primaryDescription = if (avatarImageAvailable) viewPictureDescription else openSettingsDescription
     val avatarContentDescription =
         if (showUnreadDot) {
-            "$openSettingsDescription, $otherAccountUnreadDescription"
+            "$primaryDescription, $otherAccountUnreadDescription"
         } else {
-            openSettingsDescription
+            primaryDescription
         }
     IconButton(
-        onClick = onClick,
+        onClick = {
+            if (avatarImageAvailable) {
+                viewerOpen = true
+            } else {
+                onClick()
+            }
+        },
         modifier =
             modifier
                 .size(56.dp)
@@ -1610,7 +1628,7 @@ fun AccountAvatarButton(
                 title = title,
                 seed = seed,
                 size = size,
-                pictureUrl = pictureUrl,
+                pictureUrl = safePictureUrl,
             )
             if (showUnreadDot) {
                 Box(
@@ -1627,6 +1645,19 @@ fun AccountAvatarButton(
                 )
             }
         }
+    }
+    if (viewerOpen && safePictureUrl != null && avatarImageAvailable) {
+        AvatarFullScreenViewer(
+            title = title,
+            seed = seed,
+            pictureUrl = safePictureUrl,
+            onDismiss = { viewerOpen = false },
+            editActionLabel = stringResource(R.string.profile_picture_edit),
+            onEditPicture = {
+                viewerOpen = false
+                (onEditProfilePicture ?: onClick)()
+            },
+        )
     }
 }
 
@@ -1762,6 +1793,7 @@ private fun ChatsScreen(
     appState: WhiteNoiseAppState,
     controller: ChatsController,
     onOpenSettings: () -> Unit,
+    onOpenProfileEdit: () -> Unit,
     // (chat, focusMessageId, justCreated): focusMessageId is non-null only when
     // the row was a message-body search hit (issue #290); the conversation then
     // scrolls to that message on open. justCreated is true only when the chat
@@ -2033,6 +2065,7 @@ private fun ChatsScreen(
                     }
                 },
                 onOpenSettings = onOpenSettings,
+                onOpenProfileEdit = onOpenProfileEdit,
             )
         },
         floatingActionButton = {
@@ -2982,6 +3015,7 @@ private fun ChatListTopBar(
     onSearchClose: () -> Unit,
     onMic: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenProfileEdit: () -> Unit,
     onSwitchAccount: (String) -> Unit,
 ) {
     TopAppBar(
@@ -3038,6 +3072,7 @@ private fun ChatListTopBar(
                         size = 44.dp,
                         onClick = onOpenSettings,
                         showUnreadDot = appState.hasUnreadOnOtherAccounts,
+                        onEditProfilePicture = onOpenProfileEdit,
                     )
                 }
             }
@@ -3059,6 +3094,12 @@ private fun ChatListTopBar(
                     )
                 }
             } else {
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = stringResource(R.string.open_settings),
+                    )
+                }
                 IconButton(onClick = onSearchOpen) {
                     Icon(
                         Icons.Default.Search,
@@ -9872,6 +9913,7 @@ private fun ConversationScreen(
             },
             onDismiss = { appState.clearPresentedProfile() },
             adminController = controller,
+            securePolicy = SecureFlagPolicy.SecureOn,
         )
     }
 
@@ -10823,9 +10865,12 @@ private fun GroupEditScreen(
     var name by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.name) }
     var description by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.description) }
     var showImageSearch by remember { mutableStateOf(false) }
+    var avatarViewerOpen by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var imageSaving by remember { mutableStateOf(false) }
     val canEdit = controller.isSelfMember && controller.isSelfAdmin
+    val groupAvatarUrl = ProfileSanitizer.imageUrl(controller.group.avatarUrl)
+    val groupAvatarImageAvailable = rememberAvatarImageAvailable(groupAvatarUrl)
     val saveEnabled =
         !saving &&
             !controller.mutationInFlight &&
@@ -10849,6 +10894,15 @@ private fun GroupEditScreen(
     // (rendered just before the early return that shows this screen), so it
     // wins the back event while the editor is open.
     BackHandler { onBack() }
+
+    val editImageLabel =
+        stringResource(
+            if (controller.group.avatarUrl.isNullOrBlank()) {
+                R.string.group_image_search_set
+            } else {
+                R.string.group_image_search_edit
+            },
+        )
 
     Scaffold(
         topBar = {
@@ -10895,48 +10949,54 @@ private fun GroupEditScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
                 ) {
-                    val editImageLabel =
-                        stringResource(
-                            if (controller.group.avatarUrl.isNullOrBlank()) {
-                                R.string.group_image_search_set
-                            } else {
-                                R.string.group_image_search_edit
-                            },
-                        )
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier =
-                            if (canEdit) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier =
                                 Modifier
                                     .clip(CircleShape)
                                     .clickable(
-                                        onClickLabel = editImageLabel,
+                                        enabled = groupAvatarImageAvailable || canEdit,
+                                        onClickLabel =
+                                            stringResource(
+                                                if (groupAvatarImageAvailable) R.string.profile_view_picture else R.string.group_image_search_set,
+                                            ),
                                         role = Role.Button,
-                                    ) { showImageSearch = true }
-                            } else {
-                                Modifier.clip(CircleShape)
-                            },
-                    ) {
-                        Avatar(
-                            title = controller.title(groupTitleCopy),
-                            seed = controller.group.groupIdHex,
-                            size = 96.dp,
-                            pictureUrl = controller.group.avatarUrl,
-                        )
+                                    ) {
+                                        if (groupAvatarImageAvailable) {
+                                            avatarViewerOpen = true
+                                        } else if (canEdit) {
+                                            showImageSearch = true
+                                        }
+                                    },
+                        ) {
+                            Avatar(
+                                title = controller.title(groupTitleCopy),
+                                seed = controller.group.groupIdHex,
+                                size = 96.dp,
+                                pictureUrl = groupAvatarUrl,
+                            )
+                        }
                         if (canEdit) {
                             Box(
                                 modifier =
                                     Modifier
-                                        .size(96.dp)
+                                        .align(Alignment.BottomEnd)
+                                        .offset(x = 6.dp, y = 6.dp)
+                                        .size(36.dp)
                                         .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = 0.32f)),
+                                        .background(Color.Black.copy(alpha = 0.62f))
+                                        .clickable(
+                                            onClickLabel = editImageLabel,
+                                            role = Role.Button,
+                                        ) { showImageSearch = true },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
                                     Icons.Default.PhotoCamera,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(28.dp),
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
@@ -10973,6 +11033,25 @@ private fun GroupEditScreen(
                 }
             }
         }
+    }
+
+    if (avatarViewerOpen && groupAvatarUrl != null && groupAvatarImageAvailable) {
+        AvatarFullScreenViewer(
+            title = controller.title(groupTitleCopy),
+            seed = controller.group.groupIdHex,
+            pictureUrl = groupAvatarUrl,
+            onDismiss = { avatarViewerOpen = false },
+            editActionLabel = if (canEdit) stringResource(R.string.group_image_search_edit) else null,
+            onEditPicture =
+                if (canEdit) {
+                    {
+                        avatarViewerOpen = false
+                        showImageSearch = true
+                    }
+                } else {
+                    null
+                },
+        )
     }
 
     if (showImageSearch) {
@@ -12376,13 +12455,27 @@ private fun GroupDetailsHeader(
     pictureUrl: String?,
     archived: Boolean,
 ) {
+    val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
+    var viewerOpen by remember(safePictureUrl) { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth()) {
         Column(
             Modifier.fillMaxWidth().padding(top = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Avatar(title = title, seed = seed, size = 88.dp, pictureUrl = pictureUrl)
+            Box(
+                modifier =
+                    Modifier
+                        .clip(CircleShape)
+                        .clickable(
+                            enabled = avatarImageAvailable,
+                            onClickLabel = stringResource(R.string.profile_view_picture),
+                            role = Role.Button,
+                        ) { viewerOpen = true },
+            ) {
+                Avatar(title = title, seed = seed, size = 88.dp, pictureUrl = safePictureUrl)
+            }
             Text(
                 title,
                 style = MaterialTheme.typography.headlineSmall,
@@ -12414,6 +12507,14 @@ private fun GroupDetailsHeader(
                 }
             }
         }
+    }
+    if (viewerOpen && safePictureUrl != null && avatarImageAvailable) {
+        AvatarFullScreenViewer(
+            title = title,
+            seed = seed,
+            pictureUrl = safePictureUrl,
+            onDismiss = { viewerOpen = false },
+        )
     }
 }
 
@@ -17850,6 +17951,7 @@ private fun SettingsHomeScreen(
                             pictureUrl = appState.avatarUrl(account.accountIdHex),
                             onOpenAccountSelector = { showAccountSelector = true },
                             onOpenQr = { qrAccountId = account.accountIdHex },
+                            onEditProfilePicture = { onOpenDetail(SettingsDetail.Profile) },
                         )
                     }
                     SettingsRow(stringResource(R.string.profile), stringResource(R.string.profile_settings_subtitle)) { onOpenDetail(SettingsDetail.Profile) }
@@ -18519,8 +18621,12 @@ fun SettingsAccountHeader(
     pictureUrl: String?,
     onOpenAccountSelector: () -> Unit,
     onOpenQr: () -> Unit,
+    onEditProfilePicture: () -> Unit = {},
 ) {
     val switchAccountDescription = stringResource(R.string.switch_account)
+    val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
+    var viewerOpen by remember(safePictureUrl) { mutableStateOf(false) }
     ListItem(
         modifier =
             Modifier
@@ -18529,12 +18635,23 @@ fun SettingsAccountHeader(
                 .semantics { contentDescription = switchAccountDescription },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         leadingContent = {
-            Avatar(
-                title = title,
-                seed = seed,
-                size = 52.dp,
-                pictureUrl = pictureUrl,
-            )
+            Box(
+                modifier =
+                    Modifier
+                        .clip(CircleShape)
+                        .clickable(
+                            enabled = avatarImageAvailable,
+                            onClickLabel = stringResource(R.string.profile_view_picture),
+                            role = Role.Button,
+                        ) { viewerOpen = true },
+            ) {
+                Avatar(
+                    title = title,
+                    seed = seed,
+                    size = 52.dp,
+                    pictureUrl = safePictureUrl,
+                )
+            }
         },
         headlineContent = { Text(title) },
         supportingContent = { Text(subtitle, fontFamily = FontFamily.Monospace) },
@@ -18547,6 +18664,19 @@ fun SettingsAccountHeader(
             }
         },
     )
+    if (viewerOpen && safePictureUrl != null && avatarImageAvailable) {
+        AvatarFullScreenViewer(
+            title = title,
+            seed = seed,
+            pictureUrl = safePictureUrl,
+            onDismiss = { viewerOpen = false },
+            editActionLabel = stringResource(R.string.profile_picture_edit),
+            onEditPicture = {
+                viewerOpen = false
+                onEditProfilePicture()
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -18780,6 +18910,7 @@ private fun ProfileSheet(
     // Null for every other entry point (mentions, QR, reaction list, shell
     // members-list row), which keeps those sheets byte-identical to before.
     adminController: ConversationController? = null,
+    securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
 ) {
     val clipboard = LocalClipboardManager.current
     var hex by remember(npub) { mutableStateOf<String?>(null) }
@@ -18796,6 +18927,7 @@ private fun ProfileSheet(
     val profile = hex?.let { appState.userProfile(it) }
     val title = hex?.let { appState.displayName(it) } ?: IdentityFormatter.short(npub)
     val pictureUrl = hex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
+    val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl)
     val about = ProfileSanitizer.about(profile?.about)
     val nip05 =
         profile
@@ -18898,6 +19030,7 @@ private fun ProfileSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         modifier = amoledModalSheetModifier(),
+        properties = ModalBottomSheetProperties(securePolicy = securePolicy),
     ) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -18909,7 +19042,7 @@ private fun ProfileSheet(
                     Modifier
                         .clip(CircleShape)
                         .clickable(
-                            enabled = pictureUrl != null,
+                            enabled = avatarImageAvailable,
                             onClickLabel = stringResource(R.string.profile_view_picture),
                             role = Role.Button,
                         ) { fullPictureOpen = true },
@@ -19042,11 +19175,13 @@ private fun ProfileSheet(
         }
     }
 
-    if (fullPictureOpen && pictureUrl != null) {
-        ProfilePictureDialog(
+    if (fullPictureOpen && pictureUrl != null && avatarImageAvailable) {
+        AvatarFullScreenViewer(
             title = title,
+            seed = hex ?: npub,
             pictureUrl = pictureUrl,
             onDismiss = { fullPictureOpen = false },
+            securePolicy = securePolicy,
         )
     }
 }
@@ -19359,65 +19494,348 @@ private fun ProfileSharedGroupRow(
     )
 }
 
+private const val AVATAR_VIEWER_MAX_BYTES = 8 * 1024 * 1024
+private const val AVATAR_VIEWER_CONNECT_TIMEOUT_MS = 5_000
+private const val AVATAR_VIEWER_READ_TIMEOUT_MS = 15_000
+
 @Composable
-private fun ProfilePictureDialog(
-    title: String,
-    pictureUrl: String,
-    onDismiss: () -> Unit,
-) {
-    val imageState by produceState<ProfilePictureImageState>(
-        initialValue =
-            AvatarImageLoader.peek(pictureUrl)?.let(ProfilePictureImageState::Ready)
-                ?: ProfilePictureImageState.Loading,
+private fun rememberAvatarImageAvailable(pictureUrl: String?): Boolean {
+    val available by produceState(
+        initialValue = pictureUrl?.let { AvatarImageLoader.peek(it) != null } == true,
         key1 = pictureUrl,
     ) {
-        if (value is ProfilePictureImageState.Ready) return@produceState
-        value =
-            AvatarImageLoader.load(pictureUrl)?.let(ProfilePictureImageState::Ready)
-                ?: ProfilePictureImageState.Failed
+        value = pictureUrl?.let { AvatarImageLoader.load(it) != null } == true
     }
+    return available
+}
+
+@Composable
+private fun AvatarFullScreenViewer(
+    title: String,
+    seed: String,
+    pictureUrl: String,
+    onDismiss: () -> Unit,
+    editActionLabel: String? = null,
+    onEditPicture: (() -> Unit)? = null,
+    securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
+) {
+    val safePictureUrl = remember(pictureUrl) { ProfileSanitizer.imageUrl(pictureUrl) }
+    if (safePictureUrl == null) {
+        LaunchedEffect(Unit) { onDismiss() }
+        return
+    }
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val savedMessage = stringResource(R.string.media_saved)
+    val saveFailedMessage = stringResource(R.string.media_save_failed)
+    val fileName = remember(safePictureUrl) { avatarViewerFileName(safePictureUrl) }
+    val mediaType = remember(fileName) { avatarViewerMimeType(fileName) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var scale by remember(safePictureUrl) { mutableStateOf(1f) }
+    var offset by remember(safePictureUrl) { mutableStateOf(Offset.Zero) }
+    val dismissThresholdPx = with(LocalDensity.current) { 96.dp.toPx() }
+
+    val imageState by produceState<AvatarViewerImageState>(
+        initialValue = AvatarViewerImageState.Loading,
+        safePictureUrl,
+    ) {
+        value = AvatarViewerImageState.Loading
+        val bytes =
+            withContext(Dispatchers.IO) {
+                SafeHttpsGet.get(
+                    url = safePictureUrl,
+                    maxBodyBytes = AVATAR_VIEWER_MAX_BYTES,
+                    connectTimeoutMillis = AVATAR_VIEWER_CONNECT_TIMEOUT_MS,
+                    readTimeoutMillis = AVATAR_VIEWER_READ_TIMEOUT_MS,
+                )
+            }
+        val bitmap =
+            bytes?.let { data ->
+                withContext(Dispatchers.Default) {
+                    MediaPipeline.decodeSampledBitmap(data, MediaPipeline.VIEWER_MAX_EDGE_PX)
+                }
+            }
+        value =
+            if (bytes != null && bitmap != null) {
+                AvatarViewerImageState.Ready(bytes, bitmap)
+            } else {
+                AvatarViewerImageState.Failed
+            }
+    }
+
+    val ready = imageState as? AvatarViewerImageState.Ready
+    val readyBitmap = ready?.bitmap
+    DisposableEffect(readyBitmap) {
+        onDispose { readyBitmap?.recycle() }
+    }
+    LaunchedEffect(imageState) {
+        if (imageState is AvatarViewerImageState.Failed) onDismiss()
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                securePolicy = securePolicy,
+            ),
     ) {
         Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.92f))
-                .clickable(onClick = onDismiss)
-                .padding(24.dp),
-            contentAlignment = Alignment.Center,
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+                    .pointerInput(scale, dismissThresholdPx) {
+                        if (scale <= 1f) {
+                            var draggedDown = 0f
+                            detectVerticalDragGestures(
+                                onDragEnd = { draggedDown = 0f },
+                                onDragCancel = { draggedDown = 0f },
+                                onVerticalDrag = { change, dragAmount ->
+                                    if (dragAmount > 0f || draggedDown > 0f) {
+                                        draggedDown = (draggedDown + dragAmount).coerceAtLeast(0f)
+                                        change.consume()
+                                        if (draggedDown >= dismissThresholdPx) {
+                                            draggedDown = 0f
+                                            onDismiss()
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                    },
         ) {
             when (val state = imageState) {
-                ProfilePictureImageState.Loading -> CircularProgressIndicator(color = Color.White)
-                ProfilePictureImageState.Failed ->
-                    Icon(Icons.Default.BrokenImage, contentDescription = null, tint = Color.White, modifier = Modifier.size(64.dp))
-                is ProfilePictureImageState.Ready ->
-                    Image(
-                        bitmap = state.image,
-                        contentDescription = title,
-                        modifier = Modifier.fillMaxWidth().fillMaxHeight(0.82f),
-                        contentScale = ContentScale.Fit,
+                AvatarViewerImageState.Loading ->
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = Color.White,
                     )
+                AvatarViewerImageState.Failed ->
+                    Avatar(
+                        title = title,
+                        seed = seed,
+                        size = 112.dp,
+                        pictureUrl = null,
+                    )
+                is AvatarViewerImageState.Ready -> {
+                    val image = remember(state.bitmap) { state.bitmap.asImageBitmap() }
+                    ZoomableAvatarImage(
+                        image = image,
+                        bitmapWidth = state.bitmap.width,
+                        bitmapHeight = state.bitmap.height,
+                        contentDescription = title,
+                        scale = scale,
+                        offset = offset,
+                        onScaleChange = { scale = it },
+                        onOffsetChange = { offset = it },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
+
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss), tint = Color.White)
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
+                }
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = stringResource(R.string.profile_picture_sheet_title),
+                            tint = Color.White,
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.media_save)) },
+                            leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
+                            enabled = ready != null,
+                            onClick = {
+                                menuOpen = false
+                                val bytes = ready?.bytes ?: return@DropdownMenuItem
+                                scope.launch {
+                                    val ok =
+                                        withContext(Dispatchers.IO) {
+                                            saveImageToGallery(context, bytes, fileName, mediaType)
+                                        }
+                                    snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
+                                }
+                            },
+                        )
+                        if (editActionLabel != null && onEditPicture != null) {
+                            DropdownMenuItem(
+                                text = { Text(editActionLabel) },
+                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    onEditPicture()
+                                },
+                            )
+                        }
+                    }
+                }
             }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding(),
+            )
         }
     }
 }
 
-private sealed interface ProfilePictureImageState {
-    data object Loading : ProfilePictureImageState
+@Composable
+private fun ZoomableAvatarImage(
+    image: ImageBitmap,
+    bitmapWidth: Int,
+    bitmapHeight: Int,
+    contentDescription: String,
+    scale: Float,
+    offset: Offset,
+    onScaleChange: (Float) -> Unit,
+    onOffsetChange: (Offset) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val latestScale by rememberUpdatedState(scale)
+    val latestOffset by rememberUpdatedState(offset)
+    val latestOnScaleChange by rememberUpdatedState(onScaleChange)
+    val latestOnOffsetChange by rememberUpdatedState(onOffsetChange)
 
-    data object Failed : ProfilePictureImageState
+    Image(
+        bitmap = image,
+        contentDescription = contentDescription,
+        contentScale = ContentScale.Fit,
+        modifier =
+            modifier
+                .pointerInput(image) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            if (latestScale > 1f) {
+                                latestOnScaleChange(1f)
+                                latestOnOffsetChange(Offset.Zero)
+                            } else {
+                                val viewportW = size.width.toFloat()
+                                val viewportH = size.height.toFloat()
+                                val imageAspect = bitmapWidth.toFloat() / bitmapHeight.toFloat()
+                                val viewportAspect = viewportW / viewportH
+                                val baseWidth: Float
+                                val baseHeight: Float
+                                if (imageAspect > viewportAspect) {
+                                    baseWidth = viewportW
+                                    baseHeight = viewportW / imageAspect
+                                } else {
+                                    baseHeight = viewportH
+                                    baseWidth = viewportH * imageAspect
+                                }
+                                val oneToOneScale =
+                                    maxOf(
+                                        bitmapWidth / baseWidth,
+                                        bitmapHeight / baseHeight,
+                                    ).coerceIn(1f, 5f)
+                                latestOnScaleChange(oneToOneScale)
+                                latestOnOffsetChange(Offset.Zero)
+                            }
+                        },
+                    )
+                }.pointerInput(image, bitmapWidth, bitmapHeight) {
+                    awaitEachGesture {
+                        do {
+                            val event = awaitPointerEvent()
+                            val pressedCount = event.changes.count { it.pressed }
+                            if (pressedCount == 0) break
+                            val zoom = event.calculateZoom()
+                            val pan = event.calculatePan()
+                            val currentScale = latestScale
+                            val currentOffset = latestOffset
+                            val handleAsTransform = pressedCount >= 2 || currentScale > 1f
+                            if (!handleAsTransform) continue
+
+                            val nextScale = (currentScale * zoom).coerceIn(1f, 5f)
+                            if (nextScale != currentScale) latestOnScaleChange(nextScale)
+                            if (nextScale > 1f) {
+                                val viewportW = size.width.toFloat()
+                                val viewportH = size.height.toFloat()
+                                val imageAspect = bitmapWidth.toFloat() / bitmapHeight.toFloat()
+                                val viewportAspect = viewportW / viewportH
+                                val baseWidth: Float
+                                val baseHeight: Float
+                                if (imageAspect > viewportAspect) {
+                                    baseWidth = viewportW
+                                    baseHeight = viewportW / imageAspect
+                                } else {
+                                    baseHeight = viewportH
+                                    baseWidth = viewportH * imageAspect
+                                }
+                                val maxX = ((baseWidth * nextScale) - viewportW).coerceAtLeast(0f) / 2f
+                                val maxY = ((baseHeight * nextScale) - viewportH).coerceAtLeast(0f) / 2f
+                                latestOnOffsetChange(
+                                    Offset(
+                                        (currentOffset.x + pan.x).coerceIn(-maxX, maxX),
+                                        (currentOffset.y + pan.y).coerceIn(-maxY, maxY),
+                                    ),
+                                )
+                            } else if (currentOffset != Offset.Zero) {
+                                latestOnOffsetChange(Offset.Zero)
+                            }
+                            event.changes.forEach { it.consume() }
+                        } while (true)
+                    }
+                }.graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offset.x,
+                    translationY = offset.y,
+                ),
+    )
+}
+
+private fun avatarViewerFileName(url: String): String {
+    val parsed = runCatching { android.net.Uri.parse(url) }.getOrNull()
+    val lastSegment =
+        parsed
+            ?.lastPathSegment
+            ?.takeIf { it.isNotBlank() }
+            ?: "avatar.jpg"
+    val safe = MediaPipeline.safeDisplayName(lastSegment)
+    return if (safe.contains('.')) safe else "$safe.jpg"
+}
+
+private fun avatarViewerMimeType(fileName: String): String =
+    when (fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)) {
+        "png" -> "image/png"
+        "webp" -> "image/webp"
+        "gif" -> "image/gif"
+        "heic" -> "image/heic"
+        "heif" -> "image/heif"
+        else -> MediaPipeline.RECOMPRESSED_MIME
+    }
+
+private sealed interface AvatarViewerImageState {
+    data object Loading : AvatarViewerImageState
+
+    data object Failed : AvatarViewerImageState
 
     data class Ready(
-        val image: ImageBitmap,
-    ) : ProfilePictureImageState
+        val bytes: ByteArray,
+        val bitmap: Bitmap,
+    ) : AvatarViewerImageState
 }
 
 @Composable
@@ -19758,8 +20176,10 @@ private fun ProfileEditScreen(
     // exclusively through this control so the editor reads like an app screen,
     // not a developer surface. See #286.
     var showPictureSheet by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    var fullPictureOpen by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
+    val safePictureUrl = ProfileSanitizer.imageUrl(picture)
+    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
     val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
     val lud16Valid = ProfileFieldValidation.isAcceptableLud16(lud16)
@@ -19851,43 +20271,56 @@ private fun ProfileEditScreen(
                     if (active == null) {
                         Text(stringResource(R.string.no_active_account_period), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
-                        // Tappable avatar control: opens the picture bottom
-                        // sheet (paste-link / remove). A small edit badge
-                        // signals it's interactive. Replaces the old standalone
-                        // "Picture URL" text row. See #286.
+                        // The avatar itself views the current picture. The small
+                        // camera badge remains the direct edit affordance (#317),
+                        // so viewing and editing no longer compete for the same tap.
                         val editPictureLabel = stringResource(R.string.profile_picture_edit)
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier =
-                                Modifier
-                                    .clip(CircleShape)
-                                    .clickable(
-                                        onClickLabel = editPictureLabel,
-                                        role = Role.Button,
-                                    ) { showPictureSheet = true },
-                        ) {
-                            Avatar(
-                                title = displayName.ifBlank { appState.shortNpub(active.accountIdHex) },
-                                seed = active.accountIdHex,
-                                size = 96.dp,
-                                pictureUrl = ProfileSanitizer.imageUrl(picture),
-                            )
-                            // Centered "tap to change" affordance: a dim scrim
-                            // over the whole avatar with a camera glyph, so the
-                            // image always reads as editable.
+                        Box(contentAlignment = Alignment.Center) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier =
+                                    Modifier
+                                        .clip(CircleShape)
+                                        .clickable(
+                                            onClickLabel =
+                                                stringResource(
+                                                    if (avatarImageAvailable) R.string.profile_view_picture else R.string.profile_picture_edit,
+                                                ),
+                                            role = Role.Button,
+                                        ) {
+                                            if (avatarImageAvailable) {
+                                                fullPictureOpen = true
+                                            } else {
+                                                showPictureSheet = true
+                                            }
+                                        },
+                            ) {
+                                Avatar(
+                                    title = displayName.ifBlank { appState.shortNpub(active.accountIdHex) },
+                                    seed = active.accountIdHex,
+                                    size = 96.dp,
+                                    pictureUrl = safePictureUrl,
+                                )
+                            }
                             Box(
                                 modifier =
                                     Modifier
-                                        .size(96.dp)
+                                        .align(Alignment.BottomEnd)
+                                        .offset(x = 6.dp, y = 6.dp)
+                                        .size(36.dp)
                                         .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = 0.32f)),
+                                        .background(Color.Black.copy(alpha = 0.62f))
+                                        .clickable(
+                                            onClickLabel = editPictureLabel,
+                                            role = Role.Button,
+                                        ) { showPictureSheet = true },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
                                     Icons.Default.PhotoCamera,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(28.dp),
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
@@ -20025,6 +20458,20 @@ private fun ProfileEditScreen(
                 }
             }
         }
+    }
+
+    if (fullPictureOpen && safePictureUrl != null && avatarImageAvailable) {
+        AvatarFullScreenViewer(
+            title = displayName.ifBlank { active?.let { appState.shortNpub(it.accountIdHex) }.orEmpty() },
+            seed = active?.accountIdHex.orEmpty(),
+            pictureUrl = safePictureUrl,
+            onDismiss = { fullPictureOpen = false },
+            editActionLabel = stringResource(R.string.profile_picture_edit),
+            onEditPicture = {
+                fullPictureOpen = false
+                showPictureSheet = true
+            },
+        )
     }
 
     if (showPictureSheet) {
