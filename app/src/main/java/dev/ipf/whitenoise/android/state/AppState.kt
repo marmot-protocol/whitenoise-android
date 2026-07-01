@@ -307,7 +307,16 @@ internal fun nextNavAccountRef(
 internal fun nextRetryBackoffMillis(
     current: Long,
     maxMillis: Long,
-): Long = if (current >= maxMillis) maxMillis else (current * 2).coerceAtMost(maxMillis)
+): Long {
+    val positiveCurrent = current.coerceAtLeast(1L)
+    return if (positiveCurrent >= maxMillis) {
+        maxMillis
+    } else if (positiveCurrent > Long.MAX_VALUE / 2) {
+        maxMillis
+    } else {
+        (positiveCurrent * 2).coerceAtMost(maxMillis)
+    }
+}
 
 data class ToastMessage(
     val title: AppText,

@@ -101,6 +101,40 @@ class DraftStoreTest {
     }
 
     @Test
+    fun clearForAccountToleratesDraftsCreatedDuringClear() {
+        lateinit var s: DraftStore
+        var createdDuringClear = false
+        val backing =
+            object : DraftPersistence {
+                private val map = mutableMapOf<String, String>()
+
+                override fun read(): Map<String, String> = map.toMap()
+
+                override fun write(
+                    key: String,
+                    value: String?,
+                ) {
+                    if (value == null) {
+                        map.remove(key)
+                        if (!createdDuringClear) {
+                            createdDuringClear = true
+                            s.set("a", "late", "late draft")
+                        }
+                    } else {
+                        map[key] = value
+                    }
+                }
+            }
+        s = DraftStore(backing)
+        s.set("a", "g", "existing")
+
+        s.clearAllForAccount("a")
+
+        assertNull(s.get("a", "g"))
+        assertEquals("late draft", s.get("a", "late"))
+    }
+
+    @Test
     fun persistenceLayerWritesWhenStored() {
         val backing = InMemoryDraftPersistence()
         val s = DraftStore(backing)

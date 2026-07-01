@@ -138,4 +138,18 @@ class AttachmentDownloadGateTest {
             }
         }
     }
+
+    @Test
+    fun initialRetryBackoffMustBePositive() {
+        runBlocking {
+            val gate = AttachmentDownloadGate(parallelism = 1)
+            try {
+                gate.withRetryingPermit(initialBackoffMillis = 0) {
+                    fail("zero backoff should be rejected before the first attempt")
+                }
+                fail("expected IllegalArgumentException")
+            } catch (_: IllegalArgumentException) {
+            }
+        }
+    }
 }

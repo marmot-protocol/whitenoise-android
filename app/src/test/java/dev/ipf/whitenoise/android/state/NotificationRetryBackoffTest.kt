@@ -21,5 +21,12 @@ class NotificationRetryBackoffTest {
     fun doesNotOverflowAtExtremes() {
         // Doubling Long.MAX_VALUE overflows negative; must still clamp to max.
         assertEquals(60_000L, nextRetryBackoffMillis(Long.MAX_VALUE, maxMillis = 60_000L))
+        assertEquals(Long.MAX_VALUE, nextRetryBackoffMillis(Long.MAX_VALUE - 1, maxMillis = Long.MAX_VALUE))
+    }
+
+    @Test
+    fun nonPositiveCurrentStillAdvances() {
+        assertEquals(2L, nextRetryBackoffMillis(0L, maxMillis = 60_000L))
+        assertEquals(2L, nextRetryBackoffMillis(-5L, maxMillis = 60_000L))
     }
 }

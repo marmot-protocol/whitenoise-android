@@ -18,6 +18,8 @@ private const val MAX_IMAGE_SEARCH_REDIRECT_HOPS = 5
 // endpoint could otherwise stream an unbounded body and exhaust memory. See #144.
 private const val MAX_IMAGE_SEARCH_BODY_BYTES = 4 * 1024 * 1024
 
+internal const val MAX_IMAGE_SEARCH_RESULTS = 200
+
 /**
  * Avatar-safe HTTPS URL check for the media layer (filtering decoded search
  * results, the sheet's preview avatar). Delegates to the single canonical
@@ -113,7 +115,7 @@ class DuckDuckGoImageSearchClient(
 
             val apiUrl = buildApiUrl(trimmed, token)
             val apiBody = httpGetString(apiUrl) ?: throw ImageSearchException.BadResponse()
-            runCatching { decodeResults(apiBody) }.getOrElse { throw ImageSearchException.BadResponse() }
+            runCatching { decodeImageSearchResults(apiBody) }.getOrElse { throw ImageSearchException.BadResponse() }
         }
 
     /**
@@ -143,42 +145,6 @@ class DuckDuckGoImageSearchClient(
             // non-443 ports.
             hostAllowed = { isDuckDuckGoFetchHost(it.host) },
         )
-
-    private fun decodeResults(body: String): List<ImageSearchResult> {
-        val json = JSONObject(body)
-        val results = json.optJSONArray("results") ?: return emptyList()
-        val seen = mutableSetOf<String>()
-        val out = mutableListOf<ImageSearchResult>()
-        for (i in 0 until results.length()) {
-            val raw = results.optJSONObject(i) ?: continue
-            val image = sanitizeHttpsAvatarUrl(raw.optString("image", "")) ?: continue
-            if (!seen.add(image)) continue
-            val thumbnail = sanitizeHttpsAvatarUrl(raw.optString("thumbnail", ""))
-            val sourcePage = raw.optString("url", "").takeIf { it.isNotBlank() }
-            out +=
-                ImageSearchResult(
-                    imageUrl = image,
-                    thumbnailUrl = thumbnail,
-                    sourceHost = sourceHostFor(sourcePage ?: image),
-                    dimensionsLabel = dimensionsLabel(raw.optInt("width", 0), raw.optInt("height", 0)),
-                    title = raw.optString("title", "").trim(),
-                )
-        }
-        return out
-    }
-
-    private fun sourceHostFor(raw: String?): String? {
-        if (raw.isNullOrBlank()) return null
-        return runCatching { URI(raw.trim()).host }.getOrNull()?.takeIf { it.isNotBlank() }
-    }
-
-    private fun dimensionsLabel(
-        width: Int,
-        height: Int,
-    ): String? {
-        if (width <= 0 || height <= 0) return null
-        return "${width}x$height"
-    }
 
     private fun buildLandingUrl(query: String): URL {
         val encoded = URLEncoder.encode(query, "UTF-8")
@@ -217,4 +183,41 @@ class DuckDuckGoImageSearchClient(
         }
         return null
     }
+}
+
+internal fun decodeImageSearchResults(body: String): List<ImageSearchResult> {
+    val json = JSONObject(body)
+    val results = json.optJSONArray("results") ?: return emptyList()
+    val seen = mutableSetOf<String>()
+    val out = mutableListOf<ImageSearchResult>()
+    for (i in 0 until results.length()) {
+        if (out.size >= MAX_IMAGE_SEARCH_RESULTS) break
+        val raw = results.optJSONObject(i) ?: continue
+        val image = sanitizeHttpsAvatarUrl(raw.optString("image", "")) ?: continue
+        if (!seen.add(image)) continue
+        val thumbnail = sanitizeHttpsAvatarUrl(raw.optString("thumbnail", ""))
+        val sourcePage = raw.optString("url", "").takeIf { it.isNotBlank() }
+        out +=
+            ImageSearchResult(
+                imageUrl = image,
+                thumbnailUrl = thumbnail,
+                sourceHost = sourceHostFor(sourcePage ?: image),
+                dimensionsLabel = dimensionsLabel(raw.optInt("width", 0), raw.optInt("height", 0)),
+                title = raw.optString("title", "").trim(),
+            )
+    }
+    return out
+}
+
+private fun sourceHostFor(raw: String?): String? {
+    if (raw.isNullOrBlank()) return null
+    return runCatching { URI(raw.trim()).host }.getOrNull()?.takeIf { it.isNotBlank() }
+}
+
+private fun dimensionsLabel(
+    width: Int,
+    height: Int,
+): String? {
+    if (width <= 0 || height <= 0) return null
+    return "${width}x$height"
 }
