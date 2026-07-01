@@ -182,6 +182,20 @@ object GroupProjector {
     }
 
     /**
+     * True when the live roster holds exactly one member and that member is the
+     * active account (issue #811). In this state a Leave/Delete has no one to
+     * coordinate an MLS commit with, so callers convert the action to local
+     * cleanup instead of attempting a normal MLS leave commit — and bypass the
+     * sole-admin "transfer admin first" block, since a sole member orphans no
+     * one regardless of admin status. Decided from the live roster (not a
+     * cached member count) so a stale count can't misroute the action.
+     */
+    fun isSelfSoleMember(
+        members: List<AppGroupMemberRecordFfi>,
+        activeAccountIdHex: String?,
+    ): Boolean = members.size == 1 && isActiveAccountMember(members[0], activeAccountIdHex)
+
+    /**
      * The roster with the active account dropped. Used on a successful leave
      * to rewrite the cached member snapshot synchronously, so re-opening the
      * just-left group seeds a snapshot that no longer places self in the group

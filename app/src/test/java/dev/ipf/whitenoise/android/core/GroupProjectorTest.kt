@@ -59,6 +59,38 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun selfSoleMemberIsTrueWhenLiveRosterHoldsOnlyTheActiveAccount() {
+        // #811: when the live roster is just you, Leave/Delete must convert to
+        // local cleanup — there is no one to coordinate an MLS commit with — so
+        // callers key off this instead of an MLS leave. Admin status is
+        // irrelevant: a sole member orphans no one.
+        val selfAdmin = member(memberId = "alice", account = "alice", local = true)
+        assertTrue(GroupProjector.isSelfSoleMember(listOf(selfAdmin), activeAccountIdHex = "alice"))
+        // Hex casing can drift between the roster id and the active account id.
+        assertTrue(
+            GroupProjector.isSelfSoleMember(
+                listOf(member(memberId = "ALICE", account = null, local = true)),
+                activeAccountIdHex = "alice",
+            ),
+        )
+    }
+
+    @Test
+    fun selfSoleMemberIsFalseWhenOthersRemainOrSelfIsAbsent() {
+        val self = member(memberId = "alice", account = "alice", local = true)
+        val other = member(memberId = "bob", account = "bob", local = false)
+        // Another member is still present → a real MLS leave, not local cleanup.
+        assertFalse(GroupProjector.isSelfSoleMember(listOf(self, other), activeAccountIdHex = "alice"))
+        // A lone member who is not the active account isn't self-sole.
+        assertFalse(GroupProjector.isSelfSoleMember(listOf(other), activeAccountIdHex = "alice"))
+        // No active account → nothing matches self.
+        assertFalse(GroupProjector.isSelfSoleMember(listOf(self), activeAccountIdHex = null))
+        assertFalse(GroupProjector.isSelfSoleMember(listOf(self), activeAccountIdHex = ""))
+        // An empty roster (unloaded / already gone) is not a sole-member leave.
+        assertFalse(GroupProjector.isSelfSoleMember(emptyList(), activeAccountIdHex = "alice"))
+    }
+
+    @Test
     fun adminsRequireSelfDemotionBeforeLeaving() {
         assertTrue(
             GroupProjector.requiresSelfDemoteBeforeLeave(

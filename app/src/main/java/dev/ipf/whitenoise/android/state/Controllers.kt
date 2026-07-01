@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
+import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
@@ -651,6 +652,42 @@ internal fun mediaCacheKey(
     messageIdHex: String,
     attachmentIndex: Int,
 ): String = "$account|$groupIdHex|$messageIdHex|$attachmentIndex"
+
+/**
+ * Shared local group wipe used by chat-list Delete and sole-member Leave flows.
+ * The engine drops its own rows/secrets, but Android owns decrypted media caches
+ * and tray notifications, so clear those before the group references disappear.
+ */
+private suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
+    account: String,
+    groupIdHex: String,
+) {
+    evictGroupMediaCaches(account, groupIdHex)
+    marmotIo { deleteGroupLocal(account, groupIdHex) }
+    dismissConversationNotifications(account, groupIdHex)
+}
+
+private suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
+    account: String,
+    groupIdHex: String,
+) {
+    val media =
+        runCatching { marmotIo { listMedia(account, groupIdHex, null) } }
+            .onFailure(::rethrowIfCancellation)
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+            ?: return
+    withContext(Dispatchers.IO) {
+        media.forEach { rec ->
+            val key = mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
+            mediaPlaintextCache.remove(key)
+            mediaThumbnailCache.remove(key)
+            diskMediaCache.remove(key)
+        }
+        val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
+        if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
+    }
+}
 
 internal fun optimisticMessageIdForProjection(
     optimisticMessages: Collection<TimelineMessage>,
@@ -1760,7 +1797,12 @@ class ChatsController(
         return runCatching {
             val members = appState.marmotIo { groupMembers(account, groupIdHex) }
             val memberCount = members.size
-            if (!GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)) {
+            // #811: when the live roster is just you there is no one to
+            // coordinate an MLS commit with, so a normal leave would fail (and
+            // the sole-admin transfer block must not apply either). Dissolve the
+            // group with local cleanup instead of an MLS leave/self-demote.
+            val soleMember = GroupProjector.isSelfSoleMember(members, activeAccountIdHex)
+            if (!soleMember && !GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)) {
                 appState.present(
                     R.string.toast_make_another_admin_before_leaving,
                     R.string.toast_group_needs_admin,
@@ -1768,12 +1810,16 @@ class ChatsController(
                 return@runCatching false
             }
             appState.withGroupCommitLock(account, groupIdHex) {
-                if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
-                    val demoteResult = appState.marmotIo { selfDemoteAdminDetailed(account, groupIdHex) }
-                    demotedBeforeLeave = true
-                    appState.applyLocalGroupUpdate(demoteResult.details.group)
+                if (soleMember) {
+                    appState.deleteGroupLocalWithClientCleanup(account, groupIdHex)
+                } else {
+                    if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
+                        val demoteResult = appState.marmotIo { selfDemoteAdminDetailed(account, groupIdHex) }
+                        demotedBeforeLeave = true
+                        appState.applyLocalGroupUpdate(demoteResult.details.group)
+                    }
+                    appState.marmotIo { leaveGroup(account, groupIdHex) }
                 }
-                appState.marmotIo { leaveGroup(account, groupIdHex) }
             }
             // Invalidate both snapshot sources that seed the next
             // ConversationController so re-opening the just-left group renders
@@ -1833,35 +1879,21 @@ class ChatsController(
         // left group then wipes directly instead of trying to re-leave. Fall back
         // to the caller's hint only if the membership read fails.
         val activeIdHex = appState.activeAccount?.accountIdHex
+        val liveMembers =
+            runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }.getOrNull()
         val stillMember =
-            runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }
-                .getOrNull()
+            liveMembers
                 ?.any { it.memberIdHex.equals(activeIdHex, ignoreCase = true) }
                 ?: leaveFirstHint
-        if (stillMember && !leaveGroup(groupIdHex)) {
+        // #811: a sole-member group has no one to commit an MLS leave with, so
+        // skip the leave entirely and let the deleteGroupLocal wipe below
+        // dissolve it. Attempting leaveGroup here would fail and block delete.
+        val soleMember = liveMembers != null && GroupProjector.isSelfSoleMember(liveMembers, activeIdHex)
+        if (stillMember && !soleMember && !leaveGroup(groupIdHex)) {
             removedRow?.let { foldChatRow(it) }
             return false
         }
-        // Free the app's decrypted media caches (in-memory L1 + on-disk L2) before
-        // the engine wipe drops the reference mapping — deleteGroupLocal clears its
-        // own rows/secrets but not these client-side blobs, which would otherwise
-        // linger recoverable on disk.
-        runCatching { appState.marmotIo { listMedia(account, groupIdHex, null) } }
-            .getOrNull()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { media ->
-                withContext(Dispatchers.IO) {
-                    media.forEach { rec ->
-                        val key = mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
-                        appState.mediaPlaintextCache.remove(key)
-                        appState.mediaThumbnailCache.remove(key)
-                        appState.diskMediaCache.remove(key)
-                    }
-                    val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
-                    if (tags.isNotEmpty()) appState.diskMediaCache.removeByCiphertextTags(tags)
-                }
-            }
-        val wipe = runCatching { appState.marmotIo { deleteGroupLocal(account, groupIdHex) } }
+        val wipe = runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
         wipe.exceptionOrNull()?.let {
             if (it is CancellationException) throw it
             removedRow?.let { row -> foldChatRow(row) }
@@ -2625,6 +2657,25 @@ class ConversationController(
 
     val canLeaveGroup: Boolean
         get() = GroupProjector.canLeaveGroup(group, conversationAccountIdHex, members.size)
+
+    /**
+     * Leave-dialog routing from a live roster read. The cached [members] list can
+     * lag behind roster changes, and a stale multi-member count would send a sole
+     * remaining member into the transfer-admin dead end (#811). Fall back to the
+     * current in-memory roster only if the live read is unavailable.
+     */
+    suspend fun leaveAction(): LeaveAction {
+        val account = conversationAccountRef
+        val memberCount =
+            if (account != null) {
+                runCatching { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
+                    .getOrNull()
+                    ?.size
+            } else {
+                null
+            } ?: members.size
+        return GroupProjector.leaveAction(group, conversationAccountIdHex, memberCount)
+    }
 
     /**
      * True when the active account is the only admin of a group that still has
@@ -4370,21 +4421,33 @@ class ConversationController(
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return false
-            if (!canLeaveGroup) {
+            val activeAccountIdHex = conversationAccountIdHex
+            // Decide the leave from a live roster read rather than the in-memory
+            // `members` count, which can be stale (#811). If the roster is just
+            // you there is no one to coordinate an MLS commit with, so bypass the
+            // sole-admin transfer gate and dissolve the group with local cleanup.
+            val liveMembers =
+                runCatching { appState.marmotIo { groupMembers(account, group.groupIdHex) } }.getOrNull()
+            val memberCount = liveMembers?.size ?: members.size
+            val soleMember = liveMembers != null && GroupProjector.isSelfSoleMember(liveMembers, activeAccountIdHex)
+            if (!soleMember && !GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)) {
                 appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
                 return false
             }
             var demotedBeforeLeave = false
             runCatching {
-                val activeAccountIdHex = conversationAccountIdHex
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, members.size)) {
-                        val demoteResult =
-                            appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
-                        demotedBeforeLeave = true
-                        applyMutationDetails(account, demoteResult.details)
+                    if (soleMember) {
+                        appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
+                    } else {
+                        if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
+                            val demoteResult =
+                                appState.marmotIo { selfDemoteAdminDetailed(account, group.groupIdHex) }
+                            demotedBeforeLeave = true
+                            applyMutationDetails(account, demoteResult.details)
+                        }
+                        appState.marmotIo { leaveGroup(account, group.groupIdHex) }
                     }
-                    appState.marmotIo { leaveGroup(account, group.groupIdHex) }
                 }
                 // Authoritative local self-leave: record it before the
                 // synchronous snapshot drop so any subsequent

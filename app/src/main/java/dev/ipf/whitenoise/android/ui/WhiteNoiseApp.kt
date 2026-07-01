@@ -8380,7 +8380,7 @@ private fun ConversationScreen(
     LaunchedEffect(chat.group.groupIdHex, showDetails) {
         appState.setActiveConversation(if (showDetails) null else chat.group.groupIdHex)
     }
-    var confirmLeaveFromTopBar by remember { mutableStateOf(false) }
+    var pendingTopBarLeaveAction by remember { mutableStateOf<LeaveAction?>(null) }
     // Sole-admin Leave gate: a sole admin with other members can't leave until
     // they hand admin to someone else. Instead of the old toast-only dead end,
     // the Leave action surfaces a "Transfer admin first" dialog that routes
@@ -10096,10 +10096,13 @@ private fun ConversationScreen(
                                             // leave until they transfer admin; route
                                             // them to the transfer flow instead of
                                             // the old leaveGroup() toast dead end.
-                                            if (controller.isSoleAdminWithOtherMembers) {
-                                                showTransferAdminFirst = true
-                                            } else {
-                                                confirmLeaveFromTopBar = true
+                                            appState.launchMutation {
+                                                when (val leaveAction = controller.leaveAction()) {
+                                                    LeaveAction.SoleAdminMustTransfer -> showTransferAdminFirst = true
+                                                    LeaveAction.SoleMemberDeletesGroup,
+                                                    LeaveAction.Standard,
+                                                    -> pendingTopBarLeaveAction = leaveAction
+                                                }
                                             }
                                         },
                                     )
@@ -10537,18 +10540,31 @@ private fun ConversationScreen(
         }
     }
 
-    if (confirmLeaveFromTopBar) {
+    pendingTopBarLeaveAction?.let { leaveAction ->
+        val soleMember = leaveAction == LeaveAction.SoleMemberDeletesGroup
+        val topBarGroupName = controller.title(groupTitleCopy)
         ConfirmDialog(
-            title = stringResource(R.string.confirm_leave_title),
-            message = stringResource(R.string.confirm_leave_message),
+            title =
+                if (soleMember) {
+                    stringResource(R.string.confirm_leave_sole_member_title, topBarGroupName)
+                } else {
+                    stringResource(R.string.confirm_leave_title)
+                },
+            message =
+                if (soleMember) {
+                    stringResource(R.string.confirm_leave_sole_member_message)
+                } else {
+                    stringResource(R.string.confirm_leave_message)
+                },
             confirmLabel = stringResource(R.string.leave),
             onConfirm = {
-                confirmLeaveFromTopBar = false
+                pendingTopBarLeaveAction = null
                 appState.launchMutation {
                     if (controller.leaveGroup()) onBack()
                 }
             },
-            onDismiss = { confirmLeaveFromTopBar = false },
+            onDismiss = { pendingTopBarLeaveAction = null },
+            destructive = soleMember,
         )
     }
 
@@ -11114,12 +11130,14 @@ private fun GroupDetailsScreen(
     // is resolved here (not in the dialog) so the variants read the same title.
     fun requestLeave(displayName: String) {
         controller.clearLastMutationError()
-        pendingConfirm =
-            when (GroupProjector.leaveAction(controller.group, appState.activeAccount?.accountIdHex, controller.members.size)) {
-                LeaveAction.SoleMemberDeletesGroup -> DetailsConfirm.LeaveSoleMember(displayName)
-                LeaveAction.SoleAdminMustTransfer -> DetailsConfirm.LeaveSoleAdmin(displayName)
-                LeaveAction.Standard -> DetailsConfirm.Leave(displayName)
-            }
+        appState.launchMutation {
+            pendingConfirm =
+                when (controller.leaveAction()) {
+                    LeaveAction.SoleMemberDeletesGroup -> DetailsConfirm.LeaveSoleMember(displayName)
+                    LeaveAction.SoleAdminMustTransfer -> DetailsConfirm.LeaveSoleAdmin(displayName)
+                    LeaveAction.Standard -> DetailsConfirm.Leave(displayName)
+                }
+        }
     }
 
     fun exportTranscript() {
@@ -11936,9 +11954,9 @@ private fun GroupDetailsScreen(
                     destructive = true,
                 )
             is DetailsConfirm.LeaveSoleMember ->
-                // Sole member: leaving dissolves the group entirely. Same engine
-                // path as a normal leave (no other member to orphan), but the copy
-                // makes the destructive "this deletes the group" consequence clear.
+                // Sole member: leaving dissolves the group entirely through local
+                // cleanup (no other member to coordinate an MLS commit with). The
+                // copy makes the destructive "this deletes the group" consequence clear.
                 ConfirmDialog(
                     title = stringResource(R.string.confirm_leave_sole_member_title, confirm.groupName),
                     message = stringResource(R.string.confirm_leave_sole_member_message),
@@ -12562,8 +12580,8 @@ private sealed class DetailsConfirm {
 
     /**
      * Sole-member leave: the active account is the only member left, so
-     * leaving dissolves the group entirely. Confirm → leave (the engine
-     * `leaveGroup` path drops the now-empty group from local projections).
+     * leaving dissolves the group entirely. Confirm → local cleanup; no MLS
+     * commit is attempted because there is no other member to coordinate with.
      */
     data class LeaveSoleMember(
         val groupName: String,
