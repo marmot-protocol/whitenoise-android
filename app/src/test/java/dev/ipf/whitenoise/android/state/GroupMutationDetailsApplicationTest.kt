@@ -6,7 +6,9 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.whitenoise.android.core.GroupProjector
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class GroupMutationDetailsApplicationTest {
@@ -77,6 +79,58 @@ class GroupMutationDetailsApplicationTest {
         )
     }
 
+    @Test
+    fun authoritativeChatListMembersReplaceStaleDmRosterBeforeLookup() {
+        val alice = chatMember("alice", account = "alice", local = true)
+        val bob = chatMember("bob", account = "bob")
+        val updated =
+            applyAuthoritativeChatListMembers(
+                groupIdHex = "dm",
+                members = listOf(alice),
+                activeAccountIdHex = "alice",
+                memberCacheByGroup = mapOf("dm" to listOf(alice, bob)),
+                removedGroupIds = emptySet(),
+            )
+
+        val liveMembers = updated.memberCacheByGroup.getValue("dm")
+        assertEquals(listOf(alice), liveMembers)
+        assertFalse(
+            GroupProjector.isImplicitDmWith(
+                members = liveMembers,
+                name = "",
+                activeAccountIdHex = "alice",
+                targetIdHex = "bob",
+                equivalentTarget = { false },
+            ),
+        )
+    }
+
+    @Test
+    fun authoritativeChatListMembersTrackWhetherSelfIsStillPresent() {
+        val alice = chatMember("alice", account = "alice", local = true)
+        val bob = chatMember("bob", account = "bob")
+
+        val removed =
+            applyAuthoritativeChatListMembers(
+                groupIdHex = "group",
+                members = listOf(bob),
+                activeAccountIdHex = "alice",
+                memberCacheByGroup = emptyMap(),
+                removedGroupIds = emptySet(),
+            )
+        assertEquals(setOf("group"), removed.removedGroupIds)
+
+        val restored =
+            applyAuthoritativeChatListMembers(
+                groupIdHex = "group",
+                members = listOf(alice, bob),
+                activeAccountIdHex = "alice",
+                memberCacheByGroup = removed.memberCacheByGroup,
+                removedGroupIds = removed.removedGroupIds,
+            )
+        assertEquals(emptySet<String>(), restored.removedGroupIds)
+    }
+
     private fun group(admins: List<String>) =
         AppGroupRecordFfi(
             groupIdHex = "group",
@@ -96,6 +150,16 @@ class GroupMutationDetailsApplicationTest {
             viaWelcomeMessageIdHex = null,
             disappearingMessageSecs = 0uL,
         )
+
+    private fun chatMember(
+        memberId: String,
+        account: String? = null,
+        local: Boolean = false,
+    ) = AppGroupMemberRecordFfi(
+        memberIdHex = memberId,
+        account = account,
+        local = local,
+    )
 
     private fun member(
         memberId: String,

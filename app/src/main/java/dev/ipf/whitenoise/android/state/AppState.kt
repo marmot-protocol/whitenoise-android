@@ -1089,6 +1089,20 @@ class WhiteNoiseAppState(
         chatsController?.applyLocalGroupUpdate(record)
     }
 
+    // Same temporary projection backchannel as [applyLocalGroupUpdate], but for
+    // authoritative group-details reads/mutations that also carry the live MLS
+    // roster. Keeping the chat-list member snapshot current prevents Start-DM
+    // from reusing an abandoned unnamed DM after a member removal (#825).
+    fun applyLocalGroupDetails(
+        accountRef: String,
+        record: AppGroupRecordFfi,
+        members: List<AppGroupMemberRecordFfi>,
+    ) {
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.applyLocalGroupDetails(record, members)
+    }
+
     fun applyOptimisticSentPreview(
         groupIdHex: String,
         preview: ChatListMessagePreviewFfi,

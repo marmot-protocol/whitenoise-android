@@ -993,6 +993,28 @@ internal fun cacheAppliedGroupMembers(
     appState.requestProfiles(members.map { it.memberIdHex })
 }
 
+internal data class AuthoritativeChatListMembers(
+    val memberCacheByGroup: Map<String, List<AppGroupMemberRecordFfi>>,
+    val removedGroupIds: Set<String>,
+)
+
+internal fun applyAuthoritativeChatListMembers(
+    groupIdHex: String,
+    members: List<AppGroupMemberRecordFfi>,
+    activeAccountIdHex: String?,
+    memberCacheByGroup: Map<String, List<AppGroupMemberRecordFfi>>,
+    removedGroupIds: Set<String>,
+): AuthoritativeChatListMembers {
+    val normalizedActive = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() }
+    val activeMissing =
+        normalizedActive != null &&
+            members.none { GroupProjector.isActiveAccountMember(it, normalizedActive) }
+    return AuthoritativeChatListMembers(
+        memberCacheByGroup = memberCacheByGroup + (groupIdHex to members),
+        removedGroupIds = if (activeMissing) removedGroupIds + groupIdHex else removedGroupIds - groupIdHex,
+    )
+}
+
 /**
  * Whether [detail] is the MLS "duplicate signature key" commit rejection
  * (issue #899). The engine surfaces this as a raw enum path, e.g.
@@ -1178,6 +1200,12 @@ class ChatsController(
     // longer matches and the job drops its result instead of poisoning
     // the new account's cache with stale members.
     private var bindEpoch: Long = 0L
+
+    // Monotonically increments whenever a live group update invalidates member
+    // freshness. Member-fetch jobs capture it and drop results that started
+    // before a newer group-details update, so a stale in-flight roster cannot
+    // overwrite an authoritative local mutation or live group-state change (#825).
+    private var memberCacheEpoch: Long = 0L
     private var isCleared = false
 
     private val liveSubscriptionLock = Any()
@@ -1372,9 +1400,19 @@ class ChatsController(
         }
     }
 
-    private fun foldGroup(record: AppGroupRecordFfi) {
+    private fun foldGroup(
+        record: AppGroupRecordFfi,
+        invalidateMembers: Boolean = true,
+    ) {
         groupRecordsById = groupRecordsById + (record.groupIdHex to record)
+        if (invalidateMembers) invalidateMemberCacheForGroup(record.groupIdHex)
         scheduleRecompute()
+    }
+
+    private fun invalidateMemberCacheForGroup(groupIdHex: String) {
+        if (!memberCacheByGroup.containsKey(groupIdHex) && groupIdHex !in inFlightMemberFetches) return
+        memberCacheByGroup = memberCacheByGroup - groupIdHex
+        memberCacheEpoch += 1L
     }
 
     // Marmot's `set_group_archived` writes local state + saves but emits no
@@ -1401,9 +1439,40 @@ class ChatsController(
     }
 
     fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
+        applyLocalGroupProjection(record, members = null)
+    }
+
+    fun applyLocalGroupDetails(
+        record: AppGroupRecordFfi,
+        members: List<AppGroupMemberRecordFfi>,
+    ) {
+        applyLocalGroupProjection(record, members)
+    }
+
+    private fun applyLocalGroupProjection(
+        record: AppGroupRecordFfi,
+        members: List<AppGroupMemberRecordFfi>?,
+    ) {
         if (accountRef == null) return
         val rowKey = chatRowKey(record.groupIdHex)
         if (groupRecordsById[record.groupIdHex] == null && !chatRowsByGroup.containsKey(rowKey)) return
+        if (members != null) {
+            memberCacheEpoch += 1L
+            members
+                .map { it.memberIdHex }
+                .filter { it.isNotBlank() }
+                .forEach(appState::requestProfile)
+            val updated =
+                applyAuthoritativeChatListMembers(
+                    groupIdHex = record.groupIdHex,
+                    members = members,
+                    activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
+                    memberCacheByGroup = memberCacheByGroup,
+                    removedGroupIds = removedGroupIds,
+                )
+            memberCacheByGroup = updated.memberCacheByGroup
+            removedGroupIds = updated.removedGroupIds
+        }
         // chatListItemFromProjection reads row.archived / row.pendingConfirmation
         // (not just the group record), so patch both the chat row and the group
         // record to keep them consistent.
@@ -1415,7 +1484,7 @@ class ChatsController(
                     groupName = record.name.ifBlank { row.groupName },
                 )
         }
-        foldGroup(record)
+        foldGroup(record, invalidateMembers = members == null)
     }
 
     fun applyProfileGroupDetails(
@@ -1426,9 +1495,8 @@ class ChatsController(
         val applied = applyAuthoritativeGroupDetails(details)
         val groupIdHex = applied.group.groupIdHex
         if (groupRecordsById[groupIdHex] == null && !chatRowsByGroup.containsKey(chatRowKey(groupIdHex))) return
-        memberCacheByGroup = memberCacheByGroup + (groupIdHex to applied.members)
         cacheAppliedGroupMembers(appState, account, groupIdHex, applied.members)
-        applyLocalGroupUpdate(applied.group)
+        applyLocalGroupProjection(applied.group, applied.members)
     }
 
     // Project every current chat row into a ChatListItem. Reads chatRows (kept
@@ -2077,6 +2145,7 @@ class ChatsController(
     private fun schedulePendingMemberFetches() {
         val account = accountRef ?: return
         val epoch = bindEpoch
+        val cacheEpoch = memberCacheEpoch
         val pending =
             chatRows
                 .asSequence()
@@ -2092,7 +2161,7 @@ class ChatsController(
                     memberFetchGate.withPermit {
                         if (!isActiveBindEpoch(epoch)) return@withPermit
                         val members = appState.marmotIo { groupMembers(account, groupIdHex) }
-                        if (isActiveBindEpoch(epoch)) {
+                        if (isActiveBindEpoch(epoch) && cacheEpoch == memberCacheEpoch) {
                             members
                                 .map { it.memberIdHex }
                                 .filter { it.isNotBlank() }
@@ -2126,7 +2195,12 @@ class ChatsController(
                     // belongs to the current bind. A later bind() has
                     // already cleared the set; removing again would be
                     // a no-op but obscures the invariant.
-                    if (isActiveBindEpoch(epoch)) inFlightMemberFetches.remove(groupIdHex)
+                    if (isActiveBindEpoch(epoch)) {
+                        inFlightMemberFetches.remove(groupIdHex)
+                        if (cacheEpoch != memberCacheEpoch && !memberCacheByGroup.containsKey(groupIdHex)) {
+                            scheduleRecompute()
+                        }
+                    }
                 }
             }
         }
@@ -5753,7 +5827,8 @@ class ConversationController(
             // GroupStateError::UseAfterEviction, which we map to read-only UI.
             appState.marmotIo { groupMlsState(account, group.groupIdHex) }
             val details = appState.marmotIo { groupDetails(account, group.groupIdHex) }
-            applyGroupDetails(account, details)
+            val applied = applyGroupDetails(account, details)
+            appState.applyLocalGroupDetails(account, applied.group, applied.members)
         }.onFailure {
             if (it is CancellationException) throw it
             if (it.isUseAfterEviction()) {
@@ -5866,7 +5941,7 @@ class ConversationController(
     private fun applyGroupDetails(
         account: String,
         details: GroupDetailsFfi,
-    ) {
+    ): AppliedGroupDetails {
         val previousRetention = group.disappearingMessageSecs
         val applied = applyAuthoritativeGroupDetails(details)
         group = applied.group
@@ -5881,14 +5956,15 @@ class ConversationController(
         membersLoaded = true
         membersVerified = true
         cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
+        return AppliedGroupDetails(group = group, members = members)
     }
 
     private fun applyMutationDetails(
         account: String,
         details: GroupDetailsFfi,
     ) {
-        applyGroupDetails(account, details)
-        appState.applyLocalGroupUpdate(details.group)
+        val applied = applyGroupDetails(account, details)
+        appState.applyLocalGroupDetails(account, applied.group, applied.members)
     }
 
     private suspend fun watchAgentTextStream(
