@@ -8316,15 +8316,13 @@ private fun ConversationScreen(
     val selfAccountIdHexForMentions = appState.activeAccount?.accountIdHex
     val unreadMentionMessageIds by remember {
         derivedStateOf {
-            // Anchor on the engine read watermark (controller.lastReadMessageId),
-            // not the scroll position: it only advances on real reads / markReadUpTo,
-            // so sending a message can't resurrect already-read mentions, and the
-            // chip stays in lockstep with the chat-list @-badge (same watermark).
-            // Missing-anchor handling matches countUnreadIncoming (count, don't hide).
-            if (!initialTimelineAnchored || selfAccountIdHexForMentions.isNullOrBlank()) {
+            // Anchor on the UI read high-water mark. It advances immediately when
+            // the user visits a mention and when the visible row settles, so a
+            // recreated controller cannot briefly resurrect already-read mentions.
+            if (!initialTimelineAnchored || selfAccountIdHexForMentions.isNullOrBlank() || readAnchorMessageId == null) {
                 emptyList()
             } else {
-                unreadReceivedMentionIds(controller.timeline, controller.lastReadMessageId) { msg ->
+                unreadReceivedMentionIds(controller.timeline, readAnchorMessageId) { msg ->
                     documentMentionsAccount(
                         document = msg.record.contentTokens,
                         accountIdHex = selfAccountIdHexForMentions,

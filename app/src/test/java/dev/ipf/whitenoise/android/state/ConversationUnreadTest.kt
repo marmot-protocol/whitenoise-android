@@ -267,13 +267,12 @@ class ConversationUnreadTest {
     }
 
     @Test
-    fun mentions_missingAnchor_fallsBackToCountingAll() {
-        // Watermark set but not in the loaded window (e.g. trimmed off the top):
-        // count from the window start rather than hiding the chip — same contract
-        // as countUnreadIncoming. Regression for the MEDIUM "hides unread mentions
-        // when the read watermark is outside the loaded window" finding.
+    fun mentions_missingAnchorHidesChip() {
+        // A non-null watermark outside the loaded window means the mention may
+        // already be read. Hide the in-chat chip rather than resurrecting a stale
+        // mention after recreating the conversation.
         val timeline = listOf(received("m1"), received("m2"))
-        assertEquals(listOf("m1", "m2"), unreadReceivedMentionIds(timeline, "not-in-window", isMention))
+        assertEquals(emptyList<String>(), unreadReceivedMentionIds(timeline, "not-in-window", isMention))
     }
 
     @Test
