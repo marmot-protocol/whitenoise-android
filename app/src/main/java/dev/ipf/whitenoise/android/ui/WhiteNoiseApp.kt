@@ -796,7 +796,7 @@ fun WhiteNoiseApp(
  *
  * See issue #122 (post-invite-accept toast overlapping message input).
  */
-private val LocalSnackbarBottomInset =
+internal val LocalSnackbarBottomInset =
     staticCompositionLocalOf<MutableState<Dp>> {
         // Safe fallback for hosts rendered outside the app shell —
         // androidTest fixtures, Compose previews, or any future caller
@@ -4001,184 +4001,188 @@ private fun NewChatSheet(
         onDismissRequest = onDismiss,
         modifier = amoledModalSheetModifier(),
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
-            if (directMessage) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = pending,
-                        onValueChange = {
-                            pending = it
+        Column(Modifier.fillMaxWidth()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 24.dp, top = 24.dp, end = 24.dp)
+                    .padding(bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
+                if (directMessage) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = pending,
+                            onValueChange = {
+                                pending = it
+                                error = null
+                            },
+                            label = { Text(stringResource(R.string.npub_or_hex_public_key)) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            trailingIcon = {
+                                PublicIdentifierFieldTrailingAction(
+                                    value = pending,
+                                    enabled = !busy,
+                                    onValueChange = {
+                                        pending = it
+                                        error = null
+                                    },
+                                )
+                            },
+                            keyboardOptions =
+                                KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.None,
+                                    autoCorrectEnabled = false,
+                                    imeAction = ImeAction.Done,
+                                ),
+                        )
+                        FloatingActionButton(onClick = { showScanner = true }, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_recipient_qr_code))
+                        }
+                    }
+                    // Resolved profile preview so the user can confirm "this is the
+                    // right person" before starting the DM (#631).
+                    RecipientPreviewCard(
+                        input = pending,
+                        appState = appState,
+                        onResolutionChanged = { recipientPreview = it },
+                    )
+                    // Plain-text name search over local chat-list contacts.
+                    // Tapping a row fills the npub into the field so the existing
+                    // submit/resolve path uses it; "Open existing chat" reuses the
+                    // sheet's onOpenConversation handoff instead of starting a dupe.
+                    RecipientSearchResults(
+                        query = pending,
+                        appState = appState,
+                        onSelect = { candidate ->
+                            pending = candidate.npub
                             error = null
                         },
-                        label = { Text(stringResource(R.string.npub_or_hex_public_key)) },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        trailingIcon = {
-                            PublicIdentifierFieldTrailingAction(
-                                value = pending,
-                                enabled = !busy,
-                                onValueChange = {
-                                    pending = it
-                                    error = null
-                                },
-                            )
-                        },
-                        keyboardOptions =
-                            KeyboardOptions(
-                                capitalization = KeyboardCapitalization.None,
-                                autoCorrectEnabled = false,
-                                imeAction = ImeAction.Done,
-                            ),
                     )
-                    FloatingActionButton(onClick = { showScanner = true }, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_recipient_qr_code))
+                } else {
+                    OutlinedTextField(
+                        value = groupName,
+                        onValueChange = { groupName = it },
+                        label = { Text(stringResource(R.string.group_name)) },
+                        modifier = Modifier.fillMaxWidth().focusRequester(groupNameFocusRequester),
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text(stringResource(R.string.description)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                    )
+                }
+                if (error != null) {
+                    // Inline create/validation errors are selectable so the exact
+                    // string can be long-pressed and copied into a bug report (#543).
+                    SelectionContainer {
+                        Text(
+                            error.orEmpty(),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
-                // Resolved profile preview so the user can confirm "this is the
-                // right person" before starting the DM (#631).
-                RecipientPreviewCard(
-                    input = pending,
-                    appState = appState,
-                    onResolutionChanged = { recipientPreview = it },
-                )
-                // Plain-text name search over local chat-list contacts.
-                // Tapping a row fills the npub into the field so the existing
-                // submit/resolve path uses it; "Open existing chat" reuses the
-                // sheet's onOpenConversation handoff instead of starting a dupe.
-                RecipientSearchResults(
-                    query = pending,
-                    appState = appState,
-                    onSelect = { candidate ->
-                        pending = candidate.npub
-                        error = null
-                    },
-                )
-            } else {
-                OutlinedTextField(
-                    value = groupName,
-                    onValueChange = { groupName = it },
-                    label = { Text(stringResource(R.string.group_name)) },
-                    modifier = Modifier.fillMaxWidth().focusRequester(groupNameFocusRequester),
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.description)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                )
             }
-            if (error != null) {
-                // Inline create/validation errors are selectable so the exact
-                // string can be long-pressed and copied into a bug report (#543).
-                SelectionContainer {
-                    Text(
-                        error.orEmpty(),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-            Button(
-                onClick = {
-                    val normalizedPending =
-                        if (directMessage) {
-                            // Prefer the key the preview card already resolved
-                            // (#631): it's the pubkey the user just visually
-                            // confirmed, and is the ONLY thing that carries a
-                            // resolved NIP-05 — RecipientReference.normalize
-                            // can't parse name@domain. Fall back to tokenize +
-                            // normalize for the npub/hex direct-entry path.
-                            val resolved = recipientPreview.resolvedHex
-                            if (resolved != null) {
-                                listOf(resolved)
-                            } else {
-                                RecipientReference.tokenize(pending).map { input ->
-                                    RecipientReference.normalize(input) ?: run {
-                                        error = validRecipientReferenceError
-                                        return@Button
+            StickyFormActionBar {
+                Button(
+                    onClick = {
+                        val normalizedPending =
+                            if (directMessage) {
+                                // Prefer the key the preview card already resolved
+                                // (#631): it's the pubkey the user just visually
+                                // confirmed, and is the ONLY thing that carries a
+                                // resolved NIP-05 — RecipientReference.normalize
+                                // can't parse name@domain. Fall back to tokenize +
+                                // normalize for the npub/hex direct-entry path.
+                                val resolved = recipientPreview.resolvedHex
+                                if (resolved != null) {
+                                    listOf(resolved)
+                                } else {
+                                    RecipientReference.tokenize(pending).map { input ->
+                                        RecipientReference.normalize(input) ?: run {
+                                            error = validRecipientReferenceError
+                                            return@Button
+                                        }
                                     }
                                 }
+                            } else {
+                                emptyList()
                             }
-                        } else {
-                            emptyList()
+                        val recipients = newChatMemberRefs(directMessage, normalizedPending)
+                        val account = appState.activeAccountRef ?: return@Button
+                        // Reuse an existing 1:1 instead of creating a duplicate.
+                        if (directMessage) {
+                            val target = recipients.firstOrNull() ?: return@Button
+                            existingDirectChat(target)?.let { existing ->
+                                onOpenConversation(existing, false)
+                                onDismiss()
+                                return@Button
+                            }
                         }
-                    val recipients = newChatMemberRefs(directMessage, normalizedPending)
-                    val account = appState.activeAccountRef ?: return@Button
-                    // Reuse an existing 1:1 instead of creating a duplicate.
-                    if (directMessage) {
-                        val target = recipients.firstOrNull() ?: return@Button
-                        existingDirectChat(target)?.let { existing ->
-                            onOpenConversation(existing, false)
-                            onDismiss()
-                            return@Button
+                        busy = true
+                        error = null
+                        // Process-lifetime scope so MLS commit + Nostr publish complete
+                        // even if the sheet dismisses mid-flight.
+                        appState.launchMutation {
+                            runCatching {
+                                appState.marmotIo {
+                                    createGroup(
+                                        account,
+                                        groupName.trim(),
+                                        recipients,
+                                        description.trim().ifBlank { null },
+                                    )
+                                }
+                            }.onSuccess { groupIdHex ->
+                                pending = ""
+                                appState.present(R.string.toast_chat_created)
+                                // #321/#385: navigate straight into the new
+                                // conversation instead of leaving the user on the
+                                // chat list. Direct chats keep the composer-ready
+                                // handoff; groups land unfocused so the empty-state
+                                // Add Members CTA is the next obvious action.
+                                // Dismiss the sheet first so the conversation isn't
+                                // opened behind the modal, then wait for the
+                                // chat-list projection to surface
+                                // the freshly-created group (it lands a beat after
+                                // createGroup returns). If it doesn't materialize in
+                                // time, fall back to just dismissing — the sort fix
+                                // already floats the new chat to the top of the list.
+                                onDismiss()
+                                appState.awaitChatListItem(groupIdHex)?.let { item ->
+                                    onOpenConversation(item, directMessage)
+                                }
+                            }.onFailure {
+                                error = createGroupErrorMessage(it)
+                            }
+                            busy = false
                         }
+                    },
+                    // Gate on the preview resolution too (#631): never let the
+                    // create fire on an unresolved/invalid identifier. The card
+                    // stays Empty in group mode (no recipient field), where
+                    // recipientPreviewAllowsSubmit is true, so group create is
+                    // unaffected.
+                    enabled =
+                        canSubmitNewChatSheet(directMessage, busy, pending, groupName) &&
+                            recipientPreviewAllowsSubmit(recipientPreview.state),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (busy) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
                     }
-                    busy = true
-                    error = null
-                    // Process-lifetime scope so MLS commit + Nostr publish complete
-                    // even if the sheet dismisses mid-flight.
-                    appState.launchMutation {
-                        runCatching {
-                            appState.marmotIo {
-                                createGroup(
-                                    account,
-                                    groupName.trim(),
-                                    recipients,
-                                    description.trim().ifBlank { null },
-                                )
-                            }
-                        }.onSuccess { groupIdHex ->
-                            pending = ""
-                            appState.present(R.string.toast_chat_created)
-                            // #321/#385: navigate straight into the new
-                            // conversation instead of leaving the user on the
-                            // chat list. Direct chats keep the composer-ready
-                            // handoff; groups land unfocused so the empty-state
-                            // Add Members CTA is the next obvious action.
-                            // Dismiss the sheet first so the conversation isn't
-                            // opened behind the modal, then wait for the
-                            // chat-list projection to surface
-                            // the freshly-created group (it lands a beat after
-                            // createGroup returns). If it doesn't materialize in
-                            // time, fall back to just dismissing — the sort fix
-                            // already floats the new chat to the top of the list.
-                            onDismiss()
-                            appState.awaitChatListItem(groupIdHex)?.let { item ->
-                                onOpenConversation(item, directMessage)
-                            }
-                        }.onFailure {
-                            error = createGroupErrorMessage(it)
-                        }
-                        busy = false
-                    }
-                },
-                // Gate on the preview resolution too (#631): never let the
-                // create fire on an unresolved/invalid identifier. The card
-                // stays Empty in group mode (no recipient field), where
-                // recipientPreviewAllowsSubmit is true, so group create is
-                // unaffected.
-                enabled =
-                    canSubmitNewChatSheet(directMessage, busy, pending, groupName) &&
-                        recipientPreviewAllowsSubmit(recipientPreview.state),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.create))
                 }
-                Text(stringResource(R.string.create))
             }
         }
     }
