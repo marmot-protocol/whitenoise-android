@@ -11299,40 +11299,38 @@ private fun GroupDetailsScreen(
                             ),
                         )
                     }
-                displayedMembers.forEachIndexed { index, member ->
-                    key(groupMemberRowKey(member)) {
-                        GroupMemberRow(
-                            member = member,
-                            controller = controller,
-                            appState = appState,
-                            activeMutation = activeMutation,
-                            onPromote = {
-                                runGroupMutation(
-                                    action = GroupMutationAction.PromoteAdmin,
-                                    mutation = { controller.setMemberAdmin(member, admin = true) },
-                                    target = member.memberIdHex,
-                                )
-                            },
-                            onDemote = {
-                                runGroupMutation(
-                                    action = GroupMutationAction.DemoteAdmin,
-                                    mutation = { controller.setMemberAdmin(member, admin = false) },
-                                    target = member.memberIdHex,
-                                )
-                            },
-                            onSelfDemote = {
-                                pendingConfirm =
-                                    if (controller.isSoleAdminWithOtherMembers) {
-                                        DetailsConfirm.StepDownSoleAdmin
-                                    } else {
-                                        DetailsConfirm.StepDownAdmin(member)
-                                    }
-                            },
-                            onRemove = {
-                                pendingConfirm = DetailsConfirm.RemoveMember(member)
-                            },
-                        )
-                    }
+                GroupMemberIdentityRows(displayedMembers) { index, member ->
+                    GroupMemberRow(
+                        member = member,
+                        controller = controller,
+                        appState = appState,
+                        activeMutation = activeMutation,
+                        onPromote = {
+                            runGroupMutation(
+                                action = GroupMutationAction.PromoteAdmin,
+                                mutation = { controller.setMemberAdmin(member, admin = true) },
+                                target = member.memberIdHex,
+                            )
+                        },
+                        onDemote = {
+                            runGroupMutation(
+                                action = GroupMutationAction.DemoteAdmin,
+                                mutation = { controller.setMemberAdmin(member, admin = false) },
+                                target = member.memberIdHex,
+                            )
+                        },
+                        onSelfDemote = {
+                            pendingConfirm =
+                                if (controller.isSoleAdminWithOtherMembers) {
+                                    DetailsConfirm.StepDownSoleAdmin
+                                } else {
+                                    DetailsConfirm.StepDownAdmin(member)
+                                }
+                        },
+                        onRemove = {
+                            pendingConfirm = DetailsConfirm.RemoveMember(member)
+                        },
+                    )
                     if (index < displayedMembers.lastIndex) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                     }
@@ -12867,7 +12865,22 @@ private fun GroupMemberRow(
     }
 }
 
-internal fun groupMemberRowKey(member: AppGroupMemberRecordFfi): String = member.memberIdHex
+/**
+ * Member rows are rendered in [Column] containers, so Compose would otherwise
+ * identify each child by position. Key each row by member identity so menu and
+ * avatar state move with the member when invite/profile churn re-sorts the list.
+ */
+@Composable
+internal fun GroupMemberIdentityRows(
+    members: List<AppGroupMemberRecordFfi>,
+    content: @Composable (index: Int, member: AppGroupMemberRecordFfi) -> Unit,
+) {
+    members.forEachIndexed { index, member ->
+        key(member.memberIdHex) {
+            content(index, member)
+        }
+    }
+}
 
 private val GroupMutationAction.memberStatusLabelRes: Int
     @StringRes
@@ -12958,38 +12971,36 @@ private fun TransferAdminSheet(
                     Column(
                         Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
                     ) {
-                        filtered.forEach { member ->
-                            key(groupMemberRowKey(member)) {
-                                Row(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .clickable(enabled = !busy, role = Role.Button) { onPick(member) }
-                                            .padding(vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Avatar(
-                                        title = controller.memberDisplayName(member),
-                                        seed = member.memberIdHex,
-                                        size = 40.dp,
-                                        pictureUrl = controller.memberAvatarUrl(member),
+                        GroupMemberIdentityRows(filtered) { _, member ->
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clickable(enabled = !busy, role = Role.Button) { onPick(member) }
+                                        .padding(vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Avatar(
+                                    title = controller.memberDisplayName(member),
+                                    seed = member.memberIdHex,
+                                    size = 40.dp,
+                                    pictureUrl = controller.memberAvatarUrl(member),
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        controller.memberDisplayName(member),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
-                                    Spacer(Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Text(
-                                            controller.memberDisplayName(member),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Text(
-                                            controller.memberSubtitle(member),
-                                            fontFamily = FontFamily.Monospace,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
+                                    Text(
+                                        controller.memberSubtitle(member),
+                                        fontFamily = FontFamily.Monospace,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                 }
                             }
                         }
@@ -21321,16 +21332,6 @@ private val AvatarPalette =
         Color(0xFF9A4055),
     )
 
-internal data class AvatarBindingTarget(
-    val seed: String,
-    val pictureUrl: String?,
-)
-
-internal fun avatarLoadResultTargetsCurrentBinding(
-    requested: AvatarBindingTarget,
-    current: AvatarBindingTarget,
-): Boolean = requested == current
-
 @Composable
 internal fun Avatar(
     title: String,
@@ -21339,24 +21340,17 @@ internal fun Avatar(
     pictureUrl: String? = null,
 ) {
     val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
-    val bindingTarget = AvatarBindingTarget(seed = seed, pictureUrl = pictureUrl)
-    val currentBindingTarget by rememberUpdatedState(bindingTarget)
     // Seed from the in-memory cache so re-entering a screen shows an
     // already-loaded avatar immediately, with no placeholder flash and no
-    // re-fetch. key(bindingTarget) re-creates the state holder when either the
-    // row/account identity or url changes, so a reused slot cannot keep the
-    // previous member's bitmap while the new one loads. The equality guard is a
-    // belt-and-suspenders check for any loader result that resumes after its
-    // composable has been rebound during list churn.
-    val image by key(bindingTarget) {
-        produceState(AvatarImageLoader.peek(bindingTarget.pictureUrl)) {
-            val requested = bindingTarget
-            if (value == null && requested.pictureUrl != null) {
-                val loaded = AvatarImageLoader.load(requested.pictureUrl)
-                if (avatarLoadResultTargetsCurrentBinding(requested, currentBindingTarget)) {
-                    value = loaded
-                }
-            }
+    // re-fetch. key(seed, pictureUrl) re-creates the state holder when either
+    // the row/account identity or URL changes, so a reused Column slot cannot
+    // keep the previous member's bitmap while the new one loads. The outer key
+    // is intentional: produceState keys restart the load coroutine, but the
+    // state holder itself must also be recreated to re-seed from the new cache
+    // key instead of displaying the old bitmap transiently.
+    val image by key(seed, pictureUrl) {
+        produceState(AvatarImageLoader.peek(pictureUrl)) {
+            if (value == null && pictureUrl != null) value = AvatarImageLoader.load(pictureUrl)
         }
     }
     Box(
