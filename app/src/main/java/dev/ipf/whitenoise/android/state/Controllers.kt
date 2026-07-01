@@ -722,6 +722,33 @@ internal fun failedOptimisticMessageIdForInvalidatedProjection(
         }?.record
         ?.messageIdHex
 
+internal fun invalidatedProjectionIdsMatchingMessage(
+    timelineRecords: Map<String, TimelineMessageRecordFfi>,
+    message: AppMessageRecordFfi,
+): List<String> =
+    timelineRecords.values
+        .filter { projected ->
+            projected.invalidationStatus != null &&
+                messagesHaveSameRenderableSendShape(
+                    left = TimelineProjector.toAppMessageRecord(projected),
+                    right = message,
+                )
+        }.map { it.messageIdHex }
+
+private fun messagesHaveSameRenderableSendShape(
+    left: AppMessageRecordFfi,
+    right: AppMessageRecordFfi,
+): Boolean {
+    if (left.direction != right.direction) return false
+    if (left.groupIdHex != right.groupIdHex) return false
+    if (left.sender != right.sender) return false
+    if (left.kind != right.kind) return false
+    if (!timestampsAreNear(left.recordedAt, right.recordedAt)) return false
+    return left.plaintext == right.plaintext &&
+        left.tags.filterNot { it.values.firstOrNull() == "p" } ==
+        right.tags.filterNot { it.values.firstOrNull() == "p" }
+}
+
 /**
  * Find a projected timeline row that matches [optimistic] and is committed locally
  * but not yet published (`sourceMessageIdHex == null`). Used when retrying a failed
@@ -3082,6 +3109,8 @@ class ConversationController(
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
             optimisticMessages.remove(optimisticKey)
             messageById.remove(tempId)
+            invalidatedProjectionIdsMatchingMessage(timelineRecords, confirmed)
+                .forEach(::removeProjectedRecord)
             if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
                 optimisticMessages["msg:$confirmedId"] =
                     TimelineMessage(
@@ -4112,6 +4141,8 @@ class ConversationController(
                 return
             }
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
+            invalidatedProjectionIdsMatchingMessage(timelineRecords, confirmed)
+                .forEach(::removeProjectedRecord)
             if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
                 optimisticMessages["msg:$confirmedId"] =
                     TimelineMessage(
@@ -5158,6 +5189,11 @@ class ConversationController(
             failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
         ) {
             return actionRecord
+        }
+        if (record.invalidationStatus == null) {
+            invalidatedProjectionIdsMatchingMessage(timelineRecords, actionRecord)
+                .filterNot { it == record.messageIdHex }
+                .forEach(::removeProjectedRecord)
         }
         timelineRecords[record.messageIdHex] = record
         projectedMessageIds.add(record.messageIdHex)

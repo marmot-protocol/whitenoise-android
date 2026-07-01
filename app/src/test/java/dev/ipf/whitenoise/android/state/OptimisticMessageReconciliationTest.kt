@@ -123,6 +123,33 @@ class OptimisticMessageReconciliationTest {
     }
 
     @Test
+    fun sentMessageFindsMatchingInvalidatedProjectionForCleanup() {
+        val invalidated =
+            timelineRecord(
+                messageIdHex = "invalidated",
+                plaintext = "retry cleaned me up",
+                invalidationStatus = "LosingBranch",
+            )
+        val unrelated =
+            timelineRecord(
+                messageIdHex = "unrelated",
+                plaintext = "keep me",
+                invalidationStatus = "LosingBranch",
+            )
+
+        assertEquals(
+            listOf("invalidated"),
+            invalidatedProjectionIdsMatchingMessage(
+                mapOf(
+                    invalidated.messageIdHex to invalidated,
+                    unrelated.messageIdHex to unrelated,
+                ),
+                message("confirmed", plaintext = "retry cleaned me up"),
+            ),
+        )
+    }
+
+    @Test
     fun historicalMatchingMessageIsNotReconciled() {
         val pending = timelineMessage("temp", MessageStatus.Pending)
 
@@ -387,6 +414,7 @@ class OptimisticMessageReconciliationTest {
         plaintext: String,
         sourceMessageIdHex: String? = null,
         recordedAt: ULong = 1uL,
+        invalidationStatus: String? = null,
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
             messageIdHex = messageIdHex,
@@ -409,7 +437,7 @@ class OptimisticMessageReconciliationTest {
             reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
             deleted = false,
             deletedByMessageIdHex = null,
-            invalidationStatus = null,
+            invalidationStatus = invalidationStatus,
         )
 
     private fun timelineMessage(
