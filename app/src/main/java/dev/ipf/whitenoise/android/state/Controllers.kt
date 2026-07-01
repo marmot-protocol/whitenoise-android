@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.SystemClock
 import android.util.Log
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -2158,6 +2159,11 @@ private const val TIMELINE_BATCH_CAP = 32
 // one frame without delaying the next paint.
 private const val TIMELINE_BATCH_DRAIN_MS = 6L
 
+// DEBUG-only bound on the send-latency trace map (issue #913). Small: at most a
+// handful of sends are in flight before their echo reconciles; the cap only
+// guards against a burst of never-echoed sends leaking entries.
+private const val SEND_TRACE_MAX_TRACKED = 64
+
 class ConversationController(
     private val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -2353,6 +2359,17 @@ class ConversationController(
     private val pendingProjectionsAwaitingBridge =
         appState.pendingProjectionsAwaitingBridge(conversationAccountRef, initialGroup.groupIdHex)
     private val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
+
+    // DEBUG-only send-latency trace bookkeeping (issue #913): maps a pending
+    // optimistic text message's temp id to (traceSequence, monotonicStartMs) so
+    // the engine-echo reconcile that flips the bubble pending → sent
+    // (upsertProjectedRecord) can log the accepted → echoed-reconcile latency —
+    // the "self-echo drives the flip" candidate. Short-lived lifecycle state:
+    // entries are added on optimistic send and removed on reconcile; bounded so
+    // a burst of never-echoed sends can't grow it. Holds no protocol data (only
+    // a local temp id, a one-run sequence string, and a monotonic long), so it
+    // is not an Android-owned cache of White Noise data (AGENTS.md).
+    private val sendTraceByTempId = linkedMapOf<String, SendTraceEntry>()
     private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     // Cached at start() so `loadOlderPage` / `loadNewerPage` can drive
@@ -2987,7 +3004,14 @@ class ConversationController(
         }
 
         val replyTarget = replyingTo?.messageIdHex?.takeIf { it.isNotBlank() }
+        // Per-send latency trace (issue #913). One-run-only sequence id + a
+        // monotonic start so the phases of THIS send are correlatable in logcat
+        // and back-to-back sends stay distinguishable, without any durable id.
+        val trace = SendTrace.nextSequence()
+        val traceStartMs = traceNowMs()
+        sendTrace(trace, "accepted", 0L, null, "reply" to (replyTarget != null))
         val tempId = UUID.randomUUID().toString()
+        rememberSendTrace(tempId, trace, traceStartMs)
         val now = nowSeconds()
         val optimistic =
             AppMessageRecordFfi(
@@ -3044,6 +3068,10 @@ class ConversationController(
         // mere act of dispatching this coroutine, lost the text whenever a
         // guard above bailed before this point.
         onAccepted()
+        // Optimistic bubble + chat-list preview are now published: the pending
+        // clock is on screen. Everything after this is the "clock lingers"
+        // window the issue is about.
+        sendTrace(trace, "optimistic-shown", traceElapsedMs(traceStartMs))
         try {
             // Publish with a bounded retry sweep so a *transient* relay-pool gap
             // (socket teardown mid-reconnect, doze wake, network change) doesn't
@@ -3052,16 +3080,31 @@ class ConversationController(
             // attempt; only a sustained connectivity outage — every attempt
             // exhausted — keeps the hard failure. The optimistic bubble stays
             // Pending across retries, so the user sees "sending", not "failed".
+            //
+            // The commit lock serializes commit-producing FFI calls for the same
+            // (account, group): a second back-to-back send BLOCKS here until the
+            // prior send's full MLS-commit → relay round-trip returns. Timing the
+            // lock-acquire separately from the FFI call makes that serialization
+            // visible (issue #913 "back-to-back sends don't pipeline").
+            val lockWaitStartMs = traceNowMs()
             val summary =
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    publishTextWithRetry(replyTarget, account, trimmed)
+                    val lockHeldAtMs = traceNowMs()
+                    sendTrace(
+                        trace,
+                        "commit-lock-acquired",
+                        traceElapsedMs(traceStartMs),
+                        lockHeldAtMs - lockWaitStartMs,
+                    )
+                    publishTextWithRetry(replyTarget, account, trimmed, trace, traceStartMs)
                 }
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = optimistic.copy(messageIdHex = confirmedId)
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
             optimisticMessages.remove(optimisticKey)
             messageById.remove(tempId)
-            if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
+            val insertedSent = shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)
+            if (insertedSent) {
                 optimisticMessages["msg:$confirmedId"] =
                     TimelineMessage(
                         "msg:$confirmedId",
@@ -3071,6 +3114,20 @@ class ConversationController(
                     )
             }
             publishTimelineFromIndexes()
+            // The publish returned and the pending clock flips to sent here (or,
+            // when the engine echo already landed, the reconcile in
+            // upsertProjectedRecord did it first — traced separately). `+…ms` is
+            // the total accepted → sent-flip latency the issue measures.
+            sendTrace(
+                trace,
+                "sent-flip",
+                traceElapsedMs(traceStartMs),
+                context = arrayOf("bubble" to (if (insertedSent) "local" else "echoed")),
+            )
+            // This success path removed the pending optimistic directly, so the
+            // echo-reconcile may never fire for this temp id — drop its trace
+            // entry so the bounded map doesn't retain it.
+            forgetSendTrace(tempId)
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
             retainFailedOptimisticTextSend(
@@ -3081,6 +3138,13 @@ class ConversationController(
                 timelineOrder = optimisticOrder,
             )
             publishTimelineFromIndexes()
+            sendTrace(
+                trace,
+                "send-failed",
+                traceElapsedMs(traceStartMs),
+                context = arrayOf("error" to throwable.javaClass.simpleName),
+            )
+            forgetSendTrace(tempId)
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
     }
@@ -3104,17 +3168,44 @@ class ConversationController(
         replyTarget: String?,
         account: String,
         trimmed: String,
+        trace: String,
+        traceStartMs: Long,
     ): dev.ipf.marmotkit.SendSummaryFfi {
         var lastTransient: Throwable? = null
         for (attempt in 1..SEND_RETRY_ATTEMPTS) {
+            // Time the FFI hop itself (App → engine `send_message`: MLS commit +
+            // encrypt + publish + relay ack round-trip, all synchronous inside
+            // this call). This is the primary "long pole" candidate the issue
+            // asks to measure — how long the `sendText`/`replyToMessage` call
+            // blocks before returning (issue #913).
+            val ffiStartMs = traceNowMs()
+            sendTrace(trace, "ffi-start", ffiStartMs - traceStartMs, context = arrayOf("attempt" to attempt))
             try {
-                return if (replyTarget != null) {
-                    appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, trimmed) }
-                } else {
-                    appState.marmotIo { sendText(account, group.groupIdHex, trimmed) }
-                }
+                val summary =
+                    if (replyTarget != null) {
+                        appState.marmotIo { replyToMessage(account, group.groupIdHex, replyTarget, trimmed) }
+                    } else {
+                        appState.marmotIo { sendText(account, group.groupIdHex, trimmed) }
+                    }
+                sendTrace(
+                    trace,
+                    "ffi-return",
+                    traceElapsedMs(traceStartMs),
+                    traceNowMs() - ffiStartMs,
+                    "attempt" to attempt,
+                    "msgIds" to summary.messageIds.size,
+                )
+                return summary
             } catch (throwable: Throwable) {
                 throwable.rethrowIfCancellation()
+                sendTrace(
+                    trace,
+                    "ffi-error",
+                    traceElapsedMs(traceStartMs),
+                    traceNowMs() - ffiStartMs,
+                    "attempt" to attempt,
+                    "error" to throwable.javaClass.simpleName,
+                )
                 if (!isTransientRelaySendError(throwable)) throw throwable
                 lastTransient = throwable
                 logSendRetry(attempt, throwable)
@@ -5153,6 +5244,10 @@ class ConversationController(
                 handoffOwnMediaCacheOnReconcile(optimisticKey, record.messageIdHex)
                 optimisticMessages.remove(optimisticKey)
                 messageById.remove(optimisticId)
+                // The engine echo just flipped this pending bubble to a
+                // projected record. If we're tracing this send, this is the
+                // "self-echo drives the sent flip" path (issue #913).
+                traceEchoReconcile(optimisticId)
             }
         messageById[record.messageIdHex] = actionRecord
         val item = timelineMessageFromProjection(record, actionRecord)
@@ -5866,6 +5961,62 @@ class ConversationController(
     }
 
     private fun nowSeconds(): ULong = (System.currentTimeMillis() / 1000L).toULong()
+
+    // --- Send-latency trace (issue #913) -----------------------------------
+    // Monotonic clock (unaffected by wall-clock adjustments) for measuring the
+    // accepted → sent-flip window and the FFI hop inside it. All emission is
+    // DEBUG-only and privacy-safe (see SendTrace): phase, sequence id, ms, and
+    // small counts/booleans only.
+    private fun traceNowMs(): Long = SystemClock.elapsedRealtime()
+
+    private fun traceElapsedMs(startMs: Long): Long = traceNowMs() - startMs
+
+    private fun sendTrace(
+        sequence: String,
+        phase: String,
+        sinceStartMs: Long,
+        spanMs: Long? = null,
+        vararg context: Pair<String, Any?>,
+    ) {
+        if (!BuildConfig.DEBUG) return
+        Log.d(
+            "DMConversation",
+            "${SendTrace.TAG_PREFIX} ${SendTrace.line(sequence, phase, sinceStartMs, spanMs, *context)}",
+        )
+    }
+
+    // Record (DEBUG-only) the trace start for an optimistic text send so the
+    // engine-echo reconcile can time the accepted → echoed-reconcile flip.
+    // Bounded so a burst of never-echoed sends can't grow the map.
+    private fun rememberSendTrace(
+        tempId: String,
+        sequence: String,
+        startMs: Long,
+    ) {
+        if (!BuildConfig.DEBUG) return
+        sendTraceByTempId[tempId] = SendTraceEntry(sequence, startMs)
+        while (sendTraceByTempId.size > SEND_TRACE_MAX_TRACKED) {
+            val oldest = sendTraceByTempId.keys.firstOrNull() ?: break
+            sendTraceByTempId.remove(oldest)
+        }
+    }
+
+    private fun forgetSendTrace(tempId: String) {
+        if (!BuildConfig.DEBUG) return
+        sendTraceByTempId.remove(tempId)
+    }
+
+    // Called when the engine echo reconciles a pending optimistic bubble into a
+    // projected record. If the reconciled optimistic id is one we're tracing,
+    // log the accepted → echoed-reconcile latency — this is the path that flips
+    // pending → sent when the self-echo lands before/instead of the send()
+    // success block, the "subscription churn / self-echo drives the flip"
+    // candidate in issue #913.
+    private fun traceEchoReconcile(optimisticId: String) {
+        if (!BuildConfig.DEBUG) return
+        val entry = sendTraceByTempId.remove(optimisticId) ?: return
+        sendTrace(entry.sequence, "echo-reconcile", traceElapsedMs(entry.startMs))
+    }
 
     /**
      * Whether two timeline records would render the same bubble. Compares
