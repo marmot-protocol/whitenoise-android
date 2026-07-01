@@ -40,7 +40,7 @@
     <string name="recipient_preview_unresolved">Diese Kennung konnte nicht aufgelöst werden</string>
     <string name="recipient_preview_nip05_verified">Verifizierte Adresse</string>
     <string name="recipient_preview_nip05_unverified">Nicht verifizierte Adresse</string>
-    <string name="recipient_source_in_dm">in DN</string>
+    <string name="recipient_source_in_dm">im Direktchat</string>
     <string name="recipient_search_empty_hint">Füge per npub jemanden hinzu, mit dem du noch nicht geschrieben hast.</string>
     <plurals name="recipient_source_in_groups">
         <item quantity="one">in %1$d Gruppe</item>
