@@ -32,6 +32,141 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun implicitDmMatchesActiveUnnamedPairWithTarget() {
+        // #825 happy path: an unnamed two-person conversation with self + Bob,
+        // both present, resolves as the DM with Bob (hex or npub target form).
+        val self = member(memberId = "alice", account = "alice", local = true)
+        val bob = member(memberId = "bob", account = "bob", local = false)
+
+        assertTrue(
+            GroupProjector.isImplicitDmWith(
+                members = listOf(self, bob),
+                name = "",
+                activeAccountIdHex = "alice",
+                targetIdHex = "bob",
+                equivalentTarget = { false },
+            ),
+        )
+        // Hex compare is case-insensitive, like the rest of the roster checks.
+        assertTrue(
+            GroupProjector.isImplicitDmWith(
+                members = listOf(self, bob),
+                name = "",
+                activeAccountIdHex = "ALICE",
+                targetIdHex = "BOB",
+                equivalentTarget = { false },
+            ),
+        )
+        // Target pasted as an npub the caller maps back to the peer's hex.
+        assertTrue(
+            GroupProjector.isImplicitDmWith(
+                members = listOf(self, bob),
+                name = "",
+                activeAccountIdHex = "alice",
+                targetIdHex = "npub1bob",
+                equivalentTarget = { other -> other == "bob" },
+            ),
+        )
+    }
+
+    @Test
+    fun implicitDmRejectsRenamedTwoPersonConversation() {
+        // #825 bug 1: a renamed pair is a group, not a DM — Start-DM must open a
+        // fresh DM rather than land in "Project planning".
+        val self = member(memberId = "alice", account = "alice", local = true)
+        val bob = member(memberId = "bob", account = "bob", local = false)
+
+        assertFalse(
+            GroupProjector.isImplicitDmWith(
+                members = listOf(self, bob),
+                name = "Project planning",
+                activeAccountIdHex = "alice",
+                targetIdHex = "bob",
+                equivalentTarget = { false },
+            ),
+        )
+    }
+
+    @Test
+    fun implicitDmRejectsConversationTargetWasRemovedFrom() {
+        // #825 bug 2: after Bob is removed the live roster is {Alice} only, so a
+        // "DM with Bob" lookup must not match — even unnamed.
+        val self = member(memberId = "alice", account = "alice", local = true)
+
+        assertFalse(
+            GroupProjector.isImplicitDmWith(
+                members = listOf(self),
+                name = "",
+                activeAccountIdHex = "alice",
+                targetIdHex = "bob",
+                equivalentTarget = { false },
+            ),
+        )
+        // Renamed *and* removed — still no match.
+        assertFalse(
+            GroupProjector.isImplicitDmWith(
+                members = listOf(self),
+                name = "Project planning",
+                activeAccountIdHex = "alice",
+                targetIdHex = "bob",
+                equivalentTarget = { false },
+            ),
+        )
+    }
+
+    @Test
+    fun implicitDmRequiresActiveAccountStillPresent() {
+        // The current user must still be a member; a pair of two other people
+        // (e.g. a roster read before self was evicted) is not "my DM with Bob".
+        val bob = member(memberId = "bob", account = "bob", local = false)
+        val carol = member(memberId = "carol", account = "carol", local = false)
+
+        assertFalse(
+            GroupProjector.isImplicitDmWith(
+                members = listOf(bob, carol),
+                name = "",
+                activeAccountIdHex = "alice",
+                targetIdHex = "bob",
+                equivalentTarget = { false },
+            ),
+        )
+    }
+
+    @Test
+    fun implicitDmRejectsPairWithADifferentPerson() {
+        // Unnamed pair with self, but the other member is Carol, not the Bob
+        // target — no match, so no wrong-conversation reuse.
+        val self = member(memberId = "alice", account = "alice", local = true)
+        val carol = member(memberId = "carol", account = "carol", local = false)
+
+        assertFalse(
+            GroupProjector.isImplicitDmWith(
+                members = listOf(self, carol),
+                name = "",
+                activeAccountIdHex = "alice",
+                targetIdHex = "bob",
+                equivalentTarget = { other -> other == "npub1bob" },
+            ),
+        )
+    }
+
+    @Test
+    fun implicitDmRejectsBlankTarget() {
+        val self = member(memberId = "alice", account = "alice", local = true)
+        val bob = member(memberId = "bob", account = "bob", local = false)
+
+        assertFalse(
+            GroupProjector.isImplicitDmWith(
+                members = listOf(self, bob),
+                name = "",
+                activeAccountIdHex = "alice",
+                targetIdHex = "   ",
+                equivalentTarget = { true },
+            ),
+        )
+    }
+
+    @Test
     fun adminStatusAcceptsAccountOrMemberCredentialIds() {
         val group = group(admins = listOf("alice", "credential-b"))
 

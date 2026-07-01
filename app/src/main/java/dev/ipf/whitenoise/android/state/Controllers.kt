@@ -1493,32 +1493,37 @@ class ChatsController(
         )
 
     /**
-     * The confirmed 1:1 DM with [reference] (npub or hex), or null. A 1:1 is a
-     * confirmed two-member group whose counterparty is the target; the
+     * The confirmed, still-active 1:1 DM with [reference] (npub or hex), or
+     * null. A match must be an *implicit* DM in its current MLS state: no
+     * custom group name, the active account still a member, and the live roster
+     * exactly `{me, target}` (see [GroupProjector.isImplicitDmWith]). The
      * counterparty is stored as hex, so compare in both hex and npub forms.
-     * Shared with the new-chat sheet so "open existing DM" and "don't create a
-     * duplicate DM" agree on what counts as an existing one.
+     *
+     * This is deliberately strict (#825): a two-person conversation that was
+     * renamed, or one the target was removed from (leaving the user talking to
+     * themselves), is no longer a DM with that person, so Start-DM must open a
+     * fresh DM instead of resurfacing the stale group. There is intentionally
+     * no closest-historical-match fallback. Shared with the new-chat sheet so
+     * "open existing DM" and "don't create a duplicate DM" agree on what counts
+     * as an existing one.
      */
     fun existingDirectChat(reference: String): ChatListItem? {
         val normalizedReference = reference.trim().takeIf { it.isNotEmpty() } ?: return null
+        val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
         return chatRows
             .asSequence()
             .filter { !it.pendingConfirmation }
             .firstNotNullOfOrNull { row ->
                 val members = memberCacheByGroup[row.groupIdHex] ?: return@firstNotNullOfOrNull null
-                if (members.size != 2) return@firstNotNullOfOrNull null
-                val other =
-                    GroupProjector.otherMemberAccount(
-                        members,
-                        boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
-                    ) ?: return@firstNotNullOfOrNull null
-                if (other.equals(normalizedReference, ignoreCase = true) ||
-                    appState.npub(other).equals(normalizedReference, ignoreCase = true)
-                ) {
-                    projectChatRow(row)
-                } else {
-                    null
-                }
+                val match =
+                    GroupProjector.isImplicitDmWith(
+                        members = members,
+                        name = row.groupName,
+                        activeAccountIdHex = activeAccountIdHex,
+                        targetIdHex = normalizedReference,
+                        equivalentTarget = { other -> appState.npub(other).equals(normalizedReference, ignoreCase = true) },
+                    )
+                if (match) projectChatRow(row) else null
             }
     }
 
