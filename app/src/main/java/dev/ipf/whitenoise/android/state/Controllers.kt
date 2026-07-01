@@ -2158,6 +2158,40 @@ private const val TIMELINE_BATCH_CAP = 32
 // one frame without delaying the next paint.
 private const val TIMELINE_BATCH_DRAIN_MS = 6L
 
+// Upper bound on how many consecutive media-bearing batches may coalesce
+// their `listMedia` full-scan refresh into a single deferred pass (issue
+// #843). `refreshMediaReferences` is an O(all media in the group) scan +
+// full map rebuild; during initial sync or a burst of media-bearing commits
+// the batch loop would otherwise pay it once per batch. We defer the scan
+// while the immediately queued next update is also media-bearing and flush it
+// at the first non-media boundary, but this cap forces a flush anyway so a
+// media-heavy producer that never lets the channel drain can't starve the
+// media cache — newly-projected rows still resolve their real `sourceEpoch`
+// promptly instead of falling back to the imeta parser's epoch-0 (broken
+// decryption).
+private const val TIMELINE_MEDIA_REFRESH_COALESCE_CAP = 16
+
+/**
+ * Decide whether a deferred [ConversationController.refreshMediaReferences]
+ * full scan should run now, given how many media-bearing batches have
+ * coalesced so far and whether the next queued subscription update also
+ * touches media (issue #843).
+ *
+ * Pure so it can be unit-tested without driving the whole subscription
+ * pipeline. Flush at the first non-media boundary so an isolated media batch
+ * still refreshes promptly and media refreshes cannot starve behind an
+ * unrelated text/reaction burst, or when the coalesce [cap] is reached so a
+ * media-heavy producer can't starve the media cache indefinitely.
+ */
+internal fun shouldFlushCoalescedMediaRefresh(
+    coalescedBatches: Int,
+    nextUpdateTouchesMedia: Boolean,
+    cap: Int = TIMELINE_MEDIA_REFRESH_COALESCE_CAP,
+): Boolean {
+    if (coalescedBatches <= 0) return false
+    return !nextUpdateTouchesMedia || coalescedBatches >= cap
+}
+
 class ConversationController(
     private val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -2860,8 +2894,20 @@ class ConversationController(
                 }
             }
         try {
+            // Number of media-bearing batches whose `listMedia` full-scan
+            // refresh has been deferred but not yet flushed. Carried across
+            // loop iterations so adjacent media batches in a sync burst
+            // coalesce into a single scan (issue #843).
+            var coalescedMediaBatches = 0
+            // An update peeked off the channel while probing whether a burst
+            // is still draining; seeds the next batch so nothing is dropped.
+            var carried: TimelineSubscriptionUpdateFfi? = null
             while (isActive) {
-                val first = timelineUpdates.receiveCatching().getOrNull() ?: break
+                val first =
+                    carried
+                        ?: timelineUpdates.receiveCatching().getOrNull()
+                        ?: break
+                carried = null
                 // Drain any updates that arrived within roughly one
                 // 120Hz frame budget into a single batch. The runtime
                 // can emit several updates back-to-back during a
@@ -2912,23 +2958,31 @@ class ConversationController(
                         streamIdsLaunched += streamIds
                     }
                 }
-                // Refresh media references at most once per batch.
-                // `listMedia` is an unbounded scan — gate on whether
-                // any update in the batch actually touched media so
-                // text-only / reaction-only bursts don't pay for it.
-                val touchedMedia =
-                    batch.any { update ->
-                        when (update) {
-                            is TimelineSubscriptionUpdateFfi.Page -> pageContainsMedia(update.page)
-                            is TimelineSubscriptionUpdateFfi.Projection ->
-                                if (update.update.update.groupIdHex == group.groupIdHex) {
-                                    changesContainMedia(update.update.update.changes)
-                                } else {
-                                    false
-                                }
-                        }
+                // `refreshMediaReferences` is an O(all media) scan + full
+                // map rebuild. Gate on whether any update in the batch
+                // actually touched media so text-only / reaction-only
+                // bursts don't pay for it, then coalesce adjacent
+                // media-bearing batches: defer the scan while the next
+                // queued update also touches media, and run it once at the
+                // first non-media boundary or when the coalesce cap is hit.
+                // See issue #843.
+                if (batchTouchedMedia(batch)) coalescedMediaBatches += 1
+                if (coalescedMediaBatches > 0) {
+                    // Peek the next update to learn whether the media burst
+                    // is still draining. A peeked update is carried into the
+                    // next batch so this probe never drops it; a queued
+                    // non-media update ends the media burst and flushes now.
+                    carried = timelineUpdates.tryReceive().getOrNull()
+                    val nextUpdateTouchesMedia = carried?.let(::updateTouchesMedia) == true
+                    if (shouldFlushCoalescedMediaRefresh(
+                            coalescedBatches = coalescedMediaBatches,
+                            nextUpdateTouchesMedia = nextUpdateTouchesMedia,
+                        )
+                    ) {
+                        coalescedMediaBatches = 0
+                        refreshMediaReferences()
                     }
-                if (touchedMedia) refreshMediaReferences()
+                }
                 // Scroll-driven mark-read in the UI layer handles
                 // the user-visible read pointer.
                 streamIdsLaunched.forEach { streamId ->
@@ -5536,6 +5590,22 @@ class ConversationController(
      * `listMedia(group, null)` SQLite scan on every projection batch.
      */
     private fun pageContainsMedia(page: TimelinePageFfi): Boolean = page.messages.any(::recordCarriesMedia)
+
+    /**
+     * Whether any update in [batch] carries a media attachment for this group,
+     * i.e. whether the batch should count toward a coalesced
+     * [refreshMediaReferences] pass (issue #843). Projections for other groups
+     * never touch this conversation's media, so they don't count.
+     */
+    private fun batchTouchedMedia(batch: List<TimelineSubscriptionUpdateFfi>): Boolean = batch.any(::updateTouchesMedia)
+
+    private fun updateTouchesMedia(update: TimelineSubscriptionUpdateFfi): Boolean =
+        when (update) {
+            is TimelineSubscriptionUpdateFfi.Page -> pageContainsMedia(update.page)
+            is TimelineSubscriptionUpdateFfi.Projection ->
+                update.update.update.groupIdHex == group.groupIdHex &&
+                    changesContainMedia(update.update.update.changes)
+        }
 
     private fun changesContainMedia(changes: List<TimelineMessageChangeFfi>): Boolean =
         changes.any { change ->
