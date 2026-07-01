@@ -130,6 +130,38 @@ object GroupProjector {
         name: String,
     ): Boolean = memberCount == 2 && name.isBlank()
 
+    /**
+     * True when [members] is an implicit DM between the active account and
+     * [targetIdHex] (npub or hex), as the Start-DM resolver requires (#825).
+     *
+     * All three must hold, read from *current* MLS state, never a historical
+     * snapshot:
+     * - the group has no custom [name] (it still presents as an implicit DM;
+     *   a renamed two-person conversation is a group, not a DM);
+     * - the active account is still a member;
+     * - the currently-active roster is exactly `{me, target}`.
+     *
+     * So a conversation the target was removed from (roster now `{me}`), or one
+     * that was renamed, never matches — Start-DM must open a fresh DM instead
+     * of landing in the stale group. [equivalentTarget] resolves the peer's
+     * account id against the target in whatever form it was pasted (the peer is
+     * stored as hex; the target may be an npub), mirroring [otherMemberAccount]'s
+     * hex/npub comparison at the call site.
+     */
+    fun isImplicitDmWith(
+        members: List<AppGroupMemberRecordFfi>,
+        name: String,
+        activeAccountIdHex: String?,
+        targetIdHex: String,
+        equivalentTarget: (other: String) -> Boolean,
+    ): Boolean {
+        if (targetIdHex.isBlank()) return false
+        if (!isDm(memberCount = members.size, name = name)) return false
+        if (!members.any { isActiveAccountMember(it, activeAccountIdHex) }) return false
+        val other = otherMemberAccount(members, activeAccountIdHex)?.takeIf { it.isNotBlank() } ?: return false
+        return other.equals(targetIdHex, ignoreCase = true) || equivalentTarget(other)
+    }
+
     fun memberRef(member: AppGroupMemberRecordFfi): String = member.account?.takeIf { it.isNotBlank() } ?: member.memberIdHex
 
     fun isAdmin(
