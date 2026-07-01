@@ -28,6 +28,7 @@ import dev.ipf.marmotkit.AuditLogUploadSourceFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.PushPlatformFfi
@@ -72,6 +73,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -3596,27 +3598,27 @@ class WhiteNoiseAppState(
         if (notificationJob?.isActive == true) return
         notificationJob =
             notificationScope.launch {
-                // Restart the subscription on any failure (or clean end-of-stream)
-                // with exponential backoff, so a transient relay/binding error
-                // doesn't permanently silence notifications. Backoff resets after
-                // each received update; cancellation propagates and stops the loop.
-                // See #56.
+                // Restart both notification surfaces on any failure (or clean
+                // end-of-stream) with exponential backoff, so a transient
+                // relay/binding error doesn't permanently silence notifications.
+                // Backoff resets after either stream yields an actionable event;
+                // cancellation propagates and stops the loop. See #56.
                 var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
                 while (isActive) {
                     try {
-                        val subscription = marmotIo { subscribeNotifications() }
-                        try {
-                            while (isActive) {
-                                val update = marmotIo { subscription.next() } ?: break
-                                backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
-                                postNotificationUpdate(update)
-                            }
-                        } finally {
-                            runCatching {
-                                withContext(NonCancellable + Dispatchers.IO) {
-                                    subscription.close()
-                                }
-                            }
+                        coroutineScope {
+                            runUntilFirstLiveSubscriptionEnds(
+                                first = {
+                                    runNotificationUpdateLoop {
+                                        backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                                    }
+                                },
+                                second = {
+                                    runProjectionNotificationLoop {
+                                        backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                                    }
+                                },
+                            )
                         }
                     } catch (cancel: CancellationException) {
                         throw cancel
@@ -3630,6 +3632,57 @@ class WhiteNoiseAppState(
                     backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
                 }
             }
+    }
+
+    private suspend fun runNotificationUpdateLoop(onUpdate: () -> Unit) {
+        val subscription = marmotIo { subscribeNotifications() }
+        try {
+            while (currentCoroutineContext().isActive) {
+                val update = marmotIo { subscription.next() } ?: break
+                onUpdate()
+                postNotificationUpdate(update)
+            }
+        } finally {
+            runCatching {
+                withContext(NonCancellable + Dispatchers.IO) {
+                    subscription.close()
+                }
+            }
+        }
+    }
+
+    private suspend fun runProjectionNotificationLoop(onUpdate: () -> Unit) {
+        val subscription = marmotIo { subscribeEvents() }
+        try {
+            while (currentCoroutineContext().isActive) {
+                val event = marmotIo { subscription.next() } ?: break
+                val handled = postGroupSystemProjectionNotification(event)
+                if (handled) onUpdate()
+            }
+        } finally {
+            runCatching {
+                withContext(NonCancellable + Dispatchers.IO) {
+                    subscription.close()
+                }
+            }
+        }
+    }
+
+    private suspend fun postGroupSystemProjectionNotification(event: MarmotEventFfi): Boolean {
+        val projection = (event as? MarmotEventFfi.ProjectionUpdated)?.update ?: return false
+        var handled = false
+        groupSystemActivityNotificationUpdates(projection).forEach { update ->
+            if (localNotificationsEnabledFor(update.accountRef)) {
+                handled = true
+                postNotificationUpdate(update)
+            }
+        }
+        return handled
+    }
+
+    private suspend fun localNotificationsEnabledFor(accountRef: String): Boolean {
+        val account = accountRef.takeIf { it.isNotBlank() } ?: return false
+        return runCatching { marmotIo { notificationSettings(account).localNotificationsEnabled } }.getOrDefault(false)
     }
 
     private fun updateBackgroundConnectionPreference(enabled: Boolean) {
