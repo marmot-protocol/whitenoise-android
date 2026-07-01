@@ -96,6 +96,128 @@ class OptimisticMessageReconciliationTest {
     }
 
     @Test
+    fun delayedProjectionReconcilesFailedOptimisticSend() {
+        val failed = timelineMessage("temp", MessageStatus.Failed, plaintext = "eventually sent")
+
+        assertEquals(
+            "temp",
+            optimisticMessageIdForProjection(
+                listOf(failed),
+                message("confirmed", plaintext = "eventually sent"),
+                allowDelayedProjection = true,
+            ),
+        )
+    }
+
+    @Test
+    fun invalidatedProjectionMatchesRetainedFailedOptimisticSend() {
+        val failed =
+            timelineMessage(
+                "temp",
+                MessageStatus.Failed,
+                plaintext = "never reached",
+                recordedAt = 1uL,
+            )
+
+        assertEquals(
+            "temp",
+            failedOptimisticMessageIdForInvalidatedProjection(
+                listOf(failed),
+                message("invalidated", plaintext = "never reached", recordedAt = 99uL),
+            ),
+        )
+    }
+
+    @Test
+    fun sentMessageFindsMatchingInvalidatedProjectionForCleanup() {
+        val invalidated =
+            timelineRecord(
+                messageIdHex = "invalidated",
+                plaintext = "retry cleaned me up",
+                recordedAt = 99uL,
+                invalidationStatus = "LosingBranch",
+            )
+        val unrelated =
+            timelineRecord(
+                messageIdHex = "unrelated",
+                plaintext = "keep me",
+                invalidationStatus = "LosingBranch",
+            )
+
+        assertEquals(
+            listOf("invalidated"),
+            invalidatedProjectionIdsMatchingMessage(
+                mapOf(
+                    invalidated.messageIdHex to invalidated,
+                    unrelated.messageIdHex to unrelated,
+                ),
+                message("confirmed", plaintext = "retry cleaned me up"),
+            ),
+        )
+    }
+
+    @Test
+    fun failedMessageFindsMatchingUnpublishedProjectionForSuppression() {
+        val unpublished =
+            timelineRecord(
+                messageIdHex = "local-commit",
+                plaintext = "offline duplicate",
+                sourceMessageIdHex = null,
+            )
+        val published =
+            timelineRecord(
+                messageIdHex = "published",
+                plaintext = "offline duplicate",
+                sourceMessageIdHex = "relay-event",
+            )
+
+        assertEquals(
+            listOf("local-commit"),
+            unpublishedProjectionIdsMatchingMessage(
+                mapOf(
+                    unpublished.messageIdHex to unpublished,
+                    published.messageIdHex to published,
+                ),
+                message("temp", plaintext = "offline duplicate"),
+                activeAccountIdHex = "alice",
+            ),
+        )
+    }
+
+    @Test
+    fun failedMessageMatchingIgnoresSenderHexCase() {
+        val invalidated =
+            timelineRecord(
+                messageIdHex = "invalidated",
+                plaintext = "case drift",
+                sender = "ALICE",
+                invalidationStatus = "LosingBranch",
+            )
+
+        assertEquals(
+            listOf("invalidated"),
+            invalidatedProjectionIdsMatchingMessage(
+                mapOf(invalidated.messageIdHex to invalidated),
+                message("confirmed", plaintext = "case drift", sender = "alice"),
+            ),
+        )
+    }
+
+    @Test
+    fun delayedMediaProjectionDoesNotShapeMatchWhenFailedSiblingIsAmbiguous() {
+        val failedA = mediaPending("temp-a", filename = "a.pdf").copy(status = MessageStatus.Failed)
+        val pendingB = mediaPending("temp-b", filename = "b.pdf")
+
+        assertNull(
+            optimisticMessageIdForProjection(
+                listOf(failedA, pendingB),
+                mediaProjection("confirmed-a"),
+                allowDelayedProjection = true,
+            ),
+        )
+    }
+
+    @Test
     fun historicalMatchingMessageIsNotReconciled() {
         val pending = timelineMessage("temp", MessageStatus.Pending)
 
@@ -360,13 +482,15 @@ class OptimisticMessageReconciliationTest {
         plaintext: String,
         sourceMessageIdHex: String? = null,
         recordedAt: ULong = 1uL,
+        invalidationStatus: String? = null,
+        sender: String = "alice",
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
             messageIdHex = messageIdHex,
             sourceMessageIdHex = sourceMessageIdHex,
             direction = "sent",
             groupIdHex = "group",
-            sender = "alice",
+            sender = sender,
             plaintext = plaintext,
             contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
             kind = 9uL,
@@ -382,7 +506,7 @@ class OptimisticMessageReconciliationTest {
             reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
             deleted = false,
             deletedByMessageIdHex = null,
-            invalidationStatus = null,
+            invalidationStatus = invalidationStatus,
         )
 
     private fun timelineMessage(
@@ -404,12 +528,13 @@ class OptimisticMessageReconciliationTest {
         plaintext: String = "hello",
         recordedAt: ULong = 1uL,
         direction: String = "sent",
+        sender: String = "alice",
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = id,
             direction = direction,
             groupIdHex = "group",
-            sender = "alice",
+            sender = sender,
             plaintext = plaintext,
             contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
             kind = 9uL,

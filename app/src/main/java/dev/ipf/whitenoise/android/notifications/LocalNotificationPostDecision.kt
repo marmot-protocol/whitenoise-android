@@ -9,10 +9,12 @@ internal const val CARRIED_NOTIFICATION_MESSAGE_HISTORY_CAP = MAX_NOTIFICATION_M
 
 internal data class NotificationPostDecision(
     val channelId: String,
+    val importance: ChannelImportance,
     val category: String,
     val style: NotificationStyleChoice,
     val actions: List<NotificationActionKind>,
     val historyCap: Int,
+    val replaceExistingBeforePost: Boolean,
 )
 
 internal sealed class NotificationStyleChoice {
@@ -45,6 +47,7 @@ internal fun decideNotificationPost(
 
     return NotificationPostDecision(
         channelId = spec.id,
+        importance = spec.importance,
         category = categoryFor(update.trigger),
         style = style,
         actions =
@@ -57,6 +60,7 @@ internal fun decideNotificationPost(
                 NotificationStyleChoice.Messaging -> CARRIED_NOTIFICATION_MESSAGE_HISTORY_CAP
                 else -> 0
             },
+        replaceExistingBeforePost = style == NotificationStyleChoice.Messaging,
     )
 }
 

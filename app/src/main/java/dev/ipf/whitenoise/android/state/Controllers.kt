@@ -660,18 +660,17 @@ internal fun optimisticMessageIdForProjection(
     if (projectedIsMedia) {
         val pendingMediaCount =
             optimisticMessages.count {
-                it.status == MessageStatus.Pending &&
+                isSendableOptimisticStatus(it.status, allowDelayedProjection) &&
                     it.record.tags.any { tag -> tag.values.firstOrNull() == "_media_pending" }
             }
         if (pendingMediaCount > 1) return null
     }
     return optimisticMessages
         .firstOrNull { optimistic ->
-            val sendable = optimistic.status == MessageStatus.Pending || optimistic.status == MessageStatus.Sent
-            if (!sendable) return@firstOrNull false
+            if (!isSendableOptimisticStatus(optimistic.status, allowDelayedProjection)) return@firstOrNull false
             if (optimistic.record.direction != projected.direction) return@firstOrNull false
             if (optimistic.record.groupIdHex != projected.groupIdHex) return@firstOrNull false
-            if (optimistic.record.sender != projected.sender) return@firstOrNull false
+            if (!optimistic.record.sender.equals(projected.sender, ignoreCase = true)) return@firstOrNull false
             if (optimistic.record.kind != projected.kind) return@firstOrNull false
             val timestampsOk =
                 timestampsAreNear(optimistic.record.recordedAt, projected.recordedAt) ||
@@ -699,6 +698,74 @@ internal fun optimisticMessageIdForProjection(
                 projected.tags.filterNot { it.values.firstOrNull() == "p" }
         }?.record
         ?.messageIdHex
+}
+
+private fun isSendableOptimisticStatus(
+    status: MessageStatus,
+    allowFailed: Boolean,
+): Boolean =
+    status == MessageStatus.Pending ||
+        status == MessageStatus.Sent ||
+        (allowFailed && status == MessageStatus.Failed)
+
+internal fun failedOptimisticMessageIdForInvalidatedProjection(
+    optimisticMessages: Collection<TimelineMessage>,
+    projected: AppMessageRecordFfi,
+): String? =
+    optimisticMessages
+        .firstOrNull { optimistic ->
+            if (optimistic.status != MessageStatus.Failed) return@firstOrNull false
+            if (optimistic.record.direction != projected.direction) return@firstOrNull false
+            if (optimistic.record.groupIdHex != projected.groupIdHex) return@firstOrNull false
+            if (!optimistic.record.sender.equals(projected.sender, ignoreCase = true)) return@firstOrNull false
+            if (optimistic.record.kind != projected.kind) return@firstOrNull false
+            optimistic.record.plaintext == projected.plaintext &&
+                optimistic.record.tags.filterNot { it.values.firstOrNull() == "p" } ==
+                projected.tags.filterNot { it.values.firstOrNull() == "p" }
+        }?.record
+        ?.messageIdHex
+
+internal fun invalidatedProjectionIdsMatchingMessage(
+    timelineRecords: Map<String, TimelineMessageRecordFfi>,
+    message: AppMessageRecordFfi,
+): List<String> =
+    timelineRecords.values
+        .filter { projected ->
+            projected.invalidationStatus != null &&
+                messagesHaveSameRenderableSendShape(
+                    left = TimelineProjector.toAppMessageRecord(projected),
+                    right = message,
+                )
+        }.map { it.messageIdHex }
+
+internal fun unpublishedProjectionIdsMatchingMessage(
+    timelineRecords: Map<String, TimelineMessageRecordFfi>,
+    message: AppMessageRecordFfi,
+    activeAccountIdHex: String?,
+): List<String> =
+    timelineRecords.values
+        .filter { projected ->
+            !projected.deleted &&
+                projected.invalidationStatus == null &&
+                projected.sourceMessageIdHex == null &&
+                messagesHaveSameRenderableSendShape(
+                    left = TimelineProjector.toAppMessageRecord(projected),
+                    right = message,
+                ) &&
+                MessageProjector.isMine(TimelineProjector.toAppMessageRecord(projected), activeAccountIdHex)
+        }.map { it.messageIdHex }
+
+private fun messagesHaveSameRenderableSendShape(
+    left: AppMessageRecordFfi,
+    right: AppMessageRecordFfi,
+): Boolean {
+    if (left.direction != right.direction) return false
+    if (left.groupIdHex != right.groupIdHex) return false
+    if (!left.sender.equals(right.sender, ignoreCase = true)) return false
+    if (left.kind != right.kind) return false
+    return left.plaintext == right.plaintext &&
+        left.tags.filterNot { it.values.firstOrNull() == "p" } ==
+        right.tags.filterNot { it.values.firstOrNull() == "p" }
 }
 
 /**
@@ -819,13 +886,12 @@ private fun isDerivedStateKind(kind: ULong): Boolean = kind == 1009uL || kind ==
 
 /**
  * Message ids of unread received mentions in [timeline], oldest first — drives
- * the in-conversation jump-to-mention chip. Same anchor semantics as
- * [countUnreadIncoming]: a null [readAnchorMessageId], or one that has fallen out
- * of the loaded window, counts from the first loaded row. Without a reliable
- * ordering signal for an out-of-window watermark, counting (occasionally an
- * already-read mention) is preferred over hiding genuinely-unread ones. Only
- * kind-9 chat rows can be mentions; [mentionsActiveAccount] is passed in so this
- * stays pure and the ui-layer NIP-27 detection isn't pulled into the state layer.
+ * the in-conversation jump-to-mention chip. A null [readAnchorMessageId] counts
+ * from the first loaded row, but a non-null anchor that has fallen out of the
+ * loaded window returns no ids. For this chip, hiding is safer than resurrecting
+ * an already-read mention after a conversation is recreated. Only kind-9 chat
+ * rows can be mentions; [mentionsActiveAccount] is passed in so this stays pure
+ * and the ui-layer NIP-27 detection isn't pulled into the state layer.
  */
 internal fun unreadReceivedMentionIds(
     timeline: List<TimelineMessage>,
@@ -837,6 +903,7 @@ internal fun unreadReceivedMentionIds(
         readAnchorMessageId?.let { id ->
             timeline.indexOfFirst { it.record.messageIdHex == id }
         } ?: -1
+    if (readAnchorMessageId != null && anchorIdx < 0) return emptyList()
     return timeline
         .drop(anchorIdx + 1)
         .filter { it.record.direction == "received" && it.record.kind == 9uL && mentionsActiveAccount(it) }
@@ -3061,6 +3128,8 @@ class ConversationController(
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
             optimisticMessages.remove(optimisticKey)
             messageById.remove(tempId)
+            invalidatedProjectionIdsMatchingMessage(timelineRecords, confirmed)
+                .forEach(::removeProjectedRecord)
             if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
                 optimisticMessages["msg:$confirmedId"] =
                     TimelineMessage(
@@ -3079,6 +3148,13 @@ class ConversationController(
                 key = optimisticKey,
                 optimistic = optimistic,
                 timelineOrder = optimisticOrder,
+            )
+            suppressProjectedTimelineItems(
+                unpublishedProjectionIdsMatchingMessage(
+                    timelineRecords = timelineRecords,
+                    message = optimistic,
+                    activeAccountIdHex = conversationAccountIdHex,
+                ),
             )
             publishTimelineFromIndexes()
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
@@ -4066,6 +4142,8 @@ class ConversationController(
                         localTimelineTimestampOverrides[committedProjection.messageIdHex],
                     )
                 messageById[committedProjection.messageIdHex] = projectedRecord
+                invalidatedProjectionIdsMatchingMessage(timelineRecords, projectedRecord)
+                    .forEach(::removeProjectedRecord)
                 if (discardedDuringRetry.remove(key)) {
                     publishTimelineFromIndexes()
                     return
@@ -4091,6 +4169,8 @@ class ConversationController(
                 return
             }
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
+            invalidatedProjectionIdsMatchingMessage(timelineRecords, confirmed)
+                .forEach(::removeProjectedRecord)
             if (shouldInsertSentOptimisticMessage(confirmedId, projectedMessageIds)) {
                 optimisticMessages["msg:$confirmedId"] =
                     TimelineMessage(
@@ -4122,6 +4202,13 @@ class ConversationController(
                     MessageStatus.Failed,
                     timelineOrder = order,
                 )
+            suppressProjectedTimelineItems(
+                unpublishedProjectionIdsMatchingMessage(
+                    timelineRecords = timelineRecords,
+                    message = refreshedRecord,
+                    activeAccountIdHex = conversationAccountIdHex,
+                ),
+            )
             publishTimelineFromIndexes()
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
@@ -5123,7 +5210,7 @@ class ConversationController(
         if (projectedIsMediaUpsert && !hasExactBridge && reconcileOptimistic) {
             val pendingMediaCount =
                 optimisticMessages.values.count {
-                    it.status == MessageStatus.Pending &&
+                    isSendableOptimisticStatus(it.status, allowDelayedProjection) &&
                         it.record.tags.any { tag -> tag.values.firstOrNull() == "_media_pending" }
                 }
             if (pendingMediaCount > 1) {
@@ -5131,9 +5218,37 @@ class ConversationController(
                 return draftAction
             }
         }
+        val actionRecord = draftAction
+        if (
+            record.invalidationStatus != null &&
+            failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
+        ) {
+            timelineRecords.remove(record.messageIdHex)
+            projectedMessageIds.remove(record.messageIdHex)
+            messageById.remove(record.messageIdHex)
+            if (previousItemId != null) {
+                timelineItemsById.remove(previousItemId)
+                timelineOrder.remove(previousItemId)
+            }
+            return actionRecord
+        }
+        if (
+            record.sourceMessageIdHex == null &&
+            record.invalidationStatus == null &&
+            failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
+        ) {
+            timelineRecords[record.messageIdHex] = record
+            projectedMessageIds.add(record.messageIdHex)
+            messageById[record.messageIdHex] = actionRecord
+            return actionRecord
+        }
+        if (record.invalidationStatus == null) {
+            invalidatedProjectionIdsMatchingMessage(timelineRecords, actionRecord)
+                .filterNot { it == record.messageIdHex }
+                .forEach(::removeProjectedRecord)
+        }
         timelineRecords[record.messageIdHex] = record
         projectedMessageIds.add(record.messageIdHex)
-        val actionRecord = draftAction
         preserveOptimisticDisplayPosition(record.messageIdHex, record.messageIdHex)
         optimisticMessageIdForProjection(
             optimisticMessages.values,
@@ -5178,6 +5293,14 @@ class ConversationController(
         localTimelineTimestampOverrides.remove(messageIdHex)
         timelineItemsById.remove(itemId)
         timelineOrder.remove(itemId)
+    }
+
+    private fun suppressProjectedTimelineItems(messageIds: List<String>) {
+        messageIds.forEach { messageIdHex ->
+            val itemId = timelineRecords[messageIdHex]?.let(::projectedItemId) ?: "msg:$messageIdHex"
+            timelineItemsById.remove(itemId)
+            timelineOrder.remove(itemId)
+        }
     }
 
     // Drop the oldest projected records beyond [maxItems], using the same total
@@ -5892,6 +6015,9 @@ class ConversationController(
             a.replyPreview == b.replyPreview &&
             a.mediaJson == b.mediaJson &&
             a.agentTextStreamJson == b.agentTextStreamJson &&
+            a.deleted == b.deleted &&
+            a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
+            a.invalidationStatus == b.invalidationStatus &&
             a.reactions == b.reactions
 
     companion object {
