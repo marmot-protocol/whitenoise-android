@@ -653,6 +653,42 @@ internal fun mediaCacheKey(
     attachmentIndex: Int,
 ): String = "$account|$groupIdHex|$messageIdHex|$attachmentIndex"
 
+/**
+ * Shared local group wipe used by chat-list Delete and sole-member Leave flows.
+ * The engine drops its own rows/secrets, but Android owns decrypted media caches
+ * and tray notifications, so clear those before the group references disappear.
+ */
+private suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
+    account: String,
+    groupIdHex: String,
+) {
+    evictGroupMediaCaches(account, groupIdHex)
+    marmotIo { deleteGroupLocal(account, groupIdHex) }
+    dismissConversationNotifications(account, groupIdHex)
+}
+
+private suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
+    account: String,
+    groupIdHex: String,
+) {
+    val media =
+        runCatching { marmotIo { listMedia(account, groupIdHex, null) } }
+            .onFailure(::rethrowIfCancellation)
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+            ?: return
+    withContext(Dispatchers.IO) {
+        media.forEach { rec ->
+            val key = mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
+            mediaPlaintextCache.remove(key)
+            mediaThumbnailCache.remove(key)
+            diskMediaCache.remove(key)
+        }
+        val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
+        if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
+    }
+}
+
 internal fun optimisticMessageIdForProjection(
     optimisticMessages: Collection<TimelineMessage>,
     projected: AppMessageRecordFfi,
@@ -1775,7 +1811,7 @@ class ChatsController(
             }
             appState.withGroupCommitLock(account, groupIdHex) {
                 if (soleMember) {
-                    appState.marmotIo { deleteGroupLocal(account, groupIdHex) }
+                    appState.deleteGroupLocalWithClientCleanup(account, groupIdHex)
                 } else {
                     if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
                         val demoteResult = appState.marmotIo { selfDemoteAdminDetailed(account, groupIdHex) }
@@ -1857,26 +1893,7 @@ class ChatsController(
             removedRow?.let { foldChatRow(it) }
             return false
         }
-        // Free the app's decrypted media caches (in-memory L1 + on-disk L2) before
-        // the engine wipe drops the reference mapping — deleteGroupLocal clears its
-        // own rows/secrets but not these client-side blobs, which would otherwise
-        // linger recoverable on disk.
-        runCatching { appState.marmotIo { listMedia(account, groupIdHex, null) } }
-            .getOrNull()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { media ->
-                withContext(Dispatchers.IO) {
-                    media.forEach { rec ->
-                        val key = mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
-                        appState.mediaPlaintextCache.remove(key)
-                        appState.mediaThumbnailCache.remove(key)
-                        appState.diskMediaCache.remove(key)
-                    }
-                    val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
-                    if (tags.isNotEmpty()) appState.diskMediaCache.removeByCiphertextTags(tags)
-                }
-            }
-        val wipe = runCatching { appState.marmotIo { deleteGroupLocal(account, groupIdHex) } }
+        val wipe = runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
         wipe.exceptionOrNull()?.let {
             if (it is CancellationException) throw it
             removedRow?.let { row -> foldChatRow(row) }
@@ -4421,7 +4438,7 @@ class ConversationController(
             runCatching {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     if (soleMember) {
-                        appState.marmotIo { deleteGroupLocal(account, group.groupIdHex) }
+                        appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
                     } else {
                         if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
                             val demoteResult =
