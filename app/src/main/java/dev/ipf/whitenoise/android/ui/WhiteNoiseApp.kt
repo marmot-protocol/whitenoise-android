@@ -4098,6 +4098,10 @@ private fun NewChatSheet(
                         minLines = 2,
                     )
                     if (groupInitialMembers.isNotEmpty()) {
+                        // Initial members come from a profile-sheet action. They are
+                        // shown as fixed context here because removing them would turn
+                        // "Start new group with <user>" into the plain Create Group
+                        // flow, which already has its own entry point.
                         OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                             Column(
                                 Modifier.fillMaxWidth().padding(12.dp),
@@ -18703,6 +18707,9 @@ private fun ProfileSheet(
     var showAddToGroups by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
     val activeAccountHex = appState.activeAccount?.accountIdHex
+    // UI guard covers both profile actions, including "Start new group". The
+    // state-layer addable-groups helper still rejects self as a defensive check
+    // for the add-to-existing-groups path.
     val targetIsSelf = hex?.let { activeAccountHex?.equals(it, ignoreCase = true) == true } == true
     val addableGroups =
         remember(hex, appState.chatListItems) {
@@ -18741,12 +18748,12 @@ private fun ProfileSheet(
                 addingToGroups = true
                 appState.launchMutation {
                     try {
-                        val added =
+                        val allAdded =
                             appState.inviteProfileToGroups(
                                 targetRef = hex!!,
                                 targetGroupIds = selected.map { it.group.groupIdHex },
                             )
-                        if (added) showAddToGroups = false
+                        if (allAdded) showAddToGroups = false
                     } finally {
                         addingToGroups = false
                     }
@@ -18924,12 +18931,16 @@ private fun ProfileAddToGroupsSheet(
     onAdd: (List<ChatListItem>) -> Unit,
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
-    val selected = remember(groups) { mutableStateListOf<String>() }
+    val selected = remember { mutableStateListOf<String>() }
     var confirmSelection by remember { mutableStateOf<List<ChatListItem>?>(null) }
     val titledGroups =
         remember(groups, groupTitleCopy) {
             groups.map { it to chatListItemDisplayTitle(it, appState, groupTitleCopy) }
         }
+    LaunchedEffect(groups) {
+        val availableGroupIds = groups.mapTo(mutableSetOf()) { it.group.groupIdHex }
+        selected.removeAll { it !in availableGroupIds }
+    }
     val selectedGroups = groups.filter { selected.contains(it.group.groupIdHex) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 

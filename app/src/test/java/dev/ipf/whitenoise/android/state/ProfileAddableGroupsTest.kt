@@ -4,7 +4,10 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.whitenoise.android.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -55,6 +58,53 @@ class ProfileAddableGroupsTest {
                 activeAccountIdHex = "self",
             ).isEmpty(),
         )
+    }
+
+    @Test
+    fun inviteToastCoversSuccessPartialAndFailureCounts() {
+        assertInviteToast(
+            outcome = ProfileGroupInviteOutcome(attempted = 1, failures = 0),
+            messageRes = R.string.toast_invite_sent,
+        )
+        assertInviteToast(
+            outcome = ProfileGroupInviteOutcome(attempted = 3, failures = 0),
+            messageRes = R.string.toast_invites_sent_to_groups,
+        )
+
+        val failure = AppText.Plain("relay unavailable")
+        assertInviteToast(
+            outcome = ProfileGroupInviteOutcome(attempted = 3, failures = 1, firstFailure = failure),
+            messageRes = R.string.toast_invites_sent_to_groups_partial,
+            detail = failure,
+        )
+        assertInviteToast(
+            outcome = ProfileGroupInviteOutcome(attempted = 2, failures = 2, firstFailure = failure),
+            messageRes = R.string.toast_couldnt_add_members,
+            detail = failure,
+        )
+    }
+
+    @Test
+    fun inviteOutcomeDismissesOnlyAfterCompleteSuccess() {
+        assertTrue(ProfileGroupInviteOutcome(attempted = 2, failures = 0).completedSuccessfully)
+        assertFalse(ProfileGroupInviteOutcome(attempted = 2, failures = 1).completedSuccessfully)
+        assertFalse(ProfileGroupInviteOutcome(attempted = 2, failures = 2).completedSuccessfully)
+        assertFalse(ProfileGroupInviteOutcome(attempted = 0, failures = 0).completedSuccessfully)
+    }
+
+    @Test
+    fun noInviteToastWhenNothingWasAttempted() {
+        assertNull(profileGroupInviteToast(ProfileGroupInviteOutcome(attempted = 0, failures = 0)))
+    }
+
+    private fun assertInviteToast(
+        outcome: ProfileGroupInviteOutcome,
+        messageRes: Int,
+        detail: AppText? = null,
+    ) {
+        val toast = profileGroupInviteToast(outcome)
+        assertEquals(messageRes, toast?.messageRes)
+        assertEquals(detail, toast?.detail)
     }
 
     private fun item(

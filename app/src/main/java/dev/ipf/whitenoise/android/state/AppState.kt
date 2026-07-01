@@ -137,6 +137,37 @@ internal data class SignOutOutcome(
     val phase: AppPhase,
 )
 
+internal data class ProfileGroupInviteOutcome(
+    val attempted: Int,
+    val failures: Int,
+    val firstFailure: AppText? = null,
+) {
+    val delivered: Int = attempted - failures
+    val completedSuccessfully: Boolean = attempted > 0 && failures == 0
+}
+
+internal data class ProfileGroupInviteToast(
+    @param:StringRes val messageRes: Int,
+    val detail: AppText? = null,
+)
+
+internal fun profileGroupInviteToast(outcome: ProfileGroupInviteOutcome): ProfileGroupInviteToast? {
+    require(outcome.attempted >= 0) { "attempted must be non-negative" }
+    require(outcome.failures in 0..outcome.attempted) { "failures must be between 0 and attempted" }
+    if (outcome.attempted == 0) return null
+    val failureDetail = outcome.firstFailure ?: AppText.Plain("")
+    return when {
+        outcome.failures == 0 && outcome.attempted == 1 ->
+            ProfileGroupInviteToast(R.string.toast_invite_sent)
+        outcome.failures == 0 ->
+            ProfileGroupInviteToast(R.string.toast_invites_sent_to_groups)
+        outcome.delivered == 0 ->
+            ProfileGroupInviteToast(R.string.toast_couldnt_add_members, failureDetail)
+        else ->
+            ProfileGroupInviteToast(R.string.toast_invites_sent_to_groups_partial, failureDetail)
+    }
+}
+
 private data class NotificationSystemText(
     val title: String,
     val body: String,
@@ -1151,7 +1182,9 @@ class WhiteNoiseAppState(
      * Add one viewed profile to one or more selected groups. The profile sheet
      * does the eligibility filtering (admin-only, not already a member); this
      * method keeps the commit-producing calls serialized per group and surfaces
-     * a single result toast after the fan-out completes.
+     * a single result toast after the fan-out completes. Returns true only when
+     * every attempted group accepted the invite, so partial failures can keep the
+     * picker open with the failed groups still selected for retry.
      */
     suspend fun inviteProfileToGroups(
         targetRef: String,
@@ -1193,19 +1226,20 @@ class WhiteNoiseAppState(
                 }
             }
         }
-        val delivered = targets.size - failures
-        when {
-            failures == 0 && targets.size == 1 -> present(R.string.toast_invite_sent)
-            failures == 0 -> present(R.string.toast_invites_sent_to_groups)
-            delivered == 0 ->
-                present(R.string.toast_couldnt_add_members, firstFailure ?: AppText.Plain(""))
-            else ->
-                present(
-                    R.string.toast_invites_sent_to_groups_partial,
-                    firstFailure ?: AppText.Plain(""),
-                )
+        val outcome =
+            ProfileGroupInviteOutcome(
+                attempted = targets.size,
+                failures = failures,
+                firstFailure = firstFailure,
+            )
+        profileGroupInviteToast(outcome)?.let { toast ->
+            if (toast.detail == null) {
+                present(toast.messageRes)
+            } else {
+                present(toast.messageRes, toast.detail)
+            }
         }
-        return delivered > 0
+        return outcome.completedSuccessfully
     }
 
     fun sharedGroupsWith(accountIdHex: String): List<ChatListItem> = chatsController?.sharedGroupsWith(accountIdHex, activeAccount?.accountIdHex).orEmpty()

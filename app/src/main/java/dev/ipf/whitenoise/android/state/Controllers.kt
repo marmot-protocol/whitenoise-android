@@ -983,6 +983,16 @@ internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGr
             },
     )
 
+internal fun cacheAppliedGroupMembers(
+    appState: WhiteNoiseAppState,
+    account: String,
+    groupIdHex: String,
+    members: List<AppGroupMemberRecordFfi>,
+) {
+    appState.cacheGroupMemberSnapshot(account, groupIdHex, members)
+    appState.requestProfiles(members.map { it.memberIdHex })
+}
+
 /**
  * Whether [detail] is the MLS "duplicate signature key" commit rejection
  * (issue #899). The engine surfaces this as a raw enum path, e.g.
@@ -1417,8 +1427,7 @@ class ChatsController(
         val groupIdHex = applied.group.groupIdHex
         if (groupRecordsById[groupIdHex] == null && !chatRowsByGroup.containsKey(chatRowKey(groupIdHex))) return
         memberCacheByGroup = memberCacheByGroup + (groupIdHex to applied.members)
-        appState.cacheGroupMemberSnapshot(account, groupIdHex, applied.members)
-        appState.requestProfiles(applied.members.map { it.memberIdHex })
+        cacheAppliedGroupMembers(appState, account, groupIdHex, applied.members)
         applyLocalGroupUpdate(applied.group)
     }
 
@@ -5866,8 +5875,7 @@ class ConversationController(
         members = selfMembership.rosterHonoringSelfLeft(applied.members, conversationAccountIdHex)
         membersLoaded = true
         membersVerified = true
-        appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
-        appState.requestProfiles(members.map { it.memberIdHex })
+        cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
     }
 
     private fun applyMutationDetails(
