@@ -1654,10 +1654,6 @@ private fun MainShell(
                     sectionName = MainSection.Settings.name
                     settingsDetailName = null
                 },
-                onOpenProfileEdit = {
-                    sectionName = MainSection.Settings.name
-                    settingsDetailName = SettingsDetail.Profile.name
-                },
                 onOpenGroup = { item, focusMessageId, justCreated ->
                     selectedChatFocusMessageId = focusMessageId
                     selectedChatFocusHighlight = true
@@ -1710,29 +1706,19 @@ fun AccountAvatarButton(
     // per-account aggregate the other-account avatars use. Hidden when the
     // active account has no unread (the caller passes false).
     showUnreadDot: Boolean = false,
-    onEditProfilePicture: (() -> Unit)? = null,
 ) {
     val openSettingsDescription = stringResource(R.string.open_settings)
-    val viewPictureDescription = stringResource(R.string.profile_view_picture)
     val accountUnreadDescription =
         stringResource(R.string.account_unread_indicator)
     val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
-    var viewerOpen by remember(safePictureUrl) { mutableStateOf(false) }
-    val primaryDescription = if (safePictureUrl != null) viewPictureDescription else openSettingsDescription
     val avatarContentDescription =
         if (showUnreadDot) {
-            "$primaryDescription, $accountUnreadDescription"
+            "$openSettingsDescription, $accountUnreadDescription"
         } else {
-            primaryDescription
+            openSettingsDescription
         }
     IconButton(
-        onClick = {
-            if (safePictureUrl != null) {
-                viewerOpen = true
-            } else {
-                onClick()
-            }
-        },
+        onClick = onClick,
         modifier =
             modifier
                 .size(56.dp)
@@ -1760,19 +1746,6 @@ fun AccountAvatarButton(
                 )
             }
         }
-    }
-    if (viewerOpen && safePictureUrl != null) {
-        AvatarFullScreenViewer(
-            title = title,
-            seed = seed,
-            pictureUrl = safePictureUrl,
-            onDismiss = { viewerOpen = false },
-            editActionLabel = stringResource(R.string.profile_picture_edit),
-            onEditPicture = {
-                viewerOpen = false
-                (onEditProfilePicture ?: onClick)()
-            },
-        )
     }
 }
 
@@ -1908,7 +1881,6 @@ private fun ChatsScreen(
     appState: WhiteNoiseAppState,
     controller: ChatsController,
     onOpenSettings: () -> Unit,
-    onOpenProfileEdit: () -> Unit,
     // (chat, focusMessageId, justCreated): focusMessageId is non-null only when
     // the row was a message-body search hit (issue #290); the conversation then
     // scrolls to that message on open. justCreated is true only when the chat
@@ -2180,7 +2152,6 @@ private fun ChatsScreen(
                     }
                 },
                 onOpenSettings = onOpenSettings,
-                onOpenProfileEdit = onOpenProfileEdit,
             )
         },
         floatingActionButton = {
@@ -3130,7 +3101,6 @@ private fun ChatListTopBar(
     onSearchClose: () -> Unit,
     onMic: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenProfileEdit: () -> Unit,
     onSwitchAccount: (String) -> Unit,
 ) {
     TopAppBar(
@@ -3190,7 +3160,6 @@ private fun ChatListTopBar(
                         // itself has unread, same shared decision the other
                         // avatars use — not "some other account has unread" (#805).
                         showUnreadDot = appState.accountShowsUnreadDot(active?.label),
-                        onEditProfilePicture = onOpenProfileEdit,
                     )
                 }
             }
@@ -11031,6 +11000,7 @@ private fun GroupEditScreen(
     var imageSaving by remember { mutableStateOf(false) }
     val canEdit = controller.isSelfMember && controller.isSelfAdmin
     val groupAvatarUrl = ProfileSanitizer.imageUrl(controller.group.avatarUrl)
+    val groupAvatarImageAvailable = rememberAvatarImageAvailable(groupAvatarUrl)
     val saveEnabled =
         !saving &&
             !controller.mutationInFlight &&
@@ -11116,14 +11086,14 @@ private fun GroupEditScreen(
                                 Modifier
                                     .clip(CircleShape)
                                     .clickable(
-                                        enabled = groupAvatarUrl != null || canEdit,
+                                        enabled = groupAvatarImageAvailable || canEdit,
                                         onClickLabel =
                                             stringResource(
-                                                if (groupAvatarUrl != null) R.string.profile_view_picture else R.string.group_image_search_set,
+                                                if (groupAvatarImageAvailable) R.string.profile_view_picture else R.string.group_image_search_set,
                                             ),
                                         role = Role.Button,
                                     ) {
-                                        if (groupAvatarUrl != null) {
+                                        if (groupAvatarImageAvailable) {
                                             avatarViewerOpen = true
                                         } else if (canEdit) {
                                             showImageSearch = true
@@ -11195,7 +11165,7 @@ private fun GroupEditScreen(
         }
     }
 
-    if (avatarViewerOpen && groupAvatarUrl != null) {
+    if (avatarViewerOpen && groupAvatarUrl != null && groupAvatarImageAvailable) {
         AvatarFullScreenViewer(
             title = controller.title(groupTitleCopy),
             seed = controller.group.groupIdHex,
@@ -12618,6 +12588,7 @@ private fun GroupDetailsHeader(
     archived: Boolean,
 ) {
     val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     var viewerOpen by remember(safePictureUrl) { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth()) {
         Column(
@@ -12630,7 +12601,7 @@ private fun GroupDetailsHeader(
                     Modifier
                         .clip(CircleShape)
                         .clickable(
-                            enabled = safePictureUrl != null,
+                            enabled = avatarImageAvailable,
                             onClickLabel = stringResource(R.string.profile_view_picture),
                             role = Role.Button,
                         ) { viewerOpen = true },
@@ -12669,7 +12640,7 @@ private fun GroupDetailsHeader(
             }
         }
     }
-    if (viewerOpen && safePictureUrl != null) {
+    if (viewerOpen && safePictureUrl != null && avatarImageAvailable) {
         AvatarFullScreenViewer(
             title = title,
             seed = seed,
@@ -18849,6 +18820,7 @@ fun SettingsAccountHeader(
 ) {
     val switchAccountDescription = stringResource(R.string.switch_account)
     val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     var viewerOpen by remember(safePictureUrl) { mutableStateOf(false) }
     ListItem(
         modifier =
@@ -18863,7 +18835,7 @@ fun SettingsAccountHeader(
                     Modifier
                         .clip(CircleShape)
                         .clickable(
-                            enabled = safePictureUrl != null,
+                            enabled = avatarImageAvailable,
                             onClickLabel = stringResource(R.string.profile_view_picture),
                             role = Role.Button,
                         ) { viewerOpen = true },
@@ -18887,7 +18859,7 @@ fun SettingsAccountHeader(
             }
         },
     )
-    if (viewerOpen && safePictureUrl != null) {
+    if (viewerOpen && safePictureUrl != null && avatarImageAvailable) {
         AvatarFullScreenViewer(
             title = title,
             seed = seed,
@@ -19150,6 +19122,7 @@ private fun ProfileSheet(
     val profile = hex?.let { appState.userProfile(it) }
     val title = hex?.let { appState.displayName(it) } ?: IdentityFormatter.short(npub)
     val pictureUrl = hex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
+    val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl)
     val about = ProfileSanitizer.about(profile?.about)
     val nip05 =
         profile
@@ -19264,7 +19237,7 @@ private fun ProfileSheet(
                     Modifier
                         .clip(CircleShape)
                         .clickable(
-                            enabled = pictureUrl != null,
+                            enabled = avatarImageAvailable,
                             onClickLabel = stringResource(R.string.profile_view_picture),
                             role = Role.Button,
                         ) { fullPictureOpen = true },
@@ -19397,12 +19370,13 @@ private fun ProfileSheet(
         }
     }
 
-    if (fullPictureOpen && pictureUrl != null) {
+    if (fullPictureOpen && pictureUrl != null && avatarImageAvailable) {
         AvatarFullScreenViewer(
             title = title,
             seed = hex ?: npub,
             pictureUrl = pictureUrl,
             onDismiss = { fullPictureOpen = false },
+            securePolicy = securePolicy,
         )
     }
 }
@@ -19720,6 +19694,17 @@ private const val AVATAR_VIEWER_CONNECT_TIMEOUT_MS = 5_000
 private const val AVATAR_VIEWER_READ_TIMEOUT_MS = 15_000
 
 @Composable
+private fun rememberAvatarImageAvailable(pictureUrl: String?): Boolean {
+    val available by produceState(
+        initialValue = pictureUrl?.let { AvatarImageLoader.peek(it) != null } == true,
+        key1 = pictureUrl,
+    ) {
+        value = pictureUrl?.let { AvatarImageLoader.load(it) != null } == true
+    }
+    return available
+}
+
+@Composable
 private fun AvatarFullScreenViewer(
     title: String,
     seed: String,
@@ -19727,6 +19712,7 @@ private fun AvatarFullScreenViewer(
     onDismiss: () -> Unit,
     editActionLabel: String? = null,
     onEditPicture: (() -> Unit)? = null,
+    securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
 ) {
     val safePictureUrl = remember(pictureUrl) { ProfileSanitizer.imageUrl(pictureUrl) }
     if (safePictureUrl == null) {
@@ -19742,7 +19728,6 @@ private fun AvatarFullScreenViewer(
     val fileName = remember(safePictureUrl) { avatarViewerFileName(safePictureUrl) }
     val mediaType = remember(fileName) { avatarViewerMimeType(fileName) }
     var menuOpen by remember { mutableStateOf(false) }
-    var reloadToken by remember(safePictureUrl) { mutableStateOf(0) }
     var scale by remember(safePictureUrl) { mutableStateOf(1f) }
     var offset by remember(safePictureUrl) { mutableStateOf(Offset.Zero) }
     val dismissThresholdPx = with(LocalDensity.current) { 96.dp.toPx() }
@@ -19750,7 +19735,6 @@ private fun AvatarFullScreenViewer(
     val imageState by produceState<AvatarViewerImageState>(
         initialValue = AvatarViewerImageState.Loading,
         safePictureUrl,
-        reloadToken,
     ) {
         value = AvatarViewerImageState.Loading
         val bytes =
@@ -19790,7 +19774,7 @@ private fun AvatarFullScreenViewer(
         properties =
             DialogProperties(
                 usePlatformDefaultWidth = false,
-                securePolicy = SecureFlagPolicy.Inherit,
+                securePolicy = securePolicy,
             ),
     ) {
         Box(
@@ -20427,8 +20411,10 @@ private fun ProfileEditScreen(
     // not a developer surface. See #286.
     var showPictureSheet by remember { mutableStateOf(false) }
     var fullPictureOpen by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val safePictureUrl = ProfileSanitizer.imageUrl(picture)
+    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
     val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)
     val lud16Valid = ProfileFieldValidation.isAcceptableLud16(lud16)
@@ -20561,11 +20547,11 @@ private fun ProfileEditScreen(
                                         .clickable(
                                             onClickLabel =
                                                 stringResource(
-                                                    if (safePictureUrl != null) R.string.profile_view_picture else R.string.profile_picture_edit,
+                                                    if (avatarImageAvailable) R.string.profile_view_picture else R.string.profile_picture_edit,
                                                 ),
                                             role = Role.Button,
                                         ) {
-                                            if (safePictureUrl != null) {
+                                            if (avatarImageAvailable) {
                                                 fullPictureOpen = true
                                             } else {
                                                 showPictureSheet = true
@@ -20746,7 +20732,7 @@ private fun ProfileEditScreen(
         }
     }
 
-    if (fullPictureOpen && safePictureUrl != null) {
+    if (fullPictureOpen && safePictureUrl != null && avatarImageAvailable) {
         AvatarFullScreenViewer(
             title = displayName.ifBlank { active?.let { appState.shortNpub(it.accountIdHex) }.orEmpty() },
             seed = active?.accountIdHex.orEmpty(),
