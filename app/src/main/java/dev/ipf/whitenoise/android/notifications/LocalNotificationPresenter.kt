@@ -15,6 +15,10 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
+import androidx.core.content.LocusIdCompat
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
@@ -22,6 +26,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
 class LocalNotificationPresenter(
@@ -164,6 +169,14 @@ class LocalNotificationPresenter(
                     withContext(Dispatchers.Default) {
                         existingMessagingStyle(notificationContent.notificationTag)?.messages
                     }
+                conversationShortcutId(update)?.let { shortcutId ->
+                    val locusId = LocusIdCompat(shortcutId)
+                    publishConversationShortcut(update, notificationContent, shortcutId, locusId)
+                    builder
+                        .setShortcutId(shortcutId)
+                        .setLocusId(locusId)
+                        .addPerson(senderPerson(notificationContent))
+                }
                 builder.setStyle(messagingStyle(update, notificationContent, conversationTitleOverride, decision.historyCap, carried))
                 NotificationActions
                     .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
@@ -194,7 +207,11 @@ class LocalNotificationPresenter(
             }
         }
 
-        NotificationManagerCompat.from(context).notify(notificationContent.notificationTag, notificationContent.notificationId, builder.build())
+        val notificationManager = NotificationManagerCompat.from(context)
+        if (decision.replaceExistingBeforePost) {
+            notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+        }
+        notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, builder.build())
         notificationDebug {
             // Never log the title/body — they carry sender / group names (PII).
             "posted tag=${notificationContent.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
@@ -323,6 +340,57 @@ class LocalNotificationPresenter(
                 ?: return null
         return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing.notification)
     }
+
+    private fun conversationShortcutId(update: NotificationUpdateFfi): String? {
+        if (update.accountRef.isBlank() || update.groupIdHex.isBlank()) return null
+        return "conversation-" + sha256Hex("${update.accountRef}\u0000${update.groupIdHex}").take(32)
+    }
+
+    private fun publishConversationShortcut(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+        shortcutId: String,
+        locusId: LocusIdCompat,
+    ) {
+        runCatching {
+            val title = content.conversationTitle ?: content.title
+            val intent =
+                Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    NotificationNavigation.fromUpdate(update)?.let { target ->
+                        NotificationNavigation.applyToIntent(this, target, content.notificationTag)
+                    }
+                }
+            val shortcut =
+                ShortcutInfoCompat
+                    .Builder(context, shortcutId)
+                    .setShortLabel(title.take(24).ifBlank { context.getString(R.string.app_name) })
+                    .setLongLabel(title)
+                    .setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
+                    .setIntent(intent)
+                    .setLocusId(locusId)
+                    .setPerson(senderPerson(content))
+                    .setLongLived(true)
+                    .build()
+            ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+            ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
+        }.onFailure {
+            notificationDebug { "conversation shortcut skipped group=${update.groupIdHex.take(8)}" }
+        }
+    }
+
+    private fun senderPerson(content: LocalNotificationContent): Person =
+        Person
+            .Builder()
+            .setName(content.senderName)
+            .setKey(content.senderKey)
+            .build()
+
+    private fun sha256Hex(value: String): String =
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString(separator = "") { "%02x".format(it) }
 
     private fun replyNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action {
         val remoteInput =

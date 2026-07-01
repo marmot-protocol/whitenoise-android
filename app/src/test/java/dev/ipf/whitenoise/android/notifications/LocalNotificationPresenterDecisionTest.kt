@@ -41,6 +41,7 @@ class LocalNotificationPresenterDecisionTest {
         assertSame(NotificationStyleChoice.Plain, decision?.style)
         assertEquals(emptyList<NotificationActionKind>(), decision?.actions)
         assertEquals(0, decision?.historyCap)
+        assertFalse(decision?.replaceExistingBeforePost ?: true)
     }
 
     @Test
@@ -50,6 +51,7 @@ class LocalNotificationPresenterDecisionTest {
         assertSame(NotificationStyleChoice.Messaging, decision?.style)
         assertEquals(listOf(NotificationActionKind.REPLY, NotificationActionKind.MARK_READ), decision?.actions)
         assertEquals(CARRIED_NOTIFICATION_MESSAGE_HISTORY_CAP, decision?.historyCap)
+        assertTrue(decision?.replaceExistingBeforePost ?: false)
     }
 
     @Test
@@ -68,6 +70,7 @@ class LocalNotificationPresenterDecisionTest {
         assertEquals("group-a", style?.groupIdHex)
         assertEquals(emptyList<NotificationActionKind>(), decision?.actions)
         assertEquals(0, decision?.historyCap)
+        assertFalse(decision?.replaceExistingBeforePost ?: true)
     }
 
     @Test
