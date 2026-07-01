@@ -41,6 +41,12 @@
     <string name="recipient_preview_unresolved">Couldn\'t resolve this identifier</string>
     <string name="recipient_preview_nip05_verified">Verified address</string>
     <string name="recipient_preview_nip05_unverified">Unverified address</string>
+    <string name="recipient_source_in_dm">in DM</string>
+    <string name="recipient_search_empty_hint">Paste an npub to add someone you have not chatted with yet.</string>
+    <plurals name="recipient_source_in_groups">
+        <item quantity="one">in %1$d group</item>
+        <item quantity="other">in %1$d groups</item>
+    </plurals>
     <string name="chat_row_action_archive">Archive</string>
     <string name="chat_row_action_unarchive">Unarchive</string>
     <string name="chat_row_action_mark_read">Mark as read</string>

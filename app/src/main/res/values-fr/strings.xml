@@ -40,6 +40,12 @@
     <string name="recipient_preview_unresolved">Impossible de résoudre cet identifiant</string>
     <string name="recipient_preview_nip05_verified">Adresse vérifiée</string>
     <string name="recipient_preview_nip05_unverified">Adresse non vérifiée</string>
+    <string name="recipient_source_in_dm">en MP</string>
+    <string name="recipient_search_empty_hint">Collez un npub pour ajouter une personne avec qui vous n\'avez pas encore discuté.</string>
+    <plurals name="recipient_source_in_groups">
+        <item quantity="one">dans %1$d groupe</item>
+        <item quantity="other">dans %1$d groupes</item>
+    </plurals>
     <string name="chat_row_action_archive">Archiver</string>
     <string name="chat_row_action_unarchive">Désarchiver</string>
     <string name="chat_row_action_mark_read">Marquer comme lu</string>

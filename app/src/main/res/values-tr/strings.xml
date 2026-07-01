@@ -40,6 +40,12 @@
     <string name="recipient_preview_unresolved">Bu tanımlayıcı çözümlenemedi</string>
     <string name="recipient_preview_nip05_verified">Doğrulanmış adres</string>
     <string name="recipient_preview_nip05_unverified">Doğrulanmamış adres</string>
+    <string name="recipient_source_in_dm">DM\'de</string>
+    <string name="recipient_search_empty_hint">Henüz sohbet etmediğiniz birini eklemek için bir npub yapıştırın.</string>
+    <plurals name="recipient_source_in_groups">
+        <item quantity="one">%1$d grupta</item>
+        <item quantity="other">%1$d grupta</item>
+    </plurals>
     <string name="chat_row_action_archive">Arşivle</string>
     <string name="chat_row_action_unarchive">Arşivden çıkar</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>

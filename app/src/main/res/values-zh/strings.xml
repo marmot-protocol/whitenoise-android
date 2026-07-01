@@ -40,6 +40,11 @@
     <string name="recipient_preview_unresolved">无法解析此标识符</string>
     <string name="recipient_preview_nip05_verified">已验证的地址</string>
     <string name="recipient_preview_nip05_unverified">未验证的地址</string>
+    <string name="recipient_source_in_dm">私聊中</string>
+    <string name="recipient_search_empty_hint">粘贴 npub 以添加尚未与你聊过天的人。</string>
+    <plurals name="recipient_source_in_groups">
+        <item quantity="other">在 %1$d 个群组中</item>
+    </plurals>
     <string name="chat_row_action_archive">归档</string>
     <string name="chat_row_action_unarchive">取消归档</string>
     <string name="chat_row_action_mark_read">标记为已读</string>

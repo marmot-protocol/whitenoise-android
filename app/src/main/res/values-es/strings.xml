@@ -40,6 +40,12 @@
     <string name="recipient_preview_unresolved">No se pudo resolver este identificador</string>
     <string name="recipient_preview_nip05_verified">Dirección verificada</string>
     <string name="recipient_preview_nip05_unverified">Dirección no verificada</string>
+    <string name="recipient_source_in_dm">en MD</string>
+    <string name="recipient_search_empty_hint">Pega un npub para añadir a alguien con quien aún no has chateado.</string>
+    <plurals name="recipient_source_in_groups">
+        <item quantity="one">en %1$d grupo</item>
+        <item quantity="other">en %1$d grupos</item>
+    </plurals>
     <string name="chat_row_action_archive">Archivar</string>
     <string name="chat_row_action_unarchive">Desarchivar</string>
     <string name="chat_row_action_mark_read">Marcar como leído</string>

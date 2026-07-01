@@ -2669,48 +2669,82 @@ private fun isPlainNameQuery(query: String): Boolean {
  * Distinct, non-active-account recipient candidates derived on demand from the
  * already-loaded chat-list state — UI-derived, not a new cache of protocol data
  * (AGENTS.md), since no profile-enumeration FFI exists.
+ *
+ * Candidates are ordered by recency of last activity (#831): the chat list is
+ * walked most-recent-first so the first chat that surfaces a pubkey fixes its
+ * position, letting the picker present a browsable list before the user types.
+ * Each candidate carries a [RecipientSearch.Source] hint — "in DM" when the
+ * person shares a 1:1 with the active account, otherwise "in N groups" — with
+ * the DM signal winning over the group count.
  */
 private fun deriveRecipientCandidates(
     appState: WhiteNoiseAppState,
     activeAccountIdHex: String?,
 ): List<RecipientSearch.Candidate> {
     val active = activeAccountIdHex?.trim()?.lowercase(Locale.ROOT)
-    val seen = LinkedHashSet<String>()
-    val candidates = ArrayList<RecipientSearch.Candidate>()
+    // Order is fixed by first appearance while walking the recency-sorted chat
+    // list, so a LinkedHashSet preserves the recency order for the browse list.
+    val order = LinkedHashSet<String>()
+    val inDm = HashSet<String>()
+    val groupIdsByHex = HashMap<String, MutableSet<String>>()
 
-    fun add(rawHex: String?) {
+    fun note(
+        rawHex: String?,
+        dm: Boolean,
+        groupId: String?,
+    ) {
         val hex = rawHex?.trim()?.lowercase(Locale.ROOT) ?: return
         if (hex.isEmpty()) return
         if (active != null && hex == active) return
-        if (!seen.add(hex)) return
-        candidates +=
-            RecipientSearch.Candidate(
-                accountIdHex = hex,
-                displayName = appState.displayName(hex),
-                npub = appState.npub(hex),
-            )
+        order.add(hex)
+        if (dm) inDm.add(hex)
+        if (groupId != null) {
+            groupIdsByHex.getOrPut(hex) { LinkedHashSet() }.add(groupId)
+        }
     }
-    for (item in appState.chatListItems) {
+    // Most-recent-first so recency wins the first-appearance ordering above.
+    val items = appState.chatListItems.sortedByDescending { it.latestAt ?: 0uL }
+    for (item in items) {
+        val dm = GroupProjector.isDm(item.memberCount, item.group.name)
+        val groupId = item.id.takeUnless { dm }
         // Group rosters give the members. A DM's roster, though, often holds only
         // the active account — the counterpart isn't an enumerable member — so
         // also take the resolved DM counterpart and the latest message's sender
         // (the recent-sender source) to surface DM partners.
-        item.memberSnapshot?.members?.forEach { add(it.memberIdHex) }
-        add(item.otherMemberAccount)
-        add(item.latest?.sender)
-        add(item.group.welcomerAccountIdHex)
+        item.memberSnapshot?.members?.forEach { note(it.memberIdHex, dm = dm, groupId = groupId) }
+        note(item.otherMemberAccount, dm = dm, groupId = groupId)
+        note(item.latest?.sender, dm = dm, groupId = groupId)
+        note(item.group.welcomerAccountIdHex, dm = dm, groupId = groupId)
     }
-    return candidates
+    return order.map { hex ->
+        val source =
+            when {
+                hex in inDm -> RecipientSearch.Source.InDm
+                else -> RecipientSearch.Source.InGroups(groupIdsByHex[hex]?.size ?: 0)
+            }
+        RecipientSearch.Candidate(
+            accountIdHex = hex,
+            displayName = appState.displayName(hex),
+            npub = appState.npub(hex),
+            source = source,
+        )
+    }
 }
 
 /**
- * Display-name search result list shown below the recipient input in
- * [NewChatSheet] (DM branch) and the Add-member sheet. Renders only for
- * a plain-text [query] ([isPlainNameQuery]); identifier inputs keep using
- * [RecipientPreviewCard]. Each row shows the avatar + display name + (verified)
- * NIP-05 + truncated npub.
+ * Browsable contact list shown below the recipient input in [NewChatSheet]
+ * (DM branch) and the Add-member sheet. Renders up-front with a blank [query]
+ * (#831) — existing chats / recent senders sorted by recency — and filters in
+ * place by display name as the user types. Identifier inputs (npub / NIP-05 /
+ * hex) route to [RecipientPreviewCard] instead, so the list is suppressed for
+ * those. Each row shows the avatar + display name + a dim "in DM" / "in N
+ * groups" hint + truncated npub.
  *
- * Tapping a row invokes [onSelect] with the account hex (the same effect as
+ * [excludeAccountIdHexes] drops accounts that shouldn't be offered (e.g. the
+ * current group's existing members). With a blank query and nothing to show,
+ * an empty-state hint nudges the user to paste an npub.
+ *
+ * Tapping a row invokes [onSelect] with the candidate (the same effect as
  * pasting the npub: the host sets the input/resolved hex so the existing submit
  * path uses it).
  */
@@ -2720,21 +2754,48 @@ private fun RecipientSearchResults(
     appState: WhiteNoiseAppState,
     onSelect: (RecipientSearch.Candidate) -> Unit,
     modifier: Modifier = Modifier,
+    excludeAccountIdHexes: Set<String> = emptySet(),
 ) {
-    if (!isPlainNameQuery(query)) return
+    // An identifier query is handled by the preview card, not this list. A blank
+    // or plain-name query drives the browsable/filtered list.
+    if (query.isNotBlank() && !isPlainNameQuery(query)) return
     val activeAccountIdHex = appState.activeAccount?.accountIdHex
     // Derive candidates from in-memory chat-list state and match by name. The
     // accessors used inside deriveRecipientCandidates (displayName/npub) read
     // through the profile cache, so a name that resolves a beat after the
     // roster lands repaints the list via the profile-revision recomposition.
-    val candidates = deriveRecipientCandidates(appState, activeAccountIdHex)
-    val matches = RecipientSearch.filterByDisplayName(query, candidates, activeAccountIdHex)
-    if (matches.isEmpty()) return
-    Column(
-        modifier = modifier.fillMaxWidth(),
+    val candidates =
+        remember(appState.chatListItems, activeAccountIdHex, appState.profileRevisionForCompose) {
+            deriveRecipientCandidates(appState, activeAccountIdHex)
+        }
+    val matches =
+        RecipientSearch.browse(
+            query = query,
+            candidates = candidates,
+            activeAccountIdHex = activeAccountIdHex,
+            excludeAccountIdHexes = excludeAccountIdHexes,
+        )
+    if (matches.isEmpty()) {
+        // Only nudge with the empty-state hint before the user starts typing;
+        // a no-match while filtering shouldn't paint "you have no contacts".
+        if (query.isBlank()) {
+            Text(
+                stringResource(R.string.recipient_search_empty_hint),
+                modifier = modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+    LazyColumn(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(max = 320.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        matches.forEach { candidate ->
+        items(matches, key = { it.accountIdHex }) { candidate ->
             RecipientSearchResultRow(
                 candidate = candidate,
                 appState = appState,
@@ -2744,7 +2805,7 @@ private fun RecipientSearchResults(
     }
 }
 
-/** One row of the [RecipientSearchResults] list: avatar, display name, npub. */
+/** One row of the [RecipientSearchResults] list: avatar, display name, hint, npub. */
 @Composable
 private fun RecipientSearchResultRow(
     candidate: RecipientSearch.Candidate,
@@ -2755,6 +2816,7 @@ private fun RecipientSearchResultRow(
     val pictureUrl = appState.avatarUrl(hex) ?: ProfileSanitizer.imageUrl(appState.userProfile(hex)?.picture)
     val shortNpub = IdentityFormatter.short(candidate.npub, prefix = 12, suffix = 8)
     val title = candidate.displayName.takeUnless { it.isBlank() } ?: IdentityFormatter.short(candidate.npub)
+    val hint = recipientSourceHint(candidate.source)
     OutlinedCard(
         modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onSelect() },
     ) {
@@ -2767,13 +2829,27 @@ private fun RecipientSearchResultRow(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (hint != null) {
+                        Text(
+                            hint,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                }
                 Text(
                     shortNpub,
                     style = MaterialTheme.typography.bodySmall,
@@ -2786,6 +2862,20 @@ private fun RecipientSearchResultRow(
         }
     }
 }
+
+/** The dim "in DM" / "in N groups" hint for a candidate's [source], or null. */
+@Composable
+private fun recipientSourceHint(source: RecipientSearch.Source?): String? =
+    when (source) {
+        RecipientSearch.Source.InDm -> stringResource(R.string.recipient_source_in_dm)
+        is RecipientSearch.Source.InGroups ->
+            if (source.count > 0) {
+                pluralStringResource(R.plurals.recipient_source_in_groups, source.count, source.count)
+            } else {
+                null
+            }
+        null -> null
+    }
 
 private fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,
@@ -11593,13 +11683,16 @@ private fun GroupDetailsScreen(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    // Plain-text name search over local chat-list contacts.
-                    // The Create Group flow keeps every row addable (tapping fills
-                    // the npub into the field), but still shows the "Already in
-                    // chats" badge — it does NOT offer "Open existing chat".
+                    // Browsable contact list (#831): existing chats / recent
+                    // senders appear immediately and filter as the admin types.
+                    // Tapping a row fills the npub into the field so the existing
+                    // resolve/add path runs. The group's current members are
+                    // dropped so they can't be picked (adding them would fail with
+                    // a raw DuplicateSignatureKey error, #899).
                     RecipientSearchResults(
                         query = pendingMember,
                         appState = appState,
+                        excludeAccountIdHexes = controller.members.map { it.memberIdHex }.toSet(),
                         onSelect = { candidate ->
                             pendingMember = candidate.npub
                             pendingMemberError = null

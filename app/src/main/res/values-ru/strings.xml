@@ -40,6 +40,14 @@
     <string name="recipient_preview_unresolved">Не удалось разрешить этот идентификатор</string>
     <string name="recipient_preview_nip05_verified">Подтверждённый адрес</string>
     <string name="recipient_preview_nip05_unverified">Неподтверждённый адрес</string>
+    <string name="recipient_source_in_dm">в ЛС</string>
+    <string name="recipient_search_empty_hint">Вставьте npub, чтобы добавить того, с кем вы ещё не общались.</string>
+    <plurals name="recipient_source_in_groups">
+        <item quantity="one">в %1$d группе</item>
+        <item quantity="few">в %1$d группах</item>
+        <item quantity="many">в %1$d группах</item>
+        <item quantity="other">в %1$d группах</item>
+    </plurals>
     <string name="chat_row_action_archive">Архивировать</string>
     <string name="chat_row_action_unarchive">Восстановить</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
