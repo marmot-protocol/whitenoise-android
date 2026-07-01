@@ -2050,6 +2050,13 @@ class ChatsController(
                                 members.none { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
                             ) {
                                 removedGroupIds = removedGroupIds + groupIdHex
+                                // Flip the shared snapshot in step with the row:
+                                // resetBackingState() drops this controller's
+                                // roster cache on account switch, but the shared
+                                // snapshot survives and would otherwise seed a
+                                // just-evicted group's composer as active for ~1s
+                                // on the next open.
+                                appState.cacheGroupMemberSnapshot(account, groupIdHex, members)
                             }
                             // Coalesce: a burst of member-fetch completions on
                             // account open/switch would otherwise drive N
