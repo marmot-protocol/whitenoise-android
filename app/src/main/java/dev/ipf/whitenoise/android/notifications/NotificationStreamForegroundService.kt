@@ -60,6 +60,18 @@ class NotificationStreamForegroundService : Service() {
             }.isSuccess
         val syncNativePushRegistration = shouldSyncNativePushRegistration(intent?.action)
         if (syncNativePushRegistration) pendingNativePushRegistrationSync = true
+        val keepConnectedEnabled = BackgroundConnectionPreferences.isEnabled(applicationContext)
+        if (
+            startedForeground &&
+            shouldStopStickySystemWakeRestart(
+                hasIntent = intent != null,
+                trigger = trigger,
+                backgroundConnectionEnabled = keepConnectedEnabled,
+            )
+        ) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         when (
             decideForegroundStart(
                 startForegroundSucceeded = startedForeground,
@@ -95,7 +107,7 @@ class NotificationStreamForegroundService : Service() {
                         val stopAfterSync =
                             shouldStopAfterOneShotForegroundStart(
                                 oneShotRequested = isOneShotForegroundStart(syncNativePushRegistration, trigger),
-                                backgroundConnectionEnabled = BackgroundConnectionPreferences.isEnabled(applicationContext),
+                                backgroundConnectionEnabled = keepConnectedEnabled,
                             )
                         runCatching {
                             val appState = (application as WhiteNoiseApplication).appState
@@ -116,7 +128,7 @@ class NotificationStreamForegroundService : Service() {
                     val stopAfterSync =
                         shouldStopAfterOneShotForegroundStart(
                             oneShotRequested = oneShotRequested,
-                            backgroundConnectionEnabled = BackgroundConnectionPreferences.isEnabled(applicationContext),
+                            backgroundConnectionEnabled = keepConnectedEnabled,
                         )
                     serviceScope.launch {
                         runCatching {
@@ -257,6 +269,12 @@ internal fun isOneShotForegroundStart(
     syncNativePushRegistrationRequested: Boolean,
     trigger: ForegroundStartTrigger,
 ): Boolean = syncNativePushRegistrationRequested || trigger == ForegroundStartTrigger.PushWake
+
+internal fun shouldStopStickySystemWakeRestart(
+    hasIntent: Boolean,
+    trigger: ForegroundStartTrigger,
+    backgroundConnectionEnabled: Boolean,
+): Boolean = !hasIntent && trigger == ForegroundStartTrigger.SystemWake && !backgroundConnectionEnabled
 
 /**
  * The pure decision about how [NotificationStreamForegroundService.onStartCommand] should proceed,

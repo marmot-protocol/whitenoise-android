@@ -9,6 +9,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
@@ -36,7 +38,9 @@ class DisappearingMessageSweepWorker(
     override suspend fun doWork(): Result {
         val app = applicationContext as? WhiteNoiseApplication ?: return Result.success()
         return runCatching {
-            app.appState.sweepExpiredDisappearingMessages()
+            withContext(Dispatchers.Main.immediate) {
+                app.appState.sweepExpiredDisappearingMessages()
+            }
             Result.success()
         }.getOrElse { error ->
             if (error is kotlin.coroutines.cancellation.CancellationException) throw error

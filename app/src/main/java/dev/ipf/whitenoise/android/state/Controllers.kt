@@ -3545,6 +3545,7 @@ class ConversationController(
                 add = !alreadyMine,
             )
         recomputeReactions()
+        var reactionCommitted = false
         try {
             appState.withGroupCommitLock(account, group.groupIdHex) {
                 if (alreadyMine) {
@@ -3581,14 +3582,7 @@ class ConversationController(
                     }
                 } else {
                     appState.marmotIo { reactToMessage(account, group.groupIdHex, target, emoji) }
-                    // Reacting is unambiguous evidence the user saw this message, so
-                    // advance the read marker through it. Without this the chat-list
-                    // unread badge can survive a react-then-leave until the next open,
-                    // because the scroll-driven mark-read may not have fired (the user
-                    // was already at the bottom when the message arrived). This runs on
-                    // the caller's durable mutation scope, so it isn't cancelled when
-                    // the conversation closes right after the tap.
-                    markReadUpTo(target)
+                    reactionCommitted = true
                 }
             }
         } catch (throwable: Throwable) {
@@ -3596,6 +3590,17 @@ class ConversationController(
             optimisticReactionChanges.remove(optimisticId)
             recomputeReactions()
             appState.present(R.string.toast_reaction_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
+        }
+        if (reactionCommitted) {
+            // Reacting is unambiguous evidence the user saw this message, so
+            // advance the read marker through it. Keep this best-effort and
+            // outside the reaction commit rollback path: a read-marker failure
+            // must not remove a reaction that has already been published.
+            runCatching { markReadUpTo(target) }
+                .onFailure {
+                    it.rethrowIfCancellation()
+                    Log.w("DMConversation", "mark-read after reaction failed target=${target.take(8)}", it)
+                }
         }
     }
 

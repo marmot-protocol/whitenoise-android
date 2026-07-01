@@ -201,6 +201,42 @@ class ForegroundStartDecisionTest {
     }
 
     @Test
+    fun stickySystemWakeRestartStopsWhenKeepConnectedIsDisabled() {
+        assertEquals(
+            true,
+            shouldStopStickySystemWakeRestart(
+                hasIntent = false,
+                trigger = ForegroundStartTrigger.SystemWake,
+                backgroundConnectionEnabled = false,
+            ),
+        )
+        assertEquals(
+            false,
+            shouldStopStickySystemWakeRestart(
+                hasIntent = false,
+                trigger = ForegroundStartTrigger.SystemWake,
+                backgroundConnectionEnabled = true,
+            ),
+        )
+        assertEquals(
+            false,
+            shouldStopStickySystemWakeRestart(
+                hasIntent = true,
+                trigger = ForegroundStartTrigger.SystemWake,
+                backgroundConnectionEnabled = false,
+            ),
+        )
+        assertEquals(
+            false,
+            shouldStopStickySystemWakeRestart(
+                hasIntent = false,
+                trigger = ForegroundStartTrigger.PushWake,
+                backgroundConnectionEnabled = false,
+            ),
+        )
+    }
+
+    @Test
     fun systemWakeUsesBootPermittedForegroundServiceType() {
         assertEquals(
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
