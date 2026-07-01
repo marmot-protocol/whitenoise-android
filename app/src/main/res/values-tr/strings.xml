@@ -107,6 +107,14 @@
     <string name="profile_no_bio">Henüz biyografi yok.</string>
     <string name="profile_shared_groups">Ortak gruplar</string>
     <string name="profile_no_shared_groups">Henüz ortak grup yok.</string>
+    <string name="profile_start_new_group_with">%1$s ile yeni grup başlat</string>
+    <string name="profile_add_to_another_group">Başka bir gruba ekle</string>
+    <string name="new_group_invited_members">Davet edilen üyeler</string>
+    <string name="profile_add_to_groups_title">%1$s kullanıcısını gruplara ekle</string>
+    <string name="profile_add_to_groups_description">Admin olduğunuz ve %1$s kullanıcısının henüz üye olmadığı grupları seçin.</string>
+    <string name="profile_add_to_groups_confirm_title">Seçili gruplara eklensin mi?</string>
+    <string name="profile_add_to_groups_confirm_message">%1$s, %2$s gruplarına eklenecek. Bu tüm üyeler tarafından görülebilir.</string>
+    <string name="profile_add_to_groups_confirm_label">Gruplara ekle</string>
     <string name="profile_view_picture">Profil resmini görüntüle</string>
     <string name="dismiss">Kapat</string>
     <string name="edit">Düzenle</string>
@@ -461,6 +469,8 @@
     <string name="toast_invite_sent_but_couldnt_add_admin">Davet gönderildi, ancak yönetici eklenemedi</string>
     <string name="toast_couldnt_add_members">Üye eklenemedi. Lütfen tekrar deneyin.</string>
     <string name="toast_couldnt_add_member_duplicate_detail">%1$s eklenemedi. Zaten üye ya da imzalama anahtarı mevcut bir üyeninkiyle çakışıyor.</string>
+    <string name="toast_invites_sent_to_groups">Davetler seçili gruplara gönderildi</string>
+    <string name="toast_invites_sent_to_groups_partial">Davetler bazı gruplara gönderildi; bazıları başarısız oldu</string>
     <string name="toast_member_removed">Üye kaldırıldı</string>
     <string name="toast_couldnt_remove_member">Üye çıkarılamadı. Lütfen tekrar deneyin.</string>
     <string name="toast_keep_one_admin">Bir yöneticiyi tut</string>

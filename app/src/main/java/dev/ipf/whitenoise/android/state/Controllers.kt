@@ -406,6 +406,26 @@ internal fun sharedChatListItemsWith(
         }.distinctBy { it.group.groupIdHex.lowercase() }
 }
 
+internal fun profileAddableGroupItems(
+    items: Iterable<ChatListItem>,
+    targetAccountIdHex: String,
+    activeAccountIdHex: String?,
+): List<ChatListItem> {
+    val active = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() } ?: return emptyList()
+    val target = targetAccountIdHex.trim().takeIf { it.isNotEmpty() } ?: return emptyList()
+    if (active.equals(target, ignoreCase = true)) return emptyList()
+    return items
+        .filter { item ->
+            val snapshot = item.memberSnapshot ?: return@filter false
+            !item.group.pendingConfirmation &&
+                !item.removedFromGroup(active) &&
+                !GroupProjector.isDm(item.memberCount, item.group.name) &&
+                GroupProjector.isAdminRef(item.group, active) &&
+                snapshot.containsAccount(active) &&
+                !snapshot.containsAccount(target)
+        }.distinctBy { it.group.groupIdHex.lowercase() }
+}
+
 enum class MessageStatus {
     Received,
     Pending,
@@ -963,6 +983,16 @@ internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGr
             },
     )
 
+internal fun cacheAppliedGroupMembers(
+    appState: WhiteNoiseAppState,
+    account: String,
+    groupIdHex: String,
+    members: List<AppGroupMemberRecordFfi>,
+) {
+    appState.cacheGroupMemberSnapshot(account, groupIdHex, members)
+    appState.requestProfiles(members.map { it.memberIdHex })
+}
+
 /**
  * Whether [detail] is the MLS "duplicate signature key" commit rejection
  * (issue #899). The engine surfaces this as a raw enum path, e.g.
@@ -1388,6 +1418,19 @@ class ChatsController(
         foldGroup(record)
     }
 
+    fun applyProfileGroupDetails(
+        account: String,
+        details: GroupDetailsFfi,
+    ) {
+        if (accountRef == null) return
+        val applied = applyAuthoritativeGroupDetails(details)
+        val groupIdHex = applied.group.groupIdHex
+        if (groupRecordsById[groupIdHex] == null && !chatRowsByGroup.containsKey(chatRowKey(groupIdHex))) return
+        memberCacheByGroup = memberCacheByGroup + (groupIdHex to applied.members)
+        cacheAppliedGroupMembers(appState, account, groupIdHex, applied.members)
+        applyLocalGroupUpdate(applied.group)
+    }
+
     // Project every current chat row into a ChatListItem. Reads chatRows (kept
     // current by the bind loop even when recompute is deferred behind an open
     // conversation, #6), so on-demand callers — shared groups, DM lookup,
@@ -1438,6 +1481,16 @@ class ChatsController(
             }.map { projectChatRow(it, activeAccountIdHex) }
             .toList()
     }
+
+    fun profileAddableGroups(
+        targetAccountIdHex: String,
+        activeAccountIdHex: String?,
+    ): List<ChatListItem> =
+        profileAddableGroupItems(
+            currentProjectedItems(activeAccountIdHex),
+            targetAccountIdHex,
+            activeAccountIdHex,
+        )
 
     /**
      * The confirmed 1:1 DM with [reference] (npub or hex), or null. A 1:1 is a
@@ -5822,8 +5875,7 @@ class ConversationController(
         members = selfMembership.rosterHonoringSelfLeft(applied.members, conversationAccountIdHex)
         membersLoaded = true
         membersVerified = true
-        appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
-        appState.requestProfiles(members.map { it.memberIdHex })
+        cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
     }
 
     private fun applyMutationDetails(

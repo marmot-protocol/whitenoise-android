@@ -107,6 +107,14 @@
     <string name="profile_no_bio">Aucune bio pour le moment.</string>
     <string name="profile_shared_groups">Groupes partagés</string>
     <string name="profile_no_shared_groups">Aucun groupe partagé pour le moment.</string>
+    <string name="profile_start_new_group_with">Démarrer un nouveau groupe avec %1$s</string>
+    <string name="profile_add_to_another_group">Ajouter à un autre groupe</string>
+    <string name="new_group_invited_members">Membres invités</string>
+    <string name="profile_add_to_groups_title">Ajouter %1$s à des groupes</string>
+    <string name="profile_add_to_groups_description">Choisissez des groupes dont vous êtes admin et où %1$s n’est pas déjà membre.</string>
+    <string name="profile_add_to_groups_confirm_title">Ajouter aux groupes sélectionnés ?</string>
+    <string name="profile_add_to_groups_confirm_message">%1$s sera ajouté à %2$s. Cela sera visible par tous les membres.</string>
+    <string name="profile_add_to_groups_confirm_label">Ajouter aux groupes</string>
     <string name="profile_view_picture">Voir la photo de profil</string>
     <string name="dismiss">Fermer</string>
     <string name="edit">Modifier</string>
@@ -461,6 +469,8 @@
     <string name="toast_invite_sent_but_couldnt_add_admin">Invitation envoyée, mais impossible d’ajouter l’administrateur</string>
     <string name="toast_couldnt_add_members">Impossible d’ajouter des membres. Veuillez réessayer.</string>
     <string name="toast_couldnt_add_member_duplicate_detail">Impossible d’ajouter %1$s. Cette personne est déjà membre, ou sa clé de signature entre en conflit avec celle d’un membre existant.</string>
+    <string name="toast_invites_sent_to_groups">Invitations envoyées aux groupes sélectionnés</string>
+    <string name="toast_invites_sent_to_groups_partial">Invitations envoyées à certains groupes ; certaines ont échoué</string>
     <string name="toast_member_removed">Membre supprimé</string>
     <string name="toast_couldnt_remove_member">Impossible de retirer le membre. Veuillez réessayer.</string>
     <string name="toast_keep_one_admin">Gardez un administrateur</string>

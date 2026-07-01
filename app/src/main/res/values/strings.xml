@@ -119,6 +119,14 @@
     <string name="profile_no_bio">No bio yet.</string>
     <string name="profile_shared_groups">Shared groups</string>
     <string name="profile_no_shared_groups">No shared groups yet.</string>
+    <string name="profile_start_new_group_with">Start new group with %1$s</string>
+    <string name="profile_add_to_another_group">Add to another group</string>
+    <string name="new_group_invited_members">Invited members</string>
+    <string name="profile_add_to_groups_title">Add %1$s to groups</string>
+    <string name="profile_add_to_groups_description">Choose groups where you\'re an admin and %1$s isn\'t already a member.</string>
+    <string name="profile_add_to_groups_confirm_title">Add to selected groups?</string>
+    <string name="profile_add_to_groups_confirm_message">%1$s will be added to %2$s. This is visible to all members.</string>
+    <string name="profile_add_to_groups_confirm_label">Add to groups</string>
     <string name="profile_view_picture">View profile picture</string>
     <string name="dismiss">Dismiss</string>
     <string name="edit">Edit</string>
@@ -589,6 +597,8 @@
     <string name="toast_invite_sent_but_couldnt_add_admin">Invite sent, but couldn\'t add admin</string>
     <string name="toast_couldnt_add_members">Couldn\'t add members</string>
     <string name="toast_couldnt_add_member_duplicate_detail">Couldn\'t add %1$s. They\'re already a member, or their signing key conflicts with an existing member.</string>
+    <string name="toast_invites_sent_to_groups">Invites sent to selected groups</string>
+    <string name="toast_invites_sent_to_groups_partial">Invites sent to some groups; some failed</string>
     <string name="toast_member_removed">Member removed</string>
     <string name="toast_couldnt_remove_member">Couldn\'t remove member</string>
     <string name="toast_keep_one_admin">Keep one admin</string>

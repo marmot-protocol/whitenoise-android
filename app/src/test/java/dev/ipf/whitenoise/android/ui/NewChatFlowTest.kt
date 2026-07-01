@@ -38,6 +38,18 @@ class NewChatFlowTest {
     }
 
     @Test
+    fun groupCreateKeepsInitialInvitedMembersOnly() {
+        assertEquals(
+            listOf("alice", "bob"),
+            newChatMemberRefs(
+                directMessage = false,
+                normalizedPendingRecipients = listOf("ignored"),
+                initialMemberRefs = listOf(" alice ", "bob", "ALICE", ""),
+            ),
+        )
+    }
+
+    @Test
     fun directMessageStillRequiresAndKeepsOneRecipient() {
         assertFalse(
             canSubmitNewChatSheet(

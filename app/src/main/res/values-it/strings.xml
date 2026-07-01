@@ -107,6 +107,14 @@
     <string name="profile_no_bio">Ancora nessuna bio.</string>
     <string name="profile_shared_groups">Gruppi condivisi</string>
     <string name="profile_no_shared_groups">Ancora nessun gruppo condiviso.</string>
+    <string name="profile_start_new_group_with">Avvia nuovo gruppo con %1$s</string>
+    <string name="profile_add_to_another_group">Aggiungi a un altro gruppo</string>
+    <string name="new_group_invited_members">Membri invitati</string>
+    <string name="profile_add_to_groups_title">Aggiungi %1$s ai gruppi</string>
+    <string name="profile_add_to_groups_description">Scegli i gruppi di cui sei admin e in cui %1$s non è già membro.</string>
+    <string name="profile_add_to_groups_confirm_title">Aggiungere ai gruppi selezionati?</string>
+    <string name="profile_add_to_groups_confirm_message">%1$s verrà aggiunto a %2$s. Questo sarà visibile a tutti i membri.</string>
+    <string name="profile_add_to_groups_confirm_label">Aggiungi ai gruppi</string>
     <string name="profile_view_picture">Visualizza immagine del profilo</string>
     <string name="dismiss">Chiudi</string>
     <string name="edit">Modifica</string>
@@ -461,6 +469,8 @@
     <string name="toast_invite_sent_but_couldnt_add_admin">Invito inviato, ma impossibile aggiungere l’amministratore</string>
     <string name="toast_couldnt_add_members">Impossibile aggiungere membri. Riprova.</string>
     <string name="toast_couldnt_add_member_duplicate_detail">Impossibile aggiungere %1$s. È già un membro oppure la sua chiave di firma è in conflitto con quella di un membro esistente.</string>
+    <string name="toast_invites_sent_to_groups">Inviti inviati ai gruppi selezionati</string>
+    <string name="toast_invites_sent_to_groups_partial">Inviti inviati ad alcuni gruppi; alcuni non sono riusciti</string>
     <string name="toast_member_removed">Membro rimosso</string>
     <string name="toast_couldnt_remove_member">Impossibile rimuovere il membro. Riprova.</string>
     <string name="toast_keep_one_admin">Mantieni un amministratore</string>
