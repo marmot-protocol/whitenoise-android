@@ -56,6 +56,14 @@ internal object SendTrace {
     }
 
     /**
+     * Completion phase for the send() success path. Only call it `sent-flip`
+     * when that path actually flips the local pending bubble; if the engine
+     * echo already reconciled the bubble, the visible flip was the earlier
+     * `echo-reconcile` phase and this later success event is just completion.
+     */
+    fun completionPhase(insertedSentBubble: Boolean): String = if (insertedSentBubble) "sent-flip" else "send-complete"
+
+    /**
      * Format a single trace line for [sequence] at [phase], with the elapsed
      * milliseconds since the send began ([sinceStartMs]) and, when this phase
      * closes a timed sub-span, the duration of that span ([spanMs]). Extra

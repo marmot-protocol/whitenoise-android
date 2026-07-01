@@ -3114,15 +3114,20 @@ class ConversationController(
                     )
             }
             publishTimelineFromIndexes()
-            // The publish returned and the pending clock flips to sent here (or,
-            // when the engine echo already landed, the reconcile in
-            // upsertProjectedRecord did it first — traced separately). `+…ms` is
-            // the total accepted → sent-flip latency the issue measures.
+            // The publish returned and the pending clock flips to sent here only
+            // when the projected engine echo has not already landed. If echo
+            // reconciliation consumed the temp bubble first, `echo-reconcile` is
+            // the actual clock → tick latency and this later event is just send
+            // completion; don't label it as another `sent-flip`.
             sendTrace(
                 trace,
-                "sent-flip",
+                SendTrace.completionPhase(insertedSent),
                 traceElapsedMs(traceStartMs),
-                context = arrayOf("bubble" to (if (insertedSent) "local" else "echoed")),
+                context =
+                    arrayOf(
+                        "bubble" to (if (insertedSent) "local" else "echoed"),
+                        "flip" to (if (insertedSent) null else "echo-reconcile"),
+                    ),
             )
             // This success path removed the pending optimistic directly, so the
             // echo-reconcile may never fire for this temp id — drop its trace

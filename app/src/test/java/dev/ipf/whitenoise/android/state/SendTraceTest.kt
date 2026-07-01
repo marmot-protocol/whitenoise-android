@@ -72,6 +72,23 @@ class SendTraceTest {
     }
 
     @Test
+    fun completionPhaseOnlyLabelsActualLocalFlipAsSentFlip() {
+        assertEquals("sent-flip", SendTrace.completionPhase(insertedSentBubble = true))
+        assertEquals("send-complete", SendTrace.completionPhase(insertedSentBubble = false))
+        assertEquals(
+            "s#2 send-complete +480ms bubble=echoed flip=echo-reconcile",
+            SendTrace.line(
+                "s#2",
+                SendTrace.completionPhase(insertedSentBubble = false),
+                sinceStartMs = 480L,
+                spanMs = null,
+                "bubble" to "echoed",
+                "flip" to "echo-reconcile",
+            ),
+        )
+    }
+
+    @Test
     fun negativeDurationsAreClampedToZero() {
         // Monotonic clock deltas should never be negative, but a defensive
         // clamp keeps a clock quirk from emitting a confusing "-3ms".
