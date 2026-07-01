@@ -151,6 +151,34 @@ class OptimisticMessageReconciliationTest {
     }
 
     @Test
+    fun failedMessageFindsMatchingUnpublishedProjectionForSuppression() {
+        val unpublished =
+            timelineRecord(
+                messageIdHex = "local-commit",
+                plaintext = "offline duplicate",
+                sourceMessageIdHex = null,
+            )
+        val published =
+            timelineRecord(
+                messageIdHex = "published",
+                plaintext = "offline duplicate",
+                sourceMessageIdHex = "relay-event",
+            )
+
+        assertEquals(
+            listOf("local-commit"),
+            unpublishedProjectionIdsMatchingMessage(
+                mapOf(
+                    unpublished.messageIdHex to unpublished,
+                    published.messageIdHex to published,
+                ),
+                message("temp", plaintext = "offline duplicate"),
+                activeAccountIdHex = "alice",
+            ),
+        )
+    }
+
+    @Test
     fun historicalMatchingMessageIsNotReconciled() {
         val pending = timelineMessage("temp", MessageStatus.Pending)
 

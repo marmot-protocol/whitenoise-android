@@ -735,6 +735,23 @@ internal fun invalidatedProjectionIdsMatchingMessage(
                 )
         }.map { it.messageIdHex }
 
+internal fun unpublishedProjectionIdsMatchingMessage(
+    timelineRecords: Map<String, TimelineMessageRecordFfi>,
+    message: AppMessageRecordFfi,
+    activeAccountIdHex: String?,
+): List<String> =
+    timelineRecords.values
+        .filter { projected ->
+            !projected.deleted &&
+                projected.invalidationStatus == null &&
+                projected.sourceMessageIdHex == null &&
+                messagesHaveSameRenderableSendShape(
+                    left = TimelineProjector.toAppMessageRecord(projected),
+                    right = message,
+                ) &&
+                MessageProjector.isMine(TimelineProjector.toAppMessageRecord(projected), activeAccountIdHex)
+        }.map { it.messageIdHex }
+
 private fun messagesHaveSameRenderableSendShape(
     left: AppMessageRecordFfi,
     right: AppMessageRecordFfi,
@@ -3129,6 +3146,13 @@ class ConversationController(
                 optimistic = optimistic,
                 timelineOrder = optimisticOrder,
             )
+            suppressProjectedTimelineItems(
+                unpublishedProjectionIdsMatchingMessage(
+                    timelineRecords = timelineRecords,
+                    message = optimistic,
+                    activeAccountIdHex = conversationAccountIdHex,
+                ),
+            )
             publishTimelineFromIndexes()
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
@@ -4175,6 +4199,13 @@ class ConversationController(
                     MessageStatus.Failed,
                     timelineOrder = order,
                 )
+            suppressProjectedTimelineItems(
+                unpublishedProjectionIdsMatchingMessage(
+                    timelineRecords = timelineRecords,
+                    message = refreshedRecord,
+                    activeAccountIdHex = conversationAccountIdHex,
+                ),
+            )
             publishTimelineFromIndexes()
             appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
         }
@@ -5191,6 +5222,16 @@ class ConversationController(
         ) {
             return actionRecord
         }
+        if (
+            record.sourceMessageIdHex == null &&
+            record.invalidationStatus == null &&
+            failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
+        ) {
+            timelineRecords[record.messageIdHex] = record
+            projectedMessageIds.add(record.messageIdHex)
+            messageById[record.messageIdHex] = actionRecord
+            return actionRecord
+        }
         if (record.invalidationStatus == null) {
             invalidatedProjectionIdsMatchingMessage(timelineRecords, actionRecord)
                 .filterNot { it == record.messageIdHex }
@@ -5242,6 +5283,14 @@ class ConversationController(
         localTimelineTimestampOverrides.remove(messageIdHex)
         timelineItemsById.remove(itemId)
         timelineOrder.remove(itemId)
+    }
+
+    private fun suppressProjectedTimelineItems(messageIds: List<String>) {
+        messageIds.forEach { messageIdHex ->
+            val itemId = timelineRecords[messageIdHex]?.let(::projectedItemId) ?: "msg:$messageIdHex"
+            timelineItemsById.remove(itemId)
+            timelineOrder.remove(itemId)
+        }
     }
 
     // Drop the oldest projected records beyond [maxItems], using the same total
