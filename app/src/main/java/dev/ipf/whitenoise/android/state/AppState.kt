@@ -25,6 +25,7 @@ import dev.ipf.marmotkit.AuditDataModeFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
 import dev.ipf.marmotkit.AuditLogUploadSourceFfi
+import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.NotificationSettingsFfi
@@ -1046,6 +1047,13 @@ class WhiteNoiseAppState(
     // group record so rows stop rendering stale pending/archived state.
     fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
         chatsController?.applyLocalGroupUpdate(record)
+    }
+
+    fun applyOptimisticSentPreview(
+        groupIdHex: String,
+        preview: ChatListMessagePreviewFfi,
+    ) {
+        chatsController?.applyOptimisticSentPreview(groupIdHex, preview)
     }
 
     // A self-leave stops that group's subscription, so the engine pushes no
