@@ -11472,7 +11472,7 @@ private fun GroupDetailsScreen(
                             ),
                         )
                     }
-                displayedMembers.forEachIndexed { index, member ->
+                GroupMemberIdentityRows(displayedMembers) { index, member ->
                     GroupMemberRow(
                         member = member,
                         controller = controller,
@@ -13041,6 +13041,23 @@ private fun GroupMemberRow(
     }
 }
 
+/**
+ * Member rows are rendered in [Column] containers, so Compose would otherwise
+ * identify each child by position. Key each row by member identity so menu and
+ * avatar state move with the member when invite/profile churn re-sorts the list.
+ */
+@Composable
+internal fun GroupMemberIdentityRows(
+    members: List<AppGroupMemberRecordFfi>,
+    content: @Composable (index: Int, member: AppGroupMemberRecordFfi) -> Unit,
+) {
+    members.forEachIndexed { index, member ->
+        key(member.memberIdHex) {
+            content(index, member)
+        }
+    }
+}
+
 private val GroupMutationAction.memberStatusLabelRes: Int
     @StringRes
     get() =
@@ -13130,7 +13147,7 @@ private fun TransferAdminSheet(
                     Column(
                         Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
                     ) {
-                        filtered.forEach { member ->
+                        GroupMemberIdentityRows(filtered) { _, member ->
                             Row(
                                 modifier =
                                     Modifier
@@ -21714,11 +21731,13 @@ internal fun Avatar(
     val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
     // already-loaded avatar immediately, with no placeholder flash and no
-    // re-fetch. key(pictureUrl) re-creates the state holder when the url
-    // changes, so a reused slot (e.g. a different account's avatar in the top
-    // bar) never keeps the previous url's bitmap — not even transiently while
-    // the new one loads.
-    val image by key(pictureUrl) {
+    // re-fetch. key(seed, pictureUrl) re-creates the state holder when either
+    // the row/account identity or URL changes, so a reused Column slot cannot
+    // keep the previous member's bitmap while the new one loads. The outer key
+    // is intentional: produceState keys restart the load coroutine, but the
+    // state holder itself must also be recreated to re-seed from the new cache
+    // key instead of displaying the old bitmap transiently.
+    val image by key(seed, pictureUrl) {
         produceState(AvatarImageLoader.peek(pictureUrl)) {
             if (value == null && pictureUrl != null) value = AvatarImageLoader.load(pictureUrl)
         }
