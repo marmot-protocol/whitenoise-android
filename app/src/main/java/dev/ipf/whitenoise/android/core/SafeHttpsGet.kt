@@ -33,6 +33,13 @@ import java.util.Locale
 object SafeHttpsGet {
     const val DEFAULT_MAX_REDIRECT_HOPS = 5
 
+    private val SENSITIVE_REDIRECT_HEADERS =
+        setOf(
+            "authorization",
+            "cookie",
+            "proxy-authorization",
+        )
+
     fun get(
         url: String,
         maxBodyBytes: Int,
@@ -64,7 +71,9 @@ object SafeHttpsGet {
                 connection.readTimeout = readTimeoutMillis
                 connection.instanceFollowRedirects = false
                 connection.requestMethod = "GET"
-                requestHeaders.forEach { (name, value) -> connection.setRequestProperty(name, value) }
+                headersForHop(requestHeaders, original = URL(url), current = parsed).forEach { (name, value) ->
+                    connection.setRequestProperty(name, value)
+                }
                 val code = connection.responseCode
                 when {
                     code in 300..399 -> {
@@ -88,6 +97,31 @@ object SafeHttpsGet {
             }
         }
     }
+
+    internal fun headersForHop(
+        requestHeaders: Map<String, String>,
+        original: URL,
+        current: URL,
+    ): Map<String, String> {
+        if (sameOrigin(original, current)) return requestHeaders
+        return requestHeaders.filterKeys { it.lowercase(Locale.ROOT) !in SENSITIVE_REDIRECT_HEADERS }
+    }
+
+    private fun sameOrigin(
+        first: URL,
+        second: URL,
+    ): Boolean =
+        first.protocol.equals(second.protocol, ignoreCase = true) &&
+            first.host.equals(second.host, ignoreCase = true) &&
+            effectivePort(first) == effectivePort(second)
+
+    private fun effectivePort(url: URL): Int =
+        when {
+            url.port != -1 -> url.port
+            url.protocol.equals("https", ignoreCase = true) -> 443
+            url.protocol.equals("http", ignoreCase = true) -> 80
+            else -> url.defaultPort
+        }
 
     /** [get] decoded as UTF-8, or null on any failure or oversize body. */
     fun getUtf8(

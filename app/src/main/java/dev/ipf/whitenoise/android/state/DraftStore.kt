@@ -38,6 +38,7 @@ internal interface DraftPersistence {
 class DraftStore internal constructor(
     private val persistence: DraftPersistence,
 ) {
+    private val lock = Any()
     private val drafts = mutableMapOf<String, MutableState<String?>>()
 
     init {
@@ -47,7 +48,7 @@ class DraftStore internal constructor(
     // Per-key state so reads/writes are observed independently. Creating an
     // empty state on a miss is what lets a composable that read a not-yet-set
     // draft recompose once it is set.
-    private fun stateFor(k: String): MutableState<String?> = drafts.getOrPut(k) { mutableStateOf(null) }
+    private fun stateFor(k: String): MutableState<String?> = synchronized(lock) { drafts.getOrPut(k) { mutableStateOf(null) } }
 
     fun get(
         accountIdHex: String,
@@ -78,7 +79,13 @@ class DraftStore internal constructor(
 
     fun clearAllForAccount(accountIdHex: String) {
         val prefix = "$accountIdHex "
-        drafts.forEach { (k, state) ->
+        val matchingDrafts =
+            synchronized(lock) {
+                drafts.entries
+                    .filter { (k, state) -> k.startsWith(prefix) && state.value != null }
+                    .map { (k, state) -> k to state }
+            }
+        matchingDrafts.forEach { (k, state) ->
             if (k.startsWith(prefix) && state.value != null) {
                 state.value = null
                 persistence.write(k, null)

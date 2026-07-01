@@ -44,7 +44,7 @@ internal class AttachmentDownloadGate(
         block: suspend () -> T,
     ): T {
         require(maxAttempts > 0) { "maxAttempts must be positive" }
-        require(initialBackoffMillis >= 0) { "initialBackoffMillis must be non-negative" }
+        require(initialBackoffMillis > 0) { "initialBackoffMillis must be positive" }
         require(maxBackoffMillis >= initialBackoffMillis) {
             "maxBackoffMillis must be at least initialBackoffMillis"
         }

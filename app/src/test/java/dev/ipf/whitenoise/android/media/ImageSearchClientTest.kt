@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.media
 
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -45,5 +47,24 @@ class ImageSearchClientTest {
         assertNull(sanitizeDuckDuckGoFetchUrl("https://duckduckgo.com@evil.example/i.js?q=marmot"))
         assertNull(sanitizeDuckDuckGoFetchUrl("http://duckduckgo.com/i.js?q=marmot"))
         assertNull(sanitizeDuckDuckGoFetchUrl("https://127.0.0.1/i.js?q=marmot"))
+    }
+
+    @Test
+    fun decodedResultsAreCapped() {
+        val results = JSONArray()
+        repeat(MAX_IMAGE_SEARCH_RESULTS + 25) { index ->
+            results.put(
+                JSONObject()
+                    .put("image", "https://example.com/$index.png")
+                    .put("thumbnail", "https://example.com/thumb-$index.png")
+                    .put("title", "Image $index"),
+            )
+        }
+
+        val decoded = decodeImageSearchResults(JSONObject().put("results", results).toString())
+
+        assertEquals(MAX_IMAGE_SEARCH_RESULTS, decoded.size)
+        assertEquals("https://example.com/0.png", decoded.first().imageUrl)
+        assertEquals("https://example.com/${MAX_IMAGE_SEARCH_RESULTS - 1}.png", decoded.last().imageUrl)
     }
 }
