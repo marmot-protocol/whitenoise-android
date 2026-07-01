@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscription
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
@@ -1284,6 +1285,24 @@ class ChatsController(
     // next account switch (issue: unarchive doesn't move chat out of archived
     // section). Callers in ConversationController forward the updated record
     // here via AppState so the chat list reflects the new archived flag.
+    // Optimistically bump a group's chat-list row to a just-sent message so
+    // returning to the list paints the new preview immediately, instead of one
+    // frame of the prior last-message before the chat-list stream catches up.
+    // The real stream update reconciles this shortly after. See #900.
+    fun applyOptimisticSentPreview(
+        groupIdHex: String,
+        preview: ChatListMessagePreviewFfi,
+    ) {
+        if (accountRef == null) return
+        val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: return
+        chatRowsByGroup[chatRowKey(groupIdHex)] =
+            row.copy(
+                lastMessage = preview,
+                updatedAt = maxOf(row.updatedAt, preview.timelineAt),
+            )
+        scheduleRecompute()
+    }
+
     fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
         if (accountRef == null) return
         val rowKey = chatRowKey(record.groupIdHex)
@@ -1684,6 +1703,11 @@ class ChatsController(
         leaveFirstHint: Boolean,
     ): Boolean {
         val account = accountRef ?: return false
+        // Hide the row immediately on confirm so it can't be tapped (reopening the
+        // group being deleted) during the 1-2s of leave/wipe work; restore it if
+        // the delete fails. See #894.
+        val removedRow = chatRowsByGroup[chatRowKey(groupIdHex)]
+        removeChatRow(groupIdHex)
         // Decide leave-first from the live roster, not the chat-list row's
         // removed heuristic (which can lag a leave done elsewhere) — a genuinely
         // left group then wipes directly instead of trying to re-leave. Fall back
@@ -1694,7 +1718,10 @@ class ChatsController(
                 .getOrNull()
                 ?.any { it.memberIdHex.equals(activeIdHex, ignoreCase = true) }
                 ?: leaveFirstHint
-        if (stillMember && !leaveGroup(groupIdHex)) return false
+        if (stillMember && !leaveGroup(groupIdHex)) {
+            removedRow?.let { foldChatRow(it) }
+            return false
+        }
         // Free the app's decrypted media caches (in-memory L1 + on-disk L2) before
         // the engine wipe drops the reference mapping — deleteGroupLocal clears its
         // own rows/secrets but not these client-side blobs, which would otherwise
@@ -1717,12 +1744,12 @@ class ChatsController(
         val wipe = runCatching { appState.marmotIo { deleteGroupLocal(account, groupIdHex) } }
         wipe.exceptionOrNull()?.let {
             if (it is CancellationException) throw it
+            removedRow?.let { row -> foldChatRow(row) }
             appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
             return false
         }
-        // A non-throwing wipe — whether it removed rows or found nothing to
-        // remove — means the chat is gone locally; drop the (possibly stale) row.
-        removeChatRow(groupIdHex)
+        // Wipe succeeded (or found nothing to remove) — the row was already
+        // hidden optimistically on entry, so just confirm.
         appState.present(R.string.toast_chat_deleted_local)
         return true
     }
@@ -2993,6 +3020,23 @@ class ConversationController(
             )
         messageById[tempId] = optimistic
         publishTimelineFromIndexes()
+        // Bump the chat-list row's preview in the same synchronous block as the
+        // bubble, so a back-navigation to the list paints the new last-message
+        // instead of a one-frame flash of the prior one (#900). Reuses the
+        // already-parsed markdown from the optimistic record.
+        appState.applyOptimisticSentPreview(
+            group.groupIdHex,
+            ChatListMessagePreviewFfi(
+                messageIdHex = tempId,
+                sender = conversationAccountIdHex ?: "",
+                senderDisplayName = null,
+                plaintext = trimmed,
+                contentTokens = optimistic.contentTokens,
+                kind = 9uL,
+                timelineAt = now,
+                deleted = false,
+            ),
+        )
         replyingTo = null
         // The optimistic bubble is now in the projection and published — the
         // send has visibly started. Only now is it safe to clear the input and
