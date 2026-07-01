@@ -4937,7 +4937,14 @@ internal fun MediaVideoGridTile(
     val context = LocalContext.current
     val epoch = reference.sourceEpoch
     var localFile by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf<java.io.File?>(null) }
-    var posterBitmap by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    // Seed the poster from the epoch-independent thumbnail cache (mirrors
+    // MediaImageGridTile). A sourceEpoch upgrade re-keys this state, so without
+    // the cache seed the poster would reset to null and flash back to the
+    // thumbhash before the frame is re-extracted, even though the video is
+    // already downloaded.
+    var posterBitmap by remember(messageIdHex, attachmentIndex, epoch) {
+        mutableStateOf(controller.thumbnailFor(messageIdHex, attachmentIndex)?.asImageBitmap())
+    }
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     var startDownload by remember(messageIdHex, attachmentIndex, appState.mediaAutoDownloadMatrix) {
@@ -4970,25 +4977,30 @@ internal fun MediaVideoGridTile(
     LaunchedEffect(localFile) {
         val f = localFile ?: return@LaunchedEffect
         if (posterBitmap != null) return@LaunchedEffect
-        posterBitmap =
+        val frame =
             withContext(Dispatchers.IO) {
                 val mmr = android.media.MediaMetadataRetriever()
                 try {
                     mmr.setDataSource(f.absolutePath)
                     val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
-                    mmr
-                        .getScaledFrameAtTime(
-                            0L,
-                            android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                            edge,
-                            edge,
-                        )?.asImageBitmap()
+                    mmr.getScaledFrameAtTime(
+                        0L,
+                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                        edge,
+                        edge,
+                    )
                 } catch (t: Throwable) {
                     null
                 } finally {
                     runCatching { mmr.release() }
                 }
             }
+        if (frame != null) {
+            // Cache under the epoch-independent slot so a later sourceEpoch
+            // upgrade re-seeds the poster instead of flashing the thumbhash.
+            controller.cacheThumbnail(messageIdHex, attachmentIndex, frame)
+            posterBitmap = frame.asImageBitmap()
+        }
     }
 
     Box(
@@ -5472,7 +5484,14 @@ private fun MediaVideoBubble(
     var localFile by remember(pillKey, epoch) { mutableStateOf<java.io.File?>(null) }
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
-    var posterBitmap by remember(pillKey, epoch) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    // Seed the poster from the epoch-independent thumbnail cache (mirrors
+    // MediaImageBubble). A sourceEpoch upgrade re-keys this state, so without
+    // the cache seed the poster would reset to null and flash back to the
+    // thumbhash before the frame is re-extracted, even though the video is
+    // already downloaded.
+    var posterBitmap by remember(pillKey, epoch) {
+        mutableStateOf(controller.thumbnailFor(messageIdHex, attachmentIndex)?.asImageBitmap())
+    }
     var durationMs by remember(pillKey, epoch) { mutableStateOf(0L) }
     var playerOpen by remember(pillKey) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
@@ -5511,7 +5530,9 @@ private fun MediaVideoBubble(
 
     LaunchedEffect(localFile) {
         val f = localFile ?: return@LaunchedEffect
-        if (posterBitmap != null) return@LaunchedEffect
+        // Poster may already be seeded from cache after a sourceEpoch upgrade;
+        // still recompute when the duration is missing so the label survives.
+        if (posterBitmap != null && durationMs > 0L) return@LaunchedEffect
         val (bm, dur) =
             withContext(Dispatchers.IO) {
                 val mmr = android.media.MediaMetadataRetriever()
@@ -5539,8 +5560,13 @@ private fun MediaVideoBubble(
                     runCatching { mmr.release() }
                 }
             }
-        durationMs = dur
-        posterBitmap = bm?.asImageBitmap()
+        if (dur > 0L) durationMs = dur
+        if (bm != null && posterBitmap == null) {
+            // Cache under the epoch-independent slot so a later sourceEpoch
+            // upgrade re-seeds the poster instead of flashing the thumbhash.
+            controller.cacheThumbnail(messageIdHex, attachmentIndex, bm)
+            posterBitmap = bm.asImageBitmap()
+        }
     }
 
     Surface(
