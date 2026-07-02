@@ -446,6 +446,7 @@ import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.amoledModalSheetSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -13214,7 +13215,7 @@ private fun TransferAdminSheet(
 }
 
 @Composable
-private fun amoledModalSheetModifier(): Modifier = Modifier.amoledSurfaceBorder(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+private fun amoledModalSheetModifier(): Modifier = Modifier.amoledModalSheetSurface(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
 
 @Composable
 private fun messageBubbleBorder(
