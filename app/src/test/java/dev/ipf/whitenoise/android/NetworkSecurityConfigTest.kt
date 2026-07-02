@@ -20,17 +20,29 @@ class NetworkSecurityConfigTest {
     }
 
     @Test
-    fun devAndStagingKeepLocalRelayCleartextExceptions() {
+    fun devAndStagingKeepLoopbackRelayCleartextExceptions() {
         listOf("debug", "staging").forEach { sourceSet ->
-            val config = File("src/$sourceSet/res/xml/network_security_config.xml")
-            val text = config.readText()
+            val text = File("src/$sourceSet/res/xml/network_security_config.xml").readText()
 
-            assertTrue(text.contains("localhost"))
-            assertTrue(text.contains("127.0.0.1"))
-            assertTrue(text.contains("10.0.2.2"))
             assertTrue(text.contains("""<domain includeSubdomains="false">localhost</domain>"""))
             assertTrue(text.contains("""<domain includeSubdomains="false">127.0.0.1</domain>"""))
-            assertTrue(text.contains("""<domain includeSubdomains="false">10.0.2.2</domain>"""))
         }
+    }
+
+    @Test
+    fun emulatorHostAliasCleartextStaysDebugOnly() {
+        val debug = File("src/debug/res/xml/network_security_config.xml").readText()
+        assertTrue(debug.contains("""<domain includeSubdomains="false">10.0.2.2</domain>"""))
+
+        // Staging is release-signed and runs on real hardware, where 10.0.2.2
+        // is a routable LAN address rather than the emulator loopback alias.
+        assertFalse(cleartextDomains("staging").contains("10.0.2.2"))
+    }
+
+    private fun cleartextDomains(sourceSet: String): List<String> {
+        val config = File("src/$sourceSet/res/xml/network_security_config.xml")
+        val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(config)
+        val domains = document.getElementsByTagName("domain")
+        return (0 until domains.length).map { domains.item(it).textContent.trim() }
     }
 }
