@@ -520,6 +520,13 @@
     <string name="data_and_storage_settings_subtitle">Автозагрузка медиа</string>
     <string name="app_preferences">Приложение</string>
     <string name="settings_version_label">Версия %1$s</string>
+    <string name="support_the_project">Поддержать проект</string>
+    <string name="support_the_project_subtitle">White Noise бесплатен и имеет открытый исходный код. Пожертвования помогают сохранить это.</string>
+    <string name="donate_lightning_address">Lightning-адрес</string>
+    <string name="donate_bitcoin_silent_payment">Тихий платеж Bitcoin</string>
+    <string name="donate_method_lightning">Lightning</string>
+    <string name="donate_method_bitcoin">Bitcoin</string>
+    <string name="donate_qr_code_content_description">QR-код для адреса пожертвования %1$s: %2$s</string>
     <string name="theme">Тема</string>
     <string name="theme_system">Системная</string>
     <string name="theme_light">Светлая</string>

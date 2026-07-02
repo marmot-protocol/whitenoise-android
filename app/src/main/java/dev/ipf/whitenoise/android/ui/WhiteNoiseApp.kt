@@ -26,6 +26,7 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -133,6 +134,7 @@ import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
@@ -198,7 +200,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
@@ -497,6 +502,7 @@ private enum class SettingsDetail {
     KeyPackages,
     Notifications,
     SecurityPrivacy,
+    Donate,
 }
 
 private data class DiagnosticLogEntry(
@@ -17895,6 +17901,7 @@ private fun SettingsScreen(
                 onBack = { onDetailChange(null) },
                 onOpenDiagnostics = onOpenDiagnostics,
             )
+        SettingsDetail.Donate -> DonateScreen(appState, onBack = { onDetailChange(null) })
         null ->
             SettingsHomeScreen(
                 appState = appState,
@@ -17979,6 +17986,27 @@ private fun SettingsHomeScreen(
                     SettingsRow(stringResource(R.string.security_and_privacy), stringResource(R.string.security_privacy_settings_subtitle)) {
                         onOpenDetail(SettingsDetail.SecurityPrivacy)
                     }
+                }
+            }
+            item {
+                // Navigation row to the donation page, matching the other
+                // Settings sections' row -> detail-screen shape.
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
+                    colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
+                ) {
+                    ListItem(
+                        modifier = Modifier.clickable { onOpenDetail(SettingsDetail.Donate) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        headlineContent = { Text(stringResource(R.string.support_the_project)) },
+                        supportingContent = {
+                            Text(
+                                stringResource(R.string.support_the_project_subtitle),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                    )
                 }
             }
             item {
@@ -19528,7 +19556,10 @@ private sealed interface ProfilePictureImageState {
 }
 
 @Composable
-private fun QrCodeImage(content: String) {
+private fun QrCodeImage(
+    content: String,
+    contentDescription: String = stringResource(R.string.profile_qr_code),
+) {
     val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, content) {
         value = withContext(Dispatchers.Default) { qrBitmap(content, 900).asImageBitmap() }
     }
@@ -19541,7 +19572,7 @@ private fun QrCodeImage(content: String) {
         } else {
             Image(
                 bitmap = image!!,
-                contentDescription = stringResource(R.string.profile_qr_code),
+                contentDescription = contentDescription,
                 modifier = Modifier.size(257.dp).padding(16.dp),
                 contentScale = ContentScale.Fit,
             )
@@ -21025,11 +21056,13 @@ private fun CopyableValueRow(
     value: String,
     clipboard: androidx.compose.ui.platform.ClipboardManager,
     appState: WhiteNoiseAppState,
+    displayValue: String = value,
 ) {
     val copyLabel = stringResource(R.string.copy)
     // Identifier rows (npub, group id, public key) keep the value and trailing
     // copy icon on one line. The text may tail-ellipsize when space is tight,
-    // but it must never wrap a stray character onto a second row (#799).
+    // but it must never wrap a stray character onto a second row (#799). Callers
+    // may provide a pre-shortened displayValue when they need middle ellipsis.
     Column(
         Modifier
             .fillMaxWidth()
@@ -21039,13 +21072,15 @@ private fun CopyableValueRow(
             ) {
                 clipboard.setText(AnnotatedString(value))
                 appState.presentText(AppText.Resource(R.string.toast_copied_value, listOf(label)))
+            }.semantics(mergeDescendants = true) {
+                contentDescription = "$label, $value"
             },
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                value,
+                displayValue,
                 fontFamily = FontFamily.Monospace,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -21058,6 +21093,112 @@ private fun CopyableValueRow(
                 modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+private data class DonationMethod(
+    val label: String,
+    val addressLabel: String,
+    val value: String,
+)
+
+// Settings -> Support the project (#285). Static, public donation addresses
+// shipped as localized resources — no protocol data, no Android-owned cache.
+// Wallet-style focused page: one method visible at a time via the segmented
+// selector (mutually-exclusive choice), its QR inline above a tap-to-copy row.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DonateScreen(
+    appState: WhiteNoiseAppState,
+    onBack: () -> Unit,
+) {
+    val clipboard = LocalClipboardManager.current
+    var selected by rememberSaveable { mutableStateOf(0) }
+    val methods =
+        listOf(
+            DonationMethod(
+                label = stringResource(R.string.donate_method_lightning),
+                addressLabel = stringResource(R.string.donate_lightning_address),
+                value = stringResource(R.string.donate_lightning_value),
+            ),
+            DonationMethod(
+                label = stringResource(R.string.donate_method_bitcoin),
+                addressLabel = stringResource(R.string.donate_bitcoin_silent_payment),
+                value = stringResource(R.string.donate_bitcoin_silent_payment_value),
+            ),
+        )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.support_the_project)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(Dimens.spaceLg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
+        ) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                Icon(
+                    Icons.Default.Favorite,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(Dimens.spaceLg).size(28.dp),
+                )
+            }
+            Text(
+                stringResource(R.string.support_the_project_subtitle),
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                methods.forEachIndexed { index, method ->
+                    SegmentedButton(
+                        selected = selected == index,
+                        onClick = { selected = index },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = methods.size),
+                    ) {
+                        Text(method.label)
+                    }
+                }
+            }
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
+                colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
+            ) {
+                AnimatedContent(targetState = methods[selected], label = "donationMethod") { method ->
+                    Column(
+                        Modifier.fillMaxWidth().padding(Dimens.spaceLg),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
+                    ) {
+                        QrCodeImage(
+                            content = method.value,
+                            contentDescription =
+                                stringResource(R.string.donate_qr_code_content_description, method.addressLabel, method.value),
+                        )
+                        CopyableValueRow(
+                            label = method.addressLabel,
+                            value = method.value,
+                            clipboard = clipboard,
+                            appState = appState,
+                            displayValue = IdentityFormatter.short(method.value, prefix = 18, suffix = 12),
+                        )
+                    }
+                }
+            }
         }
     }
 }

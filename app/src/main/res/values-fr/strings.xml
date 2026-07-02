@@ -514,6 +514,13 @@
     <string name="data_and_storage_settings_subtitle">Téléchargement auto des médias</string>
     <string name="app_preferences">Application</string>
     <string name="settings_version_label">Version %1$s</string>
+    <string name="support_the_project">Soutenir le projet</string>
+    <string name="support_the_project_subtitle">White Noise est gratuit et open source. Les dons aident à le garder ainsi.</string>
+    <string name="donate_lightning_address">Adresse Lightning</string>
+    <string name="donate_bitcoin_silent_payment">Paiement silencieux Bitcoin</string>
+    <string name="donate_method_lightning">Lightning</string>
+    <string name="donate_method_bitcoin">Bitcoin</string>
+    <string name="donate_qr_code_content_description">Code QR pour l’adresse de don %1$s : %2$s</string>
     <string name="theme">Thème</string>
     <string name="theme_system">Système</string>
     <string name="theme_light">Clair</string>

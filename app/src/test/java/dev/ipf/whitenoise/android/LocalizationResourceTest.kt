@@ -207,6 +207,9 @@ class LocalizationResourceTest {
                 "app_preferences",
                 "actions",
                 "bytes_count",
+                // Brand/protocol names kept identical across every locale.
+                "donate_method_bitcoin",
+                "donate_method_lightning",
                 "edit_history_original",
                 "edit_history_version_label",
                 "generic_message",

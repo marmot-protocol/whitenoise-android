@@ -512,6 +512,13 @@
     <string name="data_and_storage_settings_subtitle">媒體自動下載</string>
     <string name="app_preferences">應用程式</string>
     <string name="settings_version_label">版本 %1$s</string>
+    <string name="support_the_project">支持專案</string>
+    <string name="support_the_project_subtitle">White Noise 免費且開源。捐款有助於維持這一點。</string>
+    <string name="donate_lightning_address">Lightning 位址</string>
+    <string name="donate_bitcoin_silent_payment">Bitcoin 靜默付款</string>
+    <string name="donate_method_lightning">Lightning</string>
+    <string name="donate_method_bitcoin">Bitcoin</string>
+    <string name="donate_qr_code_content_description">%1$s 捐款地址的 QR 碼：%2$s</string>
     <string name="theme">主題</string>
     <string name="theme_system">跟隨系統</string>
     <string name="theme_light">淺色</string>

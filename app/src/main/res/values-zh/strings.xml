@@ -512,6 +512,13 @@
     <string name="data_and_storage_settings_subtitle">媒体自动下载</string>
     <string name="app_preferences">应用</string>
     <string name="settings_version_label">版本 %1$s</string>
+    <string name="support_the_project">支持项目</string>
+    <string name="support_the_project_subtitle">White Noise 免费且开源。捐赠有助于保持这一点。</string>
+    <string name="donate_lightning_address">Lightning 地址</string>
+    <string name="donate_bitcoin_silent_payment">Bitcoin 静默支付</string>
+    <string name="donate_method_lightning">Lightning</string>
+    <string name="donate_method_bitcoin">Bitcoin</string>
+    <string name="donate_qr_code_content_description">%1$s 捐赠地址的二维码：%2$s</string>
     <string name="theme">主题</string>
     <string name="theme_system">跟随系统</string>
     <string name="theme_light">浅色</string>
