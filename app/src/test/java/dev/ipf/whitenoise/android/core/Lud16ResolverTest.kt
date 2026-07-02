@@ -56,6 +56,17 @@ class Lud16ResolverTest {
     }
 
     @Test
+    fun rejectsMalformedDomainsBeforeUrlConstruction() {
+        assertNull(Lud16Resolver.wellKnownUrl("alice@example.com/path"))
+        assertNull(Lud16Resolver.wellKnownUrl("alice@example.com?x=y"))
+        assertNull(Lud16Resolver.wellKnownUrl("alice@example.com#fragment"))
+        assertNull(Lud16Resolver.wellKnownUrl("alice@https://example.com"))
+        assertNull(Lud16Resolver.wellKnownUrl("alice@example..com"))
+        assertNull(Lud16Resolver.wellKnownUrl("alice@-example.com"))
+        assertNull(Lud16Resolver.wellKnownUrl("alice@example-.com"))
+    }
+
+    @Test
     fun rejectsPrivateLoopbackAndExplicitPortHosts() {
         assertNull(Lud16Resolver.wellKnownUrl("alice@127.0.0.1"))
         assertNull(Lud16Resolver.wellKnownUrl("alice@10.0.0.1"))

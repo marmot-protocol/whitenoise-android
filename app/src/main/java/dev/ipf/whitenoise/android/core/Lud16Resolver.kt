@@ -6,6 +6,38 @@ import org.json.JSONObject
 import java.net.URL
 import java.util.Locale
 
+internal object Lud16Address {
+    private val ADDRESS = Regex("^([^@\\s]+)@([^@\\s]+)$")
+    private val LOCAL_PART = Regex("^[a-zA-Z0-9._-]+$")
+    private val DOMAIN_LABEL = Regex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+
+    data class Parsed(
+        val local: String,
+        val domain: String,
+    )
+
+    fun parse(raw: String): Parsed? {
+        val match = ADDRESS.matchEntire(raw.trim()) ?: return null
+        val local = match.groupValues[1]
+        val domain = match.groupValues[2].lowercase(Locale.ROOT)
+        if (!LOCAL_PART.matches(local)) return null
+        // The local part becomes a path segment; bare dot segments would
+        // traverse out of /.well-known/lnurlp/.
+        if (local == "." || local == "..") return null
+        if (!isHostnameOnlyDomain(domain)) return null
+        return Parsed(local = local, domain = domain)
+    }
+
+    private fun isHostnameOnlyDomain(domain: String): Boolean {
+        if (domain.length > 253) return false
+        val labels = domain.split('.')
+        if (labels.size < 2) return false
+        return labels.all { label ->
+            label.isNotEmpty() && DOMAIN_LABEL.matches(label)
+        }
+    }
+}
+
 /**
  * Verifies a lud16 Lightning address (`<name>@<domain>`) by resolving its
  * LNURL-pay endpoint, `https://<domain>/.well-known/lnurlp/<name>`, per LUD-16.
@@ -24,16 +56,6 @@ import java.util.Locale
  * Lightning address" and skips resolution entirely).
  */
 object Lud16Resolver {
-    // <local>@<domain>, no whitespace or extra '@'. Same shape as
-    // ProfileFieldValidation.INTERNET_IDENTIFIER; duplicated locally so the
-    // resolver is self-contained and can split the two halves it needs.
-    private val INTERNET_IDENTIFIER = Regex("^([^@\\s]+)@([^@\\s]+\\.[^@\\s]+)$")
-
-    // LUD-16 local parts are `a-z0-9-_.`; we accept either case (the case is
-    // preserved on the wire) but anything outside this set can't be a
-    // Lightning address, so we reject rather than send it upstream.
-    private val LOCAL_PART = Regex("^[a-zA-Z0-9._-]+$")
-
     // An LNURL-pay descriptor is a small JSON object; 1 MiB is generous headroom.
     private const val MAX_BODY_BYTES = 1 * 1024 * 1024
 
@@ -70,19 +92,9 @@ object Lud16Resolver {
      * explicit port). Pure — no network.
      */
     internal fun wellKnownUrl(address: String): String? {
-        val match = INTERNET_IDENTIFIER.matchEntire(address.trim()) ?: return null
-        val local = match.groupValues[1]
-        val domain = match.groupValues[2].lowercase(Locale.ROOT)
-        if (!LOCAL_PART.matches(local)) return null
-        // The local part becomes a path segment; a bare dot segment would
-        // traverse out of /.well-known/lnurlp/.
-        if (local == "." || local == "..") return null
-        // LNURL-pay is served on the implicit HTTPS port; an explicit port is
-        // a non-standard authority trick (SafeHttpsGet would also reject it,
-        // but failing here keeps the check offline).
-        if (domain.contains(':')) return null
-        if (HostSafety.isPrivateOrLoopbackHost(domain)) return null
-        return "https://$domain/.well-known/lnurlp/$local"
+        val parsed = Lud16Address.parse(address) ?: return null
+        if (HostSafety.isPrivateOrLoopbackHost(parsed.domain)) return null
+        return "https://${parsed.domain}/.well-known/lnurlp/${parsed.local}"
     }
 
     /**

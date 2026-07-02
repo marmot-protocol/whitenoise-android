@@ -8,7 +8,8 @@ package dev.ipf.whitenoise.android.core
  */
 object ProfileFieldValidation {
     // Internet identifier: <local>@<domain-with-a-dot>, no whitespace or extra
-    // '@'. Shared by NIP-05 and the lud16 Lightning address (same shape).
+    // '@'. NIP-05 currently accepts the broad legacy shape; LUD-16 uses the
+    // stricter resolver parser so URL delimiters never reach resolution.
     private val INTERNET_IDENTIFIER = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
     /** True when [raw] is blank or a sanitizable https avatar URL (see [ProfileSanitizer.imageUrl]). */
@@ -26,6 +27,6 @@ object ProfileFieldValidation {
     /** True when [raw] is blank or a well-formed `user@domain` Lightning (lud16) address. */
     fun isAcceptableLud16(raw: String): Boolean {
         val trimmed = raw.trim()
-        return trimmed.isEmpty() || INTERNET_IDENTIFIER.matches(trimmed)
+        return trimmed.isEmpty() || Lud16Address.parse(trimmed) != null
     }
 }
