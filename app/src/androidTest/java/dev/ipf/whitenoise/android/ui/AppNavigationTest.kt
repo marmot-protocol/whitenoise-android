@@ -40,6 +40,47 @@ class AppNavigationTest {
     }
 
     @Test
+    fun avatarWithoutUnreadDoesNotAnnounceUnread() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                AccountAvatarButton(
+                    title = "Ada Lovelace",
+                    seed = "ada",
+                    pictureUrl = null,
+                    size = 40.dp,
+                    onClick = {},
+                    showUnreadDot = false,
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Open settings").assertIsDisplayed()
+        composeRule
+            .onNodeWithContentDescription("This account has unread messages", substring = true)
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun avatarWithUnreadAnnouncesThisAccountUnread() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                AccountAvatarButton(
+                    title = "Ada Lovelace",
+                    seed = "ada",
+                    pictureUrl = null,
+                    size = 40.dp,
+                    onClick = {},
+                    showUnreadDot = true,
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithContentDescription("This account has unread messages", substring = true)
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun settingsTopBarReturnsToChatListWithBackLink() {
         var backClicks = 0
 

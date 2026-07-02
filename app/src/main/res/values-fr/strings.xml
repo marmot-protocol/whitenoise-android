@@ -16,7 +16,7 @@
     <string name="back">Retour</string>
     <string name="back_to_chats">Retour aux discussions</string>
     <string name="open_settings">Ouvrir les paramètres</string>
-    <string name="other_account_unread_indicator">Un autre compte a des messages non lus</string>
+    <string name="account_unread_indicator">Ce compte a des messages non lus</string>
     <string name="archived">Archivé</string>
     <string name="chats_count">Discussions %1$d</string>
     <string name="couldnt_load_chats">Impossible de charger les discussions</string>

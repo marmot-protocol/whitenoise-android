@@ -1586,17 +1586,18 @@ fun AccountAvatarButton(
     size: Dp = 40.dp,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    // Cross-account unread dot (#592): a small accent dot on the active
-    // account's avatar when another signed-in account has unread. Hidden on
-    // single-account devices (the caller passes false).
+    // Per-account unread dot (#592, #805): a small accent dot on the active
+    // account's avatar when that account itself has unread — the same
+    // per-account aggregate the other-account avatars use. Hidden when the
+    // active account has no unread (the caller passes false).
     showUnreadDot: Boolean = false,
 ) {
     val openSettingsDescription = stringResource(R.string.open_settings)
-    val otherAccountUnreadDescription =
-        stringResource(R.string.other_account_unread_indicator)
+    val accountUnreadDescription =
+        stringResource(R.string.account_unread_indicator)
     val avatarContentDescription =
         if (showUnreadDot) {
-            "$openSettingsDescription, $otherAccountUnreadDescription"
+            "$openSettingsDescription, $accountUnreadDescription"
         } else {
             openSettingsDescription
         }
@@ -1670,7 +1671,7 @@ private fun OtherAccountAvatarsRow(
                 title = appState.displayName(account.accountIdHex),
                 seed = account.accountIdHex,
                 pictureUrl = appState.avatarUrl(account.accountIdHex),
-                showUnreadDot = appState.unreadCountForAccount(account.label) > 0uL,
+                showUnreadDot = appState.accountShowsUnreadDot(account.label),
                 onClick = { onSwitchAccount(account.label) },
                 onLongClick = onOpenSwitcher,
             )
@@ -3039,7 +3040,10 @@ private fun ChatListTopBar(
                         pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
                         size = 44.dp,
                         onClick = onOpenSettings,
-                        showUnreadDot = appState.hasUnreadOnOtherAccounts,
+                        // Per-account dot: light only when the active account
+                        // itself has unread, same shared decision the other
+                        // avatars use — not "some other account has unread" (#805).
+                        showUnreadDot = appState.accountShowsUnreadDot(active?.label),
                     )
                 }
             }

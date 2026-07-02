@@ -16,7 +16,7 @@
     <string name="back">返回</string>
     <string name="back_to_chats">返回聊天</string>
     <string name="open_settings">打开设置</string>
-    <string name="other_account_unread_indicator">另一个账号有未读消息</string>
+    <string name="account_unread_indicator">此账号有未读消息</string>
     <string name="archived">已存档</string>
     <string name="chats_count">%1$d 聊天</string>
     <string name="couldnt_load_chats">无法加载聊天</string>

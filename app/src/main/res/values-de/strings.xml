@@ -16,7 +16,7 @@
     <string name="back">Zurück</string>
     <string name="back_to_chats">Zurück zu den Chats</string>
     <string name="open_settings">Einstellungen öffnen</string>
-    <string name="other_account_unread_indicator">Ein anderes Konto hat ungelesene Nachrichten</string>
+    <string name="account_unread_indicator">Dieses Konto hat ungelesene Nachrichten</string>
     <string name="archived">Archiviert</string>
     <string name="chats_count">%1$d Chats</string>
     <string name="couldnt_load_chats">Chats konnten nicht geladen werden</string>

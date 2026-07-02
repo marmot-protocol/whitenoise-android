@@ -16,7 +16,7 @@
     <string name="back">Voltar</string>
     <string name="back_to_chats">Voltar aos bate-papos</string>
     <string name="open_settings">Abrir configurações</string>
-    <string name="other_account_unread_indicator">Outra conta tem mensagens não lidas</string>
+    <string name="account_unread_indicator">Esta conta tem mensagens não lidas</string>
     <string name="archived">Arquivado</string>
     <string name="chats_count">%1$d bate-papos</string>
     <string name="couldnt_load_chats">Não foi possível carregar as conversas</string>

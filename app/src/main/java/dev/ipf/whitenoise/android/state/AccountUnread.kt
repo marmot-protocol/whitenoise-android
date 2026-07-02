@@ -59,6 +59,22 @@ internal fun accountUnreadCount(
         if (item.group.archived) total else total + item.effectiveUnreadCount(activeAccountIdHex)
     }
 
+/**
+ * Whether [accountRef]'s avatar should show the unread dot (#805). The dot is a
+ * per-account property: it reads *that account's own* aggregate from
+ * [countsByAccountRef] and never "some other account has unread". Every avatar
+ * in the chat-list top bar (active + secondary) and the account switcher shares
+ * this single decision so the paths can't drift apart again — the misrouting
+ * bug was the active avatar checking a cross-account aggregate instead.
+ */
+internal fun accountShowsUnreadDot(
+    accountRef: String?,
+    countsByAccountRef: Map<String, ULong>,
+): Boolean {
+    val ref = accountRef?.takeIf { it.isNotBlank() } ?: return false
+    return (countsByAccountRef[ref] ?: 0uL) > 0uL
+}
+
 private fun accountMissingFromLoadedRoster(
     activeAccountIdHex: String?,
     members: List<AppGroupMemberRecordFfi>?,

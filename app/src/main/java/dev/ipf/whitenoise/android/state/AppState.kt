@@ -613,26 +613,6 @@ class WhiteNoiseAppState(
     var activeAccountRef by mutableStateOf(preferences.getString(ACTIVE_ACCOUNT_KEY, null))
         private set
 
-    /**
-     * Whether any *other* signed-in account has unread messages (#592). Drives
-     * the cross-account unread dot on the active account's chat-list avatar so
-     * a notification waiting on a different account is visible without opening
-     * the account switcher. The candidate refs are derived from the live
-     * [accounts] list — currently-signed-in accounts (local-signing, not
-     * signed out) other than the active one — rather than straight off the
-     * [accountUnreadCounts] keys, so a signed-out/stale account whose unread
-     * total is still persisted in the map can no longer light the dot. False on
-     * a single-account device or when only the active account has unread.
-     */
-    val hasUnreadOnOtherAccounts: Boolean
-        get() =
-            accounts.any { account ->
-                account.localSigning &&
-                    !account.signedOut &&
-                    account.label != activeAccountRef &&
-                    (accountUnreadCounts[account.label] ?: 0uL) > 0uL
-            }
-
     var developerMode by mutableStateOf(preferences.getBoolean(DEVELOPER_MODE_KEY, false))
         private set
 
@@ -1534,6 +1514,14 @@ class WhiteNoiseAppState(
     }
 
     fun unreadCountForAccount(accountRef: String): ULong = accountUnreadCounts[accountRef] ?: 0uL
+
+    /**
+     * Whether [accountRef]'s avatar should light the unread dot, from that
+     * account's own per-account aggregate (#805). Shared by the active avatar,
+     * the secondary top-bar avatars, and the account switcher so no avatar can
+     * light for another account's unread.
+     */
+    fun accountShowsUnreadDot(accountRef: String?): Boolean = accountShowsUnreadDot(accountRef, accountUnreadCounts)
 
     internal fun updateAccountUnreadCount(
         accountRef: String?,

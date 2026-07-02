@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AccountUnreadTest {
@@ -86,6 +88,26 @@ class AccountUnreadTest {
             )
 
         assertEquals(0uL, count)
+    }
+
+    @Test
+    fun accountShowsUnreadDot_trueOnlyForAccountWithOwnUnread() {
+        val counts = mapOf("account-a" to 0uL, "account-b" to 3uL)
+
+        // The account that actually has unread lights its own dot.
+        assertTrue(accountShowsUnreadDot("account-b", counts))
+        // The other account (e.g. the active one) does NOT light just because
+        // another signed-in account has unread — the #805 misrouting invariant.
+        assertFalse(accountShowsUnreadDot("account-a", counts))
+    }
+
+    @Test
+    fun accountShowsUnreadDot_falseForUnknownOrBlankAccount() {
+        val counts = mapOf("account-a" to 5uL)
+
+        assertFalse(accountShowsUnreadDot("account-missing", counts))
+        assertFalse(accountShowsUnreadDot("", counts))
+        assertFalse(accountShowsUnreadDot(null, counts))
     }
 
     private fun row(
