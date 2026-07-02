@@ -456,6 +456,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -5998,14 +5999,17 @@ private fun MediaVoiceBubble(
         mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio))
     }
 
-    val playback by dev.ipf.whitenoise.android.audio.VoicePlaybackController.state
-        .collectAsState()
-    val isThis = playback.key == pillKey
-    val isPlayingThis = isThis && playback.isPlaying
-    val isPausedThis = isThis && !playback.isPlaying && playback.positionMs > 0
+    val playback by remember(pillKey) {
+        dev.ipf.whitenoise.android.audio.VoicePlaybackController.state
+            .map { state -> state.takeIf { it.key == pillKey } }
+            .distinctUntilChanged()
+    }.collectAsState(null)
+    val isThis = playback != null
+    val isPlayingThis = playback?.isPlaying == true
+    val isPausedThis = playback?.let { !it.isPlaying && it.positionMs > 0 } == true
     val activeDurationMs =
-        if (isThis && playback.durationMs > 0) playback.durationMs else totalDurationMs
-    val activePositionMs = if (isThis) playback.positionMs else 0
+        playback?.durationMs?.takeIf { it > 0 } ?: totalDurationMs
+    val activePositionMs = playback?.positionMs ?: 0
     val progressFraction =
         if (activeDurationMs > 0) {
             (activePositionMs.toFloat() / activeDurationMs.toFloat()).coerceIn(0f, 1f)
@@ -6232,8 +6236,8 @@ private fun MediaVoiceBubble(
                     )
                     // Speed pill: only shown once playback has been engaged
                     // for this clip, so an unplayed bubble stays uncluttered.
-                    if (isThis) {
-                        VoiceSpeedPill(currentSpeed = playback.speed)
+                    playback?.let { activePlayback ->
+                        VoiceSpeedPill(currentSpeed = activePlayback.speed)
                     }
                 }
             }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -84,6 +85,7 @@ class VoiceRecordingController(
     private var tailCut: CompletableDeferred<Unit>? = null
     private var restarting = false
     private var restartJob: Job? = null
+    private var startGeneration = 0L
 
     fun start(): Boolean {
         if (isRecording) return true
@@ -101,12 +103,13 @@ class VoiceRecordingController(
             VoicePlaybackController.pause()
             isRecording = true
             resetRecordingUiState()
+            val generation = nextStartGeneration()
             restartJob =
                 scope.launch(Dispatchers.Main) {
                     pending.join()
                     restarting = false
                     restartJob = null
-                    if (isRecording) beginRecording()
+                    if (isRecording && generation == startGeneration) beginRecording(generation)
                 }
             return true
         }
@@ -121,10 +124,14 @@ class VoiceRecordingController(
             return false
         }
         VoicePlaybackController.pause()
-        return beginRecording()
+        isRecording = true
+        resetRecordingUiState()
+        val generation = nextStartGeneration()
+        scope.launch(Dispatchers.Main) { beginRecording(generation) }
+        return true
     }
 
-    private fun beginRecording(): Boolean {
+    private suspend fun beginRecording(generation: Long): Boolean {
         val file =
             File(
                 outputDirectory,
@@ -132,7 +139,11 @@ class VoiceRecordingController(
             )
         val r = VoiceRecorder(context, file, bitrateProvider())
         return try {
-            r.start()
+            withContext(Dispatchers.IO) { r.start() }
+            if (!isRecording || generation != startGeneration) {
+                withContext(Dispatchers.IO) { r.cancel() }
+                return false
+            }
             recorder = r
             isRecording = true
             resetRecordingUiState()
@@ -150,12 +161,33 @@ class VoiceRecordingController(
                     }
                 }
             true
+        } catch (c: CancellationException) {
+            releaseRecorderAfterStartFailure(r)
+            throw c
         } catch (t: Throwable) {
-            abandonRecordingFocus()
+            releaseRecorderAfterStartFailure(r)
             recorder = null
-            isRecording = false
-            onError(t)
+            if (isRecording) {
+                abandonRecordingFocus()
+                isRecording = false
+                onError(t)
+            }
             false
+        }
+    }
+
+    private fun nextStartGeneration(): Long {
+        startGeneration += 1
+        return startGeneration
+    }
+
+    private fun invalidatePendingStart() {
+        startGeneration += 1
+    }
+
+    private suspend fun releaseRecorderAfterStartFailure(recorder: VoiceRecorder) {
+        withContext(NonCancellable + Dispatchers.IO) {
+            runCatching { recorder.cancel() }
         }
     }
 
@@ -178,6 +210,7 @@ class VoiceRecordingController(
         restart.cancel()
         restartJob = null
         restarting = false
+        invalidatePendingStart()
         isRecording = false
         resetRecordingUiState()
         abandonRecordingFocus()
@@ -186,7 +219,16 @@ class VoiceRecordingController(
 
     fun stop() {
         if (abortPendingRestart()) return
-        val r = recorder ?: return
+        val r =
+            recorder ?: run {
+                if (isRecording) {
+                    invalidatePendingStart()
+                    isRecording = false
+                    resetRecordingUiState()
+                    abandonRecordingFocus()
+                }
+                return
+            }
         recorder = null
         tickJob?.cancel()
         tickJob = null
@@ -243,6 +285,13 @@ class VoiceRecordingController(
     fun cancel() {
         if (abortPendingRestart()) return
         val r = recorder
+        if (r == null && isRecording) {
+            invalidatePendingStart()
+            isRecording = false
+            resetRecordingUiState()
+            abandonRecordingFocus()
+            return
+        }
         recorder = null
         tickJob?.cancel()
         tickJob = null
