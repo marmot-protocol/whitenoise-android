@@ -680,6 +680,26 @@ class WhiteNoiseAppState(
     var allowChatScreenshotsInChats by mutableStateOf(ChatScreenshotPreferences.readAllowChatScreenshots(preferences))
         private set
 
+    var requireAppUnlock by mutableStateOf(preferences.getBoolean(REQUIRE_APP_UNLOCK_KEY, false))
+        private set
+
+    var appLockDelay by mutableStateOf(AppLockDelay.fromPreference(preferences.getString(APP_LOCK_DELAY_KEY, null)))
+        private set
+
+    var appLockCredentialAvailable by mutableStateOf(isAppLockCredentialAvailable(appContext))
+        private set
+
+    var appLockScreenVisible by mutableStateOf(false)
+        private set
+
+    var appUnlockError by mutableStateOf<AppText?>(null)
+        private set
+
+    var appUnlockPromptRequestId by mutableStateOf(0)
+        private set
+
+    private var lastAppUnlockAtMillis = AppLockPreferences.readLastUnlockedAtMillis(appContext)
+
     var themeMode by mutableStateOf(AppThemeMode.fromPreference(preferences.getString(THEME_MODE_KEY, null)))
         private set
 
@@ -2056,6 +2076,93 @@ class WhiteNoiseAppState(
         ChatScreenshotPreferences.writeAllowChatScreenshots(preferences, enabled)
     }
 
+    fun refreshAppLockCredentialAvailability() {
+        appLockCredentialAvailable = isAppLockCredentialAvailable(appContext)
+        if (!appLockCredentialAvailable) {
+            appLockScreenVisible = false
+            appUnlockError = null
+        }
+    }
+
+    fun updateRequireAppUnlock(enabled: Boolean) {
+        refreshAppLockCredentialAvailability()
+        if (enabled && !appLockCredentialAvailable) {
+            requireAppUnlock = false
+            preferences.edit().putBoolean(REQUIRE_APP_UNLOCK_KEY, false).apply()
+            present(R.string.toast_app_lock_screen_lock_required)
+            return
+        }
+        requireAppUnlock = enabled
+        preferences.edit().putBoolean(REQUIRE_APP_UNLOCK_KEY, enabled).apply()
+        if (enabled) {
+            requestAppUnlock()
+        } else {
+            appLockScreenVisible = false
+            appUnlockError = null
+        }
+    }
+
+    fun updateAppLockDelay(delay: AppLockDelay) {
+        appLockDelay = delay
+        preferences.edit().putString(APP_LOCK_DELAY_KEY, delay.preferenceValue).apply()
+    }
+
+    fun requestAppUnlock() {
+        refreshAppLockCredentialAvailability()
+        if (!requireAppUnlock || !appLockCredentialAvailable) return
+        appLockScreenVisible = true
+        appUnlockError = null
+        appUnlockPromptRequestId += 1
+    }
+
+    fun markAppUnlockSucceeded(nowMillis: Long = System.currentTimeMillis()) {
+        val normalizedNow = nowMillis.coerceAtLeast(0L)
+        lastAppUnlockAtMillis = normalizedNow
+        AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
+        appLockScreenVisible = false
+        appUnlockError = null
+    }
+
+    fun markAppUnlockFailed(message: AppText = AppText.Resource(R.string.app_lock_auth_cancelled)) {
+        if (!appLockScreenVisible) return
+        appUnlockError = message
+    }
+
+    fun maybeShowAppLockForForeground(nowMillis: Long = System.currentTimeMillis()) {
+        refreshAppLockCredentialAvailability()
+        if (
+            shouldShowAppLock(
+                requireUnlock = requireAppUnlock,
+                credentialAvailable = appLockCredentialAvailable,
+                lastUnlockedAtMillis = lastAppUnlockAtMillis,
+                nowMillis = nowMillis,
+                delay = appLockDelay,
+            )
+        ) {
+            requestAppUnlock()
+        }
+    }
+
+    fun shouldSecureAppLockWindowWhileBackgrounded(): Boolean = shouldSecureAppLockWindowWhileBackgrounded(requireUnlock = requireAppUnlock)
+
+    private fun recordAppLockBackgrounded(nowMillis: Long = System.currentTimeMillis()) {
+        refreshAppLockCredentialAvailability()
+        if (
+            !shouldRefreshAppLockDelayBaselineOnBackground(
+                requireUnlock = requireAppUnlock,
+                credentialAvailable = appLockCredentialAvailable,
+                lockScreenVisible = appLockScreenVisible,
+            )
+        ) {
+            return
+        }
+        val normalizedNow = nowMillis.coerceAtLeast(0L)
+        // The delay means time spent away from the app, not time since the
+        // last credential prompt while the user was actively reading chats.
+        lastAppUnlockAtMillis = normalizedNow
+        AppLockPreferences.writeLastUnlockedAtMillis(appContext, normalizedNow)
+    }
+
     suspend fun refreshSecurityPrivacySettings() {
         relayTelemetrySettings = runCatching { marmotIo { relayTelemetrySettings() } }.getOrNull()
         auditLogSettings = runCatching { marmotIo { auditLogSettings() } }.getOrNull()
@@ -2308,6 +2415,11 @@ class WhiteNoiseAppState(
         // chat entirely, via onTaskRemoved(), so a foreground-service-kept
         // process cannot keep silencing that chat after the UI is gone (#821).
         suppression = if (foreground) suppression.onForeground() else suppression.onBackground()
+        if (foreground) {
+            maybeShowAppLockForForeground()
+        } else {
+            recordAppLockBackgrounded()
+        }
         if (foreground) {
             refreshLocalNotificationPermission()
             notificationScope.launch { catchUpAfterForegroundActivation() }
@@ -3805,6 +3917,8 @@ class WhiteNoiseAppState(
         private const val DEVELOPER_MODE_KEY = "developer_mode"
         private const val STREAMING_DEBUG_MODE_KEY = "streaming_debug_mode"
         private const val FORCE_INCOGNITO_KEYBOARD_KEY = "force_incognito_keyboard"
+        private const val REQUIRE_APP_UNLOCK_KEY = "require_app_unlock"
+        private const val APP_LOCK_DELAY_KEY = "app_lock_delay"
         private const val THEME_MODE_KEY = "theme_mode"
         private const val MEDIA_AUTO_DOWNLOAD_KEY = "media_auto_download"
 

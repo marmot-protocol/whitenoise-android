@@ -423,6 +423,7 @@ import dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
+import dev.ipf.whitenoise.android.state.AppLockDelay
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AppThemeMode
@@ -711,6 +712,7 @@ fun WhiteNoiseApp(
     onProfilePayloadHandled: (String) -> Unit = {},
     inboundNotificationTarget: NotificationTarget? = null,
     onNotificationTargetHandled: (NotificationTarget) -> Unit = {},
+    onRequestAppUnlock: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     // Mutable bottom-chrome inset so screens further down the tree
@@ -747,8 +749,9 @@ fun WhiteNoiseApp(
         appState.backgroundConnectionEnabled,
         appState.localNotificationSettings?.localNotificationsEnabled,
         appState.runtimeGeneration,
+        appState.appLockScreenVisible,
     ) {
-        if (appState.phase != AppPhase.Ready) return@LaunchedEffect
+        if (appState.phase != AppPhase.Ready || appState.appLockScreenVisible) return@LaunchedEffect
         appState.refreshLocalNotificationPermission()
         appState.refreshLocalNotificationSettings()
         if (appState.shouldRequestDefaultNotificationPermission()) {
@@ -774,6 +777,9 @@ fun WhiteNoiseApp(
         if (appState.phase == AppPhase.Ready && appState.presentProfilePayload(payload)) {
             onProfilePayloadHandled(payload)
         }
+    }
+    LaunchedEffect(appState.appLockScreenVisible, appState.appUnlockPromptRequestId) {
+        if (appState.appLockScreenVisible) onRequestAppUnlock()
     }
 
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
@@ -802,7 +808,68 @@ fun WhiteNoiseApp(
                                 onRetryAction = { appState.bootstrap() },
                             )
                     }
+                    if (appState.appLockScreenVisible) {
+                        AppLockScreen(
+                            error = appState.appUnlockError,
+                            onRetry = { appState.requestAppUnlock() },
+                        )
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppLockScreen(
+    error: AppText?,
+    onRetry: () -> Unit,
+) {
+    WindowSecureFlag()
+    val context = LocalContext.current
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                Icons.Default.Lock,
+                contentDescription = null,
+                modifier = Modifier.size(56.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = stringResource(R.string.app_locked_title),
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.app_locked_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            error?.let {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = it.resolve(context),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            Spacer(Modifier.height(24.dp))
+            Button(onClick = onRetry) {
+                Text(stringResource(R.string.app_lock_retry))
             }
         }
     }
@@ -18461,6 +18528,7 @@ private fun SecurityPrivacyScreen(
     var auditLogsBusy by remember { mutableStateOf(false) }
 
     LaunchedEffect(appState.runtimeGeneration) {
+        appState.refreshAppLockCredentialAvailability()
         appState.refreshSecurityPrivacySettings()
     }
 
@@ -18479,6 +18547,39 @@ private fun SecurityPrivacyScreen(
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 SectionCard(title = stringResource(R.string.security_and_privacy)) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.require_app_unlock),
+                        subtitle =
+                            stringResource(
+                                if (appState.appLockCredentialAvailable) {
+                                    R.string.require_app_unlock_subtitle
+                                } else {
+                                    R.string.app_lock_screen_lock_required_hint
+                                },
+                            ),
+                        checked = appState.requireAppUnlock,
+                        enabled = appState.appLockCredentialAvailable,
+                        onCheckedChange = { appState.updateRequireAppUnlock(it) },
+                    )
+                    if (appState.requireAppUnlock) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = stringResource(R.string.app_lock_delay_title),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                        Column(Modifier.selectableGroup()) {
+                            AppLockDelay.entries.forEach { delay ->
+                                SelectableSettingsRow(
+                                    title = stringResource(delay.labelRes),
+                                    selected = appState.appLockDelay == delay,
+                                    onClick = { appState.updateAppLockDelay(delay) },
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
                     SettingsSwitchRow(
                         title = stringResource(R.string.force_incognito_keyboard),
                         subtitle = stringResource(R.string.force_incognito_keyboard_subtitle),
@@ -19753,6 +19854,33 @@ private tailrec fun Context.activity(): Activity? =
         else -> null
     }
 
+private val windowSecureFlagRefCounts = java.util.WeakHashMap<android.view.Window, Int>()
+
+internal fun android.view.Window.retainSecureFlag() {
+    synchronized(windowSecureFlagRefCounts) {
+        val previous = windowSecureFlagRefCounts[this] ?: 0
+        windowSecureFlagRefCounts[this] = previous + 1
+        if (previous == 0) {
+            setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE,
+            )
+        }
+    }
+}
+
+internal fun android.view.Window.releaseSecureFlag() {
+    synchronized(windowSecureFlagRefCounts) {
+        val previous = windowSecureFlagRefCounts[this] ?: return
+        if (previous <= 1) {
+            windowSecureFlagRefCounts.remove(this)
+            clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            windowSecureFlagRefCounts[this] = previous - 1
+        }
+    }
+}
+
 /**
  * Applies or clears `FLAG_SECURE` on the host activity window for the duration
  * of this composition. `FLAG_SECURE` blocks the OS Recents/overview thumbnail,
@@ -19766,12 +19894,7 @@ private fun WindowSecureFlag(enabled: Boolean = true) {
     DisposableEffect(context, enabled) {
         val window = context.activity()?.window
         if (enabled) {
-            window?.setFlags(
-                WindowManager.LayoutParams.FLAG_SECURE,
-                WindowManager.LayoutParams.FLAG_SECURE,
-            )
-        } else {
-            window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            window?.retainSecureFlag()
         }
         onDispose {
             // No symmetric restore for enabled=false: this is the shared
@@ -19779,7 +19902,7 @@ private fun WindowSecureFlag(enabled: Boolean = true) {
             // itself instead of resurrecting stale state when a permissive
             // chat surface leaves composition.
             if (enabled) {
-                window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                window?.releaseSecureFlag()
             }
         }
     }

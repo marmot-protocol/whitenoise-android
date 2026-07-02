@@ -500,6 +500,7 @@ ktlint {
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.fragment)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.ui)
@@ -521,6 +522,7 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.play.services.base)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.biometric)
     implementation(libs.androidx.work.runtime)
     testImplementation(libs.junit)
     // Real org.json for JVM unit tests — the android.jar stubs throw on use.
