@@ -154,6 +154,9 @@ internal data class ProfileGroupInviteOutcome(
 internal data class ProfileGroupInviteToast(
     @param:StringRes val messageRes: Int,
     val detail: AppText? = null,
+    // Failure outcomes carry a diagnostic detail worth pasting into a bug
+    // report; pure-success toasts stay non-copyable (#796).
+    val copyable: Boolean = false,
 )
 
 internal fun profileGroupInviteToast(outcome: ProfileGroupInviteOutcome): ProfileGroupInviteToast? {
@@ -167,9 +170,9 @@ internal fun profileGroupInviteToast(outcome: ProfileGroupInviteOutcome): Profil
         outcome.failures == 0 ->
             ProfileGroupInviteToast(R.string.toast_invites_sent_to_groups)
         outcome.delivered == 0 ->
-            ProfileGroupInviteToast(R.string.toast_couldnt_add_members, failureDetail)
+            ProfileGroupInviteToast(R.string.toast_couldnt_add_members, failureDetail, copyable = true)
         else ->
-            ProfileGroupInviteToast(R.string.toast_invites_sent_to_groups_partial, failureDetail)
+            ProfileGroupInviteToast(R.string.toast_invites_sent_to_groups_partial, failureDetail, copyable = true)
     }
 }
 
@@ -385,6 +388,11 @@ internal fun nextRetryBackoffMillis(
 data class ToastMessage(
     val title: AppText,
     val detail: AppText? = null,
+    // Explicit copy-affordance gate (#796): only error/diagnostic toasts
+    // should offer the snackbar Copy icon. Success confirmations and
+    // transient state changes leave this false (the default) so the emit
+    // site — not a message-body heuristic — decides.
+    val copyable: Boolean = false,
 )
 
 private data class ProfilePresentation(
@@ -1196,7 +1204,7 @@ class WhiteNoiseAppState(
                 failures == 0 ->
                     presentText(AppText.Resource(R.string.toast_forwarded_to_chats, listOf(delivered)))
                 delivered == 0 ->
-                    present(R.string.toast_forward_failed)
+                    present(R.string.toast_forward_failed, copyable = true)
                 else ->
                     presentText(
                         AppText.Resource(
@@ -1267,9 +1275,9 @@ class WhiteNoiseAppState(
             )
         profileGroupInviteToast(outcome)?.let { toast ->
             if (toast.detail == null) {
-                present(toast.messageRes)
+                present(toast.messageRes, copyable = toast.copyable)
             } else {
-                present(toast.messageRes, toast.detail)
+                present(toast.messageRes, toast.detail, copyable = toast.copyable)
             }
         }
         return outcome.completedSuccessfully
@@ -1486,7 +1494,7 @@ class WhiteNoiseAppState(
             warmProfile(summary.accountIdHex)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
-            present(R.string.toast_couldnt_create_identity, AppText.Plain(error.readableMessage()))
+            present(R.string.toast_couldnt_create_identity, AppText.Plain(error.readableMessage()), copyable = true)
         }
     }
 
@@ -1503,7 +1511,7 @@ class WhiteNoiseAppState(
             warmProfile(summary.accountIdHex)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
-            present(R.string.toast_couldnt_import_identity, AppText.Plain(error.readableMessage()))
+            present(R.string.toast_couldnt_import_identity, AppText.Plain(error.readableMessage()), copyable = true)
         }
     }
 
@@ -1646,7 +1654,7 @@ class WhiteNoiseAppState(
                 marmotIo { signInAccount(label) }
             }.onFailure {
                 rethrowIfCancellation(it)
-                present(R.string.toast_couldnt_sign_in_account, AppText.Plain(it.readableMessage()))
+                present(R.string.toast_couldnt_sign_in_account, AppText.Plain(it.readableMessage()), copyable = true)
                 return
             }
             refreshAccounts()
@@ -1796,7 +1804,7 @@ class WhiteNoiseAppState(
             }.onFailure {
                 rethrowIfCancellation(it)
                 appStateDebug(it) { "signOut failed account=${signedOutRef.take(8)}: ${it.readableMessage()}" }
-                present(R.string.toast_couldnt_sign_out, AppText.Plain(it.readableMessage()))
+                present(R.string.toast_couldnt_sign_out, AppText.Plain(it.readableMessage()), copyable = true)
             }.getOrNull()
                 ?: return null
         refreshAccounts()
@@ -1843,7 +1851,7 @@ class WhiteNoiseAppState(
             rethrowIfCancellation(it)
             // Secret-key export holds the nsec in hand and the toast is not
             // behind FLAG_SECURE — scrub the FFI message before showing it (#846).
-            present(R.string.toast_couldnt_export_nsec, AppText.Plain(DiagnosticFormatter.redactError(it.readableMessage())))
+            present(R.string.toast_couldnt_export_nsec, AppText.Plain(DiagnosticFormatter.redactError(it.readableMessage())), copyable = true)
         }.getOrNull()
     }
 
@@ -1909,7 +1917,7 @@ class WhiteNoiseAppState(
         }.onFailure {
             rethrowIfCancellation(it)
             appStateDebug { "encrypted backup failed: ${it.javaClass.simpleName}" }
-            present(R.string.toast_couldnt_create_encrypted_backup)
+            present(R.string.toast_couldnt_create_encrypted_backup, copyable = true)
         }.getOrNull()
     }
 
@@ -1925,7 +1933,7 @@ class WhiteNoiseAppState(
         val account = activeAccountRef ?: return null
         val candidates = relays.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         if (candidates.any { !isAcceptableRelayUrl(it) }) {
-            present(R.string.toast_relay_update_failed, R.string.error_remove_invalid_relay_urls_first)
+            present(R.string.toast_relay_update_failed, R.string.error_remove_invalid_relay_urls_first, copyable = true)
             return accountRelayLists()
         }
         val next = normalizeRelayUrls(candidates)
@@ -1944,7 +1952,7 @@ class WhiteNoiseAppState(
             present(R.string.toast_relay_list_updated)
         }.onFailure {
             rethrowIfCancellation(it)
-            present(R.string.toast_relay_update_failed, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_relay_update_failed, AppText.Plain(it.readableMessage()), copyable = true)
         }.getOrNull()
     }
 
@@ -1957,7 +1965,7 @@ class WhiteNoiseAppState(
             marmotIo { accountKeyPackages(account, bootstrapRelays) }
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_load_key_packages, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_load_key_packages, AppText.Plain(it.readableMessage()), copyable = true)
             emptyList()
         }
     }
@@ -1974,7 +1982,7 @@ class WhiteNoiseAppState(
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_delete_key_package, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_delete_key_package, AppText.Plain(it.readableMessage()), copyable = true)
             false
         }
     }
@@ -1987,7 +1995,7 @@ class WhiteNoiseAppState(
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_publish_key_package, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_publish_key_package, AppText.Plain(it.readableMessage()), copyable = true)
             false
         }
     }
@@ -2000,7 +2008,7 @@ class WhiteNoiseAppState(
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_republish_key_package, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_republish_key_package, AppText.Plain(it.readableMessage()), copyable = true)
             false
         }
     }
@@ -2042,7 +2050,7 @@ class WhiteNoiseAppState(
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()), copyable = true)
             false
         }
 
@@ -2067,7 +2075,7 @@ class WhiteNoiseAppState(
             true
         }.getOrElse {
             if (it is CancellationException) throw it
-            present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_update_security_privacy, AppText.Plain(it.readableMessage()), copyable = true)
             false
         }
 
@@ -2082,7 +2090,7 @@ class WhiteNoiseAppState(
             runCatching { marmotIo { auditLogFiles() } }
                 .getOrElse {
                     if (it is CancellationException) throw it
-                    present(R.string.toast_couldnt_delete_audit_logs, AppText.Plain(it.readableMessage()))
+                    present(R.string.toast_couldnt_delete_audit_logs, AppText.Plain(it.readableMessage()), copyable = true)
                     return false
                 }
         if (files.isEmpty()) {
@@ -2102,6 +2110,7 @@ class WhiteNoiseAppState(
         }
         present(
             if (anyDeleted) R.string.toast_audit_logs_deleted else R.string.toast_couldnt_delete_audit_logs,
+            copyable = !anyDeleted,
         )
         return anyDeleted
     }
@@ -2575,7 +2584,7 @@ class WhiteNoiseAppState(
             true
         }.getOrElse {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()), copyable = true)
             false
         }
     }
@@ -2597,7 +2606,7 @@ class WhiteNoiseAppState(
                     marmotIo { setLocalNotificationsEnabled(account, true) }
                 }.getOrElse {
                     rethrowIfCancellation(it)
-                    present(R.string.toast_couldnt_enable_notifications, AppText.Plain(it.readableMessage()))
+                    present(R.string.toast_couldnt_enable_notifications, AppText.Plain(it.readableMessage()), copyable = true)
                     return false
                 }
             localNotificationSettings = settings
@@ -2612,7 +2621,7 @@ class WhiteNoiseAppState(
             }
         if (enabled && !serviceUpdated) {
             updateBackgroundConnectionPreference(false)
-            present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service)
+            present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service, copyable = true)
             return false
         }
         present(if (enabled) R.string.toast_background_connection_enabled else R.string.toast_background_connection_disabled)
@@ -2633,7 +2642,7 @@ class WhiteNoiseAppState(
     fun onBackgroundConnectionStartRejected() {
         if (!backgroundConnectionEnabled) return
         updateBackgroundConnectionPreference(false)
-        present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service)
+        present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service, copyable = true)
     }
 
     /**
@@ -2846,7 +2855,7 @@ class WhiteNoiseAppState(
             true
         }.getOrElse {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_update_notifications, AppText.Plain(it.readableMessage()), copyable = true)
             false
         }
     }
@@ -3251,7 +3260,7 @@ class WhiteNoiseAppState(
             marmotIo { createGroup(account, "", listOf(npub), null) }
         }.getOrElse {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_start_chat, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_start_chat, AppText.Plain(it.readableMessage()), copyable = true)
             null
         }
     }
@@ -3296,42 +3305,47 @@ class WhiteNoiseAppState(
             )
         }.onFailure {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_publish_profile, AppText.Plain(it.readableMessage()))
+            present(R.string.toast_couldnt_publish_profile, AppText.Plain(it.readableMessage()), copyable = true)
         }
     }
 
     fun present(
         title: String,
         detail: String? = null,
+        copyable: Boolean = false,
     ) {
-        presentText(AppText.Plain(title), detail?.let { AppText.Plain(it) })
+        presentText(AppText.Plain(title), detail?.let { AppText.Plain(it) }, copyable)
     }
 
     fun present(
         @StringRes titleRes: Int,
+        copyable: Boolean = false,
     ) {
-        presentText(AppText.Resource(titleRes))
+        presentText(AppText.Resource(titleRes), copyable = copyable)
     }
 
     fun present(
         @StringRes titleRes: Int,
         @StringRes detailRes: Int,
+        copyable: Boolean = false,
     ) {
-        presentText(AppText.Resource(titleRes), AppText.Resource(detailRes))
+        presentText(AppText.Resource(titleRes), AppText.Resource(detailRes), copyable)
     }
 
     fun present(
         @StringRes titleRes: Int,
         detail: AppText,
+        copyable: Boolean = false,
     ) {
-        presentText(AppText.Resource(titleRes), detail)
+        presentText(AppText.Resource(titleRes), detail, copyable)
     }
 
     fun presentText(
         title: AppText,
         detail: AppText? = null,
+        copyable: Boolean = false,
     ) {
-        toast = ToastMessage(title, detail)
+        toast = ToastMessage(title, detail, copyable)
     }
 
     fun clearToast() {

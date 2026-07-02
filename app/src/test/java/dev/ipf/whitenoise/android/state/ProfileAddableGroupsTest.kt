@@ -76,11 +76,13 @@ class ProfileAddableGroupsTest {
             outcome = ProfileGroupInviteOutcome(attempted = 3, failures = 1, firstFailure = failure),
             messageRes = R.string.toast_invites_sent_to_groups_partial,
             detail = failure,
+            copyable = true,
         )
         assertInviteToast(
             outcome = ProfileGroupInviteOutcome(attempted = 2, failures = 2, firstFailure = failure),
             messageRes = R.string.toast_couldnt_add_members,
             detail = failure,
+            copyable = true,
         )
     }
 
@@ -101,10 +103,12 @@ class ProfileAddableGroupsTest {
         outcome: ProfileGroupInviteOutcome,
         messageRes: Int,
         detail: AppText? = null,
+        copyable: Boolean = false,
     ) {
         val toast = profileGroupInviteToast(outcome)
         assertEquals(messageRes, toast?.messageRes)
         assertEquals(detail, toast?.detail)
+        assertEquals(copyable, toast?.copyable)
     }
 
     private fun item(

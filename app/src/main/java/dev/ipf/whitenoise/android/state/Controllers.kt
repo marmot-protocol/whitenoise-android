@@ -1872,7 +1872,7 @@ class ChatsController(
             true
         }.onFailure {
             if (it is CancellationException) throw it
-            appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
+            appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
         }.getOrDefault(false)
     }
 
@@ -1956,9 +1956,9 @@ class ChatsController(
                 // Tell them so they know to ask another admin to restore
                 // their role (or retry); the generic "couldn't leave"
                 // toast misses that they're now mid-state.
-                appState.present(R.string.toast_demoted_but_couldnt_leave, errorText)
+                appState.present(R.string.toast_demoted_but_couldnt_leave, errorText, copyable = true)
             } else {
-                appState.present(R.string.toast_couldnt_leave_chat, errorText)
+                appState.present(R.string.toast_couldnt_leave_chat, errorText, copyable = true)
             }
         }.getOrDefault(false)
     }
@@ -2002,7 +2002,7 @@ class ChatsController(
         wipe.exceptionOrNull()?.let {
             if (it is CancellationException) throw it
             removedRow?.let { row -> foldChatRow(row) }
-            appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(it.message ?: it.javaClass.simpleName))
+            appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
             return false
         }
         // Wipe succeeded (or found nothing to remove) — the row was already
@@ -3500,7 +3500,7 @@ class ConversationController(
                 context = arrayOf("error" to throwable.javaClass.simpleName),
             )
             forgetSendTrace(tempId)
-            appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
+            appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
         }
     }
 
@@ -3968,7 +3968,7 @@ class ConversationController(
                 // path runs) or explicitly discards.
                 publishTimelineFromIndexes()
                 Log.w("DMConversation", "media upload failed for ${group.groupIdHex.take(8)}", throwable)
-                appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
+                appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
             }
         } finally {
             appState.untrackInFlightMediaUpload(conversationAccountRef, group.groupIdHex, key, uploadJob)
@@ -4035,7 +4035,7 @@ class ConversationController(
             throwable.rethrowIfCancellation()
             optimisticReactionChanges.remove(optimisticId)
             recomputeReactions()
-            appState.present(R.string.toast_reaction_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
+            appState.present(R.string.toast_reaction_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
         }
         if (reactionCommitted) {
             // Reacting is unambiguous evidence the user saw this message, so
@@ -4062,7 +4062,7 @@ class ConversationController(
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
             deletedMessageIds = deletedMessageIds - target
-            appState.present(R.string.toast_couldnt_delete_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
+            appState.present(R.string.toast_couldnt_delete_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
         }
     }
 
@@ -4119,7 +4119,7 @@ class ConversationController(
                 ?.takeIf { it.status == MessageStatus.Pending && it.text == trimmed }
                 ?.let { optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Failed) }
             publishTimelineFromIndexes()
-            appState.present(R.string.toast_couldnt_edit_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
+            appState.present(R.string.toast_couldnt_edit_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
         }
     }
 
@@ -4590,7 +4590,7 @@ class ConversationController(
                 ),
             )
             publishTimelineFromIndexes()
-            appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName))
+            appState.present(R.string.toast_send_failed, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
         }
     }
 
@@ -4705,9 +4705,9 @@ class ConversationController(
                 val message = mutationError(it)
                 lastMutationError = message
                 if (demotedBeforeLeave) {
-                    appState.present(R.string.toast_demoted_but_couldnt_leave, AppText.Plain(message))
+                    appState.present(R.string.toast_demoted_but_couldnt_leave, AppText.Plain(message), copyable = true)
                 } else {
-                    appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(message))
+                    appState.present(R.string.toast_couldnt_leave_chat, AppText.Plain(message), copyable = true)
                 }
                 false
             }
@@ -4740,7 +4740,7 @@ class ConversationController(
                 true
             }.getOrElse {
                 it.rethrowIfCancellation()
-                appState.present(R.string.toast_couldnt_accept_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
+                appState.present(R.string.toast_couldnt_accept_invite, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
                 false
             }
         }
@@ -4757,7 +4757,7 @@ class ConversationController(
                 true
             }.getOrElse {
                 it.rethrowIfCancellation()
-                appState.present(R.string.toast_couldnt_decline_invite, AppText.Plain(it.message ?: it.javaClass.simpleName))
+                appState.present(R.string.toast_couldnt_decline_invite, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
                 false
             }
         }
@@ -4778,7 +4778,7 @@ class ConversationController(
                 it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(message))
+                appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(message), copyable = true)
             }.getOrDefault(false)
         }
 
@@ -4806,7 +4806,7 @@ class ConversationController(
                 it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message))
+                appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message), copyable = true)
             }.getOrDefault(false)
         }
 
@@ -4831,7 +4831,7 @@ class ConversationController(
                 it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message))
+                appState.present(R.string.toast_couldnt_update_group, AppText.Plain(message), copyable = true)
             }.getOrDefault(false)
         }
 
@@ -4876,7 +4876,7 @@ class ConversationController(
                     // partial success and leave the row-level Admin switch as the
                     // retry path once the member appears in details.
                     lastMutationError = "Invite sent, but admin promotion failed: $message"
-                    appState.present(R.string.toast_invite_sent_but_couldnt_add_admin, AppText.Plain(message))
+                    appState.present(R.string.toast_invite_sent_but_couldnt_add_admin, AppText.Plain(message), copyable = true)
                     true
                 } else if (isDuplicateSignatureKeyError(message)) {
                     // MLS rejected the add commit because the proposed member
@@ -4888,11 +4888,11 @@ class ConversationController(
                     val name = duplicateSignatureKeyDisplayName(refs, appState::displayName)
                     val friendly = copy.couldntAddMemberDuplicate(name)
                     lastMutationError = friendly
-                    appState.present(R.string.toast_couldnt_add_members, AppText.Plain(friendly))
+                    appState.present(R.string.toast_couldnt_add_members, AppText.Plain(friendly), copyable = true)
                     false
                 } else {
                     lastMutationError = message
-                    appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message))
+                    appState.present(R.string.toast_couldnt_add_members, AppText.Plain(message), copyable = true)
                     false
                 }
             }
@@ -4929,7 +4929,7 @@ class ConversationController(
                 } else {
                     val message = mutationError(throwable)
                     lastMutationError = message
-                    appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(message))
+                    appState.present(R.string.toast_couldnt_remove_member, AppText.Plain(message), copyable = true)
                     false
                 }
             }
@@ -4969,7 +4969,7 @@ class ConversationController(
                 it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message))
+                appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message), copyable = true)
             }.getOrDefault(false)
         }
 
@@ -5008,7 +5008,7 @@ class ConversationController(
                 it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_disappearing, AppText.Plain(message))
+                appState.present(R.string.toast_couldnt_update_disappearing, AppText.Plain(message), copyable = true)
             }.getOrDefault(false)
         }
 
@@ -5033,7 +5033,7 @@ class ConversationController(
                 it.rethrowIfCancellation()
                 val message = mutationError(it)
                 lastMutationError = message
-                appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message))
+                appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message), copyable = true)
             }.getOrDefault(false)
         }
 
@@ -5061,7 +5061,7 @@ class ConversationController(
             if (!GroupProjector.canTransferAdminTo(group, member, activeAccountIdHex)) {
                 // Already an admin, the active account isn't an admin, or the
                 // target is the active account itself. Nothing to transfer.
-                appState.present(R.string.toast_couldnt_update_admin, R.string.toast_cant_transfer_admin)
+                appState.present(R.string.toast_couldnt_update_admin, R.string.toast_cant_transfer_admin, copyable = true)
                 return@withMutationLockResult false
             }
             // Tracks whether the grant landed before the self-demote attempt so
@@ -5092,9 +5092,9 @@ class ConversationController(
                 if (grantedBeforeDemote) {
                     // Target is now an admin but we couldn't step down. Tell the user
                     // so they can retry the step-down (or revoke the grant).
-                    appState.present(R.string.toast_granted_but_couldnt_step_down, AppText.Plain(message))
+                    appState.present(R.string.toast_granted_but_couldnt_step_down, AppText.Plain(message), copyable = true)
                 } else {
-                    appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message))
+                    appState.present(R.string.toast_couldnt_update_admin, AppText.Plain(message), copyable = true)
                 }
             }.getOrDefault(false)
         }
@@ -5113,7 +5113,7 @@ class ConversationController(
             appState.marmotIo { groupMlsState(account, group.groupIdHex) }
         }.onFailure {
             if (it is CancellationException) throw it
-            appState.present(R.string.toast_couldnt_load_mls_state, AppText.Plain(it.message ?: it.javaClass.simpleName))
+            appState.present(R.string.toast_couldnt_load_mls_state, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
         }.getOrNull()
     }
 
@@ -5152,7 +5152,7 @@ class ConversationController(
             }
         }.onFailure {
             it.rethrowIfCancellation()
-            appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(it.message ?: it.javaClass.simpleName))
+            appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
         }.getOrNull()
     }
 

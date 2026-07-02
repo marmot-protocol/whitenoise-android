@@ -687,7 +687,7 @@ private fun VoiceLibraryRow(
                                     )
                                 }.onFailure {
                                     if (it is kotlinx.coroutines.CancellationException) throw it
-                                    appState.present(R.string.shared_media_voice_failed)
+                                    appState.present(R.string.shared_media_voice_failed, copyable = true)
                                 }.also { loading = false }
                                     .getOrNull() ?: return@launch
                             localFile = file
@@ -813,7 +813,7 @@ private fun FileLibraryRow(
                         when (outcome) {
                             OpenAttachmentResult.Opened -> Unit
                             OpenAttachmentResult.NoHandler -> appState.present(noOpenAppMessage)
-                            OpenAttachmentResult.Error -> appState.present(couldntOpenMessage)
+                            OpenAttachmentResult.Error -> appState.present(couldntOpenMessage, copyable = true)
                         }
                         inFlight = false
                     }
@@ -907,6 +907,7 @@ private fun FileLibraryRow(
                                     }.getOrDefault(false)
                                 appState.present(
                                     if (saved) R.string.shared_media_saved else R.string.shared_media_save_failed,
+                                    copyable = !saved,
                                 )
                             }
                         },
@@ -925,7 +926,7 @@ private fun FileLibraryRow(
                                     )
                                 }.onFailure {
                                     if (it is kotlinx.coroutines.CancellationException) throw it
-                                    appState.present(couldntOpenMessage)
+                                    appState.present(couldntOpenMessage, copyable = true)
                                 }
                             }
                         },
@@ -966,7 +967,7 @@ private fun UrlLibraryTab(
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         },
                     )
-                }.onFailure { appState.present(couldntOpenMessage) }
+                }.onFailure { appState.present(couldntOpenMessage, copyable = true) }
             },
             onCopy = {
                 clipboard.setText(AnnotatedString(entry.url))

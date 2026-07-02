@@ -80,6 +80,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
@@ -201,9 +202,11 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -752,7 +755,10 @@ fun WhiteNoiseApp(
     LaunchedEffect(toast) {
         if (toast != null) {
             snackbarHostState.showSnackbar(
-                listOfNotNull(toast.title.resolve(context), toast.detail?.resolve(context)).joinToString("\n"),
+                ToastSnackbarVisuals(
+                    message = listOfNotNull(toast.title.resolve(context), toast.detail?.resolve(context)).joinToString("\n"),
+                    copyable = toast.copyable,
+                ),
             )
             appState.clearToast()
         }
@@ -838,6 +844,30 @@ fun WhiteNoiseSnackbarHost(
 }
 
 /**
+ * Visuals for toasts pushed through `WhiteNoiseAppState.present`. Carries the
+ * emit site's explicit [copyable] flag so [SwipeDismissibleSnackbar] can gate
+ * its Copy affordance on the toast's kind (error/diagnostic vs. success or
+ * transient confirmation) instead of guessing from the message body (#796).
+ */
+internal data class ToastSnackbarVisuals(
+    override val message: String,
+    val copyable: Boolean = false,
+) : SnackbarVisuals {
+    override val actionLabel: String? = null
+    override val withDismissAction: Boolean = false
+    override val duration: SnackbarDuration = SnackbarDuration.Short
+}
+
+/**
+ * Whether a snackbar should render the Copy affordance (#543, #796). Only
+ * non-actionable toasts explicitly flagged copyable at their emit site — error
+ * and diagnostic strings — qualify; plain `showSnackbar(message)` calls and
+ * actionable snackbars never do.
+ */
+internal fun snackbarShowsCopyAffordance(visuals: SnackbarVisuals): Boolean =
+    visuals.actionLabel == null && (visuals as? ToastSnackbarVisuals)?.copyable == true
+
+/**
  * A [Snackbar] the user can swipe away horizontally (issue #352). Material 3's
  * [SnackbarHost] does not wire up swipe-to-dismiss itself, so a snackbar
  * otherwise sits until it times out or an action is tapped. Wrapping it in a
@@ -871,18 +901,10 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
         state = dismissState,
         backgroundContent = {},
     ) {
-        if (data.visuals.actionLabel != null) {
-            // Actionable snackbars (e.g. the chat-list "Undo") keep their
-            // existing action slot untouched — we only make the message text
-            // selectable. Replacing the action with a copy button here would
-            // break the action gesture and SnackbarResult.ActionPerformed.
-            SelectionContainer {
-                Snackbar(snackbarData = data)
-            }
-        } else {
-            // Error/toast snackbars never set an action label, so the action
-            // slot is free for a discoverable Copy affordance. The message is
-            // wrapped in a SelectionContainer for long-press copy (issue #543).
+        if (snackbarShowsCopyAffordance(data.visuals)) {
+            // Error/diagnostic toasts flagged copyable at their emit site get
+            // a discoverable Copy affordance in the free action slot, plus a
+            // SelectionContainer for long-press copy (issues #543, #796).
             val clipboard = LocalClipboardManager.current
             val message = data.visuals.message
             Snackbar(
@@ -898,6 +920,14 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
                 SelectionContainer {
                     Text(message)
                 }
+            }
+        } else {
+            // Everything else — actionable snackbars (e.g. the chat-list
+            // "Undo", whose action slot and SnackbarResult semantics must stay
+            // untouched) and non-copyable toasts like success confirmations —
+            // renders plain, with the message text still selectable.
+            SelectionContainer {
+                Snackbar(snackbarData = data)
             }
         }
     }
@@ -2259,7 +2289,7 @@ private fun ChatsScreen(
                 showScanner = false
                 val scanned = ProfileLink.parse(raw)
                 if (scanned == null) {
-                    appState.present(R.string.error_not_white_noise_profile_qr)
+                    appState.present(R.string.error_not_white_noise_profile_qr, copyable = true)
                 } else {
                     appState.presentProfile(scanned.npub)
                 }
@@ -4375,11 +4405,10 @@ private const val ConversationNearBottomItemSlack = 3
 // navigation bar. Used by ConversationScreen to push the global
 // snackbar host above the composer so toasts don't intercept touches
 // on the message input — see [LocalSnackbarBottomInset] + issue #122.
-// 72.dp covers the single-line composer plus its vertical padding; a
-// multi-line composer can grow taller but the snackbar still clears
-// the input row that needs to remain tappable. TODO: derive from the
-// composer's measured height instead of hardcoding so multi-line and
-// attachment-preview states stay covered exactly.
+// 72.dp covers the single-line composer plus its vertical padding.
+// Only a seed for the first frames: the bottom bar's measured height
+// replaces it as soon as layout runs (#796), so multi-line composers,
+// reply/edit banners, and the invite bar stay cleared exactly.
 private val COMPOSER_SNACKBAR_INSET = 72.dp
 
 // Approximate clearance the chat-list quick-action FAB occupies above the
@@ -5555,7 +5584,7 @@ private fun MediaFileBubble(
                                 }
                                 OpenAttachmentResult.Error -> {
                                     failed = true
-                                    appState.present(couldntOpenMessage)
+                                    appState.present(couldntOpenMessage, copyable = true)
                                 }
                             }
                             inFlight = false
@@ -8352,6 +8381,8 @@ private fun ConversationScreen(
     // reusing the same node across nav) re-runs the effect: the
     // previous chat's onDispose may not have fired before the next
     // enters, leaving the inset at zero on a stale snackbar host.
+    // Seeds the resting-composer estimate; the bottom bar's measured
+    // height takes over on first layout (#796).
     DisposableEffect(chat.id) {
         snackbarBottomInset.value = COMPOSER_SNACKBAR_INSET
         onDispose { snackbarBottomInset.value = 0.dp }
@@ -8659,7 +8690,7 @@ private fun ConversationScreen(
     fun launchCameraCapture() {
         val file = createImageCaptureFile(context)
         if (file == null) {
-            appState.present(R.string.toast_couldnt_decode_image)
+            appState.present(R.string.toast_couldnt_decode_image, copyable = true)
             return
         }
         cameraOutputFile = file
@@ -8925,6 +8956,9 @@ private fun ConversationScreen(
                         anyVideoPicked -> R.string.toast_couldnt_process_video
                         else -> R.string.toast_couldnt_decode_image
                     },
+                    // Decode/process failures are diagnostic; the album size
+                    // cap is a fixed validation limit (#796).
+                    copyable = !albumOverflowed,
                 )
                 if (attachments.isEmpty()) return@launchMutation
             }
@@ -9141,12 +9175,12 @@ private fun ConversationScreen(
                 if (imageUris.isNotEmpty()) {
                     val toast =
                         if (imageAlbumOverflowed) R.string.media_album_too_large else visualFailureToast
-                    appState.present(toast)
+                    appState.present(toast, copyable = !imageAlbumOverflowed)
                     return@launchMutation
                 }
             }
             if (acceptedImages.size < imageUris.size && !imageAlbumOverflowed) {
-                appState.present(visualFailureToast)
+                appState.present(visualFailureToast, copyable = true)
             }
             if (imageAlbumOverflowed || docOutcome.albumOverflowed) {
                 appState.present(R.string.media_album_too_large)
@@ -10125,172 +10159,186 @@ private fun ConversationScreen(
             }
         },
         bottomBar = {
-            when {
-                // While search is open the composer steps aside for the match
-                // navigation bar pinned above the keyboard.
-                searchOpen ->
-                    ConversationSearchNavBar(
-                        matchCount = searchMatchIds.size,
-                        activeIndex = searchActiveIndex,
-                        hasQuery = searchQuery.isNotBlank(),
-                        onPrev = { navigateToSearchMatch(forward = false) },
-                        onNext = { navigateToSearchMatch(forward = true) },
-                    )
-                controller.error != null -> Unit
-                // Membership-display gate (issues #545 and #623). During the
-                // brief window before refreshMembers() confirms the roster we
-                // must not flash a state we don't actually know: a left group
-                // flashing the active composer (#545) OR a member's group —
-                // especially an admin re-entering their own group — flashing the
-                // "no longer a member" notice (#623, the inverse). The gate
-                // paints the composer only for a (believed) member, the notice
-                // only for a known not-member, and NOTHING while membership is
-                // genuinely unknown (cold open with no seeding snapshot), where
-                // it upgrades on the confirmed result. The controller's
-                // `canSendMessages` guard still keeps any actual mutation safe
-                // until membership is verified.
-                else ->
-                    when (
-                        conversationComposerGate(
-                            pendingInvite = controller.group.pendingConfirmation,
-                            membersVerified = controller.membersVerified,
-                            isSelfMember = controller.isSelfMember,
-                            seededSelfMember = controller.seededSelfMember,
-                            seededMembershipKnown = controller.seededMembershipKnown,
-                            assumeMemberUntilVerified = openedFromNotification,
+            // Measure the real bottom chrome (composer with reply/edit banners and
+            // grown multi-line input, search nav bar, invite bar, or notice) and lift
+            // the global toast host by that amount, instead of assuming the resting
+            // single-line composer height (#122, #796). Nav/IME insets are subtracted
+            // because WhiteNoiseSnackbarHost pads for those itself.
+            val chromeInsets = WindowInsets.navigationBars.union(WindowInsets.ime)
+            Box(
+                Modifier.onSizeChanged { size ->
+                    val chromeBottom = chromeInsets.getBottom(density)
+                    snackbarBottomInset.value =
+                        with(density) { (size.height - chromeBottom).coerceAtLeast(0).toDp() }
+                },
+            ) {
+                when {
+                    // While search is open the composer steps aside for the match
+                    // navigation bar pinned above the keyboard.
+                    searchOpen ->
+                        ConversationSearchNavBar(
+                            matchCount = searchMatchIds.size,
+                            activeIndex = searchActiveIndex,
+                            hasQuery = searchQuery.isNotBlank(),
+                            onPrev = { navigateToSearchMatch(forward = false) },
+                            onNext = { navigateToSearchMatch(forward = true) },
                         )
-                    ) {
-                        // Reserve the composer's resting height while membership
-                        // is still unknown (e.g. right after an account switch),
-                        // so the bottom inset is stable and the composer doesn't
-                        // pop in over the last message once it resolves. Matches
-                        // ComposerBar's resting height (the 44.dp pill plus its
-                        // Column's 10.dp vertical padding top and bottom). Kept
-                        // transparent so no surface colour flashes before the
-                        // composer or notice resolves.
-                        ComposerGate.PENDING ->
-                            Spacer(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .navigationBarsPadding()
-                                    .imePadding()
-                                    .height(64.dp),
+                    controller.error != null -> Unit
+                    // Membership-display gate (issues #545 and #623). During the
+                    // brief window before refreshMembers() confirms the roster we
+                    // must not flash a state we don't actually know: a left group
+                    // flashing the active composer (#545) OR a member's group —
+                    // especially an admin re-entering their own group — flashing the
+                    // "no longer a member" notice (#623, the inverse). The gate
+                    // paints the composer only for a (believed) member, the notice
+                    // only for a known not-member, and NOTHING while membership is
+                    // genuinely unknown (cold open with no seeding snapshot), where
+                    // it upgrades on the confirmed result. The controller's
+                    // `canSendMessages` guard still keeps any actual mutation safe
+                    // until membership is verified.
+                    else ->
+                        when (
+                            conversationComposerGate(
+                                pendingInvite = controller.group.pendingConfirmation,
+                                membersVerified = controller.membersVerified,
+                                isSelfMember = controller.isSelfMember,
+                                seededSelfMember = controller.seededSelfMember,
+                                seededMembershipKnown = controller.seededMembershipKnown,
+                                assumeMemberUntilVerified = openedFromNotification,
                             )
-                        ComposerGate.NOTICE -> RemovedMemberComposerNotice()
-                        ComposerGate.INVITE ->
-                            InvitePreviewActionBar(
-                                mutationInFlight = controller.mutationInFlight,
-                                onJoin = { appState.launchMutation { controller.acceptInvite() } },
-                                onDecline = {
-                                    appState.launchMutation {
-                                        if (controller.declineInvite()) onBack()
+                        ) {
+                            // Reserve the composer's resting height while membership
+                            // is still unknown (e.g. right after an account switch),
+                            // so the bottom inset is stable and the composer doesn't
+                            // pop in over the last message once it resolves. Matches
+                            // ComposerBar's resting height (the 44.dp pill plus its
+                            // Column's 10.dp vertical padding top and bottom). Kept
+                            // transparent so no surface colour flashes before the
+                            // composer or notice resolves.
+                            ComposerGate.PENDING ->
+                                Spacer(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .navigationBarsPadding()
+                                        .imePadding()
+                                        .height(64.dp),
+                                )
+                            ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                            ComposerGate.INVITE ->
+                                InvitePreviewActionBar(
+                                    mutationInFlight = controller.mutationInFlight,
+                                    onJoin = { appState.launchMutation { controller.acceptInvite() } },
+                                    onDecline = {
+                                        appState.launchMutation {
+                                            if (controller.declineInvite()) onBack()
+                                        }
+                                    },
+                                )
+                            ComposerGate.COMPOSER -> {
+                                val groupIdHex = controller.group.groupIdHex
+                                val editingRecord =
+                                    controller.editingMessageId?.let { id ->
+                                        controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                                     }
-                                },
-                            )
-                        ComposerGate.COMPOSER -> {
-                            val groupIdHex = controller.group.groupIdHex
-                            val editingRecord =
-                                controller.editingMessageId?.let { id ->
-                                    controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
-                                }
-                            // #414: candidates for the @-mention picker — the group's
-                            // own roster minus the local account (you can't mention
-                            // yourself). Keyed on the roster + profile revision so a
-                            // late-arriving display name / nip05 re-derives the list.
-                            // The list already arrives most-recently-active first from
-                            // the roster, and MentionComposer.filter preserves order.
-                            val mentionPickerEnabled = !controller.isDm
-                            val mentionMemberIds =
-                                remember(controller.members) {
-                                    controller.members.map { it.memberIdHex }
-                                }
-                            LaunchedEffect(mentionPickerEnabled, mentionMemberIds) {
-                                if (mentionPickerEnabled) {
-                                    appState.requestProfiles(mentionMemberIds)
-                                }
-                            }
-                            val mentionCandidates =
-                                if (mentionPickerEnabled) {
-                                    val revision = appState.profileRevisionForCompose
-                                    val activeAccountIdHex = appState.activeAccount?.accountIdHex
-                                    remember(controller.members, revision, activeAccountIdHex) {
-                                        controller.members
-                                            // Exclude only the active account, not every member
-                                            // flagged `local`. Marmot sets `local` for any identity
-                                            // present on the device, which on some rosters marks all
-                                            // members local and would empty the mention list entirely.
-                                            // Mirrors the isActiveAccountMember gate used for admin actions.
-                                            .filterNot { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                                            .map { member ->
-                                                MentionComposer.Candidate(
-                                                    accountIdHex = member.memberIdHex,
-                                                    npub = appState.npub(member.memberIdHex),
-                                                    displayName = appState.chatMemberTitleCached(member.memberIdHex),
-                                                    nip05 = appState.userProfile(member.memberIdHex)?.nip05,
-                                                )
-                                            }
+                                // #414: candidates for the @-mention picker — the group's
+                                // own roster minus the local account (you can't mention
+                                // yourself). Keyed on the roster + profile revision so a
+                                // late-arriving display name / nip05 re-derives the list.
+                                // The list already arrives most-recently-active first from
+                                // the roster, and MentionComposer.filter preserves order.
+                                val mentionPickerEnabled = !controller.isDm
+                                val mentionMemberIds =
+                                    remember(controller.members) {
+                                        controller.members.map { it.memberIdHex }
                                     }
-                                } else {
-                                    emptyList()
-                                }
-                            ComposerBar(
-                                replyingTo = controller.replyingTo,
-                                messageTextCopy = messageTextCopy,
-                                onCancelReply = { controller.replyingTo = null },
-                                onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
-                                initialDraft = appState.draftFor(groupIdHex).orEmpty(),
-                                onDraftChange = { appState.setDraft(groupIdHex, it) },
-                                draftKey = groupIdHex,
-                                editingMessageId = controller.editingMessageId,
-                                editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                                onCancelEdit = { controller.editingMessageId = null },
-                                onAfterSend = {
-                                    // Always pull the user down to see their just-sent
-                                    // bubble, even if they were reading older history.
-                                    // Matches standard chat-app behavior.
-                                    scope.launch {
-                                        val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                                        listState.animateScrollToItem(lastIndex)
+                                LaunchedEffect(mentionPickerEnabled, mentionMemberIds) {
+                                    if (mentionPickerEnabled) {
+                                        appState.requestProfiles(mentionMemberIds)
                                     }
-                                },
-                                onPickFromGallery = {
-                                    imagePickerLauncher.launch(
-                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                                    )
-                                },
-                                onCaptureFromCamera = {
-                                    val granted =
-                                        ContextCompat.checkSelfPermission(
-                                            context,
-                                            Manifest.permission.CAMERA,
-                                        ) == PackageManager.PERMISSION_GRANTED
-                                    if (granted) {
-                                        launchCameraCapture()
+                                }
+                                val mentionCandidates =
+                                    if (mentionPickerEnabled) {
+                                        val revision = appState.profileRevisionForCompose
+                                        val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                                        remember(controller.members, revision, activeAccountIdHex) {
+                                            controller.members
+                                                // Exclude only the active account, not every member
+                                                // flagged `local`. Marmot sets `local` for any identity
+                                                // present on the device, which on some rosters marks all
+                                                // members local and would empty the mention list entirely.
+                                                // Mirrors the isActiveAccountMember gate used for admin actions.
+                                                .filterNot { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+                                                .map { member ->
+                                                    MentionComposer.Candidate(
+                                                        accountIdHex = member.memberIdHex,
+                                                        npub = appState.npub(member.memberIdHex),
+                                                        displayName = appState.chatMemberTitleCached(member.memberIdHex),
+                                                        nip05 = appState.userProfile(member.memberIdHex)?.nip05,
+                                                    )
+                                                }
+                                        }
                                     } else {
-                                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                        emptyList()
                                     }
-                                },
-                                onPickDocument = {
-                                    // `*/*` lets the system file picker surface every
-                                    // installed provider (Drive, Downloads, Files…)
-                                    // without restricting by MIME. Bytes upload as-is.
-                                    documentPickerLauncher.launch(arrayOf("*/*"))
-                                },
-                                voiceRecordingController = voiceRecordingController,
-                                appState = appState,
-                                mentionCandidates = mentionCandidates,
-                                mentionPickerEnabled = mentionPickerEnabled,
-                                autoFocusOnEnter = justCreated,
-                                enterKeyBehavior = appState.enterKeyBehavior,
-                                // #589: hoisted focus plumbing — the requester lets the
-                                // resume observer restore focus, and the callback keeps
-                                // `composerFocused` tracking the live keyboard state.
-                                composerFocus = composerFocus,
-                                onComposerFocusChanged = { composerFocused = it },
-                                onBottomInputChanged = ::reanchorNewestAfterBottomInputChange,
-                            )
+                                ComposerBar(
+                                    replyingTo = controller.replyingTo,
+                                    messageTextCopy = messageTextCopy,
+                                    onCancelReply = { controller.replyingTo = null },
+                                    onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
+                                    initialDraft = appState.draftFor(groupIdHex).orEmpty(),
+                                    onDraftChange = { appState.setDraft(groupIdHex, it) },
+                                    draftKey = groupIdHex,
+                                    editingMessageId = controller.editingMessageId,
+                                    editingInitialText = editingRecord?.let { controller.displayedText(it) },
+                                    onCancelEdit = { controller.editingMessageId = null },
+                                    onAfterSend = {
+                                        // Always pull the user down to see their just-sent
+                                        // bubble, even if they were reading older history.
+                                        // Matches standard chat-app behavior.
+                                        scope.launch {
+                                            val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                                            listState.animateScrollToItem(lastIndex)
+                                        }
+                                    },
+                                    onPickFromGallery = {
+                                        imagePickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                                        )
+                                    },
+                                    onCaptureFromCamera = {
+                                        val granted =
+                                            ContextCompat.checkSelfPermission(
+                                                context,
+                                                Manifest.permission.CAMERA,
+                                            ) == PackageManager.PERMISSION_GRANTED
+                                        if (granted) {
+                                            launchCameraCapture()
+                                        } else {
+                                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                        }
+                                    },
+                                    onPickDocument = {
+                                        // `*/*` lets the system file picker surface every
+                                        // installed provider (Drive, Downloads, Files…)
+                                        // without restricting by MIME. Bytes upload as-is.
+                                        documentPickerLauncher.launch(arrayOf("*/*"))
+                                    },
+                                    voiceRecordingController = voiceRecordingController,
+                                    appState = appState,
+                                    mentionCandidates = mentionCandidates,
+                                    mentionPickerEnabled = mentionPickerEnabled,
+                                    autoFocusOnEnter = justCreated,
+                                    enterKeyBehavior = appState.enterKeyBehavior,
+                                    // #589: hoisted focus plumbing — the requester lets the
+                                    // resume observer restore focus, and the callback keeps
+                                    // `composerFocused` tracking the live keyboard state.
+                                    composerFocus = composerFocus,
+                                    onComposerFocusChanged = { composerFocused = it },
+                                    onBottomInputChanged = ::reanchorNewestAfterBottomInputChange,
+                                )
+                            }
                         }
-                    }
+                }
             }
         },
     ) { padding ->
@@ -10807,11 +10855,18 @@ internal fun StickyFormActionBar(
         }
     }
 
+    // Report the bar's height net of nav/IME insets: WhiteNoiseSnackbarHost
+    // already pads for those, so including them here would lift the toast a
+    // second keyboard-height above the bar instead of just clear of it (#796).
+    val chromeInsets = WindowInsets.navigationBars.union(WindowInsets.ime)
     Surface(
         modifier =
             modifier
                 .fillMaxWidth()
-                .onSizeChanged { size -> actionBarHeight = with(density) { size.height.toDp() } },
+                .onSizeChanged { size ->
+                    val chromeBottom = chromeInsets.getBottom(density)
+                    actionBarHeight = with(density) { (size.height - chromeBottom).coerceAtLeast(0).toDp() }
+                },
         border = amoledSurfaceBorderStroke(),
         tonalElevation = 3.dp,
     ) {
@@ -11167,7 +11222,7 @@ private fun GroupDetailsScreen(
                 } catch (_: ActivityNotFoundException) {
                     pendingTranscriptShareFile = null
                     file.delete()
-                    appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(noShareTargetText))
+                    appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(noShareTargetText), copyable = true)
                 }
             } catch (error: Throwable) {
                 if (error is CancellationException) {
@@ -11179,7 +11234,7 @@ private fun GroupDetailsScreen(
                 }
                 pendingTranscriptShareFile?.delete()
                 pendingTranscriptShareFile = null
-                appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(error.message ?: error.javaClass.simpleName))
+                appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(error.message ?: error.javaClass.simpleName), copyable = true)
             } finally {
                 transcriptExportInFlight = false
             }
@@ -20505,7 +20560,7 @@ private fun IdentityScreen(
                                 if (outcome != null) {
                                     appState.present(R.string.toast_signed_out_and_wiped)
                                 } else {
-                                    appState.present(R.string.toast_couldnt_wipe_account)
+                                    appState.present(R.string.toast_couldnt_wipe_account, copyable = true)
                                 }
                             } finally {
                                 appState.signOutInProgress = false
