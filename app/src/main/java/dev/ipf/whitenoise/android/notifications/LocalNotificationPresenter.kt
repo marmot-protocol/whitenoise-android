@@ -28,11 +28,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 class LocalNotificationPresenter(
     private val context: Context,
 ) {
     private val redactedPublicVersions = ConcurrentHashMap<String, Notification>()
+    private val shortcutSnapshots = ConcurrentHashMap<String, ConversationShortcutSnapshot>()
+    private val shortcutLastUsed = ConcurrentHashMap<String, Long>()
+    private val shortcutAccessClock = AtomicLong()
 
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)
@@ -171,11 +175,13 @@ class LocalNotificationPresenter(
                     }
                 conversationShortcutId(update)?.let { shortcutId ->
                     val locusId = LocusIdCompat(shortcutId)
-                    publishConversationShortcut(update, notificationContent, shortcutId, locusId)
                     builder
                         .setShortcutId(shortcutId)
                         .setLocusId(locusId)
                         .addPerson(senderPerson(notificationContent))
+                    withContext(Dispatchers.Default) {
+                        publishConversationShortcut(update, notificationContent, shortcutId, locusId)
+                    }
                 }
                 builder.setStyle(messagingStyle(update, notificationContent, conversationTitleOverride, decision.historyCap, carried))
                 NotificationActions
@@ -208,10 +214,13 @@ class LocalNotificationPresenter(
         }
 
         val notificationManager = NotificationManagerCompat.from(context)
-        if (decision.replaceExistingBeforePost) {
-            notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+        val notification = builder.build()
+        withContext(Dispatchers.Default) {
+            if (decision.replaceExistingBeforePost) {
+                notificationManager.cancel(notificationContent.notificationTag, notificationContent.notificationId)
+            }
+            notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, notification)
         }
-        notificationManager.notify(notificationContent.notificationTag, notificationContent.notificationId, builder.build())
         notificationDebug {
             // Never log the title/body — they carry sender / group names (PII).
             "posted tag=${notificationContent.notificationTag.take(16)} trigger=${update.trigger} group=${update.groupIdHex.take(8)}"
@@ -354,6 +363,21 @@ class LocalNotificationPresenter(
     ) {
         runCatching {
             val title = content.conversationTitle ?: content.title
+            val snapshot =
+                ConversationShortcutSnapshot(
+                    shortcutId = shortcutId,
+                    shortLabel = title.take(24).ifBlank { context.getString(R.string.app_name) },
+                    longLabel = title,
+                    notificationTag = content.notificationTag,
+                    senderName = content.senderName,
+                    senderKey = content.senderKey,
+                )
+            shortcutLastUsed[shortcutId] = shortcutAccessClock.incrementAndGet()
+            if (shortcutSnapshots[shortcutId] == snapshot) {
+                ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
+                return
+            }
+            pruneConversationShortcutsBeforePublish(shortcutId)
             val intent =
                 Intent(context, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -364,8 +388,8 @@ class LocalNotificationPresenter(
             val shortcut =
                 ShortcutInfoCompat
                     .Builder(context, shortcutId)
-                    .setShortLabel(title.take(24).ifBlank { context.getString(R.string.app_name) })
-                    .setLongLabel(title)
+                    .setShortLabel(snapshot.shortLabel)
+                    .setLongLabel(snapshot.longLabel)
                     .setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
                     .setIntent(intent)
                     .setLocusId(locusId)
@@ -373,9 +397,32 @@ class LocalNotificationPresenter(
                     .setLongLived(true)
                     .build()
             ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+            shortcutSnapshots[shortcutId] = snapshot
             ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
         }.onFailure {
             notificationDebug { "conversation shortcut skipped group=${update.groupIdHex.take(8)}" }
+        }
+    }
+
+    private fun pruneConversationShortcutsBeforePublish(shortcutId: String) {
+        val maxShortcuts = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context)
+        if (maxShortcuts <= 0) return
+        val existingConversationShortcutIds =
+            ShortcutManagerCompat
+                .getDynamicShortcuts(context)
+                .map { it.id }
+                .filter { it.startsWith(CONVERSATION_SHORTCUT_PREFIX) }
+                .toSet()
+        if (shortcutId in existingConversationShortcutIds || existingConversationShortcutIds.size < maxShortcuts) return
+        val removeCount = existingConversationShortcutIds.size - maxShortcuts + 1
+        val idsToRemove =
+            conversationShortcutRemovalOrder(existingConversationShortcutIds, shortcutLastUsed, shortcutId)
+                .take(removeCount)
+        if (idsToRemove.isEmpty()) return
+        ShortcutManagerCompat.removeDynamicShortcuts(context, idsToRemove)
+        idsToRemove.forEach {
+            shortcutSnapshots.remove(it)
+            shortcutLastUsed.remove(it)
         }
     }
 
@@ -466,6 +513,15 @@ class LocalNotificationPresenter(
         )
     }
 }
+
+private data class ConversationShortcutSnapshot(
+    val shortcutId: String,
+    val shortLabel: String,
+    val longLabel: String,
+    val notificationTag: String,
+    val senderName: String,
+    val senderKey: String,
+)
 
 private inline fun notificationDebug(message: () -> String) {
     if (BuildConfig.DEBUG) Log.i("DMLocalNotify", message())

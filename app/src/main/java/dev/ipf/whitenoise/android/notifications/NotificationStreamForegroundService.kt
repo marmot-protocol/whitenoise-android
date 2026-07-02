@@ -22,6 +22,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val ACTION_START = "dev.ipf.whitenoise.android.notifications.START_STREAM_FOREGROUND_SERVICE"
 private const val ACTION_SYNC_NATIVE_PUSH_REGISTRATION =
@@ -60,18 +61,6 @@ class NotificationStreamForegroundService : Service() {
             }.isSuccess
         val syncNativePushRegistration = shouldSyncNativePushRegistration(intent?.action)
         if (syncNativePushRegistration) pendingNativePushRegistrationSync = true
-        val keepConnectedEnabled = BackgroundConnectionPreferences.isEnabled(applicationContext)
-        if (
-            startedForeground &&
-            shouldStopStickySystemWakeRestart(
-                hasIntent = intent != null,
-                trigger = trigger,
-                backgroundConnectionEnabled = keepConnectedEnabled,
-            )
-        ) {
-            stopSelf(startId)
-            return START_NOT_STICKY
-        }
         when (
             decideForegroundStart(
                 startForegroundSucceeded = startedForeground,
@@ -104,6 +93,17 @@ class NotificationStreamForegroundService : Service() {
             ForegroundStartDecision.BootstrapAndKeep -> {
                 bootstrapJob =
                     serviceScope.launch {
+                        val keepConnectedEnabled = backgroundConnectionEnabledOffMain()
+                        if (
+                            shouldStopStickySystemWakeRestart(
+                                hasIntent = intent != null,
+                                trigger = trigger,
+                                backgroundConnectionEnabled = keepConnectedEnabled,
+                            )
+                        ) {
+                            stopSelf(startId)
+                            return@launch
+                        }
                         val stopAfterSync =
                             shouldStopAfterOneShotForegroundStart(
                                 oneShotRequested = isOneShotForegroundStart(syncNativePushRegistration, trigger),
@@ -125,12 +125,13 @@ class NotificationStreamForegroundService : Service() {
                 val oneShotRequested = isOneShotForegroundStart(syncNativePushRegistration, trigger)
                 if (oneShotRequested) {
                     val inFlightBootstrap = bootstrapJob
-                    val stopAfterSync =
-                        shouldStopAfterOneShotForegroundStart(
-                            oneShotRequested = oneShotRequested,
-                            backgroundConnectionEnabled = keepConnectedEnabled,
-                        )
                     serviceScope.launch {
+                        val keepConnectedEnabled = backgroundConnectionEnabledOffMain()
+                        val stopAfterSync =
+                            shouldStopAfterOneShotForegroundStart(
+                                oneShotRequested = oneShotRequested,
+                                backgroundConnectionEnabled = keepConnectedEnabled,
+                            )
                         runCatching {
                             inFlightBootstrap?.join()
                             if (syncNativePushRegistration) {
@@ -151,9 +152,18 @@ class NotificationStreamForegroundService : Service() {
         return START_STICKY
     }
 
+    private suspend fun backgroundConnectionEnabledOffMain(): Boolean =
+        withContext(Dispatchers.Default) {
+            BackgroundConnectionPreferences.isEnabled(applicationContext)
+        }
+
     private suspend fun drainPendingNativePushRegistrationSync(appState: WhiteNoiseAppState) {
-        val store = PushTokenStore.create(applicationContext)
-        if (!pendingNativePushRegistrationSync && !store.nativePushRegistrationSyncPending()) return
+        val inMemorySyncRequested = pendingNativePushRegistrationSync
+        val durableSyncPending =
+            withContext(Dispatchers.Default) {
+                PushTokenStore.create(applicationContext).nativePushRegistrationSyncPending()
+            }
+        if (!inMemorySyncRequested && !durableSyncPending) return
         pendingNativePushRegistrationSync = false
         // The FCM token-rotation fallback (#755) starts this service to
         // re-register native push when it can't reach AppState directly.

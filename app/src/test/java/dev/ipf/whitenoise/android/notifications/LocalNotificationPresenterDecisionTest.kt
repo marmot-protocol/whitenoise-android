@@ -92,6 +92,51 @@ class LocalNotificationPresenterDecisionTest {
     }
 
     @Test
+    fun conversationShortcutRemovalOrderRemovesLeastRecentlyUsedFirst() {
+        val existing =
+            setOf(
+                "${CONVERSATION_SHORTCUT_PREFIX}a",
+                "${CONVERSATION_SHORTCUT_PREFIX}b",
+                "${CONVERSATION_SHORTCUT_PREFIX}c",
+            )
+        val lastUsed =
+            mapOf(
+                "${CONVERSATION_SHORTCUT_PREFIX}a" to 30L,
+                "${CONVERSATION_SHORTCUT_PREFIX}b" to 10L,
+                "${CONVERSATION_SHORTCUT_PREFIX}c" to 20L,
+            )
+
+        assertEquals(
+            listOf("${CONVERSATION_SHORTCUT_PREFIX}b", "${CONVERSATION_SHORTCUT_PREFIX}c"),
+            conversationShortcutRemovalOrder(
+                existingShortcutIds = existing,
+                lastUsed = lastUsed,
+                protectedShortcutId = "${CONVERSATION_SHORTCUT_PREFIX}a",
+            ).take(2),
+        )
+    }
+
+    @Test
+    fun conversationShortcutRemovalOrderTreatsUnknownUsageAsOldestButNeverRemovesProtectedShortcut() {
+        val existing =
+            setOf(
+                "${CONVERSATION_SHORTCUT_PREFIX}current",
+                "${CONVERSATION_SHORTCUT_PREFIX}old",
+                "${CONVERSATION_SHORTCUT_PREFIX}known",
+            )
+        val lastUsed = mapOf("${CONVERSATION_SHORTCUT_PREFIX}known" to 1L)
+
+        assertEquals(
+            listOf("${CONVERSATION_SHORTCUT_PREFIX}old", "${CONVERSATION_SHORTCUT_PREFIX}known"),
+            conversationShortcutRemovalOrder(
+                existingShortcutIds = existing,
+                lastUsed = lastUsed,
+                protectedShortcutId = "${CONVERSATION_SHORTCUT_PREFIX}current",
+            ),
+        )
+    }
+
+    @Test
     fun channelRoutingReturnsConcreteChannelIdsForEachPostKind() {
         val updatesWithExpectedChannels =
             listOf(

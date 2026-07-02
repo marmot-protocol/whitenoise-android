@@ -70,8 +70,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -79,7 +81,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.net.IDN
@@ -3027,21 +3031,30 @@ class WhiteNoiseAppState(
      * job of [requestProfile]/[requestProfiles].
      */
     suspend fun warmProfilePresentationsBlocking(accountIdHexes: Iterable<String>) {
-        accountIdHexes.forEach { id ->
-            val trimmed = id.trim()
-            if (trimmed.isEmpty()) return@forEach
-            // Already cached → nothing to do; the row will read it synchronously.
-            if (synchronized(profilePresentationLock) { profilePresentations.containsKey(trimmed) }) {
-                return@forEach
-            }
-            // Not cached. Do the local read ourselves and await it so the cache
-            // is populated before we return (and thus before the caller's
-            // publish). We deliberately do NOT skip when a lazy async job is
-            // already in flight for this id: that job races the synchronous
-            // publish and may not have landed yet, which is the exact #609
-            // flicker. Doing the read here and applying it (idempotently, only
-            // if still absent) guarantees the presentation is present on return.
-            materializeProfileLocally(trimmed)
+        val uncachedIds =
+            accountIdHexes
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .filterNot { id ->
+                    synchronized(profilePresentationLock) { profilePresentations.containsKey(id) }
+                }
+        if (uncachedIds.isEmpty()) return
+        val gate = Semaphore(PROFILE_PRESENTATION_WARM_FANOUT)
+        coroutineScope {
+            uncachedIds
+                .map { id ->
+                    async {
+                        gate.withPermit {
+                            // Another warm/lazy read may have populated the cache
+                            // while this coroutine waited for a permit.
+                            if (synchronized(profilePresentationLock) { profilePresentations.containsKey(id) }) {
+                                return@withPermit
+                            }
+                            materializeProfileLocally(id)
+                        }
+                    }
+                }.awaitAll()
         }
     }
 
@@ -3741,6 +3754,7 @@ class WhiteNoiseAppState(
         private const val DISK_MEDIA_CACHE_MAX_BYTES: Long = 256L * 1024L * 1024L
         private const val LANGUAGE_TAG_KEY = "language_tag"
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
+        private const val PROFILE_PRESENTATION_WARM_FANOUT = 6
         private const val MAX_PROFILE_PRESENTATION_CACHE_ENTRIES = 4096
         private const val MAX_USER_PROFILE_CACHE_ENTRIES = 4096
         private const val MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES = 1024

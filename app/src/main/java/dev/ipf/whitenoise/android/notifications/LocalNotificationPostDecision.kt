@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 
 internal const val MAX_NOTIFICATION_MESSAGE_HISTORY = 25
 internal const val CARRIED_NOTIFICATION_MESSAGE_HISTORY_CAP = MAX_NOTIFICATION_MESSAGE_HISTORY - 1
+internal const val CONVERSATION_SHORTCUT_PREFIX = "conversation-"
 
 internal data class NotificationPostDecision(
     val channelId: String,
@@ -68,6 +69,18 @@ internal fun <T> capNotificationHistory(
     history: List<T>,
     historyCap: Int,
 ): List<T> = history.takeLast(historyCap.coerceAtLeast(0))
+
+internal fun conversationShortcutRemovalOrder(
+    existingShortcutIds: Set<String>,
+    lastUsed: Map<String, Long>,
+    protectedShortcutId: String,
+): List<String> =
+    existingShortcutIds
+        .filterNot { it == protectedShortcutId }
+        .sortedWith(
+            compareBy<String> { lastUsed[it] ?: Long.MIN_VALUE }
+                .thenBy { it },
+        )
 
 internal fun shouldDismissInvite(
     extraAccountRef: String?,
