@@ -238,6 +238,8 @@
     <string name="security_privacy_settings_subtitle">Télémétrie, journaux d’audit, diagnostics</string>
     <string name="force_incognito_keyboard">Forcer le clavier en navigation privée</string>
     <string name="force_incognito_keyboard_subtitle">Empêche votre clavier d’apprendre, de suggérer ou de synchroniser ce que vous tapez dans cette application. Respecté par la plupart des claviers modernes ; certains claviers tiers peuvent ignorer cet indicateur.</string>
+    <string name="allow_chat_screenshots">Autoriser les captures d’écran dans les discussions</string>
+    <string name="allow_chat_screenshots_subtitle">Par défaut, les captures d’écran et les enregistrements d’écran des discussions sont bloqués. Activez cette option si vous devez capturer des discussions.</string>
     <string name="telemetry">Télémétrie</string>
     <string name="telemetry_settings_subtitle">Partager la télémétrie de connexion aux relais.</string>
     <string name="audit_logs">Journaux d’audit</string>

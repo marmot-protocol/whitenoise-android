@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.app.LocaleManager
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.LocaleList
 import android.util.Log
@@ -149,6 +150,19 @@ internal data class ProfileGroupInviteOutcome(
 ) {
     val delivered: Int = attempted - failures
     val completedSuccessfully: Boolean = attempted > 0 && failures == 0
+}
+
+internal object ChatScreenshotPreferences {
+    private const val KEY_ALLOW_CHAT_SCREENSHOTS = "allow_chat_screenshots"
+
+    fun readAllowChatScreenshots(preferences: SharedPreferences): Boolean = preferences.getBoolean(KEY_ALLOW_CHAT_SCREENSHOTS, false)
+
+    fun writeAllowChatScreenshots(
+        preferences: SharedPreferences,
+        enabled: Boolean,
+    ) {
+        preferences.edit().putBoolean(KEY_ALLOW_CHAT_SCREENSHOTS, enabled).apply()
+    }
 }
 
 internal data class ProfileGroupInviteToast(
@@ -655,6 +669,15 @@ class WhiteNoiseAppState(
      * data, so SharedPreferences is the correct home per AGENTS.md.
      */
     var forceIncognitoKeyboard by mutableStateOf(preferences.getBoolean(FORCE_INCOGNITO_KEYBOARD_KEY, true))
+        private set
+
+    /**
+     * User override for chat-surface FLAG_SECURE (#800). Default OFF keeps chat
+     * screenshots and screen recordings blocked; turning it ON clears the flag
+     * only for message surfaces. Identity / secret-key surfaces stay secure
+     * unconditionally at their call sites.
+     */
+    var allowChatScreenshotsInChats by mutableStateOf(ChatScreenshotPreferences.readAllowChatScreenshots(preferences))
         private set
 
     var themeMode by mutableStateOf(AppThemeMode.fromPreference(preferences.getString(THEME_MODE_KEY, null)))
@@ -2026,6 +2049,11 @@ class WhiteNoiseAppState(
     fun updateForceIncognitoKeyboard(enabled: Boolean) {
         forceIncognitoKeyboard = enabled
         preferences.edit().putBoolean(FORCE_INCOGNITO_KEYBOARD_KEY, enabled).apply()
+    }
+
+    fun updateAllowChatScreenshotsInChats(enabled: Boolean) {
+        allowChatScreenshotsInChats = enabled
+        ChatScreenshotPreferences.writeAllowChatScreenshots(preferences, enabled)
     }
 
     suspend fun refreshSecurityPrivacySettings() {

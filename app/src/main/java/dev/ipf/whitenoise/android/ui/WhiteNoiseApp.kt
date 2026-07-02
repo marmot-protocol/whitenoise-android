@@ -1532,6 +1532,12 @@ private fun MainShell(
                 npub = npub,
                 onOpenGroup = openGroupFromProfile,
                 onDismiss = { appState.clearPresentedProfile() },
+                securePolicy =
+                    when {
+                        section != MainSection.Chats -> SecureFlagPolicy.Inherit
+                        appState.allowChatScreenshotsInChats -> SecureFlagPolicy.SecureOff
+                        else -> SecureFlagPolicy.SecureOn
+                    },
             )
         }
     }
@@ -1564,7 +1570,8 @@ private fun MainShell(
     }
 
     when (section) {
-        MainSection.Chats ->
+        MainSection.Chats -> {
+            WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
             ChatsScreen(
                 appState = appState,
                 controller = chatsController,
@@ -1580,6 +1587,7 @@ private fun MainShell(
                     selectedChat = item
                 },
             )
+        }
         MainSection.Settings ->
             SettingsScreen(
                 appState = appState,
@@ -8371,7 +8379,7 @@ private fun ConversationScreen(
     // shell-level sheet's onOpenGroup exactly.
     onOpenProfileGroup: (ChatListItem, Boolean) -> Unit = { _, _ -> },
 ) {
-    WindowSecureFlag()
+    WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     // Push the global snackbar host above the conversation composer so
     // a toast (e.g. the post-invite-accept confirmation) doesn't
     // overlap and intercept touches on the message input. Resets to
@@ -9917,6 +9925,12 @@ private fun ConversationScreen(
             },
             onDismiss = { appState.clearPresentedProfile() },
             adminController = controller,
+            securePolicy =
+                if (appState.allowChatScreenshotsInChats) {
+                    SecureFlagPolicy.SecureOff
+                } else {
+                    SecureFlagPolicy.SecureOn
+                },
         )
     }
 
@@ -18445,6 +18459,13 @@ private fun SecurityPrivacyScreen(
                     )
                     HorizontalDivider(Modifier.padding(vertical = 12.dp))
                     SettingsSwitchRow(
+                        title = stringResource(R.string.allow_chat_screenshots),
+                        subtitle = stringResource(R.string.allow_chat_screenshots_subtitle),
+                        checked = appState.allowChatScreenshotsInChats,
+                        onCheckedChange = { appState.updateAllowChatScreenshotsInChats(it) },
+                    )
+                    HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                    SettingsSwitchRow(
                         title = stringResource(R.string.telemetry),
                         subtitle = stringResource(R.string.telemetry_settings_subtitle),
                         checked = appState.relayTelemetrySettings?.exportEnabled == true,
@@ -18864,6 +18885,7 @@ private fun ProfileSheet(
     // Null for every other entry point (mentions, QR, reaction list, shell
     // members-list row), which keeps those sheets byte-identical to before.
     adminController: ConversationController? = null,
+    securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
 ) {
     val clipboard = LocalClipboardManager.current
     var hex by remember(npub) { mutableStateOf<String?>(null) }
@@ -18982,6 +19004,7 @@ private fun ProfileSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         modifier = amoledModalSheetModifier(),
+        properties = ModalBottomSheetProperties(securePolicy = securePolicy),
     ) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -19700,25 +19723,33 @@ private tailrec fun Context.activity(): Activity? =
     }
 
 /**
- * Marks the host activity's window as secure for the duration of this
- * composition. `FLAG_SECURE` blocks the OS Recents/overview thumbnail,
+ * Applies or clears `FLAG_SECURE` on the host activity window for the duration
+ * of this composition. `FLAG_SECURE` blocks the OS Recents/overview thumbnail,
  * screenshots, screen recording, and casting from capturing the window's
- * contents — the only practical protection for screens that handle the
- * nsec/private key, since `PasswordVisualTransformation` only masks
- * rendered glyphs. The flag is cleared on dispose so the rest of the
- * (non-sensitive) UI remains screenshottable as users expect.
+ * contents. Identity / secret-key surfaces call this unconditionally; chat
+ * surfaces pass the user's screenshot preference so the setting applies live.
  */
 @Composable
-private fun WindowSecureFlag() {
+private fun WindowSecureFlag(enabled: Boolean = true) {
     val context = LocalContext.current
-    DisposableEffect(Unit) {
+    DisposableEffect(context, enabled) {
         val window = context.activity()?.window
-        window?.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE,
-        )
-        onDispose {
+        if (enabled) {
+            window?.setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE,
+            )
+        } else {
             window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+        onDispose {
+            // No symmetric restore for enabled=false: this is the shared
+            // activity window, so each secure surface must assert the flag for
+            // itself instead of resurrecting stale state when a permissive
+            // chat surface leaves composition.
+            if (enabled) {
+                window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            }
         }
     }
 }
