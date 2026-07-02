@@ -439,6 +439,7 @@ import dev.ipf.whitenoise.android.state.isAcceptableRelayUrl
 import dev.ipf.whitenoise.android.state.labelFor
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.nextReadAnchor
+import dev.ipf.whitenoise.android.state.otherAccountAvatars
 import dev.ipf.whitenoise.android.state.outgoingIndicator
 import dev.ipf.whitenoise.android.state.shortHex
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
@@ -1650,10 +1651,10 @@ private fun OtherAccountAvatarsRow(
     onSwitchAccount: (String) -> Unit,
     onOpenSwitcher: () -> Unit,
 ) {
-    val activeLabel = appState.activeAccount?.label
-    // Signed-in accounts only — a signed-out account is reachable via the full
-    // switcher, not a one-tap switch from here.
-    val others = appState.accounts.filter { it.label != activeLabel && !it.signedOut }
+    // Signed-in accounts other than the active one. Empty while a destructive
+    // wipe transiently nulls the active account, so no frame can flash the
+    // just-wiped (or a still-stale previously-wiped) account (#809).
+    val others = otherAccountAvatars(appState.accounts, appState.activeAccount?.label)
     if (others.isEmpty()) return
     val shown = others.take(MAX_TOP_BAR_OTHER_ACCOUNTS)
     val overflow = others.size - shown.size

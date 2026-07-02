@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AccountSummaryFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -60,6 +61,66 @@ class ShouldResetNavOnAccountChangeTest {
         // The no-accounts case drops to AppPhase.Onboarding, which tears the
         // shell down at the top-level router; no in-shell reset is needed.
         assertFalse(shouldResetNavOnAccountChange(previous = "alice", current = null))
+    }
+}
+
+class OtherAccountAvatarsTest {
+    private fun account(
+        label: String,
+        signedOut: Boolean = false,
+        localSigning: Boolean = true,
+    ): AccountSummaryFfi =
+        AccountSummaryFfi(
+            label = label,
+            accountIdHex = "hex-$label",
+            localSigning = localSigning,
+            signedOut = signedOut,
+            running = true,
+        )
+
+    @Test
+    fun showsOtherSignedInAccountsBesideTheActiveOne() {
+        val others =
+            otherAccountAvatars(
+                accounts = listOf(account("A"), account("B"), account("C")),
+                activeLabel = "A",
+            )
+        assertEquals(listOf("B", "C"), others.map { it.label })
+    }
+
+    @Test
+    fun excludesSignedOutReadOnlyAndBlankLabelAccounts() {
+        val others =
+            otherAccountAvatars(
+                accounts =
+                    listOf(
+                        account("A"),
+                        account("B", signedOut = true),
+                        account("C", localSigning = false),
+                        account(""),
+                        account("D"),
+                    ),
+                activeLabel = "A",
+            )
+        assertEquals(listOf("D"), others.map { it.label })
+    }
+
+    @Test
+    fun presentsNothingWhileTheActiveAccountIsNull() {
+        // #809 regression: Sign Out & Wipe of active C transiently nulls the
+        // active account (#610) while the pre-wipe `accounts` snapshot still
+        // lists C (and, on a device where a prior wipe's entry lingers, B).
+        // With a null active label the row must stay empty so no frame flashes
+        // the just-wiped C or the previously-wiped B before the list refreshes.
+        val staleSnapshot = listOf(account("A"), account("B"), account("C"))
+        assertTrue(otherAccountAvatars(accounts = staleSnapshot, activeLabel = null).isEmpty())
+    }
+
+    @Test
+    fun settlesToOnlyTheRemainingAccountAfterWipe() {
+        // Once the wipe finishes, `accounts` refreshes to just A and the active
+        // account lands back on A: the row is empty (A is the only account).
+        assertTrue(otherAccountAvatars(accounts = listOf(account("A")), activeLabel = "A").isEmpty())
     }
 }
 
