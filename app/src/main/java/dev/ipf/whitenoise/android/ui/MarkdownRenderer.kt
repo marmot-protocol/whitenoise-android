@@ -87,9 +87,10 @@ internal fun MarkdownMessageBody(
     modifier: Modifier = Modifier,
     mentionDisplayName: ((String) -> String?)? = null,
     onNostrProfileTap: ((String) -> Unit)? = null,
-    // Reports the layout of the final paragraph/heading so a caller can place
-    // an inline footer against the last line. Fires only for a text-bearing
-    // last block; other block types leave it unset.
+    // Reports the layout of the final rendered text line so a caller can place
+    // an inline footer against it. Fires for a text-bearing last block, or for
+    // the elision marker when the top-level block cap hides later siblings;
+    // other block types leave it unset.
     onLastTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -121,16 +122,13 @@ internal fun MarkdownMessageBody(
         remember(linkListener, mentionDisplayName) {
             MarkdownBodyContext(linkListener, mentionDisplayName)
         }
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        document.blocks.forEachIndexed { index, block ->
-            MarkdownBlockView(
-                block,
-                bodyContext,
-                depth = 0,
-                onTextLayout = if (index == document.blocks.lastIndex) onLastTextLayout else null,
-            )
-        }
-    }
+    MarkdownBlockList(
+        blocks = document.blocks,
+        ctx = bodyContext,
+        depth = 0,
+        modifier = modifier,
+        onLastTextLayout = onLastTextLayout,
+    )
     pendingLinkUrl?.let { url ->
         AlertDialog(
             onDismissRequest = { pendingLinkUrl = null },
@@ -168,6 +166,20 @@ internal const val MARKDOWN_MAX_BLOCK_DEPTH = 24
 internal fun markdownDepthExceeded(depth: Int): Boolean = depth >= MARKDOWN_MAX_BLOCK_DEPTH
 
 /**
+ * Maximum number of Markdown siblings rendered or walked at any one untrusted
+ * container boundary. Depth caps stop recursive stack DoS, but breadth DoS can
+ * also hide under one top-level quote/list/table whose children are all depth 1.
+ * 256 leaves ample room for legitimate chat formatting while bounding render,
+ * mention, and preview work. See #942.
+ */
+internal const val MARKDOWN_MAX_CONTAINER_SIBLINGS = 256
+
+internal fun <T> markdownVisibleSiblings(items: List<T>): List<T> =
+    if (items.size <= MARKDOWN_MAX_CONTAINER_SIBLINGS) items else items.take(MARKDOWN_MAX_CONTAINER_SIBLINGS)
+
+internal fun markdownSiblingsElided(items: List<*>): Boolean = items.size > MARKDOWN_MAX_CONTAINER_SIBLINGS
+
+/**
  * Maximum inline-nesting depth. Inline nodes (emphasis, strong, strikethrough,
  * link, image alt) carry child inlines, so the inline walkers recurse too — a
  * peer-crafted tree of repeated nested emphasis/links would overflow the stack
@@ -185,6 +197,45 @@ private data class MarkdownBodyContext(
 )
 
 @Composable
+private fun MarkdownBlockList(
+    blocks: List<MarkdownBlockFfi>,
+    ctx: MarkdownBodyContext,
+    depth: Int,
+    modifier: Modifier = Modifier,
+    onLastTextLayout: ((TextLayoutResult) -> Unit)? = null,
+) {
+    val visibleBlocks = markdownVisibleSiblings(blocks)
+    val blocksElided = markdownSiblingsElided(blocks)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        visibleBlocks.forEachIndexed { index, block ->
+            MarkdownBlockView(
+                block,
+                ctx,
+                depth = depth,
+                onTextLayout = if (!blocksElided && index == visibleBlocks.lastIndex) onLastTextLayout else null,
+            )
+        }
+        if (blocksElided) {
+            MarkdownElisionMarker(onTextLayout = onLastTextLayout)
+        }
+    }
+}
+
+@Composable
+private fun MarkdownElisionMarker(
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.bodyLarge,
+    onTextLayout: ((TextLayoutResult) -> Unit)? = null,
+) {
+    Text(
+        "…",
+        style = style,
+        modifier = modifier,
+        onTextLayout = { onTextLayout?.invoke(it) },
+    )
+}
+
+@Composable
 private fun MarkdownBlockView(
     block: MarkdownBlockFfi,
     ctx: MarkdownBodyContext,
@@ -195,7 +246,7 @@ private fun MarkdownBlockView(
     // instead of recursing into another quote/list level. Bounds the render
     // stack against a maliciously deep document. See #156.
     if (markdownDepthExceeded(depth)) {
-        Text("…", style = MaterialTheme.typography.bodyLarge)
+        MarkdownElisionMarker()
         return
     }
     when (block) {
@@ -278,9 +329,12 @@ private fun MarkdownBlockQuoteView(
         // weight(1f) gives the quoted content a bounded width so fillMaxWidth
         // children (nested code blocks) don't measure under unbounded
         // constraints inside the IntrinsicSize.Min row.
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            blocks.forEach { MarkdownBlockView(it, ctx, depth + 1) }
-        }
+        MarkdownBlockList(
+            blocks = blocks,
+            ctx = ctx,
+            depth = depth + 1,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -290,8 +344,10 @@ private fun MarkdownListView(
     ctx: MarkdownBodyContext,
     depth: Int,
 ) {
+    val visibleItems = markdownVisibleSiblings(block.items)
+    val itemsElided = markdownSiblingsElided(block.items)
     Column(verticalArrangement = Arrangement.spacedBy(if (block.tight) 2.dp else 6.dp)) {
-        block.items.forEachIndexed { index, item ->
+        visibleItems.forEachIndexed { index, item ->
             Row {
                 Text(
                     // Task-list checkboxes win over the plain bullet/number so
@@ -304,10 +360,16 @@ private fun MarkdownListView(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(end = 6.dp),
                 )
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    item.blocks.forEach { MarkdownBlockView(it, ctx, depth + 1) }
-                }
+                MarkdownBlockList(
+                    blocks = item.blocks,
+                    ctx = ctx,
+                    depth = depth + 1,
+                    modifier = Modifier.weight(1f),
+                )
             }
+        }
+        if (itemsElided) {
+            MarkdownElisionMarker()
         }
     }
 }
@@ -322,11 +384,16 @@ private fun MarkdownTableView(
     block: MarkdownBlockFfi.Table,
     ctx: MarkdownBodyContext,
 ) {
+    val visibleRows = markdownVisibleSiblings(block.rows)
+    val rowsElided = markdownSiblingsElided(block.rows)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         MarkdownTableRowView(block.header, block.alignments, header = true, ctx)
         HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.25f))
-        block.rows.forEach { row ->
+        visibleRows.forEach { row ->
             MarkdownTableRowView(row, block.alignments, header = false, ctx)
+        }
+        if (rowsElided) {
+            MarkdownElisionMarker()
         }
     }
 }
@@ -338,8 +405,10 @@ private fun MarkdownTableRowView(
     header: Boolean,
     ctx: MarkdownBodyContext,
 ) {
+    val visibleCells = markdownVisibleSiblings(cells)
+    val cellsElided = markdownSiblingsElided(cells)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        cells.forEachIndexed { index, cell ->
+        visibleCells.forEachIndexed { index, cell ->
             Text(
                 rememberMarkdownInlineText(cell.inlines, ctx),
                 style =
@@ -353,6 +422,12 @@ private fun MarkdownTableRowView(
                         else -> TextAlign.Start
                     },
                 modifier = Modifier.weight(1f),
+            )
+        }
+        if (cellsElided) {
+            MarkdownElisionMarker(
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
     }
@@ -428,16 +503,18 @@ private fun collectBlockMentionBech32s(
     depth: Int,
 ) {
     if (markdownDepthExceeded(depth)) return
-    blocks.forEach { block ->
+    markdownVisibleSiblings(blocks).forEach { block ->
         when (block) {
             is MarkdownBlockFfi.Paragraph -> collectMentionBech32s(block.inlines, out, depth = 0)
             is MarkdownBlockFfi.Heading -> collectMentionBech32s(block.inlines, out, depth = 0)
             is MarkdownBlockFfi.BlockQuote -> collectBlockMentionBech32s(block.blocks, out, depth + 1)
             is MarkdownBlockFfi.ListBlock ->
-                block.items.forEach { collectBlockMentionBech32s(it.blocks, out, depth + 1) }
+                markdownVisibleSiblings(block.items).forEach { collectBlockMentionBech32s(it.blocks, out, depth + 1) }
             is MarkdownBlockFfi.Table -> {
-                block.header.forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) }
-                block.rows.forEach { row -> row.forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) } }
+                markdownVisibleSiblings(block.header).forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) }
+                markdownVisibleSiblings(block.rows).forEach { row ->
+                    markdownVisibleSiblings(row).forEach { cell -> collectMentionBech32s(cell.inlines, out, depth = 0) }
+                }
             }
             else -> Unit
         }
@@ -467,9 +544,7 @@ internal fun documentMentionsAccount(
     resolveAccountIdHex: (String) -> String?,
 ): Boolean {
     val self = accountIdHex?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return false
-    val bech32s = mutableSetOf<String>()
-    collectBlockMentionBech32s(document.blocks, bech32s, depth = 0)
-    return bech32s.any { bech32 ->
+    return markdownDocumentMentionBech32s(document).any { bech32 ->
         resolveAccountIdHex(bech32)?.trim()?.lowercase() == self
     }
 }
@@ -730,8 +805,7 @@ internal fun rememberMarkdownPreviewText(
         if (mentionDisplayName == null) {
             emptyMap()
         } else {
-            val bech32s = mutableSetOf<String>()
-            collectBlockMentionBech32s(document.blocks, bech32s, depth = 0)
+            val bech32s = markdownDocumentMentionBech32s(document)
             bech32s.associateWith(mentionDisplayName)
         }
     return remember(document, contentColor, mentionNames) {
@@ -777,7 +851,7 @@ internal fun markdownDocumentToPreviewAnnotatedString(
 ): AnnotatedString {
     val flattened =
         buildAnnotatedString {
-            for (block in document.blocks) {
+            for (block in markdownVisibleSiblings(document.blocks)) {
                 if (length >= maxLength) break
                 appendPreviewBlock(block, codeStyle, maxLength, mentionDisplayName, depth = 0)
             }
@@ -807,15 +881,23 @@ private fun AnnotatedString.Builder.appendPreviewBlock(
         is MarkdownBlockFfi.CodeBlock -> appendPreviewCodeContent(block.content, codeStyle, maxLength)
         is MarkdownBlockFfi.MathBlock -> appendPreviewCodeContent(block.content, codeStyle, maxLength)
         is MarkdownBlockFfi.BlockQuote ->
-            block.blocks.forEach { appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1) }
+            markdownVisibleSiblings(block.blocks).forEach {
+                appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1)
+            }
         is MarkdownBlockFfi.ListBlock ->
-            block.items.forEach { item ->
-                item.blocks.forEach { appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1) }
+            markdownVisibleSiblings(block.items).forEach { item ->
+                markdownVisibleSiblings(item.blocks).forEach {
+                    appendPreviewBlock(it, codeStyle, maxLength, mentionDisplayName, depth + 1)
+                }
             }
         is MarkdownBlockFfi.Table -> {
-            block.header.forEach { cell -> appendPreviewInlineSegment(cell.inlines, codeStyle, maxLength, mentionDisplayName) }
-            block.rows.forEach { row ->
-                row.forEach { cell -> appendPreviewInlineSegment(cell.inlines, codeStyle, maxLength, mentionDisplayName) }
+            markdownVisibleSiblings(block.header).forEach { cell ->
+                appendPreviewInlineSegment(cell.inlines, codeStyle, maxLength, mentionDisplayName)
+            }
+            markdownVisibleSiblings(block.rows).forEach { row ->
+                markdownVisibleSiblings(row).forEach { cell ->
+                    appendPreviewInlineSegment(cell.inlines, codeStyle, maxLength, mentionDisplayName)
+                }
             }
         }
     }
