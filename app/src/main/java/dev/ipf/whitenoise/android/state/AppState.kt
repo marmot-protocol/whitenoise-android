@@ -2155,6 +2155,18 @@ class WhiteNoiseAppState(
     fun shouldAutoDownloadMedia(type: MediaAutoDownloadType): Boolean = mediaAutoDownloadMatrix.shouldAutoDownload(type, activeNetworkTypes())
 
     /**
+     * True when the device currently has an active network connection. Used to
+     * pick a "couldn't verify (no network)" message over a generic resolution
+     * failure when an online validation (e.g. lud16, issue #795) fails.
+     */
+    fun hasActiveNetwork(): Boolean {
+        val cm =
+            appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+                ?: return false
+        return cm.activeNetwork != null
+    }
+
+    /**
      * Every [MediaAutoDownloadNetwork] the active connection currently matches.
      * A single connection can match several at once (e.g. cellular that is both
      * roaming and metered). An empty set (no/unknown connection) makes the

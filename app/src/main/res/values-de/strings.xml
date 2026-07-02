@@ -684,6 +684,9 @@
     <string name="profile_nip05_invalid">Gib eine Adresse wie name@example.com ein.</string>
     <string name="profile_lightning_hint">Lightning-Adresse, z. B. you@walletprovider.com</string>
     <string name="profile_lightning_invalid">Gib eine Lightning-Adresse wie name@example.com ein.</string>
+    <string name="profile_lightning_checking">Wird geprüft…</string>
+    <string name="profile_lightning_unresolved">Diese Lightning-Adresse lässt sich nicht auflösen. Prüfe sie und versuche es erneut.</string>
+    <string name="profile_lightning_no_network">Lightning-Adresse konnte nicht überprüft werden (kein Netzwerk).</string>
     <string name="reaction_tap_to_remove">Zum Entfernen tippen</string>
     <string name="chat_list_filter_groups">Gruppen</string>
     <!-- Conversation in-chat search (#292) -->

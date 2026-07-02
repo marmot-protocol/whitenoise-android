@@ -374,6 +374,7 @@ import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
+import dev.ipf.whitenoise.android.core.Lud16Resolver
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageDebugCategory
@@ -19780,6 +19781,12 @@ private fun ProfileEditScreen(
     var picture by remember(active?.accountIdHex) { mutableStateOf("") }
     var nip05 by remember(active?.accountIdHex) { mutableStateOf("") }
     var lud16 by remember(active?.accountIdHex) { mutableStateOf("") }
+    // In-flight / failed LNURL-pay resolution of the lud16 field (#795). The
+    // error is a string resource id so the inline message can distinguish
+    // "doesn't resolve" from "no network"; it clears on every edit.
+    var lud16Checking by remember { mutableStateOf(false) }
+    var lud16ResolveError by remember(active?.accountIdHex) { mutableStateOf<Int?>(null) }
+    val lud16FocusRequester = remember { FocusRequester() }
     var busy by remember { mutableStateOf(false) }
     // Drives the avatar bottom sheet (pick-from-photos / paste-link / remove).
     // The picture URL no longer lives as a standalone editor row; it's edited
@@ -19796,6 +19803,7 @@ private fun ProfileEditScreen(
     fun saveProfile() {
         if (!saveEnabled) return
         busy = true
+        lud16ResolveError = null
         // Snapshot the field values now: the mutation outlives this composition,
         // so reading them inside the lambda would publish whatever is on screen
         // when it runs.
@@ -19808,11 +19816,38 @@ private fun ProfileEditScreen(
                 nip05 = nip05.trim().ifBlank { null },
                 lud16 = lud16.trim().ifBlank { null },
             )
-        appState.launchMutation {
-            try {
-                appState.publishProfile(metadata)
-            } finally {
-                busy = false
+        scope.launch {
+            // A non-blank Lightning address must resolve to a live LNURL-pay
+            // endpoint before it is published (#795); a blank field means "no
+            // address" and skips the check. On failure nothing is saved — the
+            // error surfaces inline and focus returns to the field.
+            val address = metadata.lud16
+            if (address != null) {
+                lud16Checking = true
+                val resolves =
+                    try {
+                        Lud16Resolver.resolve(address)
+                    } finally {
+                        lud16Checking = false
+                    }
+                if (!resolves) {
+                    lud16ResolveError =
+                        if (appState.hasActiveNetwork()) {
+                            R.string.profile_lightning_unresolved
+                        } else {
+                            R.string.profile_lightning_no_network
+                        }
+                    busy = false
+                    runCatching { lud16FocusRequester.requestFocus() }
+                    return@launch
+                }
+            }
+            appState.launchMutation {
+                try {
+                    appState.publishProfile(metadata)
+                } finally {
+                    busy = false
+                }
             }
         }
     }
@@ -20036,18 +20071,27 @@ private fun ProfileEditScreen(
                     TextField(
                         colors = profileFieldColors,
                         value = lud16,
-                        onValueChange = { lud16 = it },
+                        onValueChange = {
+                            lud16 = it
+                            lud16ResolveError = null
+                        },
                         label = { Text(stringResource(R.string.lightning)) },
                         singleLine = true,
-                        isError = !lud16Valid,
+                        isError = !lud16Valid || lud16ResolveError != null,
                         supportingText = {
+                            val resolveError = lud16ResolveError
                             Text(
                                 stringResource(
-                                    if (lud16Valid) R.string.profile_lightning_hint else R.string.profile_lightning_invalid,
+                                    when {
+                                        !lud16Valid -> R.string.profile_lightning_invalid
+                                        lud16Checking -> R.string.profile_lightning_checking
+                                        resolveError != null -> resolveError
+                                        else -> R.string.profile_lightning_hint
+                                    },
                                 ),
                             )
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().focusRequester(lud16FocusRequester),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
                     )
                 }

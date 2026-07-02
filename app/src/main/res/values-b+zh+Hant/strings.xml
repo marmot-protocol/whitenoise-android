@@ -678,6 +678,9 @@
     <string name="profile_nip05_invalid">請輸入類似 name@example.com 的位址。</string>
     <string name="profile_lightning_hint">Lightning 位址，例如 you@walletprovider.com</string>
     <string name="profile_lightning_invalid">請輸入類似 name@example.com 的 Lightning 位址。</string>
+    <string name="profile_lightning_checking">正在檢查…</string>
+    <string name="profile_lightning_unresolved">此 Lightning 位址無法解析。請檢查後重試。</string>
+    <string name="profile_lightning_no_network">無法驗證 Lightning 位址（無網路）。</string>
     <string name="reaction_tap_to_remove">輕觸以移除</string>
     <string name="chat_list_filter_groups">群組</string>
     <!-- Conversation in-chat search (#292) -->

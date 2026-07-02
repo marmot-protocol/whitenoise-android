@@ -698,6 +698,9 @@
     <string name="profile_nip05_invalid">Введите адрес вида name@example.com.</string>
     <string name="profile_lightning_hint">Lightning-адрес, например you@walletprovider.com</string>
     <string name="profile_lightning_invalid">Введите Lightning-адрес вида name@example.com.</string>
+    <string name="profile_lightning_checking">Проверка…</string>
+    <string name="profile_lightning_unresolved">Этот Lightning-адрес не разрешается. Проверьте его и попробуйте снова.</string>
+    <string name="profile_lightning_no_network">Не удалось проверить Lightning-адрес (нет сети).</string>
     <string name="reaction_tap_to_remove">Нажмите, чтобы убрать</string>
     <string name="chat_list_filter_groups">Группы</string>
     <!-- Conversation in-chat search (#292) -->
