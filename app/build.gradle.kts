@@ -28,6 +28,12 @@ fun signingProperty(vararg keys: String): String? =
         .mapNotNull { key -> localProperties.getProperty(key) ?: System.getenv(key) }
         .firstOrNull()
 
+// Values resolved here are compiled verbatim into BuildConfig and are trivially
+// recoverable from any shipped or CI-archived APK — R8 cannot hide a string
+// constant. Never provision long-lived or privileged secrets through these keys.
+// The *_AUTH_TOKEN fields must only ever carry ingest-only, low-privilege,
+// rotatable tokens (or stay empty, which makes telemetry/audit no-op). The
+// service-side hardening for this constraint is tracked in #224.
 fun runtimeConfigProperty(
     keys: List<String>,
     defaultValue: String = "",
