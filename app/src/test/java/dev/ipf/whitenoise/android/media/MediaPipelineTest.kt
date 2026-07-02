@@ -139,6 +139,20 @@ class MediaPipelineTest {
     }
 
     @Test
+    fun safeDisplayName_stripsControlCharacters() {
+        assertEquals("photo.jpg", MediaPipeline.safeDisplayName("pho\u0000to.jpg"))
+        assertEquals("image.jpg", MediaPipeline.safeDisplayName("\u0000\u001F\u007F"))
+    }
+
+    @Test
+    fun safeDisplayName_clampsLongNamesAndPreservesExtension() {
+        val sanitized = MediaPipeline.safeDisplayName("a".repeat(240) + ".jpeg")
+
+        assertEquals(120, sanitized.length)
+        assertEquals(".jpeg", sanitized.takeLast(5))
+    }
+
+    @Test
     fun jpegExifOrientation_readsBigEndianOrientationTag() {
         val jpeg = minimalJpegWith(exifOrientationSegment(MediaPipeline.EXIF_ORIENTATION_ROTATE_90))
 

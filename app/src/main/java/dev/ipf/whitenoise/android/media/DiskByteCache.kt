@@ -90,17 +90,6 @@ class DiskByteCache(
                 ensureHydrated()
                 (index[hashed] ?: return null) to generation
             }
-        if (entry.size.toLong() > entryByteLimit) {
-            synchronized(this) {
-                if (index[hashed] === entry) {
-                    index.remove(hashed)
-                    residentBytes -= entry.size
-                    runCatching { entry.file.delete() }
-                    runCatching { tagFileFor(entry.file).delete() }
-                }
-            }
-            return null
-        }
         return try {
             val bytes = entry.file.readBytes()
             synchronized(this) {

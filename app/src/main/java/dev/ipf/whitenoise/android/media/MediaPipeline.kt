@@ -39,6 +39,9 @@ object MediaPipeline {
     /** MIME on the wire always matches the recompressed payload, not the source. */
     const val RECOMPRESSED_MIME: String = "image/jpeg"
 
+    private const val MAX_SAFE_DISPLAY_NAME_CHARS = 120
+    private const val MAX_SAFE_DISPLAY_EXTENSION_CHARS = 24
+
     /**
      * Read at most [cap] bytes from [stream] into a freshly-allocated buffer
      * and return them. Returns null if the stream would exceed the cap —
@@ -150,8 +153,24 @@ object MediaPipeline {
      * out of the target directory. Returns `"image.jpg"` for empty/dot names.
      */
     fun safeDisplayName(name: String): String {
-        val base = name.replace('\\', '/').substringAfterLast('/').trim()
-        return base.takeUnless { it.isBlank() || it == "." || it == ".." } ?: "image.jpg"
+        val base =
+            name
+                .replace('\\', '/')
+                .substringAfterLast('/')
+                .filterNot { it.isISOControl() }
+                .trim()
+                .takeUnless { it.isBlank() || it == "." || it == ".." }
+                ?: "image.jpg"
+        return clampDisplayName(base)
+    }
+
+    private fun clampDisplayName(name: String): String {
+        if (name.length <= MAX_SAFE_DISPLAY_NAME_CHARS) return name
+        val dot = name.lastIndexOf('.')
+        if (dot <= 0 || dot == name.lastIndex) return name.take(MAX_SAFE_DISPLAY_NAME_CHARS)
+        val extension = name.substring(dot).take(MAX_SAFE_DISPLAY_EXTENSION_CHARS + 1)
+        val stemLimit = (MAX_SAFE_DISPLAY_NAME_CHARS - extension.length).coerceAtLeast(1)
+        return name.substring(0, dot).take(stemLimit) + extension
     }
 
     /**

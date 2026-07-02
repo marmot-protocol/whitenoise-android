@@ -124,6 +124,15 @@ class HostSafetyTest {
     }
 
     @Test
+    fun transitionalIpv6EmbeddedPrivateIpv4IsFlagged() {
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("2002:7f00:1::")) // 6to4 127.0.0.1
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("64:ff9b::7f00:1")) // NAT64 127.0.0.1
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("64:ff9b::a9fe:a9fe")) // NAT64 169.254.169.254
+        assertFalse(HostSafety.isPrivateOrLoopbackHost("2002:808:808::")) // 6to4 8.8.8.8
+        assertFalse(HostSafety.isPrivateOrLoopbackHost("64:ff9b::808:808")) // NAT64 8.8.8.8
+    }
+
+    @Test
     fun nonDottedIpv4LoopbackEncodingsAreFlagged() {
         // SSRF bypass (#153): every form below resolves to 127.0.0.1 in the
         // platform resolver and must be blocked, not waved through as a name.
@@ -262,6 +271,25 @@ class HostSafetyTest {
         assertTrue(
             HostSafety.isPrivateOrLoopbackAddress(
                 ipv6(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 1),
+            ),
+        )
+    }
+
+    @Test
+    fun resolvedTransitionalIpv6EmbeddedPrivateIpv4IsFlagged() {
+        assertTrue(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0x20, 0x02, 127, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            ),
+        )
+        assertTrue(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0, 0x64, 0xFF, 0x9B, 0, 0, 0, 0, 0, 0, 0, 0, 169, 254, 169, 254),
+            ),
+        )
+        assertFalse(
+            HostSafety.isPrivateOrLoopbackAddress(
+                ipv6(0x20, 0x02, 8, 8, 8, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             ),
         )
     }

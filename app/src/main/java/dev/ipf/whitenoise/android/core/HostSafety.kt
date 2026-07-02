@@ -88,22 +88,13 @@ object HostSafety {
             is Inet4Address -> isPrivateIpv4(toUnsignedOctets(address.address))
             is Inet6Address -> {
                 val bytes = address.address
-                // IPv4-mapped (::ffff:a.b.c.d) and IPv4-compatible (::a.b.c.d)
-                // carry an embedded IPv4 in the final four bytes; follow both
-                // forms so the resolve-time layer matches the literal-host layer.
-                if (bytes.size == 16 &&
-                    (0 until 10).all { bytes[it].toInt() == 0 } &&
-                    (
-                        (bytes[10].toInt() and 0xFF == 0xFF && bytes[11].toInt() and 0xFF == 0xFF) ||
-                            (bytes[10].toInt() and 0xFF == 0 && bytes[11].toInt() and 0xFF == 0)
-                    )
-                ) {
-                    isPrivateIpv4(toUnsignedOctets(bytes.copyOfRange(12, 16)))
-                } else {
-                    // fc00::/7 unique-local, documentation/discard-only, and
-                    // other special-use ranges not covered by the JDK helpers.
-                    isPrivateIpv6Groups(hextets(bytes))
+                val groups = hextets(bytes)
+                embeddedIpv4FromGroups(groups)?.let { embedded ->
+                    if (isPrivateIpv4(embedded)) return true
                 }
+                // fc00::/7 unique-local, documentation/discard-only, and
+                // other special-use ranges not covered by the JDK helpers.
+                isPrivateIpv6Groups(groups)
             }
             else -> false
         }
@@ -216,14 +207,11 @@ object HostSafety {
                 if (embedded != null && isPrivateIpv4(embedded)) return true
                 embedded?.let { expandIpv6WithEmbeddedIpv4(address, it) }
             } else {
-                // Hex-grouped IPv4-mapped (::ffff:7f00:1) and IPv4-compatible
-                // (::7f00:1) literals carry the embedded IPv4 in the final two
-                // hextets. These reach 127.0.0.1 just like the dotted form —
-                // the IPv6 sibling of the #153 non-dotted-encoding bypass.
-                val embedded = embeddedIpv4FromHextets(address)
-                if (embedded != null && isPrivateIpv4(embedded)) return true
                 expandIpv6(address)
             } ?: return false
+        embeddedIpv4FromGroups(groups)?.let { embedded ->
+            if (isPrivateIpv4(embedded)) return true
+        }
         return isPrivateIpv6Groups(groups)
     }
 
@@ -268,21 +256,35 @@ object HostSafety {
         return runCatching { IDN.toASCII(normalized, IDN.ALLOW_UNASSIGNED) }.getOrDefault(normalized)
     }
 
-    /**
-     * The embedded IPv4 (as four octets) from an IPv4-mapped (`::ffff:a:b`) or
-     * IPv4-compatible (`::a:b`) IPv6 literal — i.e. the high five hextets are
-     * zero and the sixth is `0xffff` (mapped) or `0` (compatible), so the last
-     * two hextets are a 32-bit IPv4. Any other shape returns null and is left
-     * to the prefix classification.
-     */
-    private fun embeddedIpv4FromHextets(address: String): IntArray? {
-        val groups = expandIpv6(address) ?: return null
-        if ((0 until 5).any { groups[it] != 0 }) return null
-        if (groups[5] != 0xFFFF && groups[5] != 0) return null
-        val high = groups[6]
-        val low = groups[7]
-        return intArrayOf((high shr 8) and 0xFF, high and 0xFF, (low shr 8) and 0xFF, low and 0xFF)
+    private fun embeddedIpv4FromGroups(groups: IntArray): IntArray? {
+        if (groups.size != 8) return null
+        // IPv4-mapped (::ffff:a:b) and IPv4-compatible (::a:b): the high five
+        // hextets are zero and the sixth is either ffff or zero.
+        if ((0 until 5).all { groups[it] == 0 } && (groups[5] == 0xFFFF || groups[5] == 0)) {
+            return ipv4FromHextetPair(groups[6], groups[7])
+        }
+        // 6to4 2002::/16 embeds IPv4 in bytes 2-5 (hextets 1-2).
+        if (groups[0] == 0x2002) {
+            return ipv4FromHextetPair(groups[1], groups[2])
+        }
+        // Well-known NAT64 64:ff9b::/96 embeds IPv4 in the final 32 bits.
+        if (
+            groups[0] == 0x0064 &&
+            groups[1] == 0xFF9B &&
+            groups[2] == 0 &&
+            groups[3] == 0 &&
+            groups[4] == 0 &&
+            groups[5] == 0
+        ) {
+            return ipv4FromHextetPair(groups[6], groups[7])
+        }
+        return null
     }
+
+    private fun ipv4FromHextetPair(
+        high: Int,
+        low: Int,
+    ): IntArray = intArrayOf((high shr 8) and 0xFF, high and 0xFF, (low shr 8) and 0xFF, low and 0xFF)
 
     /**
      * Expand an IPv6 literal — with at most one `::` run — to exactly eight

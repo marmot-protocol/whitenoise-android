@@ -27,29 +27,6 @@ class ImageSearchClientTest {
     }
 
     @Test
-    fun duckDuckGoFetchUrlIsPinnedToDuckDuckGoHosts() {
-        assertEquals(
-            "https://duckduckgo.com/?q=marmot&iax=images&ia=images",
-            sanitizeDuckDuckGoFetchUrl("https://duckduckgo.com/?q=marmot&iax=images&ia=images"),
-        )
-        assertEquals(
-            "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fexample.com%2Fa.png",
-            sanitizeDuckDuckGoFetchUrl("https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fexample.com%2Fa.png"),
-        )
-        assertEquals(
-            "https://duckduckgo.com/i.js?q=marmot",
-            sanitizeDuckDuckGoFetchUrl("//duckduckgo.com/i.js?q=marmot"),
-        )
-
-        assertNull(sanitizeDuckDuckGoFetchUrl("https://example.com/i.js?q=marmot"))
-        assertNull(sanitizeDuckDuckGoFetchUrl("https://evilduckduckgo.com/i.js?q=marmot"))
-        assertNull(sanitizeDuckDuckGoFetchUrl("https://duckduckgo.com.evil.example/i.js?q=marmot"))
-        assertNull(sanitizeDuckDuckGoFetchUrl("https://duckduckgo.com@evil.example/i.js?q=marmot"))
-        assertNull(sanitizeDuckDuckGoFetchUrl("http://duckduckgo.com/i.js?q=marmot"))
-        assertNull(sanitizeDuckDuckGoFetchUrl("https://127.0.0.1/i.js?q=marmot"))
-    }
-
-    @Test
     fun decodedResultsAreCapped() {
         val results = JSONArray()
         repeat(MAX_IMAGE_SEARCH_RESULTS + 25) { index ->

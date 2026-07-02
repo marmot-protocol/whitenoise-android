@@ -27,18 +27,6 @@ internal const val MAX_IMAGE_SEARCH_RESULTS = 200
  */
 fun sanitizeHttpsAvatarUrl(raw: String?): String? = ProfileSanitizer.imageUrl(raw)
 
-/**
- * Search handshake fetches carry the user's query and the DDG vqd token. They
- * must stay on DuckDuckGo-controlled hosts; arbitrary public HTTPS redirects
- * are only acceptable for the final result image/thumbnail URLs.
- */
-internal fun sanitizeDuckDuckGoFetchUrl(raw: String?): String? {
-    val safe = sanitizeHttpsAvatarUrl(raw) ?: return null
-    val parsed = runCatching { URI(safe) }.getOrNull() ?: return null
-    if (!isDuckDuckGoFetchHost(parsed.host)) return null
-    return safe
-}
-
 private fun isDuckDuckGoFetchHost(host: String?): Boolean {
     val normalized =
         host
