@@ -185,6 +185,44 @@ class ChatListSortingTest {
         assertEquals(listOf("active", "all-expired"), sorted.map { it.id })
     }
 
+    @Test
+    fun rollbackOptimisticChatListPreviewRestoresPreviousRowWhenTempMessageStillOwnsPreview() {
+        val previous = row(groupId = "chat", title = "Chat", preview = "real latest", latestAt = 10uL, unreadCount = 0uL)
+        val optimistic =
+            previous.copy(
+                lastMessage = preview(messageId = "temp-1", plaintext = "failed draft", latestAt = 20uL),
+                updatedAt = 20uL,
+            )
+
+        assertEquals(
+            previous,
+            rollbackOptimisticChatListPreview(
+                current = optimistic,
+                previous = previous,
+                optimisticMessageIdHex = "temp-1",
+            ),
+        )
+    }
+
+    @Test
+    fun rollbackOptimisticChatListPreviewKeepsCurrentRowWhenAuthoritativePreviewArrived() {
+        val previous = row(groupId = "chat", title = "Chat", preview = "real latest", latestAt = 10uL, unreadCount = 0uL)
+        val authoritative =
+            previous.copy(
+                lastMessage = preview(messageId = "real-2", plaintext = "new real latest", latestAt = 30uL),
+                updatedAt = 30uL,
+            )
+
+        assertEquals(
+            authoritative,
+            rollbackOptimisticChatListPreview(
+                current = authoritative,
+                previous = previous,
+                optimisticMessageIdHex = "temp-1",
+            ),
+        )
+    }
+
     private fun item(
         id: String,
         latestAt: ULong?,
@@ -231,6 +269,21 @@ class ChatListSortingTest {
         lastReadMessageIdHex = null,
         lastReadTimelineAt = null,
         updatedAt = latestAt,
+    )
+
+    private fun preview(
+        messageId: String,
+        plaintext: String,
+        latestAt: ULong,
+    ) = ChatListMessagePreviewFfi(
+        messageIdHex = messageId,
+        sender = "sender",
+        senderDisplayName = "Sender",
+        plaintext = plaintext,
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        kind = 9uL,
+        timelineAt = latestAt,
+        deleted = false,
     )
 
     private fun noMessageRow(

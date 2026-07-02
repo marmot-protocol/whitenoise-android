@@ -26,6 +26,7 @@ import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AuditLogTrackerConfigFfi
 import dev.ipf.marmotkit.AuditLogUploadSourceFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
+import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.NotificationSettingsFfi
@@ -1110,8 +1111,14 @@ class WhiteNoiseAppState(
     fun applyOptimisticSentPreview(
         groupIdHex: String,
         preview: ChatListMessagePreviewFfi,
+    ): ChatListRowFfi? = chatsController?.applyOptimisticSentPreview(groupIdHex, preview)
+
+    fun rollbackOptimisticSentPreview(
+        groupIdHex: String,
+        optimisticMessageIdHex: String,
+        previousRow: ChatListRowFfi?,
     ) {
-        chatsController?.applyOptimisticSentPreview(groupIdHex, preview)
+        chatsController?.rollbackOptimisticSentPreview(groupIdHex, optimisticMessageIdHex, previousRow)
     }
 
     // A self-leave stops that group's subscription, so the engine pushes no
@@ -1166,7 +1173,7 @@ class WhiteNoiseAppState(
         val trimmed = text.trim()
         val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
         if (trimmed.isEmpty() || targets.isEmpty()) return
-        val account = activeAccount?.accountIdHex ?: return
+        val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return
         launchMutation {
             var failures = 0
             for (groupIdHex in targets) {

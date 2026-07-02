@@ -288,6 +288,17 @@ internal fun chatListItemFromProjection(
     )
 }
 
+internal fun rollbackOptimisticChatListPreview(
+    current: ChatListRowFfi,
+    previous: ChatListRowFfi,
+    optimisticMessageIdHex: String,
+): ChatListRowFfi =
+    if (current.lastMessage?.messageIdHex == optimisticMessageIdHex) {
+        previous
+    } else {
+        current
+    }
+
 /**
  * The last-message text a chat row should run through the markdown parser,
  * or null when the row's preview line will show fallback copy instead of
@@ -1464,14 +1475,34 @@ class ChatsController(
     fun applyOptimisticSentPreview(
         groupIdHex: String,
         preview: ChatListMessagePreviewFfi,
-    ) {
-        if (accountRef == null) return
-        val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: return
+    ): ChatListRowFfi? {
+        if (accountRef == null) return null
+        val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: return null
         chatRowsByGroup[chatRowKey(groupIdHex)] =
             row.copy(
                 lastMessage = preview,
                 updatedAt = maxOf(row.updatedAt, preview.timelineAt),
             )
+        scheduleRecompute()
+        return row
+    }
+
+    fun rollbackOptimisticSentPreview(
+        groupIdHex: String,
+        optimisticMessageIdHex: String,
+        previousRow: ChatListRowFfi?,
+    ) {
+        if (accountRef == null || previousRow == null) return
+        val rowKey = chatRowKey(groupIdHex)
+        val current = chatRowsByGroup[rowKey] ?: return
+        val rolledBack =
+            rollbackOptimisticChatListPreview(
+                current = current,
+                previous = previousRow,
+                optimisticMessageIdHex = optimisticMessageIdHex,
+            )
+        if (rolledBack === current) return
+        chatRowsByGroup[rowKey] = rolledBack
         scheduleRecompute()
     }
 
@@ -2604,6 +2635,7 @@ class ConversationController(
     private val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     private val timelineOrder = mutableListOf<String>()
     private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
+    private val optimisticChatListPreviewRows = mutableMapOf<String, ChatListRowFfi>()
     private val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
     private val localTimelineOrderOverrides = appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
     private val localTimelineTimestampOverrides =
@@ -3328,19 +3360,22 @@ class ConversationController(
         // bubble, so a back-navigation to the list paints the new last-message
         // instead of a one-frame flash of the prior one (#900). Reuses the
         // already-parsed markdown from the optimistic record.
-        appState.applyOptimisticSentPreview(
-            group.groupIdHex,
-            ChatListMessagePreviewFfi(
-                messageIdHex = tempId,
-                sender = conversationAccountIdHex ?: "",
-                senderDisplayName = null,
-                plaintext = trimmed,
-                contentTokens = optimistic.contentTokens,
-                kind = 9uL,
-                timelineAt = now,
-                deleted = false,
-            ),
-        )
+        appState
+            .applyOptimisticSentPreview(
+                group.groupIdHex,
+                ChatListMessagePreviewFfi(
+                    messageIdHex = tempId,
+                    sender = conversationAccountIdHex ?: "",
+                    senderDisplayName = null,
+                    plaintext = trimmed,
+                    contentTokens = optimistic.contentTokens,
+                    kind = 9uL,
+                    timelineAt = now,
+                    deleted = false,
+                ),
+            )?.let { previousRow ->
+                optimisticChatListPreviewRows[optimisticKey] = previousRow
+            }
         replyingTo = null
         // The optimistic bubble is now in the projection and published — the
         // send has visibly started. Only now is it safe to clear the input and
@@ -3364,6 +3399,7 @@ class ConversationController(
             val confirmed = optimistic.copy(messageIdHex = confirmedId)
             if (confirmedId.isNotEmpty()) messageById[confirmedId] = confirmed
             optimisticMessages.remove(optimisticKey)
+            optimisticChatListPreviewRows.remove(optimisticKey)
             messageById.remove(tempId)
             invalidatedProjectionIdsMatchingMessage(timelineRecords, confirmed)
                 .forEach(::removeProjectedRecord)
@@ -3379,6 +3415,7 @@ class ConversationController(
             publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
+            rollbackOptimisticChatListPreview(optimisticKey, tempId)
             retainFailedOptimisticTextSend(
                 optimisticMessages = optimisticMessages,
                 messageById = messageById,
@@ -4018,6 +4055,14 @@ class ConversationController(
     // path putting the message back as Failed.
     private val discardedDuringRetry = mutableSetOf<String>()
 
+    private fun rollbackOptimisticChatListPreview(
+        key: String,
+        optimisticMessageIdHex: String,
+    ) {
+        val previousRow = optimisticChatListPreviewRows.remove(key) ?: return
+        appState.rollbackOptimisticSentPreview(group.groupIdHex, optimisticMessageIdHex, previousRow)
+    }
+
     /**
      * Compressed bytes for in-flight / failed outgoing attachments, keyed by
      * the optimistic timeline id (`"msg:<tempId>"`). Retained so a failed
@@ -4399,6 +4444,7 @@ class ConversationController(
             val confirmedId = summary.messageIds.firstOrNull() ?: tempId
             val confirmed = refreshedRecord.copy(messageIdHex = confirmedId)
             optimisticMessages.remove(key)
+            optimisticChatListPreviewRows.remove(key)
             messageById.remove(tempId)
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; drop the result entirely.
@@ -4428,6 +4474,7 @@ class ConversationController(
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; don't restore the Failed bubble.
                 optimisticMessages.remove(key)
+                optimisticChatListPreviewRows.remove(key)
                 messageById.remove(tempId)
                 publishTimelineFromIndexes()
                 return
@@ -4482,6 +4529,7 @@ class ConversationController(
             MessageStatus.Pending -> discardedDuringRetry.add(key)
             else -> return
         }
+        rollbackOptimisticChatListPreview(key, tempId)
         optimisticMessages.remove(key)
         messageById.remove(tempId)
         // Free any retained attachment bytes for a discarded media send.
