@@ -19726,7 +19726,6 @@ private fun AvatarFullScreenViewer(
     val savedMessage = stringResource(R.string.media_saved)
     val saveFailedMessage = stringResource(R.string.media_save_failed)
     val fileName = remember(safePictureUrl) { avatarViewerFileName(safePictureUrl) }
-    val mediaType = remember(fileName) { avatarViewerMimeType(fileName) }
     var menuOpen by remember { mutableStateOf(false) }
     var scale by remember(safePictureUrl) { mutableStateOf(1f) }
     var offset by remember(safePictureUrl) { mutableStateOf(Offset.Zero) }
@@ -19848,7 +19847,7 @@ private fun AvatarFullScreenViewer(
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(
                             Icons.Default.MoreVert,
-                            contentDescription = stringResource(R.string.profile_picture_sheet_title),
+                            contentDescription = stringResource(R.string.actions),
                             tint = Color.White,
                         )
                     }
@@ -19866,7 +19865,7 @@ private fun AvatarFullScreenViewer(
                                 scope.launch {
                                     val ok =
                                         withContext(Dispatchers.IO) {
-                                            saveImageToGallery(context, bytes, fileName, mediaType)
+                                            saveImageToGallery(context, bytes, fileName, avatarViewerMimeType(bytes, fileName))
                                         }
                                     snackbarHostState.showSnackbar(if (ok) savedMessage else saveFailedMessage)
                                 }
@@ -20010,6 +20009,21 @@ private fun avatarViewerFileName(url: String): String {
             ?: "avatar.jpg"
     val safe = MediaPipeline.safeDisplayName(lastSegment)
     return if (safe.contains('.')) safe else "$safe.jpg"
+}
+
+// Sniff the real content type from the bytes being saved — the URL filename is
+// only a fallback, since extensionless or mislabeled URLs would otherwise store
+// PNG/WebP bytes under JPEG metadata in MediaStore.
+private fun avatarViewerMimeType(
+    bytes: ByteArray,
+    fallbackFileName: String,
+): String {
+    val options =
+        android.graphics.BitmapFactory
+            .Options()
+            .apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+    return options.outMimeType ?: avatarViewerMimeType(fallbackFileName)
 }
 
 private fun avatarViewerMimeType(fileName: String): String =
