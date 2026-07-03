@@ -8611,7 +8611,8 @@ private fun ConversationScreen(
 
     // Scroll the lazy list so the item at [targetMessageId] sits roughly in the
     // vertical center of the message-list viewport, leaving context above and
-    // below the target visible (#595, #794).
+    // below the target visible (#595, #794). Runs as a single animated scroll
+    // to the centered offset — no jump-then-correct second animation (#999).
     suspend fun centerTimelineItemAt(
         targetMessageId: String,
         fallbackTargetIndex: Int,
@@ -8628,24 +8629,29 @@ private fun ConversationScreen(
         }
 
         val targetIndex = currentTargetIndex() ?: fallbackTargetIndex
-        val viewportHeight = listState.layoutInfo.viewportSize.height
+        val layoutInfo = listState.layoutInfo
+        val viewportHeight = layoutInfo.viewportSize.height
         if (viewportHeight <= 0) {
             // Layout not measured yet (rare on a fresh open): fall back to the
             // plain top-aligned jump rather than guessing an offset.
             listState.animateScrollToItem(targetIndex)
             return
         }
-        listState.animateScrollToItem(targetIndex, ReplyNavigation.centeredScrollOffset(viewportHeight))
-        val itemHeight =
-            listState.layoutInfo.visibleItemsInfo
-                .firstOrNull { it.index == (currentTargetIndex() ?: targetIndex) }
-                ?.size
-                ?: return
-        // Now true-center the measured bubble: top at (viewport - item) / 2.
-        val centeredOffset = ReplyNavigation.centeredScrollOffset(viewportHeight, itemHeight)
-        if (centeredOffset != ReplyNavigation.centeredScrollOffset(viewportHeight)) {
-            listState.animateScrollToItem(currentTargetIndex() ?: targetIndex, centeredOffset)
-        }
+        // Estimate the target's height so we can animate straight to its
+        // true-centered offset in a single pass — no jump-then-correct bounce
+        // (#999). Prefer the target's own measured height when it's already on
+        // screen (the common Next/Previous step lands on a nearby, often
+        // still-visible match); otherwise borrow a visible sibling bubble's
+        // height, which is a close proxy since message rows are similar sizes.
+        val estimatedItemHeight =
+            layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size
+                ?: ReplyNavigation.estimateItemHeightPx(layoutInfo.visibleItemsInfo.map { it.size })
+        // Compose clamps the resulting scroll at the list bounds, so this still
+        // degrades as #595 asks: a near-top match can't scroll up past the
+        // first row (top-aligned) and a near-bottom match can't scroll down
+        // past the last row (bottom-aligned); only the middle case truly
+        // centers.
+        listState.animateScrollToItem(targetIndex, ReplyNavigation.centeredScrollOffset(viewportHeight, estimatedItemHeight))
     }
 
     fun recordReactionEmoji(emoji: String) {
