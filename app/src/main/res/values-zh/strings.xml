@@ -839,9 +839,7 @@
     <string name="paste_npub">粘贴 npub</string>
     <string name="start_chat">开始聊天</string>
     <string name="name_this_group">为群组命名</string>
-    <string name="group_permissions">群组权限</string>
     <string name="coming_soon">即将推出</string>
-    <string name="group_photo_after_create">创建群组后即可添加群组照片</string>
     <string name="quick_action_audio">语音</string>
     <string name="quick_action_video">视频</string>
     <string name="quick_action_add">添加</string>
@@ -852,6 +850,4 @@
     <string name="encryption">加密</string>
     <string name="encryption_e2ee_note">消息均经过端到端加密</string>
     <string name="chat_lock">聊天锁定</string>
-    <string name="media_visibility">媒体可见性</string>
-    <string name="advanced_privacy">高级隐私</string>
 </resources>

@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,9 +21,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -49,7 +47,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
@@ -186,23 +183,24 @@ internal fun NewGroupSetupScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
             ) {
-                val photoHint = stringResource(R.string.group_photo_after_create)
-                Box(
-                    modifier =
-                        Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .clickable(role = Role.Button, onClickLabel = photoHint) {
-                                appState.present(R.string.group_photo_after_create)
-                            },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Default.PhotoCamera,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                val trimmedName = groupName.trim()
+                if (trimmedName.isEmpty()) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.Group,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    Avatar(title = trimmedName, seed = trimmedName, size = 72.dp)
                 }
                 TextField(
                     value = groupName,
@@ -236,12 +234,6 @@ internal fun NewGroupSetupScreen(
                 value = disappearingMessagesLabel(retentionSecs),
                 enabled = !busy,
                 onClick = { showRetentionPicker = true },
-            )
-            SettingsActionRow(
-                icon = Icons.Default.Tune,
-                title = stringResource(R.string.group_permissions),
-                enabled = false,
-                comingSoon = true,
             )
             SectionHeader("${stringResource(R.string.members)} · ${members.size}")
             members.forEach { member ->

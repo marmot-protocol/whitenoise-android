@@ -864,9 +864,7 @@
     <string name="paste_npub">Paste npub</string>
     <string name="start_chat">Start chat</string>
     <string name="name_this_group">Name this group</string>
-    <string name="group_permissions">Group permissions</string>
     <string name="coming_soon">Coming soon</string>
-    <string name="group_photo_after_create">You can add a group photo after the group is created</string>
     <string name="quick_action_audio">Audio</string>
     <string name="quick_action_video">Video</string>
     <string name="quick_action_add">Add</string>
@@ -877,6 +875,4 @@
     <string name="encryption">Encryption</string>
     <string name="encryption_e2ee_note">Messages are end-to-end encrypted</string>
     <string name="chat_lock">Chat lock</string>
-    <string name="media_visibility">Media visibility</string>
-    <string name="advanced_privacy">Advanced privacy</string>
 </resources>

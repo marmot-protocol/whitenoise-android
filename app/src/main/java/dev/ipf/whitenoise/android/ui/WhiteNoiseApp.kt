@@ -161,13 +161,11 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
@@ -11078,18 +11076,6 @@ private fun GroupDetailsScreen(
             SettingsActionRow(
                 icon = Icons.Default.Fingerprint,
                 title = stringResource(R.string.chat_lock),
-                enabled = false,
-                comingSoon = true,
-            )
-            SettingsActionRow(
-                icon = Icons.Default.Visibility,
-                title = stringResource(R.string.media_visibility),
-                enabled = false,
-                comingSoon = true,
-            )
-            SettingsActionRow(
-                icon = Icons.Default.Security,
-                title = stringResource(R.string.advanced_privacy),
                 enabled = false,
                 comingSoon = true,
             )

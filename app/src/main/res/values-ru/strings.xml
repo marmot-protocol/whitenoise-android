@@ -856,9 +856,7 @@
     <string name="paste_npub">Вставить npub</string>
     <string name="start_chat">Начать чат</string>
     <string name="name_this_group">Назовите группу</string>
-    <string name="group_permissions">Права группы</string>
     <string name="coming_soon">Скоро</string>
-    <string name="group_photo_after_create">Фото группы можно добавить после её создания</string>
     <string name="quick_action_audio">Аудио</string>
     <string name="quick_action_video">Видео</string>
     <string name="quick_action_add">Добавить</string>
@@ -869,6 +867,4 @@
     <string name="encryption">Шифрование</string>
     <string name="encryption_e2ee_note">Сообщения защищены сквозным шифрованием</string>
     <string name="chat_lock">Блокировка чата</string>
-    <string name="media_visibility">Видимость медиа</string>
-    <string name="advanced_privacy">Расширенная конфиденциальность</string>
 </resources>

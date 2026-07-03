@@ -844,9 +844,7 @@
     <string name="paste_npub">npub yapıştır</string>
     <string name="start_chat">Sohbet başlat</string>
     <string name="name_this_group">Gruba ad verin</string>
-    <string name="group_permissions">Grup izinleri</string>
     <string name="coming_soon">Çok yakında</string>
-    <string name="group_photo_after_create">Grup oluşturulduktan sonra grup fotoğrafı ekleyebilirsiniz</string>
     <string name="quick_action_audio">Ses</string>
     <string name="quick_action_video">Video</string>
     <string name="quick_action_add">Ekle</string>
@@ -857,6 +855,4 @@
     <string name="encryption">Şifreleme</string>
     <string name="encryption_e2ee_note">Mesajlar uçtan uca şifrelenir</string>
     <string name="chat_lock">Sohbet kilidi</string>
-    <string name="media_visibility">Medya görünürlüğü</string>
-    <string name="advanced_privacy">Gelişmiş gizlilik</string>
 </resources>

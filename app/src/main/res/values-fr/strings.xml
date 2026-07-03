@@ -846,9 +846,7 @@
     <string name="paste_npub">Coller le npub</string>
     <string name="start_chat">Démarrer la discussion</string>
     <string name="name_this_group">Nommez ce groupe</string>
-    <string name="group_permissions">Autorisations du groupe</string>
     <string name="coming_soon">Bientôt disponible</string>
-    <string name="group_photo_after_create">Vous pourrez ajouter une photo de groupe une fois le groupe créé</string>
     <string name="quick_action_audio">Audio</string>
     <string name="quick_action_video">Vidéo</string>
     <string name="quick_action_add">Ajouter</string>
@@ -859,6 +857,4 @@
     <string name="encryption">Chiffrement</string>
     <string name="encryption_e2ee_note">Les messages sont chiffrés de bout en bout</string>
     <string name="chat_lock">Verrouillage de la discussion</string>
-    <string name="media_visibility">Visibilité des médias</string>
-    <string name="advanced_privacy">Confidentialité avancée</string>
 </resources>

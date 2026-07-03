@@ -844,9 +844,7 @@
     <string name="paste_npub">npub einfügen</string>
     <string name="start_chat">Chat starten</string>
     <string name="name_this_group">Gruppe benennen</string>
-    <string name="group_permissions">Gruppenberechtigungen</string>
     <string name="coming_soon">Bald verfügbar</string>
-    <string name="group_photo_after_create">Ein Gruppenfoto kannst du hinzufügen, sobald die Gruppe erstellt ist</string>
     <string name="quick_action_audio">Audio</string>
     <string name="quick_action_video">Video</string>
     <string name="quick_action_add">Hinzufügen</string>
@@ -857,6 +855,4 @@
     <string name="encryption">Verschlüsselung</string>
     <string name="encryption_e2ee_note">Nachrichten sind Ende-zu-Ende-verschlüsselt</string>
     <string name="chat_lock">Chatsperre</string>
-    <string name="media_visibility">Mediensichtbarkeit</string>
-    <string name="advanced_privacy">Erweiterte Privatsphäre</string>
 </resources>
