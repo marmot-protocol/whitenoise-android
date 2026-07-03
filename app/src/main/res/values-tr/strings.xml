@@ -857,4 +857,5 @@
     <string name="chat_lock">Sohbet kilidi</string>
     <string name="toast_disappearing_not_applied">Grup oluşturuldu ancak kaybolan mesajlar açılamadı</string>
     <string name="search_members">Üye ara</string>
+    <string name="recent_chats">Son sohbetler</string>
 </resources>

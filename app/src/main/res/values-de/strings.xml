@@ -857,4 +857,5 @@
     <string name="chat_lock">Chatsperre</string>
     <string name="toast_disappearing_not_applied">Die Gruppe wurde erstellt, aber verschwindende Nachrichten konnten nicht aktiviert werden</string>
     <string name="search_members">Mitglieder suchen</string>
+    <string name="recent_chats">Letzte Chats</string>
 </resources>

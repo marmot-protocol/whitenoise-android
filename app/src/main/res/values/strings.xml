@@ -877,4 +877,5 @@
     <string name="chat_lock">Chat lock</string>
     <string name="toast_disappearing_not_applied">The group was created, but disappearing messages could not be turned on</string>
     <string name="search_members">Search members</string>
+    <string name="recent_chats">Recent chats</string>
 </resources>

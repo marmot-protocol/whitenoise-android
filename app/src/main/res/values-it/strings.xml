@@ -859,4 +859,5 @@
     <string name="chat_lock">Blocco chat</string>
     <string name="toast_disappearing_not_applied">Il gruppo è stato creato, ma non è stato possibile attivare i messaggi effimeri</string>
     <string name="search_members">Cerca membri</string>
+    <string name="recent_chats">Chat recenti</string>
 </resources>

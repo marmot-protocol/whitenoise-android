@@ -859,4 +859,5 @@
     <string name="chat_lock">Bloqueio de conversa</string>
     <string name="toast_disappearing_not_applied">O grupo foi criado, mas não foi possível ativar as mensagens temporárias</string>
     <string name="search_members">Pesquisar membros</string>
+    <string name="recent_chats">Conversas recentes</string>
 </resources>

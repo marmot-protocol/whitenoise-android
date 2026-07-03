@@ -852,4 +852,5 @@
     <string name="chat_lock">聊天鎖定</string>
     <string name="toast_disappearing_not_applied">群組已建立，但無法開啟閱後即焚訊息</string>
     <string name="search_members">搜尋成員</string>
+    <string name="recent_chats">最近的聊天</string>
 </resources>

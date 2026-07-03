@@ -172,7 +172,6 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -14584,19 +14583,28 @@ private fun ForwardMessageSheet(
                 titledTargets.filter { (_, title) -> title.contains(needle, ignoreCase = true) }
             }
         }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Opens at half height with a drag up to full — a long chat list stays
+    // reachable without the sheet swallowing the conversation behind it.
+    val sheetState = rememberModalBottomSheetState()
+    val activeAccountIdHex = appState.activeAccount?.accountIdHex
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         modifier = amoledModalSheetModifier(),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 stringResource(R.string.forward_to),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
             // Preview of what is being forwarded, so the user can confirm the
             // content before fanning it out to several chats.
@@ -14604,7 +14612,7 @@ private fun ForwardMessageSheet(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(12.dp),
                 border = amoledSurfaceBorderStroke(),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
             ) {
                 // Preview only: resolve `@npub1…` runs to display names so the
                 // confirmation reads like the bubble (#615). The forwarded text
@@ -14617,63 +14625,61 @@ private fun ForwardMessageSheet(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 )
             }
-            OutlinedTextField(
+            FlowSearchField(
                 value = query,
                 onValueChange = { query = it },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                placeholder = { Text(stringResource(R.string.forward_search_chats)) },
+                placeholder = stringResource(R.string.forward_search_chats),
+                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
             )
-            if (targets.isEmpty()) {
-                Text(
-                    stringResource(R.string.forward_no_chats),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else if (filtered.isEmpty()) {
-                Text(
-                    stringResource(R.string.forward_no_matches),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
-                ) {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(bottom = Dimens.spaceLg),
+            ) {
+                if (targets.isEmpty() || filtered.isEmpty()) {
+                    item {
+                        Text(
+                            stringResource(
+                                if (targets.isEmpty()) R.string.forward_no_chats else R.string.forward_no_matches,
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                        )
+                    }
+                } else {
+                    item { SectionHeader(stringResource(R.string.recent_chats)) }
                     items(filtered, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
                         val groupId = item.group.groupIdHex
                         val isSelected = selected.contains(groupId)
-                        ListItem(
-                            modifier =
-                                Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .amoledSurfaceBorder(RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                                    },
-                            leadingContent = {
-                                val avatarAccount =
-                                    item.otherMemberAccount
-                                        ?.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
-                                Avatar(
-                                    title = title,
-                                    seed = avatarAccount ?: item.group.groupIdHex,
-                                    size = 40.dp,
-                                    pictureUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
-                                )
+                        val avatarAccount =
+                            item.otherMemberAccount
+                                ?.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
+                        // Group rows preview the other members' names, mirroring
+                        // the chat-list mental model; direct chats need none.
+                        val membersPreview =
+                            remember(item, appState.profileRevisionForCompose) {
+                                if (avatarAccount != null) {
+                                    null
+                                } else {
+                                    item.memberSnapshot
+                                        ?.members
+                                        ?.filterNot { it.memberIdHex.equals(activeAccountIdHex, ignoreCase = true) }
+                                        ?.map { appState.chatMemberTitleCached(it.memberIdHex) }
+                                        ?.filter { it.isNotBlank() }
+                                        ?.take(6)
+                                        ?.joinToString(", ")
+                                        ?.takeIf { it.isNotBlank() }
+                                }
+                            }
+                        ContactRow(
+                            title = title,
+                            subtitle = membersPreview,
+                            avatarSeed = avatarAccount ?: item.group.groupIdHex,
+                            avatarUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
+                            onClick = {
+                                if (isSelected) selected.remove(groupId) else selected.add(groupId)
                             },
-                            headlineContent = {
-                                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            },
-                            trailingContent = {
-                                Checkbox(
-                                    checked = isSelected,
-                                    onCheckedChange = {
-                                        if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                                    },
-                                )
-                            },
+                            trailing = { SelectionIndicator(selected = isSelected) },
                         )
                     }
                 }
@@ -14684,7 +14690,7 @@ private fun ForwardMessageSheet(
                     onDismiss()
                 },
                 enabled = selected.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Forward,
