@@ -123,10 +123,13 @@ private fun NewMessageScreen(
     var creatingHex by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboardManager.current
 
-    // Back is parked while a tapped person's chat is being created; otherwise
-    // the process-lifetime create would yank the user into the new
+    // Back must stay installed (a disabled handler lets the event fall through
+    // to the Activity) but no-op while a tapped person's chat is being created;
+    // otherwise the process-lifetime create would yank the user into the new
     // conversation seconds after they left this screen.
-    BackHandler(enabled = creatingHex == null) { onBack() }
+    BackHandler {
+        if (creatingHex == null) onBack()
+    }
 
     val activeHex = appState.activeAccount?.accountIdHex
     val candidates =

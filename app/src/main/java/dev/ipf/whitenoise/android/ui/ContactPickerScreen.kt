@@ -66,7 +66,11 @@ internal fun ContactPickerScreen(
     var showScanner by remember { mutableStateOf(false) }
     val resolution = rememberRecipientResolution(query, appState)
 
-    BackHandler(enabled = !busy) { onBack() }
+    // Installed unconditionally: a disabled handler would let back fall
+    // through to the Activity while a mutation is mid-flight.
+    BackHandler {
+        if (!busy) onBack()
+    }
 
     val activeHex = appState.activeAccount?.accountIdHex
     val candidates =

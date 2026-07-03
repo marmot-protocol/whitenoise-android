@@ -4,20 +4,19 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -136,7 +135,11 @@ internal fun NewGroupSetupScreen(
         }
     }
 
-    BackHandler(enabled = !busy) { onBack() }
+    // Installed unconditionally: a disabled handler would let back fall
+    // through to the Activity while the create is mid-flight.
+    BackHandler {
+        if (!busy) onBack()
+    }
 
     Scaffold(
         modifier = Modifier.imePadding(),
@@ -176,82 +179,86 @@ internal fun NewGroupSetupScreen(
             }
         },
     ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .consumeWindowInsets(padding)
-                .verticalScroll(rememberScrollState()),
+        LazyColumn(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .consumeWindowInsets(padding),
+            contentPadding = PaddingValues(bottom = 96.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
-            ) {
-                val trimmedName = groupName.trim()
-                if (trimmedName.isEmpty()) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Default.Group,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
+                ) {
+                    val trimmedName = groupName.trim()
+                    if (trimmedName.isEmpty()) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(72.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Default.Group,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else {
+                        Avatar(title = trimmedName, seed = trimmedName, size = 72.dp)
                     }
-                } else {
-                    Avatar(title = trimmedName, seed = trimmedName, size = 72.dp)
+                    TextField(
+                        value = groupName,
+                        onValueChange = { groupName = it },
+                        label = { Text(stringResource(R.string.group_name)) },
+                        singleLine = true,
+                        enabled = !busy,
+                        colors =
+                            TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                errorContainerColor = Color.Transparent,
+                            ),
+                        modifier = Modifier.weight(1f),
+                    )
                 }
-                TextField(
-                    value = groupName,
-                    onValueChange = { groupName = it },
-                    label = { Text(stringResource(R.string.group_name)) },
-                    singleLine = true,
-                    enabled = !busy,
-                    colors =
-                        TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            errorContainerColor = Color.Transparent,
-                        ),
-                    modifier = Modifier.weight(1f),
-                )
             }
             error?.let { message ->
-                SelectionContainer {
-                    Text(
-                        message,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
-                    )
+                item {
+                    SelectionContainer {
+                        Text(
+                            message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+                        )
+                    }
                 }
             }
-            SettingsActionRow(
-                icon = Icons.Default.Schedule,
-                title = stringResource(R.string.disappearing_messages),
-                value = disappearingMessagesLabel(retentionSecs),
-                enabled = !busy,
-                onClick = { showRetentionPicker = true },
-            )
-            SectionHeader("${stringResource(R.string.members)} · ${members.size}")
-            members.forEach { member ->
-                key(member.accountIdHex) {
-                    ContactRow(
-                        title = appState.displayName(member.accountIdHex),
-                        subtitle = IdentityFormatter.short(member.npub),
-                        avatarSeed = member.accountIdHex,
-                        avatarUrl = appState.avatarUrl(member.accountIdHex),
-                    )
-                }
+            item {
+                SettingsActionRow(
+                    icon = Icons.Default.Schedule,
+                    title = stringResource(R.string.disappearing_messages),
+                    value = disappearingMessagesLabel(retentionSecs),
+                    enabled = !busy,
+                    onClick = { showRetentionPicker = true },
+                )
             }
-            Spacer(Modifier.height(96.dp))
+            item { SectionHeader("${stringResource(R.string.members)} · ${members.size}") }
+            items(members, key = { it.accountIdHex }) { member ->
+                ContactRow(
+                    title = appState.displayName(member.accountIdHex),
+                    subtitle = IdentityFormatter.short(member.npub),
+                    avatarSeed = member.accountIdHex,
+                    avatarUrl = appState.avatarUrl(member.accountIdHex),
+                )
+            }
         }
     }
 
