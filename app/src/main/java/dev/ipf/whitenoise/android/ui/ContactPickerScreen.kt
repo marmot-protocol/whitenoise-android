@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -16,11 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,7 +64,7 @@ internal fun ContactPickerScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showScanner by remember { mutableStateOf(false) }
-    var preview by remember { mutableStateOf(RecipientResolution.Empty) }
+    val resolution = rememberRecipientResolution(query, appState)
 
     BackHandler { onBack() }
 
@@ -161,36 +157,33 @@ internal fun ContactPickerScreen(
                     },
                 )
             }
-            if (identifierQuery) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
-                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
-                ) {
-                    RecipientPreviewCard(
-                        input = query,
-                        appState = appState,
-                        onResolutionChanged = { preview = it },
-                    )
-                    val resolvedHex = preview.resolvedHex
-                    val alreadyMember =
-                        groupContainsResolvedMember(
-                            memberHexes = excludeAccountIdHexes.toList(),
-                            resolvedHex = resolvedHex,
-                        )
-                    val alreadySelected =
-                        resolvedHex != null && resolvedHex.lowercase(Locale.ROOT) in selectedHexes
-                    if (alreadyMember && resolvedHex != null) {
-                        Text(
-                            stringResource(R.string.add_member_already_in_group, appState.displayName(resolvedHex)),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    FilledTonalButton(
-                        onClick = {
-                            if (resolvedHex != null) {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(bottom = 96.dp),
+            ) {
+                val resolvedHex = resolution.resolvedHex
+                if (identifierQuery && resolution.state == RecipientPreviewState.Resolving) {
+                    item { ResolvingContactRow() }
+                } else if (identifierQuery && resolvedHex != null) {
+                    item {
+                        val alreadyMember =
+                            groupContainsResolvedMember(
+                                memberHexes = excludeAccountIdHexes.toList(),
+                                resolvedHex = resolvedHex,
+                            )
+                        val isSelected = resolvedHex.lowercase(Locale.ROOT) in selectedHexes
+                        ContactRow(
+                            title = appState.displayName(resolvedHex),
+                            subtitle =
+                                if (alreadyMember) {
+                                    stringResource(R.string.add_member_already_in_group, appState.displayName(resolvedHex))
+                                } else {
+                                    IdentityFormatter.short(appState.npub(resolvedHex))
+                                },
+                            avatarSeed = resolvedHex,
+                            avatarUrl = appState.avatarUrl(resolvedHex),
+                            enabled = !busy && !alreadyMember,
+                            onClick = {
                                 toggle(
                                     RecipientSearch.Candidate(
                                         accountIdHex = resolvedHex,
@@ -198,59 +191,36 @@ internal fun ContactPickerScreen(
                                         npub = appState.npub(resolvedHex),
                                     ),
                                 )
-                            }
-                        },
-                        enabled =
-                            resolvedHex != null &&
-                                !alreadyMember &&
-                                !alreadySelected &&
-                                recipientPreviewAllowsSubmit(preview.state),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.quick_action_add))
+                            },
+                            trailing = {
+                                SelectionIndicator(selected = isSelected, dimmed = alreadyMember)
+                            },
+                        )
                     }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 96.dp),
-                ) {
-                    if (matches.isEmpty()) {
-                        item {
-                            Text(
-                                stringResource(
-                                    if (query.isBlank()) R.string.recipient_search_empty_hint else R.string.no_matches,
-                                ),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                            )
-                        }
-                    } else {
-                        item { SectionHeader(stringResource(R.string.contacts)) }
-                        items(matches, key = { it.accountIdHex }) { candidate ->
-                            val isSelected = candidate.accountIdHex.lowercase(Locale.ROOT) in selectedHexes
-                            ContactRow(
-                                title = appState.displayName(candidate.accountIdHex),
-                                subtitle = IdentityFormatter.short(candidate.npub),
-                                avatarSeed = candidate.accountIdHex,
-                                avatarUrl = appState.avatarUrl(candidate.accountIdHex),
-                                enabled = !busy,
-                                onClick = { toggle(candidate) },
-                                trailing = {
-                                    Icon(
-                                        if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                                        contentDescription = null,
-                                        tint =
-                                            if (isSelected) {
-                                                MaterialTheme.colorScheme.primary
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            },
-                                    )
-                                },
-                            )
-                        }
+                } else if (identifierQuery || matches.isEmpty()) {
+                    item {
+                        Text(
+                            stringResource(
+                                if (query.isBlank()) R.string.recipient_search_empty_hint else R.string.no_matches,
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                        )
+                    }
+                } else {
+                    item { SectionHeader(stringResource(R.string.contacts)) }
+                    items(matches, key = { it.accountIdHex }) { candidate ->
+                        val isSelected = candidate.accountIdHex.lowercase(Locale.ROOT) in selectedHexes
+                        ContactRow(
+                            title = appState.displayName(candidate.accountIdHex),
+                            subtitle = IdentityFormatter.short(candidate.npub),
+                            avatarSeed = candidate.accountIdHex,
+                            avatarUrl = appState.avatarUrl(candidate.accountIdHex),
+                            enabled = !busy,
+                            onClick = { toggle(candidate) },
+                            trailing = { SelectionIndicator(selected = isSelected) },
+                        )
                     }
                 }
             }

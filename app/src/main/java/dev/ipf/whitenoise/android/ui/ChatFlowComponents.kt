@@ -18,8 +18,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
@@ -203,6 +205,45 @@ internal fun SelectedMemberRail(
                 )
             }
         }
+    }
+}
+
+@Composable
+internal fun SelectionIndicator(
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    dimmed: Boolean = false,
+) {
+    Icon(
+        if (selected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+        contentDescription = null,
+        tint =
+            when {
+                selected -> MaterialTheme.colorScheme.primary
+                dimmed -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal fun ResolvingContactRow(modifier: Modifier = Modifier) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = 64.dp)
+                .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+        Text(
+            stringResource(R.string.recipient_preview_resolving),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

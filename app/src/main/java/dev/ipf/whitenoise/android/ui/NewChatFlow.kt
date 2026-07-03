@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -122,7 +121,6 @@ private fun NewMessageScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var showScanner by remember { mutableStateOf(false) }
     var creatingHex by remember { mutableStateOf<String?>(null) }
-    var preview by remember { mutableStateOf(RecipientResolution.Empty) }
     val clipboard = LocalClipboardManager.current
 
     BackHandler { onBack() }
@@ -133,6 +131,7 @@ private fun NewMessageScreen(
             deriveRecipientCandidates(appState, activeHex)
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query)
+    val resolution = rememberRecipientResolution(query, appState)
     val matches =
         remember(query, candidates, activeHex) {
             if (query.isNotBlank() && !isPlainNameQuery(query)) {
@@ -209,41 +208,27 @@ private fun NewMessageScreen(
                         )
                     }
                 }
-                if (identifierQuery) {
+                val resolvedHex = resolution.resolvedHex
+                if (identifierQuery && resolution.state == RecipientPreviewState.Resolving) {
+                    item { ResolvingContactRow() }
+                } else if (identifierQuery && resolvedHex != null) {
                     item {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
-                            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
-                        ) {
-                            RecipientPreviewCard(
-                                input = query,
-                                appState = appState,
-                                onResolutionChanged = { preview = it },
-                            )
-                            val resolvedHex = preview.resolvedHex
-                            FilledTonalButton(
-                                onClick = {
-                                    if (resolvedHex != null) {
-                                        openOrCreateChat(appState.npub(resolvedHex), resolvedHex)
-                                    }
-                                },
-                                enabled =
-                                    resolvedHex != null &&
-                                        creatingHex == null &&
-                                        recipientPreviewAllowsSubmit(preview.state),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                if (creatingHex != null && creatingHex == resolvedHex) {
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        ContactRow(
+                            title = appState.displayName(resolvedHex),
+                            subtitle = IdentityFormatter.short(appState.npub(resolvedHex)),
+                            avatarSeed = resolvedHex,
+                            avatarUrl = appState.avatarUrl(resolvedHex),
+                            enabled = creatingHex == null,
+                            onClick = { openOrCreateChat(appState.npub(resolvedHex), resolvedHex) },
+                            trailing =
+                                if (creatingHex == resolvedHex) {
+                                    { CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
                                 } else {
-                                    Text(stringResource(R.string.start_chat))
-                                }
-                            }
-                        }
+                                    null
+                                },
+                        )
                     }
-                } else if (matches.isEmpty()) {
+                } else if (identifierQuery || matches.isEmpty()) {
                     item {
                         Column(
                             Modifier
