@@ -40,14 +40,7 @@
     <string name="recipient_preview_unresolved">Не удалось разрешить этот идентификатор</string>
     <string name="recipient_preview_nip05_verified">Подтверждённый адрес</string>
     <string name="recipient_preview_nip05_unverified">Неподтверждённый адрес</string>
-    <string name="recipient_source_in_dm">в ЛС</string>
     <string name="recipient_search_empty_hint">Вставьте npub, чтобы добавить того, с кем вы ещё не общались.</string>
-    <plurals name="recipient_source_in_groups">
-        <item quantity="one">в %1$d группе</item>
-        <item quantity="few">в %1$d группах</item>
-        <item quantity="many">в %1$d группах</item>
-        <item quantity="other">в %1$d группах</item>
-    </plurals>
     <string name="chat_row_action_archive">Архивировать</string>
     <string name="chat_row_action_unarchive">Восстановить</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
@@ -865,4 +858,26 @@
     <string name="disappearing_unit_seconds">Секунды</string>
     <string name="disappearing_set">Задать</string>
 
+    <string name="contacts">Контакты</string>
+    <string name="next">Далее</string>
+    <string name="no_matches">Совпадений нет</string>
+    <string name="new_message">Новое сообщение</string>
+    <string name="search_people_hint">Имя или npub</string>
+    <string name="paste_npub">Вставить npub</string>
+    <string name="start_chat">Начать чат</string>
+    <string name="name_this_group">Назовите группу</string>
+    <string name="coming_soon">Скоро</string>
+    <string name="quick_action_audio">Аудио</string>
+    <string name="quick_action_video">Видео</string>
+    <string name="quick_action_add">Добавить</string>
+    <string name="quick_action_search">Поиск</string>
+    <string name="group_details_subtitle">Группа · %1$d участников</string>
+    <string name="add_group_description">Добавить описание группы</string>
+    <string name="see_all_members">Показать всех участников (%1$d)</string>
+    <string name="encryption">Шифрование</string>
+    <string name="encryption_e2ee_note">Сообщения защищены сквозным шифрованием</string>
+    <string name="chat_lock">Блокировка чата</string>
+    <string name="toast_disappearing_not_applied">Группа создана, но исчезающие сообщения включить не удалось</string>
+    <string name="search_members">Поиск участников</string>
+    <string name="recent_chats">Недавние чаты</string>
 </resources>

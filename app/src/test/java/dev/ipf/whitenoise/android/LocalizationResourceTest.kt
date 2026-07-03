@@ -271,6 +271,10 @@ class LocalizationResourceTest {
                 // in some locales ("Images" in French, "Videos" in German).
                 "shared_media_tab_images",
                 "shared_media_tab_videos",
+                // Call quick-action labels: "Audio"/"Video" are loan words
+                // spelled identically in several locales (DE/ES/FR/IT).
+                "quick_action_audio",
+                "quick_action_video",
             )
 
         // Exemptions that are valid only for SPECIFIC locales, keyed by the
@@ -289,6 +293,8 @@ class LocalizationResourceTest {
                         "disappearing_unit_minutes",
                         "disappearing_minutes_format",
                         "disappearing_5_minutes",
+                        // "Contacts" is spelled identically in French.
+                        "contacts",
                     ),
             )
     }

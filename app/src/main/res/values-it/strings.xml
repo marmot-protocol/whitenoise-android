@@ -40,12 +40,7 @@
     <string name="recipient_preview_unresolved">Impossibile risolvere questo identificatore</string>
     <string name="recipient_preview_nip05_verified">Indirizzo verificato</string>
     <string name="recipient_preview_nip05_unverified">Indirizzo non verificato</string>
-    <string name="recipient_source_in_dm">in privato</string>
     <string name="recipient_search_empty_hint">Incolla un npub per aggiungere qualcuno con cui non hai ancora chattato.</string>
-    <plurals name="recipient_source_in_groups">
-        <item quantity="one">in %1$d gruppo</item>
-        <item quantity="other">in %1$d gruppi</item>
-    </plurals>
     <string name="chat_row_action_archive">Archivia</string>
     <string name="chat_row_action_unarchive">Ripristina</string>
     <string name="chat_row_action_mark_read">Segna come letto</string>
@@ -853,4 +848,26 @@
     <string name="disappearing_unit_seconds">Secondi</string>
     <string name="disappearing_set">Imposta</string>
 
+    <string name="contacts">Contatti</string>
+    <string name="next">Avanti</string>
+    <string name="no_matches">Nessun risultato</string>
+    <string name="new_message">Nuovo messaggio</string>
+    <string name="search_people_hint">Nome o npub</string>
+    <string name="paste_npub">Incolla npub</string>
+    <string name="start_chat">Avvia chat</string>
+    <string name="name_this_group">Dai un nome al gruppo</string>
+    <string name="coming_soon">In arrivo</string>
+    <string name="quick_action_audio">Audio</string>
+    <string name="quick_action_video">Video</string>
+    <string name="quick_action_add">Aggiungi</string>
+    <string name="quick_action_search">Cerca</string>
+    <string name="group_details_subtitle">Gruppo · %1$d membri</string>
+    <string name="add_group_description">Aggiungi la descrizione del gruppo</string>
+    <string name="see_all_members">Vedi tutti i %1$d membri</string>
+    <string name="encryption">Crittografia</string>
+    <string name="encryption_e2ee_note">I messaggi sono crittografati end-to-end</string>
+    <string name="chat_lock">Blocco chat</string>
+    <string name="toast_disappearing_not_applied">Il gruppo è stato creato, ma non è stato possibile attivare i messaggi effimeri</string>
+    <string name="search_members">Cerca membri</string>
+    <string name="recent_chats">Chat recenti</string>
 </resources>

@@ -40,11 +40,7 @@
     <string name="recipient_preview_unresolved">無法解析此識別碼</string>
     <string name="recipient_preview_nip05_verified">已驗證的地址</string>
     <string name="recipient_preview_nip05_unverified">未驗證的地址</string>
-    <string name="recipient_source_in_dm">私訊中</string>
     <string name="recipient_search_empty_hint">貼上 npub 以新增尚未與你聊過天的人。</string>
-    <plurals name="recipient_source_in_groups">
-        <item quantity="other">在 %1$d 個群組中</item>
-    </plurals>
     <string name="chat_row_action_archive">封存</string>
     <string name="chat_row_action_unarchive">取消封存</string>
     <string name="chat_row_action_mark_read">標示為已讀</string>
@@ -845,4 +841,26 @@
     <string name="disappearing_unit_seconds">秒</string>
     <string name="disappearing_set">設定</string>
 
+    <string name="contacts">聯絡人</string>
+    <string name="next">下一步</string>
+    <string name="no_matches">沒有相符結果</string>
+    <string name="new_message">新訊息</string>
+    <string name="search_people_hint">姓名或 npub</string>
+    <string name="paste_npub">貼上 npub</string>
+    <string name="start_chat">開始聊天</string>
+    <string name="name_this_group">為群組命名</string>
+    <string name="coming_soon">即將推出</string>
+    <string name="quick_action_audio">語音</string>
+    <string name="quick_action_video">視訊</string>
+    <string name="quick_action_add">新增</string>
+    <string name="quick_action_search">搜尋</string>
+    <string name="group_details_subtitle">群組 · %1$d 位成員</string>
+    <string name="add_group_description">新增群組描述</string>
+    <string name="see_all_members">查看全部 %1$d 位成員</string>
+    <string name="encryption">加密</string>
+    <string name="encryption_e2ee_note">訊息均經過端對端加密</string>
+    <string name="chat_lock">聊天鎖定</string>
+    <string name="toast_disappearing_not_applied">群組已建立，但無法開啟閱後即焚訊息</string>
+    <string name="search_members">搜尋成員</string>
+    <string name="recent_chats">最近的聊天</string>
 </resources>
