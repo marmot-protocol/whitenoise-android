@@ -282,4 +282,106 @@ class DisappearingMessageSweepTest {
         // without meaningfully extending the retention window.
         assertTrue(DisappearingMessageSweep.CLOCK_SKEW_TOLERANCE_MS in 1L..60_000L)
     }
+
+    @Test
+    fun scanSeedMessageIdSortsBeforeEveryRealMessageId() {
+        // #979: the scan seeds its first cursor at (rawCutoff, all-zeros id).
+        // The engine cursor predicate is `timelineAt < before OR
+        // (timelineAt == before AND messageIdHex < beforeMessageId)`, so the
+        // seed id must sort at-or-before every real 64-hex message id for the
+        // seeded page to be exactly `timelineAt < rawCutoff`.
+        val seed = DisappearingMessageSweep.TIMELINE_SCAN_SEED_MESSAGE_ID
+        assertEquals(64, seed.length)
+        assertTrue(seed.all { it == '0' })
+        val smallestRealId = "0".repeat(63) + "1"
+        assertTrue(seed < smallestRealId)
+        assertTrue(seed <= "0".repeat(64))
+    }
+
+    @Test
+    fun cutoffSeededFirstPageCannotMissAClassifiableRow() {
+        // The seed excludes rows with timelineAt >= rawCutoff, so neither
+        // classification may ever match such a row — otherwise the seeded scan
+        // would silently skip a decision the newest-first scan used to make.
+        val rawCutoff = DisappearingMessageSweep.rawExpiryCutoffSeconds(1_000_000L, 60uL) ?: error("raw cutoff")
+        val skewCutoff = DisappearingMessageSweep.expiryCutoffSeconds(1_000_000L, 60uL) ?: error("skew cutoff")
+        for (timelineAt in listOf(rawCutoff, rawCutoff + 1uL, rawCutoff + 1_000uL)) {
+            assertFalse(DisappearingMessageSweep.isWithinSkewWindow(timelineAt, rawCutoff, skewCutoff))
+            assertFalse(DisappearingMessageSweep.isExpiredBeyondSkew(timelineAt, skewCutoff))
+        }
+        // ...while both boundary rows strictly below the cutoff stay classifiable.
+        assertTrue(DisappearingMessageSweep.isWithinSkewWindow(rawCutoff - 1uL, rawCutoff, skewCutoff))
+        assertTrue(DisappearingMessageSweep.isExpiredBeyondSkew(skewCutoff - 1uL, skewCutoff))
+    }
+
+    @Test
+    fun classifyScanPageDefersWhenSkewWindowRowSharesPageWithExpiredRows() {
+        // The raw engine prune has no cutoff parameter: if the page holds both
+        // an expired-beyond-skew row and a skew-window row, pruning would also
+        // delete the near-boundary row. Defer must win.
+        val rawCutoff = 940uL
+        val skewCutoff = 935uL
+        assertEquals(
+            DisappearingMessageSweep.TimelineScanPageDecision.DeferSkewWindow,
+            DisappearingMessageSweep.classifyScanPage(
+                timelineAtSeconds = listOf(930uL, 939uL, 950uL),
+                rawCutoffSeconds = rawCutoff,
+                skewCutoffSeconds = skewCutoff,
+            ),
+        )
+    }
+
+    @Test
+    fun classifyScanPageInvokesPruneOnlyForRowsExpiredBeyondSkew() {
+        assertEquals(
+            DisappearingMessageSweep.TimelineScanPageDecision.InvokeSecureDelete,
+            DisappearingMessageSweep.classifyScanPage(
+                timelineAtSeconds = listOf(934uL, 950uL),
+                rawCutoffSeconds = 940uL,
+                skewCutoffSeconds = 935uL,
+            ),
+        )
+    }
+
+    @Test
+    fun classifyScanPageKeepsScanningWhenNoRowIsAtOrPastTheBoundary() {
+        // Rows at/above the raw cutoff (and an empty page) decide nothing.
+        assertEquals(
+            DisappearingMessageSweep.TimelineScanPageDecision.KeepScanning,
+            DisappearingMessageSweep.classifyScanPage(
+                timelineAtSeconds = listOf(940uL, 941uL),
+                rawCutoffSeconds = 940uL,
+                skewCutoffSeconds = 935uL,
+            ),
+        )
+        assertEquals(
+            DisappearingMessageSweep.TimelineScanPageDecision.KeepScanning,
+            DisappearingMessageSweep.classifyScanPage(
+                timelineAtSeconds = emptyList(),
+                rawCutoffSeconds = 940uL,
+                skewCutoffSeconds = 935uL,
+            ),
+        )
+    }
+
+    @Test
+    fun everyRowBelowTheSeededCutoffClassifiesDecisively() {
+        // With the cursor seeded at rawCutoff, every returned row satisfies
+        // timelineAt < rawCutoff and must land in exactly one bucket — so a
+        // non-empty seeded page always decides and the scan can't walk history.
+        val rawCutoff = 940uL
+        val skewCutoff = 935uL
+        for (timelineAt in 0uL until rawCutoff) {
+            val skew = DisappearingMessageSweep.isWithinSkewWindow(timelineAt, rawCutoff, skewCutoff)
+            val expired = DisappearingMessageSweep.isExpiredBeyondSkew(timelineAt, skewCutoff)
+            assertTrue("row $timelineAt must classify", skew != expired)
+        }
+    }
+
+    @Test
+    fun scanPageCapIsBoundedLikeSearch() {
+        // Mirrors SEARCH_MAX_PAGES: a backstop, not the primary bound (the
+        // cutoff seed is), so it stays small.
+        assertTrue(DisappearingMessageSweep.TIMELINE_SCAN_MAX_PAGES in 1..100)
+    }
 }

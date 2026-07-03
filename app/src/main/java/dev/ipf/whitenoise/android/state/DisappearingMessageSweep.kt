@@ -30,6 +30,63 @@ object DisappearingMessageSweep {
     val TIMELINE_SCAN_PAGE_LIMIT: UInt = 200u
 
     /**
+     * Hard cap on pages the gating scan may fetch per group. The scan seeds
+     * its cursor at the raw cutoff (see [TIMELINE_SCAN_SEED_MESSAGE_ID]), so
+     * one page normally decides; this backstop keeps a pathological history
+     * from pinning an IO thread, mirroring `SEARCH_MAX_PAGES`. Exhausting it
+     * defers the group (never invokes the raw prune unproven). See #979.
+     */
+    const val TIMELINE_SCAN_MAX_PAGES: Int = 20
+
+    /**
+     * Compound-cursor id for seeding the gating scan's first page at the raw
+     * cutoff instead of the newest message (#979). The engine requires
+     * `before` and `beforeMessageId` together, and its cursor predicate is
+     * `timelineAt < before OR (timelineAt == before AND messageIdHex < beforeMessageId)`;
+     * the all-zeros id sorts before every real 32-byte message id, so
+     * `(rawCutoffSeconds, this)` is an exclusive `timelineAt < rawCutoffSeconds`
+     * bound — exactly the rows [classifyScanPage] can classify.
+     */
+    val TIMELINE_SCAN_SEED_MESSAGE_ID: String = "0".repeat(64)
+
+    /** Outcome of classifying one scanned timeline page against the cutoffs. */
+    enum class TimelineScanPageDecision {
+        /** A row sits in the skew window; defer the whole group this pass. */
+        DeferSkewWindow,
+
+        /** A row is expired beyond skew (and none is in the window); prune. */
+        InvokeSecureDelete,
+
+        /** No row decides either way; keep paging (or give up at the caps). */
+        KeepScanning,
+    }
+
+    /**
+     * Classify one page of timeline rows for the background-prune gate. The
+     * skew-window check deliberately wins over expired-beyond-skew when both
+     * appear on the same page: the raw engine prune has no cutoff parameter,
+     * so invoking it would also delete the near-boundary row the #745 skew
+     * tolerance exists to protect.
+     */
+    fun classifyScanPage(
+        timelineAtSeconds: Iterable<ULong>,
+        rawCutoffSeconds: ULong,
+        skewCutoffSeconds: ULong,
+    ): TimelineScanPageDecision =
+        when {
+            timelineAtSeconds.any {
+                isWithinSkewWindow(
+                    timelineAtSeconds = it,
+                    rawCutoffSeconds = rawCutoffSeconds,
+                    skewCutoffSeconds = skewCutoffSeconds,
+                )
+            } -> TimelineScanPageDecision.DeferSkewWindow
+            timelineAtSeconds.any { isExpiredBeyondSkew(it, skewCutoffSeconds) } ->
+                TimelineScanPageDecision.InvokeSecureDelete
+            else -> TimelineScanPageDecision.KeepScanning
+        }
+
+    /**
      * Slow-path cap for the in-conversation sweep when no loaded row is about
      * to expire.
      */

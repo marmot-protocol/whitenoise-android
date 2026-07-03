@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.media
 
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -198,6 +199,34 @@ class DiskByteCacheTest {
         val out = cache.get("late")
         assertNotNull(out)
         assertTrue(out!!.all { it == 9.toByte() })
+    }
+
+    @Test
+    fun contains_beforeHydration_reportsMissWithoutStattingDisk() {
+        // #983: contains() is reached from composition, so the un-hydrated
+        // branch must not stat the backing file — it reports a plain miss and
+        // leaves hydration to the first real get/put on Dispatchers.IO. Proof:
+        // an entry persisted by a previous "session" is invisible to a fresh
+        // instance's contains() until something hydrates the index.
+        DiskByteCache(dir, maxBytes = 1024).put("persisted", ByteArray(40) { 7 })
+
+        val cold = DiskByteCache(dir, maxBytes = 1024)
+        assertFalse(cold.contains("persisted"))
+
+        // First real read hydrates; the probe now sees the on-disk entry.
+        assertNotNull(cold.get("persisted"))
+        assertTrue(cold.contains("persisted"))
+    }
+
+    @Test
+    fun contains_afterHydration_reflectsIndexWithoutSeedingIt() {
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        cache.put("present", ByteArray(40) { 1 })
+
+        assertTrue(cache.contains("present"))
+        assertFalse(cache.contains("absent"))
+        // Strictly a peek: probing an absent key must not create an entry.
+        assertEquals(1, cache.size())
     }
 
     @Test
