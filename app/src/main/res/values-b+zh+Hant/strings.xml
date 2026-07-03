@@ -618,6 +618,16 @@
     <string name="enter_key_behavior_title">輸入鍵行為</string>
     <string name="enter_key_behavior_send">傳送訊息</string>
     <string name="enter_key_behavior_newline">換行</string>
+    <string name="font_size">字型大小</string>
+    <string name="font_size_settings_subtitle">縮放整個應用程式中的文字</string>
+    <string name="font_size_preview_title">預覽</string>
+    <string name="font_size_preview_incoming">嘿！這個文字大小看起來怎麼樣？</string>
+    <string name="font_size_preview_outgoing">我覺得很好。</string>
+    <string name="font_scale_small">小</string>
+    <string name="font_scale_default">預設</string>
+    <string name="font_scale_large">大</string>
+    <string name="font_scale_extra_large">特大</string>
+    <string name="font_size_description">文字會在整個應用程式中縮放。此設定會疊加在裝置字型大小之上，兩者共同生效。</string>
     <plurals name="media_selected_count">
         <item quantity="other">已選擇 %1$d 張圖片</item>
     </plurals>

@@ -629,6 +629,16 @@
     <string name="enter_key_behavior_title">Поведение клавиши Enter</string>
     <string name="enter_key_behavior_send">Отправить сообщение</string>
     <string name="enter_key_behavior_newline">Новая строка</string>
+    <string name="font_size">Размер шрифта</string>
+    <string name="font_size_settings_subtitle">Масштабирует текст во всём приложении</string>
+    <string name="font_size_preview_title">Предпросмотр</string>
+    <string name="font_size_preview_incoming">Привет! Как тебе такой размер текста?</string>
+    <string name="font_size_preview_outgoing">По-моему, отлично.</string>
+    <string name="font_scale_small">Мелкий</string>
+    <string name="font_scale_default">Стандартный</string>
+    <string name="font_scale_large">Крупный</string>
+    <string name="font_scale_extra_large">Очень крупный</string>
+    <string name="font_size_description">Текст масштабируется во всём приложении. Настройка применяется поверх системного размера шрифта, поэтому оба параметра действуют вместе.</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d изображение выбрано</item>
         <item quantity="few">%1$d изображения выбрано</item>

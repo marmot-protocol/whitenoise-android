@@ -704,6 +704,14 @@ class WhiteNoiseAppState(
         private set
 
     /**
+     * In-app font-size step (#403). Multiplies the theme typography's sp
+     * sizes on top of the OS font scale. Android platform preference (UI
+     * behavior), so SharedPreferences is the correct home per AGENTS.md.
+     */
+    var fontScale by mutableStateOf(AppFontScale.fromPreference(preferences.getString(FONT_SCALE_KEY, null)))
+        private set
+
+    /**
      * Per-account media auto-download matrix (issue #407). Reloaded whenever
      * the active account changes (see [reloadMediaAutoDownloadMatrix]); the
      * bubble call sites key their gate `remember` on this so flipping a toggle
@@ -2253,6 +2261,11 @@ class WhiteNoiseAppState(
     fun updateThemeMode(mode: AppThemeMode) {
         themeMode = mode
         preferences.edit().putString(THEME_MODE_KEY, mode.preferenceValue).apply()
+    }
+
+    fun updateFontScale(scale: AppFontScale) {
+        fontScale = scale
+        preferences.edit().putString(FONT_SCALE_KEY, scale.preferenceValue).apply()
     }
 
     /**
@@ -3920,6 +3933,7 @@ class WhiteNoiseAppState(
         private const val REQUIRE_APP_UNLOCK_KEY = "require_app_unlock"
         private const val APP_LOCK_DELAY_KEY = "app_lock_delay"
         private const val THEME_MODE_KEY = "theme_mode"
+        private const val FONT_SCALE_KEY = "font_scale"
         private const val MEDIA_AUTO_DOWNLOAD_KEY = "media_auto_download"
 
         // Per-account matrix prefs (issue #407), keyed by accountIdHex (or a

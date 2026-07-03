@@ -618,6 +618,16 @@
     <string name="enter_key_behavior_title">回车键行为</string>
     <string name="enter_key_behavior_send">发送消息</string>
     <string name="enter_key_behavior_newline">换行</string>
+    <string name="font_size">字体大小</string>
+    <string name="font_size_settings_subtitle">缩放整个应用中的文字</string>
+    <string name="font_size_preview_title">预览</string>
+    <string name="font_size_preview_incoming">嘿！这个文字大小看起来怎么样？</string>
+    <string name="font_size_preview_outgoing">我觉得很好。</string>
+    <string name="font_scale_small">小</string>
+    <string name="font_scale_default">默认</string>
+    <string name="font_scale_large">大</string>
+    <string name="font_scale_extra_large">特大</string>
+    <string name="font_size_description">文字会在整个应用中缩放。此设置会叠加在设备字体大小之上，两者共同生效。</string>
     <plurals name="media_selected_count">
         <item quantity="other">已选择 %1$d 张图片</item>
     </plurals>

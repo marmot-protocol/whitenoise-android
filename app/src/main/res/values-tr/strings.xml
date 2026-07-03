@@ -621,6 +621,16 @@
     <string name="enter_key_behavior_title">Enter tuşu davranışı</string>
     <string name="enter_key_behavior_send">Mesaj gönder</string>
     <string name="enter_key_behavior_newline">Yeni satır</string>
+    <string name="font_size">Yazı boyutu</string>
+    <string name="font_size_settings_subtitle">Metni tüm uygulamada ölçekler</string>
+    <string name="font_size_preview_title">Önizleme</string>
+    <string name="font_size_preview_incoming">Selam! Bu metin boyutu nasıl görünüyor?</string>
+    <string name="font_size_preview_outgoing">Bence harika.</string>
+    <string name="font_scale_small">Küçük</string>
+    <string name="font_scale_default">Varsayılan</string>
+    <string name="font_scale_large">Büyük</string>
+    <string name="font_scale_extra_large">Çok büyük</string>
+    <string name="font_size_description">Metin tüm uygulamada ölçeklenir. Bu ayar cihazın yazı tipi boyutuna ek olarak uygulanır; iki ayar birlikte çalışır.</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d görüntü seçildi</item>
         <item quantity="other">%1$d görüntü seçildi</item>

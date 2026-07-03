@@ -621,6 +621,16 @@
     <string name="enter_key_behavior_title">Comportamiento de la tecla Intro</string>
     <string name="enter_key_behavior_send">Enviar mensaje</string>
     <string name="enter_key_behavior_newline">Nueva línea</string>
+    <string name="font_size">Tamaño de fuente</string>
+    <string name="font_size_settings_subtitle">Escala el texto en toda la aplicación</string>
+    <string name="font_size_preview_title">Vista previa</string>
+    <string name="font_size_preview_incoming">¡Hola! ¿Qué tal se ve este tamaño de texto?</string>
+    <string name="font_size_preview_outgoing">A mí me parece bien.</string>
+    <string name="font_scale_small">Pequeño</string>
+    <string name="font_scale_default">Predeterminado</string>
+    <string name="font_scale_large">Grande</string>
+    <string name="font_scale_extra_large">Extragrande</string>
+    <string name="font_size_description">El texto se escala en toda la aplicación. Se aplica además del tamaño de fuente del dispositivo, así que ambos ajustes se combinan.</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d imagen seleccionada</item>
         <item quantity="other">%1$d imágenes seleccionadas</item>
