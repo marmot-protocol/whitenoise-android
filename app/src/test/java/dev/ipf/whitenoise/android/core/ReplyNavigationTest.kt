@@ -77,6 +77,45 @@ class ReplyNavigationTest {
     }
 
     @Test
+    fun itemHeightForScrollPrefersVisibleTargetMeasurement() {
+        assertEquals(
+            480,
+            ReplyNavigation.itemHeightForScrollPx(
+                targetMessageId = "target",
+                measuredItemHeightsByMessageId = mapOf("target" to 320),
+                visibleTargetHeightPx = 480,
+                visibleTimelineItemHeightsPx = listOf(200, 300, 400),
+            ),
+        )
+    }
+
+    @Test
+    fun itemHeightForScrollUsesCachedTargetMeasurementBeforeMedianFallback() {
+        assertEquals(
+            900,
+            ReplyNavigation.itemHeightForScrollPx(
+                targetMessageId = "target",
+                measuredItemHeightsByMessageId = mapOf("target" to 900),
+                visibleTargetHeightPx = null,
+                visibleTimelineItemHeightsPx = listOf(200, 300, 400),
+            ),
+        )
+    }
+
+    @Test
+    fun itemHeightForScrollFallsBackToVisibleTimelineMedianForNeverMeasuredRows() {
+        assertEquals(
+            300,
+            ReplyNavigation.itemHeightForScrollPx(
+                targetMessageId = "target",
+                measuredItemHeightsByMessageId = emptyMap(),
+                visibleTargetHeightPx = null,
+                visibleTimelineItemHeightsPx = listOf(200, 300, 400),
+            ),
+        )
+    }
+
+    @Test
     fun estimateItemHeightReturnsMedianOfVisibleRows() {
         assertEquals(300, ReplyNavigation.estimateItemHeightPx(listOf(200, 300, 400)))
     }
