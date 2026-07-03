@@ -286,7 +286,15 @@ for flavor in "${BUILD_FLAVORS[@]}"; do
     fi
 
     if [[ "$TARGET_ABI" == "arm64-v8a" ]]; then
-      renamed_apk="$APK_DIR/whitenoise-${flavor}-v8a-release-$(date +%F).apk"
+      # Keep the short SHA in the final name: this rename is the terminal
+      # naming step, and a date-only name makes same-day builds collide
+      # (issue #992).
+      short_sha="${GITHUB_SHA:-}"
+      short_sha="${short_sha:0:7}"
+      if [[ -z "$short_sha" ]]; then
+        short_sha="$(git rev-parse --short=7 HEAD 2>/dev/null || echo local)"
+      fi
+      renamed_apk="$APK_DIR/whitenoise-${flavor}-v8a-release-$(date +%F)-${short_sha}.apk"
       mkdir -p "$APK_DIR"
       mv "$selected_apk" "$renamed_apk"
       selected_apk="$renamed_apk"
