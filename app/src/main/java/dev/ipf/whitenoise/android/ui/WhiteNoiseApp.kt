@@ -1390,6 +1390,10 @@ private fun MainShell(
     // rememberSaveable) so it never survives process death. Reset on every
     // other open path and on back.
     var selectedChatJustCreated by remember { mutableStateOf(false) }
+    // True only for the route that has just created a 1:1 DM and is opening it
+    // before the live roster has necessarily settled. Suppresses the group-style
+    // member-count subtitle during that transient 0/1-member window (#998).
+    var selectedChatOpenedAsDmHint by remember { mutableStateOf(false) }
     // True while a tapped notification for a non-active account is mid-resolution
     // (switching account / awaiting its chat list). Holds a single stable loading
     // state over the multi-step route so the chat list never paints as an
@@ -1473,6 +1477,7 @@ private fun MainShell(
             // the IME on the next opened conversation (issue #321 guard).
             selectedChatFocusMessageId = null
             selectedChatJustCreated = false
+            selectedChatOpenedAsDmHint = false
         }
         when (step) {
             is NotificationNavStep.SwitchAccount -> {
@@ -1488,6 +1493,7 @@ private fun MainShell(
                 selectedChat = null
                 selectedChatFocusMessageId = null
                 selectedChatJustCreated = false
+                selectedChatOpenedAsDmHint = false
                 appState.setActiveAccount(step.accountRef)
             }
             NotificationNavStep.AwaitChatList -> Unit // re-fires when list state settles
@@ -1510,6 +1516,7 @@ private fun MainShell(
                         // prior New Chat / Create Group flow before showing the
                         // target conversation (issue #321 guard).
                         selectedChatJustCreated = false
+                        selectedChatOpenedAsDmHint = false
                         selectedChat = it
                     }
                 routingNotification = false
@@ -1554,6 +1561,7 @@ private fun MainShell(
                 ?.let {
                     selectedChatFocusMessageId = null
                     selectedChatOpenedFromNotification = false
+                    selectedChatOpenedAsDmHint = false
                     selectedChat = it
                 }
         }
@@ -1600,6 +1608,7 @@ private fun MainShell(
             selectedChat = null
             selectedChatFocusMessageId = null
             selectedChatJustCreated = false
+            selectedChatOpenedAsDmHint = false
             sectionName = MainSection.Chats.name
             settingsDetailName = null
         }
@@ -1614,6 +1623,10 @@ private fun MainShell(
         selectedChatFocusMessageId = null
         selectedChatOpenedFromNotification = false
         selectedChatJustCreated = justCreated
+        // `justCreated` is true only for freshly-created DMs; group creation and
+        // existing-DM opens pass false. Reuse that DM-only invariant for the
+        // open-time subtitle hint (#998).
+        selectedChatOpenedAsDmHint = justCreated
         selectedChat = item
         appState.clearPresentedProfile()
     }
@@ -1648,10 +1661,12 @@ private fun MainShell(
             highlightFocusMessage = selectedChatFocusHighlight,
             openedFromNotification = selectedChatOpenedFromNotification,
             justCreated = selectedChatJustCreated,
+            openedAsDmHint = selectedChatOpenedAsDmHint,
             onBack = {
                 selectedChat = null
                 selectedChatFocusMessageId = null
                 selectedChatJustCreated = false
+                selectedChatOpenedAsDmHint = false
             },
             onOpenProfileGroup = openGroupFromProfile,
         )
@@ -1682,6 +1697,10 @@ private fun MainShell(
                     selectedChatFocusHighlight = true
                     selectedChatOpenedFromNotification = false
                     selectedChatJustCreated = justCreated
+                    // `justCreated` is true only for freshly-created DMs; group
+                    // creation and existing-DM opens pass false. Reuse that DM-only
+                    // invariant for the open-time subtitle hint (#998).
+                    selectedChatOpenedAsDmHint = justCreated
                     selectedChat = item
                 },
             )
@@ -3571,6 +3590,26 @@ internal fun canInviteFromEmptyGroup(
         isSelfAdmin &&
         membersLoaded &&
         memberCount == 1
+
+/**
+ * Whether the conversation top bar should render a members-count subtitle.
+ *
+ * The top bar must not show group copy until the initial roster has loaded, and
+ * a just-created DM gets one extra grace state: while its nameless roster is
+ * still 0/1 members, keep the DM presentation instead of flashing "Just you" or
+ * "1 member" before the peer row hydrates. If that one-member DM state stalls,
+ * keep it quiet for this open session and let a later reopen re-evaluate from
+ * live roster state (#998).
+ */
+internal fun shouldShowConversationMembersSubtitle(
+    membersLoaded: Boolean,
+    openedAsDmHint: Boolean,
+    groupName: String,
+    memberCount: Int,
+): Boolean =
+    membersLoaded &&
+        !GroupProjector.isDm(memberCount, groupName) &&
+        !(openedAsDmHint && groupName.isBlank() && memberCount < 2)
 
 /**
  * Whether the pubkey [resolvedHex] the Add Member preview settled on is already
@@ -7681,6 +7720,11 @@ private fun ConversationScreen(
     // the user can type the first message without an extra tap. False for row
     // taps, notification routing, and search hits.
     justCreated: Boolean = false,
+    // True only when the opener knows this conversation is a newly-created DM.
+    // The live roster can briefly report 0/1 members before the peer arrives;
+    // keep that transient state in the DM presentation instead of falling into
+    // the group subtitle branch (#998).
+    openedAsDmHint: Boolean = false,
     // (chat, justCreated): navigate to another shared group when the user taps a
     // shared group / Message in the in-conversation profile sheet (issue #635).
     // Reuses the shell's existing open-group lambda so this path matches the
@@ -9327,7 +9371,14 @@ private fun ConversationScreen(
                                 // not stacked. The one-time tooltip anchors to the
                                 // whole line when the timer is on.
                                 val membersSubtitle =
-                                    if (!controller.isDm) {
+                                    if (
+                                        shouldShowConversationMembersSubtitle(
+                                            membersLoaded = controller.membersLoaded,
+                                            openedAsDmHint = openedAsDmHint,
+                                            groupName = controller.group.name,
+                                            memberCount = controller.members.size,
+                                        )
+                                    ) {
                                         controller.subtitle(
                                             justYou = stringResource(R.string.just_you),
                                             oneMember = stringResource(R.string.one_member),
