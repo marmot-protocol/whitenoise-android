@@ -11,6 +11,10 @@ import org.json.JSONObject
 data class GroupSystemEvent(
     val systemType: String,
     val text: String,
+    // Attribution fields: only ever non-null when the event came from
+    // Marmot's structured projection ([GroupSystemEvents.fromFfi]). The JSON
+    // parse fallback leaves both null — a raw payload's actor/subject are
+    // unauthenticated peer claims (#985).
     val actor: String?,
     val subject: String?,
     val name: String?,
@@ -156,6 +160,19 @@ object GroupSystemEvents {
      * Parses kind-1210 JSON content. Null when [plaintext] isn't a group
      * system payload — the caller still must not fall back to chat-body
      * rendering for a kind-1210 record; use [GroupSystemCopy.fallback].
+     *
+     * This fallback only runs when Marmot's structured projection rejected
+     * the payload (missing/unknown schema `v`, malformed JSON): synthesized
+     * rows always project, so anything landing here is at best a
+     * future-schema payload and at worst a member-authored spoof. The
+     * payload's `data.actor` / `data.subject` are unauthenticated claims and
+     * are deliberately NOT surfaced — `actor` stays null so [actorHex]
+     * attributes the row to the MLS-authenticated envelope sender, and
+     * `subject` stays null so [summary] can never name (or "you"-address)
+     * whoever the payload claims was acted on. Non-attributing display
+     * fields (`name`, `old_name`, retention seconds) are still parsed,
+     * sanitized at render time as usual. Only [fromFfi]'s structured
+     * projection may carry actor/subject. See #985.
      */
     fun parse(plaintext: String): GroupSystemEvent? =
         runCatching {
@@ -166,8 +183,9 @@ object GroupSystemEvents {
             GroupSystemEvent(
                 systemType = systemType,
                 text = json.optString("text"),
-                actor = data?.optString("actor")?.takeIf { it.isNotBlank() },
-                subject = data?.optString("subject")?.takeIf { it.isNotBlank() },
+                // Never trusted from a raw payload; see the KDoc above.
+                actor = null,
+                subject = null,
                 name = data?.optString("name")?.takeIf { it.isNotBlank() },
                 // Previous group name for a rename diff, when the peer includes
                 // it. Absent stays null so the row falls back to the new-name
@@ -216,11 +234,13 @@ object GroupSystemEvents {
         } ?: parse(plaintext)
 
     /**
-     * The hex pubkey to attribute the change to: the payload's `actor` when
-     * named, otherwise the event signer — a peer that omits `data.actor` but
-     * signs as the committing member still names the actor via the envelope.
-     * Null (passive voice) only when neither is present, e.g. a synthesized
-     * row for a convergence reorg.
+     * The hex pubkey to attribute the change to: the structured projection's
+     * `actor` when named, otherwise the event signer — a row that omits the
+     * actor but was authored by the committing member still names the actor
+     * via the envelope. JSON-fallback events always take the signer branch
+     * ([parse] never trusts a payload-claimed actor). Null (passive voice)
+     * only when neither is present, e.g. a synthesized row for a convergence
+     * reorg.
      */
     fun actorHex(
         event: GroupSystemEvent,
