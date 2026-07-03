@@ -736,6 +736,21 @@
     <string name="sign_out_and_wipe">Se déconnecter &amp; effacer</string>
     <string name="sign_out_and_wipe_confirm_body">Cette action est irréversible sur cet appareil. La base de données locale, l\'état MLS, l\'entrée du trousseau et les paquets de clés des relais pour ce compte seront supprimés.</string>
     <string name="sign_out_and_wipe_confirm_field_label">Validation</string>
+    <string name="sign_out_delete_key_packages_label">Supprimer les paquets de clés des relais</string>
+    <string name="sign_out_delete_key_packages_help">Empêche des inconnus de vous inviter dans de nouveaux groupes pendant que vous êtes déconnecté.</string>
+    <string name="toast_signed_out_locally_relay_retry">Déconnecté localement — le nettoyage des relais sera retenté à votre prochaine connexion.</string>
+    <string name="wipe_progress_title">Déconnexion et effacement…</string>
+    <string name="wipe_stage_leaving_groups">Sortie des groupes…</string>
+    <string name="wipe_stage_deleting_key_packages">Suppression des paquets de clés…</string>
+    <string name="wipe_stage_wiping_local_data">Effacement des données locales…</string>
+    <plurals name="wipe_finished_with_issues">
+        <item quantity="one">Effacement terminé avec %1$d problème</item>
+        <item quantity="other">Effacement terminé avec %1$d problèmes</item>
+    </plurals>
+    <string name="wipe_outcome_groups_left">%1$d groupes quittés</string>
+    <string name="wipe_outcome_key_packages_deleted">%1$d paquets de clés supprimés</string>
+    <string name="wipe_outcome_local_wipe_done">Données locales effacées</string>
+    <string name="wipe_outcome_local_wipe_incomplete">Effacement des données locales incomplet</string>
     <string name="secret_key_backup">Sauvegarde de la clé secrète</string>
     <string name="secret_key_backup_help">Exportez votre clé de signature pour la sauvegarder. Toute personne disposant du nsec brut peut contrôler votre identité. L’export chiffré (ncryptsec) nécessite une phrase secrète pour être déchiffré.</string>
     <string name="export_nsec">Exporter le nsec</string>
@@ -745,7 +760,6 @@
     <string name="export_encrypted_secret_field_label">Phrase secrète</string>
     <string name="share_secret_key">Partager la clé secrète</string>
     <string name="signed_out">Déconnecté</string>
-    <string name="toast_couldnt_sign_out">Impossible de se déconnecter</string>
     <string name="toast_couldnt_sign_in_account">Impossible de se connecter au compte</string>
     <string name="toast_couldnt_export_nsec">Impossible d’exporter la clé secrète</string>
     <string name="sign_out_and_wipe_confirm_instruction">Saisissez %1$s pour confirmer.</string>

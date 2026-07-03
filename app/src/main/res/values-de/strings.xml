@@ -734,6 +734,21 @@
     <string name="sign_out_and_wipe">Abmelden &amp; löschen</string>
     <string name="sign_out_and_wipe_confirm_body">Dies kann auf diesem Gerät nicht rückgängig gemacht werden. Die lokale Datenbank, der MLS-Status, der Schlüsselbund-Eintrag und die Relay-Key-Packages für dieses Konto werden entfernt.</string>
     <string name="sign_out_and_wipe_confirm_field_label">Bestätigung</string>
+    <string name="sign_out_delete_key_packages_label">Key-Pakete von Relays löschen</string>
+    <string name="sign_out_delete_key_packages_help">Verhindert, dass Fremde Sie zu neuen Gruppen einladen, während Sie abgemeldet sind.</string>
+    <string name="toast_signed_out_locally_relay_retry">Lokal abgemeldet — die Relay-Bereinigung wird bei der nächsten Anmeldung erneut versucht.</string>
+    <string name="wipe_progress_title">Abmelden &amp; Löschen…</string>
+    <string name="wipe_stage_leaving_groups">Gruppen werden verlassen…</string>
+    <string name="wipe_stage_deleting_key_packages">Key-Pakete werden gelöscht…</string>
+    <string name="wipe_stage_wiping_local_data">Lokale Daten werden gelöscht…</string>
+    <plurals name="wipe_finished_with_issues">
+        <item quantity="one">Löschen mit %1$d Problem abgeschlossen</item>
+        <item quantity="other">Löschen mit %1$d Problemen abgeschlossen</item>
+    </plurals>
+    <string name="wipe_outcome_groups_left">%1$d Gruppen verlassen</string>
+    <string name="wipe_outcome_key_packages_deleted">%1$d Key-Pakete gelöscht</string>
+    <string name="wipe_outcome_local_wipe_done">Lokale Daten gelöscht</string>
+    <string name="wipe_outcome_local_wipe_incomplete">Lokale Daten nur unvollständig gelöscht</string>
     <string name="secret_key_backup">Geheimschlüssel-Backup</string>
     <string name="secret_key_backup_help">Exportieren Sie Ihren Signierschlüssel zur Sicherung. Jeder mit dem rohen nsec kann Ihre Identität kontrollieren. Der verschlüsselte Export (ncryptsec) erfordert eine Passphrase zum Entschlüsseln.</string>
     <string name="export_nsec">nsec exportieren</string>
@@ -743,7 +758,6 @@
     <string name="export_encrypted_secret_field_label">Passwort</string>
     <string name="share_secret_key">Geheimschlüssel teilen</string>
     <string name="signed_out">Abgemeldet</string>
-    <string name="toast_couldnt_sign_out">Abmeldung fehlgeschlagen</string>
     <string name="toast_couldnt_sign_in_account">Anmeldung am Konto fehlgeschlagen</string>
     <string name="toast_couldnt_export_nsec">Geheimschlüssel konnte nicht exportiert werden</string>
     <string name="sign_out_and_wipe_confirm_instruction">Gib zur Bestätigung %1$s ein.</string>
