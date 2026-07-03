@@ -843,4 +843,29 @@
     <string name="disappearing_unit_seconds">Segundos</string>
     <string name="disappearing_set">Establecer</string>
 
+    <string name="clear_search">Borrar búsqueda</string>
+    <string name="contacts">Contactos</string>
+    <string name="next">Siguiente</string>
+    <string name="no_matches">Sin coincidencias</string>
+    <string name="new_message">Nuevo mensaje</string>
+    <string name="search_people_hint">Nombre, usuario o npub</string>
+    <string name="find_by_username">Buscar por nombre de usuario</string>
+    <string name="paste_npub">Pegar npub</string>
+    <string name="start_chat">Iniciar chat</string>
+    <string name="name_this_group">Nombra este grupo</string>
+    <string name="group_permissions">Permisos del grupo</string>
+    <string name="coming_soon">Próximamente</string>
+    <string name="group_photo_after_create">Podrás añadir una foto del grupo cuando esté creado</string>
+    <string name="quick_action_audio">Audio</string>
+    <string name="quick_action_video">Vídeo</string>
+    <string name="quick_action_add">Añadir</string>
+    <string name="quick_action_search">Buscar</string>
+    <string name="group_details_subtitle">Grupo · %1$d miembros</string>
+    <string name="add_group_description">Añadir descripción del grupo</string>
+    <string name="see_all_members">Ver los %1$d miembros</string>
+    <string name="encryption">Cifrado</string>
+    <string name="encryption_e2ee_note">Los mensajes están cifrados de extremo a extremo</string>
+    <string name="chat_lock">Bloqueo del chat</string>
+    <string name="media_visibility">Visibilidad de archivos</string>
+    <string name="advanced_privacy">Privacidad avanzada</string>
 </resources>

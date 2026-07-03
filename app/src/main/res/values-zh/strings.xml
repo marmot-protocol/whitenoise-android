@@ -835,4 +835,29 @@
     <string name="disappearing_unit_seconds">秒</string>
     <string name="disappearing_set">设置</string>
 
+    <string name="clear_search">清除搜索</string>
+    <string name="contacts">联系人</string>
+    <string name="next">下一步</string>
+    <string name="no_matches">无匹配结果</string>
+    <string name="new_message">新消息</string>
+    <string name="search_people_hint">姓名、用户名或 npub</string>
+    <string name="find_by_username">按用户名查找</string>
+    <string name="paste_npub">粘贴 npub</string>
+    <string name="start_chat">开始聊天</string>
+    <string name="name_this_group">为群组命名</string>
+    <string name="group_permissions">群组权限</string>
+    <string name="coming_soon">即将推出</string>
+    <string name="group_photo_after_create">创建群组后即可添加群组照片</string>
+    <string name="quick_action_audio">语音</string>
+    <string name="quick_action_video">视频</string>
+    <string name="quick_action_add">添加</string>
+    <string name="quick_action_search">搜索</string>
+    <string name="group_details_subtitle">群组 · %1$d 位成员</string>
+    <string name="add_group_description">添加群组描述</string>
+    <string name="see_all_members">查看全部 %1$d 位成员</string>
+    <string name="encryption">加密</string>
+    <string name="encryption_e2ee_note">消息均经过端到端加密</string>
+    <string name="chat_lock">聊天锁定</string>
+    <string name="media_visibility">媒体可见性</string>
+    <string name="advanced_privacy">高级隐私</string>
 </resources>

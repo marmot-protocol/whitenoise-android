@@ -1,0 +1,275 @@
+package dev.ipf.whitenoise.android.ui
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.core.ProfileLink
+import dev.ipf.whitenoise.android.core.RecipientReference
+import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.theme.Dimens
+import java.util.Locale
+
+/**
+ * Multi-select people picker shared by the New Group flow and the group
+ * details Add Members flow. Selection lives in the caller's [selected] list so
+ * flows can carry it across steps.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ContactPickerScreen(
+    appState: WhiteNoiseAppState,
+    title: String,
+    selected: SnapshotStateList<RecipientSearch.Candidate>,
+    onBack: () -> Unit,
+    onConfirm: () -> Unit,
+    confirmIcon: ImageVector = Icons.AutoMirrored.Filled.ArrowForward,
+    busy: Boolean = false,
+    excludeAccountIdHexes: Set<String> = emptySet(),
+    footer: (@Composable () -> Unit)? = null,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var showScanner by remember { mutableStateOf(false) }
+    var preview by remember { mutableStateOf(RecipientResolution.Empty) }
+
+    BackHandler { onBack() }
+
+    val activeHex = appState.activeAccount?.accountIdHex
+    val candidates =
+        remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
+            deriveRecipientCandidates(appState, activeHex)
+        }
+    val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query)
+    val matches =
+        remember(query, candidates, activeHex, excludeAccountIdHexes) {
+            if (query.isNotBlank() && !isPlainNameQuery(query)) {
+                emptyList()
+            } else {
+                RecipientSearch.browse(query, candidates, activeHex, excludeAccountIdHexes)
+            }
+        }
+    val selectedHexes = selected.map { it.accountIdHex.lowercase(Locale.ROOT) }.toSet()
+    val canConfirm = selected.isNotEmpty() && !busy
+
+    fun toggle(candidate: RecipientSearch.Candidate) {
+        val hex = candidate.accountIdHex.lowercase(Locale.ROOT)
+        if (hex in selectedHexes) {
+            selected.removeAll { it.accountIdHex.lowercase(Locale.ROOT) == hex }
+        } else {
+            selected.add(candidate)
+            query = ""
+        }
+    }
+
+    Scaffold(
+        modifier = Modifier.imePadding(),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        if (selected.isEmpty()) title else stringResource(R.string.members_count, selected.size),
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { if (canConfirm) onConfirm() },
+                containerColor =
+                    if (canConfirm) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHighest
+                    },
+                contentColor =
+                    if (canConfirm) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    },
+            ) {
+                if (busy) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(confirmIcon, contentDescription = stringResource(R.string.next))
+                }
+            }
+        },
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .consumeWindowInsets(padding),
+        ) {
+            FlowSearchField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = stringResource(R.string.search_people_hint),
+                onScanQr = { showScanner = true },
+                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
+            )
+            AnimatedVisibility(visible = selected.isNotEmpty()) {
+                SelectedMemberRail(
+                    members = selected,
+                    appState = appState,
+                    onRemove = { member ->
+                        selected.removeAll { it.accountIdHex == member.accountIdHex }
+                    },
+                )
+            }
+            if (identifierQuery) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
+                ) {
+                    RecipientPreviewCard(
+                        input = query,
+                        appState = appState,
+                        onResolutionChanged = { preview = it },
+                    )
+                    val resolvedHex = preview.resolvedHex
+                    val alreadyMember =
+                        groupContainsResolvedMember(
+                            memberHexes = excludeAccountIdHexes.toList(),
+                            resolvedHex = resolvedHex,
+                        )
+                    val alreadySelected =
+                        resolvedHex != null && resolvedHex.lowercase(Locale.ROOT) in selectedHexes
+                    if (alreadyMember && resolvedHex != null) {
+                        Text(
+                            stringResource(R.string.add_member_already_in_group, appState.displayName(resolvedHex)),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    FilledTonalButton(
+                        onClick = {
+                            if (resolvedHex != null) {
+                                toggle(
+                                    RecipientSearch.Candidate(
+                                        accountIdHex = resolvedHex,
+                                        displayName = appState.displayName(resolvedHex),
+                                        npub = appState.npub(resolvedHex),
+                                    ),
+                                )
+                            }
+                        },
+                        enabled =
+                            resolvedHex != null &&
+                                !alreadyMember &&
+                                !alreadySelected &&
+                                recipientPreviewAllowsSubmit(preview.state),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.quick_action_add))
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 96.dp),
+                ) {
+                    if (matches.isEmpty()) {
+                        item {
+                            Text(
+                                stringResource(
+                                    if (query.isBlank()) R.string.recipient_search_empty_hint else R.string.no_matches,
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                            )
+                        }
+                    } else {
+                        item { SectionHeader(stringResource(R.string.contacts)) }
+                        items(matches, key = { it.accountIdHex }) { candidate ->
+                            val isSelected = candidate.accountIdHex.lowercase(Locale.ROOT) in selectedHexes
+                            ContactRow(
+                                title = appState.displayName(candidate.accountIdHex),
+                                subtitle = IdentityFormatter.short(candidate.npub),
+                                avatarSeed = candidate.accountIdHex,
+                                avatarUrl = appState.avatarUrl(candidate.accountIdHex),
+                                enabled = !busy,
+                                onClick = { toggle(candidate) },
+                                trailing = {
+                                    Icon(
+                                        if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                        contentDescription = null,
+                                        tint =
+                                            if (isSelected) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            footer?.invoke()
+        }
+    }
+
+    if (showScanner) {
+        QrScannerSheet(
+            onDismiss = { showScanner = false },
+            onScan = { raw ->
+                showScanner = false
+                val ref = ProfileLink.parse(raw)?.npub ?: RecipientReference.normalize(raw)
+                if (ref == null) {
+                    appState.present(R.string.error_qr_not_valid_npub_or_public_key, copyable = true)
+                } else {
+                    query = ref
+                }
+            },
+        )
+    }
+}

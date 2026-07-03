@@ -855,4 +855,29 @@
     <string name="disappearing_unit_seconds">Секунды</string>
     <string name="disappearing_set">Задать</string>
 
+    <string name="clear_search">Очистить поиск</string>
+    <string name="contacts">Контакты</string>
+    <string name="next">Далее</string>
+    <string name="no_matches">Совпадений нет</string>
+    <string name="new_message">Новое сообщение</string>
+    <string name="search_people_hint">Имя, имя пользователя или npub</string>
+    <string name="find_by_username">Найти по имени пользователя</string>
+    <string name="paste_npub">Вставить npub</string>
+    <string name="start_chat">Начать чат</string>
+    <string name="name_this_group">Назовите группу</string>
+    <string name="group_permissions">Права группы</string>
+    <string name="coming_soon">Скоро</string>
+    <string name="group_photo_after_create">Фото группы можно добавить после её создания</string>
+    <string name="quick_action_audio">Аудио</string>
+    <string name="quick_action_video">Видео</string>
+    <string name="quick_action_add">Добавить</string>
+    <string name="quick_action_search">Поиск</string>
+    <string name="group_details_subtitle">Группа · %1$d участников</string>
+    <string name="add_group_description">Добавить описание группы</string>
+    <string name="see_all_members">Показать всех участников (%1$d)</string>
+    <string name="encryption">Шифрование</string>
+    <string name="encryption_e2ee_note">Сообщения защищены сквозным шифрованием</string>
+    <string name="chat_lock">Блокировка чата</string>
+    <string name="media_visibility">Видимость медиа</string>
+    <string name="advanced_privacy">Расширенная конфиденциальность</string>
 </resources>
