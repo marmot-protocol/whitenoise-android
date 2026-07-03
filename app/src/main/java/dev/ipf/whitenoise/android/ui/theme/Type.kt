@@ -10,6 +10,37 @@ import androidx.compose.ui.unit.sp
 // Set of Material typography styles to start with
 val Typography =
     Typography(
+        // Expressive display treatment for brand surfaces (onboarding hero name).
+        // The M3 baseline leaves display* at Normal weight with slightly positive
+        // tracking, which reads thin for a wordmark; the brand lockup wants a
+        // tighter, more confident display. Sizes stay on the M3 display scale so
+        // the in-app font-size step (#403, Typography.scaledBy) and the OS font
+        // scale still compose cleanly. Call sites may still bump weight locally
+        // (e.g. the landing name uses SemiBold).
+        displayLarge =
+            TextStyle(
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Medium,
+                fontSize = 57.sp,
+                lineHeight = 64.sp,
+                letterSpacing = (-0.25).sp,
+            ),
+        displayMedium =
+            TextStyle(
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Medium,
+                fontSize = 45.sp,
+                lineHeight = 52.sp,
+                letterSpacing = 0.sp,
+            ),
+        displaySmall =
+            TextStyle(
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Medium,
+                fontSize = 36.sp,
+                lineHeight = 44.sp,
+                letterSpacing = 0.sp,
+            ),
         bodyLarge =
             TextStyle(
                 fontFamily = FontFamily.Default,

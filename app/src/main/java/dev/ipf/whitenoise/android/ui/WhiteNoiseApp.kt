@@ -194,6 +194,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
@@ -231,6 +232,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberTooltipState
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -1210,19 +1212,35 @@ fun OnboardingContent(
  * onboarding landing. Extracted so future brand surfaces reuse the same
  * arrangement instead of re-deriving sizes and styles.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun WhiteNoiseLogoLockup(modifier: Modifier = Modifier) {
+    // Seat the WN mark in an expressive M3 container shape so the hero reads as a
+    // deliberate brand badge rather than a bare tinted glyph. Cookie9Sided is a
+    // soft, many-lobed scallop that stays legible at this size and doesn't fight
+    // the mark's own geometry the way a spikier Burst/Sunny would. A neutral
+    // surfaceContainerHighest fill keeps it subtle so the crisp primary-tinted
+    // mark still leads; the mark sits inside safe padding, centered in the badge.
+    val heroShape = MaterialShapes.Cookie9Sided.toShape()
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_wn_mark),
-            contentDescription = stringResource(R.string.white_noise_logo),
-            modifier = Modifier.size(96.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
+        Box(
+            modifier =
+                Modifier
+                    .size(120.dp)
+                    .background(color = MaterialTheme.colorScheme.surfaceContainerHighest, shape = heroShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_wn_mark),
+                contentDescription = stringResource(R.string.white_noise_logo),
+                modifier = Modifier.size(72.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
         Text(
             stringResource(R.string.onboarding_tagline),
