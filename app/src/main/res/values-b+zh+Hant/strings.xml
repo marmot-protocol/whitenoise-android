@@ -4,7 +4,6 @@
     <string name="white_noise_couldnt_start">White Noise 無法啟動</string>
     <string name="refresh">重新整理傾印</string>
     <string name="retry">重試</string>
-    <string name="white_noise_shield">White Noise 盾牌</string>
     <string name="onboarding_tagline">端對端加密群組訊息。</string>
     <string name="creating_identity">創造身份</string>
     <string name="creating_identity_title">正在建立身分</string>
@@ -304,6 +303,9 @@
     <string name="publish_to_relays">發佈到中繼</string>
     <string name="nsec_or_npub">輸入您的私鑰</string>
     <string name="import_existing_identity">登入</string>
+    <string name="white_noise_logo">White Noise 標誌</string>
+    <string name="identity_entry_error_invalid_key">這看起來不是有效的 nsec 或 npub 金鑰。</string>
+    <string name="identity_entry_error_import_failed">無法使用該金鑰登入。請檢查後重試。</string>
     <string name="identity">選擇您的身分</string>
     <string name="public_key">公鑰</string>
     <string name="local_signing">本地簽約</string>

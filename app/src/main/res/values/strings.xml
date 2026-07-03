@@ -4,7 +4,6 @@
     <string name="white_noise_couldnt_start">White Noise couldn\'t start</string>
     <string name="refresh">Refresh</string>
     <string name="retry">Retry</string>
-    <string name="white_noise_shield">White Noise shield</string>
     <string name="onboarding_tagline">End-to-end encrypted group messaging.</string>
     <string name="creating_identity">Creating identity</string>
     <string name="creating_identity_title">Creating Identity</string>
@@ -396,6 +395,9 @@
     <string name="publish_to_relays">Publish to Relays</string>
     <string name="nsec_or_npub">nsec or npub</string>
     <string name="import_existing_identity">Import Existing Identity</string>
+    <string name="white_noise_logo">White Noise logo</string>
+    <string name="identity_entry_error_invalid_key">That doesn\'t look like a valid nsec or npub key.</string>
+    <string name="identity_entry_error_import_failed">Couldn\'t sign in with that key. Check it and try again.</string>
     <string name="identity">Identity</string>
     <string name="public_key">Public key</string>
     <string name="local_signing">Local signing</string>

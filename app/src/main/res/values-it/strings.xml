@@ -4,7 +4,6 @@
     <string name="white_noise_couldnt_start">Impossibile avviare White Noise</string>
     <string name="refresh">Aggiorna dump</string>
     <string name="retry">Riprova</string>
-    <string name="white_noise_shield">White Noise scudo</string>
     <string name="onboarding_tagline">Messaggistica di gruppo con crittografia end-to-end.</string>
     <string name="creating_identity">Creare identità</string>
     <string name="creating_identity_title">Creazione identità</string>
@@ -305,6 +304,9 @@
     <string name="publish_to_relays">Pubblica su Relay</string>
     <string name="nsec_or_npub">Inserisci la tua chiave privata</string>
     <string name="import_existing_identity">Accedi</string>
+    <string name="white_noise_logo">Logo di White Noise</string>
+    <string name="identity_entry_error_invalid_key">Non sembra una chiave nsec o npub valida.</string>
+    <string name="identity_entry_error_import_failed">Impossibile accedere con questa chiave. Controllala e riprova.</string>
     <string name="identity">Scegli la tua identità</string>
     <string name="public_key">Chiave pubblica</string>
     <string name="local_signing">Firma locale</string>

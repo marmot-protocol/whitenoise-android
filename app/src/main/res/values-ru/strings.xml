@@ -4,7 +4,6 @@
     <string name="white_noise_couldnt_start">Не удалось запустить White Noise</string>
     <string name="refresh">Обновить дамп</string>
     <string name="retry">Повторить</string>
-    <string name="white_noise_shield">White Noise щит</string>
     <string name="onboarding_tagline">Групповые сообщения со сквозным шифрованием.</string>
     <string name="creating_identity">Создание индивидуальности</string>
     <string name="creating_identity_title">Создание идентичности</string>
@@ -309,6 +308,9 @@
     <string name="publish_to_relays">Публикация в реле</string>
     <string name="nsec_or_npub">Введите ваш приватный ключ</string>
     <string name="import_existing_identity">Войти</string>
+    <string name="white_noise_logo">Логотип White Noise</string>
+    <string name="identity_entry_error_invalid_key">Это не похоже на действительный ключ nsec или npub.</string>
+    <string name="identity_entry_error_import_failed">Не удалось войти с этим ключом. Проверьте его и попробуйте снова.</string>
     <string name="identity">Выберите свою личность</string>
     <string name="public_key">Публичный ключ</string>
     <string name="local_signing">Локальное подписание</string>

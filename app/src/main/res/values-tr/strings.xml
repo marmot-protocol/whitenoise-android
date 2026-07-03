@@ -4,7 +4,6 @@
     <string name="white_noise_couldnt_start">White Noise başlatılamadı</string>
     <string name="refresh">Dökümü yenile</string>
     <string name="retry">Tekrar dene</string>
-    <string name="white_noise_shield">White Noise kalkan</string>
     <string name="onboarding_tagline">Uçtan uca şifreli grup mesajlaşması.</string>
     <string name="creating_identity">Kimlik oluşturma</string>
     <string name="creating_identity_title">Kimlik Oluşturuluyor</string>
@@ -305,6 +304,9 @@
     <string name="publish_to_relays">Rölelere Yayınla</string>
     <string name="nsec_or_npub">Özel anahtarınızı girin</string>
     <string name="import_existing_identity">Giriş Yap</string>
+    <string name="white_noise_logo">White Noise logosu</string>
+    <string name="identity_entry_error_invalid_key">Bu geçerli bir nsec veya npub anahtarına benzemiyor.</string>
+    <string name="identity_entry_error_import_failed">Bu anahtarla giriş yapılamadı. Kontrol edip tekrar deneyin.</string>
     <string name="identity">Kimliğinizi seçin</string>
     <string name="public_key">Açık anahtar</string>
     <string name="local_signing">Yerel imzalama</string>

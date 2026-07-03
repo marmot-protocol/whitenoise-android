@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    In-app brand mark: the same White Noise "M" path as the notification
+    small icon (ic_stat_whitenoise), kept as a separate resource so app
+    surfaces never depend on a notification-named asset (whose alpha-only
+    white constraint is a system requirement, not a brand choice). The fill
+    is plain white so callers theme it via Icon tint / drawable tint.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M174.057,771.956V252.044H348.115V411.296L424.971,252.044H599.029V411.296L675.885,252.044H849.943V771.956H675.885V612.704L599.029,771.956H424.971V612.704L348.115,771.956H174.057ZM320.989,279.17H201.183V715.749L320.989,467.503V279.17ZM703.011,744.83H822.817V308.251L703.011,556.497V744.83ZM582,744.83L806.732,279.17H692.914L468.182,744.83H582ZM555.818,279.17H442L217.268,744.83H331.086L555.818,279.17ZM571.903,308.251L452.097,556.497V715.749L571.903,467.503V308.251Z" />
+</vector>

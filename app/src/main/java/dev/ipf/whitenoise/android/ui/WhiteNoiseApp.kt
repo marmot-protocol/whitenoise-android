@@ -182,6 +182,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -297,6 +298,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.booleanResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -380,6 +382,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemCopy
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.Lud16Resolver
@@ -1076,13 +1079,19 @@ private enum class OnboardingAction { Idle, Creating, Importing }
 private fun OnboardingScreen(appState: WhiteNoiseAppState) {
     var identity by remember { mutableStateOf("") }
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
+    var importErrorRes by remember { mutableStateOf<Int?>(null) }
     val scope = rememberCoroutineScope()
 
     OnboardingContent(
         identity = identity,
         creatingIdentity = inFlightAction == OnboardingAction.Creating,
         signingInBusy = inFlightAction == OnboardingAction.Importing,
-        onIdentityChange = { identity = it },
+        importErrorRes = importErrorRes,
+        onIdentityChange = {
+            identity = it
+            importErrorRes = null
+        },
+        onImportErrorChange = { importErrorRes = it },
         onCreateIdentity = {
             inFlightAction = OnboardingAction.Creating
             scope.launch {
@@ -1095,9 +1104,12 @@ private fun OnboardingScreen(appState: WhiteNoiseAppState) {
         },
         onImportIdentity = { value ->
             inFlightAction = OnboardingAction.Importing
+            importErrorRes = null
             scope.launch {
                 try {
-                    appState.importIdentity(value)
+                    if (!appState.importIdentity(value)) {
+                        importErrorRes = importIdentityErrorRes(value)
+                    }
                 } finally {
                     inFlightAction = OnboardingAction.Idle
                 }
@@ -1105,6 +1117,19 @@ private fun OnboardingScreen(appState: WhiteNoiseAppState) {
         },
     )
 }
+
+/**
+ * Inline message for a failed identity import (#795 lud16 pattern): input
+ * that isn't even shaped like a key reads as "not a valid key"; a
+ * well-formed key that the engine still rejected reads as a retryable
+ * sign-in failure.
+ */
+internal fun importIdentityErrorRes(identity: String): Int =
+    if (IdentityEntryInput.classify(identity) == IdentityEntryInput.Kind.Invalid) {
+        R.string.identity_entry_error_invalid_key
+    } else {
+        R.string.identity_entry_error_import_failed
+    }
 
 @Composable
 fun OnboardingContent(
@@ -1114,6 +1139,8 @@ fun OnboardingContent(
     onIdentityChange: (String) -> Unit,
     onCreateIdentity: () -> Unit,
     onImportIdentity: (String) -> Unit,
+    importErrorRes: Int? = null,
+    onImportErrorChange: (Int?) -> Unit = {},
 ) {
     var signingIn by remember { mutableStateOf(signingInBusy) }
     val busy = creatingIdentity || signingInBusy
@@ -1123,7 +1150,9 @@ fun OnboardingContent(
         SignInContent(
             identity = identity,
             busy = signingInBusy,
+            errorRes = importErrorRes,
             onIdentityChange = onIdentityChange,
+            onErrorChange = onImportErrorChange,
             onBack = { signingIn = false },
             onSignIn = { onImportIdentity(identity.trim()) },
         )
@@ -1136,26 +1165,13 @@ fun OnboardingContent(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(12.dp))
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Icon(
-                imageVector = Icons.Default.Shield,
-                contentDescription = stringResource(R.string.white_noise_shield),
-                modifier = Modifier.size(88.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
-            Text(
-                stringResource(R.string.onboarding_tagline),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        WhiteNoiseLogoLockup()
         Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             Button(
                 onClick = onCreateIdentity,
                 enabled = !busy,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
             ) {
                 if (creatingIdentity) {
                     CircularProgressIndicator(
@@ -1175,7 +1191,7 @@ fun OnboardingContent(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = { signingIn = true },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
@@ -1189,11 +1205,41 @@ fun OnboardingContent(
     }
 }
 
+/**
+ * The White Noise brand lockup (mark + name + tagline) shown on the
+ * onboarding landing. Extracted so future brand surfaces reuse the same
+ * arrangement instead of re-deriving sizes and styles.
+ */
+@Composable
+internal fun WhiteNoiseLogoLockup(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_wn_mark),
+            contentDescription = stringResource(R.string.white_noise_logo),
+            modifier = Modifier.size(96.dp),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
+        Text(
+            stringResource(R.string.onboarding_tagline),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
 @Composable
 private fun SignInContent(
     identity: String,
     busy: Boolean,
+    errorRes: Int?,
     onIdentityChange: (String) -> Unit,
+    onErrorChange: (Int?) -> Unit,
     onBack: () -> Unit,
     onSignIn: () -> Unit,
 ) {
@@ -1247,32 +1293,118 @@ private fun SignInContent(
                 stringResource(R.string.sign_in_secret_key_help),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            OutlinedTextField(
-                value = identity,
-                onValueChange = onIdentityChange,
-                label = { Text(stringResource(R.string.nostr_nsec)) },
-                singleLine = true,
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-                // Treat the nsec entry as a password: hides the value on
-                // screen, and tells the IME not to retain it for suggestions,
-                // autofill, or third-party clipboard inspection.
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions =
-                    KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        autoCorrectEnabled = false,
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done,
-                    ),
-                keyboardActions =
-                    KeyboardActions(
-                        onDone = {
-                            if (canSignIn) onSignIn()
-                        },
-                    ),
+            IdentityEntryForm(
+                identity = identity,
+                busy = busy,
+                errorRes = errorRes,
+                onIdentityChange = onIdentityChange,
+                onErrorChange = onErrorChange,
+                onSubmit = onSignIn,
             )
         }
+    }
+}
+
+/**
+ * The shared nsec/npub entry field used by the onboarding sign-in screen and
+ * the add-account sheet (previously two drifted copies of the same form).
+ * Owns masking, the paste/clear/QR-scan affordances, and the inline import
+ * error; submission stays with the caller — the QR path only fills the field
+ * so the user confirms before anything is imported.
+ */
+@Composable
+internal fun IdentityEntryForm(
+    identity: String,
+    busy: Boolean,
+    errorRes: Int?,
+    onIdentityChange: (String) -> Unit,
+    onErrorChange: (Int?) -> Unit,
+    onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var showScanner by remember { mutableStateOf(false) }
+    val canSubmit = identity.isNotBlank() && !busy
+    val context = LocalContext.current
+    val clipboardManager =
+        remember(context) {
+            ContextCompat.getSystemService(context, android.content.ClipboardManager::class.java)
+        }
+    val canOfferPaste = rememberClipboardCanOfferPaste(clipboardManager)
+
+    // Mask unless the value is unambiguously a public npub. Treats partial /
+    // empty / unprefixed input as potentially secret, so a pasted nsec is
+    // never rendered while the field is non-empty. Keep
+    // `KeyboardType.Password` even when revealing the npub so the IME stays
+    // opted out of suggestions / autofill / history.
+    val maskSecret = !identity.trim().startsWith("npub1")
+    OutlinedTextField(
+        value = identity,
+        onValueChange = onIdentityChange,
+        label = { Text(stringResource(R.string.nsec_or_npub)) },
+        singleLine = true,
+        enabled = !busy,
+        isError = errorRes != null,
+        supportingText = errorRes?.let { { Text(stringResource(it)) } },
+        trailingIcon = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                when {
+                    identity.isNotEmpty() -> {
+                        IconButton(onClick = { onIdentityChange("") }, enabled = !busy) {
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear))
+                        }
+                    }
+                    else -> {
+                        if (canOfferPaste) {
+                            IconButton(
+                                onClick = {
+                                    // Identity-specific paste: ClipboardPasteAffordance
+                                    // is public-identifier-only and would reject an nsec.
+                                    IdentityEntryInput
+                                        .pasteValue(clipboardManager?.primaryClipPlainText(context))
+                                        ?.let(onIdentityChange)
+                                },
+                                enabled = !busy,
+                            ) {
+                                Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
+                            }
+                        }
+                        IconButton(onClick = { showScanner = true }, enabled = !busy) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_qr_code))
+                        }
+                    }
+                }
+            }
+        },
+        modifier = modifier.fillMaxWidth(),
+        visualTransformation = if (maskSecret) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions =
+            KeyboardOptions(
+                capitalization = KeyboardCapitalization.None,
+                autoCorrectEnabled = false,
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done,
+            ),
+        keyboardActions =
+            KeyboardActions(
+                onDone = {
+                    if (canSubmit) onSubmit()
+                },
+            ),
+    )
+    if (showScanner) {
+        QrScannerSheet(
+            onDismiss = { showScanner = false },
+            onScan = { raw ->
+                showScanner = false
+                val scanned = IdentityEntryInput.scannedValue(raw)
+                if (scanned == null) {
+                    onErrorChange(R.string.identity_entry_error_invalid_key)
+                } else {
+                    // Fill only; the user reviews and taps sign in / import.
+                    onIdentityChange(scanned)
+                }
+            },
+        )
     }
 }
 
@@ -18185,7 +18317,7 @@ fun SettingsAccountHeader(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AccountSelectorSheet(
     appState: WhiteNoiseAppState,
@@ -18193,8 +18325,15 @@ private fun AccountSelectorSheet(
     onAddAccount: () -> Unit,
     onAccountSwitched: () -> Unit,
 ) {
+    // Local in-flight signal for the expressive loading state: refreshAccounts
+    // itself exposes none, and this sheet is the only caller that needs one.
+    var refreshingAccounts by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
-        appState.refreshAccounts()
+        try {
+            appState.refreshAccounts()
+        } finally {
+            refreshingAccounts = false
+        }
     }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -18202,78 +18341,95 @@ private fun AccountSelectorSheet(
     ) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleLarge)
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
-                items(appState.accounts, key = { it.label }) { account ->
-                    val unreadCount = appState.unreadCountForAccount(account.label)
-                    ListItem(
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    // Run on the process-lifetime mutation scope, not this
-                                    // sheet's rememberCoroutineScope. setActiveAccount flips
-                                    // activeAccountRef partway through and keeps suspending
-                                    // (profile warm, notification refresh, push sync); the
-                                    // account-change nav reset in MainShell then disposes this
-                                    // sheet, which would cancel a sheet-scoped coroutine before
-                                    // the switch cleanup finishes (#547). onDismiss /
-                                    // onAccountSwitched only set parent composition state, so
-                                    // they are safe to run from the mutation scope.
-                                    appState.launchMutation {
-                                        appState.setActiveAccount(account.label)
-                                        onDismiss()
-                                        // Land on the newly-active account's chat list
-                                        // instead of leaving the user on Settings (#316).
-                                        onAccountSwitched()
+            if (refreshingAccounts) {
+                Box(Modifier.fillMaxWidth().heightIn(min = 120.dp), contentAlignment = Alignment.Center) {
+                    LoadingIndicator()
+                }
+            } else {
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                    items(appState.accounts, key = { it.label }) { account ->
+                        val unreadCount = appState.unreadCountForAccount(account.label)
+                        val isActiveAccount = account.label == appState.activeAccountRef
+                        ListItem(
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        // Run on the process-lifetime mutation scope, not this
+                                        // sheet's rememberCoroutineScope. setActiveAccount flips
+                                        // activeAccountRef partway through and keeps suspending
+                                        // (profile warm, notification refresh, push sync); the
+                                        // account-change nav reset in MainShell then disposes this
+                                        // sheet, which would cancel a sheet-scoped coroutine before
+                                        // the switch cleanup finishes (#547). onDismiss /
+                                        // onAccountSwitched only set parent composition state, so
+                                        // they are safe to run from the mutation scope.
+                                        appState.launchMutation {
+                                            appState.setActiveAccount(account.label)
+                                            onDismiss()
+                                            // Land on the newly-active account's chat list
+                                            // instead of leaving the user on Settings (#316).
+                                            onAccountSwitched()
+                                        }
+                                    },
+                            colors =
+                                ListItemDefaults.colors(
+                                    // Tonal highlight so the active account reads at a
+                                    // glance, not only from the trailing check.
+                                    containerColor =
+                                        if (isActiveAccount) {
+                                            MaterialTheme.colorScheme.secondaryContainer
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                ),
+                            leadingContent = {
+                                Avatar(
+                                    title = appState.displayName(account.accountIdHex),
+                                    seed = account.accountIdHex,
+                                    size = 44.dp,
+                                    pictureUrl = appState.avatarUrl(account.accountIdHex),
+                                )
+                            },
+                            headlineContent = { Text(appState.displayName(account.accountIdHex)) },
+                            supportingContent = {
+                                Text(
+                                    appState.shortNpub(account.accountIdHex),
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            trailingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (unreadCount > 0uL) {
+                                        UnreadCountBadge(unreadCount)
+                                        Spacer(Modifier.width(8.dp))
                                     }
-                                },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = {
-                            Avatar(
-                                title = appState.displayName(account.accountIdHex),
-                                seed = account.accountIdHex,
-                                size = 44.dp,
-                                pictureUrl = appState.avatarUrl(account.accountIdHex),
-                            )
-                        },
-                        headlineContent = { Text(appState.displayName(account.accountIdHex)) },
-                        supportingContent = {
-                            Text(
-                                appState.shortNpub(account.accountIdHex),
-                                fontFamily = FontFamily.Monospace,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        trailingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (unreadCount > 0uL) {
-                                    UnreadCountBadge(unreadCount)
-                                    Spacer(Modifier.width(8.dp))
+                                    if (!account.localSigning) {
+                                        Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)
+                                        Spacer(Modifier.width(8.dp))
+                                    }
+                                    if (account.signedOut) {
+                                        Text(stringResource(R.string.signed_out), style = MaterialTheme.typography.labelSmall)
+                                        Spacer(Modifier.width(8.dp))
+                                    }
+                                    if (isActiveAccount) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = stringResource(R.string.active),
+                                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        )
+                                    }
                                 }
-                                if (!account.localSigning) {
-                                    Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)
-                                    Spacer(Modifier.width(8.dp))
-                                }
-                                if (account.signedOut) {
-                                    Text(stringResource(R.string.signed_out), style = MaterialTheme.typography.labelSmall)
-                                    Spacer(Modifier.width(8.dp))
-                                }
-                                if (account.label == appState.activeAccountRef) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = stringResource(R.string.active),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                            }
-                        },
-                    )
-                    HorizontalDivider()
+                            },
+                        )
+                        HorizontalDivider()
+                    }
                 }
             }
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = onAddAccount,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -20092,6 +20248,7 @@ private fun AddIdentitySheet(
     WindowSecureFlag()
     var identity by remember { mutableStateOf("") }
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
+    var importErrorRes by remember { mutableStateOf<Int?>(null) }
     val busy = inFlightAction != OnboardingAction.Idle
     val creatingIdentityDescription = stringResource(R.string.creating_identity)
     val importingDescription = stringResource(R.string.import_existing_identity)
@@ -20101,9 +20258,12 @@ private fun AddIdentitySheet(
     fun startImport() {
         if (inFlightAction != OnboardingAction.Idle || identity.isBlank()) return
         inFlightAction = OnboardingAction.Importing
+        importErrorRes = null
         appState.launchMutation {
             try {
-                appState.importIdentity(identity)
+                if (!appState.importIdentity(identity)) {
+                    importErrorRes = importIdentityErrorRes(identity)
+                }
             } finally {
                 inFlightAction = OnboardingAction.Idle
             }
@@ -20157,30 +20317,18 @@ private fun AddIdentitySheet(
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(if (inFlightAction == OnboardingAction.Creating) R.string.creating_identity_title else R.string.create_new_identity))
             }
-            // Mask unless the value is unambiguously a public npub.
-            // Treats partial / empty / unprefixed input as potentially secret,
-            // so a pasted nsec is never rendered while the field is non-empty.
-            // Keep `KeyboardType.Password` even when revealing the npub so the
-            // IME stays opted out of suggestions / autofill / history.
-            val maskSecret = !identity.trim().startsWith("npub1")
-            OutlinedTextField(
-                value = identity,
-                onValueChange = { identity = it },
-                label = { Text(stringResource(R.string.nsec_or_npub)) },
-                singleLine = true,
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-                visualTransformation = if (maskSecret) PasswordVisualTransformation() else VisualTransformation.None,
-                keyboardOptions =
-                    KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        autoCorrectEnabled = false,
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done,
-                    ),
-                keyboardActions = KeyboardActions(onDone = { startImport() }),
+            IdentityEntryForm(
+                identity = identity,
+                busy = busy,
+                errorRes = importErrorRes,
+                onIdentityChange = {
+                    identity = it
+                    importErrorRes = null
+                },
+                onErrorChange = { importErrorRes = it },
+                onSubmit = { startImport() },
             )
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = { startImport() },
                 enabled = !busy && identity.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
