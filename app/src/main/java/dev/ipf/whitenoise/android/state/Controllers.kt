@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.StreamDebugEventFormatter
@@ -109,6 +110,25 @@ data class ChatListItem(
 
     val projectedTitle: String?
         get() = projection?.title?.takeIf { it.isNotBlank() }
+
+    /**
+     * The title a NAMED group's row displays and sorts by: the projection's
+     * title when present, else the raw group name, both routed through
+     * [ProfileSanitizer.displayName] because the name is peer-supplied —
+     * bidi overrides / zero-width spoofing chars must never reach the UI or
+     * the sort key (#980). Null for unnamed groups, or when sanitization
+     * strips the whole name; callers then fall back to the same
+     * unnamed-group projection the row already uses.
+     */
+    val sanitizedNamedTitle: String?
+        get() =
+            group.name.takeIf { it.isNotBlank() }?.let { raw ->
+                // Fall back to the raw name when a stale projected title
+                // sanitizes away entirely, mirroring chatListItemDisplayTitle's
+                // recovery path so a row never renders named but sorts unnamed.
+                projectedTitle?.let(ProfileSanitizer::displayName)
+                    ?: ProfileSanitizer.displayName(raw)
+            }
 
     val latestAt: ULong?
         // Prefer the last message's timeline timestamp. When a chat has no last
@@ -213,18 +233,18 @@ internal fun sortChatListItems(items: List<ChatListItem>): List<ChatListItem> =
 
 /**
  * Sort tie-breaker key. Mirrors the gating that the UI uses to derive a
- * display title: named groups sort by the projected/raw name; unnamed
- * groups sort by the peer account (stable; co-locates the same DM-shaped
+ * display title: named groups sort by the *sanitized* projected/raw name
+ * ([ChatListItem.sanitizedNamedTitle], the same value the row renders, so
+ * hostile bidi/zero-width names can't make the order drift from the visible
+ * titles); unnamed groups — including names that sanitization strips entirely —
+ * sort by the peer account (stable; co-locates the same DM-shaped
  * conversation across renders) or, lacking that, the member count. The
  * raw group hex must never leak into the sort key — that's what the UI
  * stopped showing, and the sort would otherwise drift away from it.
  */
 internal fun chatListItemSortKey(item: ChatListItem): String =
-    if (item.group.name.isNotBlank()) {
-        (item.projectedTitle ?: item.group.name).lowercase()
-    } else {
-        (item.otherMemberAccount ?: "~${item.memberCount}").lowercase()
-    }
+    item.sanitizedNamedTitle?.lowercase()
+        ?: (item.otherMemberAccount ?: "~${item.memberCount}").lowercase()
 
 /**
  * Build a `ChatListItem` from the FFI projection. The optional [members]

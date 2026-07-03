@@ -385,6 +385,83 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun namedChatTitleStripsBidiOverrideCharacters() {
+        // #980: the group name is peer-supplied; a title must never carry bidi
+        // override/isolate controls that could visually reverse surrounding UI
+        // text. Same policy as the transcript export and the #681 rename rows.
+        val named = group(name = "\u202Egnp.exe\u202C safe")
+
+        assertEquals(
+            "gnp.exe safe",
+            GroupProjector.displayTitle(
+                group = named,
+                otherMemberAccount = "alice",
+                memberCount = 2,
+                memberTitle = { "Alice" },
+            ),
+        )
+    }
+
+    @Test
+    fun nameOfOnlyZeroWidthCharactersFallsThroughToUnnamedProjection() {
+        // A "name" of zero-width/default-ignorable chars is invisible; treating
+        // it as a real name would render a blank title. It must fall through to
+        // the same fallbacks an unnamed chat uses.
+        val invisible = group(name = "\u200B\u200E\uFEFF")
+
+        assertEquals(
+            "Bob",
+            GroupProjector.displayTitle(
+                group = invisible,
+                otherMemberAccount = "bob",
+                memberCount = 2,
+                memberTitle = { "Bob" },
+            ),
+        )
+        assertEquals(
+            "Group of 4 people",
+            GroupProjector.displayTitle(
+                group = invisible,
+                otherMemberAccount = "bob",
+                memberCount = 4,
+                memberTitle = { "Bob" },
+            ),
+        )
+    }
+
+    @Test
+    fun namedChatTitleIsCappedAt80CodePoints() {
+        val named = group(name = "x".repeat(200))
+
+        val title =
+            GroupProjector.displayTitle(
+                group = named,
+                otherMemberAccount = null,
+                memberCount = 3,
+                memberTitle = { it },
+            )
+
+        assertEquals("x".repeat(80), title)
+    }
+
+    @Test
+    fun namedChatTitleFoldsFullwidthHomoglyphs() {
+        // NFKC compatibility folding, mirroring ProfileSanitizer.displayName:
+        // fullwidth look-alikes must not impersonate another group's title.
+        val named = group(name = "ＡＢＣ")
+
+        assertEquals(
+            "ABC",
+            GroupProjector.displayTitle(
+                group = named,
+                otherMemberAccount = null,
+                memberCount = 3,
+                memberTitle = { it },
+            ),
+        )
+    }
+
+    @Test
     fun unnamedChatTitleUsesGroupSizeBeforeMemberNameForLargerGroups() {
         val unnamed = group(name = "")
 

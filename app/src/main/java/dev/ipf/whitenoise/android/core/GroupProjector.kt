@@ -47,6 +47,12 @@ object GroupProjector {
      * the group name when set, an invite line when pending, "Group of N people"
      * for larger unnamed groups, the other member for a pair, else an Unknown
      * fallback — never the group id hex, which is opaque to users.
+     *
+     * The group name is peer-supplied, so it is routed through
+     * [ProfileSanitizer.displayName] (strip bidi overrides / zero-width and
+     * other default-ignorable spoofing chars, NFKC-fold homoglyphs, cap the
+     * length) like every other group-name surface (#980). A name that
+     * sanitizes away entirely falls through to the unnamed fallbacks.
      */
     fun displayTitle(
         name: String,
@@ -57,10 +63,7 @@ object GroupProjector {
         memberTitle: (String) -> String,
         copy: GroupTitleCopy = GroupTitleCopy.Default,
     ): String {
-        name
-            .trim()
-            .takeIf { it.isNotBlank() }
-            ?.let { return it }
+        ProfileSanitizer.displayName(name)?.let { return it }
         pendingInviteAccount?.takeIf { it.isNotBlank() }?.let { return copy.inviteFrom(memberTitle(it)) }
         if (memberCount > 2) return copy.groupOfPeople(memberCount)
         if (memberCount == 2) {

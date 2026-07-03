@@ -85,7 +85,13 @@ object MediaReferenceParser {
         val fields = mutableMapOf<String, String>()
         val locators = mutableListOf<MediaLocatorFfi>()
         for (entry in values) {
-            if (entry.startsWith("blurhash ")) return null
+            // `blurhash` (and any other key this version doesn't model, e.g.
+            // NIP-92 extras from interoperating clients) falls through to the
+            // generic key/value path below and is ignored: the required-field
+            // validation — locator, hashes, nonce, and the pinned
+            // `v encrypted-media-v1` — already rejects tags from other
+            // protocol versions, so an extra hint key must not drop an
+            // otherwise-valid attachment (#981).
             if (entry.startsWith("locator ")) {
                 val rest = entry.removePrefix("locator ")
                 val split = rest.indexOf(' ')
