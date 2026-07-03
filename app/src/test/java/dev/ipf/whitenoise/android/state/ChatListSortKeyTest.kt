@@ -82,6 +82,33 @@ class ChatListSortKeyTest {
     }
 
     @Test
+    fun hostileNamedTitleIsSanitizedInTheSortKey() {
+        // #980: the sort key must track the *sanitized* title the row renders,
+        // so a bidi-override-laden name sorts by its visible form.
+        val item =
+            item(
+                groupId = "aaaa",
+                groupName = "\u202EEvil\u202C Group",
+            )
+
+        assertEquals("evil group", chatListItemSortKey(item))
+    }
+
+    @Test
+    fun zeroWidthOnlyGroupNameRoutesThroughTheUnnamedPath() {
+        // A name that sanitization strips entirely renders via the unnamed
+        // projection, so the key must come from the peer account too.
+        val item =
+            item(
+                groupId = "aaaa",
+                groupName = "\u200B\u200E\uFEFF",
+                otherMemberAccount = "peer",
+            )
+
+        assertEquals("peer", chatListItemSortKey(item))
+    }
+
+    @Test
     fun groupHexNeverLeaksIntoTheSortKey() {
         val named = item(groupId = "feedface", groupName = "Named")
         val unnamedWithPeer = item(groupId = "feedface", groupName = "", otherMemberAccount = "peer")
