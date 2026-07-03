@@ -36,6 +36,31 @@ enum class MediaAutoDownloadNetwork(
 
     companion object {
         fun fromKey(key: String?): MediaAutoDownloadNetwork? = entries.firstOrNull { it.preferenceKey == key }
+
+        /**
+         * Pure mapping from a live connection's transport/capability flags to
+         * every condition it matches. Extracting the flags from
+         * `NetworkCapabilities` (an Android type) stays in [WhiteNoiseAppState];
+         * this keeps the fan-out rules — cellular implies Mobile and, when
+         * roaming, Roaming; metered stacks on either transport — unit-testable
+         * on the JVM. Empty means no/unknown connection, which
+         * [MediaAutoDownloadMatrix.shouldAutoDownload] treats as "do not
+         * auto-download".
+         */
+        fun matching(
+            hasWifiTransport: Boolean,
+            hasCellularTransport: Boolean,
+            isRoaming: Boolean,
+            isMetered: Boolean,
+        ): Set<MediaAutoDownloadNetwork> =
+            buildSet {
+                if (hasWifiTransport) add(WiFi)
+                if (hasCellularTransport) {
+                    add(Mobile)
+                    if (isRoaming) add(Roaming)
+                }
+                if (isMetered) add(Metered)
+            }
     }
 }
 

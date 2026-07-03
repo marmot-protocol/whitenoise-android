@@ -139,4 +139,69 @@ class MediaAutoDownloadMatrixTest {
         assertTrue(mixed.isEnabled(MediaAutoDownloadType.Video, MediaAutoDownloadNetwork.Roaming))
         assertFalse(mixed.isEnabled(MediaAutoDownloadType.Audio, MediaAutoDownloadNetwork.WiFi))
     }
+
+    @Test
+    fun matchingMapsWifiAndCellularTransportsToTheirConditions() {
+        // #984: the same fan-out the inline ConnectivityManager query used to
+        // compute now feeds the callback-maintained snapshot.
+        assertEquals(
+            setOf(MediaAutoDownloadNetwork.WiFi),
+            MediaAutoDownloadNetwork.matching(
+                hasWifiTransport = true,
+                hasCellularTransport = false,
+                isRoaming = false,
+                isMetered = false,
+            ),
+        )
+        assertEquals(
+            setOf(MediaAutoDownloadNetwork.Mobile, MediaAutoDownloadNetwork.Metered),
+            MediaAutoDownloadNetwork.matching(
+                hasWifiTransport = false,
+                hasCellularTransport = true,
+                isRoaming = false,
+                isMetered = true,
+            ),
+        )
+    }
+
+    @Test
+    fun matchingCountsRoamingOnlyOnCellular() {
+        // Roaming is a cellular condition: a roaming flag without the cellular
+        // transport (e.g. VPN quirk) must not gate on the Roaming row.
+        assertEquals(
+            setOf(
+                MediaAutoDownloadNetwork.Mobile,
+                MediaAutoDownloadNetwork.Roaming,
+                MediaAutoDownloadNetwork.Metered,
+            ),
+            MediaAutoDownloadNetwork.matching(
+                hasWifiTransport = false,
+                hasCellularTransport = true,
+                isRoaming = true,
+                isMetered = true,
+            ),
+        )
+        assertEquals(
+            setOf(MediaAutoDownloadNetwork.WiFi),
+            MediaAutoDownloadNetwork.matching(
+                hasWifiTransport = true,
+                hasCellularTransport = false,
+                isRoaming = true,
+                isMetered = false,
+            ),
+        )
+    }
+
+    @Test
+    fun matchingUnknownConnectionYieldsEmptySoTheGateSaysNo() {
+        val none =
+            MediaAutoDownloadNetwork.matching(
+                hasWifiTransport = false,
+                hasCellularTransport = false,
+                isRoaming = false,
+                isMetered = false,
+            )
+        assertTrue(none.isEmpty())
+        assertFalse(MediaAutoDownloadMatrix.DEFAULT.shouldAutoDownload(MediaAutoDownloadType.Image, none))
+    }
 }

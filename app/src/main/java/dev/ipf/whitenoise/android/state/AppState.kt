@@ -878,6 +878,11 @@ class WhiteNoiseAppState(
 
     init {
         applyLanguageTag(languageTag)
+        // Off-main: the ConnectivityManager registration + seed query are
+        // binder IPCs and this constructor runs on the main thread. Until the
+        // seed lands, the snapshot reads as offline/no-networks — the same
+        // conservative answer the auto-download gate gives for "unknown".
+        mutationsScope.launch(Dispatchers.IO) { registerActiveNetworkListener() }
     }
 
     val activeAccount: AccountSummaryFfi?
@@ -2314,42 +2319,88 @@ class WhiteNoiseAppState(
     /**
      * True when the device currently has an active network connection. Used to
      * pick a "couldn't verify (no network)" message over a generic resolution
-     * failure when an online validation (e.g. lud16, issue #795) fails.
+     * failure when an online validation (e.g. lud16, issue #795) fails. Reads
+     * the callback-maintained snapshot — no binder IPC on the caller's thread.
      */
-    fun hasActiveNetwork(): Boolean {
-        val cm =
-            appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
-                ?: return false
-        return cm.activeNetwork != null
-    }
+    fun hasActiveNetwork(): Boolean = hasActiveNetworkSnapshot
 
     /**
      * Every [MediaAutoDownloadNetwork] the active connection currently matches.
      * A single connection can match several at once (e.g. cellular that is both
      * roaming and metered). An empty set (no/unknown connection) makes the
      * decision conservatively fall to "do not auto-download".
+     *
+     * Reads the snapshot maintained by [registerActiveNetworkListener]: the
+     * gate runs during bubble composition, and querying ConnectivityManager
+     * inline (getSystemService/activeNetwork/getNetworkCapabilities) is three
+     * synchronous binder IPCs per call (#984).
      */
-    private fun activeNetworkTypes(): Set<MediaAutoDownloadNetwork> {
+    private fun activeNetworkTypes(): Set<MediaAutoDownloadNetwork> = activeNetworkTypesSnapshot
+
+    // Callback-maintained mirror of the default network's state, volatile so
+    // composition-time reads see the connectivity thread's latest write.
+    @Volatile
+    private var activeNetworkTypesSnapshot: Set<MediaAutoDownloadNetwork> = emptySet()
+
+    @Volatile
+    private var hasActiveNetworkSnapshot = false
+
+    /**
+     * Register the process-lifetime default-network callback that keeps
+     * [activeNetworkTypesSnapshot]/[hasActiveNetworkSnapshot] current. Runs off
+     * the main thread (see `init`): registration and the one-shot seed query
+     * are themselves binder IPCs. The callback is never unregistered because
+     * [WhiteNoiseAppState] has no teardown — it lives as long as the process.
+     */
+    private fun registerActiveNetworkListener() {
         val cm =
             appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
-                ?: return emptySet()
-        val network = cm.activeNetwork ?: return emptySet()
-        val caps = cm.getNetworkCapabilities(network) ?: return emptySet()
-        val types = mutableSetOf<MediaAutoDownloadNetwork>()
-        if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
-            types += MediaAutoDownloadNetwork.WiFi
+                ?: return
+        // Seed before registering so the first composition doesn't read an
+        // empty snapshot while the callback's initial dispatch is in flight;
+        // that dispatch then overwrites the seed with the same current state.
+        val network = cm.activeNetwork
+        hasActiveNetworkSnapshot = network != null
+        activeNetworkTypesSnapshot =
+            network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
+        runCatching {
+            cm.registerDefaultNetworkCallback(
+                object : android.net.ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: android.net.Network) {
+                        // Capabilities arrive in the onCapabilitiesChanged that
+                        // follows; until then only the yes/no bit is known and
+                        // the empty type set conservatively blocks auto-download.
+                        hasActiveNetworkSnapshot = true
+                    }
+
+                    override fun onCapabilitiesChanged(
+                        network: android.net.Network,
+                        networkCapabilities: android.net.NetworkCapabilities,
+                    ) {
+                        hasActiveNetworkSnapshot = true
+                        activeNetworkTypesSnapshot = networkTypesFor(networkCapabilities)
+                    }
+
+                    override fun onLost(network: android.net.Network) {
+                        hasActiveNetworkSnapshot = false
+                        activeNetworkTypesSnapshot = emptySet()
+                    }
+                },
+            )
+        }.onFailure {
+            // Too many callbacks / SecurityException: keep the seeded snapshot
+            // rather than crash; it just won't track later connectivity changes.
+            appStateDebug(it) { "default network callback registration failed: ${it.readableMessage()}" }
         }
-        if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR)) {
-            types += MediaAutoDownloadNetwork.Mobile
-            if (!caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)) {
-                types += MediaAutoDownloadNetwork.Roaming
-            }
-        }
-        if (!caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) {
-            types += MediaAutoDownloadNetwork.Metered
-        }
-        return types
     }
+
+    private fun networkTypesFor(caps: android.net.NetworkCapabilities): Set<MediaAutoDownloadNetwork> =
+        MediaAutoDownloadNetwork.matching(
+            hasWifiTransport = caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI),
+            hasCellularTransport = caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR),
+            isRoaming = !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING),
+            isMetered = !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
+        )
 
     /**
      * Refreshes [mediaAutoDownloadMatrix] for the current active account.
@@ -2577,9 +2628,18 @@ class WhiteNoiseAppState(
      * Gate the raw engine prune so the background sweep honors the #745 clock
      * skew tolerance in the real deletion path. `secureDeleteExpired` does not
      * accept a cutoff parameter; it would prune everything before
-     * `now - retention`. Before invoking it, scan the local timeline newest to
-     * oldest and defer the group if any row falls in the interval that the raw
-     * engine cutoff would delete but the skew-adjusted cutoff would keep.
+     * `now - retention`. Before invoking it, scan the local timeline and defer
+     * the group if any row falls in the interval that the raw engine cutoff
+     * would delete but the skew-adjusted cutoff would keep.
+     *
+     * The scan's first cursor is seeded at the raw cutoff (#979): both
+     * classifications only match rows with `timelineAt < rawCutoffSeconds`, so
+     * paging from the newest message would walk the entire un-expired history
+     * per group per pass just to reach the boundary. The seed makes the first
+     * page hold the newest classifiable rows, and a skew-window row — being
+     * newer than every expired-beyond-skew row — can never hide on a later
+     * page than the rows that would trigger the prune. A page cap backstops
+     * pathological histories; exhausting it defers the group.
      */
     private suspend fun shouldInvokeBackgroundSecureDelete(
         accountRef: String,
@@ -2591,9 +2651,13 @@ class WhiteNoiseAppState(
         val skewCutoffSeconds = DisappearingMessageSweep.expiryCutoffSeconds(nowMillis, retentionSecs) ?: return false
         if (rawCutoffSeconds == 0uL) return false
 
-        var before: ULong? = null
-        var beforeMessageId: String? = null
-        while (true) {
+        // The engine requires the (before, beforeMessageId) pair together; the
+        // all-zeros seed id sorts before every real message id, making this an
+        // exclusive `timelineAt < rawCutoffSeconds` first page.
+        var before: ULong = rawCutoffSeconds
+        var beforeMessageId: String = DisappearingMessageSweep.TIMELINE_SCAN_SEED_MESSAGE_ID
+        var pagesScanned = 0
+        while (pagesScanned < DisappearingMessageSweep.TIMELINE_SCAN_MAX_PAGES) {
             currentCoroutineContext().ensureActive()
             val page =
                 runCatching {
@@ -2619,21 +2683,19 @@ class WhiteNoiseAppState(
                 }.getOrNull()
                     ?: return false
 
-            if (
-                page.messages.any {
-                    DisappearingMessageSweep.isWithinSkewWindow(
-                        timelineAtSeconds = it.timelineAt,
-                        rawCutoffSeconds = rawCutoffSeconds,
-                        skewCutoffSeconds = skewCutoffSeconds,
-                    )
-                }
+            when (
+                DisappearingMessageSweep.classifyScanPage(
+                    timelineAtSeconds = page.messages.map { it.timelineAt },
+                    rawCutoffSeconds = rawCutoffSeconds,
+                    skewCutoffSeconds = skewCutoffSeconds,
+                )
             ) {
-                appStateDebug { "sweep deferred inside clock-skew window group=${groupIdHex.take(8)}" }
-                return false
-            }
-
-            if (page.messages.any { DisappearingMessageSweep.isExpiredBeyondSkew(it.timelineAt, skewCutoffSeconds) }) {
-                return true
+                DisappearingMessageSweep.TimelineScanPageDecision.DeferSkewWindow -> {
+                    appStateDebug { "sweep deferred inside clock-skew window group=${groupIdHex.take(8)}" }
+                    return false
+                }
+                DisappearingMessageSweep.TimelineScanPageDecision.InvokeSecureDelete -> return true
+                DisappearingMessageSweep.TimelineScanPageDecision.KeepScanning -> Unit
             }
 
             if (!page.hasMoreBefore || page.messages.isEmpty()) return false
@@ -2643,7 +2705,12 @@ class WhiteNoiseAppState(
             if (before == nextBefore && beforeMessageId == nextBeforeMessageId) return false
             before = nextBefore
             beforeMessageId = nextBeforeMessageId
+            pagesScanned++
         }
+        // Cap exhausted without proving the skew window empty: defer to the
+        // next sweep pass rather than risk the raw prune early-deleting a
+        // near-boundary row.
+        return false
     }
 
     /**

@@ -66,16 +66,19 @@ class DiskByteCache(
      * disk. Doesn't read the file, doesn't promote LRU, doesn't fall
      * through to anywhere. Lets a caller decide UI affordances (e.g. show
      * a download chevron only on miss) without paying the read cost.
+     *
+     * Before the first hydration this reports a miss WITHOUT stat-ing the
+     * backing file: contains() is reached from composition (via
+     * `ConversationController.hasCachedAttachment`), and an inline
+     * `File.isFile`/`length()` would put the deferred directory I/O (#100)
+     * back on the caller's thread. A cold-start false only means the bubble
+     * shows its download affordance until the first real get/put hydrates
+     * the index off-thread. See #983.
      */
     fun contains(key: String): Boolean {
         val hashed = fileNameFor(key)
         return synchronized(this) {
-            if (hydrated) {
-                index.containsKey(hashed)
-            } else {
-                val file = File(cacheDir, hashed)
-                file.isFile && file.length() in 1..entryByteLimit
-            }
+            hydrated && index.containsKey(hashed)
         }
     }
 
