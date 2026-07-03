@@ -621,6 +621,16 @@
     <string name="enter_key_behavior_title">Comportement de la touche Entrée</string>
     <string name="enter_key_behavior_send">Envoyer le message</string>
     <string name="enter_key_behavior_newline">Nouvelle ligne</string>
+    <string name="font_size">Taille du texte</string>
+    <string name="font_size_settings_subtitle">Ajuste le texte dans toute l\'application</string>
+    <string name="font_size_preview_title">Aperçu</string>
+    <string name="font_size_preview_incoming">Salut ! Que penses-tu de cette taille de texte ?</string>
+    <string name="font_size_preview_outgoing">Ça me va très bien.</string>
+    <string name="font_scale_small">Petite</string>
+    <string name="font_scale_default">Par défaut</string>
+    <string name="font_scale_large">Grande</string>
+    <string name="font_scale_extra_large">Très grande</string>
+    <string name="font_size_description">Le texte est mis à l\'échelle dans toute l\'application. Ce réglage s\'ajoute à la taille de police de l\'appareil : les deux se combinent.</string>
     <plurals name="media_selected_count">
         <item quantity="one">%1$d image sélectionnée</item>
         <item quantity="other">%1$d images sélectionnées</item>

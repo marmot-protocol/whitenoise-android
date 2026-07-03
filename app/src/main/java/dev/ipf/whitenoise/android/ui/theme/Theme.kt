@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
@@ -97,6 +98,10 @@ fun WhiteNoiseTheme(
     // The app ships a locked brand palette, so dynamic (wallpaper-derived)
     // color is off by default. The path is kept for anyone who opts in.
     dynamicColor: Boolean = false,
+    // In-app font-size step (#403). Multiplies sp typography sizes, which
+    // already include the OS font scale, so it composes with the system
+    // setting rather than replacing it.
+    fontScale: Float = 1f,
     content: @Composable () -> Unit,
 ) {
     val baseColorScheme =
@@ -165,7 +170,7 @@ fun WhiteNoiseTheme(
     CompositionLocalProvider(LocalAmoledSurfaceTheme provides amoledActive) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = Typography,
+            typography = remember(fontScale) { Typography.scaledBy(fontScale) },
             content = content,
         )
     }

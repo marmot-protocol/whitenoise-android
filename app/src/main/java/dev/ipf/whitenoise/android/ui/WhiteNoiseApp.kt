@@ -425,6 +425,7 @@ import dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
+import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.AppLockDelay
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppText
@@ -498,6 +499,7 @@ private enum class MainSection {
 
 private enum class SettingsDetail {
     Appearance,
+    FontSize,
     Data,
     Profile,
     Identity,
@@ -677,6 +679,16 @@ private val AppThemeMode.labelRes: Int
             AppThemeMode.Light -> R.string.theme_light
             AppThemeMode.Dark -> R.string.theme_dark
             AppThemeMode.Amoled -> R.string.theme_amoled
+        }
+
+private val AppFontScale.labelRes: Int
+    @StringRes
+    get() =
+        when (this) {
+            AppFontScale.Small -> R.string.font_scale_small
+            AppFontScale.Default -> R.string.font_scale_default
+            AppFontScale.Large -> R.string.font_scale_large
+            AppFontScale.ExtraLarge -> R.string.font_scale_extra_large
         }
 
 private val MediaQuality.labelRes: Int
@@ -18009,15 +18021,23 @@ private fun SettingsScreen(
     // claim back here — pop the detail when on a subscreen, otherwise
     // hand control to the chats list (mirroring the top-bar back arrow).
     BackHandler {
-        if (detail != null) {
-            onDetailChange(null)
-        } else {
-            onBackToChats()
+        when {
+            // Font size is a level-2 subscreen reached from Appearance, so
+            // back returns there rather than jumping to the Settings home.
+            detail == SettingsDetail.FontSize -> onDetailChange(SettingsDetail.Appearance)
+            detail != null -> onDetailChange(null)
+            else -> onBackToChats()
         }
     }
 
     when (detail) {
-        SettingsDetail.Appearance -> AppearanceScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Appearance ->
+            AppearanceScreen(
+                appState = appState,
+                onBack = { onDetailChange(null) },
+                onOpenFontSize = { onDetailChange(SettingsDetail.FontSize) },
+            )
+        SettingsDetail.FontSize -> FontSizeScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.Data -> AutoDownloadDataScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Profile -> ProfileEditScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Identity -> IdentityScreen(appState, onBack = { onDetailChange(null) })
@@ -18191,6 +18211,7 @@ private fun SettingsHomeScreen(
 private fun AppearanceScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    onOpenFontSize: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -18217,6 +18238,14 @@ private fun AppearanceScreen(
                 }
             }
             item {
+                SectionCard(title = stringResource(R.string.font_size)) {
+                    SettingsRow(
+                        stringResource(appState.fontScale.labelRes),
+                        stringResource(R.string.font_size_settings_subtitle),
+                    ) { onOpenFontSize() }
+                }
+            }
+            item {
                 SectionCard(title = stringResource(R.string.language)) {
                     languageOptions.forEach { option ->
                         SelectableSettingsRow(
@@ -18238,6 +18267,93 @@ private fun AppearanceScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Settings -> Appearance -> Font size (issue #403). A four-step in-app text
+ * scale with a live message-bubble preview at the top. Tapping a step persists
+ * immediately via [WhiteNoiseAppState.updateFontScale] — no Save button — and
+ * the theme typography rescales on the spot, so the preview (rendered with the
+ * ambient, already-scaled typography) updates live. The in-app factor
+ * multiplies sp sizes, which already include the OS font scale, so the
+ * effective size is system x app.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FontSizeScreen(
+    appState: WhiteNoiseAppState,
+    onBack: () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.font_size)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            item {
+                SectionCard(title = stringResource(R.string.font_size_preview_title)) {
+                    FontSizePreviewBubble(text = stringResource(R.string.font_size_preview_incoming), mine = false)
+                    FontSizePreviewBubble(text = stringResource(R.string.font_size_preview_outgoing), mine = true)
+                }
+            }
+            item {
+                SectionCard(title = stringResource(R.string.font_size)) {
+                    AppFontScale.entries.forEach { scale ->
+                        SelectableSettingsRow(
+                            title = stringResource(scale.labelRes),
+                            selected = appState.fontScale == scale,
+                            onClick = { appState.updateFontScale(scale) },
+                        )
+                    }
+                }
+            }
+            item {
+                Text(
+                    text = stringResource(R.string.font_size_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+// Mirrors the conversation bubble treatment (color roles, 18dp radius, AMOLED
+// border) so the preview tracks what real chat text looks like at the selected
+// step. Body text uses the same bodyLarge style as message bubbles.
+@Composable
+private fun FontSizePreviewBubble(
+    text: String,
+    mine: Boolean,
+) {
+    val bubbleColor =
+        when {
+            isAmoledSurfaceTheme() -> Color.Black
+            mine -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.surfaceVariant
+        }
+    Box(Modifier.fillMaxWidth()) {
+        Surface(
+            modifier = Modifier.align(if (mine) Alignment.CenterEnd else Alignment.CenterStart),
+            color = bubbleColor,
+            shape = RoundedCornerShape(18.dp),
+            border = messageBubbleBorder(highlighted = false, mine = mine),
+            tonalElevation = if (mine) 1.dp else 0.dp,
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            )
         }
     }
 }
