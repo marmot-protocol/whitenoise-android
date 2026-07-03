@@ -455,7 +455,7 @@ import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
-import dev.ipf.whitenoise.android.ui.theme.amoledModalSheetSurface
+import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -7055,7 +7055,7 @@ private fun MediaPreviewSheet(
     var sending by remember { mutableStateOf(false) }
     var addMoreMenuOpen by remember { mutableStateOf(false) }
     ModalBottomSheet(
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -11504,7 +11504,7 @@ private fun ImageSearchSheet(
     }
 
     ModalBottomSheet(
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -12394,7 +12394,7 @@ private fun TransferAdminSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
     ) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
@@ -12475,9 +12475,6 @@ private fun TransferAdminSheet(
         }
     }
 }
-
-@Composable
-private fun amoledModalSheetModifier(): Modifier = Modifier.amoledModalSheetSurface(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
 
 @Composable
 private fun messageBubbleBorder(
@@ -13990,7 +13987,7 @@ private fun ReactionDetailsSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
     ) {
         Column(
             Modifier
@@ -14131,7 +14128,7 @@ private fun EditHistorySheet(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
     ) {
         // The header is anchored above the scroll region so the title and
         // count chip remain visible while the user pages through a long edit
@@ -14605,7 +14602,7 @@ private fun ForwardMessageSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
     ) {
         Column(
             modifier =
@@ -14782,7 +14779,7 @@ private fun MessageInfoSheet(
     val copyActionLabel = stringResource(R.string.copy_text)
 
     ModalBottomSheet(
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismissRequest,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -15013,7 +15010,7 @@ private fun EmojiPickerSheet(
         }
     }
     ModalBottomSheet(
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismissRequest,
         // Start at the partial detent, but keep the sheet composed under the
         // customize screen so an expanded picker returns expanded without a
@@ -18055,7 +18052,7 @@ private fun AccountSelectorSheet(
     }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
     ) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleLarge)
@@ -18180,7 +18177,7 @@ private fun ProfileQrSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
     ) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -18389,7 +18386,7 @@ private fun ProfileSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
         properties = ModalBottomSheetProperties(securePolicy = securePolicy),
     ) {
         Column(
@@ -18588,7 +18585,7 @@ private fun ProfileAddToGroupsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
     ) {
         Column(
             modifier =
@@ -19271,7 +19268,7 @@ internal fun QrScannerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
     ) {
         Column(
             Modifier.fillMaxWidth().padding(16.dp),
@@ -19973,7 +19970,7 @@ private fun AddIdentitySheet(
     // so the nsec field inside is also protected from Recents/screenshot
     // capture.
     ModalBottomSheet(
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismiss,
         properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
     ) {
@@ -20410,7 +20407,7 @@ private fun EncryptedBackupSheet(
     }
 
     ModalBottomSheet(
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
         onDismissRequest = { dismissAndClear() },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
@@ -20650,7 +20647,7 @@ private fun SignOutSheet(
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
@@ -20702,7 +20699,7 @@ private fun SignOutAndWipeSheet(
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
-        modifier = amoledModalSheetModifier(),
+        containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
