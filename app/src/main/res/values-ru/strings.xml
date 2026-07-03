@@ -4,7 +4,14 @@
     <string name="white_noise_couldnt_start">Не удалось запустить White Noise</string>
     <string name="refresh">Обновить дамп</string>
     <string name="retry">Повторить</string>
-    <string name="onboarding_tagline">Групповые сообщения со сквозным шифрованием.</string>
+    <string name="onboarding_headline">Нецензурируемо.</string>
+    <string name="onboarding_body">Приватные сообщения на основе Nostr и MLS. Без номеров телефонов, без серверов для изъятия.</string>
+    <string name="onboarding_chip_end_to_end">Сквозное</string>
+    <string name="onboarding_chip_end_to_end_description">Сквозное шифрование</string>
+    <string name="onboarding_chip_no_metadata">Без метаданных</string>
+    <string name="onboarding_chip_no_metadata_description">Метаданные не собираются</string>
+    <string name="onboarding_create_account">Создать аккаунт</string>
+    <string name="onboarding_i_have_a_key">У меня есть ключ</string>
     <string name="creating_identity">Создание индивидуальности</string>
     <string name="creating_identity_title">Создание идентичности</string>
     <string name="create_new_identity">Создать новую идентичность</string>

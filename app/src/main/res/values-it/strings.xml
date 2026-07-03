@@ -4,7 +4,14 @@
     <string name="white_noise_couldnt_start">Impossibile avviare White Noise</string>
     <string name="refresh">Aggiorna dump</string>
     <string name="retry">Riprova</string>
-    <string name="onboarding_tagline">Messaggistica di gruppo con crittografia end-to-end.</string>
+    <string name="onboarding_headline">Incensurabile.</string>
+    <string name="onboarding_body">Messaggistica privata basata su Nostr e MLS. Niente numeri di telefono, nessun server da sequestrare.</string>
+    <string name="onboarding_chip_end_to_end">Da punto a punto</string>
+    <string name="onboarding_chip_end_to_end_description">Crittografia end-to-end</string>
+    <string name="onboarding_chip_no_metadata">Nessun metadato</string>
+    <string name="onboarding_chip_no_metadata_description">Nessun metadato raccolto</string>
+    <string name="onboarding_create_account">Crea account</string>
+    <string name="onboarding_i_have_a_key">Ho una chiave</string>
     <string name="creating_identity">Creare identità</string>
     <string name="creating_identity_title">Creazione identità</string>
     <string name="create_new_identity">Crea nuova identità</string>

@@ -4,7 +4,14 @@
     <string name="white_noise_couldnt_start">No se pudo iniciar White Noise</string>
     <string name="refresh">Actualizar volcado</string>
     <string name="retry">Reintentar</string>
-    <string name="onboarding_tagline">Mensajería de grupo cifrada de extremo a extremo.</string>
+    <string name="onboarding_headline">Incensurable.</string>
+    <string name="onboarding_body">Mensajería privada basada en Nostr y MLS. Sin números de teléfono, sin servidores que incautar.</string>
+    <string name="onboarding_chip_end_to_end">De extremo a extremo</string>
+    <string name="onboarding_chip_end_to_end_description">Cifrado de extremo a extremo</string>
+    <string name="onboarding_chip_no_metadata">Sin metadatos</string>
+    <string name="onboarding_chip_no_metadata_description">No se recopilan metadatos</string>
+    <string name="onboarding_create_account">Crear cuenta</string>
+    <string name="onboarding_i_have_a_key">Tengo una clave</string>
     <string name="creating_identity">Creando identidad</string>
     <string name="creating_identity_title">Creando identidad</string>
     <string name="create_new_identity">Crear nueva identidad</string>

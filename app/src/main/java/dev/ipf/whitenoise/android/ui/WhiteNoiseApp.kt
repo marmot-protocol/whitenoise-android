@@ -168,8 +168,11 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.PublicOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -194,7 +197,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
@@ -232,7 +234,6 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberTooltipState
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -468,6 +469,10 @@ import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.OnboardingBadgeBlueDark
+import dev.ipf.whitenoise.android.ui.theme.OnboardingBadgeBlueLight
+import dev.ipf.whitenoise.android.ui.theme.OnboardingBadgeMarkDark
+import dev.ipf.whitenoise.android.ui.theme.OnboardingBadgeMarkLight
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
@@ -1163,15 +1168,38 @@ fun OnboardingContent(
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(12.dp))
+        // Hero block: brand badge, fixed headline, supporting body, and the
+        // decorative feature chips. Grouped so the flexible spacer below pushes
+        // the action buttons to the bottom while the hero stays top-anchored.
+        Spacer(Modifier.height(24.dp))
         WhiteNoiseLogoLockup()
+        Spacer(Modifier.height(28.dp))
+        Text(
+            stringResource(R.string.onboarding_headline),
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            stringResource(R.string.onboarding_body),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(20.dp))
+        OnboardingFeatureChips()
+
+        Spacer(Modifier.weight(1f))
+
         Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             Button(
                 onClick = onCreateIdentity,
                 enabled = !busy,
+                shape = RoundedCornerShape(28.dp),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
             ) {
@@ -1183,12 +1211,10 @@ fun OnboardingContent(
                                 .semantics { contentDescription = creatingIdentityDescription },
                         strokeWidth = 2.dp,
                     )
-                } else {
-                    Icon(Icons.Default.Key, contentDescription = null)
+                    Spacer(Modifier.width(10.dp))
                 }
-                Spacer(Modifier.width(10.dp))
                 Text(
-                    stringResource(if (creatingIdentity) R.string.creating_identity_title else R.string.create_new_identity),
+                    stringResource(if (creatingIdentity) R.string.creating_identity_title else R.string.onboarding_create_account),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -1196,57 +1222,90 @@ fun OnboardingContent(
             FilledTonalButton(
                 onClick = { signingIn = true },
                 enabled = !busy,
+                shape = RoundedCornerShape(28.dp),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
             ) {
-                Icon(Icons.Default.Person, contentDescription = null)
-                Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(R.string.onboarding_i_have_a_key),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }
 }
 
 /**
- * The White Noise brand lockup (mark + name + tagline) shown on the
- * onboarding landing. Extracted so future brand surfaces reuse the same
- * arrangement instead of re-deriving sizes and styles.
+ * The two decorative feature chips on the onboarding landing ("End-to-end",
+ * "No metadata"). Non-interactive — [AssistChip] requires an `onClick`, so we
+ * pass an empty handler and lean on the outlined (border) styling for a subtle
+ * pill; the icons carry content descriptions so the pair still reads to
+ * assistive tech.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun OnboardingFeatureChips() {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AssistChip(
+            onClick = {},
+            border = AssistChipDefaults.assistChipBorder(enabled = true),
+            label = { Text(stringResource(R.string.onboarding_chip_end_to_end)) },
+            leadingIcon = {
+                Icon(
+                    Icons.Outlined.Lock,
+                    contentDescription = stringResource(R.string.onboarding_chip_end_to_end_description),
+                    modifier = Modifier.size(AssistChipDefaults.IconSize),
+                )
+            },
+        )
+        AssistChip(
+            onClick = {},
+            border = AssistChipDefaults.assistChipBorder(enabled = true),
+            label = { Text(stringResource(R.string.onboarding_chip_no_metadata)) },
+            leadingIcon = {
+                Icon(
+                    Icons.Outlined.PublicOff,
+                    contentDescription = stringResource(R.string.onboarding_chip_no_metadata_description),
+                    modifier = Modifier.size(AssistChipDefaults.IconSize),
+                )
+            },
+        )
+    }
+}
+
+/**
+ * The White Noise brand badge shown on the onboarding landing: the WN "M" mark
+ * seated in a filled squircle. The squircle deliberately echoes the shipped
+ * launcher icon (#1001) so install→first-launch reads as one continuous brand
+ * surface rather than two unrelated marks.
+ *
+ * The fill and mark tint are fixed brand tokens (see Color.kt), NOT scheme
+ * roles: the launcher icon they mirror is a single fixed asset, so the badge
+ * must render identically regardless of the active color scheme or a
+ * dynamic-color opt-in. Light vs. dark is picked off the background luminance
+ * (matching how the rest of this file derives light/dark) rather than
+ * `isSystemInDarkTheme()`, so a forced-theme preview/test resolves correctly.
+ */
 @Composable
 internal fun WhiteNoiseLogoLockup(modifier: Modifier = Modifier) {
-    // Seat the WN mark in an expressive M3 container shape so the hero reads as a
-    // deliberate brand badge rather than a bare tinted glyph. Cookie9Sided is a
-    // soft, many-lobed scallop that stays legible at this size and doesn't fight
-    // the mark's own geometry the way a spikier Burst/Sunny would. A neutral
-    // surfaceContainerHighest fill keeps it subtle so the crisp primary-tinted
-    // mark still leads; the mark sits inside safe padding, centered in the badge.
-    val heroShape = MaterialShapes.Cookie9Sided.toShape()
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val badgeColor = if (isLight) OnboardingBadgeBlueLight else OnboardingBadgeBlueDark
+    val markColor = if (isLight) OnboardingBadgeMarkLight else OnboardingBadgeMarkDark
+    Box(
+        modifier =
+            modifier
+                .size(104.dp)
+                .background(color = badgeColor, shape = RoundedCornerShape(28.dp)),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(120.dp)
-                    .background(color = MaterialTheme.colorScheme.surfaceContainerHighest, shape = heroShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_wn_mark),
-                contentDescription = stringResource(R.string.white_noise_logo),
-                modifier = Modifier.size(72.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
-        Text(
-            stringResource(R.string.onboarding_tagline),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+        Icon(
+            painter = painterResource(R.drawable.ic_wn_mark),
+            contentDescription = stringResource(R.string.white_noise_logo),
+            modifier = Modifier.size(56.dp),
+            tint = markColor,
         )
     }
 }

@@ -4,7 +4,14 @@
     <string name="white_noise_couldnt_start">White Noise 无法启动</string>
     <string name="refresh">刷新转储</string>
     <string name="retry">重试</string>
-    <string name="onboarding_tagline">端到端加密群组消息。</string>
+    <string name="onboarding_headline">无法审查。</string>
+    <string name="onboarding_body">基于 Nostr 和 MLS 的私密消息。无需电话号码，无可查封的服务器。</string>
+    <string name="onboarding_chip_end_to_end">端到端</string>
+    <string name="onboarding_chip_end_to_end_description">端到端加密</string>
+    <string name="onboarding_chip_no_metadata">无元数据</string>
+    <string name="onboarding_chip_no_metadata_description">不收集元数据</string>
+    <string name="onboarding_create_account">创建账户</string>
+    <string name="onboarding_i_have_a_key">我有密钥</string>
     <string name="creating_identity">创造身份</string>
     <string name="creating_identity_title">正在创建身份</string>
     <string name="create_new_identity">创建新身份</string>

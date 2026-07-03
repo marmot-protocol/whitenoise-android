@@ -4,7 +4,14 @@
     <string name="white_noise_couldnt_start">White Noise başlatılamadı</string>
     <string name="refresh">Dökümü yenile</string>
     <string name="retry">Tekrar dene</string>
-    <string name="onboarding_tagline">Uçtan uca şifreli grup mesajlaşması.</string>
+    <string name="onboarding_headline">Sansürlenemez.</string>
+    <string name="onboarding_body">Nostr ve MLS üzerine kurulu özel mesajlaşma. Telefon numarası yok, ele geçirilecek sunucu yok.</string>
+    <string name="onboarding_chip_end_to_end">Uçtan uca</string>
+    <string name="onboarding_chip_end_to_end_description">Uçtan uca şifreli</string>
+    <string name="onboarding_chip_no_metadata">Meta veri yok</string>
+    <string name="onboarding_chip_no_metadata_description">Meta veri toplanmaz</string>
+    <string name="onboarding_create_account">Hesap oluştur</string>
+    <string name="onboarding_i_have_a_key">Anahtarım var</string>
     <string name="creating_identity">Kimlik oluşturma</string>
     <string name="creating_identity_title">Kimlik Oluşturuluyor</string>
     <string name="create_new_identity">Yeni Kimlik Oluştur</string>

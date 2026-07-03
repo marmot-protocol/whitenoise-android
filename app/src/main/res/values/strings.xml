@@ -4,7 +4,14 @@
     <string name="white_noise_couldnt_start">White Noise couldn\'t start</string>
     <string name="refresh">Refresh</string>
     <string name="retry">Retry</string>
-    <string name="onboarding_tagline">End-to-end encrypted group messaging.</string>
+    <string name="onboarding_headline">Uncensorable.</string>
+    <string name="onboarding_body">Private messaging built on Nostr and MLS. No phone numbers, no servers to seize.</string>
+    <string name="onboarding_chip_end_to_end">End-to-end</string>
+    <string name="onboarding_chip_end_to_end_description">End-to-end encrypted</string>
+    <string name="onboarding_chip_no_metadata">No metadata</string>
+    <string name="onboarding_chip_no_metadata_description">No metadata collected</string>
+    <string name="onboarding_create_account">Create account</string>
+    <string name="onboarding_i_have_a_key">I have a key</string>
     <string name="creating_identity">Creating identity</string>
     <string name="creating_identity_title">Creating Identity</string>
     <string name="create_new_identity">Create New Identity</string>

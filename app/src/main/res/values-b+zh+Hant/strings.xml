@@ -4,7 +4,14 @@
     <string name="white_noise_couldnt_start">White Noise 無法啟動</string>
     <string name="refresh">重新整理傾印</string>
     <string name="retry">重試</string>
-    <string name="onboarding_tagline">端對端加密群組訊息。</string>
+    <string name="onboarding_headline">無法審查。</string>
+    <string name="onboarding_body">基於 Nostr 和 MLS 的私密訊息。無需電話號碼，無可查封的伺服器。</string>
+    <string name="onboarding_chip_end_to_end">端對端</string>
+    <string name="onboarding_chip_end_to_end_description">端對端加密</string>
+    <string name="onboarding_chip_no_metadata">無中繼資料</string>
+    <string name="onboarding_chip_no_metadata_description">不收集中繼資料</string>
+    <string name="onboarding_create_account">建立帳戶</string>
+    <string name="onboarding_i_have_a_key">我有金鑰</string>
     <string name="creating_identity">創造身份</string>
     <string name="creating_identity_title">正在建立身分</string>
     <string name="create_new_identity">建立新身分</string>

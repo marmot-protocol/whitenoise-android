@@ -4,7 +4,14 @@
     <string name="white_noise_couldnt_start">Não foi possível iniciar o White Noise</string>
     <string name="refresh">Atualizar dump</string>
     <string name="retry">Tentar novamente</string>
-    <string name="onboarding_tagline">Mensagens de grupo criptografadas de ponta a ponta.</string>
+    <string name="onboarding_headline">Incensurável.</string>
+    <string name="onboarding_body">Mensagens privadas baseadas em Nostr e MLS. Sem números de telefone, sem servidores para apreender.</string>
+    <string name="onboarding_chip_end_to_end">Ponta a ponta</string>
+    <string name="onboarding_chip_end_to_end_description">Criptografado de ponta a ponta</string>
+    <string name="onboarding_chip_no_metadata">Sem metadados</string>
+    <string name="onboarding_chip_no_metadata_description">Nenhum metadado coletado</string>
+    <string name="onboarding_create_account">Criar conta</string>
+    <string name="onboarding_i_have_a_key">Tenho uma chave</string>
     <string name="creating_identity">Criando identidade</string>
     <string name="creating_identity_title">Criando identidade</string>
     <string name="create_new_identity">Criar nova identidade</string>

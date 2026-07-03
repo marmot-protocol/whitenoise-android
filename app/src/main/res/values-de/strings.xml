@@ -4,7 +4,14 @@
     <string name="white_noise_couldnt_start">White Noise konnte nicht gestartet werden</string>
     <string name="refresh">Dump aktualisieren</string>
     <string name="retry">Erneut versuchen</string>
-    <string name="onboarding_tagline">Ende-zu-Ende verschlüsselte Gruppennachrichten.</string>
+    <string name="onboarding_headline">Unzensierbar.</string>
+    <string name="onboarding_body">Private Nachrichten auf Basis von Nostr und MLS. Keine Telefonnummern, keine Server zum Beschlagnahmen.</string>
+    <string name="onboarding_chip_end_to_end">Ende-zu-Ende</string>
+    <string name="onboarding_chip_end_to_end_description">Ende-zu-Ende-verschlüsselt</string>
+    <string name="onboarding_chip_no_metadata">Keine Metadaten</string>
+    <string name="onboarding_chip_no_metadata_description">Keine Metadaten erfasst</string>
+    <string name="onboarding_create_account">Konto erstellen</string>
+    <string name="onboarding_i_have_a_key">Ich habe einen Schlüssel</string>
     <string name="creating_identity">Identität schaffen</string>
     <string name="creating_identity_title">Identität wird erstellt</string>
     <string name="create_new_identity">Neue Identität erstellen</string>
