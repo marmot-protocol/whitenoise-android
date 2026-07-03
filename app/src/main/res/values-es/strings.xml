@@ -40,12 +40,7 @@
     <string name="recipient_preview_unresolved">No se pudo resolver este identificador</string>
     <string name="recipient_preview_nip05_verified">Dirección verificada</string>
     <string name="recipient_preview_nip05_unverified">Dirección no verificada</string>
-    <string name="recipient_source_in_dm">en MD</string>
     <string name="recipient_search_empty_hint">Pega un npub para añadir a alguien con quien aún no has chateado.</string>
-    <plurals name="recipient_source_in_groups">
-        <item quantity="one">en %1$d grupo</item>
-        <item quantity="other">en %1$d grupos</item>
-    </plurals>
     <string name="chat_row_action_archive">Archivar</string>
     <string name="chat_row_action_unarchive">Desarchivar</string>
     <string name="chat_row_action_mark_read">Marcar como leído</string>
@@ -853,4 +848,26 @@
     <string name="disappearing_unit_seconds">Segundos</string>
     <string name="disappearing_set">Establecer</string>
 
+    <string name="contacts">Contactos</string>
+    <string name="next">Siguiente</string>
+    <string name="no_matches">Sin coincidencias</string>
+    <string name="new_message">Nuevo mensaje</string>
+    <string name="search_people_hint">Nombre o npub</string>
+    <string name="paste_npub">Pegar npub</string>
+    <string name="start_chat">Iniciar chat</string>
+    <string name="name_this_group">Nombra este grupo</string>
+    <string name="coming_soon">Próximamente</string>
+    <string name="quick_action_audio">Audio</string>
+    <string name="quick_action_video">Vídeo</string>
+    <string name="quick_action_add">Añadir</string>
+    <string name="quick_action_search">Buscar</string>
+    <string name="group_details_subtitle">Grupo · %1$d miembros</string>
+    <string name="add_group_description">Añadir descripción del grupo</string>
+    <string name="see_all_members">Ver los %1$d miembros</string>
+    <string name="encryption">Cifrado</string>
+    <string name="encryption_e2ee_note">Los mensajes están cifrados de extremo a extremo</string>
+    <string name="chat_lock">Bloqueo del chat</string>
+    <string name="toast_disappearing_not_applied">El grupo se creó, pero no se pudieron activar los mensajes temporales</string>
+    <string name="search_members">Buscar miembros</string>
+    <string name="recent_chats">Chats recientes</string>
 </resources>

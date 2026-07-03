@@ -123,6 +123,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -136,6 +137,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
@@ -150,6 +152,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
@@ -162,13 +165,13 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Unarchive
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -180,8 +183,6 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonMenu
-import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -195,7 +196,6 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
@@ -221,8 +221,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.ToggleFloatingActionButton
-import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
@@ -273,14 +271,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -360,7 +356,6 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
-import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
 import dev.ipf.marmotkit.RelayHealthFfi
@@ -459,6 +454,7 @@ import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledModalSheetSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -519,13 +515,6 @@ private data class DiagnosticLogEntry(
 private data class LanguageOption(
     val tag: String,
     @param:StringRes val labelRes: Int,
-)
-
-private data class NewChatInitialMember(
-    val ref: String,
-    val title: String,
-    val seed: String,
-    val pictureUrl: String?,
 )
 
 private val languageOptions =
@@ -1265,7 +1254,7 @@ private fun SignInContent(
 }
 
 @Composable
-private fun PublicIdentifierFieldTrailingAction(
+internal fun PublicIdentifierFieldTrailingAction(
     value: String,
     enabled: Boolean = true,
     allowHexPublicKey: Boolean = true,
@@ -1901,11 +1890,7 @@ private fun ChatsScreen(
     onOpenGroup: (ChatListItem, String?, Boolean) -> Unit,
 ) {
     val groupTitleCopy = rememberGroupTitleCopy()
-    var showNewChat by remember { mutableStateOf(false) }
-    var newChatTitle by remember { mutableStateOf(R.string.new_chat) }
-    var newChatDirect by remember { mutableStateOf(false) }
-    var showScanner by remember { mutableStateOf(false) }
-    var quickActionsExpanded by remember { mutableStateOf(false) }
+    var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<ChatListItem?>(null) }
     // Search expand/collapse + live query. The search input is anchored in
     // the top bar; tapping the magnifier swaps the chrome (account avatar
@@ -1945,9 +1930,6 @@ private fun ChatsScreen(
         onDispose { snackbarBottomInset.value = 0.dp }
     }
 
-    LaunchedEffect(showArchived) {
-        if (showArchived) quickActionsExpanded = false
-    }
     LaunchedEffect(searchOpen) {
         if (searchOpen) {
             // LaunchedEffect runs after composition + layout, so the
@@ -2133,6 +2115,18 @@ private fun ChatsScreen(
         if (filter == ChatListFilter.Archived && controller.archivedItems.isEmpty()) filter = ChatListFilter.All
     }
 
+    if (showNewChatFlow) {
+        NewChatFlowHost(
+            appState = appState,
+            onOpenConversation = { item, justCreated ->
+                showNewChatFlow = false
+                onOpenGroup(item, null, justCreated)
+            },
+            onClose = { showNewChatFlow = false },
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             ChatListTopBar(
@@ -2168,21 +2162,9 @@ private fun ChatsScreen(
         },
         floatingActionButton = {
             if (!searchOpen) {
-                QuickActionFabMenu(
-                    expanded = quickActionsExpanded,
-                    onExpandedChange = { quickActionsExpanded = it },
-                    onScanQr = { showScanner = true },
-                    onNewChat = {
-                        newChatTitle = R.string.new_chat
-                        newChatDirect = true
-                        showNewChat = true
-                    },
-                    onCreateGroup = {
-                        newChatTitle = R.string.new_group
-                        newChatDirect = false
-                        showNewChat = true
-                    },
-                )
+                FloatingActionButton(onClick = { showNewChatFlow = true }) {
+                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.new_message))
+                }
             }
         },
     ) { padding ->
@@ -2237,11 +2219,7 @@ private fun ChatsScreen(
                             )
                         }
                     sourceList.isEmpty() ->
-                        EmptyChats(onCreate = {
-                            newChatTitle = R.string.new_chat
-                            newChatDirect = true
-                            showNewChat = true
-                        })
+                        EmptyChats(onCreate = { showNewChatFlow = true })
                     visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None -> Unit
                     visibleItems.isEmpty() ->
                         ChatListNoResults(
@@ -2339,59 +2317,10 @@ private fun ChatsScreen(
                         )
                     }
                 }
-                // Tap-absorbing backdrop while the quick-action FAB menu is open:
-                // without it a tap outside the menu falls through to the chat row
-                // beneath and opens the wrong chat (#452). Transparent (no dim) —
-                // it only consumes the gesture and collapses the menu. The menu
-                // sits in the Scaffold FAB slot above this Box, so its items stay
-                // tappable; this also blocks the jump-to-top FAB while open.
-                if (quickActionsExpanded) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                // Consume the press in the Initial pass so the
-                                // chat row's clickable (Main pass) never sees an
-                                // unconsumed down — a Main-pass detectTapGestures
-                                // here loses the arbitration to the row and the
-                                // tap falls through. Collapsing on down also makes
-                                // the dismissal feel immediate.
-                                awaitEachGesture {
-                                    awaitFirstDown(pass = PointerEventPass.Initial).consume()
-                                    quickActionsExpanded = false
-                                }
-                            },
-                    )
-                }
             }
         }
     }
 
-    if (showNewChat) {
-        NewChatSheet(
-            appState = appState,
-            titleRes = newChatTitle,
-            directMessage = newChatDirect,
-            existingDirectChat = { pubkey -> appState.existingDirectChat(pubkey) },
-            onOpenConversation = { chat, justCreated -> onOpenGroup(chat, null, justCreated) },
-            onDismiss = { showNewChat = false },
-        )
-    }
-
-    if (showScanner) {
-        QrScannerSheet(
-            onDismiss = { showScanner = false },
-            onScan = { raw ->
-                showScanner = false
-                val scanned = ProfileLink.parse(raw)
-                if (scanned == null) {
-                    appState.present(R.string.error_not_white_noise_profile_qr, copyable = true)
-                } else {
-                    appState.presentProfile(scanned.npub)
-                }
-            },
-        )
-    }
     pendingDelete?.let { item ->
         val alreadyLeft = item.removedFromGroup(appState.activeAccount?.accountIdHex)
         ConfirmDialog(
@@ -2540,42 +2469,18 @@ private fun ChatListIdentifierResult(
 }
 
 /**
- * Profile-preview card shown below the recipient input in NewChatSheet (DM
- * branch) and the Add-member sheet (issue #631). After the user pastes/enters
- * an `npub1…`, a hex pubkey, or a NIP-05 `name@domain`, this resolves the
- * identifier and renders one of four states (resolving / loaded / resolved-but-
- * no-profile / invalid) so the user can confirm "this is the right person"
- * before inviting them. Empty input renders nothing.
- *
- * Resolution reuses the existing ProfileSheet + chat-list-search pattern:
- * [ChatListIdentifierSearch.classify] sorts npub vs NIP-05, an npub/hex
- * resolves synchronously through `appState.accountIdHex`, and a NIP-05 goes
- * through [Nip05Resolver] (debounced, so a half-typed address doesn't fire a
- * lookup on every keystroke). The kind:0 fields are read back through the same
- * `appState` accessors the profile sheet uses, so a name that lands a beat
- * after the key resolves repaints via the profile-revision recomposition.
- *
- * The resolved display state is hoisted to the parent via [onResolutionChanged]
- * so the surface can keep its action button disabled while the card is
- * invalid/resolving (but enabled for the loaded AND no-profile states).
- *
- * No contact/follow status is shown: the UniFFI surface exposes no kind:3
- * contacts API, and the issue says to omit it gracefully rather than block the
- * card on it.
+ * Resolve an identifier input (npub / profile link / NIP-05 / bare hex) to a
+ * pubkey, reporting the same [RecipientResolution] contract the old preview
+ * card exposed (issue #631). Plain-text names and empty input stay Empty so
+ * the local name search renders instead; callers present the resolved person
+ * as an ordinary contact row.
  */
 @Composable
-private fun RecipientPreviewCard(
+internal fun rememberRecipientResolution(
     input: String,
     appState: WhiteNoiseAppState,
-    onResolutionChanged: (RecipientResolution) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+): RecipientResolution {
     val trimmed = input.trim()
-    // Re-key on the trimmed input so each edit cancels the prior in-flight
-    // resolve (npub validation, NIP-05 lookup) and starts fresh. A plain-text
-    // name isn't an identifier to resolve — it drives the local name search —
-    // so it must never enter the Resolving state, or the card flashes a spinner
-    // on every keystroke and hides the name results.
     var resolving by remember(trimmed) { mutableStateOf(trimmed.isNotEmpty() && !isPlainNameQuery(trimmed)) }
     var resolvedHex by remember(trimmed) { mutableStateOf<String?>(null) }
 
@@ -2589,19 +2494,14 @@ private fun RecipientPreviewCard(
         resolvedHex = null
         val hex =
             when (val id = ChatListIdentifierSearch.classify(trimmed)) {
-                // An npub / nostr: / White Noise link carries the key; accountIdHex
-                // validates the bech32 (rejecting a bad checksum) and yields hex.
                 is ChatListIdentifierSearch.Identifier.Npub -> appState.accountIdHex(id.npub)
-                // A NIP-05 address needs a network /.well-known lookup. Debounce
-                // so a mid-typed domain doesn't fire a request every keystroke;
-                // the effect re-keys and cancels the prior attempt as typing
-                // continues.
                 is ChatListIdentifierSearch.Identifier.Nip05 -> {
+                    // Debounce so a mid-typed domain doesn't fire a lookup on
+                    // every keystroke; the effect re-keys and cancels the prior
+                    // attempt as typing continues.
                     delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
                     Nip05Resolver.resolve(id.identifier)
                 }
-                // Not an npub/NIP-05: still try a bare hex pubkey — accountIdHex
-                // accepts it and ProfileSheet relies on the same call.
                 null -> appState.accountIdHex(trimmed)
             }
         resolvedHex = hex
@@ -2609,38 +2509,10 @@ private fun RecipientPreviewCard(
         resolving = false
     }
 
-    // Read the kind:0 fields through the same accessors ProfileSheet uses, so a
-    // name/avatar that resolves a beat after the key repaints via the profile
-    // cache's revision recomposition.
     val profile = resolvedHex?.let { appState.userProfile(it) }
-    val npub = resolvedHex?.let { appState.npub(it) }
-    val resolvedDisplayName = resolvedHex?.let { appState.displayName(it) }
-    val pictureUrl =
-        resolvedHex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
+    val pictureUrl = resolvedHex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
     val about = ProfileSanitizer.about(profile?.about)
-    val nip05 =
-        profile
-            ?.nip05
-            ?.trim()
-            ?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
-    // A kind:0 nip05 is a self-assertion until proven: re-resolve it via the
-    // same /.well-known lookup and only trust it if it maps back to the pubkey
-    // the card resolved. Showing a check on an unverified address would weaken
-    // the very wrong-key / NIP-05-hijack signal this card exists to surface
-    // (#631). Re-keys on (nip05, resolvedHex) so an edit cancels the prior probe.
-    var nip05ResolvedHex by remember(nip05, resolvedHex) { mutableStateOf<String?>(null) }
-    LaunchedEffect(nip05, resolvedHex) {
-        nip05ResolvedHex = null
-        val declared = nip05
-        if (declared == null || resolvedHex == null) return@LaunchedEffect
-        nip05ResolvedHex = Nip05Resolver.resolve(declared)
-    }
-    val nip05Verified = recipientNip05Verified(nip05, nip05ResolvedHex, resolvedHex)
-    val shortNpub = npub?.let { IdentityFormatter.short(it, prefix = 12, suffix = 8) }
-    // A published profile is one carrying at least one usable kind:0 field. We
-    // read the raw metadata (not the displayName accessor, which falls back to
-    // a short-npub string when no name is published) so a key with no metadata
-    // lands on the NoProfile fallback rather than masquerading as Loaded.
+    val nip05 = profile?.nip05?.trim()?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
     val hasProfile =
         profile != null &&
             (
@@ -2649,153 +2521,17 @@ private fun RecipientPreviewCard(
                     pictureUrl != null ||
                     nip05 != null
             )
-
-    val state = recipientPreviewState(trimmed.isNotEmpty(), resolving, resolvedHex, hasProfile)
-    LaunchedEffect(state, resolvedHex) {
-        onResolutionChanged(RecipientResolution(state, resolvedHex))
-    }
-
-    when (state) {
-        RecipientPreviewState.Empty -> Unit
-        RecipientPreviewState.Resolving ->
-            OutlinedCard(modifier = modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Text(
-                        stringResource(R.string.recipient_preview_resolving),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        // A plain display-name query isn't a malformed identifier — it
-        // drives the local name search ([RecipientSearchResults]) instead, so
-        // suppress the "couldn't resolve" card here rather than painting an
-        // error above the valid name-search rows. The reported state stays
-        // Invalid (submit remains disabled until a result row is tapped, which
-        // fills an npub and flips this back to the identifier path).
-        RecipientPreviewState.Invalid ->
-            if (!isPlainNameQuery(trimmed)) {
-                OutlinedCard(modifier = modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.ErrorOutline,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Text(
-                            stringResource(R.string.recipient_preview_unresolved),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            }
-        RecipientPreviewState.Loaded, RecipientPreviewState.NoProfile -> {
-            val title = resolvedDisplayName?.takeUnless { it.isBlank() } ?: IdentityFormatter.short(npub.orEmpty())
-            OutlinedCard(modifier = modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Avatar(
-                        title = title,
-                        seed = resolvedHex ?: trimmed,
-                        size = 56.dp,
-                        pictureUrl = pictureUrl,
-                    )
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text(
-                            title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (nip05 != null) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                // Only a NIP-05 that resolves back to THIS pubkey
-                                // earns a verified check; a self-asserted kind:0
-                                // nip05 that hasn't been verified shows no check
-                                // (and an "unverified" a11y label), so the card
-                                // never paints a false trust signal at the
-                                // wrong-key / hijack checkpoint (#631).
-                                if (nip05Verified) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription =
-                                            stringResource(R.string.recipient_preview_nip05_verified),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.Default.ErrorOutline,
-                                        contentDescription =
-                                            stringResource(R.string.recipient_preview_nip05_unverified),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                }
-                                Text(
-                                    nip05,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                        shortNpub?.let {
-                            Text(
-                                it,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        if (state == RecipientPreviewState.NoProfile) {
-                            Text(
-                                stringResource(R.string.recipient_preview_no_profile),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else if (about != null) {
-                            Text(
-                                about,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
+    return RecipientResolution(
+        recipientPreviewState(trimmed.isNotEmpty(), resolving, resolvedHex, hasProfile),
+        resolvedHex,
+    )
 }
 
 /**
  * True when [query] is plain text (name search) rather than an identifier
  * (npub / profile link / NIP-05 / bare hex) that routes to the preview card.
  */
-private fun isPlainNameQuery(query: String): Boolean {
+internal fun isPlainNameQuery(query: String): Boolean {
     val trimmed = query.trim()
     if (trimmed.isEmpty()) return false
     if (ChatListIdentifierSearch.classify(trimmed) != null) return false
@@ -2815,7 +2551,7 @@ private fun isPlainNameQuery(query: String): Boolean {
  * person shares a 1:1 with the active account, otherwise "in N groups" — with
  * the DM signal winning over the group count.
  */
-private fun deriveRecipientCandidates(
+internal fun deriveRecipientCandidates(
     appState: WhiteNoiseAppState,
     activeAccountIdHex: String?,
 ): List<RecipientSearch.Candidate> {
@@ -2868,152 +2604,6 @@ private fun deriveRecipientCandidates(
         )
     }
 }
-
-/**
- * Browsable contact list shown below the recipient input in [NewChatSheet]
- * (DM branch) and the Add-member sheet. Renders up-front with a blank [query]
- * (#831) — existing chats / recent senders sorted by recency — and filters in
- * place by display name as the user types. Identifier inputs (npub / NIP-05 /
- * hex) route to [RecipientPreviewCard] instead, so the list is suppressed for
- * those. Each row shows the avatar + display name + a dim "in DM" / "in N
- * groups" hint + truncated npub.
- *
- * [excludeAccountIdHexes] drops accounts that shouldn't be offered (e.g. the
- * current group's existing members). With a blank query and nothing to show,
- * an empty-state hint nudges the user to paste an npub.
- *
- * Tapping a row invokes [onSelect] with the candidate (the same effect as
- * pasting the npub: the host sets the input/resolved hex so the existing submit
- * path uses it).
- */
-@Composable
-private fun RecipientSearchResults(
-    query: String,
-    appState: WhiteNoiseAppState,
-    onSelect: (RecipientSearch.Candidate) -> Unit,
-    modifier: Modifier = Modifier,
-    excludeAccountIdHexes: Set<String> = emptySet(),
-) {
-    // An identifier query is handled by the preview card, not this list. A blank
-    // or plain-name query drives the browsable/filtered list.
-    if (query.isNotBlank() && !isPlainNameQuery(query)) return
-    val activeAccountIdHex = appState.activeAccount?.accountIdHex
-    // Derive candidates from in-memory chat-list state and match by name. The
-    // accessors used inside deriveRecipientCandidates (displayName/npub) read
-    // through the profile cache, so a name that resolves a beat after the
-    // roster lands repaints the list via the profile-revision recomposition.
-    val candidates =
-        remember(appState.chatListItems, activeAccountIdHex, appState.profileRevisionForCompose) {
-            deriveRecipientCandidates(appState, activeAccountIdHex)
-        }
-    val matches =
-        RecipientSearch.browse(
-            query = query,
-            candidates = candidates,
-            activeAccountIdHex = activeAccountIdHex,
-            excludeAccountIdHexes = excludeAccountIdHexes,
-        )
-    if (matches.isEmpty()) {
-        // Only nudge with the empty-state hint before the user starts typing;
-        // a no-match while filtering shouldn't paint "you have no contacts".
-        if (query.isBlank()) {
-            Text(
-                stringResource(R.string.recipient_search_empty_hint),
-                modifier = modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        return
-    }
-    LazyColumn(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .heightIn(max = 320.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(matches, key = { it.accountIdHex }) { candidate ->
-            RecipientSearchResultRow(
-                candidate = candidate,
-                appState = appState,
-                onSelect = { onSelect(candidate) },
-            )
-        }
-    }
-}
-
-/** One row of the [RecipientSearchResults] list: avatar, display name, hint, npub. */
-@Composable
-private fun RecipientSearchResultRow(
-    candidate: RecipientSearch.Candidate,
-    appState: WhiteNoiseAppState,
-    onSelect: () -> Unit,
-) {
-    val hex = candidate.accountIdHex
-    val pictureUrl = appState.avatarUrl(hex) ?: ProfileSanitizer.imageUrl(appState.userProfile(hex)?.picture)
-    val shortNpub = IdentityFormatter.short(candidate.npub, prefix = 12, suffix = 8)
-    val title = candidate.displayName.takeUnless { it.isBlank() } ?: IdentityFormatter.short(candidate.npub)
-    val hint = recipientSourceHint(candidate.source)
-    OutlinedCard(
-        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onSelect() },
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Avatar(title = title, seed = hex, size = 48.dp, pictureUrl = pictureUrl)
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    if (hint != null) {
-                        Text(
-                            hint,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                    }
-                }
-                Text(
-                    shortNpub,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-/** The dim "in DM" / "in N groups" hint for a candidate's [source], or null. */
-@Composable
-private fun recipientSourceHint(source: RecipientSearch.Source?): String? =
-    when (source) {
-        RecipientSearch.Source.InDm -> stringResource(R.string.recipient_source_in_dm)
-        is RecipientSearch.Source.InGroups ->
-            if (source.count > 0) {
-                pluralStringResource(R.plurals.recipient_source_in_groups, source.count, source.count)
-            } else {
-                null
-            }
-        null -> null
-    }
 
 private fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,
@@ -3536,66 +3126,6 @@ private fun ChatRowWithMenu(
                 },
             )
         }
-    }
-}
-
-@Composable
-fun QuickActionFabMenu(
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    onScanQr: () -> Unit,
-    onNewChat: () -> Unit,
-    onCreateGroup: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    fun runAction(action: () -> Unit) {
-        onExpandedChange(false)
-        action()
-    }
-
-    BackHandler(enabled = expanded) {
-        onExpandedChange(false)
-    }
-
-    FloatingActionButtonMenu(
-        expanded = expanded,
-        modifier = modifier,
-        button = {
-            ToggleFloatingActionButton(
-                checked = expanded,
-                onCheckedChange = { onExpandedChange(it) },
-            ) {
-                val imageVector by remember {
-                    derivedStateOf {
-                        if (checkedProgress > 0.5f) Icons.Default.Close else Icons.Default.Add
-                    }
-                }
-                Icon(
-                    painter = rememberVectorPainter(imageVector),
-                    contentDescription =
-                        stringResource(
-                            if (expanded) R.string.close_quick_actions else R.string.open_quick_actions,
-                        ),
-                    modifier = Modifier.animateIcon({ checkedProgress }),
-                )
-            }
-        },
-    ) {
-        FloatingActionButtonMenuItem(
-            onClick = { runAction(onNewChat) },
-            icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(20.dp)) },
-            text = { Text(stringResource(R.string.new_chat), style = MaterialTheme.typography.labelLarge) },
-        )
-        FloatingActionButtonMenuItem(
-            onClick = { runAction(onCreateGroup) },
-            icon = { Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(20.dp)) },
-            text = { Text(stringResource(R.string.new_group), style = MaterialTheme.typography.labelLarge) },
-        )
-        FloatingActionButtonMenuItem(
-            onClick = { runAction(onScanQr) },
-            icon = { Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp)) },
-            text = { Text(stringResource(R.string.scan_qr_code), style = MaterialTheme.typography.labelLarge) },
-        )
     }
 }
 
@@ -4158,341 +3688,6 @@ internal fun shouldClearFocusOnResume(
     restoringComposerFocus: Boolean,
     searchOpen: Boolean,
 ): Boolean = !restoringComposerFocus && !searchOpen
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun NewChatSheet(
-    appState: WhiteNoiseAppState,
-    @StringRes titleRes: Int = R.string.new_chat,
-    directMessage: Boolean = false,
-    initialMembers: List<NewChatInitialMember> = emptyList(),
-    existingDirectChat: (String) -> ChatListItem? = { null },
-    // (chat, justCreated): justCreated is true when this open follows a
-    // brand-new group/DM create in the same step (issue #321) so the
-    // conversation lands with the composer focused + keyboard up. Reusing an
-    // existing 1:1 passes false.
-    onOpenConversation: (ChatListItem, Boolean) -> Unit = { _, _ -> },
-    onDismiss: () -> Unit,
-) {
-    var pending by remember { mutableStateOf("") }
-    var groupName by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var showScanner by remember { mutableStateOf(false) }
-    // Resolution state of the recipient preview card (#631), hoisted so the
-    // Create button can stay disabled while the pasted identifier is
-    // invalid/resolving (but enabled for the loaded AND no-profile states).
-    var recipientPreview by remember { mutableStateOf(RecipientResolution.Empty) }
-    val validRecipientReferenceError = stringResource(R.string.error_valid_recipient_reference)
-    val missingKeyPackageError = stringResource(R.string.error_missing_key_package)
-    val missingKeyPackageForFormat = stringResource(R.string.error_missing_key_package_for)
-    val invalidIdentityReferenceError = stringResource(R.string.error_invalid_identity_reference)
-    val groupPublishFailedFormat = stringResource(R.string.error_group_publish_failed)
-    val notWhiteNoiseProfileQrError = stringResource(R.string.error_not_white_noise_profile_qr)
-    val groupNameFocusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val groupInitialMembers =
-        remember(directMessage, initialMembers) {
-            if (directMessage) {
-                emptyList()
-            } else {
-                initialMembers
-                    .filter { it.ref.isNotBlank() }
-                    .distinctBy { it.ref.lowercase() }
-            }
-        }
-
-    // Focus the name field and raise the IME as the sheet settles, exactly once
-    // per open. The consumed flag is rememberSaveable so it survives Activity
-    // recreation: a plain `remember` resets on a config change (rotation), which
-    // would re-fire the focus + keyboard mid-session. Requesting focus then
-    // `show()` synchronously — without first waiting a frame — lets the keyboard
-    // rise while the panel is still settling, so the first composed frame already
-    // reserves the IME inset and the input arrives in its keyboard-adjusted
-    // position in one motion instead of jumping up after a rest-position layout
-    // (mirrors the conversation composer auto-focus).
-    var autoFocusConsumed by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(directMessage) {
-        if (!directMessage && !autoFocusConsumed) {
-            autoFocusConsumed = true
-            runCatching { groupNameFocusRequester.requestFocus() }
-            keyboardController?.show()
-        }
-    }
-
-    fun createGroupErrorMessage(throwable: Throwable): String =
-        when (throwable) {
-            is MarmotKitException.MissingKeyPackage ->
-                // Name the failing recipient so the user knows which invited
-                // member to ask, instead of a generic 'that account' (#322).
-                // chatMemberTitle returns the cached display name when one is
-                // known and falls back to a short npub otherwise — never the
-                // raw hex pubkey. Fall back to the generic copy if the engine
-                // ever reports a blank account ref (defensive: the FFI declares
-                // a non-null String, but the value can in principle be empty).
-                if (throwable.account.isNotBlank()) {
-                    String.format(missingKeyPackageForFormat, appState.chatMemberTitle(throwable.account))
-                } else {
-                    missingKeyPackageError
-                }
-            is MarmotKitException.InvalidIdentity ->
-                invalidIdentityReferenceError
-            is MarmotKitException.Publish ->
-                String.format(groupPublishFailedFormat, throwable.details)
-            else -> throwable.message ?: throwable.javaClass.simpleName
-        }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        modifier = amoledModalSheetModifier(),
-    ) {
-        Column(Modifier.fillMaxWidth()) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 24.dp, top = 24.dp, end = 24.dp)
-                    .padding(bottom = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
-                if (directMessage) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = pending,
-                            onValueChange = {
-                                pending = it
-                                error = null
-                            },
-                            label = { Text(stringResource(R.string.npub_or_hex_public_key)) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            trailingIcon = {
-                                PublicIdentifierFieldTrailingAction(
-                                    value = pending,
-                                    enabled = !busy,
-                                    onValueChange = {
-                                        pending = it
-                                        error = null
-                                    },
-                                )
-                            },
-                            keyboardOptions =
-                                KeyboardOptions(
-                                    capitalization = KeyboardCapitalization.None,
-                                    autoCorrectEnabled = false,
-                                    imeAction = ImeAction.Done,
-                                ),
-                        )
-                        FloatingActionButton(onClick = { showScanner = true }, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_recipient_qr_code))
-                        }
-                    }
-                    // Resolved profile preview so the user can confirm "this is the
-                    // right person" before starting the DM (#631).
-                    RecipientPreviewCard(
-                        input = pending,
-                        appState = appState,
-                        onResolutionChanged = { recipientPreview = it },
-                    )
-                    // Plain-text name search over local chat-list contacts.
-                    // Tapping a row fills the npub into the field so the existing
-                    // submit/resolve path uses it; "Open existing chat" reuses the
-                    // sheet's onOpenConversation handoff instead of starting a dupe.
-                    RecipientSearchResults(
-                        query = pending,
-                        appState = appState,
-                        onSelect = { candidate ->
-                            pending = candidate.npub
-                            error = null
-                        },
-                    )
-                } else {
-                    OutlinedTextField(
-                        value = groupName,
-                        onValueChange = { groupName = it },
-                        label = { Text(stringResource(R.string.group_name)) },
-                        modifier = Modifier.fillMaxWidth().focusRequester(groupNameFocusRequester),
-                        singleLine = true,
-                    )
-                    OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        label = { Text(stringResource(R.string.description)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                    )
-                    if (groupInitialMembers.isNotEmpty()) {
-                        // Initial members come from a profile-sheet action. They are
-                        // shown as fixed context here because removing them would turn
-                        // "Start new group with <user>" into the plain Create Group
-                        // flow, which already has its own entry point.
-                        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-                            Column(
-                                Modifier.fillMaxWidth().padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Text(
-                                    stringResource(R.string.new_group_invited_members),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                groupInitialMembers.forEach { member ->
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    ) {
-                                        Avatar(
-                                            title = member.title,
-                                            seed = member.seed,
-                                            size = 36.dp,
-                                            pictureUrl = member.pictureUrl,
-                                        )
-                                        Text(
-                                            member.title,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if (error != null) {
-                    // Inline create/validation errors are selectable so the exact
-                    // string can be long-pressed and copied into a bug report (#543).
-                    SelectionContainer {
-                        Text(
-                            error.orEmpty(),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            }
-            StickyFormActionBar {
-                Button(
-                    onClick = {
-                        val normalizedPending =
-                            if (directMessage) {
-                                // Prefer the key the preview card already resolved
-                                // (#631): it's the pubkey the user just visually
-                                // confirmed, and is the ONLY thing that carries a
-                                // resolved NIP-05 — RecipientReference.normalize
-                                // can't parse name@domain. Fall back to tokenize +
-                                // normalize for the npub/hex direct-entry path.
-                                val resolved = recipientPreview.resolvedHex
-                                if (resolved != null) {
-                                    listOf(resolved)
-                                } else {
-                                    RecipientReference.tokenize(pending).map { input ->
-                                        RecipientReference.normalize(input) ?: run {
-                                            error = validRecipientReferenceError
-                                            return@Button
-                                        }
-                                    }
-                                }
-                            } else {
-                                emptyList()
-                            }
-                        val recipients =
-                            newChatMemberRefs(
-                                directMessage,
-                                normalizedPending,
-                                initialMemberRefs = groupInitialMembers.map { it.ref },
-                            )
-                        val account = appState.activeAccountRef ?: return@Button
-                        // Reuse an existing 1:1 instead of creating a duplicate.
-                        if (directMessage) {
-                            val target = recipients.firstOrNull() ?: return@Button
-                            existingDirectChat(target)?.let { existing ->
-                                onOpenConversation(existing, false)
-                                onDismiss()
-                                return@Button
-                            }
-                        }
-                        busy = true
-                        error = null
-                        // Process-lifetime scope so MLS commit + Nostr publish complete
-                        // even if the sheet dismisses mid-flight.
-                        appState.launchMutation {
-                            runCatching {
-                                appState.marmotIo {
-                                    createGroup(
-                                        account,
-                                        groupName.trim(),
-                                        recipients,
-                                        description.trim().ifBlank { null },
-                                    )
-                                }
-                            }.onSuccess { groupIdHex ->
-                                pending = ""
-                                appState.present(R.string.toast_chat_created)
-                                // #321/#385: navigate straight into the new
-                                // conversation instead of leaving the user on the
-                                // chat list. Direct chats keep the composer-ready
-                                // handoff; groups land unfocused so the empty-state
-                                // Add Members CTA is the next obvious action.
-                                // Dismiss the sheet first so the conversation isn't
-                                // opened behind the modal, then wait for the
-                                // chat-list projection to surface
-                                // the freshly-created group (it lands a beat after
-                                // createGroup returns). If it doesn't materialize in
-                                // time, fall back to just dismissing — the sort fix
-                                // already floats the new chat to the top of the list.
-                                onDismiss()
-                                appState.awaitChatListItem(groupIdHex)?.let { item ->
-                                    onOpenConversation(item, directMessage)
-                                }
-                            }.onFailure {
-                                error = createGroupErrorMessage(it)
-                            }
-                            busy = false
-                        }
-                    },
-                    // Gate on the preview resolution too (#631): never let the
-                    // create fire on an unresolved/invalid identifier. The card
-                    // stays Empty in group mode (no recipient field), where
-                    // recipientPreviewAllowsSubmit is true, so group create is
-                    // unaffected.
-                    enabled =
-                        canSubmitNewChatSheet(directMessage, busy, pending, groupName) &&
-                            recipientPreviewAllowsSubmit(recipientPreview.state),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (busy) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Text(stringResource(R.string.create))
-                }
-            }
-        }
-    }
-
-    if (showScanner) {
-        QrScannerSheet(
-            onDismiss = { showScanner = false },
-            onScan = { raw ->
-                showScanner = false
-                val scanned = ProfileLink.parse(raw)
-                if (scanned == null) {
-                    error = notWhiteNoiseProfileQrError
-                } else {
-                    error = null
-                    // A new direct chat keeps the scanned recipient in the field.
-                    if (directMessage) pending = scanned.npub
-                }
-            },
-        )
-    }
-}
 
 /** Within this many items of the trailing edge counts as "at bottom". */
 private const val ConversationNearBottomItemSlack = 3
@@ -10043,6 +9238,10 @@ private fun ConversationScreen(
             autoOpenTransferAdmin = openTransferOnDetails,
             autoOpenAddMember = openAddMemberOnDetails,
             onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
+            onOpenSearch = {
+                showDetails = false
+                searchOpen = true
+            },
         )
         return
     }
@@ -11223,6 +10422,9 @@ private fun GroupEditScreen(
     }
 }
 
+// Members shown in Group Details before the "See all" expander.
+private const val GROUP_MEMBERS_PREVIEW_COUNT = 6
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GroupDetailsScreen(
@@ -11241,18 +10443,16 @@ private fun GroupDetailsScreen(
     // details screen is mounted so the initial invite path reuses later-add UI.
     autoOpenAddMember: Boolean = false,
     onAutoOpenAddMemberConsumed: () -> Unit = {},
+    // Close details and raise the conversation's message search.
+    onOpenSearch: (() -> Unit)? = null,
 ) {
-    var pendingMember by remember { mutableStateOf("") }
     var pendingMemberAsAdmin by remember { mutableStateOf(false) }
-    var pendingMemberError by remember { mutableStateOf<String?>(null) }
-    // Resolution state of the add-member preview card (#631), hoisted so the
-    // Add button stays disabled while the pasted identifier is invalid or
-    // resolving (but enabled for the loaded AND no-profile states).
-    var pendingMemberPreview by remember { mutableStateOf(RecipientResolution.Empty) }
-    var showMemberScanner by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember { mutableStateOf(false) }
     var showAddMember by remember { mutableStateOf(false) }
+    var membersExpanded by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var memberSearchOpen by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var memberQuery by remember(controller.group.groupIdHex) { mutableStateOf("") }
     // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
     // leave path and the Admins prompt so a trapped sole admin can hand the
     // role to another member (issue #417).
@@ -11268,7 +10468,6 @@ private fun GroupDetailsScreen(
     }
     LaunchedEffect(autoOpenAddMember, controller.isSelfMember, controller.isSelfAdmin) {
         if (autoOpenAddMember && controller.isSelfMember && controller.isSelfAdmin) {
-            pendingMemberError = null
             pendingMemberAsAdmin = false
             showAddMember = true
             onAutoOpenAddMemberConsumed()
@@ -11295,8 +10494,6 @@ private fun GroupDetailsScreen(
     val inviteLabelText = stringResource(R.string.invite)
     val noShareTargetText = stringResource(R.string.no_share_target_available)
     val groupTitleCopy = rememberGroupTitleCopy()
-    val oneValidMemberReferenceError = stringResource(R.string.error_one_valid_member_reference)
-    val qrNotValidNpubOrPublicKeyError = stringResource(R.string.error_qr_not_valid_npub_or_public_key)
 
     suspend fun refreshMlsDetails() {
         if (!appState.developerMode) return
@@ -11426,6 +10623,57 @@ private fun GroupDetailsScreen(
         return
     }
 
+    if (showAddMember) {
+        // remember scoped to this branch: the selection resets every time the
+        // picker is reopened.
+        val addSelection = remember { mutableStateListOf<RecipientSearch.Candidate>() }
+        val adding = activeMutation?.action == GroupMutationAction.InviteMember
+        ContactPickerScreen(
+            appState = appState,
+            title = stringResource(R.string.add_member),
+            selected = addSelection,
+            onBack = {
+                if (!adding) {
+                    showAddMember = false
+                    pendingMemberAsAdmin = false
+                }
+            },
+            onConfirm = {
+                val refs = addSelection.map { it.accountIdHex }
+                runGroupMutation(
+                    action = GroupMutationAction.InviteMember,
+                    mutation = { controller.inviteMembers(refs, addAsAdmin = pendingMemberAsAdmin) },
+                    onSuccess = {
+                        pendingInvites = (pendingInvites + refs).distinct()
+                        pendingMemberAsAdmin = false
+                        showAddMember = false
+                    },
+                )
+            },
+            confirmIcon = Icons.Default.Check,
+            busy = adding || controller.mutationInFlight,
+            excludeAccountIdHexes = controller.members.map { it.memberIdHex }.toSet(),
+            footer = {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.add_as_admin), style = MaterialTheme.typography.bodyLarge)
+                    Switch(
+                        checked = pendingMemberAsAdmin,
+                        onCheckedChange = { pendingMemberAsAdmin = it },
+                        enabled = !adding && !controller.mutationInFlight,
+                    )
+                }
+            },
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -11528,23 +10776,29 @@ private fun GroupDetailsScreen(
             )
         },
     ) { padding ->
+        val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin
+        val mutationsBlocked = activeMutation != null || controller.mutationInFlight
+        val isDm = GroupProjector.isDm(controller.members.size, controller.group.name)
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(padding)
-                .padding(horizontal = 20.dp)
                 .padding(top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             GroupDetailsHeader(
                 title = controller.title(groupTitleCopy),
                 subtitle =
-                    controller.subtitle(
-                        justYou = stringResource(R.string.just_you),
-                        oneMember = stringResource(R.string.one_member),
-                        membersFormat = stringResource(R.string.members_count),
-                    ),
+                    if (isDm) {
+                        controller.subtitle(
+                            justYou = stringResource(R.string.just_you),
+                            oneMember = stringResource(R.string.one_member),
+                            membersFormat = stringResource(R.string.members_count),
+                        )
+                    } else {
+                        stringResource(R.string.group_details_subtitle, controller.members.size)
+                    },
                 description = controller.group.description,
                 // Show the DM peer's avatar + initials seed here — the same
                 // peer metadata the top bar and chat-list row resolve (#837).
@@ -11553,51 +10807,100 @@ private fun GroupDetailsScreen(
                 seed = controller.avatarAccount ?: controller.group.groupIdHex,
                 pictureUrl = controller.avatarUrl,
                 archived = controller.group.archived,
+                onAddDescription =
+                    if (canEdit && controller.group.description.isBlank()) {
+                        { showEditGroup = true }
+                    } else {
+                        null
+                    },
             )
+
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Dimens.spaceLg),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+            ) {
+                QuickActionButton(
+                    icon = Icons.Default.Call,
+                    label = stringResource(R.string.quick_action_audio),
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.weight(1f),
+                )
+                QuickActionButton(
+                    icon = Icons.Default.Videocam,
+                    label = stringResource(R.string.quick_action_video),
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.weight(1f),
+                )
+                if (canEdit) {
+                    QuickActionButton(
+                        icon = Icons.Default.PersonAdd,
+                        label = stringResource(R.string.quick_action_add),
+                        onClick = {
+                            pendingMemberAsAdmin = false
+                            showAddMember = true
+                        },
+                        enabled = !mutationsBlocked,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (onOpenSearch != null) {
+                    QuickActionButton(
+                        icon = Icons.Default.Search,
+                        label = stringResource(R.string.quick_action_search),
+                        onClick = onOpenSearch,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
 
             controller.lastMutationError?.let { message ->
-                GroupMutationErrorBanner(
-                    message = message,
-                    onDismiss = { controller.clearLastMutationError() },
+                Box(Modifier.padding(horizontal = Dimens.spaceLg)) {
+                    GroupMutationErrorBanner(
+                        message = message,
+                        onDismiss = { controller.clearLastMutationError() },
+                    )
+                }
+            }
+
+            Column(Modifier.padding(horizontal = Dimens.spaceLg)) {
+                SharedMediaSection(
+                    tiles = sharedMediaTiles,
+                    controller = controller,
+                    appState = appState,
+                    onSeeAll = { showMediaLibrary = true },
+                    onJumpToMessage = onJumpToMessage,
                 )
             }
 
-            SharedMediaSection(
-                tiles = sharedMediaTiles,
-                controller = controller,
-                appState = appState,
-                onSeeAll = { showMediaLibrary = true },
-                onJumpToMessage = onJumpToMessage,
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            SettingsActionRow(
+                icon = Icons.Default.Schedule,
+                title = stringResource(R.string.disappearing_messages),
+                value = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
+                inProgress = activeMutation?.action == GroupMutationAction.DisappearingMessages,
+                onClick =
+                    if (canEdit && !mutationsBlocked) {
+                        { showDisappearingPicker = true }
+                    } else {
+                        null
+                    },
             )
-
-            SectionCard(title = stringResource(R.string.disappearing_messages)) {
-                val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin
-                val inProgress = activeMutation?.action == GroupMutationAction.DisappearingMessages
-                ListItem(
-                    modifier =
-                        if (canEdit && activeMutation == null && !controller.mutationInFlight) {
-                            Modifier.clickable { showDisappearingPicker = true }
-                        } else {
-                            Modifier
-                        },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    leadingContent = { Icon(Icons.Default.Schedule, contentDescription = null) },
-                    headlineContent = { Text(disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong())) },
-                    supportingContent = {
-                        Text(
-                            stringResource(
-                                if (canEdit) R.string.disappearing_row_hint_admin else R.string.disappearing_row_hint_readonly,
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    },
-                    trailingContent = {
-                        if (inProgress) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        }
-                    },
-                )
-            }
+            SettingsActionRow(
+                icon = Icons.Default.Lock,
+                title = stringResource(R.string.encryption),
+                value = stringResource(R.string.encryption_e2ee_note),
+            )
+            SettingsActionRow(
+                icon = Icons.Default.Fingerprint,
+                title = stringResource(R.string.chat_lock),
+                enabled = false,
+                comingSoon = true,
+            )
 
             if (showDisappearingPicker) {
                 DisappearingMessagesPickerDialog(
@@ -11642,122 +10945,170 @@ private fun GroupDetailsScreen(
                 )
             }
 
-            SectionCardWithAction(
-                title = "${stringResource(R.string.members)} · ${controller.members.size}",
-                action = {
-                    if (!readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin) {
-                        TextButton(
-                            onClick = {
-                                pendingMemberError = null
-                                pendingMemberAsAdmin = false
-                                showAddMember = true
-                            },
-                            enabled = activeMutation == null && !controller.mutationInFlight,
-                        ) {
-                            if (activeMutation?.action == GroupMutationAction.InviteMember) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                            }
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.add_member))
-                        }
-                    }
-                },
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // #612: render members in a deterministic order — you first,
-                // then other admins alpha by display name, then non-admins
-                // alpha by display name, with memberIdHex as a stable
-                // tiebreaker. Display names are resolved once into a map so
-                // the comparator does pure reads. lowercase(Locale.ROOT) keeps
-                // ordering consistent across device locales (e.g. Turkish I).
-                val activeAccountIdHex = appState.activeAccount?.accountIdHex
-                // Prefetch member profiles here so the title map below can stay a
-                // pure read (chatMemberTitleCached); the profile-revision key
-                // recomposes the sort once names land.
-                LaunchedEffect(controller.members) {
-                    appState.requestProfiles(controller.members.map { it.memberIdHex })
-                }
-                val displayedMembers =
-                    remember(
-                        controller.members,
-                        activeAccountIdHex,
-                        appState.profileRevisionForCompose,
-                    ) {
-                        val titlesByHex =
-                            controller.members.associate {
-                                it.memberIdHex to
-                                    appState.chatMemberTitleCached(it.memberIdHex).lowercase(Locale.ROOT)
-                            }
-                        controller.members.sortedWith(
-                            compareBy(
-                                { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) },
-                                { !controller.isAdmin(it) },
-                                { titlesByHex[it.memberIdHex].orEmpty() },
-                                { it.memberIdHex.lowercase(Locale.ROOT) },
-                            ),
-                        )
-                    }
-                GroupMemberIdentityRows(displayedMembers) { index, member ->
-                    GroupMemberRow(
-                        member = member,
-                        controller = controller,
-                        appState = appState,
-                        activeMutation = activeMutation,
-                        onPromote = {
-                            runGroupMutation(
-                                action = GroupMutationAction.PromoteAdmin,
-                                mutation = { controller.setMemberAdmin(member, admin = true) },
-                                target = member.memberIdHex,
-                            )
-                        },
-                        onDemote = {
-                            runGroupMutation(
-                                action = GroupMutationAction.DemoteAdmin,
-                                mutation = { controller.setMemberAdmin(member, admin = false) },
-                                target = member.memberIdHex,
-                            )
-                        },
-                        onSelfDemote = {
-                            pendingConfirm =
-                                if (controller.isSoleAdminWithOtherMembers) {
-                                    DetailsConfirm.StepDownSoleAdmin
-                                } else {
-                                    DetailsConfirm.StepDownAdmin(member)
-                                }
-                        },
-                        onRemove = {
-                            pendingConfirm = DetailsConfirm.RemoveMember(member)
-                        },
+                SectionHeader(
+                    stringResource(R.string.members_count, controller.members.size),
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = {
+                        memberSearchOpen = !memberSearchOpen
+                        if (!memberSearchOpen) memberQuery = ""
+                    },
+                    modifier = Modifier.padding(end = Dimens.spaceSm),
+                ) {
+                    Icon(
+                        if (memberSearchOpen) Icons.Default.Close else Icons.Default.Search,
+                        contentDescription = stringResource(R.string.search_members),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (index < displayedMembers.lastIndex) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                    }
                 }
-                if (pendingInvites.isNotEmpty()) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        pendingInvites.forEach { invite ->
-                            // Pending invites stay non-actionable, but a tap
-                            // copies the full invite key to the clipboard.
-                            AssistChip(
-                                onClick = {
-                                    clipboard.setText(AnnotatedString(invite))
-                                    appState.presentText(
-                                        AppText.Resource(R.string.toast_copied_value, listOf(inviteLabelText)),
-                                    )
-                                },
-                                label = { Text(stringResource(R.string.invite_pending, IdentityFormatter.short(invite))) },
-                                leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
-                            )
+            }
+            if (memberSearchOpen) {
+                FlowSearchField(
+                    value = memberQuery,
+                    onValueChange = { memberQuery = it },
+                    placeholder = stringResource(R.string.search_members),
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg).padding(bottom = Dimens.spaceSm),
+                )
+            }
+            if (canEdit) {
+                FlowQuickActionRow(
+                    icon = Icons.Default.PersonAdd,
+                    title = stringResource(R.string.add_member),
+                    enabled = !mutationsBlocked,
+                    onClick = {
+                        pendingMemberAsAdmin = false
+                        showAddMember = true
+                    },
+                )
+            }
+            // #612: render members in a deterministic order — you first,
+            // then other admins alpha by display name, then non-admins
+            // alpha by display name, with memberIdHex as a stable
+            // tiebreaker. Display names are resolved once into a map so
+            // the comparator does pure reads. lowercase(Locale.ROOT) keeps
+            // ordering consistent across device locales (e.g. Turkish I).
+            val activeAccountIdHex = appState.activeAccount?.accountIdHex
+            // Prefetch member profiles here so the title map below can stay a
+            // pure read (chatMemberTitleCached); the profile-revision key
+            // recomposes the sort once names land.
+            LaunchedEffect(controller.members) {
+                appState.requestProfiles(controller.members.map { it.memberIdHex })
+            }
+            val displayedMembers =
+                remember(
+                    controller.members,
+                    activeAccountIdHex,
+                    appState.profileRevisionForCompose,
+                ) {
+                    val titlesByHex =
+                        controller.members.associate {
+                            it.memberIdHex to
+                                appState.chatMemberTitleCached(it.memberIdHex).lowercase(Locale.ROOT)
                         }
+                    controller.members.sortedWith(
+                        compareBy(
+                            { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) },
+                            { !controller.isAdmin(it) },
+                            { titlesByHex[it.memberIdHex].orEmpty() },
+                            { it.memberIdHex.lowercase(Locale.ROOT) },
+                        ),
+                    )
+                }
+            val memberNeedle = memberQuery.trim()
+            val visibleMembers =
+                when {
+                    memberNeedle.isNotEmpty() ->
+                        displayedMembers.filter {
+                            appState.chatMemberTitleCached(it.memberIdHex).contains(memberNeedle, ignoreCase = true)
+                        }
+                    membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT -> displayedMembers
+                    else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
+                }
+            if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
+                Text(
+                    stringResource(R.string.no_matches),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                )
+            }
+            // Row taps route into the profile sheet, which carries the same
+            // admin actions (grant/revoke admin, remove) the old per-row menu
+            // exposed (#444/#635 scope rules).
+            GroupMemberIdentityRows(visibleMembers) { _, member ->
+                val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
+                val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
+                ContactRow(
+                    title = controller.memberDisplayName(member),
+                    subtitle =
+                        if (isSelfRow) {
+                            stringResource(R.string.you)
+                        } else {
+                            IdentityFormatter.short(appState.npub(member.memberIdHex))
+                        },
+                    avatarSeed = member.memberIdHex,
+                    avatarUrl = controller.memberAvatarUrl(member),
+                    onClick = { appState.presentProfile(appState.npub(member.memberIdHex)) },
+                    trailing = {
+                        if (rowMutation != null) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else if (controller.isAdmin(member)) {
+                            Surface(shape = PillShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                                Text(
+                                    stringResource(R.string.admin),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = Dimens.spaceSm, vertical = Dimens.spaceXxs),
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+            if (memberNeedle.isEmpty() && !membersExpanded && displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT) {
+                FlowQuickActionRow(
+                    icon = Icons.Default.ExpandMore,
+                    title = stringResource(R.string.see_all_members, displayedMembers.size),
+                    onClick = { membersExpanded = true },
+                )
+            }
+            if (pendingInvites.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                ) {
+                    pendingInvites.forEach { invite ->
+                        // Pending invites stay non-actionable, but a tap
+                        // copies the full invite key to the clipboard.
+                        AssistChip(
+                            onClick = {
+                                clipboard.setText(AnnotatedString(invite))
+                                appState.presentText(
+                                    AppText.Resource(R.string.toast_copied_value, listOf(inviteLabelText)),
+                                )
+                            },
+                            label = { Text(stringResource(R.string.invite_pending, IdentityFormatter.short(invite))) },
+                            leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+                        )
                     }
                 }
             }
 
-            SectionCard(title = stringResource(R.string.info)) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            SectionHeader(stringResource(R.string.info))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Dimens.spaceLg),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
+            ) {
                 CopyableValueRow(
                     label = stringResource(R.string.group_id),
                     value = controller.group.groupIdHex,
@@ -11781,274 +11132,119 @@ private fun GroupDetailsScreen(
             }
 
             if (appState.developerMode) {
-                SectionCard(title = stringResource(R.string.transcript_export)) {
-                    Text(
-                        stringResource(R.string.transcript_export_description),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    TextButton(
-                        onClick = { exportTranscript() },
-                        enabled = !transcriptExportInFlight && appState.activeAccountRef != null,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (transcriptExportInFlight) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Description, contentDescription = null)
-                        }
-                        Spacer(Modifier.width(8.dp))
+                Column(
+                    Modifier.padding(horizontal = Dimens.spaceLg),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    SectionCard(title = stringResource(R.string.transcript_export)) {
                         Text(
-                            stringResource(
-                                if (transcriptExportInFlight) {
-                                    R.string.exporting_transcript
-                                } else {
-                                    R.string.export_conversation_transcript
-                                },
-                            ),
+                            stringResource(R.string.transcript_export_description),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
                         )
-                    }
-                }
-
-                SectionCard(title = stringResource(R.string.mls)) {
-                    when {
-                        mlsLoading -> Text(stringResource(R.string.loading_mls_state), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        mlsState == null -> Text(stringResource(R.string.mls_state_unavailable), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        else -> {
-                            val state = requireNotNull(mlsState)
-                            DiagnosticRow(
-                                stringResource(R.string.group_id),
-                                IdentityFormatter.short(state.groupIdHex),
-                                copyValue = state.groupIdHex,
-                                appState = appState,
+                        TextButton(
+                            onClick = { exportTranscript() },
+                            enabled = !transcriptExportInFlight && appState.activeAccountRef != null,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (transcriptExportInFlight) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Description, contentDescription = null)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                stringResource(
+                                    if (transcriptExportInFlight) {
+                                        R.string.exporting_transcript
+                                    } else {
+                                        R.string.export_conversation_transcript
+                                    },
+                                ),
                             )
-                            DiagnosticRow(stringResource(R.string.epoch), state.epoch.toString())
-                            DiagnosticRow(stringResource(R.string.mls_members), state.memberCount.toString())
-                            DiagnosticRow(stringResource(R.string.required_components), state.requiredAppComponents.joinToString(", "))
+                        }
+                    }
+
+                    SectionCard(title = stringResource(R.string.mls)) {
+                        when {
+                            mlsLoading -> Text(stringResource(R.string.loading_mls_state), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            mlsState == null -> Text(stringResource(R.string.mls_state_unavailable), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            else -> {
+                                val state = requireNotNull(mlsState)
+                                DiagnosticRow(
+                                    stringResource(R.string.group_id),
+                                    IdentityFormatter.short(state.groupIdHex),
+                                    copyValue = state.groupIdHex,
+                                    appState = appState,
+                                )
+                                DiagnosticRow(stringResource(R.string.epoch), state.epoch.toString())
+                                DiagnosticRow(stringResource(R.string.mls_members), state.memberCount.toString())
+                                DiagnosticRow(stringResource(R.string.required_components), state.requiredAppComponents.joinToString(", "))
+                            }
                         }
                     }
                 }
             }
 
-            // Destructive "Leave group" affordance at the bottom of the details
-            // screen (#416). Routes through requestLeave so the sole-admin and
-            // sole-member cases get their own confirm copy. On failure the
-            // controller's lastMutationError surfaces inline here (in addition
-            // to the snackbar) so the user stays on the screen and can retry.
+            // Danger zone (#416): leave routes through requestLeave so the
+            // sole-admin and sole-member cases get their own confirm copy. On
+            // failure the controller's lastMutationError surfaces inline here
+            // (in addition to the snackbar) so the user can retry in place.
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            val selfMember =
+                controller.members.firstOrNull { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+            if (canEdit && selfMember != null) {
+                DangerActionRow(
+                    icon = Icons.Default.Shield,
+                    title = stringResource(R.string.step_down_as_admin),
+                    enabled = !mutationsBlocked,
+                    inProgress = activeMutation?.action == GroupMutationAction.SelfDemoteAdmin,
+                    onClick = {
+                        pendingConfirm =
+                            if (controller.isSoleAdminWithOtherMembers) {
+                                DetailsConfirm.StepDownSoleAdmin
+                            } else {
+                                DetailsConfirm.StepDownAdmin(selfMember)
+                            }
+                    },
+                )
+            }
+            if (!readOnlyInvite) {
+                DangerActionRow(
+                    icon = Icons.Default.Archive,
+                    title =
+                        stringResource(
+                            if (controller.group.archived) R.string.unarchive_chat else R.string.archive_chat,
+                        ),
+                    enabled = !mutationsBlocked,
+                    inProgress = activeMutation?.action == GroupMutationAction.Archive,
+                    onClick = {
+                        runGroupMutation(
+                            action = GroupMutationAction.Archive,
+                            mutation = { controller.setArchived(!controller.group.archived) },
+                        )
+                    },
+                )
+            }
             if (controller.isSelfMember) {
-                val leaving = activeMutation?.action == GroupMutationAction.Leave
                 controller.lastMutationError?.let { error ->
                     Text(
                         error,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
                     )
                 }
-                TextButton(
+                DangerActionRow(
+                    icon = Icons.AutoMirrored.Filled.Logout,
+                    title = stringResource(R.string.leave_group),
+                    enabled = !mutationsBlocked && controller.membersLoaded,
+                    inProgress = activeMutation?.action == GroupMutationAction.Leave,
                     onClick = { requestLeave(controller.title(groupTitleCopy)) },
-                    enabled = activeMutation == null && !controller.mutationInFlight && controller.membersLoaded,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors =
-                        ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        ),
-                ) {
-                    if (leaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    } else {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(if (leaving) R.string.leaving_chat else R.string.leave_group))
-                }
+                )
             }
         }
     }
-    if (showMemberScanner) {
-        QrScannerSheet(
-            onDismiss = { showMemberScanner = false },
-            onScan = { raw ->
-                val ref = RecipientReference.normalize(raw)
-                showMemberScanner = false
-                if (ref == null) {
-                    pendingMemberError = qrNotValidNpubOrPublicKeyError
-                } else {
-                    pendingMember = ref
-                    pendingMemberError = null
-                }
-            },
-        )
-    }
-
-    if (showAddMember) {
-        // Pre-check membership against the group's own roster (#899): if the
-        // resolved pubkey is already a member, MLS would reject the add commit
-        // with a raw DuplicateSignatureKey enum path. Say so inline on the
-        // resolved card and disable Add, rather than firing a doomed invite and
-        // surfacing the backend string.
-        val alreadyMember =
-            groupContainsResolvedMember(
-                memberHexes = controller.members.map { it.memberIdHex },
-                resolvedHex = pendingMemberPreview.resolvedHex,
-            )
-        ModalBottomSheet(
-            modifier = amoledModalSheetModifier(),
-            onDismissRequest = {
-                showAddMember = false
-                pendingMember = ""
-                pendingMemberError = null
-                pendingMemberPreview = RecipientResolution.Empty
-                pendingMemberAsAdmin = false
-            },
-        ) {
-            Column(Modifier.fillMaxWidth()) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
-                        .padding(start = 24.dp, top = 24.dp, end = 24.dp)
-                        .padding(bottom = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(stringResource(R.string.add_member), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    OutlinedTextField(
-                        value = pendingMember,
-                        onValueChange = {
-                            pendingMember = it
-                            pendingMemberError = null
-                        },
-                        label = { Text(stringResource(R.string.npub_or_public_key)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        isError = pendingMemberError != null,
-                        supportingText =
-                            pendingMemberError?.let { message ->
-                                { Text(message) }
-                            },
-                        trailingIcon = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                PublicIdentifierFieldTrailingAction(
-                                    value = pendingMember,
-                                    enabled = activeMutation == null && !controller.mutationInFlight,
-                                    onValueChange = {
-                                        pendingMember = it
-                                        pendingMemberError = null
-                                    },
-                                )
-                                IconButton(onClick = { showMemberScanner = true }) {
-                                    Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_member_qr_code))
-                                }
-                            }
-                        },
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
-                    )
-                    // Resolved profile preview so the admin can confirm they're
-                    // inviting the right person before history is shared with them
-                    // (#631).
-                    RecipientPreviewCard(
-                        input = pendingMember,
-                        appState = appState,
-                        onResolutionChanged = { pendingMemberPreview = it },
-                    )
-                    if (alreadyMember) {
-                        val alreadyName =
-                            pendingMemberPreview.resolvedHex?.let { appState.displayName(it) }.orEmpty()
-                        Text(
-                            stringResource(R.string.add_member_already_in_group, alreadyName),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    // Browsable contact list (#831): existing chats / recent
-                    // senders appear immediately and filter as the admin types.
-                    // Tapping a row fills the npub into the field so the existing
-                    // resolve/add path runs. The group's current members are
-                    // dropped so they can't be picked (adding them would fail with
-                    // a raw DuplicateSignatureKey error, #899).
-                    RecipientSearchResults(
-                        query = pendingMember,
-                        appState = appState,
-                        excludeAccountIdHexes = controller.members.map { it.memberIdHex }.toSet(),
-                        onSelect = { candidate ->
-                            pendingMember = candidate.npub
-                            pendingMemberError = null
-                        },
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.add_as_admin), style = MaterialTheme.typography.bodyLarge)
-                        Switch(
-                            checked = pendingMemberAsAdmin,
-                            onCheckedChange = { pendingMemberAsAdmin = it },
-                            enabled = activeMutation == null && !controller.mutationInFlight,
-                        )
-                    }
-                }
-                StickyFormActionBar {
-                    Button(
-                        onClick = {
-                            // Prefer the key the preview card resolved (#631): it
-                            // carries a resolved NIP-05, which RecipientReference
-                            // .normalize can't parse. Fall back to normalize for
-                            // the npub/hex direct-entry path.
-                            val ref =
-                                pendingMemberPreview.resolvedHex
-                                    ?: RecipientReference.normalize(pendingMember)
-                            if (ref == null) {
-                                pendingMemberError = oneValidMemberReferenceError
-                                return@Button
-                            }
-                            pendingMemberError = null
-                            runGroupMutation(
-                                action = GroupMutationAction.InviteMember,
-                                mutation = { controller.inviteMembers(listOf(ref), addAsAdmin = pendingMemberAsAdmin) },
-                                target = ref,
-                                onSuccess = {
-                                    pendingMember = ""
-                                    pendingMemberAsAdmin = false
-                                    pendingMemberError = null
-                                    pendingInvites = (pendingInvites + ref).distinct()
-                                    showAddMember = false
-                                },
-                            )
-                        },
-                        // Gate on the preview resolution too (#631): keep the invite
-                        // from firing on an unresolved/invalid identifier, while
-                        // still allowing the loaded AND no-profile states through.
-                        // Also block when the resolved pubkey is already in the
-                        // group (#899) — adding them would fail with a raw
-                        // DuplicateSignatureKey error.
-                        enabled =
-                            pendingMember.isNotBlank() &&
-                                activeMutation == null &&
-                                !controller.mutationInFlight &&
-                                !alreadyMember &&
-                                recipientPreviewAllowsSubmit(pendingMemberPreview.state),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (activeMutation?.action == GroupMutationAction.InviteMember) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(if (activeMutation?.action == GroupMutationAction.InviteMember) R.string.adding_member else R.string.add_member))
-                    }
-                }
-            }
-        }
-    }
-
     if (showTransferAdmin) {
         TransferAdminSheet(
             controller = controller,
@@ -12601,13 +11797,14 @@ private fun GroupDetailsHeader(
     seed: String,
     pictureUrl: String?,
     archived: Boolean,
+    onAddDescription: (() -> Unit)? = null,
 ) {
     val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
     val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
     var viewerOpen by remember(safePictureUrl) { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth()) {
         Column(
-            Modifier.fillMaxWidth().padding(top = 8.dp),
+            Modifier.fillMaxWidth().padding(top = 8.dp).padding(horizontal = Dimens.spaceLg),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -12621,7 +11818,7 @@ private fun GroupDetailsHeader(
                             role = Role.Button,
                         ) { viewerOpen = true },
             ) {
-                Avatar(title = title, seed = seed, size = 88.dp, pictureUrl = safePictureUrl)
+                Avatar(title = title, seed = seed, size = 96.dp, pictureUrl = safePictureUrl)
             }
             Text(
                 title,
@@ -12629,6 +11826,11 @@ private fun GroupDetailsHeader(
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (description.isNotBlank()) {
                 Text(
@@ -12638,8 +11840,11 @@ private fun GroupDetailsHeader(
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
+            } else if (onAddDescription != null) {
+                TextButton(onClick = onAddDescription) {
+                    Text(stringResource(R.string.add_group_description))
+                }
             }
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -12825,7 +12030,7 @@ private sealed class DetailsConfirm {
 private val disappearingPresetSecs = listOf(0L, 2_419_200L, 604_800L, 86_400L, 28_800L, 3_600L, 300L, 30L)
 
 @Composable
-private fun disappearingMessagesLabel(secs: Long): String =
+internal fun disappearingMessagesLabel(secs: Long): String =
     when (secs) {
         0L -> stringResource(R.string.disappearing_off)
         2_419_200L -> stringResource(R.string.disappearing_4_weeks)
@@ -12850,7 +12055,7 @@ private fun disappearingMessagesLabel(secs: Long): String =
 // mutation lock + prune confirm) fires once. Custom opens a wheel picker.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DisappearingMessagesPickerDialog(
+internal fun DisappearingMessagesPickerDialog(
     currentSecs: Long,
     onDismiss: () -> Unit,
     onPick: (Long) -> Unit,
@@ -13139,156 +12344,6 @@ internal fun profileSheetAdminActions(
     ).filter { it != GroupMemberMenuAction.StepDownAsAdmin }
 }
 
-@Composable
-private fun GroupMemberRow(
-    member: AppGroupMemberRecordFfi,
-    controller: ConversationController,
-    appState: WhiteNoiseAppState,
-    activeMutation: ActiveGroupMutation?,
-    onPromote: () -> Unit,
-    onDemote: () -> Unit,
-    onSelfDemote: () -> Unit,
-    onRemove: () -> Unit,
-) {
-    val isAdmin = controller.isAdmin(member)
-    val isSelfRow =
-        GroupProjector.isActiveAccountMember(
-            member,
-            appState.activeAccount?.accountIdHex,
-        )
-    val memberActions =
-        groupMemberMenuActions(
-            viewerIsMember = controller.isSelfMember,
-            viewerIsAdmin = controller.isSelfAdmin,
-            targetIsSelf = isSelfRow,
-            targetIsAdmin = isAdmin,
-        )
-    val rowMutation = activeMutation?.takeIf { it.target == member.memberIdHex }
-    var menuOpen by remember(member.memberIdHex) { mutableStateOf(false) }
-
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(role = Role.Button) { appState.presentProfile(appState.npub(member.memberIdHex)) }
-                .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Avatar(
-            title = controller.memberDisplayName(member),
-            seed = member.memberIdHex,
-            size = 40.dp,
-            pictureUrl = controller.memberAvatarUrl(member),
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(controller.memberDisplayName(member), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (isSelfRow) {
-                    Text(
-                        stringResource(R.string.you),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (isAdmin) {
-                    Text(
-                        stringResource(R.string.admin),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-        if (rowMutation != null) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                Text(
-                    stringResource(rowMutation.action.memberStatusLabelRes),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else if (memberActions.isNotEmpty()) {
-            Box {
-                IconButton(
-                    onClick = { menuOpen = true },
-                    enabled = !controller.mutationInFlight,
-                ) {
-                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.member_actions))
-                }
-                DropdownMenu(
-                    expanded = menuOpen,
-                    onDismissRequest = { menuOpen = false },
-                    shape = MenuDefaults.shape,
-                    border = amoledSurfaceBorderStroke(),
-                ) {
-                    memberActions.forEach { action ->
-                        when (action) {
-                            GroupMemberMenuAction.GrantAdmin ->
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.make_admin)) },
-                                    leadingIcon = { Icon(Icons.Default.Shield, contentDescription = null) },
-                                    enabled = !controller.mutationInFlight,
-                                    onClick = {
-                                        menuOpen = false
-                                        onPromote()
-                                    },
-                                )
-                            GroupMemberMenuAction.RevokeAdmin ->
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.remove_admin)) },
-                                    leadingIcon = { Icon(Icons.Default.Shield, contentDescription = null) },
-                                    enabled = !controller.mutationInFlight,
-                                    onClick = {
-                                        menuOpen = false
-                                        onDemote()
-                                    },
-                                )
-                            GroupMemberMenuAction.RemoveMember ->
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.remove_member)) },
-                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                                    enabled = !controller.mutationInFlight,
-                                    colors =
-                                        MenuDefaults.itemColors(
-                                            textColor = MaterialTheme.colorScheme.error,
-                                            leadingIconColor = MaterialTheme.colorScheme.error,
-                                        ),
-                                    onClick = {
-                                        menuOpen = false
-                                        onRemove()
-                                    },
-                                )
-                            GroupMemberMenuAction.StepDownAsAdmin ->
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.step_down_as_admin)) },
-                                    leadingIcon = { Icon(Icons.Default.Shield, contentDescription = null) },
-                                    enabled = !controller.mutationInFlight,
-                                    colors =
-                                        MenuDefaults.itemColors(
-                                            textColor = MaterialTheme.colorScheme.error,
-                                            leadingIconColor = MaterialTheme.colorScheme.error,
-                                        ),
-                                    onClick = {
-                                        menuOpen = false
-                                        onSelfDemote()
-                                    },
-                                )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 /**
  * Member rows are rendered in [Column] containers, so Compose would otherwise
  * identify each child by position. Key each row by member identity so menu and
@@ -13305,19 +12360,6 @@ internal fun GroupMemberIdentityRows(
         }
     }
 }
-
-private val GroupMutationAction.memberStatusLabelRes: Int
-    @StringRes
-    get() =
-        when (this) {
-            GroupMutationAction.PromoteAdmin -> R.string.adding_admin
-            GroupMutationAction.DemoteAdmin,
-            GroupMutationAction.SelfDemoteAdmin,
-            -> R.string.removing_admin
-            GroupMutationAction.TransferAdmin -> R.string.transferring_admin
-            GroupMutationAction.RemoveMember -> R.string.removing_member
-            else -> R.string.member_actions
-        }
 
 /**
  * Bottom sheet listing the non-admin members eligible to receive a transferred
@@ -15556,19 +14598,28 @@ private fun ForwardMessageSheet(
                 titledTargets.filter { (_, title) -> title.contains(needle, ignoreCase = true) }
             }
         }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Opens at half height with a drag up to full — a long chat list stays
+    // reachable without the sheet swallowing the conversation behind it.
+    val sheetState = rememberModalBottomSheetState()
+    val activeAccountIdHex = appState.activeAccount?.accountIdHex
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         modifier = amoledModalSheetModifier(),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 stringResource(R.string.forward_to),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
             // Preview of what is being forwarded, so the user can confirm the
             // content before fanning it out to several chats.
@@ -15576,7 +14627,7 @@ private fun ForwardMessageSheet(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(12.dp),
                 border = amoledSurfaceBorderStroke(),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
             ) {
                 // Preview only: resolve `@npub1…` runs to display names so the
                 // confirmation reads like the bubble (#615). The forwarded text
@@ -15589,63 +14640,61 @@ private fun ForwardMessageSheet(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 )
             }
-            OutlinedTextField(
+            FlowSearchField(
                 value = query,
                 onValueChange = { query = it },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                placeholder = { Text(stringResource(R.string.forward_search_chats)) },
+                placeholder = stringResource(R.string.forward_search_chats),
+                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
             )
-            if (targets.isEmpty()) {
-                Text(
-                    stringResource(R.string.forward_no_chats),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else if (filtered.isEmpty()) {
-                Text(
-                    stringResource(R.string.forward_no_matches),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
-                ) {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(bottom = Dimens.spaceLg),
+            ) {
+                if (targets.isEmpty() || filtered.isEmpty()) {
+                    item {
+                        Text(
+                            stringResource(
+                                if (targets.isEmpty()) R.string.forward_no_chats else R.string.forward_no_matches,
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                        )
+                    }
+                } else {
+                    item { SectionHeader(stringResource(R.string.recent_chats)) }
                     items(filtered, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
                         val groupId = item.group.groupIdHex
                         val isSelected = selected.contains(groupId)
-                        ListItem(
-                            modifier =
-                                Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .amoledSurfaceBorder(RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                                    },
-                            leadingContent = {
-                                val avatarAccount =
-                                    item.otherMemberAccount
-                                        ?.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
-                                Avatar(
-                                    title = title,
-                                    seed = avatarAccount ?: item.group.groupIdHex,
-                                    size = 40.dp,
-                                    pictureUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
-                                )
+                        val avatarAccount =
+                            item.otherMemberAccount
+                                ?.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
+                        // Group rows preview the other members' names, mirroring
+                        // the chat-list mental model; direct chats need none.
+                        val membersPreview =
+                            remember(item, appState.profileRevisionForCompose) {
+                                if (avatarAccount != null) {
+                                    null
+                                } else {
+                                    item.memberSnapshot
+                                        ?.members
+                                        ?.filterNot { it.memberIdHex.equals(activeAccountIdHex, ignoreCase = true) }
+                                        ?.map { appState.chatMemberTitleCached(it.memberIdHex) }
+                                        ?.filter { it.isNotBlank() }
+                                        ?.take(6)
+                                        ?.joinToString(", ")
+                                        ?.takeIf { it.isNotBlank() }
+                                }
+                            }
+                        ContactRow(
+                            title = title,
+                            subtitle = membersPreview,
+                            avatarSeed = avatarAccount ?: item.group.groupIdHex,
+                            avatarUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
+                            onClick = {
+                                if (isSelected) selected.remove(groupId) else selected.add(groupId)
                             },
-                            headlineContent = {
-                                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            },
-                            trailingContent = {
-                                Checkbox(
-                                    checked = isSelected,
-                                    onCheckedChange = {
-                                        if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                                    },
-                                )
-                            },
+                            trailing = { SelectionIndicator(selected = isSelected) },
                         )
                     }
                 }
@@ -15656,7 +14705,7 @@ private fun ForwardMessageSheet(
                     onDismiss()
                 },
                 enabled = selected.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Forward,
@@ -19294,21 +18343,18 @@ private fun ProfileSheet(
         }
 
     if (showStartGroup && hex != null) {
-        NewChatSheet(
+        NewGroupFlow(
             appState = appState,
-            titleRes = R.string.new_group,
-            directMessage = false,
             initialMembers =
                 listOf(
-                    NewChatInitialMember(
-                        ref = hex!!,
-                        title = title,
-                        seed = hex!!,
-                        pictureUrl = pictureUrl,
+                    RecipientSearch.Candidate(
+                        accountIdHex = hex!!,
+                        displayName = title,
+                        npub = npub,
                     ),
                 ),
             onOpenConversation = { chat, justCreated -> onOpenGroup(chat, justCreated) },
-            onDismiss = { showStartGroup = false },
+            onClose = { showStartGroup = false },
         )
         return
     }
@@ -19347,7 +18393,7 @@ private fun ProfileSheet(
         properties = ModalBottomSheetProperties(securePolicy = securePolicy),
     ) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -19364,7 +18410,7 @@ private fun ProfileSheet(
                 Avatar(
                     title = title,
                     seed = hex ?: npub,
-                    size = 112.dp,
+                    size = 96.dp,
                     pictureUrl = pictureUrl,
                 )
             }
@@ -19382,32 +18428,76 @@ private fun ProfileSheet(
                     }
                 }
             }
-            CopyableValueRow(
-                label = "npub",
-                value = npub,
-                clipboard = clipboard,
-                appState = appState,
-            )
-            SectionCard(title = stringResource(R.string.about)) {
-                Text(
-                    about ?: stringResource(R.string.profile_no_bio),
-                    color = if (about == null) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
-                    modifier = Modifier.fillMaxWidth(),
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl)) {
+                QuickActionButton(
+                    icon = Icons.AutoMirrored.Filled.Chat,
+                    label = stringResource(R.string.message),
+                    enabled = hex != null && !creatingChat,
+                    inProgress = creatingChat,
+                    // Opens the existing 1:1 DM, or starts a new one with this
+                    // person when none exists yet. The create runs in the
+                    // process-lifetime mutation scope (Main.immediate) so the MLS
+                    // commit + Nostr publish finish regardless; we keep the sheet up
+                    // with a spinner until the conversation is ready, then navigate
+                    // straight in — no dismiss-into-a-blank-gap.
+                    onClick = {
+                        val existing = directMessageGroup
+                        if (existing != null) {
+                            onOpenGroup(existing, false)
+                        } else {
+                            creatingChat = true
+                            appState.launchMutation {
+                                val groupId = appState.startProfileChat(npub)
+                                val item = groupId?.let { appState.awaitChatListItem(it) }
+                                if (item != null) onOpenGroup(item, true) else creatingChat = false
+                            }
+                        }
+                    },
+                )
+                QuickActionButton(
+                    icon = Icons.Default.Call,
+                    label = stringResource(R.string.quick_action_audio),
+                    onClick = {},
+                    enabled = false,
+                )
+                QuickActionButton(
+                    icon = Icons.Default.Videocam,
+                    label = stringResource(R.string.quick_action_video),
+                    onClick = {},
+                    enabled = false,
                 )
             }
-            SectionCard(title = stringResource(R.string.profile_shared_groups)) {
-                if (sharedGroups.isEmpty()) {
-                    Text(stringResource(R.string.profile_no_shared_groups), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    sharedGroups.forEachIndexed { index, group ->
-                        ProfileSharedGroupRow(
-                            item = group,
-                            appState = appState,
-                            titleCopy = groupTitleCopy,
-                            onOpen = { onOpenGroup(group, false) },
-                        )
-                        if (index != sharedGroups.lastIndex) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                CopyableValueRow(
+                    label = "npub",
+                    value = npub,
+                    clipboard = clipboard,
+                    appState = appState,
+                )
+                SectionCard(title = stringResource(R.string.about)) {
+                    Text(
+                        about ?: stringResource(R.string.profile_no_bio),
+                        color = if (about == null) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                SectionCard(title = stringResource(R.string.profile_shared_groups)) {
+                    if (sharedGroups.isEmpty()) {
+                        Text(stringResource(R.string.profile_no_shared_groups), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        sharedGroups.forEachIndexed { index, group ->
+                            ProfileSharedGroupRow(
+                                item = group,
+                                appState = appState,
+                                titleCopy = groupTitleCopy,
+                                onOpen = { onOpenGroup(group, false) },
+                            )
+                            if (index != sharedGroups.lastIndex) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                            }
                         }
                     }
                 }
@@ -19415,60 +18505,21 @@ private fun ProfileSheet(
             if (hex == null) {
                 Text(stringResource(R.string.couldnt_read_profile_code), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Button(
-                // Opens the existing 1:1 DM, or starts a new one with this
-                // person when none exists yet. The create runs in the
-                // process-lifetime mutation scope (Main.immediate) so the MLS
-                // commit + Nostr publish finish regardless; we keep the sheet up
-                // with a spinner until the conversation is ready, then navigate
-                // straight in — no dismiss-into-a-blank-gap.
-                onClick = {
-                    val existing = directMessageGroup
-                    if (existing != null) {
-                        onOpenGroup(existing, false)
-                    } else {
-                        creatingChat = true
-                        appState.launchMutation {
-                            val groupId = appState.startProfileChat(npub)
-                            val item = groupId?.let { appState.awaitChatListItem(it) }
-                            if (item != null) onOpenGroup(item, true) else creatingChat = false
-                        }
-                    }
-                },
-                enabled = hex != null && !creatingChat,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (creatingChat) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.message))
-                }
-            }
             if (hex != null && !targetIsSelf) {
-                OutlinedButton(
-                    onClick = { showStartGroup = true },
-                    enabled = !creatingChat,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Default.Group, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.profile_start_new_group_with, title))
-                }
-                if (addableGroups.isNotEmpty()) {
-                    OutlinedButton(
-                        onClick = { showAddToGroups = true },
+                Column(Modifier.fillMaxWidth()) {
+                    SettingsActionRow(
+                        icon = Icons.Default.Group,
+                        title = stringResource(R.string.profile_start_new_group_with, title),
                         enabled = !creatingChat,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.profile_add_to_another_group))
+                        onClick = { showStartGroup = true },
+                    )
+                    if (addableGroups.isNotEmpty()) {
+                        SettingsActionRow(
+                            icon = Icons.Default.Add,
+                            title = stringResource(R.string.profile_add_to_another_group),
+                            enabled = !creatingChat,
+                            onClick = { showAddToGroups = true },
+                        )
                     }
                 }
             }
@@ -19513,9 +18564,19 @@ private fun ProfileAddToGroupsSheet(
     val groupTitleCopy = rememberGroupTitleCopy()
     val selected = remember { mutableStateListOf<String>() }
     var confirmSelection by remember { mutableStateOf<List<ChatListItem>?>(null) }
+    var query by remember { mutableStateOf("") }
     val titledGroups =
         remember(groups, groupTitleCopy) {
             groups.map { it to chatListItemDisplayTitle(it, appState, groupTitleCopy) }
+        }
+    val filteredGroups =
+        remember(titledGroups, query) {
+            val needle = query.trim()
+            if (needle.isEmpty()) {
+                titledGroups
+            } else {
+                titledGroups.filter { (_, title) -> title.contains(needle, ignoreCase = true) }
+            }
         }
     LaunchedEffect(groups) {
         val availableGroupIds = groups.mapTo(mutableSetOf()) { it.group.groupIdHex }
@@ -19533,70 +18594,62 @@ private fun ProfileAddToGroupsSheet(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
                     .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 stringResource(R.string.profile_add_to_groups_title, targetName),
                 style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 24.dp),
             )
             Text(
                 stringResource(R.string.profile_add_to_groups_description, targetName),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+            FlowSearchField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = stringResource(R.string.forward_search_chats),
+                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
             )
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
             ) {
+                if (filteredGroups.isEmpty()) {
+                    item {
+                        Text(
+                            stringResource(R.string.no_matches),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                        )
+                    }
+                }
                 items(
-                    titledGroups,
+                    filteredGroups,
                     key = { (item, _) -> item.group.groupIdHex },
                 ) { (item, title) ->
                     val groupId = item.group.groupIdHex
                     val isSelected = selected.contains(groupId)
-
-                    fun toggle() {
-                        if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                    }
-                    ListItem(
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
-                                .clickable(enabled = !busy, role = Role.Checkbox) { toggle() },
-                        leadingContent = {
-                            Avatar(
-                                title = title,
-                                seed = item.group.groupIdHex,
-                                size = 40.dp,
-                                pictureUrl = item.group.avatarUrl,
-                            )
+                    ContactRow(
+                        title = title,
+                        subtitle = stringResource(R.string.members_count, item.memberCount),
+                        avatarSeed = item.group.groupIdHex,
+                        avatarUrl = item.group.avatarUrl,
+                        enabled = !busy,
+                        onClick = {
+                            if (isSelected) selected.remove(groupId) else selected.add(groupId)
                         },
-                        headlineContent = {
-                            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        },
-                        supportingContent = {
-                            Text(
-                                stringResource(R.string.members_count, item.memberCount),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        trailingContent = {
-                            Checkbox(
-                                checked = isSelected,
-                                enabled = !busy,
-                                onCheckedChange = { toggle() },
-                            )
-                        },
+                        trailing = { SelectionIndicator(selected = isSelected) },
                     )
                 }
             }
             Button(
                 onClick = { confirmSelection = selectedGroups },
                 enabled = selectedGroups.isNotEmpty() && !busy,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
             ) {
                 if (busy) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -19705,45 +18758,32 @@ private fun ProfileSheetAdminActions(
                 stringResource(R.string.admin),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
             )
         }
         actions.forEach { action ->
             when (action) {
                 GroupMemberMenuAction.GrantAdmin ->
-                    OutlinedButton(
+                    SettingsActionRow(
+                        icon = Icons.Default.Shield,
+                        title = stringResource(R.string.make_admin),
+                        enabled = !busy,
                         onClick = { runMutation { controller.setMemberAdmin(targetMember, admin = true) } },
-                        enabled = !busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.Shield, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.make_admin))
-                    }
+                    )
                 GroupMemberMenuAction.RevokeAdmin ->
-                    OutlinedButton(
+                    SettingsActionRow(
+                        icon = Icons.Default.Shield,
+                        title = stringResource(R.string.remove_admin),
+                        enabled = !busy,
                         onClick = { runMutation { controller.setMemberAdmin(targetMember, admin = false) } },
-                        enabled = !busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.Shield, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.remove_admin))
-                    }
+                    )
                 GroupMemberMenuAction.RemoveMember ->
-                    OutlinedButton(
-                        onClick = { confirmRemove = true },
+                    DangerActionRow(
+                        icon = Icons.Default.Delete,
+                        title = stringResource(R.string.remove_member),
                         enabled = !busy,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors =
-                            ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error,
-                            ),
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.remove_member))
-                    }
+                        onClick = { confirmRemove = true },
+                    )
                 // Self is excluded on this surface, so StepDownAsAdmin never
                 // appears (it is filtered out by profileSheetAdminActions).
                 GroupMemberMenuAction.StepDownAsAdmin -> Unit
@@ -20209,7 +19249,7 @@ private fun qrBitmap(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QrScannerSheet(
+internal fun QrScannerSheet(
     onDismiss: () -> Unit,
     onScan: (String) -> Unit,
 ) {
