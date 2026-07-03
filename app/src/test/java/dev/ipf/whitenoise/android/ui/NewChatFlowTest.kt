@@ -208,6 +208,9 @@ class NewChatFlowTest {
                 memberCount = 1,
             ),
         )
+        // Once the roster reaches two nameless members, normal live-DM detection
+        // suppresses the subtitle; the 0/1-member cases above are the transient
+        // states covered by the open-time hint.
         assertFalse(
             shouldShowConversationMembersSubtitle(
                 membersLoaded = true,

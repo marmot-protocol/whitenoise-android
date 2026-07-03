@@ -1622,6 +1622,9 @@ private fun MainShell(
         selectedChatFocusMessageId = null
         selectedChatOpenedFromNotification = false
         selectedChatJustCreated = justCreated
+        // `justCreated` is true only for freshly-created DMs; group creation and
+        // existing-DM opens pass false. Reuse that DM-only invariant for the
+        // open-time subtitle hint (#998).
         selectedChatOpenedAsDmHint = justCreated
         selectedChat = item
         appState.clearPresentedProfile()
@@ -1693,6 +1696,9 @@ private fun MainShell(
                     selectedChatFocusHighlight = true
                     selectedChatOpenedFromNotification = false
                     selectedChatJustCreated = justCreated
+                    // `justCreated` is true only for freshly-created DMs; group
+                    // creation and existing-DM opens pass false. Reuse that DM-only
+                    // invariant for the open-time subtitle hint (#998).
                     selectedChatOpenedAsDmHint = justCreated
                     selectedChat = item
                 },
@@ -3590,7 +3596,9 @@ internal fun canInviteFromEmptyGroup(
  * The top bar must not show group copy until the initial roster has loaded, and
  * a just-created DM gets one extra grace state: while its nameless roster is
  * still 0/1 members, keep the DM presentation instead of flashing "Just you" or
- * "1 member" before the peer row hydrates (#998).
+ * "1 member" before the peer row hydrates. If that one-member DM state stalls,
+ * keep it quiet for this open session and let a later reopen re-evaluate from
+ * live roster state (#998).
  */
 internal fun shouldShowConversationMembersSubtitle(
     membersLoaded: Boolean,
