@@ -875,4 +875,5 @@
     <string name="encryption">Encryption</string>
     <string name="encryption_e2ee_note">Messages are end-to-end encrypted</string>
     <string name="chat_lock">Chat lock</string>
+    <string name="toast_disappearing_not_applied">The group was created, but disappearing messages could not be turned on</string>
 </resources>

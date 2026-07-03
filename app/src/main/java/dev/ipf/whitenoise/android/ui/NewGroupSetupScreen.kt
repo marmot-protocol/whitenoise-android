@@ -96,7 +96,9 @@ internal fun NewGroupSetupScreen(
     val canCreate = canSubmitNewChatSheet(directMessage = false, busy = busy, pendingRecipient = "", groupName = groupName)
 
     fun create() {
-        if (!canCreate) return
+        // canCreate is a composition-time snapshot; the direct `busy` state
+        // read blocks a second tap that lands before recomposition.
+        if (busy || !canCreate) return
         val account = appState.activeAccountRef ?: return
         val recipients =
             newChatMemberRefs(
@@ -114,10 +116,13 @@ internal fun NewGroupSetupScreen(
             }.onSuccess { groupIdHex ->
                 if (retentionSecs > 0L) {
                     // Applied post-create because the create commit has no
-                    // retention parameter; a failure here leaves the group
-                    // usable with the default (off) window.
+                    // retention parameter; a failure leaves the group usable
+                    // with the default (off) window, so say so instead of
+                    // letting the user believe the timer is on.
                     runCatching {
                         appState.marmotIo { updateMessageRetention(account, groupIdHex, retentionSecs.toULong()) }
+                    }.onFailure {
+                        appState.present(R.string.toast_disappearing_not_applied, copyable = true)
                     }
                 }
                 appState.present(R.string.toast_chat_created)

@@ -123,7 +123,10 @@ private fun NewMessageScreen(
     var creatingHex by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboardManager.current
 
-    BackHandler { onBack() }
+    // Back is parked while a tapped person's chat is being created; otherwise
+    // the process-lifetime create would yank the user into the new
+    // conversation seconds after they left this screen.
+    BackHandler(enabled = creatingHex == null) { onBack() }
 
     val activeHex = appState.activeAccount?.accountIdHex
     val candidates =
@@ -168,7 +171,7 @@ private fun NewMessageScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.new_message)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, enabled = creatingHex == null) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
@@ -208,7 +211,10 @@ private fun NewMessageScreen(
                         )
                     }
                 }
-                val resolvedHex = resolution.resolvedHex
+                // A pasted/scanned self identifier is dropped like the browse
+                // list drops the active account, landing on "No matches".
+                val resolvedHex =
+                    resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
                 if (identifierQuery && resolution.state == RecipientPreviewState.Resolving) {
                     item { ResolvingContactRow() }
                 } else if (identifierQuery && resolvedHex != null) {

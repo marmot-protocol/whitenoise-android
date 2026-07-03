@@ -66,7 +66,7 @@ internal fun ContactPickerScreen(
     var showScanner by remember { mutableStateOf(false) }
     val resolution = rememberRecipientResolution(query, appState)
 
-    BackHandler { onBack() }
+    BackHandler(enabled = !busy) { onBack() }
 
     val activeHex = appState.activeAccount?.accountIdHex
     val candidates =
@@ -105,7 +105,7 @@ internal fun ContactPickerScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, enabled = !busy) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
@@ -161,7 +161,10 @@ internal fun ContactPickerScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(bottom = 96.dp),
             ) {
-                val resolvedHex = resolution.resolvedHex
+                // A pasted/scanned self identifier is dropped like the browse
+                // list drops the active account, landing on "No matches".
+                val resolvedHex =
+                    resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
                 if (identifierQuery && resolution.state == RecipientPreviewState.Resolving) {
                     item { ResolvingContactRow() }
                 } else if (identifierQuery && resolvedHex != null) {

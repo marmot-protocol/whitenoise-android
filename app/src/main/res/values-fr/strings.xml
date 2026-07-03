@@ -857,4 +857,5 @@
     <string name="encryption">Chiffrement</string>
     <string name="encryption_e2ee_note">Les messages sont chiffrés de bout en bout</string>
     <string name="chat_lock">Verrouillage de la discussion</string>
+    <string name="toast_disappearing_not_applied">Le groupe a été créé, mais les messages éphémères n’ont pas pu être activés</string>
 </resources>

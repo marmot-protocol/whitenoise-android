@@ -855,4 +855,5 @@
     <string name="encryption">Şifreleme</string>
     <string name="encryption_e2ee_note">Mesajlar uçtan uca şifrelenir</string>
     <string name="chat_lock">Sohbet kilidi</string>
+    <string name="toast_disappearing_not_applied">Grup oluşturuldu ancak kaybolan mesajlar açılamadı</string>
 </resources>
