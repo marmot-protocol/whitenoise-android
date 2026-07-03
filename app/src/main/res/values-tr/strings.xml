@@ -67,8 +67,8 @@
     <string name="new_chat">Yeni sohbet</string>
     <string name="error_not_white_noise_profile_qr">Bu QR kodu bir White Noise profili değil.</string>
     <string name="error_valid_recipient_reference">Geçerli bir npub, profil bağlantısı veya hex genel anahtarı girin.</string>
-    <string name="error_missing_key_package">Bu hesabın henüz yayınlanmış bir anahtar paketi yok. Onlardan White Noise açmalarını isteyin ve tekrar deneyin.</string>
-    <string name="error_missing_key_package_for">%1$s için henüz yayınlanmış bir anahtar paketi yok. Onlardan White Noise açmalarını isteyin ve tekrar deneyin.</string>
+    <string name="error_missing_key_package">Bu kişi henüz şifreli mesajlaşmayı ayarlamadı. White Noise uygulamasını yükleyip bir kez açmasını isteyin, ardından tekrar deneyin.</string>
+    <string name="error_missing_key_package_for">%1$s henüz şifreli mesajlaşmayı ayarlamadı. White Noise uygulamasını yükleyip bir kez açmasını isteyin, ardından tekrar deneyin.</string>
     <string name="error_invalid_identity_reference">Bu alıcı geçerli bir Nostr genel anahtarı değil. Bir npub, profil bağlantısı veya hex genel anahtarı kullanın.</string>
     <string name="error_group_publish_failed">Grup yerel olarak oluşturuldu ancak yayınlanamadı: %1$s</string>
     <string name="remove">Kaldır</string>

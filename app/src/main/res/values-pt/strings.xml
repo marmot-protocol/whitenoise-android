@@ -67,8 +67,8 @@
     <string name="new_chat">Novo chat</string>
     <string name="error_not_white_noise_profile_qr">Esse código QR não é um perfil White Noise.</string>
     <string name="error_valid_recipient_reference">Insira um npub válido, link de perfil ou chave pública hex.</string>
-    <string name="error_missing_key_package">Essa conta ainda não possui um pacote de chaves publicado. Peça-lhes para abrirem White Noise e tente novamente.</string>
-    <string name="error_missing_key_package_for">%1$s ainda não possui um pacote de chaves publicado. Peça-lhes para abrirem White Noise e tente novamente.</string>
+    <string name="error_missing_key_package">Esta pessoa ainda não configurou mensagens criptografadas. Peça para ela instalar o White Noise e abrir o app uma vez; depois tente novamente.</string>
+    <string name="error_missing_key_package_for">%1$s ainda não configurou mensagens criptografadas. Peça para ela instalar o White Noise e abrir o app uma vez; depois tente novamente.</string>
     <string name="error_invalid_identity_reference">Esse destinatário não é uma chave pública Nostr válida. Use um npub, link de perfil ou chave pública hex.</string>
     <string name="error_group_publish_failed">O grupo foi criado localmente, mas a publicação falhou: %1$s</string>
     <string name="remove">Remover</string>
