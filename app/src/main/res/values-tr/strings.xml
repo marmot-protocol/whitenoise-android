@@ -734,6 +734,21 @@
     <string name="sign_out_and_wipe">Oturumu kapat &amp; sil</string>
     <string name="sign_out_and_wipe_confirm_body">Bu işlem bu cihazda geri alınamaz. Bu hesaba ait yerel veritabanı, MLS durumu, anahtar zinciri kaydı ve rölelerdeki anahtar paketleri kaldırılacak.</string>
     <string name="sign_out_and_wipe_confirm_field_label">Doğrulama</string>
+    <string name="sign_out_delete_key_packages_label">Anahtar paketlerini rölelerden sil</string>
+    <string name="sign_out_delete_key_packages_help">Oturumunuz kapalıyken yabancıların sizi yeni gruplara davet etmesini engeller.</string>
+    <string name="toast_signed_out_locally_relay_retry">Yerel olarak oturum kapatıldı — röle temizliği bir sonraki oturum açışınızda yeniden denenecek.</string>
+    <string name="wipe_progress_title">Oturum kapatılıyor ve siliniyor…</string>
+    <string name="wipe_stage_leaving_groups">Gruplardan çıkılıyor…</string>
+    <string name="wipe_stage_deleting_key_packages">Anahtar paketleri siliniyor…</string>
+    <string name="wipe_stage_wiping_local_data">Yerel veriler siliniyor…</string>
+    <plurals name="wipe_finished_with_issues">
+        <item quantity="one">Silme %1$d sorunla tamamlandı</item>
+        <item quantity="other">Silme %1$d sorunla tamamlandı</item>
+    </plurals>
+    <string name="wipe_outcome_groups_left">%1$d gruptan çıkıldı</string>
+    <string name="wipe_outcome_key_packages_deleted">%1$d anahtar paketi silindi</string>
+    <string name="wipe_outcome_local_wipe_done">Yerel veriler silindi</string>
+    <string name="wipe_outcome_local_wipe_incomplete">Yerel veriler tamamen silinemedi</string>
     <string name="secret_key_backup">Gizli anahtar yedekleme</string>
     <string name="secret_key_backup_help">Yedeklemek için imza anahtarınızı dışa aktarın. Ham nsec’e sahip olan herkes kimliğinizi kontrol edebilir. Şifreli dışa aktarma (ncryptsec) için çözme parolası gerekir.</string>
     <string name="export_nsec">nsec dışa aktar</string>
@@ -743,7 +758,6 @@
     <string name="export_encrypted_secret_field_label">Parola</string>
     <string name="share_secret_key">Gizli anahtarı paylaş</string>
     <string name="signed_out">Oturum kapalı</string>
-    <string name="toast_couldnt_sign_out">Oturum kapatılamadı</string>
     <string name="toast_couldnt_sign_in_account">Hesaba giriş yapılamadı</string>
     <string name="toast_couldnt_export_nsec">Gizli anahtar dışa aktarılamadı</string>
     <string name="sign_out_and_wipe_confirm_instruction">Onaylamak için %1$s yazın.</string>

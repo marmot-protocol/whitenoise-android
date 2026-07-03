@@ -729,6 +729,20 @@
     <string name="sign_out_and_wipe">退出登录并清除</string>
     <string name="sign_out_and_wipe_confirm_body">此操作在本设备上无法撤销。该账户的本地数据库、MLS 状态、钥匙串条目以及中继上的密钥包都将被删除。</string>
     <string name="sign_out_and_wipe_confirm_field_label">确认操作</string>
+    <string name="sign_out_delete_key_packages_label">从中继删除密钥包</string>
+    <string name="sign_out_delete_key_packages_help">防止陌生人在你退出登录期间邀请你加入新群组。</string>
+    <string name="toast_signed_out_locally_relay_retry">已在本地退出登录 — 中继清理将在下次登录时重试。</string>
+    <string name="wipe_progress_title">正在退出登录并清除…</string>
+    <string name="wipe_stage_leaving_groups">正在退出群组…</string>
+    <string name="wipe_stage_deleting_key_packages">正在删除密钥包…</string>
+    <string name="wipe_stage_wiping_local_data">正在清除本地数据…</string>
+    <plurals name="wipe_finished_with_issues">
+        <item quantity="other">清除完成，发现 %1$d 个问题</item>
+    </plurals>
+    <string name="wipe_outcome_groups_left">已退出 %1$d 个群组</string>
+    <string name="wipe_outcome_key_packages_deleted">已删除 %1$d 个密钥包</string>
+    <string name="wipe_outcome_local_wipe_done">本地数据已清除</string>
+    <string name="wipe_outcome_local_wipe_incomplete">本地数据未完全清除</string>
     <string name="secret_key_backup">密钥备份</string>
     <string name="secret_key_backup_help">导出签名密钥以进行备份。任何拥有原始 nsec 的人都可以控制你的身份。加密导出（ncryptsec）需要密码才能解密。</string>
     <string name="export_nsec">导出 nsec</string>
@@ -738,7 +752,6 @@
     <string name="export_encrypted_secret_field_label">密码</string>
     <string name="share_secret_key">分享密钥</string>
     <string name="signed_out">已退出</string>
-    <string name="toast_couldnt_sign_out">无法退出登录</string>
     <string name="toast_couldnt_sign_in_account">无法登录该账户</string>
     <string name="toast_couldnt_export_nsec">无法导出密钥</string>
     <string name="sign_out_and_wipe_confirm_instruction">输入 %1$s 以确认。</string>
