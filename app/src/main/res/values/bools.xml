@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <bool name="pre_compose_light_system_bars">true</bool>
+    <!-- Overridden to true in the staging source set; gates staging-only UI. -->
+    <bool name="staging_build">false</bool>
 </resources>

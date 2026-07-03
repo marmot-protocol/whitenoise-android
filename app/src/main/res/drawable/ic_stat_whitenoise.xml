@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Notification small icon: the White Noise "M" mark, converted from the
+    production logo SVG in the marmot-protocol/whitenoise (Flutter) repo
+    (ios/Runner/production.icon/Assets/Logo.svg). Must stay alpha-only
+    white — the system renders small icons from the alpha channel and
+    tints them itself.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
     <path
         android:fillColor="@android:color/white"
-        android:pathData="M12,2.5C7.25,2.5 3.4,5.87 3.4,10.03C3.4,12.55 4.82,14.78 7,16.14V20.5L11.1,17.42C11.4,17.45 11.7,17.46 12,17.46C16.75,17.46 20.6,14.09 20.6,9.93C20.6,5.78 16.75,2.5 12,2.5ZM8.25,9.96C8.25,9.22 8.85,8.62 9.59,8.62C10.33,8.62 10.93,9.22 10.93,9.96C10.93,10.7 10.33,11.3 9.59,11.3C8.85,11.3 8.25,10.7 8.25,9.96ZM13.07,9.96C13.07,9.22 13.67,8.62 14.41,8.62C15.15,8.62 15.75,9.22 15.75,9.96C15.75,10.7 15.15,11.3 14.41,11.3C13.67,11.3 13.07,10.7 13.07,9.96Z" />
+        android:fillType="evenOdd"
+        android:pathData="M174.057,771.956V252.044H348.115V411.296L424.971,252.044H599.029V411.296L675.885,252.044H849.943V771.956H675.885V612.704L599.029,771.956H424.971V612.704L348.115,771.956H174.057ZM320.989,279.17H201.183V715.749L320.989,467.503V279.17ZM703.011,744.83H822.817V308.251L703.011,556.497V744.83ZM582,744.83L806.732,279.17H692.914L468.182,744.83H582ZM555.818,279.17H442L217.268,744.83H331.086L555.818,279.17ZM571.903,308.251L452.097,556.497V715.749L571.903,467.503V308.251Z" />
 </vector>

@@ -295,6 +295,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.booleanResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -17235,20 +17236,42 @@ private fun SettingsHomeScreen(
                 // surface to keep the line uncluttered; triage that
                 // needs the code can read it via `dumpsys package`,
                 // logcat, or the Diagnostics screen.
-                Text(
-                    text =
-                        stringResource(
-                            R.string.settings_version_label,
-                            BuildConfig.VERSION_NAME,
-                        ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
+                Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .padding(top = 8.dp, bottom = 24.dp),
-                )
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text =
+                            stringResource(
+                                R.string.settings_version_label,
+                                BuildConfig.VERSION_NAME,
+                            ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    // Release-channel badge: `staging_build` is false in main
+                    // resources and overridden to true only in the staging
+                    // source set, so dev/production never render it.
+                    if (booleanResource(R.bool.staging_build)) {
+                        Surface(
+                            shape = PillShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_staging_badge),
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
             }
         }
     }
