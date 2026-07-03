@@ -101,6 +101,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -125,6 +126,7 @@ import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
@@ -439,8 +441,12 @@ import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.ReactionParticipant
 import dev.ipf.whitenoise.android.state.RelayListKind
+import dev.ipf.whitenoise.android.state.SignOutCompletion
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.WipeReport
+import dev.ipf.whitenoise.android.state.WipeStage
+import dev.ipf.whitenoise.android.state.WipeStageReport
 import dev.ipf.whitenoise.android.state.countUnreadIncoming
 import dev.ipf.whitenoise.android.state.formatExactTimestamp
 import dev.ipf.whitenoise.android.state.isAcceptableRelayUrl
@@ -453,6 +459,7 @@ import dev.ipf.whitenoise.android.state.shortHex
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
+import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
@@ -815,6 +822,20 @@ fun WhiteNoiseApp(
                         AppLockScreen(
                             error = appState.appUnlockError,
                             onRetry = { appState.requestAppUnlock() },
+                        )
+                    }
+                    // Sign Out & Wipe chrome (#350) is hosted here, above the
+                    // phase router: the wipe flips the active account (or drops
+                    // to Onboarding) mid-flight, popping whatever screen
+                    // started it, so neither the progress sheet nor the
+                    // partial-failure outcome sheet can live in that screen.
+                    if (appState.wipeInProgress) {
+                        WipeProgressSheet()
+                    }
+                    appState.pendingWipeReport?.let { report ->
+                        WipeOutcomeSheet(
+                            report = report,
+                            onDismiss = { appState.pendingWipeReport = null },
                         )
                     }
                 }
@@ -20216,17 +20237,24 @@ private fun IdentityScreen(
 
     if (showSignOutSheet) {
         SignOutSheet(
-            onConfirm = {
+            onConfirm = { deleteKeyPackages ->
                 showSignOutSheet = false
                 appState.signOutInProgress = true
                 // Mutation scope, not the screen scope: signOutActiveAccount()
-                // flips activeAccountRef before its disk-media wipe / push
-                // cleanup finishes, and the account-change nav reset pops this
-                // screen — a screen-scoped job would be cancelled mid-teardown.
+                // flips activeAccountRef before its disk-media wipe finishes,
+                // and the account-change nav reset pops this screen — a
+                // screen-scoped job would be cancelled mid-teardown.
                 appState.launchMutation {
                     try {
-                        if (appState.signOutActiveAccount() != null) {
-                            appState.present(R.string.toast_signed_out)
+                        when (appState.signOutActiveAccount(deleteKeyPackages)) {
+                            SignOutCompletion.Complete -> appState.present(R.string.toast_signed_out)
+                            // Local sign-out completed but the engine call
+                            // failed or reported relay cleanup failures.
+                            // Informational, not copyable (#966): the retry is
+                            // automatic on next sign-in, nothing to report.
+                            SignOutCompletion.RelayCleanupPending ->
+                                appState.present(R.string.toast_signed_out_locally_relay_retry)
+                            null -> Unit
                         }
                     } finally {
                         appState.signOutInProgress = false
@@ -20314,18 +20342,33 @@ private fun IdentityScreen(
                         // (push teardown, notification refresh); the account-change nav
                         // reset in MainShell then pops IdentityScreen out of composition,
                         // which would cancel a screen-scoped coroutine before the wipe
-                        // finishes and before the success toast is presented (#547).
-                        appState.signOutInProgress = true
+                        // finishes and before the outcome is presented (#547).
+                        //
+                        // wipeInProgress (not signOutInProgress) drives the
+                        // app-root staged progress sheet (#350), which survives
+                        // that nav reset.
+                        appState.wipeInProgress = true
                         appState.launchMutation {
                             try {
                                 val outcome = appState.signOutAndWipeActiveAccount()
-                                if (outcome != null) {
-                                    appState.present(R.string.toast_signed_out_and_wiped)
-                                } else {
+                                if (outcome == null) {
+                                    // Total FFI failure: nothing was wiped and the
+                                    // runtime state was restored — this one is
+                                    // worth a bug report, so keep it copyable.
                                     appState.present(R.string.toast_couldnt_wipe_account, copyable = true)
+                                } else {
+                                    val report = wipeReport(outcome)
+                                    if (report.clean) {
+                                        appState.present(R.string.toast_signed_out_and_wiped)
+                                    } else {
+                                        // Local wipe completed regardless; the
+                                        // app-root sheet lists the best-effort
+                                        // relay/group failures (#350).
+                                        appState.pendingWipeReport = report
+                                    }
                                 }
                             } finally {
-                                appState.signOutInProgress = false
+                                appState.wipeInProgress = false
                             }
                         }
                     },
@@ -20635,17 +20678,18 @@ private fun EncryptedBackupPassphraseStrength.color(): Color =
     }
 
 /**
- * Non-destructive sign-out sheet (#348). Explains what stays on device and what
- * changes, then performs the actual sign-out via [onConfirm]. Copy is
- * intentionally limited to what the current sign-out path actually does (push
- * off, relay KeyPackage deletion, in-memory caches cleared, identity retained).
+ * Non-destructive sign-out sheet (#348, #349). Explains what stays on device
+ * and what changes, offers the "Delete key packages from relays" toggle
+ * (default ON — passed through to the engine `sign_out` FFI), then performs
+ * the actual sign-out via [onConfirm].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SignOutSheet(
-    onConfirm: () -> Unit,
+    onConfirm: (deleteKeyPackages: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var deleteKeyPackages by remember { mutableStateOf(true) }
     ModalBottomSheet(
         containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismiss,
@@ -20676,7 +20720,28 @@ private fun SignOutSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = deleteKeyPackages,
+                        role = Role.Switch,
+                        onValueChange = { deleteKeyPackages = it },
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(stringResource(R.string.sign_out_delete_key_packages_label))
+                    Text(
+                        stringResource(R.string.sign_out_delete_key_packages_help),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = deleteKeyPackages, onCheckedChange = null)
+            }
+            Button(onClick = { onConfirm(deleteKeyPackages) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Close, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.sign_out))
@@ -20749,6 +20814,125 @@ private fun WipeBullet(text: String) {
         Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
+
+/**
+ * Non-cancellable staged progress sheet shown while the engine's
+ * `signOutAndWipe` runs (#350). The FFI is a single suspend call that reports
+ * per-stage results only in its final [dev.ipf.marmotkit.WipeOutcomeFfi] \u2014
+ * there is no streaming progress \u2014 so this deliberately renders all three
+ * stages as in-flight with indeterminate expressive indicators rather than
+ * faking real-time per-stage advancement; the stages are marked from the
+ * outcome afterwards (partial-failure sheet, or success toast). Hosted at the
+ * app root because the wipe pops the screen that started it mid-flight.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WipeProgressSheet() {
+    ModalBottomSheet(
+        containerColor = amoledSheetContainerColor(),
+        // The teardown cannot be cancelled: swallow scrim taps, reject the
+        // hide gesture, keep back from dismissing, and drop the drag handle so
+        // the sheet doesn't advertise a dismissal it won't honor.
+        onDismissRequest = {},
+        sheetState =
+            rememberModalBottomSheetState(
+                skipPartiallyExpanded = true,
+                confirmValueChange = { it != SheetValue.Hidden },
+            ),
+        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false),
+        dragHandle = null,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(stringResource(R.string.wipe_progress_title), style = MaterialTheme.typography.titleLarge)
+            WipeProgressStageRow(stringResource(R.string.wipe_stage_leaving_groups))
+            WipeProgressStageRow(stringResource(R.string.wipe_stage_deleting_key_packages))
+            WipeProgressStageRow(stringResource(R.string.wipe_stage_wiping_local_data))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun WipeProgressStageRow(label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        LoadingIndicator(modifier = Modifier.size(28.dp))
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/**
+ * Post-wipe partial-failure sheet (#350): "Wipe finished with N issues", one
+ * row per engine stage with its best-effort failures. Renders only the mapped
+ * [WipeReport] snapshot \u2014 the wiped account's ref is invalid by the time this
+ * shows, so nothing here may reach back into the FFI (see #956). Shown over
+ * the post-wipe end state (next account's chat list, or onboarding).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WipeOutcomeSheet(
+    report: WipeReport,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        containerColor = amoledSheetContainerColor(),
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                pluralStringResource(R.plurals.wipe_finished_with_issues, report.issueCount, report.issueCount),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            report.stages.forEach { stage -> WipeOutcomeStageRow(stage) }
+            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.close))
+            }
+        }
+    }
+}
+
+@Composable
+private fun WipeOutcomeStageRow(stage: WipeStageReport) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Icon(
+            if (stage.hasIssues) Icons.Default.ErrorOutline else Icons.Default.CheckCircle,
+            contentDescription = null,
+            tint = if (stage.hasIssues) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        )
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(wipeOutcomeStageSummary(stage))
+            stage.failures.forEach { failure ->
+                Text(
+                    listOfNotNull(failure.subject, failure.reason.takeIf { it.isNotBlank() }).joinToString(" \u2014 "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun wipeOutcomeStageSummary(stage: WipeStageReport): String =
+    when (stage.stage) {
+        WipeStage.LeavingGroups ->
+            stringResource(R.string.wipe_outcome_groups_left, stage.completedCount ?: 0)
+        WipeStage.DeletingKeyPackages ->
+            stringResource(R.string.wipe_outcome_key_packages_deleted, stage.completedCount ?: 0)
+        WipeStage.WipingLocalData ->
+            stringResource(
+                if (stage.hasIssues) R.string.wipe_outcome_local_wipe_incomplete else R.string.wipe_outcome_local_wipe_done,
+            )
+    }
 
 @Composable
 private fun CopyableValueRow(

@@ -36,7 +36,6 @@ import dev.ipf.marmotkit.PushPlatformFfi
 import dev.ipf.marmotkit.RelayTelemetryResourceFfi
 import dev.ipf.marmotkit.RelayTelemetryRuntimeConfigFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
-import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
@@ -652,6 +651,19 @@ class WhiteNoiseAppState(
     // show a blocking spinner. Lives here (not in the screen) because the wipe
     // runs on the mutation scope and pops the identity screen mid-teardown.
     var signOutInProgress by mutableStateOf(false)
+
+    // Set while the destructive Sign Out & Wipe FFI call is in flight (#350).
+    // Drives the non-cancellable staged progress sheet, which is hosted at the
+    // app root (not the identity screen) because the wipe flips the active
+    // account partway through and the resulting nav reset pops the screen that
+    // started it.
+    var wipeInProgress by mutableStateOf(false)
+
+    // Structured outcome of a wipe that finished with issues (#350): drives
+    // the "Wipe finished with N issues" sheet at the app root, over whatever
+    // end state the wipe navigated to. Null when nothing is pending; the
+    // sheet's dismiss clears it. Clean wipes never set this — they toast.
+    var pendingWipeReport by mutableStateOf<WipeReport?>(null)
 
     /**
      * True only when both developer mode and the streaming-debug toggle are on.
@@ -1835,7 +1847,21 @@ class WhiteNoiseAppState(
         profileRevision += 1
     }
 
-    suspend fun signOutActiveAccount(): SignOutOutcomeFfi? {
+    /**
+     * Non-destructive sign-out of the active account, driven by the engine's
+     * [dev.ipf.marmotkit.Marmot.signOut] (#349). The engine owns the per-step
+     * teardown — account deactivation, push registration teardown, and (when
+     * [deleteKeyPackages]) relay KeyPackage deletion — so this method keeps
+     * only the local UI bookkeeping: media-cache wipe, active-account
+     * switch/navigation, and notification settings refresh.
+     *
+     * An engine failure (relay unreachable, runtime error) must not strand
+     * the user in a session they asked to leave: local sign-out still
+     * completes and the result is [SignOutCompletion.RelayCleanupPending] so
+     * the caller can hint that relay cleanup retries on the next sign-in.
+     * Returns null only when no account is active.
+     */
+    suspend fun signOutActiveAccount(deleteKeyPackages: Boolean = true): SignOutCompletion? {
         // Sign-out is a non-destructive session switch: the identity stays in
         // the device keychain and the user can switch back to it. Per-account
         // state that the user would expect to find on return (drafts, recent
@@ -1854,15 +1880,28 @@ class WhiteNoiseAppState(
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
+        // The account is signed out engine-side once this returns; no code
+        // below may issue further account-scoped FFI calls for signedOutRef.
         val engineOutcome =
             runCatching {
-                marmotIo { signOut(signedOutRef, deleteKeyPackages = true) }
+                marmotIo { signOut(signedOutRef, deleteKeyPackages) }
+            }.onSuccess {
+                // The engine deactivated the account (including its push
+                // registration), so any disable retry queued by an older
+                // per-step sign-out attempt is moot. Drop the local push
+                // fingerprint too: server-side registration state changed
+                // underneath the cache, and a stale hit would make a later
+                // re-sign-in skip the re-registration it needs.
+                pushTokenStore.clearPendingDisable(signedOutRef)
+                nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
             }.onFailure {
                 rethrowIfCancellation(it)
                 appStateDebug(it) { "signOut failed account=${signedOutRef.take(8)}: ${it.readableMessage()}" }
-                present(R.string.toast_couldnt_sign_out, AppText.Plain(it.readableMessage()), copyable = true)
+                // The engine never deactivated the account, so queue a push
+                // disable for the next foreground sync; the relay-side
+                // KeyPackage cleanup is the engine's to retry on next sign-in.
+                pushTokenStore.recordPendingDisable(signedOutRef)
             }.getOrNull()
-                ?: return null
         refreshAccounts()
         val outcome = signOutOutcome(accounts.map { it.label }, signedOutRef)
         val next = outcome.nextActiveRef
@@ -1877,26 +1916,11 @@ class WhiteNoiseAppState(
         // MainShell with no active account. See issue #11.
         phase = outcome.phase
         wipeDecryptedMediaFromDisk()
-        // Tell the runtime to forget the signed-out account's push
-        // registration before refreshing visible settings. Otherwise the
-        // MIP-05 server keeps wrapping wake messages for an account that
-        // can no longer decrypt them on this device. Best-effort: a
-        // failure here doesn't block sign-out, the next foreground sync
-        // will retry.
-        runCatching { marmotIo { setNativePushEnabled(signedOutRef, false) } }
-            .onSuccess { pushTokenStore.clearPendingDisable(signedOutRef) }
-            .onFailure {
-                rethrowIfCancellation(it)
-                // Runtime flag stays enabled; queue the disable so the sync skips this account and retries it.
-                pushTokenStore.recordPendingDisable(signedOutRef)
-                appStateDebug { "setNativePushEnabled(false) failed on sign-out; queued disable retry: ${it.readableMessage()}" }
-            }
-        clearPushRegistrationForAccount(signedOutRef)
         // Drop the cached FCM token only when no accounts remain on the
         // device — other identities still need it on multi-account switch.
         if (next == null) pushTokenStore.clear()
         refreshLocalNotificationSettings()
-        return engineOutcome
+        return signOutCompletion(engineOutcome)
     }
 
     suspend fun exportActiveAccountNsec(): String? {
