@@ -18,9 +18,10 @@ import java.util.Locale
  * Callers that issue a real request to a user-controlled host should ALSO call
  * the resolve-time check [isPrivateOrLoopbackAddress] on each resolved
  * [InetAddress] from the IO dispatcher — that closes the public-name →
- * private-IP gap. (A pinned-IP connection would be needed to fully defeat an
- * active mid-connection rebind, which `HttpURLConnection` can't express; the
- * resolve-time check is the high-value layer that blocks the common attack.)
+ * private-IP gap. ([SafeHttpsGet] additionally pins its socket to a vetted
+ * resolved address so the answer that was checked is the answer that is
+ * dialed — a short-TTL rebind between check and connect can't re-steer it;
+ * prefer it over hand-rolling a fetch.)
  */
 object HostSafety {
     /**
