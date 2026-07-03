@@ -60,6 +60,8 @@ private data class StartChatErrorUiState(
     val progressHex: String,
     val detail: AppText,
     val copyable: Boolean,
+    val title: AppText = AppText.Resource(R.string.toast_couldnt_start_chat),
+    val retryGroupIdHex: String? = null,
 )
 
 /**
@@ -163,18 +165,21 @@ private fun NewMessageScreen(
     fun openOrCreateChat(
         npub: String,
         hexForProgress: String,
+        retryGroupIdHex: String? = null,
     ) {
         if (creatingHex != null) return
         startChatError = null
-        appState.existingDirectChat(npub)?.let {
-            onOpenConversation(it, false)
-            return
+        if (retryGroupIdHex == null) {
+            appState.existingDirectChat(npub)?.let {
+                onOpenConversation(it, false)
+                return
+            }
         }
         creatingHex = hexForProgress
         appState.launchMutation {
             try {
                 runCatching {
-                    appState.createProfileChatGroup(npub)
+                    retryGroupIdHex ?: appState.createProfileChatGroup(npub)
                 }.onSuccess { groupIdHex ->
                     val item = appState.awaitChatListItem(groupIdHex)
                     if (item != null) {
@@ -184,8 +189,10 @@ private fun NewMessageScreen(
                             StartChatErrorUiState(
                                 npub = npub,
                                 progressHex = hexForProgress,
-                                detail = AppText.Resource(R.string.couldnt_load_chats),
+                                detail = AppText.Resource(R.string.error_chat_created_not_loaded),
                                 copyable = false,
+                                title = AppText.Resource(R.string.couldnt_load_chats),
+                                retryGroupIdHex = groupIdHex,
                             )
                     }
                 }.onFailure { error ->
@@ -257,7 +264,7 @@ private fun NewMessageScreen(
                     item {
                         StartChatErrorCard(
                             error = error,
-                            onRetry = { openOrCreateChat(error.npub, error.progressHex) },
+                            onRetry = { openOrCreateChat(error.npub, error.progressHex, error.retryGroupIdHex) },
                             onCopy = { detail ->
                                 clipboard.setText(AnnotatedString(detail))
                                 appState.present(R.string.copied)
@@ -395,6 +402,7 @@ private fun StartChatErrorCard(
     onRetry: () -> Unit,
     onCopy: (String) -> Unit,
 ) {
+    val title = error.title.resolveForCompose()
     val detail = error.detail.resolveForCompose()
     Column(
         Modifier
@@ -403,7 +411,7 @@ private fun StartChatErrorCard(
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
     ) {
         Text(
-            stringResource(R.string.toast_couldnt_start_chat),
+            title,
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.error,
         )

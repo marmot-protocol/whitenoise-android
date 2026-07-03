@@ -73,6 +73,8 @@
     <string name="error_missing_key_package_for">%1$s ещё не настроил(а) зашифрованные сообщения. Попросите этого человека установить White Noise и один раз открыть приложение, затем попробуйте снова.</string>
     <string name="error_invalid_identity_reference">Этот получатель не является действительным открытым ключом Nostr. Используйте npub, ссылку на профиль или открытый ключ hex.</string>
     <string name="error_group_publish_failed">Группа была создана локально, но публикация не удалась: %1$s</string>
+    <string name="error_group_create_failed_retry">Что-то пошло не так при настройке зашифрованного чата. Проверьте подключение и повторите попытку.</string>
+    <string name="error_chat_created_not_loaded">Чат создан, но ещё не появился в вашем списке. Повторите попытку через минуту.</string>
     <string name="remove">Удалить</string>
     <string name="npub_or_hex_public_key">npub или hex-публичный ключ</string>
     <string name="scan_recipient_qr_code">Отсканируйте QR код получателя</string>

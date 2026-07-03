@@ -71,6 +71,8 @@
     <string name="error_missing_key_package_for">%1$s ainda não configurou mensagens criptografadas. Peça para ela instalar o White Noise e abrir o app uma vez; depois tente novamente.</string>
     <string name="error_invalid_identity_reference">Esse destinatário não é uma chave pública Nostr válida. Use um npub, link de perfil ou chave pública hex.</string>
     <string name="error_group_publish_failed">O grupo foi criado localmente, mas a publicação falhou: %1$s</string>
+    <string name="error_group_create_failed_retry">Algo deu errado ao configurar a conversa criptografada. Verifique sua conexão e tente novamente.</string>
+    <string name="error_chat_created_not_loaded">A conversa foi criada, mas ainda não apareceu na sua lista. Tente novamente em instantes.</string>
     <string name="remove">Remover</string>
     <string name="npub_or_hex_public_key">npub ou chave pública hex</string>
     <string name="scan_recipient_qr_code">Digitalize o código QR do destinatário</string>

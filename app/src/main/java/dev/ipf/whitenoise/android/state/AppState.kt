@@ -194,7 +194,7 @@ internal fun profileGroupInviteToast(outcome: ProfileGroupInviteOutcome): Profil
 
 private fun Throwable.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
-internal fun startProfileChatFailureDetail(
+internal fun groupCreateFailureDetail(
     throwable: Throwable,
     displayName: (String) -> String,
 ): AppText =
@@ -210,13 +210,26 @@ internal fun startProfileChatFailureDetail(
         }
         is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
         is MarmotKitException.Publish -> AppText.Resource(R.string.error_group_publish_failed, listOf(throwable.details))
+        is MarmotKitException -> AppText.Resource(R.string.error_group_create_failed_retry)
         else -> AppText.Plain(throwable.readableMessage())
     }
 
-internal fun startProfileChatFailureCopyable(throwable: Throwable): Boolean =
-    throwable !is StartProfileChatNoActiveAccountException &&
-        throwable !is MarmotKitException.MissingKeyPackage &&
-        throwable !is MarmotKitException.InvalidIdentity
+internal fun startProfileChatFailureDetail(
+    throwable: Throwable,
+    displayName: (String) -> String,
+): AppText = groupCreateFailureDetail(throwable, displayName)
+
+internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
+    when (throwable) {
+        is StartProfileChatNoActiveAccountException -> false
+        is MarmotKitException.MissingKeyPackage -> false
+        is MarmotKitException.InvalidIdentity -> false
+        is MarmotKitException.Publish -> true
+        is MarmotKitException -> false
+        else -> true
+    }
+
+internal fun startProfileChatFailureCopyable(throwable: Throwable): Boolean = groupCreateFailureCopyable(throwable)
 
 private data class NotificationSystemText(
     val title: String,
