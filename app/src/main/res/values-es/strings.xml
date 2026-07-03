@@ -40,12 +40,7 @@
     <string name="recipient_preview_unresolved">No se pudo resolver este identificador</string>
     <string name="recipient_preview_nip05_verified">Dirección verificada</string>
     <string name="recipient_preview_nip05_unverified">Dirección no verificada</string>
-    <string name="recipient_source_in_dm">en MD</string>
     <string name="recipient_search_empty_hint">Pega un npub para añadir a alguien con quien aún no has chateado.</string>
-    <plurals name="recipient_source_in_groups">
-        <item quantity="one">en %1$d grupo</item>
-        <item quantity="other">en %1$d grupos</item>
-    </plurals>
     <string name="chat_row_action_archive">Archivar</string>
     <string name="chat_row_action_unarchive">Desarchivar</string>
     <string name="chat_row_action_mark_read">Marcar como leído</string>
@@ -843,13 +838,11 @@
     <string name="disappearing_unit_seconds">Segundos</string>
     <string name="disappearing_set">Establecer</string>
 
-    <string name="clear_search">Borrar búsqueda</string>
     <string name="contacts">Contactos</string>
     <string name="next">Siguiente</string>
     <string name="no_matches">Sin coincidencias</string>
     <string name="new_message">Nuevo mensaje</string>
-    <string name="search_people_hint">Nombre, usuario o npub</string>
-    <string name="find_by_username">Buscar por nombre de usuario</string>
+    <string name="search_people_hint">Nombre o npub</string>
     <string name="paste_npub">Pegar npub</string>
     <string name="start_chat">Iniciar chat</string>
     <string name="name_this_group">Nombra este grupo</string>

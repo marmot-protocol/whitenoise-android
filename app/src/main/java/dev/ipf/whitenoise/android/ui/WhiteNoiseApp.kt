@@ -1246,7 +1246,7 @@ private fun SignInContent(
 }
 
 @Composable
-private fun PublicIdentifierFieldTrailingAction(
+internal fun PublicIdentifierFieldTrailingAction(
     value: String,
     enabled: Boolean = true,
     allowHexPublicKey: Boolean = true,
@@ -2789,20 +2789,6 @@ internal fun deriveRecipientCandidates(
         )
     }
 }
-
-/** The dim "in DM" / "in N groups" hint for a candidate's [source], or null. */
-@Composable
-internal fun recipientSourceHint(source: RecipientSearch.Source?): String? =
-    when (source) {
-        RecipientSearch.Source.InDm -> stringResource(R.string.recipient_source_in_dm)
-        is RecipientSearch.Source.InGroups ->
-            if (source.count > 0) {
-                pluralStringResource(R.plurals.recipient_source_in_groups, source.count, source.count)
-            } else {
-                null
-            }
-        null -> null
-    }
 
 private fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,

@@ -67,24 +67,19 @@ internal fun FlowSearchField(
         onValueChange = onValueChange,
         placeholder = { Text(placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-        trailingIcon =
-            when {
-                value.isNotEmpty() -> {
-                    {
-                        IconButton(onClick = { onValueChange("") }) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear_search))
-                        }
+        trailingIcon = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PublicIdentifierFieldTrailingAction(
+                    value = value,
+                    onValueChange = onValueChange,
+                )
+                if (value.isEmpty() && onScanQr != null) {
+                    IconButton(onClick = onScanQr) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_qr_code))
                     }
                 }
-                onScanQr != null -> {
-                    {
-                        IconButton(onClick = onScanQr) {
-                            Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_qr_code))
-                        }
-                    }
-                }
-                else -> null
-            },
+            }
+        },
         singleLine = true,
         shape = shape,
         colors =

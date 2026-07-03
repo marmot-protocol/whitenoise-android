@@ -41,12 +41,7 @@
     <string name="recipient_preview_unresolved">Couldn\'t resolve this identifier</string>
     <string name="recipient_preview_nip05_verified">Verified address</string>
     <string name="recipient_preview_nip05_unverified">Unverified address</string>
-    <string name="recipient_source_in_dm">in DM</string>
     <string name="recipient_search_empty_hint">Paste an npub to add someone you have not chatted with yet.</string>
-    <plurals name="recipient_source_in_groups">
-        <item quantity="one">in %1$d group</item>
-        <item quantity="other">in %1$d groups</item>
-    </plurals>
     <string name="chat_row_action_archive">Archive</string>
     <string name="chat_row_action_unarchive">Unarchive</string>
     <string name="chat_row_action_mark_read">Mark as read</string>
@@ -861,13 +856,11 @@
     <string name="disappearing_unit_seconds">Seconds</string>
     <string name="disappearing_set">Set</string>
 
-    <string name="clear_search">Clear search</string>
     <string name="contacts">Contacts</string>
     <string name="next">Next</string>
     <string name="no_matches">No matches</string>
     <string name="new_message">New message</string>
-    <string name="search_people_hint">Name, username, or npub</string>
-    <string name="find_by_username">Find by username</string>
+    <string name="search_people_hint">Name or npub</string>
     <string name="paste_npub">Paste npub</string>
     <string name="start_chat">Start chat</string>
     <string name="name_this_group">Name this group</string>

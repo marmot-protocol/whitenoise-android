@@ -40,12 +40,7 @@
     <string name="recipient_preview_unresolved">Diese Kennung konnte nicht aufgelöst werden</string>
     <string name="recipient_preview_nip05_verified">Verifizierte Adresse</string>
     <string name="recipient_preview_nip05_unverified">Nicht verifizierte Adresse</string>
-    <string name="recipient_source_in_dm">im Direktchat</string>
     <string name="recipient_search_empty_hint">Füge per npub jemanden hinzu, mit dem du noch nicht geschrieben hast.</string>
-    <plurals name="recipient_source_in_groups">
-        <item quantity="one">in %1$d Gruppe</item>
-        <item quantity="other">in %1$d Gruppen</item>
-    </plurals>
     <string name="chat_row_action_archive">Archivieren</string>
     <string name="chat_row_action_unarchive">Aus dem Archiv</string>
     <string name="chat_row_action_mark_read">Als gelesen markieren</string>
@@ -841,13 +836,11 @@
     <string name="disappearing_unit_seconds">Sekunden</string>
     <string name="disappearing_set">Festlegen</string>
 
-    <string name="clear_search">Suche löschen</string>
     <string name="contacts">Kontakte</string>
     <string name="next">Weiter</string>
     <string name="no_matches">Keine Treffer</string>
     <string name="new_message">Neue Nachricht</string>
-    <string name="search_people_hint">Name, Benutzername oder npub</string>
-    <string name="find_by_username">Nach Benutzername suchen</string>
+    <string name="search_people_hint">Name oder npub</string>
     <string name="paste_npub">npub einfügen</string>
     <string name="start_chat">Chat starten</string>
     <string name="name_this_group">Gruppe benennen</string>

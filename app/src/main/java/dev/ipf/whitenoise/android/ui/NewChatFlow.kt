@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -39,9 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -126,8 +123,6 @@ private fun NewMessageScreen(
     var showScanner by remember { mutableStateOf(false) }
     var creatingHex by remember { mutableStateOf<String?>(null) }
     var preview by remember { mutableStateOf(RecipientResolution.Empty) }
-    val searchFocus = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
     val clipboard = LocalClipboardManager.current
 
     BackHandler { onBack() }
@@ -191,7 +186,6 @@ private fun NewMessageScreen(
                 value = query,
                 onValueChange = { query = it },
                 placeholder = stringResource(R.string.search_people_hint),
-                focusRequester = searchFocus,
                 onScanQr = { showScanner = true },
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
             )
@@ -205,16 +199,6 @@ private fun NewMessageScreen(
                             icon = Icons.Default.Group,
                             title = stringResource(R.string.new_group),
                             onClick = onNewGroup,
-                        )
-                    }
-                    item {
-                        FlowQuickActionRow(
-                            icon = Icons.Default.AlternateEmail,
-                            title = stringResource(R.string.find_by_username),
-                            onClick = {
-                                runCatching { searchFocus.requestFocus() }
-                                keyboard?.show()
-                            },
                         )
                     }
                     item {
@@ -317,21 +301,10 @@ private fun NewMessageScreen(
                             enabled = creatingHex == null,
                             onClick = { openOrCreateChat(candidate.npub, candidate.accountIdHex) },
                             trailing =
-                                when {
-                                    creatingHex == candidate.accountIdHex -> {
-                                        { CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
-                                    }
-                                    else -> {
-                                        recipientSourceHint(candidate.source)?.let { hint ->
-                                            {
-                                                Text(
-                                                    hint,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                        }
-                                    }
+                                if (creatingHex == candidate.accountIdHex) {
+                                    { CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
+                                } else {
+                                    null
                                 },
                         )
                     }
