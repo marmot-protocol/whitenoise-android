@@ -858,4 +858,5 @@
     <string name="encryption_e2ee_note">Los mensajes están cifrados de extremo a extremo</string>
     <string name="chat_lock">Bloqueo del chat</string>
     <string name="toast_disappearing_not_applied">El grupo se creó, pero no se pudieron activar los mensajes temporales</string>
+    <string name="search_members">Buscar miembros</string>
 </resources>

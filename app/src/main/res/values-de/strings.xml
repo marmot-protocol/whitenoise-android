@@ -856,4 +856,5 @@
     <string name="encryption_e2ee_note">Nachrichten sind Ende-zu-Ende-verschlüsselt</string>
     <string name="chat_lock">Chatsperre</string>
     <string name="toast_disappearing_not_applied">Die Gruppe wurde erstellt, aber verschwindende Nachrichten konnten nicht aktiviert werden</string>
+    <string name="search_members">Mitglieder suchen</string>
 </resources>

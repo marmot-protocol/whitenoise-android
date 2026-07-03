@@ -10437,6 +10437,8 @@ private fun GroupDetailsScreen(
     var showEditGroup by remember { mutableStateOf(false) }
     var showAddMember by remember { mutableStateOf(false) }
     var membersExpanded by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var memberSearchOpen by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var memberQuery by remember(controller.group.groupIdHex) { mutableStateOf("") }
     // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
     // leave path and the Admins prompt so a trapped sole admin can hand the
     // role to another member (issue #417).
@@ -10930,7 +10932,36 @@ private fun GroupDetailsScreen(
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            SectionHeader(stringResource(R.string.members_count, controller.members.size))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SectionHeader(
+                    stringResource(R.string.members_count, controller.members.size),
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = {
+                        memberSearchOpen = !memberSearchOpen
+                        if (!memberSearchOpen) memberQuery = ""
+                    },
+                    modifier = Modifier.padding(end = Dimens.spaceSm),
+                ) {
+                    Icon(
+                        if (memberSearchOpen) Icons.Default.Close else Icons.Default.Search,
+                        contentDescription = stringResource(R.string.search_members),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (memberSearchOpen) {
+                FlowSearchField(
+                    value = memberQuery,
+                    onValueChange = { memberQuery = it },
+                    placeholder = stringResource(R.string.search_members),
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg).padding(bottom = Dimens.spaceSm),
+                )
+            }
             if (canEdit) {
                 FlowQuickActionRow(
                     icon = Icons.Default.PersonAdd,
@@ -10975,12 +11006,24 @@ private fun GroupDetailsScreen(
                         ),
                     )
                 }
+            val memberNeedle = memberQuery.trim()
             val visibleMembers =
-                if (membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT) {
-                    displayedMembers
-                } else {
-                    displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
+                when {
+                    memberNeedle.isNotEmpty() ->
+                        displayedMembers.filter {
+                            appState.chatMemberTitleCached(it.memberIdHex).contains(memberNeedle, ignoreCase = true)
+                        }
+                    membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT -> displayedMembers
+                    else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
                 }
+            if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
+                Text(
+                    stringResource(R.string.no_matches),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                )
+            }
             // Row taps route into the profile sheet, which carries the same
             // admin actions (grant/revoke admin, remove) the old per-row menu
             // exposed (#444/#635 scope rules).
@@ -11014,7 +11057,7 @@ private fun GroupDetailsScreen(
                     },
                 )
             }
-            if (!membersExpanded && displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT) {
+            if (memberNeedle.isEmpty() && !membersExpanded && displayedMembers.size > GROUP_MEMBERS_PREVIEW_COUNT) {
                 FlowQuickActionRow(
                     icon = Icons.Default.ExpandMore,
                     title = stringResource(R.string.see_all_members, displayedMembers.size),

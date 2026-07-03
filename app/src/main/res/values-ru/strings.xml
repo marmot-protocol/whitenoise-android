@@ -868,4 +868,5 @@
     <string name="encryption_e2ee_note">Сообщения защищены сквозным шифрованием</string>
     <string name="chat_lock">Блокировка чата</string>
     <string name="toast_disappearing_not_applied">Группа создана, но исчезающие сообщения включить не удалось</string>
+    <string name="search_members">Поиск участников</string>
 </resources>
