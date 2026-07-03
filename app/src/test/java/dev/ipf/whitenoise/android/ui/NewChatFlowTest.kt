@@ -136,6 +136,13 @@ class NewChatFlowTest {
             startProfileChatFailureDetail(missing) { "Alice" },
         )
         assertFalse(startProfileChatFailureCopyable(missing))
+
+        val missingBlankAccount = MarmotKitException.MissingKeyPackage("  ")
+        assertEquals(
+            AppText.Resource(R.string.error_missing_key_package),
+            startProfileChatFailureDetail(missingBlankAccount) { "ignored" },
+        )
+        assertFalse(startProfileChatFailureCopyable(missingBlankAccount))
     }
 
     @Test
