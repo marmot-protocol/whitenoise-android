@@ -1,3 +1,5 @@
+import java.time.LocalDate
+import java.time.ZoneOffset
 import java.util.Properties
 
 plugins {
@@ -425,6 +427,26 @@ androidComponents {
                 else -> true
             }
         variantBuilder.enable = enabled
+    }
+
+    // Embed short commit SHA + build date into every release APK filename so
+    // multiple CI builds against master (which currently share versionCode /
+    // versionName until those are manually bumped) don't produce identically
+    // named APKs. Local builds without GITHUB_SHA fall back to "local".
+    // See issue #992.
+    val shortSha =
+        System.getenv("GITHUB_SHA")?.take(7)
+            ?: System.getenv("GIT_COMMIT")?.take(7)
+            ?: "local"
+    val buildDate = LocalDate.now(ZoneOffset.UTC).toString()
+
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.outputs.forEach { output ->
+            val currentName = output.outputFileName.get()
+            val stem = currentName.removeSuffix(".apk")
+            val suffix = if (currentName.endsWith(".apk")) ".apk" else ""
+            output.outputFileName.set("$stem-$buildDate-$shortSha$suffix")
+        }
     }
 }
 

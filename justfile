@@ -105,7 +105,7 @@ release-fast:
 # sanity-checking a release build on your own phone.
 install-production:
     ./scripts/release.sh --skip-bindings --flavor production --abi arm64-v8a
-    adb install -r {{ PRODUCTION_APK_DIR }}/whitenoise-production-v8a-release-$(date +%F).apk
+    adb install -r "$(ls -t {{ PRODUCTION_APK_DIR }}/whitenoise-production-v8a-release-*.apk | head -1)"
 
 # Launch the installed production variant.
 launch-production:
@@ -121,7 +121,7 @@ uninstall-production:
 # Install the arm64-v8a staging APK on the connected device.
 install-staging:
     ./scripts/release.sh --skip-bindings --flavor staging --abi arm64-v8a
-    adb install -r {{ STAGING_APK_DIR }}/whitenoise-staging-v8a-release-$(date +%F).apk
+    adb install -r "$(ls -t {{ STAGING_APK_DIR }}/whitenoise-staging-v8a-release-*.apk | head -1)"
 
 # Launch the installed staging variant.
 launch-staging:
