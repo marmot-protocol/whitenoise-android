@@ -18396,9 +18396,19 @@ private fun ProfileAddToGroupsSheet(
     val groupTitleCopy = rememberGroupTitleCopy()
     val selected = remember { mutableStateListOf<String>() }
     var confirmSelection by remember { mutableStateOf<List<ChatListItem>?>(null) }
+    var query by remember { mutableStateOf("") }
     val titledGroups =
         remember(groups, groupTitleCopy) {
             groups.map { it to chatListItemDisplayTitle(it, appState, groupTitleCopy) }
+        }
+    val filteredGroups =
+        remember(titledGroups, query) {
+            val needle = query.trim()
+            if (needle.isEmpty()) {
+                titledGroups
+            } else {
+                titledGroups.filter { (_, title) -> title.contains(needle, ignoreCase = true) }
+            }
         }
     LaunchedEffect(groups) {
         val availableGroupIds = groups.mapTo(mutableSetOf()) { it.group.groupIdHex }
@@ -18416,70 +18426,62 @@ private fun ProfileAddToGroupsSheet(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
                     .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 stringResource(R.string.profile_add_to_groups_title, targetName),
                 style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 24.dp),
             )
             Text(
                 stringResource(R.string.profile_add_to_groups_description, targetName),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+            FlowSearchField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = stringResource(R.string.forward_search_chats),
+                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
             )
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
             ) {
+                if (filteredGroups.isEmpty()) {
+                    item {
+                        Text(
+                            stringResource(R.string.no_matches),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                        )
+                    }
+                }
                 items(
-                    titledGroups,
+                    filteredGroups,
                     key = { (item, _) -> item.group.groupIdHex },
                 ) { (item, title) ->
                     val groupId = item.group.groupIdHex
                     val isSelected = selected.contains(groupId)
-
-                    fun toggle() {
-                        if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                    }
-                    ListItem(
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
-                                .clickable(enabled = !busy, role = Role.Checkbox) { toggle() },
-                        leadingContent = {
-                            Avatar(
-                                title = title,
-                                seed = item.group.groupIdHex,
-                                size = 40.dp,
-                                pictureUrl = item.group.avatarUrl,
-                            )
+                    ContactRow(
+                        title = title,
+                        subtitle = stringResource(R.string.members_count, item.memberCount),
+                        avatarSeed = item.group.groupIdHex,
+                        avatarUrl = item.group.avatarUrl,
+                        enabled = !busy,
+                        onClick = {
+                            if (isSelected) selected.remove(groupId) else selected.add(groupId)
                         },
-                        headlineContent = {
-                            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        },
-                        supportingContent = {
-                            Text(
-                                stringResource(R.string.members_count, item.memberCount),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        trailingContent = {
-                            Checkbox(
-                                checked = isSelected,
-                                enabled = !busy,
-                                onCheckedChange = { toggle() },
-                            )
-                        },
+                        trailing = { SelectionIndicator(selected = isSelected) },
                     )
                 }
             }
             Button(
                 onClick = { confirmSelection = selectedGroups },
                 enabled = selectedGroups.isNotEmpty() && !busy,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
             ) {
                 if (busy) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
