@@ -242,6 +242,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -7811,6 +7812,11 @@ private fun ConversationScreen(
     var initialTimelineLoadStarted by remember(chat.id) { mutableStateOf(false) }
     var highlightedMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
     var navigateReplyJob by remember(chat.id) { mutableStateOf<Job?>(null) }
+    // UI-only row-height cache for exact centered scrolls. LazyColumn can only
+    // measure a target after it has been composed; keeping the measured height
+    // by message id lets future off-screen jumps animate straight to the exact
+    // centered offset, while never becoming protocol/data source-of-truth state.
+    val timelineItemHeightsPx = remember(chat.id) { mutableStateMapOf<String, Int>() }
     // In-chat search (#292). Opening from the overflow menu swaps the top
     // bar into an inline search field; closing it restores the normal bar.
     // `searchPinnedMatchId` keeps the active match anchored to a concrete
@@ -8656,7 +8662,9 @@ private fun ConversationScreen(
 
     // Scroll the lazy list so the item at [targetMessageId] sits roughly in the
     // vertical center of the message-list viewport, leaving context above and
-    // below the target visible (#595, #794).
+    // below the target visible (#595, #794). Uses one animated scroll; if the
+    // target was never measured before, any final exact-centering correction is
+    // a non-animated snap rather than the visible bounce from #999.
     suspend fun centerTimelineItemAt(
         targetMessageId: String,
         fallbackTargetIndex: Int,
@@ -8673,23 +8681,56 @@ private fun ConversationScreen(
         }
 
         val targetIndex = currentTargetIndex() ?: fallbackTargetIndex
-        val viewportHeight = listState.layoutInfo.viewportSize.height
+        val layoutInfo = listState.layoutInfo
+        val viewportHeight = layoutInfo.viewportSize.height
         if (viewportHeight <= 0) {
             // Layout not measured yet (rare on a fresh open): fall back to the
             // plain top-aligned jump rather than guessing an offset.
             listState.animateScrollToItem(targetIndex)
             return
         }
-        listState.animateScrollToItem(targetIndex, ReplyNavigation.centeredScrollOffset(viewportHeight))
+        val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+        val firstTimelineListIndex = 1 + olderMessagesHeaderCount
+        val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        val lastTimelineListIndex = firstTimelineListIndex + renderedForHeightSample.size - 1
+        val visibleTargetHeight = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size
+        val visibleTimelineHeights =
+            layoutInfo.visibleItemsInfo
+                .filter { visibleItem ->
+                    if (visibleItem.index !in firstTimelineListIndex..lastTimelineListIndex) return@filter false
+                    val row = renderedForHeightSample.getOrNull(visibleItem.index - firstTimelineListIndex) ?: return@filter false
+                    timelineRowKind(row.record, appState.streamingDebugEnabled) == TimelineRowKind.Bubble
+                }.map { it.size }
         val itemHeight =
-            listState.layoutInfo.visibleItemsInfo
-                .firstOrNull { it.index == (currentTargetIndex() ?: targetIndex) }
-                ?.size
-                ?: return
-        // Now true-center the measured bubble: top at (viewport - item) / 2.
-        val centeredOffset = ReplyNavigation.centeredScrollOffset(viewportHeight, itemHeight)
-        if (centeredOffset != ReplyNavigation.centeredScrollOffset(viewportHeight)) {
-            listState.animateScrollToItem(currentTargetIndex() ?: targetIndex, centeredOffset)
+            ReplyNavigation.itemHeightForScrollPx(
+                targetMessageId = targetMessageId,
+                measuredItemHeightsByMessageId = timelineItemHeightsPx,
+                visibleTargetHeightPx = visibleTargetHeight,
+                visibleTimelineItemHeightsPx = visibleTimelineHeights,
+            )
+        // Compose clamps the resulting scroll at the list bounds, so this still
+        // degrades as #595 asks: a near-top match can't scroll up past the
+        // first row (top-aligned) and a near-bottom match can't scroll down
+        // past the last row (bottom-aligned); only the middle case truly
+        // centers.
+        val animatedOffset = ReplyNavigation.centeredScrollOffset(viewportHeight, itemHeight)
+        listState.animateScrollToItem(targetIndex, animatedOffset)
+
+        // After an off-screen row is composed, use its real measured height for
+        // exact final centering. This must remain non-animated: the old second
+        // animateScrollToItem is what produced the visible overshoot/backtrack.
+        withFrameNanos { }
+        val resolvedTargetIndex = currentTargetIndex() ?: targetIndex
+        val postScrollLayoutInfo = listState.layoutInfo
+        val measuredItemHeight =
+            postScrollLayoutInfo.visibleItemsInfo.firstOrNull { it.index == resolvedTargetIndex }?.size
+                ?: timelineItemHeightsPx[targetMessageId]
+        val measuredViewportHeight = postScrollLayoutInfo.viewportSize.height
+        if (measuredViewportHeight > 0 && measuredItemHeight != null) {
+            val measuredOffset = ReplyNavigation.centeredScrollOffset(measuredViewportHeight, measuredItemHeight)
+            if (resolvedTargetIndex != targetIndex || measuredOffset != animatedOffset) {
+                listState.scrollToItem(resolvedTargetIndex, measuredOffset)
+            }
         }
     }
 
@@ -9795,82 +9836,92 @@ private fun ConversationScreen(
                                     if (MessageProjector.isGroupSystem(item.record)) "groupSystem" else "message"
                                 },
                             ) { index, item ->
-                                // Rendered inside the slot, not as its own item, so
-                                // the anchor index math stays intact.
-                                val older = renderedTimeline.getOrNull(index - 1)
-                                val daySeparatorLabel =
-                                    remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale) {
-                                        if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
-                                            messageDayLabel(item.record.recordedAt, transcriptLocale)
-                                        } else {
-                                            null
+                                Column(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .onSizeChanged { size ->
+                                            if (size.height > 0 && timelineItemHeightsPx[item.record.messageIdHex] != size.height) {
+                                                timelineItemHeightsPx[item.record.messageIdHex] = size.height
+                                            }
+                                        },
+                                ) {
+                                    // Rendered inside the slot, not as its own item, so
+                                    // the anchor index math stays intact.
+                                    val older = renderedTimeline.getOrNull(index - 1)
+                                    val daySeparatorLabel =
+                                        remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale) {
+                                            if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
+                                                messageDayLabel(item.record.recordedAt, transcriptLocale)
+                                            } else {
+                                                null
+                                            }
                                         }
+                                    if (daySeparatorLabel != null) {
+                                        DaySeparator(daySeparatorLabel)
                                     }
-                                if (daySeparatorLabel != null) {
-                                    DaySeparator(daySeparatorLabel)
-                                }
-                                if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
-                                    UnreadMessagesDivider(count = entryUnreadCount)
-                                }
-                                // Synthetic `dbg:stream:` rows must never fall
-                                // through to normal message rendering — not even in
-                                // the window between the toggle flipping off and the
-                                // republish that drops them. Draw the debug row only
-                                // when enabled; otherwise suppress the row entirely.
-                                if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
-                                    if (appState.streamingDebugEnabled) {
-                                        StreamDebugEventRow(record = item.record)
+                                    if (entryUnreadCount > 0 && item.record.messageIdHex == entryFirstUnreadMessageId) {
+                                        UnreadMessagesDivider(count = entryUnreadCount)
                                     }
-                                    return@itemsIndexed
-                                }
-                                // One decision point for which row a record renders
-                                // as. Group-system (kind 1210) rows are derived state
-                                // facts, not chat: they render the centered one-line
-                                // summary, never a raw-JSON bubble — and that summary
-                                // stays the default even in developer mode, with the
-                                // MLS dump reachable per-row behind a tap (#857). The
-                                // debug-row path covers the other non-user-visible
-                                // signaling kinds only when streaming debug is on, so
-                                // the timeline is byte-identical to today when off.
-                                when (timelineRowKind(item.record, appState.streamingDebugEnabled)) {
-                                    TimelineRowKind.GroupSystem -> {
-                                        GroupSystemRow(
-                                            record = item.record,
-                                            appState = appState,
-                                            groupSystem = item.projected?.groupSystem,
-                                        )
-                                        return@itemsIndexed
+                                    // Synthetic `dbg:stream:` rows must never fall
+                                    // through to normal message rendering — not even in
+                                    // the window between the toggle flipping off and the
+                                    // republish that drops them. Draw the debug row only
+                                    // when enabled; otherwise suppress the row entirely.
+                                    if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
+                                        if (appState.streamingDebugEnabled) {
+                                            StreamDebugEventRow(record = item.record)
+                                        }
+                                        return@Column
                                     }
-                                    TimelineRowKind.DebugRow -> {
-                                        MessageDebugRow(
-                                            style = MessageDebugClassifier.debugStyle(item.record),
-                                            record = item.record,
-                                        )
-                                        return@itemsIndexed
+                                    // One decision point for which row a record renders
+                                    // as. Group-system (kind 1210) rows are derived state
+                                    // facts, not chat: they render the centered one-line
+                                    // summary, never a raw-JSON bubble — and that summary
+                                    // stays the default even in developer mode, with the
+                                    // MLS dump reachable per-row behind a tap (#857). The
+                                    // debug-row path covers the other non-user-visible
+                                    // signaling kinds only when streaming debug is on, so
+                                    // the timeline is byte-identical to today when off.
+                                    when (timelineRowKind(item.record, appState.streamingDebugEnabled)) {
+                                        TimelineRowKind.GroupSystem -> {
+                                            GroupSystemRow(
+                                                record = item.record,
+                                                appState = appState,
+                                                groupSystem = item.projected?.groupSystem,
+                                            )
+                                            return@Column
+                                        }
+                                        TimelineRowKind.DebugRow -> {
+                                            MessageDebugRow(
+                                                style = MessageDebugClassifier.debugStyle(item.record),
+                                                record = item.record,
+                                            )
+                                            return@Column
+                                        }
+                                        TimelineRowKind.Bubble -> Unit
                                     }
-                                    TimelineRowKind.Bubble -> Unit
+                                    MessageBubble(
+                                        item = item,
+                                        controller = controller,
+                                        appState = appState,
+                                        highlighted = item.record.messageIdHex == highlightedMessageId,
+                                        quickReactionEmojis = quickReactionEmojis,
+                                        isActionMenuOpen = openActionMenuId == item.record.messageIdHex,
+                                        onActionMenuOpenChange = { open ->
+                                            openActionMenuId = if (open) item.record.messageIdHex else null
+                                        },
+                                        // Lambdas, not method references: the Compose
+                                        // compiler memoizes lambdas but allocates a fresh
+                                        // function reference per recomposition, which made
+                                        // every visible bubble recompose on any timeline
+                                        // change. See #110.
+                                        onReactionEmojiPicked = { recordReactionEmoji(it) },
+                                        onQuickReactionsSave = { saveQuickReactionEmojis(it) },
+                                        onQuickReactionsReset = { resetQuickReactionEmojis() },
+                                        onReplyPreviewClick = { navigateToReplyTarget(it) },
+                                        readOnly = controller.group.pendingConfirmation,
+                                    )
                                 }
-                                MessageBubble(
-                                    item = item,
-                                    controller = controller,
-                                    appState = appState,
-                                    highlighted = item.record.messageIdHex == highlightedMessageId,
-                                    quickReactionEmojis = quickReactionEmojis,
-                                    isActionMenuOpen = openActionMenuId == item.record.messageIdHex,
-                                    onActionMenuOpenChange = { open ->
-                                        openActionMenuId = if (open) item.record.messageIdHex else null
-                                    },
-                                    // Lambdas, not method references: the Compose
-                                    // compiler memoizes lambdas but allocates a fresh
-                                    // function reference per recomposition, which made
-                                    // every visible bubble recompose on any timeline
-                                    // change. See #110.
-                                    onReactionEmojiPicked = { recordReactionEmoji(it) },
-                                    onQuickReactionsSave = { saveQuickReactionEmojis(it) },
-                                    onQuickReactionsReset = { resetQuickReactionEmojis() },
-                                    onReplyPreviewClick = { navigateToReplyTarget(it) },
-                                    readOnly = controller.group.pendingConfirmation,
-                                )
                             }
                             // Kept minimal (matches the top-spacer) so the last
                             // bubble sits a tight breathing-room above the
