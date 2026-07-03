@@ -199,6 +199,7 @@ internal fun ContactPickerScreen(
                                     ),
                                 )
                             },
+                            onLongClick = { appState.presentProfile(appState.npub(resolvedHex)) },
                             trailing = {
                                 SelectionIndicator(selected = isSelected, dimmed = alreadyMember)
                             },
@@ -226,6 +227,7 @@ internal fun ContactPickerScreen(
                             avatarUrl = appState.avatarUrl(candidate.accountIdHex),
                             enabled = !busy,
                             onClick = { toggle(candidate) },
+                            onLongClick = { appState.presentProfile(candidate.npub) },
                             trailing = { SelectionIndicator(selected = isSelected) },
                         )
                     }

@@ -229,6 +229,7 @@ private fun NewMessageScreen(
                             avatarUrl = appState.avatarUrl(resolvedHex),
                             enabled = creatingHex == null,
                             onClick = { openOrCreateChat(appState.npub(resolvedHex), resolvedHex) },
+                            onLongClick = { appState.presentProfile(appState.npub(resolvedHex)) },
                             trailing =
                                 if (creatingHex == resolvedHex) {
                                     { CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
@@ -294,6 +295,7 @@ private fun NewMessageScreen(
                             avatarUrl = appState.avatarUrl(candidate.accountIdHex),
                             enabled = creatingHex == null,
                             onClick = { openOrCreateChat(candidate.npub, candidate.accountIdHex) },
+                            onLongClick = { appState.presentProfile(candidate.npub) },
                             trailing =
                                 if (creatingHex == candidate.accountIdHex) {
                                     { CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }

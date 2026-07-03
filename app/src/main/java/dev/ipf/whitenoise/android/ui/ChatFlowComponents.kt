@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -115,6 +116,7 @@ internal fun ContactRow(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
@@ -122,8 +124,18 @@ internal fun ContactRow(
             modifier
                 .fillMaxWidth()
                 .heightIn(min = 64.dp)
-                .let { if (onClick != null) it.clickable(enabled = enabled, role = Role.Button, onClick = onClick) else it }
-                .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
+                .let {
+                    if (onClick != null) {
+                        it.combinedClickable(
+                            enabled = enabled,
+                            role = Role.Button,
+                            onLongClick = onLongClick,
+                            onClick = onClick,
+                        )
+                    } else {
+                        it
+                    }
+                }.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
     ) {
