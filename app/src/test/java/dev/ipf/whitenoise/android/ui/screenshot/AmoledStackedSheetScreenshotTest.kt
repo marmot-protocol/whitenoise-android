@@ -18,7 +18,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import dev.ipf.whitenoise.android.ui.theme.amoledModalSheetSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import org.junit.Rule
 import org.junit.Test
@@ -79,16 +78,19 @@ private fun StackedSheetOverSettingsCard() {
         ) {
             Text("underneath", modifier = Modifier.padding(8.dp), color = Color.White)
         }
-        // On top: the bottom-sheet surface pinned to the lower half, using the
-        // shared AMOLED sheet modifier. Its opaque fill + own stroke must fully
-        // cover the card beneath in the overlap region.
-        Box(
+        // On top: the bottom-sheet surface pinned to the lower half, painted
+        // the way a real sheet now is — an opaque black containerColor on the
+        // sheet's own Surface (a positional modifier would detach from the
+        // sheet's translation). It must fully cover the card beneath in the
+        // overlap region.
+        Surface(
+            color = Color.Black,
+            shape = sheetShape,
             modifier =
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .height(110.dp)
-                    .amoledModalSheetSurface(sheetShape),
+                    .height(110.dp),
         ) {
             Text("bottom sheet", modifier = Modifier.padding(16.dp), color = Color.White)
         }
