@@ -8646,12 +8646,16 @@ private fun ConversationScreen(
         }
         val olderMessagesHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
         val firstTimelineListIndex = 1 + olderMessagesHeaderCount
-        val lastTimelineListIndex = firstTimelineListIndex + renderedSize - 1
+        val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        val lastTimelineListIndex = firstTimelineListIndex + renderedForHeightSample.size - 1
         val visibleTargetHeight = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size
         val visibleTimelineHeights =
             layoutInfo.visibleItemsInfo
-                .filter { item -> item.index in firstTimelineListIndex..lastTimelineListIndex }
-                .map { it.size }
+                .filter { visibleItem ->
+                    if (visibleItem.index !in firstTimelineListIndex..lastTimelineListIndex) return@filter false
+                    val row = renderedForHeightSample.getOrNull(visibleItem.index - firstTimelineListIndex) ?: return@filter false
+                    timelineRowKind(row.record, appState.streamingDebugEnabled) == TimelineRowKind.Bubble
+                }.map { it.size }
         val itemHeight =
             ReplyNavigation.itemHeightForScrollPx(
                 targetMessageId = targetMessageId,
