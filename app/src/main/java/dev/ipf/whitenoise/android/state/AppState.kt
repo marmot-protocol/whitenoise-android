@@ -2359,10 +2359,17 @@ class WhiteNoiseAppState(
         // Seed before registering so the first composition doesn't read an
         // empty snapshot while the callback's initial dispatch is in flight;
         // that dispatch then overwrites the seed with the same current state.
-        val network = cm.activeNetwork
-        hasActiveNetworkSnapshot = network != null
-        activeNetworkTypesSnapshot =
-            network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
+        runCatching {
+            val network = cm.activeNetwork
+            hasActiveNetworkSnapshot = network != null
+            activeNetworkTypesSnapshot =
+                network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
+        }.onFailure {
+            // Restricted profiles can throw from the connectivity queries; the
+            // empty snapshots are the same conservative offline default the
+            // callback path falls back to.
+            appStateDebug(it) { "network snapshot seed failed: ${it.readableMessage()}" }
+        }
         runCatching {
             cm.registerDefaultNetworkCallback(
                 object : android.net.ConnectivityManager.NetworkCallback() {
