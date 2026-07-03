@@ -17,16 +17,68 @@ class GroupSystemEventsTest {
     fun parsesAvatarChangedPayload() {
         val event = GroupSystemEvents.parse(avatarChangedJson)
 
+        // The payload's `data.actor` is an unauthenticated claim: the JSON
+        // fallback never surfaces it (attribution comes from the envelope
+        // sender via actorHex). Only the structured FFI projection may name
+        // an actor. See #985.
         assertEquals(
             GroupSystemEvent(
                 systemType = "group_avatar_changed",
                 text = "Group avatar changed",
-                actor = actorHex,
+                actor = null,
                 subject = null,
                 name = null,
             ),
             event,
         )
+    }
+
+    @Test
+    fun parseFallbackNeverAttributesFromPayloadClaims() {
+        // A member can author a kind-1210 payload the structured projection
+        // rejects (e.g. missing schema `v`), which is exactly when this
+        // fallback runs. Its actor/subject are spoofable claims: attribution
+        // must fall back to the MLS-authenticated envelope sender, and no
+        // named subject (or "you" form) may render from the payload.
+        val subjectHex = "b2".repeat(32)
+        val spoofed =
+            """{"system_type":"admin_added","text":"Admin added",""" +
+                """"data":{"actor":"$actorHex","subject":"$subjectHex"}}"""
+
+        val event = GroupSystemEvents.parse(spoofed)!!
+
+        assertNull(event.actor)
+        assertNull(event.subject)
+        // Attribution falls back to the authenticated sender…
+        assertEquals("d946d2", GroupSystemEvents.actorHex(event, "d946d2"))
+        // …and the subject renders as the anonymous form, never a name the
+        // payload picked. subjectIsSelf can't trigger either (subject == null).
+        assertEquals(
+            "Mallory made Someone an admin",
+            GroupSystemEvents.summary(event, actorName = "Mallory", subjectName = null),
+        )
+    }
+
+    @Test
+    fun structuredProjectionStillCarriesAttribution() {
+        // fromFfi is the only attribution source: Marmot's projection is the
+        // vetted schema-v1 parse, so its actor/subject flow through intact.
+        val structured =
+            GroupSystemEventFfi(
+                systemType = "member_added",
+                text = "",
+                actorAccountIdHex = actorHex,
+                subjectAccountIdHex = "b2".repeat(32),
+                name = null,
+                oldName = null,
+                oldRetentionSeconds = null,
+                newRetentionSeconds = null,
+            )
+
+        val event = GroupSystemEvents.resolve("""{"v":1,"system_type":"member_added"}""", structured)!!
+
+        assertEquals(actorHex, event.actor)
+        assertEquals("b2".repeat(32), event.subject)
     }
 
     @Test
