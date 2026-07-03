@@ -3072,7 +3072,12 @@ private fun applyChatListSearchAndFilter(
  *
  * For NAMED groups (`group.name` non-blank) we honour whatever the
  * projection's title field carries — it's a localized rendering of the
- * group name and may differ from the raw `group.name`.
+ * group name and may differ from the raw `group.name`. Either way the
+ * value is peer-supplied, so it renders via
+ * [ChatListItem.sanitizedNamedTitle] (ProfileSanitizer.displayName:
+ * strip bidi/zero-width spoofing chars, NFKC-fold, cap length — #980),
+ * never the raw string; a name that sanitization strips entirely falls
+ * through to the unnamed projection below.
  *
  * For UNNAMED groups we deliberately ignore `projectedTitle`: the
  * upstream projection emits the group id hex there when no name is set,
@@ -3089,9 +3094,7 @@ private fun chatListItemDisplayTitle(
     appState: WhiteNoiseAppState,
     copy: GroupTitleCopy,
 ): String {
-    if (item.group.name.isNotBlank()) {
-        return item.projectedTitle ?: item.group.name
-    }
+    item.sanitizedNamedTitle?.let { return it }
     return GroupProjector.displayTitle(
         group = item.group,
         otherMemberAccount = item.otherMemberAccount,

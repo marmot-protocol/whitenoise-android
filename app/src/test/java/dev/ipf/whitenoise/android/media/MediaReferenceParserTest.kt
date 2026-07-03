@@ -188,8 +188,34 @@ class MediaReferenceParserTest {
     }
 
     @Test
-    fun returnsNull_whenBlurhashIsPresent() {
-        val tag = MessageTagFfi(canonicalImetaTag().values + "blurhash legacy")
+    fun parsesValidTagCarryingABlurhashHint() {
+        // #981: NIP-92 imeta tags from interoperating clients commonly carry a
+        // blurhash preview hint. It is just another unrecognized key — the
+        // version pin already rejects other protocol versions — so it must not
+        // drop an otherwise-valid attachment.
+        val tag = MessageTagFfi(canonicalImetaTag().values + "blurhash LEHV6nWB2yk8pyo0adR*.7kCMdnj")
+        val ref = MediaReferenceParser.parseImetaTag(listOf(tag))
+        assertNotNull(ref)
+        assertEquals(URL, ref!!.locators.single().value)
+        assertEquals("photo.jpg", ref.fileName)
+    }
+
+    @Test
+    fun returnsNull_whenBlurhashOnlyTagLacksRequiredFields() {
+        // A blurhash alone doesn't make a valid attachment: the required-field
+        // validation (locator, hashes, nonce, version) still rejects it.
+        val tag = MessageTagFfi(listOf("imeta", "blurhash LEHV6nWB2yk8pyo0adR*.7kCMdnj"))
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
+    }
+
+    @Test
+    fun returnsNull_whenBlurhashRidesAnOtherwiseInvalidTag() {
+        // The blurhash hint must not rescue a tag that fails validation for
+        // real reasons (wrong protocol version here).
+        val tag =
+            MessageTagFfi(
+                imetaWithOverride("v" to "mip04-v2").values + "blurhash LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+            )
         assertNull(MediaReferenceParser.parseImetaTag(listOf(tag)))
     }
 
