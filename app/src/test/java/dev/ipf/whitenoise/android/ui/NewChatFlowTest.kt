@@ -171,6 +171,74 @@ class NewChatFlowTest {
     }
 
     @Test
+    fun conversationMembersSubtitleWaitsForLoadedRoster() {
+        assertFalse(
+            shouldShowConversationMembersSubtitle(
+                membersLoaded = false,
+                openedAsDmHint = false,
+                groupName = "Marmot Lab",
+                memberCount = 0,
+            ),
+        )
+        assertTrue(
+            shouldShowConversationMembersSubtitle(
+                membersLoaded = true,
+                openedAsDmHint = false,
+                groupName = "Marmot Lab",
+                memberCount = 1,
+            ),
+        )
+    }
+
+    @Test
+    fun conversationMembersSubtitleSuppressesJustCreatedDmTransientRoster() {
+        assertFalse(
+            shouldShowConversationMembersSubtitle(
+                membersLoaded = true,
+                openedAsDmHint = true,
+                groupName = "",
+                memberCount = 0,
+            ),
+        )
+        assertFalse(
+            shouldShowConversationMembersSubtitle(
+                membersLoaded = true,
+                openedAsDmHint = true,
+                groupName = "",
+                memberCount = 1,
+            ),
+        )
+        assertFalse(
+            shouldShowConversationMembersSubtitle(
+                membersLoaded = true,
+                openedAsDmHint = true,
+                groupName = "",
+                memberCount = 2,
+            ),
+        )
+    }
+
+    @Test
+    fun conversationMembersSubtitleLetsLiveGroupStateOverrideDmHint() {
+        assertTrue(
+            shouldShowConversationMembersSubtitle(
+                membersLoaded = true,
+                openedAsDmHint = true,
+                groupName = "Marmot Lab",
+                memberCount = 1,
+            ),
+        )
+        assertTrue(
+            shouldShowConversationMembersSubtitle(
+                membersLoaded = true,
+                openedAsDmHint = true,
+                groupName = "",
+                memberCount = 3,
+            ),
+        )
+    }
+
+    @Test
     fun resolvedRecipientRefsPrefersResolvedKeyOverFallback() {
         val resolvedKey = "a".repeat(64)
         // A resolved hex (e.g. from a NIP-05 the normalize path can't parse) is
