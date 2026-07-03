@@ -121,7 +121,14 @@ data class ChatListItem(
      * unnamed-group projection the row already uses.
      */
     val sanitizedNamedTitle: String?
-        get() = group.name.takeIf { it.isNotBlank() }?.let { ProfileSanitizer.displayName(projectedTitle ?: it) }
+        get() =
+            group.name.takeIf { it.isNotBlank() }?.let { raw ->
+                // Fall back to the raw name when a stale projected title
+                // sanitizes away entirely, mirroring chatListItemDisplayTitle's
+                // recovery path so a row never renders named but sorts unnamed.
+                projectedTitle?.let(ProfileSanitizer::displayName)
+                    ?: ProfileSanitizer.displayName(raw)
+            }
 
     val latestAt: ULong?
         // Prefer the last message's timeline timestamp. When a chat has no last

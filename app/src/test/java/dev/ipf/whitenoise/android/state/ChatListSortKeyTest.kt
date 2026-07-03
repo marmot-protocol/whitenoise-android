@@ -109,6 +109,22 @@ class ChatListSortKeyTest {
     }
 
     @Test
+    fun zeroWidthOnlyProjectedTitleFallsBackToSanitizedRawName() {
+        // A stale projected title that sanitizes away must not demote the row
+        // to the unnamed path when the raw group name is still displayable —
+        // chatListItemDisplayTitle recovers from the raw name, and the sort
+        // key must track what the row renders.
+        val item =
+            item(
+                groupId = "aaaa",
+                groupName = "Real Name",
+                projectedTitle = "\u200B\u200E\uFEFF",
+            )
+
+        assertEquals("real name", chatListItemSortKey(item))
+    }
+
+    @Test
     fun groupHexNeverLeaksIntoTheSortKey() {
         val named = item(groupId = "feedface", groupName = "Named")
         val unnamedWithPeer = item(groupId = "feedface", groupName = "", otherMemberAccount = "peer")
