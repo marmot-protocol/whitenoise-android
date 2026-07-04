@@ -1,5 +1,11 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
+import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
+import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -116,6 +122,61 @@ class NewChatFlowTest {
         // In-flight / unresolvable identifiers block the action.
         assertFalse(recipientPreviewAllowsSubmit(RecipientPreviewState.Resolving))
         assertFalse(recipientPreviewAllowsSubmit(RecipientPreviewState.Invalid))
+    }
+
+    @Test
+    fun startProfileChatFailureMapsMissingSetupToHumanCopy() {
+        val missing = MarmotKitException.MissingKeyPackage("deadbeef")
+
+        assertEquals(
+            AppText.Resource(
+                R.string.error_missing_key_package_for,
+                listOf("Alice"),
+            ),
+            startProfileChatFailureDetail(missing) { "Alice" },
+        )
+        assertFalse(startProfileChatFailureCopyable(missing))
+
+        val missingBlankAccount = MarmotKitException.MissingKeyPackage("  ")
+        assertEquals(
+            AppText.Resource(R.string.error_missing_key_package),
+            startProfileChatFailureDetail(missingBlankAccount) { "ignored" },
+        )
+        assertFalse(startProfileChatFailureCopyable(missingBlankAccount))
+    }
+
+    @Test
+    fun startProfileChatFailureDistinguishesInvalidAndTechnicalFailures() {
+        assertEquals(
+            AppText.Resource(R.string.error_invalid_identity_reference),
+            startProfileChatFailureDetail(MarmotKitException.InvalidIdentity("bad npub")) { "ignored" },
+        )
+        val publishFailure = MarmotKitException.Publish("relay unreachable")
+        assertEquals(
+            AppText.Resource(R.string.error_group_publish_failed, listOf("relay unreachable")),
+            startProfileChatFailureDetail(publishFailure) { "ignored" },
+        )
+        assertTrue(startProfileChatFailureCopyable(publishFailure))
+        val runtimeFailure = MarmotKitException.Runtime("relay unreachable")
+        assertEquals(
+            AppText.Resource(R.string.error_group_create_failed_retry),
+            startProfileChatFailureDetail(runtimeFailure) { "ignored" },
+        )
+        assertFalse(startProfileChatFailureCopyable(runtimeFailure))
+        val unexpectedFailure = RuntimeException("relay unreachable")
+        assertEquals(AppText.Plain("relay unreachable"), startProfileChatFailureDetail(unexpectedFailure) { "ignored" })
+        assertTrue(startProfileChatFailureCopyable(unexpectedFailure))
+    }
+
+    @Test
+    fun startProfileChatFailureMapsNoActiveAccountToLocalizedCopy() {
+        val noActiveAccount = StartProfileChatNoActiveAccountException()
+
+        assertEquals(
+            AppText.Resource(R.string.toast_no_active_account),
+            startProfileChatFailureDetail(noActiveAccount) { "ignored" },
+        )
+        assertFalse(startProfileChatFailureCopyable(noActiveAccount))
     }
 
     @Test

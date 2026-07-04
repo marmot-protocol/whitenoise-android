@@ -39,16 +39,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.rethrowIfCancellation
+import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
+import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 private enum class NewChatStep { NewMessage, NewGroup }
+
+private data class StartChatErrorUiState(
+    val npub: String,
+    val progressHex: String,
+    val detail: AppText,
+    val copyable: Boolean,
+    val title: AppText = AppText.Resource(R.string.toast_couldnt_start_chat),
+    val retryGroupIdHex: String? = null,
+)
 
 /**
  * Full-screen New Message flow: pick a person to open/start a direct chat, or
@@ -121,6 +135,7 @@ private fun NewMessageScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var showScanner by remember { mutableStateOf(false) }
     var creatingHex by remember { mutableStateOf<String?>(null) }
+    var startChatError by remember { mutableStateOf<StartChatErrorUiState?>(null) }
     val clipboard = LocalClipboardManager.current
 
     // Back must stay installed (a disabled handler lets the event fall through
@@ -150,18 +165,46 @@ private fun NewMessageScreen(
     fun openOrCreateChat(
         npub: String,
         hexForProgress: String,
+        retryGroupIdHex: String? = null,
     ) {
         if (creatingHex != null) return
-        appState.existingDirectChat(npub)?.let {
-            onOpenConversation(it, false)
-            return
+        startChatError = null
+        if (retryGroupIdHex == null) {
+            appState.existingDirectChat(npub)?.let {
+                onOpenConversation(it, false)
+                return
+            }
         }
         creatingHex = hexForProgress
         appState.launchMutation {
             try {
-                val groupIdHex = appState.startProfileChat(npub)
-                val item = groupIdHex?.let { appState.awaitChatListItem(it) }
-                if (item != null) onOpenConversation(item, true)
+                runCatching {
+                    retryGroupIdHex ?: appState.createProfileChatGroup(npub)
+                }.onSuccess { groupIdHex ->
+                    val item = appState.awaitChatListItem(groupIdHex)
+                    if (item != null) {
+                        onOpenConversation(item, true)
+                    } else {
+                        startChatError =
+                            StartChatErrorUiState(
+                                npub = npub,
+                                progressHex = hexForProgress,
+                                detail = AppText.Resource(R.string.error_chat_created_not_loaded),
+                                copyable = false,
+                                title = AppText.Resource(R.string.couldnt_load_chats),
+                                retryGroupIdHex = groupIdHex,
+                            )
+                    }
+                }.onFailure { error ->
+                    rethrowIfCancellation(error)
+                    startChatError =
+                        StartChatErrorUiState(
+                            npub = npub,
+                            progressHex = hexForProgress,
+                            detail = startProfileChatFailureDetail(error, appState::displayName),
+                            copyable = startProfileChatFailureCopyable(error),
+                        )
+                }
             } finally {
                 creatingHex = null
             }
@@ -189,7 +232,10 @@ private fun NewMessageScreen(
         ) {
             FlowSearchField(
                 value = query,
-                onValueChange = { query = it },
+                onValueChange = {
+                    query = it
+                    startChatError = null
+                },
                 placeholder = stringResource(R.string.search_people_hint),
                 onScanQr = { showScanner = true },
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
@@ -211,6 +257,18 @@ private fun NewMessageScreen(
                             icon = Icons.Default.QrCodeScanner,
                             title = stringResource(R.string.scan_qr_code),
                             onClick = { showScanner = true },
+                        )
+                    }
+                }
+                startChatError?.let { error ->
+                    item {
+                        StartChatErrorCard(
+                            error = error,
+                            onRetry = { openOrCreateChat(error.npub, error.progressHex, error.retryGroupIdHex) },
+                            onCopy = { detail ->
+                                clipboard.setText(AnnotatedString(detail))
+                                appState.present(R.string.copied)
+                            },
                         )
                     }
                 }
@@ -319,8 +377,58 @@ private fun NewMessageScreen(
                     appState.present(R.string.error_not_white_noise_profile_qr, copyable = true)
                 } else {
                     query = scanned.npub
+                    startChatError = null
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun AppText.resolveForCompose(): String =
+    when (this) {
+        is AppText.Plain -> value
+        is AppText.Resource ->
+            if (args.isEmpty()) {
+                stringResource(resId)
+            } else {
+                stringResource(resId, *args.toTypedArray())
+            }
+    }
+
+@Composable
+private fun StartChatErrorCard(
+    error: StartChatErrorUiState,
+    onRetry: () -> Unit,
+    onCopy: (String) -> Unit,
+) {
+    val title = error.title.resolveForCompose()
+    val detail = error.detail.resolveForCompose()
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+        Text(
+            detail,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm)) {
+            TextButton(onClick = onRetry) {
+                Text(stringResource(R.string.retry))
+            }
+            if (error.copyable) {
+                TextButton(onClick = { onCopy(detail) }) {
+                    Text(stringResource(R.string.copy))
+                }
+            }
+        }
     }
 }
