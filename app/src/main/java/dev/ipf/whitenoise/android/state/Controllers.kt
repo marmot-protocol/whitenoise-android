@@ -28,6 +28,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -183,6 +184,12 @@ data class ChatListItem(
      */
     fun removedFromGroup(activeAccountIdHex: String?): Boolean {
         val active = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() } ?: return false
+        // Authoritative: the engine now reports the local account's own
+        // membership directly on the row. REMOVED (evicted) and LEFT (voluntary)
+        // both mean non-member, and take precedence over the roster heuristic
+        // below (which stays as a fallback for the optimistic self-leave window
+        // and rows whose projection hasn't landed yet).
+        if (projection?.selfMembership?.isNonMember() == true) return true
         if (removed) return true
         val snapshot = memberSnapshot?.takeIf { it.members.isNotEmpty() } ?: return false
         return !snapshot.containsAccount(active)
@@ -391,6 +398,7 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         encryptedMedia = defaultEncryptedMediaComponent(),
         archived = row.archived,
         pendingConfirmation = row.pendingConfirmation,
+        selfMembership = row.selfMembership,
         welcomerAccountIdHex = null,
         viaWelcomeMessageIdHex = null,
         disappearingMessageSecs = 0uL,
@@ -1101,6 +1109,14 @@ internal fun duplicateSignatureKeyDisplayName(
     refs: List<String>,
     displayName: (String) -> String,
 ): String = refs.firstOrNull()?.let(displayName).orEmpty()
+
+/**
+ * Whether the engine's authoritative self-membership says the local account is
+ * no longer in the group: [SelfMembershipFfi.REMOVED] (evicted) or
+ * [SelfMembershipFfi.LEFT] (voluntary departure). Both are terminal non-member
+ * states; [SelfMembershipFfi.MEMBER] is the only membership-preserving value.
+ */
+internal fun SelfMembershipFfi.isNonMember(): Boolean = this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.LEFT
 
 internal class ConversationSelfLeftState(
     seededMembershipKnown: Boolean,
@@ -3497,6 +3513,21 @@ class ConversationController(
             forgetSendTrace(tempId)
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
+            if (throwable.isUseAfterEviction()) {
+                // The engine realized our own eviction while replaying to send:
+                // we are no longer a member, so this message can never publish.
+                // Drop the optimistic bubble (a retry would only re-fail) and
+                // flip to the read-only removed state — the same realization the
+                // conversation-open and refresh paths perform — instead of
+                // surfacing the raw backend error.
+                rollbackOptimisticChatListPreview(optimisticKey, tempId)
+                optimisticMessages.remove(optimisticKey)
+                messageById.remove(tempId)
+                forgetSendTrace(tempId)
+                publishTimelineFromIndexes()
+                markActiveAccountRemovedFromMembers(account)
+                return
+            }
             rollbackOptimisticChatListPreview(optimisticKey, tempId)
             retainFailedOptimisticTextSend(
                 optimisticMessages = optimisticMessages,
@@ -6178,6 +6209,14 @@ class ConversationController(
         group = applied.group
         if (previousRetention != group.disappearingMessageSecs) {
             publishTimelineFromIndexes()
+        }
+        // Authoritative engine signal: the group record now carries the local
+        // account's own membership. When it reports a non-member (evicted or
+        // voluntarily left), latch the self-left marker so the composer goes
+        // read-only and the roster line below drops self — no longer relying
+        // solely on the UseAfterEviction string-match round-trip.
+        if (applied.group.selfMembership.isNonMember()) {
+            recordSelfLeft()
         }
         // Once a self-leave has been recorded locally, refuse to re-add self
         // from a details round-trip that still predates the engine eviction —

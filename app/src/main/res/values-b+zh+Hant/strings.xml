@@ -88,7 +88,7 @@
     <string name="no_messages_yet">尚無訊息</string>
     <string name="group_empty_only_you_title">這個群組目前只有你</string>
     <string name="group_empty_invite_members">準備好後邀請其他人。</string>
-    <string name="you_are_no_longer_a_member">你已不再是此群組的成員。</string>
+    <string name="you_are_no_longer_a_member">你無法向此群組發送訊息，因為你已不再是成員。</string>
     <string name="chat_row_draft_prefix">草稿：</string>
     <string name="jump_to_newest">跳至最新</string>
     <string name="scroll_to_top">捲動到頂部</string>
