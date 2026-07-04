@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.core
 
-import dev.ipf.whitenoise.android.BuildConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -11,14 +10,21 @@ class ProfileLinkTest {
     private val sampleNpub = "npub1" + "a".repeat(58)
 
     @Test
-    fun buildsWhiteNoiseProfileDeepLinks() {
+    fun buildsMarmotProfileDeepLinks() {
         val link = ProfileLink(sampleNpub)
 
-        assertEquals("${BuildConfig.WHITENOISE_DEEP_LINK_SCHEME}://profile/$sampleNpub", link.uri)
+        // Generates the cross-client marmot:// scheme (issue #1018); the QR
+        // variant carries the ?from=qr provenance hint.
+        assertEquals("marmot://profile/$sampleNpub", link.uri)
+        assertEquals("marmot://profile/$sampleNpub?from=qr", link.qrUri)
     }
 
     @Test
-    fun parsesWhiteNoiseNostrAndBareNpubPayloads() {
+    fun parsesMarmotWhiteNoiseNostrAndBareNpubPayloads() {
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("marmot://profile/$sampleNpub"))
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("marmot://profile/$sampleNpub?from=qr"))
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("marmot://$sampleNpub"))
+        // whitenoise:// stays recognized for inbound/legacy links.
         assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise://profile/$sampleNpub"))
         assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise://$sampleNpub"))
         assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise-staging://profile/$sampleNpub"))
