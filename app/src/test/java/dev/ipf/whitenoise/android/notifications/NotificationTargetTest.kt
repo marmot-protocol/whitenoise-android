@@ -128,6 +128,46 @@ class NotificationTargetTest {
         assertNull(target?.messageIdHex)
     }
 
+    @Test
+    fun notificationOpenReadTarget_messageNotificationWithMessageId_returnsCursor() {
+        val target =
+            NotificationTarget(
+                "acct-a",
+                "group-1",
+                "message-1",
+                NotificationTargetKind.MESSAGE,
+            )
+
+        assertEquals(
+            NotificationReadTarget("acct-a", "group-1", "message-1"),
+            notificationOpenReadTarget(target),
+        )
+    }
+
+    @Test
+    fun notificationOpenReadTarget_inviteOrMissingMessageId_returnsNull() {
+        assertNull(
+            notificationOpenReadTarget(
+                NotificationTarget(
+                    "acct-a",
+                    "group-1",
+                    "message-1",
+                    NotificationTargetKind.INVITE,
+                ),
+            ),
+        )
+        assertNull(
+            notificationOpenReadTarget(
+                NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.MESSAGE),
+            ),
+        )
+        assertNull(
+            notificationOpenReadTarget(
+                NotificationTarget("acct-a", "group-1", " ", NotificationTargetKind.MESSAGE),
+            ),
+        )
+    }
+
     // ---- PendingIntent identity --------------------------------------------
 
     @Test
