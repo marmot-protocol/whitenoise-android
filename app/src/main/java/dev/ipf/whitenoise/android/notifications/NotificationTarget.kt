@@ -20,26 +20,6 @@ data class NotificationTarget(
     val kind: NotificationTargetKind,
 )
 
-/** Message read cursor that should be advanced after a tapped notification opens. */
-data class NotificationReadTarget(
-    val accountRef: String,
-    val groupIdHex: String,
-    val messageIdHex: String,
-)
-
-/**
- * The durable read-marker update implied by opening a notification, if any.
- * Invite notifications and message notifications without a concrete message id
- * have no safe read cursor to advance.
- */
-fun notificationOpenReadTarget(target: NotificationTarget): NotificationReadTarget? {
-    if (target.kind != NotificationTargetKind.MESSAGE) return null
-    val account = target.accountRef.takeIf { it.isNotBlank() } ?: return null
-    val group = target.groupIdHex.takeIf { it.isNotBlank() } ?: return null
-    val message = target.messageIdHex?.takeIf { it.isNotBlank() } ?: return null
-    return NotificationReadTarget(account, group, message)
-}
-
 /** One step of the tap-to-navigate state machine (see [resolveNotificationNav]). */
 sealed interface NotificationNavStep {
     /** Active account differs from the target's — switch first, then re-evaluate. */

@@ -128,46 +128,6 @@ class NotificationTargetTest {
         assertNull(target?.messageIdHex)
     }
 
-    @Test
-    fun notificationOpenReadTarget_messageNotificationWithMessageId_returnsCursor() {
-        val target =
-            NotificationTarget(
-                "acct-a",
-                "group-1",
-                "message-1",
-                NotificationTargetKind.MESSAGE,
-            )
-
-        assertEquals(
-            NotificationReadTarget("acct-a", "group-1", "message-1"),
-            notificationOpenReadTarget(target),
-        )
-    }
-
-    @Test
-    fun notificationOpenReadTarget_inviteOrMissingMessageId_returnsNull() {
-        assertNull(
-            notificationOpenReadTarget(
-                NotificationTarget(
-                    "acct-a",
-                    "group-1",
-                    "message-1",
-                    NotificationTargetKind.INVITE,
-                ),
-            ),
-        )
-        assertNull(
-            notificationOpenReadTarget(
-                NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.MESSAGE),
-            ),
-        )
-        assertNull(
-            notificationOpenReadTarget(
-                NotificationTarget("acct-a", "group-1", " ", NotificationTargetKind.MESSAGE),
-            ),
-        )
-    }
-
     // ---- PendingIntent identity --------------------------------------------
 
     @Test
@@ -401,15 +361,16 @@ class NotificationTargetTest {
 
     @Test
     fun nav_messageNotificationOpen_carriesMessageFocus() {
+        val messageIdHex = "a".repeat(64)
         val step =
             resolveNotificationNav(
-                target.copy(messageIdHex = "message-123"),
+                target.copy(messageIdHex = messageIdHex),
                 knownAccountRefs = setOf("acct-a"),
                 activeAccountRef = "acct-a",
                 chatListReady = true,
                 availableGroupIds = setOf("group-1"),
             )
-        assertEquals(NotificationNavStep.OpenConversation("group-1", "message-123"), step)
+        assertEquals(NotificationNavStep.OpenConversation("group-1", messageIdHex), step)
     }
 
     @Test

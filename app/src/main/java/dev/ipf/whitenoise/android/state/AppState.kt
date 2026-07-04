@@ -2844,6 +2844,8 @@ class WhiteNoiseAppState(
         val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
         val message = messageIdHex.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) } ?: return false
         return runCatching {
+            // markTimelineMessageRead advances the persisted cursor monotonically;
+            // an old notification tap must not move the read marker backwards.
             marmotIo { markTimelineMessageRead(account, group, message) }
             true
         }.onFailure {

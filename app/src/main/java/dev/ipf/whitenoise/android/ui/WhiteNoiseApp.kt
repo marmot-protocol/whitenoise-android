@@ -423,7 +423,6 @@ import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
-import dev.ipf.whitenoise.android.notifications.notificationOpenReadTarget
 import dev.ipf.whitenoise.android.notifications.resolveNotificationNav
 import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.AppLockDelay
@@ -1507,17 +1506,17 @@ private fun MainShell(
                 allChats
                     .firstOrNull { it.group.groupIdHex == step.groupIdHex }
                     ?.let {
-                        // Opening from a message notification is itself an
-                        // explicit read of that delivered message. Persist that
-                        // cursor outside the conversation composition so a quick
-                        // back press cannot cancel the scroll-driven mark-read
-                        // before it reaches the store (#1016).
-                        notificationOpenReadTarget(target)?.let { readTarget ->
+                        // Opening from a message notification explicitly reads
+                        // up to the notified message. Persist that cursor outside
+                        // the conversation composition so a quick back press
+                        // cannot cancel the scroll-driven mark-read before it
+                        // reaches the store (#1016).
+                        step.focusMessageIdHex?.let { messageIdHex ->
                             appState.launchMutation {
                                 appState.markNotificationMessageRead(
-                                    accountRef = readTarget.accountRef,
-                                    groupIdHex = readTarget.groupIdHex,
-                                    messageIdHex = readTarget.messageIdHex,
+                                    accountRef = target.accountRef,
+                                    groupIdHex = target.groupIdHex,
+                                    messageIdHex = messageIdHex,
                                 )
                             }
                         }
