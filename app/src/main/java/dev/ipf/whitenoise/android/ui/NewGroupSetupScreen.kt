@@ -45,14 +45,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 /**
@@ -73,24 +74,9 @@ internal fun NewGroupSetupScreen(
     var showRetentionPicker by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
-    val missingKeyPackageError = stringResource(R.string.error_missing_key_package)
-    val missingKeyPackageForFormat = stringResource(R.string.error_missing_key_package_for)
-    val invalidIdentityReferenceError = stringResource(R.string.error_invalid_identity_reference)
-    val groupPublishFailedFormat = stringResource(R.string.error_group_publish_failed)
-
-    fun createGroupErrorMessage(throwable: Throwable): String =
-        when (throwable) {
-            is MarmotKitException.MissingKeyPackage ->
-                if (throwable.account.isNotBlank()) {
-                    String.format(missingKeyPackageForFormat, appState.chatMemberTitle(throwable.account))
-                } else {
-                    missingKeyPackageError
-                }
-            is MarmotKitException.InvalidIdentity -> invalidIdentityReferenceError
-            is MarmotKitException.Publish -> String.format(groupPublishFailedFormat, throwable.details)
-            else -> throwable.message ?: throwable.javaClass.simpleName
-        }
+    fun createGroupErrorMessage(throwable: Throwable): String = groupCreateFailureDetail(throwable, appState::chatMemberTitle).resolve(context)
 
     val canCreate = canSubmitNewChatSheet(directMessage = false, busy = busy, pendingRecipient = "", groupName = groupName)
 

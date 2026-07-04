@@ -66,10 +66,12 @@
     <string name="new_chat">新聊天</string>
     <string name="error_not_white_noise_profile_qr">該 QR 程式碼不是 White Noise 設定檔。</string>
     <string name="error_valid_recipient_reference">輸入有效的 npub、設定檔連結或 hex 公鑰。</string>
-    <string name="error_missing_key_package">該帳戶尚未發布密鑰包。請他們打開 White Noise，然後再試一次。</string>
-    <string name="error_missing_key_package_for">%1$s 尚未發布密鑰包。請他們打開 White Noise，然後再試一次。</string>
+    <string name="error_missing_key_package">此人尚未設定加密訊息。請對方安裝 White Noise 並開啟一次應用程式，然後重試。</string>
+    <string name="error_missing_key_package_for">%1$s 尚未設定加密訊息。請對方安裝 White Noise 並開啟一次應用程式，然後重試。</string>
     <string name="error_invalid_identity_reference">該收件者不是有效的 Nostr 公鑰。使用 npub、設定檔連結或 hex 公鑰。</string>
     <string name="error_group_publish_failed">該群組已在本地創建，但發布失敗：%1$s</string>
+    <string name="error_group_create_failed_retry">設定加密聊天時發生問題。請檢查連線，然後再試一次。</string>
+    <string name="error_chat_created_not_loaded">聊天已建立，但尚未出現在聊天清單中。請稍後再試。</string>
     <string name="remove">移除</string>
     <string name="npub_or_hex_public_key">npub 或 hex 公鑰</string>
     <string name="scan_recipient_qr_code">掃描收件者QR碼</string>

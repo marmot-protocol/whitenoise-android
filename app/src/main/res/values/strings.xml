@@ -68,10 +68,12 @@
     <string name="new_chat">New Chat</string>
     <string name="error_not_white_noise_profile_qr">That QR code is not a White Noise profile.</string>
     <string name="error_valid_recipient_reference">Enter a valid npub, profile link, or hex public key.</string>
-    <string name="error_missing_key_package">That account does not have a published key package yet. Ask them to open White Noise, then try again.</string>
-    <string name="error_missing_key_package_for">%1$s does not have a published key package yet. Ask them to open White Noise, then try again.</string>
+    <string name="error_missing_key_package">This person hasn’t set up encrypted messaging yet. Ask them to install White Noise and open it once, then try again.</string>
+    <string name="error_missing_key_package_for">%1$s hasn’t set up encrypted messaging yet. Ask them to install White Noise and open it once, then try again.</string>
     <string name="error_invalid_identity_reference">That recipient is not a valid Nostr public key. Use an npub, profile link, or hex public key.</string>
     <string name="error_group_publish_failed">The group was created locally, but publishing failed: %1$s</string>
+    <string name="error_group_create_failed_retry">Something went wrong while setting up encrypted chat. Check your connection and try again.</string>
+    <string name="error_chat_created_not_loaded">The chat was created, but it hasn’t appeared in your chat list yet. Try again in a moment.</string>
     <string name="remove">Remove</string>
     <string name="npub_or_hex_public_key">npub or hex public key</string>
     <string name="scan_recipient_qr_code">Scan recipient QR code</string>

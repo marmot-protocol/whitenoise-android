@@ -67,10 +67,12 @@
     <string name="new_chat">Nouveau chat</string>
     <string name="error_not_white_noise_profile_qr">Ce code QR n’est pas un profil White Noise.</string>
     <string name="error_valid_recipient_reference">Entrez un npub valide, un lien de profil ou une clé publique hex.</string>
-    <string name="error_missing_key_package">Ce compte n’a pas encore de package de clés publié. Demandez-leur d’ouvrir White Noise, puis réessayez.</string>
-    <string name="error_missing_key_package_for">%1$s n’a pas encore de package de clés publié. Demandez-leur d’ouvrir White Noise, puis réessayez.</string>
+    <string name="error_missing_key_package">Cette personne n’a pas encore configuré la messagerie chiffrée. Demandez-lui d’installer White Noise et d’ouvrir l’app une fois, puis réessayez.</string>
+    <string name="error_missing_key_package_for">%1$s n’a pas encore configuré la messagerie chiffrée. Demandez-lui d’installer White Noise et d’ouvrir l’app une fois, puis réessayez.</string>
     <string name="error_invalid_identity_reference">Ce destinataire n’est pas une clé publique Nostr valide. Utilisez un npub, un lien de profil ou une clé publique hex.</string>
     <string name="error_group_publish_failed">Le groupe a été créé localement, mais la publication a échoué : %1$s</string>
+    <string name="error_group_create_failed_retry">Un problème est survenu lors de la configuration de la discussion chiffrée. Vérifiez votre connexion et réessayez.</string>
+    <string name="error_chat_created_not_loaded">La discussion a été créée, mais elle n’apparaît pas encore dans votre liste. Réessayez dans un instant.</string>
     <string name="remove">Supprimer</string>
     <string name="npub_or_hex_public_key">npub ou clé publique hex</string>
     <string name="scan_recipient_qr_code">Scanner le code QR du destinataire</string>

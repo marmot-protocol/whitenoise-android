@@ -30,6 +30,7 @@ import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.PushPlatformFfi
@@ -172,6 +173,8 @@ internal data class ProfileGroupInviteToast(
     val copyable: Boolean = false,
 )
 
+internal class StartProfileChatNoActiveAccountException : IllegalStateException("No active account")
+
 internal fun profileGroupInviteToast(outcome: ProfileGroupInviteOutcome): ProfileGroupInviteToast? {
     require(outcome.attempted >= 0) { "attempted must be non-negative" }
     require(outcome.failures in 0..outcome.attempted) { "failures must be between 0 and attempted" }
@@ -188,6 +191,45 @@ internal fun profileGroupInviteToast(outcome: ProfileGroupInviteOutcome): Profil
             ProfileGroupInviteToast(R.string.toast_invites_sent_to_groups_partial, failureDetail, copyable = true)
     }
 }
+
+private fun Throwable.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
+
+internal fun groupCreateFailureDetail(
+    throwable: Throwable,
+    displayName: (String) -> String,
+): AppText =
+    when (throwable) {
+        is StartProfileChatNoActiveAccountException -> AppText.Resource(R.string.toast_no_active_account)
+        is MarmotKitException.MissingKeyPackage -> {
+            val account = throwable.account.trim()
+            if (account.isEmpty()) {
+                AppText.Resource(R.string.error_missing_key_package)
+            } else {
+                AppText.Resource(R.string.error_missing_key_package_for, listOf(displayName(account)))
+            }
+        }
+        is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
+        is MarmotKitException.Publish -> AppText.Resource(R.string.error_group_publish_failed, listOf(throwable.details))
+        is MarmotKitException -> AppText.Resource(R.string.error_group_create_failed_retry)
+        else -> AppText.Plain(throwable.readableMessage())
+    }
+
+internal fun startProfileChatFailureDetail(
+    throwable: Throwable,
+    displayName: (String) -> String,
+): AppText = groupCreateFailureDetail(throwable, displayName)
+
+internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
+    when (throwable) {
+        is StartProfileChatNoActiveAccountException -> false
+        is MarmotKitException.MissingKeyPackage -> false
+        is MarmotKitException.InvalidIdentity -> false
+        is MarmotKitException.Publish -> true
+        is MarmotKitException -> false
+        else -> true
+    }
+
+internal fun startProfileChatFailureCopyable(throwable: Throwable): Boolean = groupCreateFailureCopyable(throwable)
 
 private data class NotificationSystemText(
     val title: String,
@@ -3501,20 +3543,32 @@ class WhiteNoiseAppState(
     }
 
     /**
+     * Create a 1:1 DM group with [npub]. This lower-level variant leaves
+     * failure presentation to the caller so the New Message flow can keep an
+     * inline retry state instead of collapsing everything into a transient toast.
+     */
+    suspend fun createProfileChatGroup(npub: String): String {
+        val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
+        return marmotIo { createGroup(account, "", listOf(npub), null) }
+    }
+
+    /**
      * Create a 1:1 DM group with [npub] and return its group id hex, or null on
      * failure (a toast explains why). Caller can open the new chat once the
      * chat-list projection surfaces it — see [awaitChatListItem].
      */
-    suspend fun startProfileChat(npub: String): String? {
-        val account = activeAccountRef ?: return null
-        return runCatching {
-            marmotIo { createGroup(account, "", listOf(npub), null) }
+    suspend fun startProfileChat(npub: String): String? =
+        runCatching {
+            createProfileChatGroup(npub)
         }.getOrElse {
             rethrowIfCancellation(it)
-            present(R.string.toast_couldnt_start_chat, AppText.Plain(it.readableMessage()), copyable = true)
+            present(
+                R.string.toast_couldnt_start_chat,
+                startProfileChatFailureDetail(it, ::displayName),
+                copyable = startProfileChatFailureCopyable(it),
+            )
             null
         }
-    }
 
     /**
      * Suspend until the chat list materializes [groupIdHex] (a freshly created
@@ -4020,8 +4074,6 @@ class WhiteNoiseAppState(
         val account = accountRef?.takeIf { it.isNotBlank() } ?: return null
         return "$account:$groupIdHex"
     }
-
-    private fun Throwable.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
     companion object {
         private const val ACTIVE_ACCOUNT_KEY = "active_account"
