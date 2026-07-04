@@ -13446,25 +13446,32 @@ private fun MessageBubble(
                                                 ),
                                     ) {
                                         // Mention names resolve through the profile
-                                        // cache; npub taps stay in-app via the
-                                        // profile sheet (never an external nostr:
+                                        // cache; npub/nprofile taps stay in-app via
+                                        // the profile sheet (never an external nostr:
                                         // intent). The "@" mention treatment is
-                                        // reserved for a resolved account that is a
-                                        // current member of this group's live roster
-                                        // (#1017); a pasted npub/nprofile of a
-                                        // non-member keeps its name but drops the "@".
+                                        // reserved for an account in the roster
+                                        // snapshot captured for this bubble (#1017),
+                                        // so later roster updates do not rewrite old
+                                        // rendered message semantics. If the roster
+                                        // has not loaded yet, leave membership unknown
+                                        // and keep pre-#1017 rendering until it does.
+                                        val mentionMemberSnapshot =
+                                            remember(record.messageIdHex, controller.membersLoaded) {
+                                                if (controller.membersLoaded) controller.members else null
+                                            }
+                                        val mentionMembershipResolver =
+                                            remember(appState, mentionMemberSnapshot) {
+                                                mentionMemberSnapshot?.let { members ->
+                                                    { bech32: String -> appState.isRosterMember(bech32, members) }
+                                                }
+                                            }
                                         MarkdownMessageBody(
                                             markdownDocument,
                                             mentionDisplayName =
                                                 remember(appState) {
                                                     { bech32: String -> appState.mentionDisplayName(bech32) }
                                                 },
-                                            isGroupMember =
-                                                remember(appState, controller.members) {
-                                                    { bech32: String ->
-                                                        appState.isRosterMember(bech32, controller.members)
-                                                    }
-                                                },
+                                            isGroupMember = mentionMembershipResolver,
                                             onNostrProfileTap =
                                                 remember(appState) {
                                                     { bech32: String -> appState.presentNostrProfile(bech32) }

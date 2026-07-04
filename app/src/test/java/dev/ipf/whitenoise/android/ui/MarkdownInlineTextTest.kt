@@ -395,6 +395,31 @@ class MarkdownInlineTextTest {
     }
 
     @Test
+    fun unresolvedNonMemberMentionDropsTheAtPrefixButStaysTappable() {
+        val npub = "npub1" + "q".repeat(58)
+        val annotated =
+            markdownInlinesToAnnotatedString(
+                inlines =
+                    listOf(
+                        MarkdownInlineFfi.NostrMention(
+                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub),
+                        ),
+                    ),
+                codeStyle = codeStyle,
+                linkStyle = linkStyle,
+                mentionDisplayName = { null },
+                isGroupMember = { false },
+            )
+        // The roster decision is independent of the profile cache: a known
+        // non-member cache miss must not render a transient false @ mention.
+        assertEquals("npub1qqqqqqq…qqqqqq", annotated.text)
+        val code = annotated.spanStyles.single()
+        assertEquals(FontFamily.Monospace, code.item.fontFamily)
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + npub, (link.item as LinkAnnotation.Clickable).tag)
+    }
+
+    @Test
     fun nonMemberNprofileMentionAlsoDropsTheAtPrefix() {
         val nprofile = "nprofile1" + "q".repeat(60)
         val annotated =

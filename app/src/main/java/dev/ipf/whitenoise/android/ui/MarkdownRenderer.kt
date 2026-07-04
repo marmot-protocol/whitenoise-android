@@ -686,10 +686,12 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
  * non-member reference (pasted npub/nprofile of someone outside the active
  * group) → its display name WITHOUT the "@" (underlined link styling), so the
  * "@" stays reserved for actually addressing a member (#1017). An unresolved
- * entity → "@"+shortened bech32 for a mention, or a bare shortened bech32 for a
- * plain nostr: URI, both in the code style. npub/nprofile entities carry a
- * [LinkAnnotation.Clickable] routed (via the shared listener) to the in-app
- * profile sheet in every resolved/unresolved case; the other HRPs
+ * profile mention keeps the "@" only when no roster is available or the roster
+ * snapshot says it is a member; known non-member misses render as shortened
+ * bech32 without the "@" so cache misses do not leak a false mention signal.
+ * A plain nostr: URI always renders as bare shortened bech32. npub/nprofile
+ * entities carry a [LinkAnnotation.Clickable] routed (via the shared listener)
+ * to the in-app profile sheet in every resolved/unresolved case; the other HRPs
  * (note/nevent/naddr/nrelay) have no in-app destination yet, so they stay inert.
  */
 private fun AnnotatedString.Builder.appendNostrEntity(
@@ -698,12 +700,19 @@ private fun AnnotatedString.Builder.appendNostrEntity(
     ctx: MarkdownInlineRenderContext,
 ) {
     val name = if (mention) ctx.mentionDisplayName?.invoke(entity.bech32) else null
-    // The "@" is a group-membership signal: apply it (and the bold mention
-    // treatment) only when the resolved account is a current member of the
-    // active group. A null resolver means no roster is available, so keep the
-    // pre-#1017 behavior and treat any resolved name as a member. A resolved
-    // NON-member keeps its display name but renders as a plain profile link.
-    val memberMention = name != null && (ctx.isGroupMember?.invoke(entity.bech32) ?: true)
+    val opensProfile =
+        entity.hrp == MarkdownNostrHrpFfi.NPUB || entity.hrp == MarkdownNostrHrpFfi.NPROFILE
+    // The "@" is a group-membership signal for profile mentions: apply it (and
+    // the bold mention treatment) only when the resolved account is a member of
+    // the roster snapshot. A null resolver means no roster is available, so keep
+    // the pre-#1017 behavior and treat profile mentions as members. Known
+    // non-members drop the prefix even when the profile name is not cached yet.
+    // Non-profile NostrMention nodes keep their historical "@" fallback because
+    // they do not resolve to accounts/roster seats.
+    val mentionIsMember =
+        mention &&
+            (!opensProfile || (ctx.isGroupMember?.invoke(entity.bech32) ?: true))
+    val memberMention = name != null && mentionIsMember
     // The annotated run borrows the link color (LocalContentColor in the
     // bubble): a Clickable region is painted with ITS OWN TextLinkStyles —
     // when those are null, Material's Text falls back to the theme's default
@@ -732,10 +741,8 @@ private fun AnnotatedString.Builder.appendNostrEntity(
         when {
             memberMention -> "@$name"
             name != null -> name
-            else -> (if (mention) "@" else "") + shortenedBech32(entity.bech32)
+            else -> (if (mentionIsMember) "@" else "") + shortenedBech32(entity.bech32)
         }
-    val opensProfile =
-        entity.hrp == MarkdownNostrHrpFfi.NPUB || entity.hrp == MarkdownNostrHrpFfi.NPROFILE
     if (opensProfile) {
         withLink(
             LinkAnnotation.Clickable(

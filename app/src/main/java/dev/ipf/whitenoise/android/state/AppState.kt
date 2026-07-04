@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.core.HostSafety
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.NostrProfileReference
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
@@ -3503,13 +3504,11 @@ class WhiteNoiseAppState(
     }
 
     /**
-     * Display name for a markdown mention entity (its bare bech32, npub form).
+     * Display name for a markdown mention entity (npub or nprofile bech32).
      * Null when the reference doesn't normalize to a pubkey or the profile is
      * unknown, so the renderer keeps its shortened-bech32 fallback. A miss
      * schedules a relay profile fetch; the profile-revision read inside
      * [profilePresentation] re-renders observers when the name lands.
-     * (nprofile mentions return null for now: the Rust `accountIdHex`
-     * normalizer accepts npub/hex but not nprofile TLVs.)
      */
     fun mentionDisplayName(bech32: String): String? {
         val accountIdHex = nostrEntityAccountIdHex(bech32) ?: return null
@@ -3528,24 +3527,29 @@ class WhiteNoiseAppState(
         presentProfile(npub(accountIdHex))
     }
 
-    private fun nostrEntityAccountIdHex(bech32: String): String? = runCatching { marmot().accountIdHex(bech32.trim()) }.getOrNull()
+    private fun nostrEntityAccountIdHex(bech32: String): String? {
+        val trimmed = bech32.trim()
+        return runCatching { marmot().accountIdHex(trimmed) }.getOrNull()
+            ?: NostrProfileReference.accountIdHex(trimmed)
+    }
 
     /**
      * Public bech32 (npub/nprofile) → hex pubkey resolver for the renderer's
-     * self-mention detection (#414). Pure FFI encoding (no storage read), so
-     * it's safe to call from the receiver-bubble path; returns null when the
+     * self-mention detection (#414). Pure FFI/local encoding (no storage read),
+     * so it's safe to call from the receiver-bubble path; returns null when the
      * reference doesn't normalize to a pubkey.
      */
     fun accountIdHexForMention(bech32: String): String? = nostrEntityAccountIdHex(bech32)
 
     /**
      * Whether a mention/profile [bech32] (npub/nprofile) resolves to an account
-     * that is a current member of [members] — the active group's live roster.
-     * The message renderer uses this to reserve the "@" mention treatment for
-     * real group members: a pasted npub of a non-member still resolves to a
-     * display name but renders without the "@" (#1017). Pure FFI encoding +
-     * roster comparison (case-insensitive, as hex casing round-trips through the
-     * FFI); an unresolvable reference is never a member.
+     * that is in [members] — the active group's roster snapshot for this
+     * message render. The message renderer uses this to reserve the "@" mention
+     * treatment for real group members: a pasted npub/nprofile of a non-member
+     * still resolves to a display name but renders without the "@" (#1017).
+     * Pure FFI/local encoding + roster comparison (case-insensitive, as hex
+     * casing round-trips through the FFI); an unresolvable reference is never a
+     * member.
      */
     fun isRosterMember(
         bech32: String,
