@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -243,6 +244,7 @@ class ChatListSortingTest {
         latestAt: ULong,
         unreadCount: ULong,
     ) = ChatListRowFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
         unreadMention = false,
         groupIdHex = groupId,
@@ -292,6 +294,7 @@ class ChatListSortingTest {
         updatedAt: ULong,
         lastReadTimelineAt: ULong? = null,
     ) = ChatListRowFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
         unreadMention = false,
         groupIdHex = groupId,
@@ -314,6 +317,7 @@ class ChatListSortingTest {
         id: String,
         pending: Boolean = false,
     ) = AppGroupRecordFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         groupIdHex = id,
         endpoint = "endpoint-$id",
         name = "",

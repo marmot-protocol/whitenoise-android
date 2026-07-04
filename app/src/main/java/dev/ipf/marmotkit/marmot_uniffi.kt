@@ -1715,7 +1715,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_relay_lists() != 47794.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_unread_summary() != 225.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_unread_summary() != 17362.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_audit_log_files() != 25846.toShort()) {
@@ -1772,7 +1772,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_edit_message() != 43927.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key() != 9505.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_export_encrypted_secret_key() != 16556.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_group_details() != 55062.toShort()) {
@@ -1820,7 +1820,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_messages() != 45709.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_normalize_member_ref() != 27721.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_normalize_member_ref() != 2364.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_notification_settings() != 40364.toShort()) {
@@ -1856,7 +1856,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_push_registration() != 38312.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_quarantined_groups() != 7043.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_quarantined_groups() != 50209.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_react_to_message() != 39138.toShort()) {
@@ -1892,10 +1892,10 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_retry_group_convergence() != 64264.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_retry_hydrate_quarantined_group() != 51443.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_retry_hydrate_quarantined_group() != 14413.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_reveal_nsec() != 63603.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_reveal_nsec() != 58041.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_secure_delete_expired() != 16091.toShort()) {
@@ -1925,7 +1925,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_settings() != 36141.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_tracker_config() != 30506.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_audit_log_tracker_config() != 61397.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_set_group_archived() != 17316.toShort()) {
@@ -1949,10 +1949,10 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_sign_in_account() != 63258.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_sign_out() != 40136.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_sign_out() != 46293.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_sign_out_and_wipe() != 64245.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_sign_out_and_wipe() != 44173.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_start() != 20136.toShort()) {
@@ -1997,7 +1997,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_update_group_profile() != 53035.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_update_message_retention() != 38717.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_update_message_retention() != 47317.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_upload_media() != 20405.toShort()) {
@@ -3852,7 +3852,7 @@ public interface MarmotInterface {
     
     /**
      * Per-account unread aggregate for the account-switcher badge
-     * (darkmatter#461). Each entry's `unread_count` is read from that
+     * (mdk#461). Each entry's `unread_count` is read from that
      * account's materialized chat-list projection, so this does not require
      * switching into, or loading a full session/timeline for, any account —
      * non-active (not-`running`) accounts are reported too. Only
@@ -3970,7 +3970,7 @@ public interface MarmotInterface {
     
     /**
      * Export the active account's private key as a password-encrypted NIP-49
-     * `ncryptsec1...` bech32 backup string (darkmatter#544).
+     * `ncryptsec1...` bech32 backup string (mdk#544).
      *
      * SENSITIVE: the passphrase is accepted as an owned FFI string and zeroed
      * on return by the Rust boundary. The encrypted export is logged to the
@@ -4058,7 +4058,7 @@ public interface MarmotInterface {
     
     /**
      * Normalize a member reference for group-management UI. Accepts hex,
-     * `npub`, `nostr:npub...`, and `darkmatter://profile/...` references.
+     * `npub`, `nostr:npub...`, and `marmot://profile/...` references.
      */
     fun `normalizeMemberRef`(`memberRef`: kotlin.String): MemberRefFfi
     
@@ -4119,9 +4119,9 @@ public interface MarmotInterface {
     
     /**
      * Stored groups that failed session-open hydration and were skipped so the
-     * rest of the account could open (darkmatter#151 / #417). These groups are
+     * rest of the account could open (mdk#151 / #417). These groups are
      * not in the live roster and otherwise vanish from the account with no
-     * explanation; surface them in a per-group recovery flow (darkmatter#426)
+     * explanation; surface them in a per-group recovery flow (mdk#426)
      * distinct from healthy and archived groups, using `reason` to pick the
      * per-reason guidance, and offer
      * [`Self::retry_hydrate_quarantined_group`].
@@ -4197,7 +4197,7 @@ public interface MarmotInterface {
     suspend fun `retryGroupConvergence`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): SendSummaryFfi
     
     /**
-     * Re-attempt hydration of a single quarantined group (darkmatter#426).
+     * Re-attempt hydration of a single quarantined group (mdk#426).
      *
      * Non-destructive, user-initiated recovery for a transiently-bad group
      * (e.g. a partial DB restore that has since completed). Returns `true` if
@@ -4210,7 +4210,7 @@ public interface MarmotInterface {
     
     /**
      * Export the active account's raw private key in canonical `nsec1...`
-     * bech32 form for an in-app key-backup display (darkmatter#543).
+     * bech32 form for an in-app key-backup display (mdk#543).
      *
      * SENSITIVE: revealing the raw key is logged to the per-account audit log
      * and permanently marks the account's NIP-49 KEY_SECURITY_BYTE as 0x00
@@ -4276,6 +4276,9 @@ public interface MarmotInterface {
      * Supply non-persisted audit tracker upload metadata: optional Goggles
      * upload URL override, bearer token from the host app, and optional human
      * source labels.
+     *
+     * The returned config confirms what was stored but never echoes the
+     * bearer token back across FFI: secrets flow in, not out.
      */
     fun `setAuditLogTrackerConfig`(`config`: AuditLogTrackerConfigFfi): AuditLogTrackerConfigFfi
     
@@ -4333,7 +4336,7 @@ public interface MarmotInterface {
      * groups, message history, and drafts intact. The account ref stays valid
      * after this returns. The returned `SignOutOutcomeFfi` surfaces per-relay
      * KeyPackage cleanup failures so the app can show a "will retry on next
-     * sign-in" hint (darkmatter#477).
+     * sign-in" hint (mdk#477).
      */
     suspend fun `signOut`(`accountRef`: kotlin.String, `deleteKeyPackages`: kotlin.Boolean): SignOutOutcomeFfi
     
@@ -4344,7 +4347,7 @@ public interface MarmotInterface {
      * the secret-store nsec). After this returns the account ref is no longer
      * valid for any further FFI call. The returned `WipeOutcomeFfi` reports
      * each stage independently so the app can show progress and a
-     * partial-failure sheet (darkmatter#478).
+     * partial-failure sheet (mdk#478).
      */
     suspend fun `signOutAndWipe`(`accountRef`: kotlin.String): WipeOutcomeFfi
     
@@ -4451,7 +4454,7 @@ public interface MarmotInterface {
      * Set the per-group disappearing-message retention, wrapping the engine's
      * `update_message_retention`. `disappearing_message_secs` of `0` disables
      * expiry; any positive value is the retention window in seconds. Thin
-     * passthrough over the already-public engine API (darkmatter#571).
+     * passthrough over the already-public engine API (mdk#571).
      */
     suspend fun `updateMessageRetention`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `disappearingMessageSecs`: kotlin.ULong): SendSummaryFfi
     
@@ -4696,7 +4699,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     /**
      * Per-account unread aggregate for the account-switcher badge
-     * (darkmatter#461). Each entry's `unread_count` is read from that
+     * (mdk#461). Each entry's `unread_count` is read from that
      * account's materialized chat-list projection, so this does not require
      * switching into, or loading a full session/timeline for, any account —
      * non-active (not-`running`) accounts are reported too. Only
@@ -5136,7 +5139,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     /**
      * Export the active account's private key as a password-encrypted NIP-49
-     * `ncryptsec1...` bech32 backup string (darkmatter#544).
+     * `ncryptsec1...` bech32 backup string (mdk#544).
      *
      * SENSITIVE: the passphrase is accepted as an owned FFI string and zeroed
      * on return by the Rust boundary. The encrypted export is logged to the
@@ -5471,7 +5474,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     /**
      * Normalize a member reference for group-management UI. Accepts hex,
-     * `npub`, `nostr:npub...`, and `darkmatter://profile/...` references.
+     * `npub`, `nostr:npub...`, and `marmot://profile/...` references.
      */
     @Throws(MarmotKitException::class)override fun `normalizeMemberRef`(`memberRef`: kotlin.String): MemberRefFfi {
             return FfiConverterTypeMemberRefFfi.lift(
@@ -5719,9 +5722,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     /**
      * Stored groups that failed session-open hydration and were skipped so the
-     * rest of the account could open (darkmatter#151 / #417). These groups are
+     * rest of the account could open (mdk#151 / #417). These groups are
      * not in the live roster and otherwise vanish from the account with no
-     * explanation; surface them in a per-group recovery flow (darkmatter#426)
+     * explanation; surface them in a per-group recovery flow (mdk#426)
      * distinct from healthy and archived groups, using `reason` to pick the
      * per-reason guidance, and offer
      * [`Self::retry_hydrate_quarantined_group`].
@@ -6018,7 +6021,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
-     * Re-attempt hydration of a single quarantined group (darkmatter#426).
+     * Re-attempt hydration of a single quarantined group (mdk#426).
      *
      * Non-destructive, user-initiated recovery for a transiently-bad group
      * (e.g. a partial DB restore that has since completed). Returns `true` if
@@ -6050,7 +6053,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     
     /**
      * Export the active account's raw private key in canonical `nsec1...`
-     * bech32 form for an in-app key-backup display (darkmatter#543).
+     * bech32 form for an in-app key-backup display (mdk#543).
      *
      * SENSITIVE: revealing the raw key is logged to the per-account audit log
      * and permanently marks the account's NIP-49 KEY_SECURITY_BYTE as 0x00
@@ -6298,6 +6301,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * Supply non-persisted audit tracker upload metadata: optional Goggles
      * upload URL override, bearer token from the host app, and optional human
      * source labels.
+     *
+     * The returned config confirms what was stored but never echoes the
+     * bearer token back across FFI: secrets flow in, not out.
      */
     @Throws(MarmotKitException::class)override fun `setAuditLogTrackerConfig`(`config`: AuditLogTrackerConfigFfi): AuditLogTrackerConfigFfi {
             return FfiConverterTypeAuditLogTrackerConfigFfi.lift(
@@ -6492,7 +6498,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * groups, message history, and drafts intact. The account ref stays valid
      * after this returns. The returned `SignOutOutcomeFfi` surfaces per-relay
      * KeyPackage cleanup failures so the app can show a "will retry on next
-     * sign-in" hint (darkmatter#477).
+     * sign-in" hint (mdk#477).
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -6522,7 +6528,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * the secret-store nsec). After this returns the account ref is no longer
      * valid for any further FFI call. The returned `WipeOutcomeFfi` reports
      * each stage independently so the app can show progress and a
-     * partial-failure sheet (darkmatter#478).
+     * partial-failure sheet (mdk#478).
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -6890,7 +6896,7 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * Set the per-group disappearing-message retention, wrapping the engine's
      * `update_message_retention`. `disappearing_message_secs` of `0` disables
      * expiry; any positive value is the retention window in seconds. Thin
-     * passthrough over the already-public engine API (darkmatter#571).
+     * passthrough over the already-public engine API (mdk#571).
      */
     @Throws(MarmotKitException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -8099,7 +8105,7 @@ public object FfiConverterTypeAccountSummaryFfi: FfiConverterRustBuffer<AccountS
 
 /**
  * Per-account unread aggregate for the account-switcher badge
- * (darkmatter#461). Computed from each account's materialized chat-list
+ * (mdk#461). Computed from each account's materialized chat-list
  * projection without loading a full session/timeline, so accounts that are
  * not the active/running one are reported too.
  */
@@ -8371,6 +8377,11 @@ data class AppGroupRecordFfi (
     var `disappearingMessageSecs`: kotlin.ULong, 
     var `archived`: kotlin.Boolean, 
     var `pendingConfirmation`: kotlin.Boolean, 
+    /**
+     * Whether the local account is still a member of this group, and if not,
+     * whether it left voluntarily or was removed.
+     */
+    var `selfMembership`: SelfMembershipFfi, 
     var `welcomerAccountIdHex`: kotlin.String?, 
     var `viaWelcomeMessageIdHex`: kotlin.String?
 ) {
@@ -8398,6 +8409,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterULong.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterTypeSelfMembershipFfi.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
         )
@@ -8418,6 +8430,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterULong.allocationSize(value.`disappearingMessageSecs`) +
             FfiConverterBoolean.allocationSize(value.`archived`) +
             FfiConverterBoolean.allocationSize(value.`pendingConfirmation`) +
+            FfiConverterTypeSelfMembershipFfi.allocationSize(value.`selfMembership`) +
             FfiConverterOptionalString.allocationSize(value.`welcomerAccountIdHex`) +
             FfiConverterOptionalString.allocationSize(value.`viaWelcomeMessageIdHex`)
     )
@@ -8437,6 +8450,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterULong.write(value.`disappearingMessageSecs`, buf)
             FfiConverterBoolean.write(value.`archived`, buf)
             FfiConverterBoolean.write(value.`pendingConfirmation`, buf)
+            FfiConverterTypeSelfMembershipFfi.write(value.`selfMembership`, buf)
             FfiConverterOptionalString.write(value.`welcomerAccountIdHex`, buf)
             FfiConverterOptionalString.write(value.`viaWelcomeMessageIdHex`, buf)
     }
@@ -8516,8 +8530,8 @@ public object FfiConverterTypeAppMessageRecordFfi: FfiConverterRustBuffer<AppMes
 
 /**
  * A stored group that failed session-open hydration and was skipped so the
- * rest of the account could open (darkmatter#151 / #417). Surfaced so the app
- * can present a per-group recovery flow (darkmatter#426) distinct from healthy
+ * rest of the account could open (mdk#151 / #417). Surfaced so the app
+ * can present a per-group recovery flow (mdk#426) distinct from healthy
  * and archived groups, and offer a non-destructive re-hydration retry.
  */
 data class AppQuarantinedGroupFfi (
@@ -8661,6 +8675,12 @@ public object FfiConverterTypeAuditLogSettingsFfi: FfiConverterRustBuffer<AuditL
 
 
 
+/**
+ * Tracker upload config supplied by the host app. Write-only across FFI:
+ * `authorization_bearer_token` is accepted here but never returned back to
+ * the host — [`redacted`](Self::redacted) strips it — and the hand-written
+ * `Debug` impl below never prints it.
+ */
 data class AuditLogTrackerConfigFfi (
     var `endpoint`: kotlin.String?, 
     var `authorizationBearerToken`: kotlin.String?, 
@@ -8841,6 +8861,17 @@ public object FfiConverterTypeBackgroundNotificationCollectionFfi: FfiConverterR
 
 
 
+/**
+ * Group avatar reference. `image_key_hex` is the symmetric key that decrypts
+ * the avatar blob and `image_upload_key_hex` is the Blossom upload secret;
+ * the hand-written `Debug` impl below redacts both so a Rust-side `{:?}`
+ * never prints key material.
+ *
+ * Host-language stringification is NOT covered: uniffi 0.28 generates plain
+ * record types (e.g. Kotlin data classes) whose default `toString` prints
+ * all fields, and `#[uniffi::export(Debug)]` on records requires uniffi
+ * >= 0.29. Host apps must not log this record until that upgrade lands.
+ */
 data class ChatListAvatarFfi (
     var `imageHashHex`: kotlin.String, 
     var `imageKeyHex`: kotlin.String, 
@@ -8957,7 +8988,12 @@ data class ChatListRowFfi (
     var `firstUnreadMessageIdHex`: kotlin.String?, 
     var `lastReadMessageIdHex`: kotlin.String?, 
     var `lastReadTimelineAt`: kotlin.ULong?, 
-    var `updatedAt`: kotlin.ULong
+    var `updatedAt`: kotlin.ULong, 
+    /**
+     * Whether the local account is still a member of this group, and if not,
+     * whether it left voluntarily or was removed.
+     */
+    var `selfMembership`: SelfMembershipFfi
 ) {
     
     companion object
@@ -8985,6 +9021,7 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalULong.read(buf),
             FfiConverterULong.read(buf),
+            FfiConverterTypeSelfMembershipFfi.read(buf),
         )
     }
 
@@ -9004,7 +9041,8 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterOptionalString.allocationSize(value.`firstUnreadMessageIdHex`) +
             FfiConverterOptionalString.allocationSize(value.`lastReadMessageIdHex`) +
             FfiConverterOptionalULong.allocationSize(value.`lastReadTimelineAt`) +
-            FfiConverterULong.allocationSize(value.`updatedAt`)
+            FfiConverterULong.allocationSize(value.`updatedAt`) +
+            FfiConverterTypeSelfMembershipFfi.allocationSize(value.`selfMembership`)
     )
 
     override fun write(value: ChatListRowFfi, buf: ByteBuffer) {
@@ -9024,6 +9062,7 @@ public object FfiConverterTypeChatListRowFfi: FfiConverterRustBuffer<ChatListRow
             FfiConverterOptionalString.write(value.`lastReadMessageIdHex`, buf)
             FfiConverterOptionalULong.write(value.`lastReadTimelineAt`, buf)
             FfiConverterULong.write(value.`updatedAt`, buf)
+            FfiConverterTypeSelfMembershipFfi.write(value.`selfMembership`, buf)
     }
 }
 
@@ -10612,6 +10651,11 @@ public object FfiConverterTypeRelayTelemetryResourceFfi: FfiConverterRustBuffer<
 
 
 
+/**
+ * Relay-telemetry runtime config supplied by the host app. The hand-written
+ * `Debug` impl below redacts `authorization_bearer_token` (the OTLP push
+ * credential) so a `{:?}` never prints it.
+ */
 data class RelayTelemetryRuntimeConfigFfi (
     var `otlpEndpoint`: kotlin.String?, 
     var `authorizationBearerToken`: kotlin.String?, 
@@ -11623,7 +11667,7 @@ public object FfiConverterTypeAgentStreamUpdateFfi : FfiConverterRustBuffer<Agen
 
 /**
  * Coarse, privacy-safe reason a stored group failed session-open hydration and
- * was quarantined (darkmatter#151 / #417). Carries no group/member ids,
+ * was quarantined (mdk#151 / #417). Carries no group/member ids,
  * payloads, or key material — only a category the client can map to per-reason
  * recovery guidance.
  */
@@ -11842,7 +11886,7 @@ public object FfiConverterTypeChatListUpdateTriggerFfi: FfiConverterRustBuffer<C
  * `account_label`, discarding the group id, event kind, and the typed
  * recovery details (quarantine reason, recovered epoch) — so native clients
  * could not react to the typed events the recovery feature surfaces
- * (darkmatter#441 finding 1). This enum mirrors each `GroupEvent` variant and
+ * (mdk#441 finding 1). This enum mirrors each `GroupEvent` variant and
  * carries its privacy-safe scalar fields: ids are hex-encoded, epochs are
  * `u64`, and the two deeply-nested inner enums (`GroupStateChange`,
  * `AppMessageInvalidationReason`) are surfaced as stable low-cardinality tag
@@ -11902,6 +11946,20 @@ sealed class GroupEventKindFfi {
     
     data class CommitRolledBack(
         val `invalidatedCommitIdHex`: kotlin.String) : GroupEventKindFfi() {
+        companion object
+    }
+    
+    /**
+     * Explicit withdrawal of every `GroupStateChanged` notification whose
+     * `origin_commit_id_hex` matches `invalidated_commit_id_hex`: branch
+     * selection superseded that commit, so the changes it announced never
+     * canonically happened. `reason` is a stable low-cardinality tag
+     * (`superseded_by_branch_selection`).
+     */
+    data class GroupStateInvalidated(
+        val `epoch`: kotlin.ULong, 
+        val `invalidatedCommitIdHex`: kotlin.String, 
+        val `reason`: kotlin.String) : GroupEventKindFfi() {
         companion object
     }
     
@@ -11965,11 +12023,16 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
             9 -> GroupEventKindFfi.CommitRolledBack(
                 FfiConverterString.read(buf),
                 )
-            10 -> GroupEventKindFfi.GroupUnrecoverable
-            11 -> GroupEventKindFfi.PendingCommitRecovered(
+            10 -> GroupEventKindFfi.GroupStateInvalidated(
+                FfiConverterULong.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                )
+            11 -> GroupEventKindFfi.GroupUnrecoverable
+            12 -> GroupEventKindFfi.PendingCommitRecovered(
                 FfiConverterULong.read(buf),
                 )
-            12 -> GroupEventKindFfi.GroupHydrationRecovered(
+            13 -> GroupEventKindFfi.GroupHydrationRecovered(
                 FfiConverterULong.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
@@ -12048,6 +12111,15 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
             (
                 4UL
                 + FfiConverterString.allocationSize(value.`invalidatedCommitIdHex`)
+            )
+        }
+        is GroupEventKindFfi.GroupStateInvalidated -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterULong.allocationSize(value.`epoch`)
+                + FfiConverterString.allocationSize(value.`invalidatedCommitIdHex`)
+                + FfiConverterString.allocationSize(value.`reason`)
             )
         }
         is GroupEventKindFfi.GroupUnrecoverable -> {
@@ -12129,17 +12201,24 @@ public object FfiConverterTypeGroupEventKindFfi : FfiConverterRustBuffer<GroupEv
                 FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
                 Unit
             }
-            is GroupEventKindFfi.GroupUnrecoverable -> {
+            is GroupEventKindFfi.GroupStateInvalidated -> {
                 buf.putInt(10)
+                FfiConverterULong.write(value.`epoch`, buf)
+                FfiConverterString.write(value.`invalidatedCommitIdHex`, buf)
+                FfiConverterString.write(value.`reason`, buf)
+                Unit
+            }
+            is GroupEventKindFfi.GroupUnrecoverable -> {
+                buf.putInt(11)
                 Unit
             }
             is GroupEventKindFfi.PendingCommitRecovered -> {
-                buf.putInt(11)
+                buf.putInt(12)
                 FfiConverterULong.write(value.`recoveredEpoch`, buf)
                 Unit
             }
             is GroupEventKindFfi.GroupHydrationRecovered -> {
-                buf.putInt(12)
+                buf.putInt(13)
                 FfiConverterULong.write(value.`recoveredEpoch`, buf)
                 Unit
             }
@@ -13710,7 +13789,7 @@ public object FfiConverterTypeMessageUpdateFfi : FfiConverterRustBuffer<MessageU
 
 /**
  * A relay list the account is missing, as a stable typed variant clients
- * localize without parsing strings (darkmatter#565).
+ * localize without parsing strings (mdk#565).
  */
 
 enum class MissingRelayListKindFfi {
@@ -13873,6 +13952,45 @@ public object FfiConverterTypePushPlatformFfi: FfiConverterRustBuffer<PushPlatfo
     override fun allocationSize(value: PushPlatformFfi) = 4UL
 
     override fun write(value: PushPlatformFfi, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * The local account's own membership in a group: an active `Member`, or a
+ * terminal state describing how it left — `Left` (a voluntary self-removal or
+ * declined invite) or `Removed` (evicted by another member). Surfaced on both
+ * the chat-list row and the group-detail record.
+ */
+
+enum class SelfMembershipFfi {
+    
+    MEMBER,
+    LEFT,
+    REMOVED;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSelfMembershipFfi: FfiConverterRustBuffer<SelfMembershipFfi> {
+    override fun read(buf: ByteBuffer) = try {
+        
+        SelfMembershipFfi.entries[buf.getInt() - 1]
+        
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: SelfMembershipFfi) = 4UL
+
+    override fun write(value: SelfMembershipFfi, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }

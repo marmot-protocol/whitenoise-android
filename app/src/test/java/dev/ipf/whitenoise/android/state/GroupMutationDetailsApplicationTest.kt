@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -133,6 +134,7 @@ class GroupMutationDetailsApplicationTest {
 
     private fun group(admins: List<String>) =
         AppGroupRecordFfi(
+            selfMembership = SelfMembershipFfi.MEMBER,
             groupIdHex = "group",
             endpoint = "endpoint",
             name = "Test Group",
