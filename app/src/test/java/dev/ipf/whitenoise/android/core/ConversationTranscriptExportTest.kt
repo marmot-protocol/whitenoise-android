@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
@@ -327,6 +328,7 @@ class ConversationTranscriptExportTest {
         name: String,
         groupIdHex: String = "aa".repeat(32),
     ) = AppGroupRecordFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         groupIdHex = groupIdHex,
         endpoint = "",
         name = name,

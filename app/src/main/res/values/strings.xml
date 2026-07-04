@@ -101,7 +101,7 @@
     <string name="no_messages_yet">No messages yet</string>
     <string name="group_empty_only_you_title">This group is only you</string>
     <string name="group_empty_invite_members">Invite people when you are ready.</string>
-    <string name="you_are_no_longer_a_member">You are no longer a member of this group.</string>
+    <string name="you_are_no_longer_a_member">You can\'t send messages to this group because you\'re no longer a member.</string>
     <string name="chat_row_draft_prefix">Draft: </string>
     <string name="jump_to_newest">Jump to newest</string>
     <string name="scroll_to_top">Scroll to top</string>

@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import org.junit.Assert.assertEquals
@@ -224,6 +225,7 @@ class ChatListTitleTest {
         welcomer: String? = null,
         groupId: String = "test-group",
     ) = AppGroupRecordFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         groupIdHex = groupId,
         endpoint = "endpoint",
         name = name,
@@ -258,6 +260,7 @@ class ChatListTitleTest {
         groupId: String,
         rawTitle: String,
     ) = ChatListRowFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
         unreadMention = false,
         groupIdHex = groupId,

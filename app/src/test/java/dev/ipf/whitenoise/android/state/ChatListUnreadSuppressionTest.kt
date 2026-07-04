@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -46,6 +47,27 @@ class ChatListUnreadSuppressionTest {
         assertFalse(item.removedFromGroup("self"))
         assertEquals(4uL, item.effectiveUnreadCount("self"))
         assertTrue(item.effectiveHasUnread("self"))
+    }
+
+    @Test
+    fun engineReportedRemovedSelfMembershipSuppressesEvenWhileTheRosterStillContainsSelf() {
+        // The engine's authoritative self-membership takes precedence over the
+        // roster heuristic: an evicted account whose cached roster hasn't caught
+        // up (self still listed) is still removed.
+        val item = item(unreadCount = 4uL, members = listOf("self", "peer"), selfMembership = SelfMembershipFfi.REMOVED)
+
+        assertTrue(item.removedFromGroup("self"))
+        assertEquals(0uL, item.effectiveUnreadCount("self"))
+        assertFalse(item.effectiveHasUnread("self"))
+    }
+
+    @Test
+    fun engineReportedLeftSelfMembershipSuppressesEvenWhileTheRosterStillContainsSelf() {
+        val item = item(unreadCount = 4uL, members = listOf("self", "peer"), selfMembership = SelfMembershipFfi.LEFT)
+
+        assertTrue(item.removedFromGroup("self"))
+        assertEquals(0uL, item.effectiveUnreadCount("self"))
+        assertFalse(item.effectiveHasUnread("self"))
     }
 
     @Test
@@ -113,6 +135,7 @@ class ChatListUnreadSuppressionTest {
         unreadCount: ULong,
         members: List<String>?,
         removed: Boolean = false,
+        selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
     ): ChatListItem =
         ChatListItem(
             group = group("group-a"),
@@ -120,7 +143,7 @@ class ChatListUnreadSuppressionTest {
             otherMemberAccount = null,
             memberCount = members?.size ?: 0,
             memberSnapshot = members?.let { GroupMemberSnapshot(it.map(::member)) },
-            projection = row("group-a", unreadCount),
+            projection = row("group-a", unreadCount, selfMembership),
             removed = removed,
         )
 
@@ -134,7 +157,9 @@ class ChatListUnreadSuppressionTest {
     private fun row(
         groupId: String,
         unreadCount: ULong,
+        selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
     ) = ChatListRowFfi(
+        selfMembership = selfMembership,
         unreadMentionCount = 0uL,
         unreadMention = false,
         groupIdHex = groupId,
@@ -155,6 +180,7 @@ class ChatListUnreadSuppressionTest {
 
     private fun group(id: String) =
         AppGroupRecordFfi(
+            selfMembership = SelfMembershipFfi.MEMBER,
             groupIdHex = id,
             endpoint = "endpoint-$id",
             name = "",

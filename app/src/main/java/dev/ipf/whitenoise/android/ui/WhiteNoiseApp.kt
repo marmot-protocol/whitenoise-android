@@ -15964,6 +15964,9 @@ private fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
         tonalElevation = 3.dp,
     ) {
         Text(
+            // Explains the disabled composer for a member who left or was
+            // removed; the timeline system row carries the left-vs-removed
+            // distinction on its own.
             text = stringResource(R.string.you_are_no_longer_a_member),
             modifier =
                 Modifier
@@ -18348,7 +18351,7 @@ private fun ProfileQrSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(if (copied) stringResource(R.string.copied) else IdentityFormatter.short(npub, prefix = 16, suffix = 14))
             }
-            link?.let { QrCodeImage(content = it.uri) }
+            link?.let { QrCodeImage(content = it.qrUri) }
             scanError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
