@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -339,6 +340,7 @@ class ChatListProjectionReducerTest {
         unreadCount: ULong = 0uL,
         hasUnread: Boolean = false,
     ) = ChatListRowFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
         unreadMention = false,
         groupIdHex = groupId,
@@ -369,6 +371,7 @@ class ChatListProjectionReducerTest {
         archived: Boolean = false,
         pendingConfirmation: Boolean = false,
     ) = AppGroupRecordFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         groupIdHex = groupId,
         endpoint = "endpoint-$groupId",
         name = name,

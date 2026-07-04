@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -131,6 +132,7 @@ class ProfileAddableGroupsTest {
         admins: List<String>,
         pending: Boolean,
     ) = AppGroupRecordFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         groupIdHex = groupId,
         endpoint = "endpoint",
         name = name,

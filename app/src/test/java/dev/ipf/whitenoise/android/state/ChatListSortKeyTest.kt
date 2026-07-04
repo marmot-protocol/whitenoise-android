@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -172,6 +173,7 @@ class ChatListSortKeyTest {
         groupName: String,
         title: String,
     ) = ChatListRowFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
         unreadMention = false,
         groupIdHex = groupId,
@@ -194,6 +196,7 @@ class ChatListSortKeyTest {
         id: String,
         name: String,
     ) = AppGroupRecordFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         groupIdHex = id,
         endpoint = "endpoint-$id",
         name = name,

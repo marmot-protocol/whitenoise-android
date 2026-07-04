@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -151,6 +152,7 @@ class ProjectedPreviewTextTest {
         groupId: String,
         preview: ChatListMessagePreviewFfi,
     ) = ChatListRowFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
         unreadMention = false,
         groupIdHex = groupId,
@@ -171,6 +173,7 @@ class ProjectedPreviewTextTest {
 
     private fun group(id: String) =
         AppGroupRecordFfi(
+            selfMembership = SelfMembershipFfi.MEMBER,
             groupIdHex = id,
             endpoint = "endpoint-$id",
             name = "",

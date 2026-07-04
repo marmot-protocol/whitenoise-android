@@ -10,9 +10,18 @@ data class ProfileLink(
         require(isLikelyNpub(npub)) { "invalid npub" }
     }
 
-    val uri: String = "${BuildConfig.WHITENOISE_DEEP_LINK_SCHEME}://profile/$npub"
+    // Canonical cross-client profile link. Emits the marmot:// scheme that MDK
+    // and other Marmot clients parse; the app's own whitenoise:// scheme stays
+    // registered for inbound/legacy links but is no longer generated.
+    val uri: String = "$MARMOT_SCHEME://profile/$npub"
+
+    // [uri] with a provenance hint, emitted in shared QR codes so the scanning
+    // client can tell the link came from a QR.
+    val qrUri: String = "$uri?from=qr"
 
     companion object {
+        const val MARMOT_SCHEME = "marmot"
+
         // A Nostr npub is bech32-encoded: prefix `npub1`, body in the bech32
         // alphabet (lowercase a-z 0-9 minus 'b' 'i' 'o' '1'), total length 63.
         // We don't bech32-decode here (that's the FFI's job) — we just reject
@@ -73,6 +82,7 @@ data class ProfileLink(
         // drift apart if a future flavor adds a scheme (#847).
         private val PROFILE_SCHEMES =
             setOf(
+                MARMOT_SCHEME,
                 "whitenoise",
                 "whitenoise-staging",
                 "whitenoise-dev",

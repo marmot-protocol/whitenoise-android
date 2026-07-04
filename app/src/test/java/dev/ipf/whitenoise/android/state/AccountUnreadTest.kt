@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -115,6 +116,7 @@ class AccountUnreadTest {
         unreadCount: ULong,
         archived: Boolean = false,
     ) = ChatListRowFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
         unreadMention = false,
         groupIdHex = groupId,

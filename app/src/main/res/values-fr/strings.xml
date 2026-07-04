@@ -89,7 +89,7 @@
     <string name="no_messages_yet">Pas encore de messages</string>
     <string name="group_empty_only_you_title">Ce groupe ne contient que vous</string>
     <string name="group_empty_invite_members">Invitez des personnes quand vous êtes prêt.</string>
-    <string name="you_are_no_longer_a_member">Vous n’êtes plus membre de ce groupe.</string>
+    <string name="you_are_no_longer_a_member">Vous ne pouvez plus envoyer de messages à ce groupe, car vous n’en êtes plus membre.</string>
     <string name="chat_row_draft_prefix">Brouillon : </string>
     <string name="jump_to_newest">Aller au plus récent</string>
     <string name="scroll_to_top">Faire défiler vers le haut</string>
