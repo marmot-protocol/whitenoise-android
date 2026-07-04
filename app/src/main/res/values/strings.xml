@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <!-- In-app brand wordmark (onboarding landing). Always the product name and
+         deliberately NOT app_name: the debug build type overrides app_name to
+         "White Noise Dev" for the launcher label, but the in-app brand stays
+         "White Noise". Kept identical across locales (see LocalizationResourceTest). -->
+    <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise couldn\'t start</string>
     <string name="refresh">Refresh</string>
     <string name="retry">Retry</string>
-    <string name="white_noise_shield">White Noise shield</string>
-    <string name="onboarding_tagline">End-to-end encrypted group messaging.</string>
     <string name="creating_identity">Creating identity</string>
     <string name="creating_identity_title">Creating Identity</string>
     <string name="create_new_identity">Create New Identity</string>
     <string name="sign_in">Sign in</string>
-    <string name="sign_in_to_white_noise">Sign in to White Noise</string>
+    <string name="sign_in_headline">Enter your key</string>
     <string name="sign_in_secret_key_help">Enter your Nostr secret key to use an existing identity on this device.</string>
     <string name="nostr_nsec">Nostr nsec</string>
     <string name="back">Back</string>
@@ -398,6 +401,9 @@
     <string name="publish_to_relays">Publish to Relays</string>
     <string name="nsec_or_npub">nsec or npub</string>
     <string name="import_existing_identity">Import Existing Identity</string>
+    <string name="white_noise_logo">White Noise logo</string>
+    <string name="identity_entry_error_invalid_key">That doesn\'t look like a valid nsec or npub key.</string>
+    <string name="identity_entry_error_import_failed">Couldn\'t sign in with that key. Check it and try again.</string>
     <string name="identity">Identity</string>
     <string name="public_key">Public key</string>
     <string name="local_signing">Local signing</string>
@@ -908,4 +914,10 @@
     <string name="toast_disappearing_not_applied">The group was created, but disappearing messages could not be turned on</string>
     <string name="search_members">Search members</string>
     <string name="recent_chats">Recent chats</string>
+    <string name="onboarding_login">Login</string>
+    <string name="onboarding_sign_up">Sign Up</string>
+    <string name="onboarding_slogan_decentralized">Decentralized</string>
+    <string name="onboarding_slogan_uncensorable">Uncensorable</string>
+    <string name="onboarding_slogan_secure_messaging">Secure Messaging</string>
+    <string name="sign_in_error_public_key">That\'s a public key. Enter your secret key (nsec) to sign in.</string>
 </resources>

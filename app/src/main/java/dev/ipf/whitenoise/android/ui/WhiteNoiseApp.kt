@@ -38,6 +38,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -67,6 +68,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -79,12 +81,15 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -182,6 +187,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -241,6 +247,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -297,6 +304,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.booleanResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -380,6 +388,7 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemCopy
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.Lud16Resolver
@@ -1072,17 +1081,29 @@ private fun FailureScreen(
 // disables the other while one runs.
 private enum class OnboardingAction { Idle, Creating, Importing }
 
+// Adaptive cap for the onboarding + sign-in surfaces: on a phone the hero and
+// actions fill the width, but on tablets / unfolded foldables / desktop windows
+// they stay a readable single column centered in the window rather than
+// stretching full-bleed (per the `adaptive` skill's max-content-width guidance).
+private val OnboardingMaxContentWidth = 440.dp
+
 @Composable
 private fun OnboardingScreen(appState: WhiteNoiseAppState) {
     var identity by remember { mutableStateOf("") }
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
+    var importErrorRes by remember { mutableStateOf<Int?>(null) }
     val scope = rememberCoroutineScope()
 
     OnboardingContent(
         identity = identity,
         creatingIdentity = inFlightAction == OnboardingAction.Creating,
         signingInBusy = inFlightAction == OnboardingAction.Importing,
-        onIdentityChange = { identity = it },
+        importErrorRes = importErrorRes,
+        onIdentityChange = {
+            identity = it
+            importErrorRes = null
+        },
+        onImportErrorChange = { importErrorRes = it },
         onCreateIdentity = {
             inFlightAction = OnboardingAction.Creating
             scope.launch {
@@ -1095,9 +1116,12 @@ private fun OnboardingScreen(appState: WhiteNoiseAppState) {
         },
         onImportIdentity = { value ->
             inFlightAction = OnboardingAction.Importing
+            importErrorRes = null
             scope.launch {
                 try {
-                    appState.importIdentity(value)
+                    if (!appState.importIdentity(value)) {
+                        importErrorRes = importIdentityErrorRes(value)
+                    }
                 } finally {
                     inFlightAction = OnboardingAction.Idle
                 }
@@ -1105,6 +1129,19 @@ private fun OnboardingScreen(appState: WhiteNoiseAppState) {
         },
     )
 }
+
+/**
+ * Inline message for a failed identity import (#795 lud16 pattern): input
+ * that isn't even shaped like a key reads as "not a valid key"; a
+ * well-formed key that the engine still rejected reads as a retryable
+ * sign-in failure.
+ */
+internal fun importIdentityErrorRes(identity: String): Int =
+    if (IdentityEntryInput.classify(identity) == IdentityEntryInput.Kind.Invalid) {
+        R.string.identity_entry_error_invalid_key
+    } else {
+        R.string.identity_entry_error_import_failed
+    }
 
 @Composable
 fun OnboardingContent(
@@ -1114,6 +1151,8 @@ fun OnboardingContent(
     onIdentityChange: (String) -> Unit,
     onCreateIdentity: () -> Unit,
     onImportIdentity: (String) -> Unit,
+    importErrorRes: Int? = null,
+    onImportErrorChange: (Int?) -> Unit = {},
 ) {
     var signingIn by remember { mutableStateOf(signingInBusy) }
     val busy = creatingIdentity || signingInBusy
@@ -1123,156 +1162,437 @@ fun OnboardingContent(
         SignInContent(
             identity = identity,
             busy = signingInBusy,
+            errorRes = importErrorRes,
             onIdentityChange = onIdentityChange,
+            onErrorChange = onImportErrorChange,
             onBack = { signingIn = false },
             onSignIn = { onImportIdentity(identity.trim()) },
         )
         return
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
-        horizontalAlignment = Alignment.CenterHorizontally,
+    // Edge-to-edge: the landing is hosted in a Scaffold with zero content insets
+    // (see WhiteNoiseApp), so it owns its own system-bar / display-cutout padding
+    // via safeDrawing. Adaptive: the hero + actions are capped at a readable
+    // width and centered so the column doesn't stretch full-bleed on tablets /
+    // unfolded foldables / desktop windows. Layout mirrors the old app: plain
+    // logo + rotating slogan centered above a bottom "slate" holding the two
+    // auth actions.
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing),
+        contentAlignment = Alignment.TopCenter,
     ) {
-        Spacer(Modifier.height(12.dp))
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Icon(
-                imageVector = Icons.Default.Shield,
-                contentDescription = stringResource(R.string.white_noise_shield),
-                modifier = Modifier.size(88.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
-            Text(
-                stringResource(R.string.onboarding_tagline),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            Button(
-                onClick = onCreateIdentity,
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = OnboardingMaxContentWidth)
+                    .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            // Hero: plain mark + wordmark + rotating slogan, centered in the
+            // flexible space above the slate.
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
-                if (creatingIdentity) {
-                    CircularProgressIndicator(
-                        modifier =
-                            Modifier
-                                .size(20.dp)
-                                .semantics { contentDescription = creatingIdentityDescription },
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Icon(Icons.Default.Key, contentDescription = null)
-                }
-                Spacer(Modifier.width(10.dp))
+                WhiteNoiseLogoLockup(size = 96.dp)
+                Spacer(Modifier.height(24.dp))
                 Text(
-                    stringResource(if (creatingIdentity) R.string.creating_identity_title else R.string.create_new_identity),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    // Brand wordmark: always "White Noise" (see the white_noise
+                    // string), never app_name, which debug builds relabel to
+                    // "White Noise Dev".
+                    stringResource(R.string.white_noise),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
                 )
+                Spacer(Modifier.height(8.dp))
+                OnboardingRotatingSlogan()
             }
-            OutlinedButton(
-                onClick = { signingIn = true },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+
+            // Bottom slate: a lifted surface panel holding the auth actions,
+            // echoing the old app's WnSlate. Login (tonal) sits above Sign up
+            // (filled primary), matching the old auth-buttons order.
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Default.Person, contentDescription = null)
-                Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
+                ) {
+                    FilledTonalButton(
+                        onClick = { signingIn = true },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.onboarding_login),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Button(
+                        onClick = onCreateIdentity,
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                    ) {
+                        if (creatingIdentity) {
+                            CircularProgressIndicator(
+                                modifier =
+                                    Modifier
+                                        .size(20.dp)
+                                        .semantics { contentDescription = creatingIdentityDescription },
+                                strokeWidth = 2.dp,
+                            )
+                            Spacer(Modifier.width(10.dp))
+                        }
+                        Text(
+                            stringResource(if (creatingIdentity) R.string.creating_identity_title else R.string.onboarding_sign_up),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
             }
         }
     }
 }
 
+/**
+ * The rotating brand slogan on the onboarding landing, mirroring the old app:
+ * fades through "Decentralized" → "Uncensorable" → "Secure messaging" every 3s.
+ * The index advances on a paused-clock-friendly [delay] loop, so a screenshot
+ * test that doesn't advance the clock deterministically captures the first
+ * slogan.
+ */
+@Composable
+private fun OnboardingRotatingSlogan() {
+    val slogans =
+        listOf(
+            R.string.onboarding_slogan_decentralized,
+            R.string.onboarding_slogan_uncensorable,
+            R.string.onboarding_slogan_secure_messaging,
+        )
+    var index by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(3000)
+            index = (index + 1) % slogans.size
+        }
+    }
+    AnimatedContent(
+        targetState = index,
+        transitionSpec = { fadeIn(tween(500)) togetherWith fadeOut(tween(500)) },
+        label = "onboarding-slogan",
+    ) { current ->
+        Text(
+            stringResource(slogans[current]),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/**
+ * The White Noise brand mark shown on the onboarding surfaces: the bare WN "M"
+ * mark, tinted with the foreground content color (white on the dark AMOLED
+ * background, near-black in light theme). No container/badge — this mirrors the
+ * old app's plain-logo treatment. The tint reads off the background luminance
+ * (matching how the rest of this file derives light/dark) rather than
+ * `isSystemInDarkTheme()`, so a forced-theme preview/test resolves correctly.
+ */
+@Composable
+internal fun WhiteNoiseLogoLockup(
+    modifier: Modifier = Modifier,
+    size: Dp = 96.dp,
+) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val markColor = if (isLight) MaterialTheme.colorScheme.onBackground else Color.White
+    Icon(
+        painter = painterResource(R.drawable.ic_wn_mark),
+        contentDescription = stringResource(R.string.white_noise_logo),
+        modifier = modifier.size(size),
+        tint = markColor,
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SignInContent(
     identity: String,
     busy: Boolean,
+    errorRes: Int?,
     onIdentityChange: (String) -> Unit,
+    onErrorChange: (Int?) -> Unit,
     onBack: () -> Unit,
     onSignIn: () -> Unit,
 ) {
     WindowSecureFlag()
     val canSignIn = identity.isNotBlank() && !busy
     val signInDescription = stringResource(R.string.sign_in)
+    // Login is nsec-only: reject a public key (npub) with a clear message
+    // rather than importing it as a read-only account.
+    val submit = {
+        if (IdentityEntryInput.classify(identity) == IdentityEntryInput.Kind.PublicKey) {
+            onErrorChange(R.string.sign_in_error_public_key)
+        } else {
+            onSignIn()
+        }
+    }
+    // System back on the login screen returns to the landing (same as the
+    // visible back arrow), instead of propagating to the activity and exiting
+    // the app.
+    BackHandler { onBack() }
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0.dp),
+        // Edge-to-edge: the content owns the top + horizontal safe-area insets;
+        // the bottom slate owns the navigation-bar + IME insets (it applies
+        // navigationBarsPadding().imePadding() itself), so the sign-in button
+        // rides above the keyboard and the field stays reachable.
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         bottomBar = {
-            StickyFormActionBar {
-                Button(
-                    onClick = onSignIn,
-                    enabled = canSignIn,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
+            // Match the landing's bottom slate: same surface + shape, and the
+            // primary button in the same 12dp shape/size as the landing's
+            // buttons — no bordered, tonally-elevated action bar behind it.
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .imePadding()
+                            .padding(horizontal = 24.dp, vertical = 20.dp),
                 ) {
-                    if (busy) {
-                        CircularProgressIndicator(
-                            modifier =
-                                Modifier
-                                    .size(20.dp)
-                                    .semantics { contentDescription = signInDescription },
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Icon(Icons.Default.Person, contentDescription = null)
+                    Button(
+                        onClick = submit,
+                        enabled = canSignIn,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                    ) {
+                        if (busy) {
+                            LoadingIndicator(
+                                modifier =
+                                    Modifier
+                                        .size(24.dp)
+                                        .semantics { contentDescription = signInDescription },
+                            )
+                            Spacer(Modifier.width(10.dp))
+                        }
+                        Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     }
-                    Spacer(Modifier.width(10.dp))
-                    Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
         },
     ) { padding ->
-        Column(
+        // Adaptive: cap + center the column so the field and brand don't stretch
+        // full-bleed on large / foldable / desktop windows.
+        Box(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+                    .consumeWindowInsets(padding),
+            contentAlignment = Alignment.TopCenter,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack, enabled = !busy) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+            Column(
+                modifier =
+                    Modifier
+                        .widthIn(max = OnboardingMaxContentWidth)
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack, enabled = !busy) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
                 }
-                Text(stringResource(R.string.sign_in_to_white_noise), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+                // Smaller sibling of the landing badge to tie the two surfaces
+                // together (same squircle + brand tokens, scaled down).
+                WhiteNoiseLogoLockup(size = 72.dp)
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    stringResource(R.string.sign_in_headline),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.sign_in_secret_key_help),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(28.dp))
+                IdentityEntryForm(
+                    identity = identity,
+                    busy = busy,
+                    errorRes = errorRes,
+                    onIdentityChange = onIdentityChange,
+                    onErrorChange = onErrorChange,
+                    onSubmit = submit,
+                    // Login is nsec-only: no QR scan (the scanner yields
+                    // npub / profile-link payloads), and the field is always
+                    // masked and labelled as a secret key.
+                    allowScan = false,
+                    secretKeyOnly = true,
+                )
+                Spacer(Modifier.height(24.dp))
             }
-            Text(
-                stringResource(R.string.sign_in_secret_key_help),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedTextField(
-                value = identity,
-                onValueChange = onIdentityChange,
-                label = { Text(stringResource(R.string.nostr_nsec)) },
-                singleLine = true,
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-                // Treat the nsec entry as a password: hides the value on
-                // screen, and tells the IME not to retain it for suggestions,
-                // autofill, or third-party clipboard inspection.
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions =
-                    KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        autoCorrectEnabled = false,
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done,
-                    ),
-                keyboardActions =
-                    KeyboardActions(
-                        onDone = {
-                            if (canSignIn) onSignIn()
-                        },
-                    ),
-            )
         }
+    }
+}
+
+/**
+ * The shared nsec/npub entry field used by the onboarding sign-in screen and
+ * the add-account sheet (previously two drifted copies of the same form).
+ * Owns masking, the paste/clear/QR-scan affordances, and the inline import
+ * error; submission stays with the caller — the QR path only fills the field
+ * so the user confirms before anything is imported.
+ */
+@Composable
+internal fun IdentityEntryForm(
+    identity: String,
+    busy: Boolean,
+    errorRes: Int?,
+    onIdentityChange: (String) -> Unit,
+    onErrorChange: (Int?) -> Unit,
+    onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
+    // Opt-in prominent "Scan QR Code" button under the field.
+    // Off by default so the add-account sheet keeps the compact field-only form.
+    showScanShortcut: Boolean = false,
+    // Whether any QR-scan affordance is offered. The login screen sets this
+    // false: logging in requires the *secret* key (nsec), and the scanner
+    // yields npub / profile-link payloads, so scanning has no place there.
+    allowScan: Boolean = true,
+    // nsec-only mode (login): always masks the input and labels it as a secret
+    // key. npub is rejected by the caller's submit validation.
+    secretKeyOnly: Boolean = false,
+) {
+    var showScanner by remember { mutableStateOf(false) }
+    val canSubmit = identity.isNotBlank() && !busy
+    val context = LocalContext.current
+    val clipboardManager =
+        remember(context) {
+            ContextCompat.getSystemService(context, android.content.ClipboardManager::class.java)
+        }
+    val canOfferPaste = rememberClipboardCanOfferPaste(clipboardManager)
+
+    // Mask unless the value is unambiguously a public npub. Treats partial /
+    // empty / unprefixed input as potentially secret, so a pasted nsec is
+    // never rendered while the field is non-empty. Keep
+    // `KeyboardType.Password` even when revealing the npub so the IME stays
+    // opted out of suggestions / autofill / history.
+    val maskSecret = secretKeyOnly || !identity.trim().startsWith("npub1")
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedTextField(
+            value = identity,
+            onValueChange = onIdentityChange,
+            label = { Text(stringResource(if (secretKeyOnly) R.string.nostr_nsec else R.string.nsec_or_npub)) },
+            singleLine = true,
+            enabled = !busy,
+            isError = errorRes != null,
+            supportingText = errorRes?.let { { Text(stringResource(it)) } },
+            trailingIcon = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    when {
+                        identity.isNotEmpty() -> {
+                            IconButton(onClick = { onIdentityChange("") }, enabled = !busy) {
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear))
+                            }
+                        }
+                        else -> {
+                            if (canOfferPaste) {
+                                IconButton(
+                                    onClick = {
+                                        // Identity-specific paste: ClipboardPasteAffordance
+                                        // is public-identifier-only and would reject an nsec.
+                                        IdentityEntryInput
+                                            .pasteValue(clipboardManager?.primaryClipPlainText(context))
+                                            ?.let(onIdentityChange)
+                                    },
+                                    enabled = !busy,
+                                ) {
+                                    Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
+                                }
+                            }
+                            if (allowScan) {
+                                IconButton(onClick = { showScanner = true }, enabled = !busy) {
+                                    Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_qr_code))
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (maskSecret) PasswordVisualTransformation() else VisualTransformation.None,
+            keyboardOptions =
+                KeyboardOptions(
+                    capitalization = KeyboardCapitalization.None,
+                    autoCorrectEnabled = false,
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done,
+                ),
+            keyboardActions =
+                KeyboardActions(
+                    onDone = {
+                        if (canSubmit) onSubmit()
+                    },
+                ),
+        )
+        if (showScanShortcut && allowScan) {
+            // Prominent secondary route to the same scanner the trailing icon
+            // opens (shared `showScanner` state), for the in-person QR flow.
+            OutlinedButton(
+                onClick = { showScanner = true },
+                enabled = !busy,
+                shape = RoundedCornerShape(28.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            ) {
+                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(R.string.scan_qr_code), style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+    if (showScanner) {
+        QrScannerSheet(
+            onDismiss = { showScanner = false },
+            onScan = { raw ->
+                showScanner = false
+                val scanned = IdentityEntryInput.scannedValue(raw)
+                if (scanned == null) {
+                    onErrorChange(R.string.identity_entry_error_invalid_key)
+                } else {
+                    // Fill only; the user reviews and taps sign in / import.
+                    onIdentityChange(scanned)
+                }
+            },
+        )
     }
 }
 
@@ -18188,7 +18508,7 @@ fun SettingsAccountHeader(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AccountSelectorSheet(
     appState: WhiteNoiseAppState,
@@ -18196,8 +18516,15 @@ private fun AccountSelectorSheet(
     onAddAccount: () -> Unit,
     onAccountSwitched: () -> Unit,
 ) {
+    // Local in-flight signal for the expressive loading state: refreshAccounts
+    // itself exposes none, and this sheet is the only caller that needs one.
+    var refreshingAccounts by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
-        appState.refreshAccounts()
+        try {
+            appState.refreshAccounts()
+        } finally {
+            refreshingAccounts = false
+        }
     }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -18205,78 +18532,95 @@ private fun AccountSelectorSheet(
     ) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleLarge)
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
-                items(appState.accounts, key = { it.label }) { account ->
-                    val unreadCount = appState.unreadCountForAccount(account.label)
-                    ListItem(
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .amoledSurfaceBorder(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    // Run on the process-lifetime mutation scope, not this
-                                    // sheet's rememberCoroutineScope. setActiveAccount flips
-                                    // activeAccountRef partway through and keeps suspending
-                                    // (profile warm, notification refresh, push sync); the
-                                    // account-change nav reset in MainShell then disposes this
-                                    // sheet, which would cancel a sheet-scoped coroutine before
-                                    // the switch cleanup finishes (#547). onDismiss /
-                                    // onAccountSwitched only set parent composition state, so
-                                    // they are safe to run from the mutation scope.
-                                    appState.launchMutation {
-                                        appState.setActiveAccount(account.label)
-                                        onDismiss()
-                                        // Land on the newly-active account's chat list
-                                        // instead of leaving the user on Settings (#316).
-                                        onAccountSwitched()
+            if (refreshingAccounts) {
+                Box(Modifier.fillMaxWidth().heightIn(min = 120.dp), contentAlignment = Alignment.Center) {
+                    LoadingIndicator()
+                }
+            } else {
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                    items(appState.accounts, key = { it.label }) { account ->
+                        val unreadCount = appState.unreadCountForAccount(account.label)
+                        val isActiveAccount = account.label == appState.activeAccountRef
+                        ListItem(
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        // Run on the process-lifetime mutation scope, not this
+                                        // sheet's rememberCoroutineScope. setActiveAccount flips
+                                        // activeAccountRef partway through and keeps suspending
+                                        // (profile warm, notification refresh, push sync); the
+                                        // account-change nav reset in MainShell then disposes this
+                                        // sheet, which would cancel a sheet-scoped coroutine before
+                                        // the switch cleanup finishes (#547). onDismiss /
+                                        // onAccountSwitched only set parent composition state, so
+                                        // they are safe to run from the mutation scope.
+                                        appState.launchMutation {
+                                            appState.setActiveAccount(account.label)
+                                            onDismiss()
+                                            // Land on the newly-active account's chat list
+                                            // instead of leaving the user on Settings (#316).
+                                            onAccountSwitched()
+                                        }
+                                    },
+                            colors =
+                                ListItemDefaults.colors(
+                                    // Tonal highlight so the active account reads at a
+                                    // glance, not only from the trailing check.
+                                    containerColor =
+                                        if (isActiveAccount) {
+                                            MaterialTheme.colorScheme.secondaryContainer
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                ),
+                            leadingContent = {
+                                Avatar(
+                                    title = appState.displayName(account.accountIdHex),
+                                    seed = account.accountIdHex,
+                                    size = 44.dp,
+                                    pictureUrl = appState.avatarUrl(account.accountIdHex),
+                                )
+                            },
+                            headlineContent = { Text(appState.displayName(account.accountIdHex)) },
+                            supportingContent = {
+                                Text(
+                                    appState.shortNpub(account.accountIdHex),
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            trailingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (unreadCount > 0uL) {
+                                        UnreadCountBadge(unreadCount)
+                                        Spacer(Modifier.width(8.dp))
                                     }
-                                },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = {
-                            Avatar(
-                                title = appState.displayName(account.accountIdHex),
-                                seed = account.accountIdHex,
-                                size = 44.dp,
-                                pictureUrl = appState.avatarUrl(account.accountIdHex),
-                            )
-                        },
-                        headlineContent = { Text(appState.displayName(account.accountIdHex)) },
-                        supportingContent = {
-                            Text(
-                                appState.shortNpub(account.accountIdHex),
-                                fontFamily = FontFamily.Monospace,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        trailingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (unreadCount > 0uL) {
-                                    UnreadCountBadge(unreadCount)
-                                    Spacer(Modifier.width(8.dp))
+                                    if (!account.localSigning) {
+                                        Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)
+                                        Spacer(Modifier.width(8.dp))
+                                    }
+                                    if (account.signedOut) {
+                                        Text(stringResource(R.string.signed_out), style = MaterialTheme.typography.labelSmall)
+                                        Spacer(Modifier.width(8.dp))
+                                    }
+                                    if (isActiveAccount) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = stringResource(R.string.active),
+                                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        )
+                                    }
                                 }
-                                if (!account.localSigning) {
-                                    Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)
-                                    Spacer(Modifier.width(8.dp))
-                                }
-                                if (account.signedOut) {
-                                    Text(stringResource(R.string.signed_out), style = MaterialTheme.typography.labelSmall)
-                                    Spacer(Modifier.width(8.dp))
-                                }
-                                if (account.label == appState.activeAccountRef) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = stringResource(R.string.active),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                            }
-                        },
-                    )
-                    HorizontalDivider()
+                            },
+                        )
+                        HorizontalDivider()
+                    }
                 }
             }
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = onAddAccount,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -20095,6 +20439,7 @@ private fun AddIdentitySheet(
     WindowSecureFlag()
     var identity by remember { mutableStateOf("") }
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
+    var importErrorRes by remember { mutableStateOf<Int?>(null) }
     val busy = inFlightAction != OnboardingAction.Idle
     val creatingIdentityDescription = stringResource(R.string.creating_identity)
     val importingDescription = stringResource(R.string.import_existing_identity)
@@ -20104,9 +20449,12 @@ private fun AddIdentitySheet(
     fun startImport() {
         if (inFlightAction != OnboardingAction.Idle || identity.isBlank()) return
         inFlightAction = OnboardingAction.Importing
+        importErrorRes = null
         appState.launchMutation {
             try {
-                appState.importIdentity(identity)
+                if (!appState.importIdentity(identity)) {
+                    importErrorRes = importIdentityErrorRes(identity)
+                }
             } finally {
                 inFlightAction = OnboardingAction.Idle
             }
@@ -20160,30 +20508,18 @@ private fun AddIdentitySheet(
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(if (inFlightAction == OnboardingAction.Creating) R.string.creating_identity_title else R.string.create_new_identity))
             }
-            // Mask unless the value is unambiguously a public npub.
-            // Treats partial / empty / unprefixed input as potentially secret,
-            // so a pasted nsec is never rendered while the field is non-empty.
-            // Keep `KeyboardType.Password` even when revealing the npub so the
-            // IME stays opted out of suggestions / autofill / history.
-            val maskSecret = !identity.trim().startsWith("npub1")
-            OutlinedTextField(
-                value = identity,
-                onValueChange = { identity = it },
-                label = { Text(stringResource(R.string.nsec_or_npub)) },
-                singleLine = true,
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-                visualTransformation = if (maskSecret) PasswordVisualTransformation() else VisualTransformation.None,
-                keyboardOptions =
-                    KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        autoCorrectEnabled = false,
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done,
-                    ),
-                keyboardActions = KeyboardActions(onDone = { startImport() }),
+            IdentityEntryForm(
+                identity = identity,
+                busy = busy,
+                errorRes = importErrorRes,
+                onIdentityChange = {
+                    identity = it
+                    importErrorRes = null
+                },
+                onErrorChange = { importErrorRes = it },
+                onSubmit = { startImport() },
             )
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = { startImport() },
                 enabled = !busy && identity.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
