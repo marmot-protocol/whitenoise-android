@@ -3538,6 +3538,23 @@ class WhiteNoiseAppState(
      */
     fun accountIdHexForMention(bech32: String): String? = nostrEntityAccountIdHex(bech32)
 
+    /**
+     * Whether a mention/profile [bech32] (npub/nprofile) resolves to an account
+     * that is a current member of [members] — the active group's live roster.
+     * The message renderer uses this to reserve the "@" mention treatment for
+     * real group members: a pasted npub of a non-member still resolves to a
+     * display name but renders without the "@" (#1017). Pure FFI encoding +
+     * roster comparison (case-insensitive, as hex casing round-trips through the
+     * FFI); an unresolvable reference is never a member.
+     */
+    fun isRosterMember(
+        bech32: String,
+        members: List<AppGroupMemberRecordFfi>,
+    ): Boolean {
+        val hex = nostrEntityAccountIdHex(bech32)?.trim()?.takeIf { it.isNotEmpty() } ?: return false
+        return members.any { it.memberIdHex.equals(hex, ignoreCase = true) }
+    }
+
     fun clearPresentedProfile() {
         pendingProfileNpub = null
     }

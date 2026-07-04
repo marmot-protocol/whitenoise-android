@@ -13448,12 +13448,22 @@ private fun MessageBubble(
                                         // Mention names resolve through the profile
                                         // cache; npub taps stay in-app via the
                                         // profile sheet (never an external nostr:
-                                        // intent).
+                                        // intent). The "@" mention treatment is
+                                        // reserved for a resolved account that is a
+                                        // current member of this group's live roster
+                                        // (#1017); a pasted npub/nprofile of a
+                                        // non-member keeps its name but drops the "@".
                                         MarkdownMessageBody(
                                             markdownDocument,
                                             mentionDisplayName =
                                                 remember(appState) {
                                                     { bech32: String -> appState.mentionDisplayName(bech32) }
+                                                },
+                                            isGroupMember =
+                                                remember(appState, controller.members) {
+                                                    { bech32: String ->
+                                                        appState.isRosterMember(bech32, controller.members)
+                                                    }
                                                 },
                                             onNostrProfileTap =
                                                 remember(appState) {

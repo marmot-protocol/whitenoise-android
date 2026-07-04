@@ -75,17 +75,29 @@ import dev.ipf.whitenoise.android.R
  *   fetches would bypass the encrypted-media pipeline, so we don't.
  * - Math (inline + block): monospace literal, no typesetting.
  *
- * Nostr entities are first-class: a mention renders as "@DisplayName" (bold)
- * when [mentionDisplayName] resolves one, else as its shortened bech32 in the
- * code style; npub/nprofile entities route taps to [onNostrProfileTap] (an
- * in-app profile presentation — identity taps are never handed to external
- * apps via ACTION_VIEW). note/nevent/naddr/nrelay stay styled but inert.
+ * Nostr entities are first-class. The "@" prefix is reserved for a real
+ * group-member mention: a `NostrMention` whose resolved account is a current
+ * member of the active group (per [isGroupMember]) renders as "@DisplayName"
+ * (bold, tinted). A pasted npub/nprofile of a NON-member still resolves and
+ * shows its display name via [mentionDisplayName], but WITHOUT the "@" — it
+ * reads as an inline profile link, not a mention, so "@" keeps meaning
+ * "addressing a member of this group" (#1017). An unresolved entity falls back
+ * to its shortened bech32 in the code style. npub/nprofile entities route taps
+ * to [onNostrProfileTap] (an in-app profile presentation — identity taps are
+ * never handed to external apps via ACTION_VIEW) in every case;
+ * note/nevent/naddr/nrelay stay styled but inert.
  */
 @Composable
 internal fun MarkdownMessageBody(
     document: MarkdownDocumentFfi,
     modifier: Modifier = Modifier,
     mentionDisplayName: ((String) -> String?)? = null,
+    // Whether a mention entity's bech32 resolves to a current member of the
+    // active group. Only a member gets the "@" mention treatment; a resolved
+    // non-member keeps its name but drops the "@" (#1017). Null (no roster
+    // available) treats every resolved mention as a member — the pre-#1017
+    // behavior — so DM/preview callers without a roster are unchanged.
+    isGroupMember: ((String) -> Boolean)? = null,
     onNostrProfileTap: ((String) -> Unit)? = null,
     // Reports the layout of the final rendered text line so a caller can place
     // an inline footer against it. Fires for a text-bearing last block, or for
@@ -119,8 +131,8 @@ internal fun MarkdownMessageBody(
             }
         }
     val bodyContext =
-        remember(linkListener, mentionDisplayName) {
-            MarkdownBodyContext(linkListener, mentionDisplayName)
+        remember(linkListener, mentionDisplayName, isGroupMember) {
+            MarkdownBodyContext(linkListener, mentionDisplayName, isGroupMember)
         }
     MarkdownBlockList(
         blocks = document.blocks,
@@ -194,6 +206,7 @@ internal fun markdownInlineDepthExceeded(depth: Int): Boolean = depth >= MARKDOW
 private data class MarkdownBodyContext(
     val linkListener: LinkInteractionListener,
     val mentionDisplayName: ((String) -> String?)?,
+    val isGroupMember: ((String) -> Boolean)?,
 )
 
 @Composable
@@ -463,6 +476,7 @@ private fun rememberMarkdownInlineText(
                 ),
             linkListener = ctx.linkListener,
             mentionDisplayName = mentionNames::get,
+            isGroupMember = ctx.isGroupMember,
         )
     }
 }
@@ -569,8 +583,13 @@ internal const val CONFIRM_LINK_TAG_PREFIX = "confirm-link:"
  * [isOpenableMarkdownLink]) become tappable [LinkAnnotation.Url]s; anything
  * else (javascript:, data:, file:, …) renders its visible text with no
  * annotation at all, so there is nothing to tap and nothing to launch.
- * Nostr mentions resolve through [mentionDisplayName] (bold "@Name") or fall
- * back to their shortened bech32 in [codeStyle].
+ * A resolved [MarkdownInlineFfi.NostrMention] renders as the bold "@Name"
+ * mention only when [isGroupMember] reports its bech32 as a current member of
+ * the active group; a resolved non-member keeps its display name but drops the
+ * "@" and reads as an inline profile link (#1017). A null [isGroupMember]
+ * treats every resolved mention as a member (the pre-#1017 behavior), so
+ * roster-less callers are unaffected. Unresolved mentions fall back to their
+ * shortened bech32 in [codeStyle].
  */
 internal fun markdownInlinesToAnnotatedString(
     inlines: List<MarkdownInlineFfi>,
@@ -578,11 +597,12 @@ internal fun markdownInlinesToAnnotatedString(
     linkStyle: SpanStyle,
     linkListener: LinkInteractionListener? = null,
     mentionDisplayName: ((String) -> String?)? = null,
+    isGroupMember: ((String) -> Boolean)? = null,
 ): AnnotatedString =
     buildAnnotatedString {
         appendMarkdownInlines(
             inlines,
-            MarkdownInlineRenderContext(codeStyle, linkStyle, linkListener, mentionDisplayName),
+            MarkdownInlineRenderContext(codeStyle, linkStyle, linkListener, mentionDisplayName, isGroupMember),
             depth = 0,
         )
     }
@@ -593,6 +613,7 @@ private class MarkdownInlineRenderContext(
     val linkStyle: SpanStyle,
     val linkListener: LinkInteractionListener?,
     val mentionDisplayName: ((String) -> String?)?,
+    val isGroupMember: ((String) -> Boolean)?,
 )
 
 private fun AnnotatedString.Builder.appendMarkdownInlines(
@@ -661,12 +682,15 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
 }
 
 /**
- * Mention → "@DisplayName" (bold) when resolvable, else "@" + shortened
- * bech32 in the code style; a plain nostr: URI shows the shortened bech32
- * without the "@" and never resolves a name. npub/nprofile entities carry a
+ * A group-member mention → "@DisplayName" (bold, tinted). A resolved
+ * non-member reference (pasted npub/nprofile of someone outside the active
+ * group) → its display name WITHOUT the "@" (underlined link styling), so the
+ * "@" stays reserved for actually addressing a member (#1017). An unresolved
+ * entity → "@"+shortened bech32 for a mention, or a bare shortened bech32 for a
+ * plain nostr: URI, both in the code style. npub/nprofile entities carry a
  * [LinkAnnotation.Clickable] routed (via the shared listener) to the in-app
- * profile sheet; the other HRPs (note/nevent/naddr/nrelay) have no in-app
- * destination yet, so they stay inert.
+ * profile sheet in every resolved/unresolved case; the other HRPs
+ * (note/nevent/naddr/nrelay) have no in-app destination yet, so they stay inert.
  */
 private fun AnnotatedString.Builder.appendNostrEntity(
     entity: MarkdownNostrEntityFfi,
@@ -674,28 +698,42 @@ private fun AnnotatedString.Builder.appendNostrEntity(
     ctx: MarkdownInlineRenderContext,
 ) {
     val name = if (mention) ctx.mentionDisplayName?.invoke(entity.bech32) else null
+    // The "@" is a group-membership signal: apply it (and the bold mention
+    // treatment) only when the resolved account is a current member of the
+    // active group. A null resolver means no roster is available, so keep the
+    // pre-#1017 behavior and treat any resolved name as a member. A resolved
+    // NON-member keeps its display name but renders as a plain profile link.
+    val memberMention = name != null && (ctx.isGroupMember?.invoke(entity.bech32) ?: true)
     // The annotated run borrows the link color (LocalContentColor in the
     // bubble): a Clickable region is painted with ITS OWN TextLinkStyles —
     // when those are null, Material's Text falls back to the theme's default
     // link color (primary), which is invisible on the outgoing
     // primary-container bubble. Same color policy as linkStyle itself.
     //
-    // A resolved mention also gets a slight background tint (#414) so it reads
-    // as a highlighted token, not just bold text. The tint is an alpha wash of
-    // the same content-derived link color rather than a scheme token, so it
-    // stays visible on both the incoming surfaceVariant and outgoing
+    // A resolved member mention also gets a slight background tint (#414) so it
+    // reads as a highlighted token, not just bold text. The tint is an alpha
+    // wash of the same content-derived link color rather than a scheme token,
+    // so it stays visible on both the incoming surfaceVariant and outgoing
     // primaryContainer bubbles (a token fill would vanish into one of them).
+    // A resolved non-member name reads as an inline profile link (underline),
+    // not a mention: same content-derived color, no "@", no bold/tint.
     val style =
-        if (name != null) {
-            SpanStyle(
-                color = ctx.linkStyle.color,
-                fontWeight = FontWeight.Bold,
-                background = ctx.linkStyle.color.copy(alpha = 0.12f),
-            )
-        } else {
-            ctx.codeStyle.copy(color = ctx.linkStyle.color)
+        when {
+            memberMention ->
+                SpanStyle(
+                    color = ctx.linkStyle.color,
+                    fontWeight = FontWeight.Bold,
+                    background = ctx.linkStyle.color.copy(alpha = 0.12f),
+                )
+            name != null -> ctx.linkStyle
+            else -> ctx.codeStyle.copy(color = ctx.linkStyle.color)
         }
-    val visible = if (name != null) "@$name" else (if (mention) "@" else "") + shortenedBech32(entity.bech32)
+    val visible =
+        when {
+            memberMention -> "@$name"
+            name != null -> name
+            else -> (if (mention) "@" else "") + shortenedBech32(entity.bech32)
+        }
     val opensProfile =
         entity.hrp == MarkdownNostrHrpFfi.NPUB || entity.hrp == MarkdownNostrHrpFfi.NPROFILE
     if (opensProfile) {
@@ -713,7 +751,7 @@ private fun AnnotatedString.Builder.appendNostrEntity(
     } else {
         // Inert entities inherit the surrounding color normally — no
         // annotation, no color override needed.
-        withStyle(if (name != null) SpanStyle(fontWeight = FontWeight.Bold) else ctx.codeStyle) {
+        withStyle(if (memberMention) SpanStyle(fontWeight = FontWeight.Bold) else ctx.codeStyle) {
             append(visible)
         }
     }

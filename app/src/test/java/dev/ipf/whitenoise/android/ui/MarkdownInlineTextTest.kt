@@ -344,6 +344,99 @@ class MarkdownInlineTextTest {
     }
 
     @Test
+    fun resolvedGroupMemberMentionKeepsTheAtPrefixAndMentionStyling() {
+        val npub = "npub1" + "q".repeat(58)
+        val annotated =
+            markdownInlinesToAnnotatedString(
+                inlines =
+                    listOf(
+                        MarkdownInlineFfi.NostrMention(
+                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub),
+                        ),
+                    ),
+                codeStyle = codeStyle,
+                linkStyle = linkStyle,
+                mentionDisplayName = { "Alice" },
+                isGroupMember = { bech32 -> bech32 == npub },
+            )
+        // A current member is addressed: the "@" mention treatment stays.
+        assertEquals("@Alice", annotated.text)
+        val bold = annotated.spanStyles.single()
+        assertEquals(FontWeight.Bold, bold.item.fontWeight)
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + npub, (link.item as LinkAnnotation.Clickable).tag)
+    }
+
+    @Test
+    fun resolvedNonMemberMentionDropsTheAtPrefixButStaysTappable() {
+        val npub = "npub1" + "q".repeat(58)
+        val annotated =
+            markdownInlinesToAnnotatedString(
+                inlines =
+                    listOf(
+                        MarkdownInlineFfi.NostrMention(
+                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub),
+                        ),
+                    ),
+                codeStyle = codeStyle,
+                linkStyle = linkStyle,
+                mentionDisplayName = { "Alice" },
+                // Resolves to a name, but the account is NOT in the active group.
+                isGroupMember = { false },
+            )
+        // #1017: a non-member reference keeps the resolved name but NOT the "@";
+        // it reads as an inline profile link, not a mention.
+        assertEquals("Alice", annotated.text)
+        // No bold mention treatment — the name is styled as the (link) reference.
+        assertTrue(annotated.spanStyles.none { it.item.fontWeight == FontWeight.Bold })
+        // Still tappable through to the in-app profile sheet (#259 preserved).
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + npub, (link.item as LinkAnnotation.Clickable).tag)
+    }
+
+    @Test
+    fun nonMemberNprofileMentionAlsoDropsTheAtPrefix() {
+        val nprofile = "nprofile1" + "q".repeat(60)
+        val annotated =
+            markdownInlinesToAnnotatedString(
+                inlines =
+                    listOf(
+                        MarkdownInlineFfi.NostrMention(
+                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPROFILE, nprofile),
+                        ),
+                    ),
+                codeStyle = codeStyle,
+                linkStyle = linkStyle,
+                mentionDisplayName = { "Bob" },
+                isGroupMember = { false },
+            )
+        // Same non-member treatment for nprofile as for npub (#1017).
+        assertEquals("Bob", annotated.text)
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertEquals(NOSTR_PROFILE_LINK_TAG_PREFIX + nprofile, (link.item as LinkAnnotation.Clickable).tag)
+    }
+
+    @Test
+    fun resolvedMentionWithoutAMembershipResolverKeepsTheAtPrefix() {
+        val npub = "npub1" + "q".repeat(58)
+        val annotated =
+            markdownInlinesToAnnotatedString(
+                inlines =
+                    listOf(
+                        MarkdownInlineFfi.NostrMention(
+                            MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub),
+                        ),
+                    ),
+                codeStyle = codeStyle,
+                linkStyle = linkStyle,
+                mentionDisplayName = { "Alice" },
+                // No roster available (isGroupMember == null): keep pre-#1017
+                // behavior so roster-less callers are unchanged.
+            )
+        assertEquals("@Alice", annotated.text)
+    }
+
+    @Test
     fun nostrUriRendersShortenedBech32WithoutAtSignAndIgnoresTheResolver() {
         val nprofile = "nprofile1" + "q".repeat(60)
         val annotated =
