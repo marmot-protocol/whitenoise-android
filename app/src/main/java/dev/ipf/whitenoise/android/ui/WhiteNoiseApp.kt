@@ -1827,6 +1827,20 @@ private fun MainShell(
                 allChats
                     .firstOrNull { it.group.groupIdHex == step.groupIdHex }
                     ?.let {
+                        // Opening from a message notification explicitly reads
+                        // up to the notified message. Persist that cursor outside
+                        // the conversation composition so a quick back press
+                        // cannot cancel the scroll-driven mark-read before it
+                        // reaches the store (#1016).
+                        step.focusMessageIdHex?.let { messageIdHex ->
+                            appState.launchMutation {
+                                appState.markNotificationMessageRead(
+                                    accountRef = target.accountRef,
+                                    groupIdHex = target.groupIdHex,
+                                    messageIdHex = messageIdHex,
+                                )
+                            }
+                        }
                         // Scroll to the notified message, reusing the search-hit
                         // focus path. The id is resolved (and MESSAGE-gated) in
                         // the nav FSM. No highlight flash on a notification tap.

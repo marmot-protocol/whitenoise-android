@@ -361,15 +361,16 @@ class NotificationTargetTest {
 
     @Test
     fun nav_messageNotificationOpen_carriesMessageFocus() {
+        val messageIdHex = "a".repeat(64)
         val step =
             resolveNotificationNav(
-                target.copy(messageIdHex = "message-123"),
+                target.copy(messageIdHex = messageIdHex),
                 knownAccountRefs = setOf("acct-a"),
                 activeAccountRef = "acct-a",
                 chatListReady = true,
                 availableGroupIds = setOf("group-1"),
             )
-        assertEquals(NotificationNavStep.OpenConversation("group-1", "message-123"), step)
+        assertEquals(NotificationNavStep.OpenConversation("group-1", messageIdHex), step)
     }
 
     @Test
