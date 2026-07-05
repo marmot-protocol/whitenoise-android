@@ -50,6 +50,13 @@ class ProfileSanitizerTest {
         assertEquals(cappedDisplayName, ProfileSanitizer.displayName(zalgo))
         assertEquals(cappedStripUnsafe, ProfileSanitizer.stripUnsafe(zalgo))
 
+        // Enclosing marks (Me) are also combining marks; cap them the same way.
+        val enclosingCircle = "\u20DD"
+        val enclosingZalgo = "A" + enclosingCircle.repeat(79)
+        val cappedEnclosing = "A" + enclosingCircle.repeat(4)
+        assertEquals(cappedEnclosing, ProfileSanitizer.displayName(enclosingZalgo))
+        assertEquals(cappedEnclosing, ProfileSanitizer.stripUnsafe(enclosingZalgo))
+
         // ZWJ/ZWNJ are preserved for emoji and script shaping, but they are not
         // visual base characters and must not reset the mark budget.
         val joinerBypass = "A" + combiningAcute.repeat(4) + "\u200D" + combiningAcute.repeat(4)

@@ -8,7 +8,7 @@ object ProfileSanitizer {
     private const val MAX_ABOUT_LENGTH = 1000
     private const val MAX_MESSAGE_LENGTH = 8000
 
-    /** Max consecutive Mn/Mc code points after one base character (Zalgo guard). */
+    /** Max consecutive Unicode mark code points after one base character (Zalgo guard). */
     private const val MAX_COMBINING_MARKS_PER_BASE = 4
     private val blankLineRun = Regex("\n{3,}")
     private val whitespaceRun = Regex("\\s+")
@@ -133,5 +133,8 @@ object ProfileSanitizer {
             }
         }
 
-    private fun isCombiningMark(type: Int): Boolean = type == Character.NON_SPACING_MARK.toInt() || type == Character.COMBINING_SPACING_MARK.toInt()
+    private fun isCombiningMark(type: Int): Boolean =
+        type == Character.NON_SPACING_MARK.toInt() ||
+            type == Character.COMBINING_SPACING_MARK.toInt() ||
+            type == Character.ENCLOSING_MARK.toInt()
 }
