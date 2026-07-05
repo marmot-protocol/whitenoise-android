@@ -3110,6 +3110,10 @@ class ConversationController(
             coroutineScope {
                 runUntilFirstLiveSubscriptionEndsWithAttemptJobs(
                     startAttemptJobs = {
+                        // Snapshot-time agent streams are attempt-scoped: cancel them when
+                        // either live subscription ends, but do not join them before
+                        // reconnecting and closing the dropped live subscription handles.
+                        // Batch-time streams below remain timeline-pipeline children.
                         snapshotStreamIds.forEach { streamId ->
                             if (activeStreamIds.add(streamId)) {
                                 launch { watchAgentTextStream(account, streamId) }
