@@ -65,6 +65,8 @@ class DraftStore internal constructor(
         text: String,
     ) {
         val k = key(accountIdHex, groupIdHex)
+        // Keep persistence writes inside the same lock as the cache mutation so
+        // set/clear cannot interleave between the in-memory and backing-store updates.
         synchronized(lock) {
             val state = drafts.getOrPut(k) { mutableStateOf(null) }
             if (text.isBlank()) {

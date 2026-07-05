@@ -288,6 +288,7 @@ internal class NotificationJobSlot {
 
     fun isActive(): Boolean = synchronized(lock) { job?.isActive == true }
 
+    // Called while holding [lock]; [start] must only enqueue work and return promptly.
     fun startIfInactive(start: () -> Job) {
         synchronized(lock) {
             if (job?.isActive == true) return
