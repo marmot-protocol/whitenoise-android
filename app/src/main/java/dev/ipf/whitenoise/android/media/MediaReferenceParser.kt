@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.core.HostSafety
 import java.net.InetAddress
 import java.net.URI
+import java.util.Locale
 
 /**
  * Pure parser for the encrypted-media-v1 `imeta` tag carried on kind-9
@@ -30,10 +31,14 @@ object MediaReferenceParser {
     private const val TAG_NAME = "imeta"
     private const val VERSION_VALUE = "encrypted-media-v1"
     private const val BLOSSOM_LOCATOR_KIND = "blossom-v1"
-    private const val MALFORMED_LOCATOR_HOST = "<malformed-locator>"
     private const val SHA256_HEX_LEN = 64 // 32 bytes
     private const val NONCE_HEX_LEN = 24 // 12 bytes
     private const val HEX_CHARS = "0123456789abcdefABCDEF"
+
+    private data class ParsedFetchableLocator(
+        val host: String,
+        val nativeValue: String,
+    )
 
     /**
      * Build the `imeta` tag for [reference] in the canonical encrypted-media-v1 field
@@ -138,7 +143,7 @@ object MediaReferenceParser {
 
     /**
      * Whether [raw] is a media URL we're willing to download: a non-blank
-     * `https` URL whose host is not loopback / the local network. Defense in
+     * default-port `https` URL whose host is not loopback / the local network. Defense in
      * depth against SSRF via a malicious imeta tag — a hostile group member
      * could otherwise point auto-download at `http://127.0.0.1:8080/...` or an
      * RFC-1918 service. See issue #98.
@@ -148,56 +153,72 @@ object MediaReferenceParser {
      * any on-path observer, defeating the point of the encrypted transport.
      */
     private fun isDownloadableBlossomLocator(raw: String): Boolean {
-        if (raw.isBlank()) return false
-        val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return false
-        if (uri.scheme?.lowercase() != "https") return false
-        if (!uri.userInfo.isNullOrEmpty()) return false
-        val host = uri.host ?: return false
-        if (host.isBlank()) return false
-        return !HostSafety.isPrivateOrLoopbackHost(host)
+        // Delegate to the hardened parser so the parse-time gate enforces the
+        // same authority rules (https, no userInfo, default/443 port, public
+        // host) the download path uses. The caller has already filtered to the
+        // blossom kind, so this takes the raw value only.
+        val parsed = parseFetchableLocator(raw) ?: return false
+        return !HostSafety.isPrivateOrLoopbackHost(parsed.host)
     }
 
     /**
-     * The first **fetchable** (blossom-v1) locator host in [locators] that fails
-     * the SSRF gate — a literal private/loopback host, a public-looking name that
-     * [resolve]s to a private/loopback address, or a malformed/hostless locator
-     * (fail closed) — or null when every fetchable locator is safe (or there are
-     * none).
-     *
-     * Non-fetchable locator kinds are ignored: the engine only fetches the
-     * supported kind, so a stale/unsupported/private entry of another kind must
-     * not block an otherwise-downloadable attachment. Within the fetchable kind
-     * the check stays strict (any unsafe entry blocks) so a safe decoy locator
-     * can't smuggle a private one past the gate before the engine's own
-     * resolve-time guard lands.
-     *
-     * [resolve] is injected (production passes `InetAddress.getAllByName` on an
-     * IO dispatcher) so the resolve-time decision is unit-testable without a
-     * network. A null/empty resolution is treated as unsafe: we can't prove the
-     * target is public, so it isn't handed to the native fetch.
+     * Returns a copy of [reference] whose fetchable locators are rewritten from
+     * the authority parsed and validated here before the value crosses into the
+     * native downloader. That keeps the native fetch from consuming a raw
+     * locator string whose authority could be interpreted differently from this
+     * Kotlin SSRF gate.
      */
-    internal fun firstUnsafeFetchableLocatorHost(
-        locators: List<MediaLocatorFfi>,
+    internal fun safeDownloadReference(
+        reference: MediaAttachmentReferenceFfi,
+        resolve: (String) -> List<InetAddress>?,
+    ): MediaAttachmentReferenceFfi? {
+        val safeLocators =
+            reference.locators.map { locator ->
+                if (locator.kind != BLOSSOM_LOCATOR_KIND) return@map locator
+                val parsed = parseFetchableLocator(locator.value) ?: return null
+                if (unsafeFetchableLocatorHost(parsed, resolve) != null) return null
+                locator.copy(value = parsed.nativeValue)
+            }
+        return reference.copy(locators = safeLocators)
+    }
+
+    private fun unsafeFetchableLocatorHost(
+        parsed: ParsedFetchableLocator,
         resolve: (String) -> List<InetAddress>?,
     ): String? {
-        for (locator in locators) {
-            // The engine only fetches the supported kind; ignore others so one
-            // unsupported/private entry can't block a valid attachment.
-            if (locator.kind != BLOSSOM_LOCATOR_KIND) continue
-            // Fail closed: a locator whose host we can't parse must not reach the
-            // native fetch — the native URL parser could still extract a host we
-            // never validated — so treat it as unsafe rather than skipping it.
-            val host =
-                runCatching { URI(locator.value.trim()).host }
-                    .getOrNull()
-                    ?.takeIf { it.isNotBlank() }
-                    ?: return MALFORMED_LOCATOR_HOST
-            if (HostSafety.isPrivateOrLoopbackHost(host)) return host
-            val resolved = resolve(host)
-            if (resolved.isNullOrEmpty() || resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }) return host
-        }
+        if (HostSafety.isPrivateOrLoopbackHost(parsed.host)) return parsed.host
+        val resolved = resolve(parsed.host)
+        if (resolved.isNullOrEmpty() || resolved.any { HostSafety.isPrivateOrLoopbackAddress(it) }) return parsed.host
         return null
     }
+
+    private fun parseFetchableLocator(raw: String): ParsedFetchableLocator? {
+        if (raw.isBlank()) return null
+        val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return null
+        if (uri.scheme?.lowercase(Locale.ROOT) != "https") return null
+        if (!uri.rawUserInfo.isNullOrEmpty()) return null
+        if (uri.port != -1 && uri.port != 443) return null
+        val host =
+            uri.host
+                ?.trim()
+                ?.removeSurrounding("[", "]")
+                ?.lowercase(Locale.ROOT)
+                ?.takeIf { it.isNotBlank() }
+                ?: return null
+        return ParsedFetchableLocator(host = host, nativeValue = nativeLocatorValue(uri, host))
+    }
+
+    private fun nativeLocatorValue(
+        uri: URI,
+        host: String,
+    ): String =
+        buildString {
+            append("https://")
+            append(if (host.contains(':')) "[$host]" else host)
+            append(uri.rawPath.orEmpty())
+            uri.rawQuery?.let { append('?').append(it) }
+            uri.rawFragment?.let { append('#').append(it) }
+        }
 
     /** True iff [s] has [requiredLength] characters, all hex. */
     private fun isHex(
