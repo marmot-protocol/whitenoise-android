@@ -65,30 +65,34 @@ class DraftStore internal constructor(
         text: String,
     ) {
         val k = key(accountIdHex, groupIdHex)
-        val state = stateFor(k)
-        if (text.isBlank()) {
-            if (state.value != null) {
-                state.value = null
-                persistence.write(k, null)
+        synchronized(lock) {
+            val state = drafts.getOrPut(k) { mutableStateOf(null) }
+            if (text.isBlank()) {
+                if (state.value != null) {
+                    state.value = null
+                    persistence.write(k, null)
+                }
+            } else if (state.value != text) {
+                state.value = text
+                persistence.write(k, text)
             }
-        } else if (state.value != text) {
-            state.value = text
-            persistence.write(k, text)
         }
     }
 
     fun clearAllForAccount(accountIdHex: String) {
         val prefix = "$accountIdHex "
-        val matchingDrafts =
-            synchronized(lock) {
+        synchronized(lock) {
+            val matchingDrafts =
                 drafts.entries
-                    .filter { (k, state) -> k.startsWith(prefix) && state.value != null }
-                    .map { (k, state) -> k to state }
-            }
-        matchingDrafts.forEach { (k, state) ->
-            if (k.startsWith(prefix) && state.value != null) {
-                state.value = null
-                persistence.write(k, null)
+                    .mapNotNull { (k, state) ->
+                        val value = state.value
+                        if (k.startsWith(prefix) && value != null) Triple(k, state, value) else null
+                    }
+            matchingDrafts.forEach { (k, state, snapshottedValue) ->
+                if (state.value == snapshottedValue) {
+                    state.value = null
+                    persistence.write(k, null)
+                }
             }
         }
     }
