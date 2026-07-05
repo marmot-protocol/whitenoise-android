@@ -38,6 +38,25 @@ class ProfileSanitizerTest {
     }
 
     @Test
+    fun displayNamesCapCombiningMarksPerBaseCharacter() {
+        // One base letter plus a long run of Mn accents is 80 code points and
+        // passes safeTake, but must not render as an unbounded Zalgo cluster.
+        val combiningAcute = "\u0301"
+        val zalgo = "A" + combiningAcute.repeat(79)
+        val cappedStripUnsafe = "A" + combiningAcute.repeat(4)
+        // displayName applies NFKC first, folding A+acute to Á before capping.
+        val cappedDisplayName = "\u00C1" + combiningAcute.repeat(4)
+
+        assertEquals(cappedDisplayName, ProfileSanitizer.displayName(zalgo))
+        assertEquals(cappedStripUnsafe, ProfileSanitizer.stripUnsafe(zalgo))
+
+        // ZWJ/ZWNJ are preserved for emoji and script shaping, but they are not
+        // visual base characters and must not reset the mark budget.
+        val joinerBypass = "A" + combiningAcute.repeat(4) + "\u200D" + combiningAcute.repeat(4)
+        assertEquals(cappedStripUnsafe + "\u200D", ProfileSanitizer.stripUnsafe(joinerBypass))
+    }
+
+    @Test
     fun stripUnsafeRemovesSupplementaryPlaneFormatCharacters() {
         val tagSmallA = String(Character.toChars(0xE0061))
         val variationSelector = String(Character.toChars(0xE0101))
