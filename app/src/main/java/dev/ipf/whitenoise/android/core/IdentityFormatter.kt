@@ -151,21 +151,21 @@ object IdentityFormatter {
     }
 
     private fun localizedDateWithoutYearFormatter(locale: Locale): DateTimeFormatter =
-        noYearFormatters.getOrPut(locale) {
+        noYearFormatters.computeIfAbsent(locale) { requestedLocale ->
             val localizedPattern =
                 DateTimeFormatterBuilder.getLocalizedDateTimePattern(
                     FormatStyle.MEDIUM,
                     null,
                     IsoChronology.INSTANCE,
-                    locale,
+                    requestedLocale,
                 )
             val pattern = stripYearFromLocalizedDatePattern(localizedPattern)
-            DateTimeFormatter.ofPattern(pattern.ifBlank { "d MMM" }, locale)
+            DateTimeFormatter.ofPattern(pattern.ifBlank { "d MMM" }, requestedLocale)
         }
 
     private fun shortDateFormatter(locale: Locale): DateTimeFormatter =
-        shortDateFormatters.getOrPut(locale) {
-            DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale)
+        shortDateFormatters.computeIfAbsent(locale) { requestedLocale ->
+            DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(requestedLocale)
         }
 
     internal fun stripYearFromLocalizedDatePattern(pattern: String): String {
