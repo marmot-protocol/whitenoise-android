@@ -36,27 +36,43 @@ object EmojiData {
 
     @Volatile private var cache: List<EmojiEntry>? = null
 
-    fun load(context: Context): List<EmojiEntry> {
+    fun load(context: Context): List<EmojiEntry> =
+        load {
+            context.applicationContext.assets
+                .open("emoji.json")
+                .bufferedReader()
+                .use { it.readText() }
+        }
+
+    internal fun load(readEmojiJson: () -> String): List<EmojiEntry> {
         cache?.let { return it }
-        val parsed =
-            runCatching {
-                val text =
-                    context.applicationContext.assets
-                        .open("emoji.json")
-                        .bufferedReader()
-                        .use { it.readText() }
-                val array = JSONArray(text)
-                buildList(array.length()) {
-                    for (i in 0 until array.length()) {
-                        val obj = array.getJSONObject(i)
-                        val codes = obj.getJSONArray("k")
-                        val keywords = buildList(codes.length()) { for (j in 0 until codes.length()) add(codes.getString(j)) }
-                        add(EmojiEntry(obj.getString("e"), obj.getString("n"), obj.getInt("g"), keywords))
+        return synchronized(this) {
+            cache?.let { return it }
+            val parsed = runCatching { parseEmojiJson(readEmojiJson()) }.getOrNull()
+            if (parsed != null) {
+                cache = parsed
+                parsed
+            } else {
+                emptyList()
+            }
+        }
+    }
+
+    private fun parseEmojiJson(text: String): List<EmojiEntry> {
+        val array = JSONArray(text)
+        return buildList(array.length()) {
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val codes = obj.getJSONArray("k")
+                val keywords =
+                    buildList(codes.length()) {
+                        for (j in 0 until codes.length()) {
+                            add(codes.getString(j))
+                        }
                     }
-                }
-            }.getOrDefault(emptyList())
-        cache = parsed
-        return parsed
+                add(EmojiEntry(obj.getString("e"), obj.getString("n"), obj.getInt("g"), keywords))
+            }
+        }
     }
 
     // Ranked name/keyword match: exact and prefix hits sort ahead of substring
