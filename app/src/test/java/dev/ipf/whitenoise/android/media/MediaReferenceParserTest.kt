@@ -188,6 +188,23 @@ class MediaReferenceParserTest {
     }
 
     @Test
+    fun ignoresUnsupportedLocatorKindsWhenValidBlossomLocatorPresent() {
+        val tag =
+            MessageTagFfi(
+                listOf(
+                    "imeta",
+                    "locator url https://127.0.0.1/blob",
+                    "locator blossom-v1 $URL",
+                ) + canonicalEntries().filterNot { it.startsWith("locator ") },
+            )
+
+        val ref = MediaReferenceParser.parseImetaTag(listOf(tag))
+
+        assertNotNull(ref)
+        assertEquals(listOf(MediaLocatorFfi(kind = "blossom-v1", value = URL)), ref!!.locators)
+    }
+
+    @Test
     fun parsesValidTagCarryingABlurhashHint() {
         // #981: NIP-92 imeta tags from interoperating clients commonly carry a
         // blurhash preview hint. It is just another unrecognized key — the
