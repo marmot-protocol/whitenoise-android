@@ -37,13 +37,15 @@ object HostSafety {
         val normalized =
             host
                 ?.trim()
-                ?.removeSurrounding("[", "]")
                 ?.let(::canonicalizeHostLiteral)
                 // Drop any rooting dots first: `127.0.0.1.` / `localhost.`
                 // and their multi-dot / unicode-dot variants still resolve to
                 // loopback, but trailing empty labels would otherwise make the
                 // IPv4 decode and localhost check miss. See #153 and #781.
+                // Brackets are stripped after dots so `[::1].` canonicalizes
+                // the same as `::1` (order-independent). See #1037.
                 ?.trimEnd('.')
+                ?.removeSurrounding("[", "]")
                 ?.lowercase(Locale.ROOT)
                 .orEmpty()
         if (normalized.isEmpty()) return true
