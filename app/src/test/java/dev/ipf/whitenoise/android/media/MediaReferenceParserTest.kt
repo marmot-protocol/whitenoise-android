@@ -183,7 +183,7 @@ class MediaReferenceParserTest {
     }
 
     @Test
-    fun returnsNull_whenLocatorKindIsNotBlossomV1() {
+    fun returnsNull_whenOnlyLocatorKindIsUnsupported() {
         assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("other-v1", URL))))
     }
 
@@ -193,6 +193,8 @@ class MediaReferenceParserTest {
             MessageTagFfi(
                 listOf(
                     "imeta",
+                    // Unsupported locator kinds are skipped before SSRF validation,
+                    // so this private-host URL must not poison the valid blossom locator.
                     "locator url https://127.0.0.1/blob",
                     "locator blossom-v1 $URL",
                 ) + canonicalEntries().filterNot { it.startsWith("locator ") },
