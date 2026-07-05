@@ -1153,6 +1153,10 @@ object MediaPipeline {
                         thumbhash = thumbhash,
                     ),
                 )
+            } catch (_: RuntimeException) {
+                return VideoReadResult.Failed
+            } catch (_: OutOfMemoryError) {
+                return VideoReadResult.Failed
             } finally {
                 runCatching { mmr.release() }
             }
