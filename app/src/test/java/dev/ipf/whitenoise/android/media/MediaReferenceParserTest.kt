@@ -172,6 +172,12 @@ class MediaReferenceParserTest {
     fun acceptsPublicHttpsMediaLocators() {
         assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "https://blossom.example/x.bin"))))
         assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "https://172.32.0.1/x.bin"))))
+        assertNotNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "https://blossom.example:443/x.bin"))))
+    }
+
+    @Test
+    fun returnsNull_whenLocatorUsesNonDefaultHttpsPort() {
+        assertNull(MediaReferenceParser.parseImetaTag(listOf(imetaWithLocator("blossom-v1", "https://blossom.example:6379/x.bin"))))
     }
 
     @Test
@@ -311,19 +317,21 @@ class MediaReferenceParserTest {
             listOf(imetaWithOverride("m" to mime)),
         )!!
 
-    private fun referenceFixture(fileName: String = "photo.jpg") =
-        MediaAttachmentReferenceFfi(
-            locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = URL)),
-            ciphertextSha256 = CIPHERTEXT_SHA256_HEX,
-            plaintextSha256 = PLAINTEXT_SHA256_HEX,
-            nonceHex = NONCE_HEX,
-            fileName = fileName,
-            mediaType = MIME_JPEG,
-            version = "encrypted-media-v1",
-            sourceEpoch = 99uL,
-            dim = "640x480",
-            thumbhash = THUMBHASH,
-        )
+    private fun referenceFixture(
+        fileName: String = "photo.jpg",
+        locatorUrl: String = URL,
+    ) = MediaAttachmentReferenceFfi(
+        locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = locatorUrl)),
+        ciphertextSha256 = CIPHERTEXT_SHA256_HEX,
+        plaintextSha256 = PLAINTEXT_SHA256_HEX,
+        nonceHex = NONCE_HEX,
+        fileName = fileName,
+        mediaType = MIME_JPEG,
+        version = "encrypted-media-v1",
+        sourceEpoch = 99uL,
+        dim = "640x480",
+        thumbhash = THUMBHASH,
+    )
 
     // ---- firstUnsafeLocatorHost (resolve-time SSRF gate) -------------------
 
@@ -375,6 +383,29 @@ class MediaReferenceParserTest {
         val unsafe =
             MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://attacker.example/blob"))) { null }
         assertEquals("attacker.example", unsafe)
+    }
+
+    @Test
+    fun firstUnsafeLocatorHost_blocksNonDefaultPortWithoutResolving() {
+        var resolverCalled = false
+        val unsafe =
+            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://media.example:6379/blob"))) {
+                resolverCalled = true
+                listOf(addr(93, 184, 216, 34))
+            }
+        assertNotNull(unsafe)
+        assertFalse(resolverCalled)
+    }
+
+    @Test
+    fun safeDownloadReference_rewritesFetchableLocatorBeforeNativeFetch() {
+        val safe =
+            MediaReferenceParser.safeDownloadReference(
+                referenceFixture(locatorUrl = " HTTPS://MEDIA.EXAMPLE:443/blob?token=abc#client "),
+            ) { listOf(addr(93, 184, 216, 34)) }
+
+        assertNotNull(safe)
+        assertEquals("https://media.example:443/blob?token=abc#client", safe!!.locators.single().value)
     }
 
     @Test

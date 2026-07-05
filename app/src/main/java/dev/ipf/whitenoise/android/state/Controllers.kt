@@ -4312,16 +4312,17 @@ class ConversationController(
     // only validates the literal host, so an attacker's public-looking locator
     // name can still resolve to loopback / RFC-1918. The native fetch re-resolves,
     // so this blocks the common static case (not an active mid-connection
-    // rebind), matching the avatar/profile fetchers. The decision lives in
-    // MediaReferenceParser so it's unit-testable with an injected resolver.
-    private suspend fun assertMediaLocatorsResolveSafe(reference: MediaAttachmentReferenceFfi) {
-        val unsafeHost =
+    // rebind), matching the avatar/profile fetchers. MediaReferenceParser also
+    // rewrites fetchable locators from the parsed authority before native sees
+    // them, so Kotlin and native do not disagree about the raw locator host.
+    private suspend fun assertMediaLocatorsResolveSafe(reference: MediaAttachmentReferenceFfi): MediaAttachmentReferenceFfi {
+        val safeReference =
             withContext(Dispatchers.IO) {
-                MediaReferenceParser.firstUnsafeFetchableLocatorHost(reference.locators) { host ->
+                MediaReferenceParser.safeDownloadReference(reference) { host ->
                     runCatching { InetAddress.getAllByName(host).toList() }.getOrNull()
                 }
             }
-        if (unsafeHost != null) error("blocked private/loopback media locator")
+        return safeReference ?: error("blocked private/loopback media locator")
     }
 
     /**
@@ -4360,8 +4361,8 @@ class ConversationController(
                 val cacheGeneration = appState.diskMediaCache.generation()
                 val result =
                     runCatching {
-                        assertMediaLocatorsResolveSafe(reference)
-                        appState.marmotIo { downloadMedia(account, groupIdHex, reference) }
+                        val safeReference = assertMediaLocatorsResolveSafe(reference)
+                        appState.marmotIo { downloadMedia(account, groupIdHex, safeReference) }
                     }.onFailure {
                         if (it is CancellationException) throw it
                         // Strip query/path tail so any signed tokens or
