@@ -2703,13 +2703,14 @@ class WhiteNoiseAppState(
         for (row in rows) {
             currentCoroutineContext().ensureActive()
             val groupIdHex = row.groupIdHex.takeIf { it.isNotBlank() } ?: continue
-            sweepExpiredForGroup(accountRef, groupIdHex)
+            sweepExpiredForGroup(accountRef, groupIdHex, row)
         }
     }
 
     private suspend fun sweepExpiredForGroup(
         accountRef: String,
         groupIdHex: String,
+        chatRow: ChatListRowFfi,
     ) {
         val retentionSecs =
             runCatching { marmotIo { groupDetails(accountRef, groupIdHex) }.group.disappearingMessageSecs }
@@ -2721,11 +2722,12 @@ class WhiteNoiseAppState(
         // No-op for groups with the timer off (acceptance criterion).
         if (!DisappearingMessageSweep.shouldSweepGroup(retentionSecs)) return
         if (
-            !shouldInvokeBackgroundSecureDelete(
+            !shouldInvokeDisappearingSecureDelete(
                 accountRef,
                 groupIdHex,
                 retentionSecs,
                 System.currentTimeMillis(),
+                chatRow.lastReadTimelineAt,
             )
         ) {
             return
@@ -2747,27 +2749,34 @@ class WhiteNoiseAppState(
     }
 
     /**
-     * Gate the raw engine prune so the background sweep honors the #745 clock
-     * skew tolerance in the real deletion path. `secureDeleteExpired` does not
+     * Gate the raw engine prune so foreground/background sweeps honor the #745
+     * clock-skew tolerance and #797 read anchors in the real deletion path.
+     * `secureDeleteExpired` does not
      * accept a cutoff parameter; it would prune everything before
      * `now - retention`. Before invoking it, scan the local timeline and defer
      * the group if any row falls in the interval that the raw engine cutoff
-     * would delete but the skew-adjusted cutoff would keep.
+     * would delete but the skew-adjusted cutoff would keep, or if it would
+     * delete an unread received row before the user has had a chance to anchor
+     * its local expiry clock.
      *
      * The scan's first cursor is seeded at the raw cutoff (#979): both
      * classifications only match rows with `timelineAt < rawCutoffSeconds`, so
      * paging from the newest message would walk the entire un-expired history
      * per group per pass just to reach the boundary. The seed makes the first
-     * page hold the newest classifiable rows, and a skew-window row — being
-     * newer than every expired-beyond-skew row — can never hide on a later
-     * page than the rows that would trigger the prune. A page cap backstops
-     * pathological histories; exhausting it defers the group.
+     * page hold the newest classifiable rows. A skew-window row — being newer
+     * than every expired-beyond-skew row — can never hide on a later page than
+     * the rows that would trigger the prune. Unread received rows can be older
+     * than a read/sent expired row, so once a prunable row is seen the scan keeps
+     * paging until it proves no unread received row is still in the raw-prune
+     * range. A page cap backstops pathological histories; exhausting it defers
+     * the group.
      */
-    private suspend fun shouldInvokeBackgroundSecureDelete(
+    internal suspend fun shouldInvokeDisappearingSecureDelete(
         accountRef: String,
         groupIdHex: String,
         retentionSecs: ULong,
         nowMillis: Long,
+        lastReadTimelineAt: ULong?,
     ): Boolean {
         val rawCutoffSeconds = DisappearingMessageSweep.rawExpiryCutoffSeconds(nowMillis, retentionSecs) ?: return false
         val skewCutoffSeconds = DisappearingMessageSweep.expiryCutoffSeconds(nowMillis, retentionSecs) ?: return false
@@ -2779,6 +2788,7 @@ class WhiteNoiseAppState(
         var before: ULong = rawCutoffSeconds
         var beforeMessageId: String = DisappearingMessageSweep.TIMELINE_SCAN_SEED_MESSAGE_ID
         var pagesScanned = 0
+        var sawPrunableExpiredRow = false
         while (pagesScanned < DisappearingMessageSweep.TIMELINE_SCAN_MAX_PAGES) {
             currentCoroutineContext().ensureActive()
             val page =
@@ -2807,21 +2817,34 @@ class WhiteNoiseAppState(
 
             when (
                 DisappearingMessageSweep.classifyScanPage(
-                    timelineAtSeconds = page.messages.map { it.timelineAt },
+                    rows =
+                        page.messages.map {
+                            DisappearingMessageSweep.TimelineScanRow(
+                                timelineAtSeconds = it.timelineAt,
+                                direction = it.direction,
+                            )
+                        },
                     rawCutoffSeconds = rawCutoffSeconds,
                     skewCutoffSeconds = skewCutoffSeconds,
+                    lastReadTimelineAt = lastReadTimelineAt,
                 )
             ) {
                 DisappearingMessageSweep.TimelineScanPageDecision.DeferSkewWindow -> {
                     appStateDebug { "sweep deferred inside clock-skew window group=${groupIdHex.take(8)}" }
                     return false
                 }
-                DisappearingMessageSweep.TimelineScanPageDecision.InvokeSecureDelete -> return true
+                DisappearingMessageSweep.TimelineScanPageDecision.DeferUnreadReceived -> {
+                    appStateDebug { "sweep deferred for unread received expiry group=${groupIdHex.take(8)}" }
+                    return false
+                }
+                DisappearingMessageSweep.TimelineScanPageDecision.InvokeSecureDelete -> sawPrunableExpiredRow = true
                 DisappearingMessageSweep.TimelineScanPageDecision.KeepScanning -> Unit
             }
 
-            if (!page.hasMoreBefore || page.messages.isEmpty()) return false
+            if (page.messages.isEmpty()) return false
+            if (!page.hasMoreBefore) return sawPrunableExpiredRow
             val oldest = page.messages.minWith(compareBy({ it.timelineAt }, { it.messageIdHex }))
+            if (lastReadTimelineAt != null && oldest.timelineAt <= lastReadTimelineAt) return sawPrunableExpiredRow
             val nextBefore = oldest.timelineAt
             val nextBeforeMessageId = oldest.messageIdHex
             if (before == nextBefore && beforeMessageId == nextBeforeMessageId) return false

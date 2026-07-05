@@ -384,4 +384,107 @@ class DisappearingMessageSweepTest {
         // cutoff seed is), so it stays small.
         assertTrue(DisappearingMessageSweep.TIMELINE_SCAN_MAX_PAGES in 1..100)
     }
+
+    @Test
+    fun unreadReceivedRowsDeferSendTimeLocalExpiry() {
+        val row =
+            DisappearingMessageSweep.LocalExpiryRow(
+                timelineAtSeconds = 940uL,
+                deferSendTimeExpiry = true,
+            )
+        assertFalse(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 10_000_000L,
+                disappearingMessageSecs = 60uL,
+                row = row,
+            ),
+        )
+    }
+
+    @Test
+    fun readAnchoredExpiryUsesDisplayAnchorPlusRetention() {
+        val row =
+            DisappearingMessageSweep.LocalExpiryRow(
+                timelineAtSeconds = 100uL,
+                readAnchoredAtSeconds = 1_000uL,
+            )
+        assertFalse(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 1_059_000L,
+                disappearingMessageSecs = 60uL,
+                row = row,
+            ),
+        )
+        assertTrue(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 1_060_000L,
+                disappearingMessageSecs = 60uL,
+                row = row,
+            ),
+        )
+    }
+
+    @Test
+    fun expiresAtLocalSecondsOverrideReadAnchor() {
+        val row =
+            DisappearingMessageSweep.LocalExpiryRow(
+                timelineAtSeconds = 100uL,
+                readAnchoredAtSeconds = 1_000uL,
+                expiresAtLocalSeconds = 1_010uL,
+            )
+        assertTrue(
+            DisappearingMessageSweep.isLocallyExpired(
+                nowMillis = 1_010_000L,
+                disappearingMessageSecs = 60uL,
+                row = row,
+            ),
+        )
+    }
+
+    @Test
+    fun backgroundScanDefersUnreadReceivedRowsPastSendTimeCutoff() {
+        val rawCutoff = 940uL
+        val skewCutoff = 935uL
+        assertEquals(
+            DisappearingMessageSweep.TimelineScanPageDecision.DeferUnreadReceived,
+            DisappearingMessageSweep.classifyScanPage(
+                rows =
+                    listOf(
+                        DisappearingMessageSweep.TimelineScanRow(930uL, "received"),
+                    ),
+                rawCutoffSeconds = rawCutoff,
+                skewCutoffSeconds = skewCutoff,
+                lastReadTimelineAt = null,
+            ),
+        )
+        assertEquals(
+            DisappearingMessageSweep.TimelineScanPageDecision.InvokeSecureDelete,
+            DisappearingMessageSweep.classifyScanPage(
+                rows =
+                    listOf(
+                        DisappearingMessageSweep.TimelineScanRow(930uL, "received"),
+                    ),
+                rawCutoffSeconds = rawCutoff,
+                skewCutoffSeconds = skewCutoff,
+                lastReadTimelineAt = 930uL,
+            ),
+        )
+    }
+
+    @Test
+    fun backgroundScanDefersMixedPageWithUnreadReceivedRowsPastSendTimeCutoff() {
+        assertEquals(
+            DisappearingMessageSweep.TimelineScanPageDecision.DeferUnreadReceived,
+            DisappearingMessageSweep.classifyScanPage(
+                rows =
+                    listOf(
+                        DisappearingMessageSweep.TimelineScanRow(930uL, "received"),
+                        DisappearingMessageSweep.TimelineScanRow(920uL, "sent"),
+                    ),
+                rawCutoffSeconds = 940uL,
+                skewCutoffSeconds = 935uL,
+                lastReadTimelineAt = null,
+            ),
+        )
+    }
 }
