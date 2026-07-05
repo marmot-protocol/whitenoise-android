@@ -3907,9 +3907,19 @@ class ConversationController(
                     retained.attachments.forEachIndexed { index, attachment ->
                         val confirmedKey = mediaCacheKey(account, confirmedId, index)
                         appState.mediaPlaintextCache.put(confirmedKey, attachment.plaintextBytes)
-                        MediaPipeline
-                            .decodeSampledBitmap(attachment.plaintextBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
-                            ?.let { appState.mediaThumbnailCache.put(confirmedKey, it) }
+                        // Offload the multi-MB ARGB decode to Default; the
+                        // main-confined thumbnail-cache put resumes on Main.
+                        // Mirrors the receive/render path in WhiteNoiseApp.
+                        val decoded =
+                            withContext(Dispatchers.Default) {
+                                MediaPipeline.decodeSampledBitmap(
+                                    attachment.plaintextBytes,
+                                    MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                                )
+                            }
+                        if (decoded != null) {
+                            appState.mediaThumbnailCache.put(confirmedKey, decoded)
+                        }
                         val bytesToPersist = attachment.plaintextBytes
                         val cacheGeneration = appState.diskMediaCache.generation()
                         // Tag with the uploaded blob's ciphertext hash so the
@@ -4426,9 +4436,25 @@ class ConversationController(
         retained.attachments.forEachIndexed { index, attachment ->
             val cacheKey = mediaCacheKey(account, projectedMessageIdHex, index)
             appState.mediaPlaintextCache.put(cacheKey, attachment.plaintextBytes)
-            MediaPipeline
-                .decodeSampledBitmap(attachment.plaintextBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
-                ?.let { appState.mediaThumbnailCache.put(cacheKey, it) }
+            // Seed the L1 plaintext synchronously above (the bit that stops the
+            // bubble's LaunchedEffect from re-downloading from Blossom), but
+            // offload the multi-MB ARGB thumbnail decode off this main-thread
+            // reconcile. The main-confined thumbnail-cache put resumes on Main
+            // via launchMutation's Main.immediate scope. Mirrors the
+            // receive/render path in WhiteNoiseApp.
+            val plaintextBytes = attachment.plaintextBytes
+            appState.launchMutation {
+                val decoded =
+                    withContext(Dispatchers.Default) {
+                        MediaPipeline.decodeSampledBitmap(
+                            plaintextBytes,
+                            MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                        )
+                    }
+                if (decoded != null) {
+                    appState.mediaThumbnailCache.put(cacheKey, decoded)
+                }
+            }
             val bytesToPersist = attachment.plaintextBytes
             val cacheGeneration = appState.diskMediaCache.generation()
             // Tag with the uploaded blob's ciphertext hash (captured at upload)
