@@ -289,7 +289,7 @@ object VoicePlaybackController {
             _state.value = PlaybackState()
             return
         }
-        mp.start()
+        if (!startPreparedNewPlayer(mp)) return
         player = mp
         currentKey = key
         currentOwnerKey = ownerKey
@@ -310,6 +310,15 @@ object VoicePlaybackController {
             )
         startTicker()
     }
+
+    private fun startPreparedNewPlayer(mp: MediaPlayer): Boolean =
+        runCatching { mp.start() }
+            .onFailure {
+                Log.w(TAG, "MediaPlayer start failed", it)
+                abandonFocus()
+                mp.runCatching { release() }
+                _state.value = PlaybackState()
+            }.isSuccess
 
     private fun requestFocus(): Boolean {
         val am = audioManager ?: return true

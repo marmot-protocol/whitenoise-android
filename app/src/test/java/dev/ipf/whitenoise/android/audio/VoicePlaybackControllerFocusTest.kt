@@ -1,7 +1,10 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.media.AudioManager
+import android.media.MediaPlayer
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -60,6 +63,34 @@ class VoicePlaybackControllerFocusTest {
         assertNotNull(controllerField("focusRequest"))
     }
 
+    @Test
+    fun startFailureReleasesUnassignedPlayerAndAbandonsFocus() {
+        val context = RuntimeEnvironment.getApplication()
+        val audioManager = context.getSystemService(AudioManager::class.java)
+        val shadowAudioManager = shadowOf(audioManager)
+        VoicePlaybackController.attach(context)
+
+        assertTrue(requestFocus())
+        val focusRequest = shadowAudioManager.lastAudioFocusRequest
+        assertNotNull(focusRequest)
+        setPlaybackState(
+            VoicePlaybackController.PlaybackState(
+                key = "voice-key",
+                isPlaying = true,
+                positionMs = 123,
+                durationMs = 456,
+            ),
+        )
+        val mediaPlayer = ThrowingStartMediaPlayer()
+
+        assertFalse(startPreparedNewPlayer(mediaPlayer))
+
+        assertTrue(mediaPlayer.released)
+        assertNull(controllerField("focusRequest"))
+        assertSame(focusRequest.audioFocusRequest, shadowAudioManager.lastAbandonedAudioFocusRequest)
+        assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
+    }
+
     // Hit the private focus path directly; public playback needs MediaPlayer file
     // setup and would obscure the focus bookkeeping this regression protects.
     private fun requestFocus(): Boolean {
@@ -68,10 +99,29 @@ class VoicePlaybackControllerFocusTest {
         return method.invoke(VoicePlaybackController) as Boolean
     }
 
+    private fun startPreparedNewPlayer(mediaPlayer: MediaPlayer): Boolean {
+        val method =
+            VoicePlaybackController::class.java.getDeclaredMethod(
+                "startPreparedNewPlayer",
+                MediaPlayer::class.java,
+            )
+        method.isAccessible = true
+        return method.invoke(VoicePlaybackController, mediaPlayer) as Boolean
+    }
+
     private fun controllerField(name: String): Any? {
         val field = VoicePlaybackController::class.java.getDeclaredField(name)
         field.isAccessible = true
         return field.get(VoicePlaybackController)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun setPlaybackState(state: VoicePlaybackController.PlaybackState) {
+        val field = VoicePlaybackController::class.java.getDeclaredField("_state")
+        field.isAccessible = true
+        val stateFlow =
+            field.get(VoicePlaybackController) as MutableStateFlow<VoicePlaybackController.PlaybackState>
+        stateFlow.value = state
     }
 
     private fun setControllerField(
@@ -81,5 +131,16 @@ class VoicePlaybackControllerFocusTest {
         val field = VoicePlaybackController::class.java.getDeclaredField(name)
         field.isAccessible = true
         field.set(VoicePlaybackController, value)
+    }
+
+    private class ThrowingStartMediaPlayer : MediaPlayer() {
+        var released = false
+            private set
+
+        override fun start(): Unit = throw IllegalStateException("start failed")
+
+        override fun release() {
+            released = true
+        }
     }
 }
