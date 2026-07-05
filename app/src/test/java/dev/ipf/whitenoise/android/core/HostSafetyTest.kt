@@ -75,6 +75,7 @@ class HostSafetyTest {
     fun ipv6LoopbackAndUnspecifiedAreFlagged() {
         assertTrue(HostSafety.isPrivateOrLoopbackHost("::1"))
         assertTrue(HostSafety.isPrivateOrLoopbackHost("[::1]"))
+        assertTrue(HostSafety.isPrivateOrLoopbackHost("[::1].")) // #1037: bracket + trailing dot
         assertTrue(HostSafety.isPrivateOrLoopbackHost("::"))
     }
 
