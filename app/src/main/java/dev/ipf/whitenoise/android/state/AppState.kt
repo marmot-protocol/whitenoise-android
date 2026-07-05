@@ -1628,7 +1628,11 @@ class WhiteNoiseAppState(
             true
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
-            appStateDebug(error) { "identity import failed: ${error.readableMessage()}" }
+            // The submitted nsec can surface in the engine's error text, so
+            // redact before logging (mirrors exportActiveAccountNsec) and don't
+            // pass the raw throwable to the logger, whose stack trace would
+            // echo the unredacted message.
+            appStateDebug { "identity import failed: ${DiagnosticFormatter.redactError(error.readableMessage())}" }
             false
         }
     }

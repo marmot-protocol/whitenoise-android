@@ -1353,8 +1353,9 @@ private fun SignInContent(
     }
     // System back on the login screen returns to the landing (same as the
     // visible back arrow), instead of propagating to the activity and exiting
-    // the app.
-    BackHandler { onBack() }
+    // the app. While an import is in flight it is consumed (no-op) so back
+    // can't hide the in-progress/error state behind the landing.
+    BackHandler { if (!busy) onBack() }
 
     Scaffold(
         // Edge-to-edge: the content owns the top + horizontal safe-area insets;
@@ -18522,6 +18523,9 @@ private fun AccountSelectorSheet(
     LaunchedEffect(Unit) {
         try {
             appState.refreshAccounts()
+        } catch (error: Throwable) {
+            if (error is kotlin.coroutines.cancellation.CancellationException) throw error
+            // Keep the cached account list rather than failing the sheet.
         } finally {
             refreshingAccounts = false
         }
