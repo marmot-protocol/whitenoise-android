@@ -164,6 +164,21 @@ class ChatListMessageSearchTest {
         assertEquals(5, s.highlightEnd)
     }
 
+    @Test
+    fun shortSnippetHighlightsNeedleAfterLengthChangingCaseFold() {
+        val needle = "hello"
+        val s = ChatListMessageSearch.buildSnippet("X İ $needle", needle)!!
+        assertEquals(needle, s.text.substring(s.highlightStart, s.highlightEnd))
+    }
+
+    @Test
+    fun clippedSnippetHighlightsNeedleAfterLengthChangingCaseFold() {
+        val needle = "marmot"
+        val body = "İ" + "x".repeat(200) + needle + "y".repeat(200)
+        val s = ChatListMessageSearch.buildSnippet(body, needle, maxLength = 40)!!
+        assertEquals(needle, s.text.substring(s.highlightStart, s.highlightEnd))
+    }
+
     // ---- titleOrPreviewMatches (issue #290, blocking review #1) --------------
 
     @Test
