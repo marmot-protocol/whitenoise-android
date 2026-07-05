@@ -37,10 +37,9 @@ object ChatListMessageSearch {
     ): Boolean = !deleted && kind in SearchableBodyKinds && plaintext.isNotBlank()
 
     /**
-     * Case-insensitive, trimmed needle match against a body, tokenized the
-     * same way the title/preview match in `applyChatListSearchAndFilter` is:
-     * lowercase + substring containment. Returns false for a blank needle so
-     * callers don't have to pre-check.
+     * Case-insensitive, trimmed needle match against a whitespace-normalized
+     * body, aligned with the title/preview match's substring semantics.
+     * Returns false for a blank needle so callers don't have to pre-check.
      */
     fun bodyMatches(
         plaintext: String,
@@ -49,8 +48,7 @@ object ChatListMessageSearch {
         val normalizedNeedle = normalizeWhitespace(ciNeedle)
         if (normalizedNeedle.isEmpty()) return false
         return normalizeSearchBody(plaintext)
-            .lowercase(Locale.ROOT)
-            .contains(normalizedNeedle.lowercase(Locale.ROOT))
+            .contains(normalizedNeedle, ignoreCase = true)
     }
 
     /**
@@ -104,7 +102,7 @@ object ChatListMessageSearch {
         val normalized = normalizeSearchBody(plaintext)
         val normalizedNeedle = normalizeWhitespace(needle)
         if (normalizedNeedle.isEmpty()) return null
-        val matchStart = normalized.lowercase(Locale.ROOT).indexOf(normalizedNeedle.lowercase(Locale.ROOT))
+        val matchStart = normalized.indexOf(normalizedNeedle, ignoreCase = true)
         if (matchStart < 0) return null
         val matchEnd = matchStart + normalizedNeedle.length
 
