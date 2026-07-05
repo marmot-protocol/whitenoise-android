@@ -33,6 +33,35 @@ class GroupProjectorTest {
     }
 
     @Test
+    fun isDmTreatsNameOfOnlyDefaultIgnorableCharsAsUnnamed() {
+        // A "name" of only zero-width / bidi default-ignorable chars is invisible
+        // and sanitizes away entirely, so displayTitle already treats such a pair
+        // as an unnamed DM. isDm must agree: name.isBlank() returns false for
+        // these non-whitespace chars, so classification would diverge from title.
+        assertTrue(GroupProjector.isDm(memberCount = 2, name = "\u200B\u200E\uFEFF"))
+    }
+
+    @Test
+    fun implicitDmMatchesUnnamedPairWhoseNameIsOnlyDefaultIgnorableChars() {
+        // Start-DM dedup (#825) must reuse an unnamed DM even when its stored name
+        // is only invisible default-ignorable chars — the same pair displayTitle
+        // renders as unnamed. A raw isBlank() check would misread it as a renamed
+        // group and open a duplicate DM.
+        val self = member(memberId = "alice", account = "alice", local = true)
+        val bob = member(memberId = "bob", account = "bob", local = false)
+
+        assertTrue(
+            GroupProjector.isImplicitDmWith(
+                members = listOf(self, bob),
+                name = "\u200B\u200E\uFEFF",
+                activeAccountIdHex = "alice",
+                targetIdHex = "bob",
+                equivalentTarget = { false },
+            ),
+        )
+    }
+
+    @Test
     fun implicitDmMatchesActiveUnnamedPairWithTarget() {
         // #825 happy path: an unnamed two-person conversation with self + Bob,
         // both present, resolves as the DM with Bob (hex or npub target form).
@@ -514,6 +543,18 @@ class GroupProjectorTest {
         assertEquals(
             "bob",
             GroupProjector.avatarAccount(group(name = ""), otherMemberAccount = "bob", memberCount = 2),
+        )
+    }
+
+    @Test
+    fun avatarAccountResolvesPeerWhenNameIsOnlyDefaultIgnorableChars() {
+        // #837: the avatar rule must agree with displayTitle, which treats a name
+        // of only invisible default-ignorable chars as unnamed. group.name.isBlank()
+        // is false for these non-whitespace chars, so the DM peer would be dropped
+        // and the top bar / chat-list row would disagree on the DM's avatar.
+        assertEquals(
+            "bob",
+            GroupProjector.avatarAccount(group(name = "\u200B\u200E\uFEFF"), otherMemberAccount = "bob", memberCount = 2),
         )
     }
 

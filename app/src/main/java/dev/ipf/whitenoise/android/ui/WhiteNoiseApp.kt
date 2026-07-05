@@ -3945,7 +3945,7 @@ internal fun shouldShowConversationMembersSubtitle(
 ): Boolean =
     membersLoaded &&
         !GroupProjector.isDm(memberCount, groupName) &&
-        !(openedAsDmHint && groupName.isBlank() && memberCount < 2)
+        !(openedAsDmHint && GroupProjector.isUnnamed(groupName) && memberCount < 2)
 
 /**
  * Whether the pubkey [resolvedHex] the Add Member preview settled on is already
@@ -15038,6 +15038,29 @@ private fun MessageActionMenu(
  * ([originGroupIdHex]): forwarding a message back into its own conversation is
  * never the intent and would just duplicate it.
  */
+internal fun forwardTargetAvatarAccount(item: ChatListItem): String? =
+    GroupProjector.avatarAccount(
+        group = item.group,
+        otherMemberAccount = item.otherMemberAccount,
+        memberCount = item.memberCount,
+    )
+
+internal fun forwardTargetMembersPreview(
+    item: ChatListItem,
+    activeAccountIdHex: String?,
+    memberTitle: (String) -> String,
+): String? {
+    if (forwardTargetAvatarAccount(item) != null) return null
+    return item.memberSnapshot
+        ?.members
+        ?.filterNot { it.memberIdHex.equals(activeAccountIdHex, ignoreCase = true) }
+        ?.map { memberTitle(it.memberIdHex) }
+        ?.filter { it.isNotBlank() }
+        ?.take(6)
+        ?.joinToString(", ")
+        ?.takeIf { it.isNotBlank() }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ForwardMessageSheet(
@@ -15139,24 +15162,13 @@ private fun ForwardMessageSheet(
                     items(filtered, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
                         val groupId = item.group.groupIdHex
                         val isSelected = selected.contains(groupId)
-                        val avatarAccount =
-                            item.otherMemberAccount
-                                ?.takeIf { item.group.name.isBlank() && item.memberCount == 2 }
+                        val avatarAccount = forwardTargetAvatarAccount(item)
                         // Group rows preview the other members' names, mirroring
                         // the chat-list mental model; direct chats need none.
                         val membersPreview =
                             remember(item, appState.profileRevisionForCompose) {
-                                if (avatarAccount != null) {
-                                    null
-                                } else {
-                                    item.memberSnapshot
-                                        ?.members
-                                        ?.filterNot { it.memberIdHex.equals(activeAccountIdHex, ignoreCase = true) }
-                                        ?.map { appState.chatMemberTitleCached(it.memberIdHex) }
-                                        ?.filter { it.isNotBlank() }
-                                        ?.take(6)
-                                        ?.joinToString(", ")
-                                        ?.takeIf { it.isNotBlank() }
+                                forwardTargetMembersPreview(item, activeAccountIdHex) { memberIdHex ->
+                                    appState.chatMemberTitleCached(memberIdHex)
                                 }
                             }
                         ContactRow(
