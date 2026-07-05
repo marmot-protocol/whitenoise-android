@@ -43,15 +43,19 @@ class Nip05ResolverTest {
         }
 
     @Test
-    fun rejectsExplicitPortsWithoutNetwork() =
+    fun rejectsUrlAuthorityDelimitersWithoutNetwork() =
         runBlocking {
             // NIP-05 well-known is served on the implicit HTTPS port. Any
-            // explicit port is a URL authority delimiter, not a hostname
-            // character, and is rejected before URL construction or network.
+            // explicit port, path, query, or backslash is a URL delimiter, not
+            // a hostname character, and is rejected before URL construction or
+            // network.
             assertNull(Nip05Resolver.resolve("alice@example.com:8080"))
             assertNull(Nip05Resolver.resolve("alice@example.com:443"))
             assertNull(Nip05Resolver.resolve("alice@example.com:80"))
             assertNull(Nip05Resolver.resolve("alice@example.com:22"))
+            assertNull(Nip05Resolver.resolve("alice@example.com/path"))
+            assertNull(Nip05Resolver.resolve("alice@example.com?name=bob"))
+            assertNull(Nip05Resolver.resolve("alice@example.com\\evil"))
         }
 
     @Test
@@ -62,6 +66,11 @@ class Nip05ResolverTest {
                 "example.com?name=bob",
                 "example.com:443",
                 "example.com\\evil",
+                "127.0.0.1",
+                "10.0.0.1",
+                "192.168.1.1",
+                "169.254.1.1",
+                "foo.localhost",
             )
 
         invalidDomains.forEach { domain ->

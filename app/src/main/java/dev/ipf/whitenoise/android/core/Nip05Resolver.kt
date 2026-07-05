@@ -67,11 +67,6 @@ object Nip05Resolver {
             if (!LOCAL_PART.matches(local)) return@withContext null
             val url = buildUrl(local, domain) ?: return@withContext null
 
-            // Block obviously-private domains before issuing any request. A bare
-            // hostname (the common case) passes this literal check and a DNS
-            // rebinding attack is out of scope here, matching HostSafety's
-            // documented contract.
-            if (HostSafety.isPrivateOrLoopbackHost(domain)) return@withContext null
             val body = httpGetString(url, timeoutMillis) ?: return@withContext null
             decodePubkey(body, local)
         }
@@ -81,18 +76,24 @@ object Nip05Resolver {
         domain: String,
     ): URL? {
         if (!Lud16Address.isHostnameOnlyDomain(domain)) return null
+        // Block obviously-private domains before issuing any request. A bare
+        // hostname (the common case) passes this literal check and a DNS
+        // rebinding attack is out of scope here, matching HostSafety's
+        // documented contract.
+        if (HostSafety.isPrivateOrLoopbackHost(domain)) return null
         val encodedName = URLEncoder.encode(local, "UTF-8")
         // The local part is already constrained to [a-z0-9._-] so this is a
-        // plain query string; the domain is constrained to DNS labels before it
-        // reaches the URL authority, then re-validated as a real host inside
-        // httpGetString.
+        // plain query string; the domain is constrained to a public DNS-label
+        // host before it reaches the URL authority, then re-validated as a real
+        // host inside httpGetString.
         return runCatching { URL("https://$domain/.well-known/nostr.json?name=$encodedName") }.getOrNull()
     }
 
     /**
-     * NIP-05 well-known fetch via the shared [SafeHttpsGet] (HTTPS-only, port
-     * 443, per-hop revalidation, bounded body). Returns the decoded body (UTF-8)
-     * or null on any downgrade, private-host hop, oversize body, or IO error.
+     * NIP-05 well-known fetch via the shared [SafeHttpsGet] (HTTPS-only,
+     * default port, per-hop revalidation, bounded body). Returns the decoded
+     * body (UTF-8) or null on any downgrade, private-host hop, oversize body,
+     * or IO error.
      */
     private fun httpGetString(
         initial: URL,
