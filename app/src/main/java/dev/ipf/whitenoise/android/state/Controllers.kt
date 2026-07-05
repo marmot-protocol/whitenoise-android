@@ -693,6 +693,14 @@ internal fun mediaCacheKey(
     attachmentIndex: Int,
 ): String = "$account|$groupIdHex|$messageIdHex|$attachmentIndex"
 
+private suspend fun decodeMediaThumbnailOffMain(plaintextBytes: ByteArray) =
+    withContext(Dispatchers.Default) {
+        MediaPipeline.decodeSampledBitmap(
+            plaintextBytes,
+            MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+        )
+    }
+
 /**
  * Shared local group wipe used by chat-list Delete and sole-member Leave flows.
  * The engine drops its own rows/secrets, but Android owns decrypted media caches
@@ -3896,20 +3904,20 @@ class ConversationController(
                 // keeps the behaviour consistent (it would no-op anyway). The bridge
                 // insert below is intentionally left running: the publish already
                 // committed, so the timeline state still needs reconciling.
-                val sessionStillValid =
-                    shouldAcceptMediaUploadForAccount(
-                        account,
-                        mediaUploadSessionEpoch,
-                        appState.activeAccountRef,
-                        appState.mediaUploadSessionEpoch(),
-                    )
+                val sessionStillValid = mediaUploadSessionStillCurrent(account)
                 if (confirmedId.isNotEmpty() && sessionStillValid) {
                     retained.attachments.forEachIndexed { index, attachment ->
+                        if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         val confirmedKey = mediaCacheKey(account, confirmedId, index)
                         appState.mediaPlaintextCache.put(confirmedKey, attachment.plaintextBytes)
-                        MediaPipeline
-                            .decodeSampledBitmap(attachment.plaintextBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
-                            ?.let { appState.mediaThumbnailCache.put(confirmedKey, it) }
+                        // Offload the multi-MB ARGB decode to Default; the
+                        // main-confined thumbnail-cache put resumes on Main.
+                        // Mirrors the receive/render path in WhiteNoiseApp.
+                        val decoded = decodeMediaThumbnailOffMain(attachment.plaintextBytes)
+                        if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
+                        if (decoded != null) {
+                            appState.mediaThumbnailCache.put(confirmedKey, decoded)
+                        }
                         val bytesToPersist = attachment.plaintextBytes
                         val cacheGeneration = appState.diskMediaCache.generation()
                         // Tag with the uploaded blob's ciphertext hash so the
@@ -4242,6 +4250,14 @@ class ConversationController(
         attachmentIndex: Int,
     ): String = mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex)
 
+    private fun mediaUploadSessionStillCurrent(account: String): Boolean =
+        shouldAcceptMediaUploadForAccount(
+            account,
+            mediaUploadSessionEpoch,
+            appState.activeAccountRef,
+            appState.mediaUploadSessionEpoch(),
+        )
+
     // Evict decrypted media (L1 plaintext, decoded thumbnails, L2 disk) for the
     // attachments the engine just secure-deleted on expiry, matched by ciphertext
     // hash through the cached references. Without this the decrypted bytes stay
@@ -4419,16 +4435,27 @@ class ConversationController(
         projectedMessageIdHex: String,
     ) {
         val retained = retainedMediaUploads.get(optimisticKey) ?: return
-        val account = conversationAccountRef ?: return
+        val account = conversationAccountRef?.takeIf(::mediaUploadSessionStillCurrent) ?: return
         // Seed every attachment under its own (messageId, attachmentIndex)
         // key so the projected album bubble's per-tile cache lookups all
         // hit immediately on reconcile.
         retained.attachments.forEachIndexed { index, attachment ->
+            if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
             val cacheKey = mediaCacheKey(account, projectedMessageIdHex, index)
             appState.mediaPlaintextCache.put(cacheKey, attachment.plaintextBytes)
-            MediaPipeline
-                .decodeSampledBitmap(attachment.plaintextBytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
-                ?.let { appState.mediaThumbnailCache.put(cacheKey, it) }
+            // Seed the L1 plaintext synchronously above (the bit that stops the
+            // bubble's LaunchedEffect from re-downloading from Blossom), but
+            // offload the multi-MB ARGB thumbnail decode off this main-thread
+            // reconcile. The main-confined thumbnail-cache put resumes on Main
+            // via launchMutation's Main.immediate scope. Mirrors the
+            // receive/render path in WhiteNoiseApp.
+            val plaintextBytes = attachment.plaintextBytes
+            appState.launchMutation {
+                val decoded = decodeMediaThumbnailOffMain(plaintextBytes)
+                if (decoded != null && mediaUploadSessionStillCurrent(account)) {
+                    appState.mediaThumbnailCache.put(cacheKey, decoded)
+                }
+            }
             val bytesToPersist = attachment.plaintextBytes
             val cacheGeneration = appState.diskMediaCache.generation()
             // Tag with the uploaded blob's ciphertext hash (captured at upload)
