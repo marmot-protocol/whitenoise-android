@@ -153,6 +153,8 @@ class AccountUnreadTest {
                 "expected two roster reads to start, saw ${started.toList()}",
                 firstTwoStarted.await(2, TimeUnit.SECONDS),
             )
+            // The first two loads are parked on release; this yield only gives
+            // an incorrectly-unbounded third load a chance to start.
             Thread.sleep(50)
             assertEquals(2, started.size)
             assertEquals(2, maxActive.get())

@@ -1677,6 +1677,8 @@ class WhiteNoiseAppState(
                 appStateDebug(it) { "account unread summary refresh failed: ${it.readableMessage()}" }
             }.getOrNull()
         val accountGate = Semaphore(ACCOUNT_UNREAD_ACCOUNT_FANOUT)
+        // Share one roster gate across the whole bulk refresh so member FFI
+        // fan-out stays bounded across all signed-in accounts, not per account.
         val memberGate = Semaphore(ACCOUNT_UNREAD_MEMBER_FANOUT)
         val refreshedPairs =
             coroutineScope {
