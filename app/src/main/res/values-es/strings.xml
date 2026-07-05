@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">No se pudo iniciar White Noise</string>
     <string name="refresh">Actualizar volcado</string>
     <string name="retry">Reintentar</string>
-    <string name="white_noise_shield">White Noise escudo</string>
-    <string name="onboarding_tagline">Mensajería de grupo cifrada de extremo a extremo.</string>
     <string name="creating_identity">Creando identidad</string>
     <string name="creating_identity_title">Creando identidad</string>
     <string name="create_new_identity">Crear nueva identidad</string>
     <string name="sign_in">Iniciar sesión</string>
-    <string name="sign_in_to_white_noise">Iniciar sesión en White Noise</string>
+    <string name="sign_in_headline">Ingrese su clave</string>
     <string name="sign_in_secret_key_help">Ingrese su clave secreta Nostr para usar una identidad existente en este dispositivo.</string>
     <string name="nostr_nsec">Introduce tu llave privada</string>
     <string name="back">Volver</string>
@@ -307,6 +306,9 @@
     <string name="publish_to_relays">Publicar en retransmisiones</string>
     <string name="nsec_or_npub">Introduce tu llave privada</string>
     <string name="import_existing_identity">Iniciar sesión</string>
+    <string name="white_noise_logo">Logotipo de White Noise</string>
+    <string name="identity_entry_error_invalid_key">Eso no parece una clave nsec o npub válida.</string>
+    <string name="identity_entry_error_import_failed">No se pudo iniciar sesión con esa clave. Revísala e inténtalo de nuevo.</string>
     <string name="identity">Elige tu identidad</string>
     <string name="public_key">Llave pública</string>
     <string name="local_signing">Fichaje local</string>
@@ -886,4 +888,10 @@
     <string name="toast_disappearing_not_applied">El grupo se creó, pero no se pudieron activar los mensajes temporales</string>
     <string name="search_members">Buscar miembros</string>
     <string name="recent_chats">Chats recientes</string>
+    <string name="onboarding_login">Iniciar sesión</string>
+    <string name="onboarding_sign_up">Registrarse</string>
+    <string name="onboarding_slogan_decentralized">Descentralizado</string>
+    <string name="onboarding_slogan_uncensorable">Incensurable</string>
+    <string name="onboarding_slogan_secure_messaging">Mensajería Segura</string>
+    <string name="sign_in_error_public_key">Esa es una clave pública. Introduce tu clave secreta (nsec) para iniciar sesión.</string>
 </resources>
