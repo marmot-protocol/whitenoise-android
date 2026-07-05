@@ -68,6 +68,9 @@ object DisappearingMessageSweep {
         /** A row sits in the skew window; defer the whole group this pass. */
         DeferSkewWindow,
 
+        /** A raw prune would delete an unread received row before its read anchor. */
+        DeferUnreadReceived,
+
         /** A row is expired beyond skew (and none is in the window); prune. */
         InvokeSecureDelete,
 
@@ -103,25 +106,30 @@ object DisappearingMessageSweep {
         rawCutoffSeconds: ULong,
         skewCutoffSeconds: ULong,
         lastReadTimelineAt: ULong?,
-    ): TimelineScanPageDecision =
-        when {
-            rows.any {
+    ): TimelineScanPageDecision {
+        val scannedRows = rows.toList()
+        return when {
+            scannedRows.any {
                 isWithinSkewWindow(
                     timelineAtSeconds = it.timelineAtSeconds,
                     rawCutoffSeconds = rawCutoffSeconds,
                     skewCutoffSeconds = skewCutoffSeconds,
                 )
             } -> TimelineScanPageDecision.DeferSkewWindow
-            rows.any {
-                isExpiredBeyondSkew(it.timelineAtSeconds, skewCutoffSeconds) &&
-                    !isSendTimeExpiryDeferredForBackgroundScan(
+            scannedRows.any {
+                it.timelineAtSeconds < rawCutoffSeconds &&
+                    isSendTimeExpiryDeferredForBackgroundScan(
                         direction = it.direction,
                         timelineAtSeconds = it.timelineAtSeconds,
                         lastReadTimelineAt = lastReadTimelineAt,
                     )
+            } -> TimelineScanPageDecision.DeferUnreadReceived
+            scannedRows.any {
+                isExpiredBeyondSkew(it.timelineAtSeconds, skewCutoffSeconds)
             } -> TimelineScanPageDecision.InvokeSecureDelete
             else -> TimelineScanPageDecision.KeepScanning
         }
+    }
 
     /**
      * True when a received row is still unread on the persisted watermark, so

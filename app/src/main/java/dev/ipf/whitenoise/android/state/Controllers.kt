@@ -2966,24 +2966,35 @@ class ConversationController(
     private suspend fun runForegroundDisappearingMessageSweep(account: String) {
         while (coroutineContext.isActive) {
             if (group.disappearingMessageSecs > 0uL) {
-                lastForegroundSweepStartedAtMillis = System.currentTimeMillis()
-                // Refresh references before pruning so evictExpiredMediaCaches can
-                // map a pruned attachment's ciphertext back to its in-memory (L1)
-                // plaintext/thumbnail entries. The open-snapshot path may not have
-                // loaded them yet when this first sweep runs, and listMedia must be
-                // read before secureDeleteExpired removes the rows.
-                refreshMediaReferences()
-                runCatching {
-                    appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) }
-                }.onSuccess { result ->
-                    // When the engine actually pruned rows, clear the
-                    // conversation's accumulating tray card so it can't keep
-                    // pointing at a now-vanished message. #333.
-                    if (result.prunedMessages > 0uL) {
-                        appState.dismissConversationNotifications(account, group.groupIdHex)
-                    }
-                    evictExpiredMediaCaches(account, result.mediaCiphertextSha256.toSet())
-                }.onFailure { it.rethrowIfCancellation() }
+                val nowMillis = System.currentTimeMillis()
+                lastForegroundSweepStartedAtMillis = nowMillis
+                if (
+                    appState.shouldInvokeDisappearingSecureDelete(
+                        account,
+                        group.groupIdHex,
+                        group.disappearingMessageSecs,
+                        nowMillis,
+                        persistedLastReadTimelineAt,
+                    )
+                ) {
+                    // Refresh references before pruning so evictExpiredMediaCaches can
+                    // map a pruned attachment's ciphertext back to its in-memory (L1)
+                    // plaintext/thumbnail entries. The open-snapshot path may not have
+                    // loaded them yet when this first sweep runs, and listMedia must be
+                    // read before secureDeleteExpired removes the rows.
+                    refreshMediaReferences()
+                    runCatching {
+                        appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) }
+                    }.onSuccess { result ->
+                        // When the engine actually pruned rows, clear the
+                        // conversation's accumulating tray card so it can't keep
+                        // pointing at a now-vanished message. #333.
+                        if (result.prunedMessages > 0uL) {
+                            appState.dismissConversationNotifications(account, group.groupIdHex)
+                        }
+                        evictExpiredMediaCaches(account, result.mediaCiphertextSha256.toSet())
+                    }.onFailure { it.rethrowIfCancellation() }
+                }
                 publishTimelineFromIndexes()
             }
             awaitForegroundDisappearingSweepSchedule()

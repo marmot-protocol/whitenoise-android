@@ -446,7 +446,7 @@ class DisappearingMessageSweepTest {
         val rawCutoff = 940uL
         val skewCutoff = 935uL
         assertEquals(
-            DisappearingMessageSweep.TimelineScanPageDecision.KeepScanning,
+            DisappearingMessageSweep.TimelineScanPageDecision.DeferUnreadReceived,
             DisappearingMessageSweep.classifyScanPage(
                 rows =
                     listOf(
@@ -467,6 +467,23 @@ class DisappearingMessageSweepTest {
                 rawCutoffSeconds = rawCutoff,
                 skewCutoffSeconds = skewCutoff,
                 lastReadTimelineAt = 930uL,
+            ),
+        )
+    }
+
+    @Test
+    fun backgroundScanDefersMixedPageWithUnreadReceivedRowsPastSendTimeCutoff() {
+        assertEquals(
+            DisappearingMessageSweep.TimelineScanPageDecision.DeferUnreadReceived,
+            DisappearingMessageSweep.classifyScanPage(
+                rows =
+                    listOf(
+                        DisappearingMessageSweep.TimelineScanRow(930uL, "received"),
+                        DisappearingMessageSweep.TimelineScanRow(920uL, "sent"),
+                    ),
+                rawCutoffSeconds = 940uL,
+                skewCutoffSeconds = 935uL,
+                lastReadTimelineAt = null,
             ),
         )
     }
