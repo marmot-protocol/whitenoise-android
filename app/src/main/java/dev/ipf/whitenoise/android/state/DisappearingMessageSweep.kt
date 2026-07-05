@@ -49,10 +49,27 @@ object DisappearingMessageSweep {
      */
     val TIMELINE_SCAN_SEED_MESSAGE_ID: String = "0".repeat(64)
 
+    /** Inputs for read-anchored local expiry (#797). */
+    data class LocalExpiryRow(
+        val timelineAtSeconds: ULong,
+        val expiresAtLocalSeconds: ULong? = null,
+        val readAnchoredAtSeconds: ULong? = null,
+        val deferSendTimeExpiry: Boolean = false,
+    )
+
+    /** One row in the background-prune gating scan. */
+    data class TimelineScanRow(
+        val timelineAtSeconds: ULong,
+        val direction: String,
+    )
+
     /** Outcome of classifying one scanned timeline page against the cutoffs. */
     enum class TimelineScanPageDecision {
         /** A row sits in the skew window; defer the whole group this pass. */
         DeferSkewWindow,
+
+        /** A raw prune would delete an unread received row before its read anchor. */
+        DeferUnreadReceived,
 
         /** A row is expired beyond skew (and none is in the window); prune. */
         InvokeSecureDelete,
@@ -73,18 +90,60 @@ object DisappearingMessageSweep {
         rawCutoffSeconds: ULong,
         skewCutoffSeconds: ULong,
     ): TimelineScanPageDecision =
-        when {
-            timelineAtSeconds.any {
+        classifyScanPage(
+            rows = timelineAtSeconds.map { TimelineScanRow(it, direction = "sent") },
+            rawCutoffSeconds = rawCutoffSeconds,
+            skewCutoffSeconds = skewCutoffSeconds,
+            lastReadTimelineAt = null,
+        )
+
+    /**
+     * Classify one page for the background-prune gate, deferring send-time
+     * expiry for received rows the user has not read yet (#797).
+     */
+    fun classifyScanPage(
+        rows: Iterable<TimelineScanRow>,
+        rawCutoffSeconds: ULong,
+        skewCutoffSeconds: ULong,
+        lastReadTimelineAt: ULong?,
+    ): TimelineScanPageDecision {
+        val scannedRows = rows.toList()
+        return when {
+            scannedRows.any {
                 isWithinSkewWindow(
-                    timelineAtSeconds = it,
+                    timelineAtSeconds = it.timelineAtSeconds,
                     rawCutoffSeconds = rawCutoffSeconds,
                     skewCutoffSeconds = skewCutoffSeconds,
                 )
             } -> TimelineScanPageDecision.DeferSkewWindow
-            timelineAtSeconds.any { isExpiredBeyondSkew(it, skewCutoffSeconds) } ->
-                TimelineScanPageDecision.InvokeSecureDelete
+            scannedRows.any {
+                it.timelineAtSeconds < rawCutoffSeconds &&
+                    isSendTimeExpiryDeferredForBackgroundScan(
+                        direction = it.direction,
+                        timelineAtSeconds = it.timelineAtSeconds,
+                        lastReadTimelineAt = lastReadTimelineAt,
+                    )
+            } -> TimelineScanPageDecision.DeferUnreadReceived
+            scannedRows.any {
+                isExpiredBeyondSkew(it.timelineAtSeconds, skewCutoffSeconds)
+            } -> TimelineScanPageDecision.InvokeSecureDelete
             else -> TimelineScanPageDecision.KeepScanning
         }
+    }
+
+    /**
+     * True when a received row is still unread on the persisted watermark, so
+     * its send-time expiry must not hide or prune it yet (#797).
+     */
+    fun isSendTimeExpiryDeferredForBackgroundScan(
+        direction: String,
+        timelineAtSeconds: ULong,
+        lastReadTimelineAt: ULong?,
+    ): Boolean {
+        if (direction != "received") return false
+        if (lastReadTimelineAt != null) return timelineAtSeconds > lastReadTimelineAt
+        return true
+    }
 
     /**
      * Slow-path cap for the in-conversation sweep when no loaded row is about
@@ -114,12 +173,40 @@ object DisappearingMessageSweep {
         nowMillis: Long,
         disappearingMessageSecs: ULong,
         timelineAtSeconds: ULong,
+    ): Boolean =
+        isLocallyExpired(
+            nowMillis = nowMillis,
+            disappearingMessageSecs = disappearingMessageSecs,
+            row = LocalExpiryRow(timelineAtSeconds = timelineAtSeconds),
+        )
+
+    /**
+     * Read-anchored local expiry (#797). Prefers engine-owned
+     * [LocalExpiryRow.expiresAtLocalSeconds] when present, then a session
+     * read/display anchor, then send-time expiry unless
+     * [LocalExpiryRow.deferSendTimeExpiry] suspends it for unread received
+     * rows.
+     */
+    fun isLocallyExpired(
+        nowMillis: Long,
+        disappearingMessageSecs: ULong,
+        row: LocalExpiryRow,
     ): Boolean {
         if (!shouldSweepGroup(disappearingMessageSecs)) return false
-        val expirySeconds = timelineAtSeconds.saturatingPlus(disappearingMessageSecs)
+        val expirySeconds = resolveLocalExpirySeconds(disappearingMessageSecs, row) ?: return false
         if (expirySeconds > maxSafeExpirySeconds) return false
         val nowSeconds = (nowMillis.coerceAtLeast(0L) / MILLIS_PER_SECOND).toULong()
         return expirySeconds <= nowSeconds
+    }
+
+    internal fun resolveLocalExpirySeconds(
+        disappearingMessageSecs: ULong,
+        row: LocalExpiryRow,
+    ): ULong? {
+        row.expiresAtLocalSeconds?.let { return it }
+        row.readAnchoredAtSeconds?.let { return it.saturatingPlus(disappearingMessageSecs) }
+        if (row.deferSendTimeExpiry) return null
+        return row.timelineAtSeconds.saturatingPlus(disappearingMessageSecs)
     }
 
     /**
@@ -183,12 +270,24 @@ object DisappearingMessageSweep {
         nowMillis: Long,
         disappearingMessageSecs: ULong,
         timelineAtSeconds: Iterable<ULong>,
+    ): Long =
+        nextForegroundSweepDelayMillis(
+            nowMillis = nowMillis,
+            disappearingMessageSecs = disappearingMessageSecs,
+            rows = timelineAtSeconds.map { LocalExpiryRow(timelineAtSeconds = it) },
+        )
+
+    @JvmName("nextForegroundSweepDelayMillisForRows")
+    fun nextForegroundSweepDelayMillis(
+        nowMillis: Long,
+        disappearingMessageSecs: ULong,
+        rows: Iterable<LocalExpiryRow>,
     ): Long {
         if (!shouldSweepGroup(disappearingMessageSecs)) return FOREGROUND_SWEEP_MAX_DELAY_MS
         val safeNowMillis = nowMillis.coerceAtLeast(0L)
         var bestDelay = FOREGROUND_SWEEP_MAX_DELAY_MS
-        for (timelineAt in timelineAtSeconds) {
-            val expirySeconds = timelineAt.saturatingPlus(disappearingMessageSecs)
+        for (row in rows) {
+            val expirySeconds = resolveLocalExpirySeconds(disappearingMessageSecs, row) ?: continue
             if (expirySeconds > maxSafeExpirySeconds) continue
             val expiryMillis = expirySeconds.toLong() * MILLIS_PER_SECOND
             val delay = expiryMillis - safeNowMillis
@@ -219,13 +318,29 @@ object DisappearingMessageSweep {
         lastSweepStartedAtMillis: Long,
         disappearingMessageSecs: ULong,
         timelineAtSeconds: Iterable<ULong>,
+    ): Boolean =
+        shouldRunForegroundSweepAfterWake(
+            wakeSignalReceived = wakeSignalReceived,
+            nowMillis = nowMillis,
+            lastSweepStartedAtMillis = lastSweepStartedAtMillis,
+            disappearingMessageSecs = disappearingMessageSecs,
+            rows = timelineAtSeconds.map { LocalExpiryRow(timelineAtSeconds = it) },
+        )
+
+    @JvmName("shouldRunForegroundSweepAfterWakeForRows")
+    fun shouldRunForegroundSweepAfterWake(
+        wakeSignalReceived: Boolean,
+        nowMillis: Long,
+        lastSweepStartedAtMillis: Long,
+        disappearingMessageSecs: ULong,
+        rows: Iterable<LocalExpiryRow>,
     ): Boolean {
         if (!wakeSignalReceived) return true
         return shouldSweepAfterForegroundReschedule(
             nowMillis = nowMillis,
             lastSweepStartedAtMillis = lastSweepStartedAtMillis,
             disappearingMessageSecs = disappearingMessageSecs,
-            timelineAtSeconds = timelineAtSeconds,
+            rows = rows,
         )
     }
 
@@ -233,15 +348,15 @@ object DisappearingMessageSweep {
         nowMillis: Long,
         lastSweepStartedAtMillis: Long,
         disappearingMessageSecs: ULong,
-        timelineAtSeconds: Iterable<ULong>,
+        rows: Iterable<LocalExpiryRow>,
     ): Boolean {
         if (!shouldSweepGroup(disappearingMessageSecs)) return false
         if (nowMillis - lastSweepStartedAtMillis < FOREGROUND_EXPIRED_RETRY_DELAY_MS) return false
-        return timelineAtSeconds.any {
+        return rows.any {
             isLocallyExpired(
                 nowMillis = nowMillis,
                 disappearingMessageSecs = disappearingMessageSecs,
-                timelineAtSeconds = it,
+                row = it,
             )
         }
     }
