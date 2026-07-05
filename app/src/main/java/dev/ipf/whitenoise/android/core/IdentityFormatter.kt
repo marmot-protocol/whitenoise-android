@@ -10,9 +10,24 @@ import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 object IdentityFormatter {
     private const val ELLIPSIS = "..."
+
+    // Immutable/reusable objects hoisted off the scroll-hot avatar/timestamp path
+    // so each visible row does not re-allocate them (#1011).
+    private val WHITESPACE = Regex("\\s+")
+    private val YEAR_SEPARATORS = setOf(',', '.', '/', '-', '年')
+
+    // BreakIterator is not thread-safe, so keep one per thread rather than
+    // allocating a fresh instance on every initials() call.
+    private val graphemeBreaker = ThreadLocal.withInitial { BreakIterator.getCharacterInstance() }
+
+    // DateTimeFormatters are immutable and thread-safe; memoize the two locale-derived
+    // formatters used on the older-than-a-week timestamp rungs.
+    private val noYearFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
+    private val shortDateFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
 
     fun short(
         value: String,
@@ -30,7 +45,7 @@ object IdentityFormatter {
         val words =
             name
                 .trim()
-                .split(Regex("\\s+"))
+                .split(WHITESPACE)
                 .filter { it.isNotBlank() }
         // Candidate initials, taken as whole grapheme clusters so emoji,
         // surrogate pairs and ZWJ sequences (👨‍👩‍👧, 🏃‍♂️) are never split into a
@@ -64,7 +79,8 @@ object IdentityFormatter {
         limit: Int,
     ): List<String> {
         if (value.isEmpty()) return emptyList()
-        val boundaries = BreakIterator.getCharacterInstance()
+        // withInitial never yields null, but ThreadLocal.get() is typed nullable.
+        val boundaries = graphemeBreaker.get()!!
         boundaries.setText(value)
         val out = mutableListOf<String>()
         var start = boundaries.first()
@@ -127,24 +143,30 @@ object IdentityFormatter {
                         days == 1L -> copy.yesterday
                         days < 7L -> messageDate.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
                         days < 365L -> localizedDateWithoutYearFormatter(locale).format(messageDate)
-                        else -> DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale).format(messageDate)
+                        else -> shortDateFormatter(locale).format(messageDate)
                     }
                 }.getOrDefault(copy.now)
             }
         }
     }
 
-    private fun localizedDateWithoutYearFormatter(locale: Locale): DateTimeFormatter {
-        val localizedPattern =
-            DateTimeFormatterBuilder.getLocalizedDateTimePattern(
-                FormatStyle.MEDIUM,
-                null,
-                IsoChronology.INSTANCE,
-                locale,
-            )
-        val pattern = stripYearFromLocalizedDatePattern(localizedPattern)
-        return DateTimeFormatter.ofPattern(pattern.ifBlank { "d MMM" }, locale)
-    }
+    private fun localizedDateWithoutYearFormatter(locale: Locale): DateTimeFormatter =
+        noYearFormatters.getOrPut(locale) {
+            val localizedPattern =
+                DateTimeFormatterBuilder.getLocalizedDateTimePattern(
+                    FormatStyle.MEDIUM,
+                    null,
+                    IsoChronology.INSTANCE,
+                    locale,
+                )
+            val pattern = stripYearFromLocalizedDatePattern(localizedPattern)
+            DateTimeFormatter.ofPattern(pattern.ifBlank { "d MMM" }, locale)
+        }
+
+    private fun shortDateFormatter(locale: Locale): DateTimeFormatter =
+        shortDateFormatters.getOrPut(locale) {
+            DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale)
+        }
 
     internal fun stripYearFromLocalizedDatePattern(pattern: String): String {
         val chars = pattern.toMutableList()
@@ -171,7 +193,7 @@ object IdentityFormatter {
         return chars.joinToString("").trim().trim(',', '.', '/', '-', ' ')
     }
 
-    private fun Char.isYearSeparator(): Boolean = this.isWhitespace() || this in setOf(',', '.', '/', '-', '年')
+    private fun Char.isYearSeparator(): Boolean = this.isWhitespace() || this in YEAR_SEPARATORS
 
     private fun removeYearAffixAfter(
         chars: MutableList<Char>,
