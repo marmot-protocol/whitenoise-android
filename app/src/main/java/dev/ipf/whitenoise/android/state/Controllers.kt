@@ -725,14 +725,19 @@ private suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
             .getOrNull()
             ?.takeIf { it.isNotEmpty() }
             ?: return
-    withContext(Dispatchers.IO) {
-        media.forEach { rec ->
-            val key = mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
+    val cacheKeys =
+        media.map { rec ->
+            mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
+        }
+    withContext(Dispatchers.Main.immediate) {
+        cacheKeys.forEach { key ->
             mediaPlaintextCache.remove(key)
             mediaThumbnailCache.remove(key)
-            diskMediaCache.remove(key)
         }
-        val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
+    }
+    val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
+    withContext(Dispatchers.IO) {
+        cacheKeys.forEach { diskMediaCache.remove(it) }
         if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
     }
 }
