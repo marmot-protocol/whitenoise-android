@@ -11,6 +11,8 @@ import org.junit.Test
 import java.io.File
 import java.lang.reflect.Modifier
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class DiskByteCacheTest {
     private lateinit var dir: File
@@ -258,6 +260,64 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun put_coldHydrationDoesNotBlockContainsMonitor() {
+        DiskByteCache(dir, maxBytes = 1024).put("persisted", ByteArray(40) { 3 })
+
+        val hydrationEntered = CountDownLatch(1)
+        val releaseHydration = CountDownLatch(1)
+        val blockingDir = BlockingListFilesDir(dir, hydrationEntered, releaseHydration)
+        val cache = DiskByteCache(blockingDir, maxBytes = 1024)
+        val putFinished = CountDownLatch(1)
+        val putThread =
+            Thread {
+                try {
+                    cache.put("new", ByteArray(40) { 4 }, cache.generation())
+                } finally {
+                    putFinished.countDown()
+                }
+            }
+        putThread.start()
+
+        assertTrue(
+            "put should enter cold hydration",
+            hydrationEntered.await(5, TimeUnit.SECONDS),
+        )
+        assertFalse(
+            "put should still be parked in cold hydration",
+            putFinished.await(100, TimeUnit.MILLISECONDS),
+        )
+
+        val containsFinished = CountDownLatch(1)
+        var containsValue: Boolean? = null
+        val containsThread =
+            Thread {
+                try {
+                    containsValue = cache.contains("persisted")
+                } finally {
+                    containsFinished.countDown()
+                }
+            }
+        containsThread.start()
+
+        try {
+            assertTrue(
+                "contains must not wait for cold put hydration to release the cache monitor",
+                containsFinished.await(500, TimeUnit.MILLISECONDS),
+            )
+            assertFalse(
+                "cold contains still reports miss before hydration is installed",
+                containsValue!!,
+            )
+        } finally {
+            releaseHydration.countDown()
+            putThread.join(5_000)
+            containsThread.join(5_000)
+        }
+        assertTrue("put should finish after hydration is released", putFinished.await(5, TimeUnit.SECONDS))
+        assertNotNull(cache.get("new"))
+    }
+
+    @Test
     fun reinit_evictsToFitReducedCap() {
         DiskByteCache(dir, maxBytes = 1024).run {
             put("a", ByteArray(40))
@@ -370,14 +430,6 @@ class DiskByteCacheTest {
         assertNotNull(cache.get("k"))
     }
 
-    private fun sha256Hex(value: String): String {
-        val digest =
-            java.security.MessageDigest
-                .getInstance("SHA-256")
-                .digest(value.toByteArray())
-        return digest.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
-    }
-
     @Test
     fun differentKeys_collideToDifferentFiles() {
         // Defense against hash collision oversight — two keys must map to
@@ -388,5 +440,31 @@ class DiskByteCacheTest {
         cache.put("bob|group|msg-1", ByteArray(30))
         assertEquals(2, cache.size())
         assertEquals(50L, cache.residentBytes())
+    }
+
+    private fun sha256Hex(value: String): String {
+        val digest =
+            java.security.MessageDigest
+                .getInstance("SHA-256")
+                .digest(value.toByteArray())
+        return digest.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+    }
+
+    private class BlockingListFilesDir(
+        private val delegate: File,
+        private val hydrationEntered: CountDownLatch,
+        private val releaseHydration: CountDownLatch,
+    ) : File(delegate.path) {
+        override fun mkdirs(): Boolean = delegate.mkdirs()
+
+        override fun listFiles(): Array<File>? {
+            hydrationEntered.countDown()
+            try {
+                releaseHydration.await(5, TimeUnit.SECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+            return delegate.listFiles()
+        }
     }
 }

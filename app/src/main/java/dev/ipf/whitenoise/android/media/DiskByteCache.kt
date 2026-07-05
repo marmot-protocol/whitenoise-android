@@ -26,9 +26,10 @@ import java.security.MessageDigest
  * ciphertext hash — not the cache key — so the "key not recoverable from disk"
  * guarantee is preserved.
  *
- * Synchronized on `this` because file I/O happens on whatever thread the
- * caller is on (typically `Dispatchers.IO` for `get`/`put`, main for
- * `clear` during sign-out).
+ * Index state is synchronized on `this`, but expensive read/write/hydration
+ * disk I/O is kept outside that monitor so main-thread probes don't block on
+ * background cache work. `clear()` is the exception: sign-out/account-switch
+ * wipes intentionally hold the monitor to preserve the privacy guarantee.
  *
  * Eviction is LRU by access order via `LinkedHashMap(accessOrder=true)`.
  * On `init`, the directory is scanned and the in-memory index is
@@ -43,6 +44,7 @@ class DiskByteCache(
     private val index = LinkedHashMap<String, Entry>(8, 0.75f, true)
     private var residentBytes: Long = 0L
     private var hydrated = false
+    private val hydrationLock = Any()
 
     // Bumped on every clear(). A deferred put() captures this at schedule time
     // and is rejected if a wipe intervened, so decrypted plaintext from a
@@ -55,10 +57,22 @@ class DiskByteCache(
     // thread at app launch (the cache is constructed eagerly as an AppState
     // field). First access happens on Dispatchers.IO. See #100.
     private fun ensureHydrated() {
-        if (hydrated) return
-        cacheDir.mkdirs()
-        rehydrateIndex()
-        hydrated = true
+        if (synchronized(this) { hydrated }) return
+        synchronized(hydrationLock) {
+            val generationAtStart =
+                synchronized(this) {
+                    if (hydrated) null else generation
+                } ?: return
+            cacheDir.mkdirs()
+            val snapshot = buildHydratedIndex()
+            synchronized(this) install@{
+                if (hydrated || generation != generationAtStart) return@install
+                index.clear()
+                index.putAll(snapshot.index)
+                residentBytes = snapshot.residentBytes
+                hydrated = true
+            }
+        }
     }
 
     /**
@@ -88,9 +102,9 @@ class DiskByteCache(
         // file OUTSIDE it. Holding the monitor across readBytes() serialized
         // every concurrent media load and blocked clear() for the duration of
         // disk I/O. See #99.
+        ensureHydrated()
         val (entry, generationAtLookup) =
             synchronized(this) {
-                ensureHydrated()
                 (index[hashed] ?: return null) to generation
             }
         return try {
@@ -142,9 +156,14 @@ class DiskByteCache(
         // the wipe skips here and no plaintext lands after sign-out. See #154.
         synchronized(this) {
             if (expectedGeneration != generation) return
-            // Hydrate before writing `.tmp` files so rehydrate's orphan sweep
-            // doesn't delete in-flight temps on first access.
-            ensureHydrated()
+        }
+        // Hydrate before writing `.tmp` files so rehydrate's orphan sweep
+        // doesn't delete in-flight temps on first access. Hydration itself may
+        // scan the directory and read `.tag` files, so keep it off `this` to
+        // avoid blocking main-thread contains() probes during scroll.
+        ensureHydrated()
+        synchronized(this) {
+            if (expectedGeneration != generation) return
         }
         cacheDir.mkdirs()
         val hashed = fileNameFor(key)
@@ -246,13 +265,14 @@ class DiskByteCache(
      * plaintext from disk once the engine reports it secure-deleted, so it isn't
      * recoverable from the L2 cache after expiry. No-op if absent.
      */
-    @Synchronized
     fun remove(key: String) {
         ensureHydrated()
-        val entry = index.remove(fileNameFor(key)) ?: return
-        residentBytes -= entry.size
-        runCatching { entry.file.delete() }
-        runCatching { tagFileFor(entry.file).delete() }
+        synchronized(this) {
+            val entry = index.remove(fileNameFor(key)) ?: return
+            residentBytes -= entry.size
+            runCatching { entry.file.delete() }
+            runCatching { tagFileFor(entry.file).delete() }
+        }
     }
 
     /**
@@ -263,23 +283,24 @@ class DiskByteCache(
      * when their message isn't currently loaded (and thus has no entry in the
      * in-memory hash→key reference map). Returns the number of entries removed.
      */
-    @Synchronized
     fun removeByCiphertextTags(ciphertextTags: Set<String>): Int {
         if (ciphertextTags.isEmpty()) return 0
         ensureHydrated()
-        var removed = 0
-        val iterator = index.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next().value
-            if (entry.tag != null && entry.tag in ciphertextTags) {
-                runCatching { entry.file.delete() }
-                runCatching { tagFileFor(entry.file).delete() }
-                residentBytes -= entry.size
-                iterator.remove()
-                removed++
+        synchronized(this) {
+            var removed = 0
+            val iterator = index.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next().value
+                if (entry.tag != null && entry.tag in ciphertextTags) {
+                    runCatching { entry.file.delete() }
+                    runCatching { tagFileFor(entry.file).delete() }
+                    residentBytes -= entry.size
+                    iterator.remove()
+                    removed++
+                }
             }
+            return removed
         }
-        return removed
     }
 
     @Synchronized
@@ -313,17 +334,15 @@ class DiskByteCache(
             }?.forEach { runCatching { it.delete() } }
     }
 
-    fun size(): Int =
-        synchronized(this) {
-            ensureHydrated()
-            index.size
-        }
+    fun size(): Int {
+        ensureHydrated()
+        return synchronized(this) { index.size }
+    }
 
-    fun residentBytes(): Long =
-        synchronized(this) {
-            ensureHydrated()
-            residentBytes
-        }
+    fun residentBytes(): Long {
+        ensureHydrated()
+        return synchronized(this) { residentBytes }
+    }
 
     private fun uniqueTmpFile(
         baseName: String,
@@ -354,8 +373,10 @@ class DiskByteCache(
         }
     }
 
-    private fun rehydrateIndex() {
-        val allFiles = cacheDir.listFiles()?.filter { it.isFile } ?: return
+    private fun buildHydratedIndex(): HydratedIndex {
+        val hydratedIndex = LinkedHashMap<String, Entry>(8, 0.75f, true)
+        var hydratedBytes = 0L
+        val allFiles = cacheDir.listFiles()?.filter { it.isFile } ?: return HydratedIndex(hydratedIndex, hydratedBytes)
         // Sweep stranded `.tmp` files from a prior crash so the byte cap
         // matches what's actually on disk.
         for (file in allFiles) {
@@ -383,8 +404,18 @@ class DiskByteCache(
                     .takeIf { it.exists() }
                     ?.let { runCatching { it.readText() }.getOrNull() }
                     ?.takeIf { it.isNotBlank() }
-            index[file.name] = Entry(file, size.toInt(), tag)
-            residentBytes += size
+            hydratedIndex[file.name] = Entry(file, size.toInt(), tag)
+            hydratedBytes += size
+        }
+        // Hot-trim if total resident exceeds cap (e.g., cap was reduced
+        // since the previous run; or disk filled out-of-band).
+        val iterator = hydratedIndex.entries.iterator()
+        while (iterator.hasNext() && hydratedBytes > maxBytes) {
+            val (_, entry) = iterator.next()
+            runCatching { entry.file.delete() }
+            runCatching { tagFileFor(entry.file).delete() }
+            hydratedBytes -= entry.size
+            iterator.remove()
         }
         // Drop any orphaned `.tag` sidecar whose `.bin` is gone, so they don't
         // accumulate after entries are evicted out-of-band.
@@ -392,11 +423,9 @@ class DiskByteCache(
             .filter { it.name.endsWith(TAG_SUFFIX) }
             .forEach { tagFile ->
                 val binName = tagFile.name.removeSuffix(TAG_SUFFIX) + SUFFIX
-                if (!index.containsKey(binName)) runCatching { tagFile.delete() }
+                if (!hydratedIndex.containsKey(binName)) runCatching { tagFile.delete() }
             }
-        // Hot-trim if total resident exceeds cap (e.g., cap was reduced
-        // since the previous run; or disk filled out-of-band).
-        evictUntilUnderCap()
+        return HydratedIndex(hydratedIndex, hydratedBytes)
     }
 
     // Sibling sidecar that stores an entry's ciphertext tag: `<sha256>.tag`
@@ -419,6 +448,11 @@ class DiskByteCache(
         val file: File,
         val size: Int,
         val tag: String? = null,
+    )
+
+    private data class HydratedIndex(
+        val index: LinkedHashMap<String, Entry>,
+        val residentBytes: Long,
     )
 
     private companion object {
