@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.snapshots.Snapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -135,6 +136,17 @@ class DraftStoreTest {
     }
 
     @Test
+    fun clearForAccountDoesNotClobberDraftReplacedAfterSnapshot() {
+        val s = store()
+        val replacingState = ReplacingOnFirstReadState(initial = "old draft", replacement = "new draft")
+        s.replaceDraftStateForTest(draftKey("a", "g"), replacingState)
+
+        s.clearAllForAccount("a")
+
+        assertEquals("new draft", replacingState.rawValue)
+    }
+
+    @Test
     fun persistenceLayerWritesWhenStored() {
         val backing = InMemoryDraftPersistence()
         val s = DraftStore(backing)
@@ -242,6 +254,45 @@ class DraftStoreTest {
         account: String,
         group: String,
     ): String = "$account $group"
+
+    private fun DraftStore.replaceDraftStateForTest(
+        key: String,
+        state: MutableState<String?>,
+    ) {
+        val draftsField = DraftStore::class.java.getDeclaredField("drafts").apply { isAccessible = true }
+
+        @Suppress("UNCHECKED_CAST")
+        val drafts = draftsField.get(this) as MutableMap<String, MutableState<String?>>
+        drafts[key] = state
+    }
+
+    private class ReplacingOnFirstReadState(
+        initial: String?,
+        private val replacement: String?,
+    ) : MutableState<String?> {
+        private var current = initial
+        private var replaced = false
+
+        val rawValue: String?
+            get() = current
+
+        override var value: String?
+            get() {
+                val observed = current
+                if (!replaced) {
+                    replaced = true
+                    current = replacement
+                }
+                return observed
+            }
+            set(value) {
+                current = value
+            }
+
+        override fun component1(): String? = value
+
+        override fun component2(): (String?) -> Unit = { value = it }
+    }
 }
 
 private class InMemoryDraftPersistence : DraftPersistence {

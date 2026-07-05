@@ -282,6 +282,29 @@ internal fun dismissConversationNotificationsOnOpen(
     }
 }
 
+internal class NotificationJobSlot {
+    private val lock = Any()
+    private var job: Job? = null
+
+    fun isActive(): Boolean = synchronized(lock) { job?.isActive == true }
+
+    // Called while holding [lock]; [start] must only enqueue work and return promptly.
+    fun startIfInactive(start: () -> Job) {
+        synchronized(lock) {
+            if (job?.isActive == true) return
+            job = start()
+        }
+    }
+
+    suspend fun cancelAndJoin() {
+        val previous =
+            synchronized(lock) {
+                job.also { job = null }
+            }
+        previous?.cancelAndJoin()
+    }
+}
+
 internal class InFlightMediaUploads {
     private val lock = Any()
     private val jobs = mutableMapOf<String, Job>()
@@ -897,7 +920,7 @@ class WhiteNoiseAppState(
     private val mediaUploadSessionEpoch =
         java.util.concurrent.atomic
             .AtomicInteger(0)
-    private var notificationJob: Job? = null
+    private val notificationJob = NotificationJobSlot()
 
     // Coalesces per-account unread refreshes across a notification burst so a
     // catch-up flood drains to one expensive (chat-list + per-group roster)
@@ -1178,7 +1201,7 @@ class WhiteNoiseAppState(
     }
 
     private suspend fun prepareForDestructiveAccountWipe(accountRef: String): Boolean {
-        val restartNotifications = notificationJob?.isActive == true
+        val restartNotifications = notificationJob.isActive()
         val chatsControllerForTeardown = chatsController
         val conversationControllersForTeardown = conversationControllersForAccountTeardown()
         applyDestructiveWipeRuntimeState(prepareDestructiveAccountWipeRuntimeState(destructiveWipeRuntimeState()))
@@ -1206,9 +1229,7 @@ class WhiteNoiseAppState(
     }
 
     private suspend fun stopNotificationListenerForAccountTeardown() {
-        val job = notificationJob
-        notificationJob = null
-        job?.cancelAndJoin()
+        notificationJob.cancelAndJoin()
         unreadRefreshScheduler.cancelAndClear()
     }
 
@@ -3950,8 +3971,7 @@ class WhiteNoiseAppState(
     }
 
     private fun startNotificationListener() {
-        if (notificationJob?.isActive == true) return
-        notificationJob =
+        notificationJob.startIfInactive {
             notificationScope.launch {
                 // Restart the subscription on any failure (or clean end-of-stream)
                 // with exponential backoff, so a transient relay/binding error
@@ -3987,6 +4007,7 @@ class WhiteNoiseAppState(
                     backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
                 }
             }
+        }
     }
 
     private fun updateBackgroundConnectionPreference(enabled: Boolean) {
