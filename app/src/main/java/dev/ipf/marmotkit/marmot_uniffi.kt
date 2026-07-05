@@ -12324,6 +12324,10 @@ sealed class MarkdownBlockFfi {
         companion object
     }
     
+    /**
+     * Named `ListBlock` (not `List`) to match the sibling `*Block` variants and
+     * to avoid shadowing `kotlin.collections.List` in generated Kotlin bindings.
+     */
     data class ListBlock(
         val `kind`: MarkdownListKindFfi, 
         val `tight`: kotlin.Boolean, 
@@ -13006,6 +13010,20 @@ sealed class MarmotEventFfi {
         companion object
     }
     
+    /**
+     * A confirmed create/invite could not deliver a welcome to `recipient_hex`;
+     * that member is in the group but unjoinable until the welcome is
+     * re-delivered via `redeliver_welcome(message_id_hex)` (mdk#352).
+     */
+    data class WelcomeDeliveryPending(
+        val `accountIdHex`: kotlin.String, 
+        val `accountLabel`: kotlin.String, 
+        val `groupIdHex`: kotlin.String, 
+        val `messageIdHex`: kotlin.String, 
+        val `recipientHex`: kotlin.String) : MarmotEventFfi() {
+        companion object
+    }
+    
 
     
     companion object
@@ -13045,6 +13063,13 @@ public object FfiConverterTypeMarmotEventFfi : FfiConverterRustBuffer<MarmotEven
                 FfiConverterString.read(buf),
                 )
             7 -> MarmotEventFfi.AgentStreamActivity(
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                )
+            8 -> MarmotEventFfi.WelcomeDeliveryPending(
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
@@ -13112,6 +13137,17 @@ public object FfiConverterTypeMarmotEventFfi : FfiConverterRustBuffer<MarmotEven
                 + FfiConverterString.allocationSize(value.`accountLabel`)
             )
         }
+        is MarmotEventFfi.WelcomeDeliveryPending -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`accountIdHex`)
+                + FfiConverterString.allocationSize(value.`accountLabel`)
+                + FfiConverterString.allocationSize(value.`groupIdHex`)
+                + FfiConverterString.allocationSize(value.`messageIdHex`)
+                + FfiConverterString.allocationSize(value.`recipientHex`)
+            )
+        }
     }
 
     override fun write(value: MarmotEventFfi, buf: ByteBuffer) {
@@ -13159,6 +13195,15 @@ public object FfiConverterTypeMarmotEventFfi : FfiConverterRustBuffer<MarmotEven
                 buf.putInt(7)
                 FfiConverterString.write(value.`accountIdHex`, buf)
                 FfiConverterString.write(value.`accountLabel`, buf)
+                Unit
+            }
+            is MarmotEventFfi.WelcomeDeliveryPending -> {
+                buf.putInt(8)
+                FfiConverterString.write(value.`accountIdHex`, buf)
+                FfiConverterString.write(value.`accountLabel`, buf)
+                FfiConverterString.write(value.`groupIdHex`, buf)
+                FfiConverterString.write(value.`messageIdHex`, buf)
+                FfiConverterString.write(value.`recipientHex`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }

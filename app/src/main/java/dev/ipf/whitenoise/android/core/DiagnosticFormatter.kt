@@ -33,6 +33,12 @@ object DiagnosticFormatter {
                 "[${event.accountLabel}] error: ${redactError(event.message)}"
             is MarmotEventFfi.AgentStreamActivity ->
                 "[${event.accountLabel}] agent stream activity"
+            is MarmotEventFfi.WelcomeDeliveryPending ->
+                // hex ids only (recipient pubkey + group id) — no secret content;
+                // shortened like the other arms so this stays capture-safe.
+                "[${event.accountLabel}] welcome pending for ${IdentityFormatter.short(
+                    event.recipientHex,
+                )} in group ${IdentityFormatter.short(event.groupIdHex)}"
         }
 
     private const val MAX_ERROR_LEN = 80
