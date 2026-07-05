@@ -1,8 +1,15 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.marmotkit.AppBlobEndpointFfi
+import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
@@ -283,6 +290,37 @@ class NewChatFlowTest {
     }
 
     @Test
+    fun conversationMembersSubtitleTreatsDefaultIgnorableNameAsUnnamedDuringDmHint() {
+        // The transient just-created-DM branch must use the same sanitized
+        // "unnamed" rule as the eventual two-member DM projection. Raw
+        // isBlank() is false for these invisible non-whitespace characters.
+        assertFalse(
+            shouldShowConversationMembersSubtitle(
+                membersLoaded = true,
+                openedAsDmHint = true,
+                groupName = "\u200B\u200E\uFEFF",
+                memberCount = 1,
+            ),
+        )
+    }
+
+    @Test
+    fun forwardTargetPresentationTreatsDefaultIgnorableNameAsDirectChat() {
+        val item =
+            chatListItem(
+                group = group(name = "\u200B\u200E\uFEFF"),
+                otherMemberAccount = "bob",
+                members = listOf(member("alice"), member("bob")),
+            )
+
+        assertEquals("bob", forwardTargetAvatarAccount(item))
+        assertEquals(
+            null,
+            forwardTargetMembersPreview(item, activeAccountIdHex = "alice") { id -> titleFor(id) },
+        )
+    }
+
+    @Test
     fun conversationMembersSubtitleLetsLiveGroupStateOverrideDmHint() {
         assertTrue(
             shouldShowConversationMembersSubtitle(
@@ -400,4 +438,56 @@ class NewChatFlowTest {
             ),
         )
     }
+
+    private fun chatListItem(
+        group: AppGroupRecordFfi,
+        otherMemberAccount: String?,
+        members: List<AppGroupMemberRecordFfi>,
+    ) = ChatListItem(
+        group = group,
+        latest = null,
+        otherMemberAccount = otherMemberAccount,
+        memberCount = members.size,
+        memberSnapshot = GroupMemberSnapshot(members),
+    )
+
+    private fun group(name: String) =
+        AppGroupRecordFfi(
+            selfMembership = SelfMembershipFfi.MEMBER,
+            groupIdHex = "group",
+            endpoint = "endpoint",
+            name = name,
+            description = "A group",
+            admins = emptyList(),
+            relays = listOf("wss://relay.example"),
+            nostrGroupIdHex = "nostr",
+            avatarUrl = null,
+            avatarDim = null,
+            avatarThumbhash = null,
+            encryptedMedia = encryptedMedia(),
+            archived = false,
+            pendingConfirmation = false,
+            welcomerAccountIdHex = null,
+            viaWelcomeMessageIdHex = null,
+            disappearingMessageSecs = 0uL,
+        )
+
+    private fun encryptedMedia() =
+        AppGroupEncryptedMediaComponentFfi(
+            componentId = 0x8008u,
+            component = "marmot.group.encrypted-media.v1",
+            required = true,
+            mediaFormat = "encrypted-media-v1",
+            allowedLocatorKinds = listOf("blossom-v1"),
+            defaultBlobEndpoints = listOf(AppBlobEndpointFfi(locatorKind = "blossom-v1", baseUrl = "https://blossom.primal.net")),
+        )
+
+    private fun member(id: String) =
+        AppGroupMemberRecordFfi(
+            memberIdHex = id,
+            account = id,
+            local = id == "alice",
+        )
+
+    private fun titleFor(id: String): String = id.replaceFirstChar { it.titlecase() }
 }

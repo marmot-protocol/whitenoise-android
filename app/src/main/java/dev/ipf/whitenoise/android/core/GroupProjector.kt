@@ -97,7 +97,7 @@ object GroupProjector {
         memberCount: Int,
     ): String? =
         inviteAccount(group, otherMemberAccount)
-            ?: otherMemberAccount?.takeIf { group.name.isBlank() && memberCount == 2 }
+            ?: otherMemberAccount?.takeIf { isUnnamed(group.name) && memberCount == 2 }
 
     fun otherMemberAccount(
         members: List<AppGroupMemberRecordFfi>,
@@ -131,7 +131,18 @@ object GroupProjector {
     fun isDm(
         memberCount: Int,
         name: String,
-    ): Boolean = memberCount == 2 && name.isBlank()
+    ): Boolean = memberCount == 2 && isUnnamed(name)
+
+    /**
+     * Whether a peer-supplied group [name] should be treated as absent — the
+     * "unnamed" signal DM classification and avatar resolution key off. Uses
+     * the same [ProfileSanitizer.displayName] policy [displayTitle] applies, so
+     * a name that sanitizes away entirely (e.g. only zero-width / bidi
+     * default-ignorable chars) reads as unnamed everywhere instead of diverging
+     * from the rendered title. A raw `name.isBlank()` would miss those
+     * non-whitespace-but-invisible names.
+     */
+    internal fun isUnnamed(name: String): Boolean = ProfileSanitizer.displayName(name) == null
 
     /**
      * True when [members] is an implicit DM between the active account and
