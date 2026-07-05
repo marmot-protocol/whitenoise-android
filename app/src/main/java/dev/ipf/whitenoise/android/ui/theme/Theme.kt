@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -91,6 +94,21 @@ private val LightColorScheme =
         scrim = Color(0xFF000000),
     )
 
+// Route the existing brand corner radii (Radii) through MaterialTheme.shapes so
+// theme-aware M3 components (Button/Card/dialog/text-field/sheet) pick up
+// consistent corners instead of the violet-baseline defaults. Values mirror the
+// current literal radii used at call sites — extraSmall halves `sm` for the
+// smallest chips, and extraLarge maps to `xl` (24dp) rather than the M3 default
+// 28dp so large sheets/containers match the rest of the brand scale.
+private val ShapeScheme =
+    Shapes(
+        extraSmall = RoundedCornerShape(Radii.sm / 2),
+        small = RoundedCornerShape(Radii.sm),
+        medium = RoundedCornerShape(Radii.md),
+        large = RoundedCornerShape(Radii.lg),
+        extraLarge = RoundedCornerShape(Radii.xl),
+    )
+
 @Composable
 fun WhiteNoiseTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -170,6 +188,9 @@ fun WhiteNoiseTheme(
     CompositionLocalProvider(LocalAmoledSurfaceTheme provides amoledActive) {
         MaterialTheme(
             colorScheme = colorScheme,
+            // Expressive spring-based motion for M3 components app-wide (M3E).
+            motionScheme = MotionScheme.expressive(),
+            shapes = ShapeScheme,
             typography = remember(fontScale) { Typography.scaledBy(fontScale) },
             content = content,
         )

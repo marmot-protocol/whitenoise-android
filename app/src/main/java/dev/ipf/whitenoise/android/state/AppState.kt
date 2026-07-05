@@ -1608,10 +1608,16 @@ class WhiteNoiseAppState(
         }
     }
 
-    suspend fun importIdentity(identity: String) {
+    /**
+     * Returns whether the import succeeded. Failures are reported to the
+     * caller (not toasted from here) so the identity-entry form can show a
+     * readable inline error next to the field; the raw engine message only
+     * goes to the debug log.
+     */
+    suspend fun importIdentity(identity: String): Boolean {
         val trimmed = identity.trim()
-        if (trimmed.isEmpty()) return
-        try {
+        if (trimmed.isEmpty()) return false
+        return try {
             val summary = marmotIo { login(trimmed, MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
             refreshAccounts()
             setActiveAccount(summary.label)
@@ -1619,9 +1625,15 @@ class WhiteNoiseAppState(
             phase = AppPhase.Ready
             present(R.string.toast_identity_imported)
             warmProfile(summary.accountIdHex)
+            true
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
-            present(R.string.toast_couldnt_import_identity, AppText.Plain(error.readableMessage()), copyable = true)
+            // The submitted nsec can surface in the engine's error text, so
+            // redact before logging (mirrors exportActiveAccountNsec) and don't
+            // pass the raw throwable to the logger, whose stack trace would
+            // echo the unredacted message.
+            appStateDebug { "identity import failed: ${DiagnosticFormatter.redactError(error.readableMessage())}" }
+            false
         }
     }
 

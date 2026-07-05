@@ -38,16 +38,16 @@ class OnboardingContentTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("White Noise shield").assertIsDisplayed()
-        composeRule.onNodeWithText("Create New Identity").assertIsDisplayed()
-        composeRule.onNodeWithText("Sign in").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("White Noise logo").assertIsDisplayed()
+        composeRule.onNodeWithText("Sign Up").assertIsDisplayed()
+        composeRule.onNodeWithText("Login").assertIsDisplayed()
         composeRule.onNodeWithText("Import Existing Identity").assertDoesNotExist()
         composeRule.onNodeWithText("Nostr nsec").assertDoesNotExist()
 
-        composeRule.onNodeWithText("Create New Identity").performClick()
+        composeRule.onNodeWithText("Sign Up").performClick()
         composeRule.runOnIdle { assertEquals(1, createClicks) }
 
-        composeRule.onNodeWithText("Sign in").performClick()
+        composeRule.onNodeWithText("Login").performClick()
         composeRule.onNodeWithText("Nostr nsec").assertIsDisplayed()
         composeRule.onNodeWithText("Import Existing Identity").assertDoesNotExist()
 

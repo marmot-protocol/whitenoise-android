@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise konnte nicht gestartet werden</string>
     <string name="refresh">Dump aktualisieren</string>
     <string name="retry">Erneut versuchen</string>
-    <string name="white_noise_shield">White Noise Schild</string>
-    <string name="onboarding_tagline">Ende-zu-Ende verschlüsselte Gruppennachrichten.</string>
     <string name="creating_identity">Identität schaffen</string>
     <string name="creating_identity_title">Identität wird erstellt</string>
     <string name="create_new_identity">Neue Identität erstellen</string>
     <string name="sign_in">Anmelden</string>
-    <string name="sign_in_to_white_noise">Bei White Noise anmelden</string>
+    <string name="sign_in_headline">Geben Sie Ihren Schlüssel ein</string>
     <string name="sign_in_secret_key_help">Geben Sie Ihren geheimen Nostr-Schlüssel ein, um eine vorhandene Identität auf diesem Gerät zu verwenden.</string>
     <string name="nostr_nsec">Privaten Schlüssel eingeben</string>
     <string name="back">Zurück</string>
@@ -307,6 +306,9 @@
     <string name="publish_to_relays">Auf Relays veröffentlichen</string>
     <string name="nsec_or_npub">Privaten Schlüssel eingeben</string>
     <string name="import_existing_identity">Anmelden</string>
+    <string name="white_noise_logo">White-Noise-Logo</string>
+    <string name="identity_entry_error_invalid_key">Das sieht nicht wie ein gültiger nsec- oder npub-Schlüssel aus.</string>
+    <string name="identity_entry_error_import_failed">Anmeldung mit diesem Schlüssel fehlgeschlagen. Bitte prüfen und erneut versuchen.</string>
     <string name="identity">Wähle deine Identität</string>
     <string name="public_key">Öffentlicher Schlüssel</string>
     <string name="local_signing">Lokale Signierung</string>
@@ -884,4 +886,10 @@
     <string name="toast_disappearing_not_applied">Die Gruppe wurde erstellt, aber verschwindende Nachrichten konnten nicht aktiviert werden</string>
     <string name="search_members">Mitglieder suchen</string>
     <string name="recent_chats">Letzte Chats</string>
+    <string name="onboarding_login">Anmelden</string>
+    <string name="onboarding_sign_up">Registrieren</string>
+    <string name="onboarding_slogan_decentralized">Dezentralisiert</string>
+    <string name="onboarding_slogan_uncensorable">Unzensierbar</string>
+    <string name="onboarding_slogan_secure_messaging">Sichere Nachrichten</string>
+    <string name="sign_in_error_public_key">Das ist ein öffentlicher Schlüssel. Gib deinen geheimen Schlüssel (nsec) ein, um dich anzumelden.</string>
 </resources>

@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">White Noise n’a pas pu démarrer</string>
     <string name="refresh">Actualiser l’export</string>
     <string name="retry">Réessayer</string>
-    <string name="white_noise_shield">Bouclier White Noise</string>
-    <string name="onboarding_tagline">Messagerie de groupe chiffrée de bout en bout.</string>
     <string name="creating_identity">Créer une identité</string>
     <string name="creating_identity_title">Création de l’identité</string>
     <string name="create_new_identity">Créer une nouvelle identité</string>
     <string name="sign_in">Connexion</string>
-    <string name="sign_in_to_white_noise">Se connecter à White Noise</string>
+    <string name="sign_in_headline">Saisissez votre clé</string>
     <string name="sign_in_secret_key_help">Saisissez votre clé secrète Nostr pour utiliser une identité existante sur cet appareil.</string>
     <string name="nostr_nsec">Entrez votre clé privée</string>
     <string name="back">Retour</string>
@@ -307,6 +306,9 @@
     <string name="publish_to_relays">Publier sur des relais</string>
     <string name="nsec_or_npub">Entrez votre clé privée</string>
     <string name="import_existing_identity">Connexion</string>
+    <string name="white_noise_logo">Logo White Noise</string>
+    <string name="identity_entry_error_invalid_key">Cela ne ressemble pas à une clé nsec ou npub valide.</string>
+    <string name="identity_entry_error_import_failed">Impossible de se connecter avec cette clé. Vérifiez-la et réessayez.</string>
     <string name="identity">Choisissez votre identité</string>
     <string name="public_key">Clé publique</string>
     <string name="local_signing">Signature locale</string>
@@ -886,4 +888,10 @@
     <string name="toast_disappearing_not_applied">Le groupe a été créé, mais les messages éphémères n’ont pas pu être activés</string>
     <string name="search_members">Rechercher des membres</string>
     <string name="recent_chats">Discussions récentes</string>
+    <string name="onboarding_login">Connexion</string>
+    <string name="onboarding_sign_up">S\'inscrire</string>
+    <string name="onboarding_slogan_decentralized">Décentralisé</string>
+    <string name="onboarding_slogan_uncensorable">Incensurable</string>
+    <string name="onboarding_slogan_secure_messaging">Messagerie Sécurisée</string>
+    <string name="sign_in_error_public_key">Ceci est une clé publique. Saisissez votre clé secrète (nsec) pour vous connecter.</string>
 </resources>

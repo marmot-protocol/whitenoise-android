@@ -204,6 +204,9 @@ class LocalizationResourceTest {
                 "conversation_search_match_count",
                 "admin",
                 "app_name",
+                // In-app brand wordmark; the product name "White Noise" is kept
+                // identical across every locale.
+                "white_noise",
                 "app_preferences",
                 "actions",
                 "bytes_count",

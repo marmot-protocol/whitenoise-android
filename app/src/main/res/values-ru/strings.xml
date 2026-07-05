@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">White Noise</string>
+    <string name="white_noise">White Noise</string>
     <string name="white_noise_couldnt_start">Не удалось запустить White Noise</string>
     <string name="refresh">Обновить дамп</string>
     <string name="retry">Повторить</string>
-    <string name="white_noise_shield">White Noise щит</string>
-    <string name="onboarding_tagline">Групповые сообщения со сквозным шифрованием.</string>
     <string name="creating_identity">Создание индивидуальности</string>
     <string name="creating_identity_title">Создание идентичности</string>
     <string name="create_new_identity">Создать новую идентичность</string>
     <string name="sign_in">Войти</string>
-    <string name="sign_in_to_white_noise">Войти в White Noise</string>
+    <string name="sign_in_headline">Введите ваш ключ</string>
     <string name="sign_in_secret_key_help">Введите секретный ключ Nostr, чтобы использовать существующий идентификатор на этом устройстве.</string>
     <string name="nostr_nsec">Введите ваш приватный ключ</string>
     <string name="back">Назад</string>
@@ -311,6 +310,9 @@
     <string name="publish_to_relays">Публикация в реле</string>
     <string name="nsec_or_npub">Введите ваш приватный ключ</string>
     <string name="import_existing_identity">Войти</string>
+    <string name="white_noise_logo">Логотип White Noise</string>
+    <string name="identity_entry_error_invalid_key">Это не похоже на действительный ключ nsec или npub.</string>
+    <string name="identity_entry_error_import_failed">Не удалось войти с этим ключом. Проверьте его и попробуйте снова.</string>
     <string name="identity">Выберите свою личность</string>
     <string name="public_key">Публичный ключ</string>
     <string name="local_signing">Локальное подписание</string>
@@ -898,4 +900,10 @@
     <string name="toast_disappearing_not_applied">Группа создана, но исчезающие сообщения включить не удалось</string>
     <string name="search_members">Поиск участников</string>
     <string name="recent_chats">Недавние чаты</string>
+    <string name="onboarding_login">Войти</string>
+    <string name="onboarding_sign_up">Регистрация</string>
+    <string name="onboarding_slogan_decentralized">Децентрализованный</string>
+    <string name="onboarding_slogan_uncensorable">Нецензурируемый</string>
+    <string name="onboarding_slogan_secure_messaging">Безопасный Мессенджер</string>
+    <string name="sign_in_error_public_key">Это открытый ключ. Введите свой секретный ключ (nsec) для входа.</string>
 </resources>

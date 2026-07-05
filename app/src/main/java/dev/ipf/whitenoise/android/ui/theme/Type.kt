@@ -2,14 +2,74 @@ package dev.ipf.whitenoise.android.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
+import dev.ipf.whitenoise.android.R
+
+val Manrope =
+    FontFamily(
+        Font(R.font.manrope_medium, FontWeight.Medium),
+        Font(R.font.manrope_semibold, FontWeight.SemiBold),
+        Font(R.font.manrope_bold, FontWeight.Bold),
+    )
+
+/** Applies [family] to every style of a [Typography] so the whole scale shares one font. */
+private fun Typography.applyFontFamily(family: FontFamily): Typography =
+    copy(
+        displayLarge = displayLarge.copy(fontFamily = family),
+        displayMedium = displayMedium.copy(fontFamily = family),
+        displaySmall = displaySmall.copy(fontFamily = family),
+        headlineLarge = headlineLarge.copy(fontFamily = family),
+        headlineMedium = headlineMedium.copy(fontFamily = family),
+        headlineSmall = headlineSmall.copy(fontFamily = family),
+        titleLarge = titleLarge.copy(fontFamily = family),
+        titleMedium = titleMedium.copy(fontFamily = family),
+        titleSmall = titleSmall.copy(fontFamily = family),
+        bodyLarge = bodyLarge.copy(fontFamily = family),
+        bodyMedium = bodyMedium.copy(fontFamily = family),
+        bodySmall = bodySmall.copy(fontFamily = family),
+        labelLarge = labelLarge.copy(fontFamily = family),
+        labelMedium = labelMedium.copy(fontFamily = family),
+        labelSmall = labelSmall.copy(fontFamily = family),
+    )
 
 // Set of Material typography styles to start with
 val Typography =
     Typography(
+        // Expressive display treatment for brand surfaces (onboarding hero name).
+        // The M3 baseline leaves display* at Normal weight with slightly positive
+        // tracking, which reads thin for a wordmark; the brand lockup wants a
+        // tighter, more confident display. Sizes stay on the M3 display scale so
+        // the in-app font-size step (#403, Typography.scaledBy) and the OS font
+        // scale still compose cleanly. Call sites may still bump weight locally
+        // (e.g. the landing name uses SemiBold).
+        displayLarge =
+            TextStyle(
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Medium,
+                fontSize = 57.sp,
+                lineHeight = 64.sp,
+                letterSpacing = (-0.25).sp,
+            ),
+        displayMedium =
+            TextStyle(
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Medium,
+                fontSize = 45.sp,
+                lineHeight = 52.sp,
+                letterSpacing = 0.sp,
+            ),
+        displaySmall =
+            TextStyle(
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Medium,
+                fontSize = 36.sp,
+                lineHeight = 44.sp,
+                letterSpacing = 0.sp,
+            ),
         bodyLarge =
             TextStyle(
                 fontFamily = FontFamily.Default,
@@ -34,7 +94,7 @@ val Typography =
         letterSpacing = 0.5.sp
     )
      */
-    )
+    ).applyFontFamily(Manrope)
 
 /**
  * Scale every Material text style by the in-app font-size step (#403).
