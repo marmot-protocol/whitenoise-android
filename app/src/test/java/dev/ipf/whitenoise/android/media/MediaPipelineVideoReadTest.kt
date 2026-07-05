@@ -34,6 +34,8 @@ class MediaPipelineVideoReadTest {
         val context = RuntimeEnvironment.getApplication()
         val uri = Uri.parse("content://$AUTHORITY/corrupt.mp4")
 
+        // The provider passes the video MIME gate; the stream supplier supplies bytes
+        // so the test reaches MediaMetadataRetriever and can verify release cleanup.
         ShadowContentResolver.registerProviderInternal(AUTHORITY, VideoMimeProvider())
         shadowOf(context.contentResolver)
             .registerInputStreamSupplier(uri) { ByteArrayInputStream(ByteArray(32) { 0x7f }) }
