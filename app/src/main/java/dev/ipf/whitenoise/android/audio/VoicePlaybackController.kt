@@ -313,6 +313,10 @@ object VoicePlaybackController {
 
     private fun requestFocus(): Boolean {
         val am = audioManager ?: return true
+        // focusRequest is non-null only after AudioManager granted focus and is
+        // cleared when that request is abandoned. Reuse the held request so the
+        // same instance can be abandoned later instead of orphaning it.
+        if (focusRequest != null) return true
         val attrs =
             AudioAttributes
                 .Builder()
@@ -325,8 +329,9 @@ object VoicePlaybackController {
                 .setAudioAttributes(attrs)
                 .setOnAudioFocusChangeListener(focusListener)
                 .build()
-        focusRequest = req
-        return am.requestAudioFocus(req) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        val granted = am.requestAudioFocus(req) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        if (granted) focusRequest = req
+        return granted
     }
 
     private fun abandonFocus() {
