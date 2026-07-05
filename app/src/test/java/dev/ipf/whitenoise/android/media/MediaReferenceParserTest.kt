@@ -320,8 +320,9 @@ class MediaReferenceParserTest {
     private fun referenceFixture(
         fileName: String = "photo.jpg",
         locatorUrl: String = URL,
+        locators: List<MediaLocatorFfi> = listOf(MediaLocatorFfi(kind = "blossom-v1", value = locatorUrl)),
     ) = MediaAttachmentReferenceFfi(
-        locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = locatorUrl)),
+        locators = locators,
         ciphertextSha256 = CIPHERTEXT_SHA256_HEX,
         plaintextSha256 = PLAINTEXT_SHA256_HEX,
         nonceHex = NONCE_HEX,
@@ -333,67 +334,66 @@ class MediaReferenceParserTest {
         thumbhash = THUMBHASH,
     )
 
-    // ---- firstUnsafeLocatorHost (resolve-time SSRF gate) -------------------
+    // ---- safeDownloadReference (production download preflight) ------------
 
     @Test
-    fun firstUnsafeLocatorHost_allowsPublicNameResolvingToPublicAddress() {
-        val unsafe =
-            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://media.example/blob"))) {
+    fun safeDownloadReference_allowsPublicNameResolvingToPublicAddress() {
+        val safe =
+            MediaReferenceParser.safeDownloadReference(referenceFixture(locatorUrl = "https://media.example/blob")) {
                 listOf(addr(93, 184, 216, 34))
             }
-        assertNull(unsafe)
+        assertNotNull(safe)
     }
 
     @Test
-    fun firstUnsafeLocatorHost_blocksPublicNameResolvingToLoopback() {
+    fun safeDownloadReference_blocksPublicNameResolvingToLoopback() {
         // The core gap: a public-looking host whose A-record points at loopback
-        // passes the literal check but must be blocked at resolve time.
-        val unsafe =
-            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://attacker.example/blob"))) {
+        // passes the literal imeta parse but must be blocked before native fetch.
+        val safe =
+            MediaReferenceParser.safeDownloadReference(referenceFixture(locatorUrl = "https://attacker.example/blob")) {
                 listOf(addr(127, 0, 0, 1))
             }
-        assertEquals("attacker.example", unsafe)
+        assertNull(safe)
     }
 
     @Test
-    fun firstUnsafeLocatorHost_blocksPublicNameResolvingToRfc1918() {
-        val unsafe =
-            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://attacker.example/blob"))) {
+    fun safeDownloadReference_blocksPublicNameResolvingToRfc1918() {
+        val safe =
+            MediaReferenceParser.safeDownloadReference(referenceFixture(locatorUrl = "https://attacker.example/blob")) {
                 listOf(addr(10, 0, 0, 5))
             }
-        assertEquals("attacker.example", unsafe)
+        assertNull(safe)
     }
 
     @Test
-    fun firstUnsafeLocatorHost_blocksLiteralPrivateHostWithoutResolving() {
+    fun safeDownloadReference_blocksLiteralPrivateHostWithoutResolving() {
         var resolverCalled = false
-        val unsafe =
-            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://127.0.0.1/blob"))) {
+        val safe =
+            MediaReferenceParser.safeDownloadReference(referenceFixture(locatorUrl = "https://127.0.0.1/blob")) {
                 resolverCalled = true
                 listOf(addr(8, 8, 8, 8))
             }
-        assertEquals("127.0.0.1", unsafe)
+        assertNull(safe)
         // Literal check short-circuits before any DNS work.
         assertFalse(resolverCalled)
     }
 
     @Test
-    fun firstUnsafeLocatorHost_blocksWhenResolutionFails() {
+    fun safeDownloadReference_blocksWhenResolutionFails() {
         // Can't prove the target is public, so don't hand it to the native fetch.
-        val unsafe =
-            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://attacker.example/blob"))) { null }
-        assertEquals("attacker.example", unsafe)
+        val safe = MediaReferenceParser.safeDownloadReference(referenceFixture(locatorUrl = "https://attacker.example/blob")) { null }
+        assertNull(safe)
     }
 
     @Test
-    fun firstUnsafeLocatorHost_blocksNonDefaultPortWithoutResolving() {
+    fun safeDownloadReference_blocksNonDefaultPortWithoutResolving() {
         var resolverCalled = false
-        val unsafe =
-            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("https://media.example:6379/blob"))) {
+        val safe =
+            MediaReferenceParser.safeDownloadReference(referenceFixture(locatorUrl = "https://media.example:6379/blob")) {
                 resolverCalled = true
                 listOf(addr(93, 184, 216, 34))
             }
-        assertNotNull(unsafe)
+        assertNull(safe)
         assertFalse(resolverCalled)
     }
 
@@ -405,59 +405,62 @@ class MediaReferenceParserTest {
             ) { listOf(addr(93, 184, 216, 34)) }
 
         assertNotNull(safe)
-        assertEquals("https://media.example:443/blob?token=abc#client", safe!!.locators.single().value)
+        assertEquals("https://media.example/blob?token=abc#client", safe!!.locators.single().value)
     }
 
     @Test
-    fun firstUnsafeLocatorHost_blocksWhenAnyLocatorIsUnsafe() {
-        val unsafe =
-            MediaReferenceParser.firstUnsafeFetchableLocatorHost(
-                listOf(blossom("https://good.example/a"), blossom("https://attacker.example/b")),
+    fun safeDownloadReference_blocksWhenAnyFetchableLocatorIsUnsafe() {
+        val safe =
+            MediaReferenceParser.safeDownloadReference(
+                referenceFixture(
+                    locators =
+                        listOf(
+                            blossom("https://good.example/a"),
+                            blossom("https://attacker.example/b"),
+                        ),
+                ),
             ) { host -> if (host == "good.example") listOf(addr(93, 184, 216, 34)) else listOf(addr(192, 168, 1, 9)) }
-        assertEquals("attacker.example", unsafe)
+        assertNull(safe)
     }
 
     @Test
-    fun firstUnsafeLocatorHost_failsClosedOnMalformedLocator() {
-        // A locator whose host can't be parsed must be treated as unsafe, not
-        // skipped — otherwise it would reach the native fetch unchecked.
+    fun safeDownloadReference_failsClosedOnMalformedFetchableLocator() {
+        // A locator whose host can't be parsed must not reach the native fetch —
+        // the native URL parser could still extract a host we never validated.
         var resolverCalled = false
-        val unsafe =
-            MediaReferenceParser.firstUnsafeFetchableLocatorHost(listOf(blossom("not a url"))) {
+        val safe =
+            MediaReferenceParser.safeDownloadReference(referenceFixture(locatorUrl = "not a url")) {
                 resolverCalled = true
                 listOf(addr(8, 8, 8, 8))
             }
-        assertNotNull(unsafe)
+        assertNull(safe)
         assertFalse(resolverCalled)
     }
 
     @Test
-    fun firstUnsafeFetchableLocatorHost_ignoresUnsupportedKindAndAllowsSafeBlossom() {
+    fun safeDownloadReference_preservesUnsupportedLocatorAndAllowsSafeBlossom() {
         // The engine never fetches a non-blossom locator, so an unsafe entry of
         // another kind must not block an otherwise-downloadable attachment.
-        val unsafe =
-            MediaReferenceParser.firstUnsafeFetchableLocatorHost(
-                listOf(
-                    locator(kind = "ipfs-v1", url = "https://127.0.0.1/blob"),
-                    blossom("https://media.example/blob"),
-                ),
+        val unsupported = locator(kind = "ipfs-v1", url = "https://127.0.0.1/blob")
+        val safe =
+            MediaReferenceParser.safeDownloadReference(
+                referenceFixture(locators = listOf(unsupported, blossom("https://media.example/blob"))),
             ) { listOf(addr(93, 184, 216, 34)) }
-        assertNull(unsafe)
+        assertEquals(listOf(unsupported, blossom("https://media.example/blob")), safe?.locators)
     }
 
     @Test
-    fun firstUnsafeFetchableLocatorHost_ignoresUnsupportedKindWithNoFetchableLocator() {
+    fun safeDownloadReference_preservesUnsupportedLocatorWithNoFetchableLocator() {
         // No fetchable locator at all → nothing for the engine to fetch, so the
         // preflight has nothing to block (the engine no-ops on its own).
         var resolverCalled = false
-        val unsafe =
-            MediaReferenceParser.firstUnsafeFetchableLocatorHost(
-                listOf(locator(kind = "ipfs-v1", url = "https://127.0.0.1/blob")),
-            ) {
+        val unsupported = locator(kind = "ipfs-v1", url = "https://127.0.0.1/blob")
+        val safe =
+            MediaReferenceParser.safeDownloadReference(referenceFixture(locators = listOf(unsupported))) {
                 resolverCalled = true
                 listOf(addr(8, 8, 8, 8))
             }
-        assertNull(unsafe)
+        assertEquals(listOf(unsupported), safe?.locators)
         assertFalse(resolverCalled)
     }
 

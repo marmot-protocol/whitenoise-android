@@ -31,7 +31,6 @@ object MediaReferenceParser {
     private const val TAG_NAME = "imeta"
     private const val VERSION_VALUE = "encrypted-media-v1"
     private const val BLOSSOM_LOCATOR_KIND = "blossom-v1"
-    private const val MALFORMED_LOCATOR_HOST = "<malformed-locator>"
     private const val SHA256_HEX_LEN = 64 // 32 bytes
     private const val NONCE_HEX_LEN = 24 // 12 bytes
     private const val HEX_CHARS = "0123456789abcdefABCDEF"
@@ -163,39 +162,6 @@ object MediaReferenceParser {
     }
 
     /**
-     * The first **fetchable** (blossom-v1) locator host in [locators] that fails
-     * the SSRF gate — a literal private/loopback host, a public-looking name that
-     * [resolve]s to a private/loopback address, or a malformed/hostless/non-default-port
-     * locator (fail closed) — or null when every fetchable locator is safe (or there are
-     * none).
-     *
-     * Non-fetchable locator kinds are ignored: the engine only fetches the
-     * supported kind, so a stale/unsupported/private entry of another kind must
-     * not block an otherwise-downloadable attachment. Within the fetchable kind
-     * the check stays strict (any unsafe entry blocks) so a safe decoy locator
-     * can't smuggle a private one past the gate before the engine's own
-     * resolve-time guard lands.
-     *
-     * [resolve] is injected (production passes `InetAddress.getAllByName` on an
-     * IO dispatcher) so the resolve-time decision is unit-testable without a
-     * network. A null/empty resolution is treated as unsafe: we can't prove the
-     * target is public, so it isn't handed to the native fetch.
-     */
-    internal fun firstUnsafeFetchableLocatorHost(
-        locators: List<MediaLocatorFfi>,
-        resolve: (String) -> List<InetAddress>?,
-    ): String? {
-        for (locator in locators) {
-            // The engine only fetches the supported kind; ignore others so one
-            // unsupported/private entry can't block a valid attachment.
-            if (locator.kind != BLOSSOM_LOCATOR_KIND) continue
-            val parsed = parseFetchableLocator(locator.value) ?: return MALFORMED_LOCATOR_HOST
-            unsafeFetchableLocatorHost(parsed, resolve)?.let { return it }
-        }
-        return null
-    }
-
-    /**
      * Returns a copy of [reference] whose fetchable locators are rewritten from
      * the authority parsed and validated here before the value crosses into the
      * native downloader. That keeps the native fetch from consuming a raw
@@ -249,7 +215,6 @@ object MediaReferenceParser {
         buildString {
             append("https://")
             append(if (host.contains(':')) "[$host]" else host)
-            if (uri.port == 443) append(":443")
             append(uri.rawPath.orEmpty())
             uri.rawQuery?.let { append('?').append(it) }
             uri.rawFragment?.let { append('#').append(it) }
