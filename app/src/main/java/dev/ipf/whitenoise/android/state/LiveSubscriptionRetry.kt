@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
@@ -79,6 +80,30 @@ internal fun restoreFailedDestructiveAccountWipeRuntimeState(
     )
 
 internal suspend fun <T> Mutex.withSerializedNativePushWipe(block: suspend () -> T): T = withLock { block() }
+
+/**
+ * Run attempt-scoped side jobs alongside the two live subscription consumers.
+ * The side jobs are cancelled as soon as either live subscription ends, but the
+ * reconnect path does not wait for those side jobs to finish their own native
+ * stream cleanup before returning to the caller.
+ */
+internal suspend fun CoroutineScope.runUntilFirstLiveSubscriptionEndsWithAttemptJobs(
+    startAttemptJobs: CoroutineScope.() -> Unit,
+    first: suspend CoroutineScope.() -> Unit,
+    second: suspend CoroutineScope.() -> Unit,
+) {
+    val attemptJob = SupervisorJob()
+    val attemptScope = CoroutineScope(coroutineContext + attemptJob)
+    try {
+        attemptScope.startAttemptJobs()
+        runUntilFirstLiveSubscriptionEnds(
+            first = first,
+            second = second,
+        )
+    } finally {
+        attemptJob.cancel()
+    }
+}
 
 /**
  * Run two live subscription consumers in parallel until either finishes
