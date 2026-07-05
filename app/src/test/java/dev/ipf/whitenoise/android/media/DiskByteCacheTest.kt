@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import java.lang.reflect.Modifier
 import java.nio.file.Files
 
 class DiskByteCacheTest {
@@ -230,6 +231,33 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun put_overloadsAreNotSynchronizedMethods() {
+        val deferredPut =
+            DiskByteCache::class.java.getDeclaredMethod(
+                "put",
+                String::class.java,
+                ByteArray::class.java,
+                Int::class.javaPrimitiveType!!,
+                String::class.java,
+            )
+        val immediatePut =
+            DiskByteCache::class.java.getDeclaredMethod(
+                "put",
+                String::class.java,
+                ByteArray::class.java,
+            )
+
+        assertFalse(
+            "deferred put must not hold the object monitor across disk writes",
+            Modifier.isSynchronized(deferredPut.modifiers),
+        )
+        assertFalse(
+            "immediate put must not hold the object monitor across disk writes",
+            Modifier.isSynchronized(immediatePut.modifiers),
+        )
+    }
+
+    @Test
     fun reinit_evictsToFitReducedCap() {
         DiskByteCache(dir, maxBytes = 1024).run {
             put("a", ByteArray(40))
@@ -316,13 +344,12 @@ class DiskByteCacheTest {
     fun taggedPut_failsClosed_whenTagCannotBePersisted() {
         // The ciphertext tag authorizes hash-based expiry deletion, so a tagged
         // write must fail closed: if the tag can't land, no decrypted .bin may
-        // survive untagged. Force the failure by occupying the tag's temp path
-        // with a non-empty directory (writeText to a dir throws), mirroring the
-        // on-disk naming sha256(key).tag.tmp.
+        // survive untagged. Force the failure by occupying the tag's final path
+        // with a non-empty directory (renameTo onto it fails).
         val key = "acct|grp|msg|0"
-        File(dir, sha256Hex(key) + ".tag.tmp").apply {
+        File(dir, sha256Hex(key) + ".tag").apply {
             mkdirs()
-            File(this, "occupied").writeText("x") // non-empty so the tmp-sweep can't delete it
+            File(this, "occupied").writeText("x")
         }
         val cache = DiskByteCache(dir, maxBytes = 1024)
         cache.put(key, ByteArray(40) { 1 }, cache.generation(), "the-hash")

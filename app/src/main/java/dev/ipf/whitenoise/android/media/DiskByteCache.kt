@@ -129,7 +129,6 @@ class DiskByteCache(
     @Synchronized
     fun generation(): Int = generation
 
-    @Synchronized
     fun put(
         key: String,
         bytes: ByteArray,
@@ -141,23 +140,24 @@ class DiskByteCache(
         // Reject a write whose session was wiped while it sat queued: clear()
         // bumps `generation` under this same lock, so a put scheduled before
         // the wipe skips here and no plaintext lands after sign-out. See #154.
-        if (expectedGeneration != generation) return
+        synchronized(this) {
+            if (expectedGeneration != generation) return
+            // Hydrate before writing `.tmp` files so rehydrate's orphan sweep
+            // doesn't delete in-flight temps on first access.
+            ensureHydrated()
+        }
         cacheDir.mkdirs()
         val hashed = fileNameFor(key)
-        if (!hydrated) ensureHydrated()
-        val existing = index.remove(hashed)
-        if (existing != null) {
-            residentBytes -= existing.size
-            runCatching { existing.file.delete() }
-            runCatching { tagFileFor(existing.file).delete() }
-        }
+        val file = File(cacheDir, hashed)
+        // Unique `.tmp` names so concurrent puts for the same key (possible while
+        // this thread is outside the monitor) don't clobber each other.
+        val tmp = uniqueTmpFile(hashed.removeSuffix(SUFFIX), "bin")
         // Atomic write: write to a sibling `.tmp` file then rename onto the
         // final path. A power loss or kill mid-`writeBytes` would otherwise
         // leave a truncated `.bin` that `rehydrateIndex` indexes with the
         // wrong size; subsequent `readBytes()` returns truncated bytes that
-        // a decoder treats as corrupt.
-        val file = File(cacheDir, hashed)
-        val tmp = File(cacheDir, "$hashed$TMP_SUFFIX")
+        // a decoder treats as corrupt. Done outside the monitor so a main-thread
+        // `contains()` isn't blocked behind multi-MB writes. See #1033.
         try {
             tmp.writeBytes(bytes)
         } catch (_: IOException) {
@@ -173,41 +173,72 @@ class DiskByteCache(
         // crash then leaves at most an orphan `.tag` (swept on rehydrate) or a
         // complete pair — never a decrypted `.bin` without the tag that authorizes
         // its later deletion. If the tag can't be persisted, drop the `.bin`.
-        if (ciphertextTag != null) {
-            val tagFile = tagFileFor(file)
-            val tagTmp = File(cacheDir, "${tagFile.name}$TMP_SUFFIX")
-            val tagPersisted =
-                runCatching {
-                    tagTmp.writeText(ciphertextTag)
-                    tagTmp.renameTo(tagFile)
-                }.getOrDefault(false)
-            if (!tagPersisted) {
-                runCatching { tagTmp.delete() }
-                runCatching { tmp.delete() }
+        // The expensive tag write happens outside the monitor; the final tag
+        // rename is part of the short commit phase so concurrent puts for the
+        // same key cannot publish a mismatched `.bin`/`.tag` pair.
+        val tagFile = if (ciphertextTag != null) tagFileFor(file) else null
+        val tagTmp =
+            if (ciphertextTag != null && tagFile != null) {
+                val tmpTag =
+                    uniqueTmpFile(
+                        tagFile.name.removeSuffix(TAG_SUFFIX),
+                        "tag",
+                    )
+                val tagWritten =
+                    runCatching {
+                        tmpTag.writeText(ciphertextTag)
+                    }.isSuccess
+                if (!tagWritten) {
+                    runCatching { tmpTag.delete() }
+                    runCatching { tmp.delete() }
+                    return
+                }
+                tmpTag
+            } else {
+                null
+            }
+        synchronized(this) {
+            // A concurrent clear() (sign-out / account switch) may have run while
+            // we were writing — abort and drop temp artifacts rather than
+            // re-persisting plaintext for a wiped session. See #154, #1033.
+            if (expectedGeneration != generation) {
+                abortPut(tmp, tagTmp)
                 return
             }
+            val existing = index.remove(hashed)
+            if (existing != null) {
+                residentBytes -= existing.size
+                runCatching { existing.file.delete() }
+                runCatching { tagFileFor(existing.file).delete() }
+            }
+            if (tagTmp != null && tagFile != null && !tagTmp.renameTo(tagFile)) {
+                abortPut(tmp, tagTmp)
+                return
+            }
+            if (!tmp.renameTo(file)) {
+                runCatching { tmp.delete() }
+                // Couldn't place the `.bin`; drop the tag we just wrote so no orphan
+                // sidecar points at a nonexistent entry.
+                tagFile?.let { runCatching { it.delete() } }
+                return
+            }
+            val size = bytes.size
+            index[hashed] = Entry(file, size, ciphertextTag)
+            residentBytes += size
+            evictUntilUnderCap()
         }
-        if (!tmp.renameTo(file)) {
-            runCatching { tmp.delete() }
-            // Couldn't place the `.bin`; drop the tag we just wrote so no orphan
-            // sidecar points at a nonexistent entry.
-            if (ciphertextTag != null) runCatching { tagFileFor(file).delete() }
-            return
-        }
-        val size = bytes.size
-        index[hashed] = Entry(file, size, ciphertextTag)
-        residentBytes += size
-        evictUntilUnderCap()
     }
 
     /** Immediate write at the current generation. Deferred/background writes
      *  that must honor a sign-out wipe should capture [generation] at schedule
      *  time and use the three-arg overload instead. */
-    @Synchronized
     fun put(
         key: String,
         bytes: ByteArray,
-    ) = put(key, bytes, generation)
+    ) {
+        val currentGeneration = synchronized(this) { generation }
+        put(key, bytes, currentGeneration)
+    }
 
     /**
      * Drop a single entry — delete its backing file and index row. Used by the
@@ -293,6 +324,23 @@ class DiskByteCache(
             ensureHydrated()
             residentBytes
         }
+
+    private fun uniqueTmpFile(
+        baseName: String,
+        kind: String,
+    ): File =
+        File(
+            cacheDir,
+            "$baseName-$kind-${System.nanoTime()}$TMP_SUFFIX",
+        )
+
+    private fun abortPut(
+        tmp: File,
+        tagTmp: File?,
+    ) {
+        runCatching { tmp.delete() }
+        tagTmp?.let { runCatching { it.delete() } }
+    }
 
     private fun evictUntilUnderCap() {
         if (residentBytes <= maxBytes) return
