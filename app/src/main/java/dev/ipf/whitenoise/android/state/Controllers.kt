@@ -4365,14 +4365,21 @@ class ConversationController(
                         appState.marmotIo { downloadMedia(account, groupIdHex, safeReference) }
                     }.onFailure {
                         if (it is CancellationException) throw it
-                        // Strip query/path tail so any signed tokens or
-                        // capabilities in the locator don't end up in logs.
+                        // Strip path AND query/fragment so any signed tokens or
+                        // capabilities in the locator don't end up in logs — a
+                        // path-less locator like `https://host?token=…` would
+                        // otherwise survive the `/`-only trim.
                         val host =
                             reference.locators
                                 .firstOrNull()
                                 ?.value
-                                ?.let { url -> url.substringAfter("://", "").substringBefore('/') }
-                                .orEmpty()
+                                ?.let { url ->
+                                    url
+                                        .substringAfter("://", "")
+                                        .substringBefore('/')
+                                        .substringBefore('?')
+                                        .substringBefore('#')
+                                }.orEmpty()
                         Log.w(
                             "DMConversation",
                             "downloadAttachment failed for ${groupIdHex.take(8)} message=${messageIdHex.take(8)} host=$host",
