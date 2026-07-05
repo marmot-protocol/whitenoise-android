@@ -16,8 +16,8 @@ import java.util.Locale
  * domain comes from untrusted, user-pasted input, so this is an SSRF vector.
  * We therefore:
  *  - force HTTPS (a NIP-05 well-known doc is always HTTPS),
- *  - reject an explicit non-443 port (NIP-05 well-known is served on the
- *    default HTTPS port; an explicit port is a non-standard authority trick),
+ *  - reject URL delimiters in the domain, including explicit ports (NIP-05
+ *    well-known is served on the implicit default HTTPS port),
  *  - reject private / loopback / link-local hosts via [HostSafety] at the
  *    initial host AND at every redirect hop, checking BOTH the literal host
  *    string and every DNS-resolved address (so a public hostname that resolves
@@ -35,10 +35,9 @@ import java.util.Locale
  * or malformed document, no matching name, non-hex value) returns null.
  */
 object Nip05Resolver {
-    // <local>@<domain>, no whitespace or extra '@'. Same shape as
-    // ProfileFieldValidation.INTERNET_IDENTIFIER; duplicated locally so the
-    // resolver is self-contained and can split the two halves it needs.
-    private val INTERNET_IDENTIFIER = Regex("^([^@\\s]+)@([^@\\s]+\\.[^@\\s]+)$")
+    // <local>@<domain>, no whitespace or extra '@'. The domain's DNS-label
+    // shape is validated separately before it is interpolated into a URL.
+    private val INTERNET_IDENTIFIER = Regex("^([^@\\s]+)@([^@\\s]+)$")
     private val HEX_PUBKEY = Regex("^[0-9a-fA-F]{64}$")
 
     // NIP-05 local parts are restricted to a-z, 0-9, '-', '_', '.'. We accept
@@ -66,25 +65,27 @@ object Nip05Resolver {
             val local = match.groupValues[1].lowercase(Locale.ROOT)
             val domain = match.groupValues[2].lowercase(Locale.ROOT)
             if (!LOCAL_PART.matches(local)) return@withContext null
+            val url = buildUrl(local, domain) ?: return@withContext null
+
             // Block obviously-private domains before issuing any request. A bare
             // hostname (the common case) passes this literal check and a DNS
             // rebinding attack is out of scope here, matching HostSafety's
             // documented contract.
             if (HostSafety.isPrivateOrLoopbackHost(domain)) return@withContext null
-
-            val url = buildUrl(local, domain) ?: return@withContext null
             val body = httpGetString(url, timeoutMillis) ?: return@withContext null
             decodePubkey(body, local)
         }
 
-    private fun buildUrl(
+    internal fun buildUrl(
         local: String,
         domain: String,
     ): URL? {
+        if (!Lud16Address.isHostnameOnlyDomain(domain)) return null
         val encodedName = URLEncoder.encode(local, "UTF-8")
         // The local part is already constrained to [a-z0-9._-] so this is a
-        // plain query string; the domain is interpolated into the authority and
-        // re-validated as a real host inside httpGetString.
+        // plain query string; the domain is constrained to DNS labels before it
+        // reaches the URL authority, then re-validated as a real host inside
+        // httpGetString.
         return runCatching { URL("https://$domain/.well-known/nostr.json?name=$encodedName") }.getOrNull()
     }
 

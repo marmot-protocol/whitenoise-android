@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -42,15 +43,37 @@ class Nip05ResolverTest {
         }
 
     @Test
-    fun rejectsExplicitNonDefaultPortWithoutNetwork() =
+    fun rejectsExplicitPortsWithoutNetwork() =
         runBlocking {
-            // NIP-05 well-known is served on the implicit HTTPS port. An
-            // explicit non-443 port is a non-standard authority trick and is
-            // rejected in httpGetString BEFORE any DNS resolution / connection,
-            // so this stays offline. The domain carries a dot (NIP-05 shape) and
-            // is a public name, so the only thing that stops it is the port.
+            // NIP-05 well-known is served on the implicit HTTPS port. Any
+            // explicit port is a URL authority delimiter, not a hostname
+            // character, and is rejected before URL construction or network.
             assertNull(Nip05Resolver.resolve("alice@example.com:8080"))
+            assertNull(Nip05Resolver.resolve("alice@example.com:443"))
             assertNull(Nip05Resolver.resolve("alice@example.com:80"))
             assertNull(Nip05Resolver.resolve("alice@example.com:22"))
         }
+
+    @Test
+    fun rejectsUrlDelimitersInDomainBeforeBuildingWellKnownUrl() {
+        val invalidDomains =
+            listOf(
+                "example.com/path",
+                "example.com?name=bob",
+                "example.com:443",
+                "example.com\\evil",
+            )
+
+        invalidDomains.forEach { domain ->
+            assertNull("domain=$domain", Nip05Resolver.buildUrl(local = "alice", domain = domain))
+        }
+    }
+
+    @Test
+    fun buildsWellKnownUrlForStrictHostnameDomain() {
+        assertEquals(
+            "https://example.com/.well-known/nostr.json?name=alice",
+            Nip05Resolver.buildUrl(local = "alice", domain = "example.com")?.toString(),
+        )
+    }
 }
