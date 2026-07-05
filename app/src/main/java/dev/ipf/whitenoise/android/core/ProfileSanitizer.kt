@@ -7,6 +7,9 @@ object ProfileSanitizer {
     private const val MAX_NAME_LENGTH = 80
     private const val MAX_ABOUT_LENGTH = 1000
     private const val MAX_MESSAGE_LENGTH = 8000
+
+    /** Max consecutive Unicode mark code points after one base character (Zalgo guard). */
+    private const val MAX_COMBINING_MARKS_PER_BASE = 4
     private val blankLineRun = Regex("\n{3,}")
     private val whitespaceRun = Regex("\\s+")
 
@@ -91,10 +94,14 @@ object ProfileSanitizer {
 
     fun stripUnsafe(value: String): String =
         buildString(value.length) {
+            var consecutiveCombiningMarks = 0
             value.codePoints().forEach { cp ->
                 val type = Character.getType(cp)
                 when {
-                    cp == '\n'.code || cp == '\t'.code || cp == '\r'.code -> appendCodePoint(cp)
+                    cp == '\n'.code || cp == '\t'.code || cp == '\r'.code -> {
+                        consecutiveCombiningMarks = 0
+                        appendCodePoint(cp)
+                    }
                     type == Character.CONTROL.toInt() -> Unit
                     type == Character.FORMAT.toInt() && cp != 0x200C && cp != 0x200D -> Unit
                     cp in 0xE0000..0xE007F -> Unit // supplementary TAG characters
@@ -112,8 +119,22 @@ object ProfileSanitizer {
                     cp == 0x180E -> Unit // Mongolian vowel separator: default-ignorable since Unicode 6.3
                     cp == 0x2060 -> Unit // word joiner
                     cp in 0x2061..0x2064 -> Unit // invisible math operators
-                    else -> appendCodePoint(cp)
+                    cp == 0x200C || cp == 0x200D -> appendCodePoint(cp)
+                    isCombiningMark(type) -> {
+                        if (consecutiveCombiningMarks >= MAX_COMBINING_MARKS_PER_BASE) return@forEach
+                        consecutiveCombiningMarks++
+                        appendCodePoint(cp)
+                    }
+                    else -> {
+                        consecutiveCombiningMarks = 0
+                        appendCodePoint(cp)
+                    }
                 }
             }
         }
+
+    private fun isCombiningMark(type: Int): Boolean =
+        type == Character.NON_SPACING_MARK.toInt() ||
+            type == Character.COMBINING_SPACING_MARK.toInt() ||
+            type == Character.ENCLOSING_MARK.toInt()
 }
