@@ -28,7 +28,7 @@ internal object Lud16Address {
         return Parsed(local = local, domain = domain)
     }
 
-    private fun isHostnameOnlyDomain(domain: String): Boolean {
+    internal fun isHostnameOnlyDomain(domain: String): Boolean {
         if (domain.length > 253) return false
         val labels = domain.split('.')
         if (labels.size < 2) return false
