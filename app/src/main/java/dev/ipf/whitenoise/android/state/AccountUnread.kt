@@ -2,6 +2,12 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * Aggregate unread messages for an account from durable chat-list rows.
@@ -13,6 +19,54 @@ internal fun accountUnreadCount(rows: Iterable<ChatListRowFfi>): ULong =
     rows.fold(0uL) { total, row ->
         if (row.archived) total else total + row.unreadCount
     }
+
+/**
+ * Group ids whose rosters can change the effective unread total: non-archived
+ * rows with unread messages and a usable group id. Distinct ids keep duplicate
+ * chat-list rows from issuing duplicate roster FFI reads during bulk refreshes.
+ */
+internal fun unreadRosterGroupIds(rows: Iterable<ChatListRowFfi>): List<String> =
+    rows
+        .asSequence()
+        .filter { !it.archived && it.unreadCount > 0uL }
+        .map { it.groupIdHex }
+        .filter { it.isNotBlank() }
+        .distinct()
+        .toList()
+
+/**
+ * Load member rosters needed for suppression-aware unread counts with bounded
+ * concurrency. Individual roster failures are best-effort: omit that roster so
+ * [accountUnreadCount] preserves the raw unread row rather than suppressing from
+ * incomplete evidence. Cancellation still propagates.
+ */
+internal suspend fun loadUnreadMemberRosters(
+    rows: Iterable<ChatListRowFfi>,
+    gate: Semaphore,
+    onFailure: (groupIdHex: String, error: Throwable) -> Unit = { _, _ -> },
+    loadMembers: suspend (groupIdHex: String) -> List<AppGroupMemberRecordFfi>,
+): Map<String, List<AppGroupMemberRecordFfi>> {
+    val groupIds = unreadRosterGroupIds(rows)
+    if (groupIds.isEmpty()) return emptyMap()
+    return coroutineScope {
+        groupIds
+            .map { groupId ->
+                async {
+                    gate.withPermit {
+                        try {
+                            groupId to loadMembers(groupId)
+                        } catch (error: Throwable) {
+                            if (error is CancellationException) throw error
+                            onFailure(groupId, error)
+                            null
+                        }
+                    }
+                }
+            }.awaitAll()
+            .filterNotNull()
+            .toMap()
+    }
+}
 
 /**
  * Aggregate unread messages from durable chat-list rows, applying removed-group

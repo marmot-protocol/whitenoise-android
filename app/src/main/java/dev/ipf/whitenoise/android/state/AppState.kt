@@ -1676,19 +1676,32 @@ class WhiteNoiseAppState(
                 rethrowIfCancellation(it)
                 appStateDebug(it) { "account unread summary refresh failed: ${it.readableMessage()}" }
             }.getOrNull()
+        val accountGate = Semaphore(ACCOUNT_UNREAD_ACCOUNT_FANOUT)
+        // Share one roster gate across the whole bulk refresh so member FFI
+        // fan-out stays bounded across all signed-in accounts, not per account.
+        val memberGate = Semaphore(ACCOUNT_UNREAD_MEMBER_FANOUT)
+        val refreshedPairs =
+            coroutineScope {
+                localSigning
+                    .map { summary ->
+                        async {
+                            accountGate.withPermit {
+                                val rawCount = rawCountsByHex?.get(summary.accountIdHex)?.unreadCount
+                                summary.label to
+                                    if (rawCount == 0uL) {
+                                        0uL
+                                    } else {
+                                        refreshEffectiveAccountUnreadCount(summary, memberGate)
+                                            ?: rawCount
+                                            ?: previous[summary.label]
+                                            ?: 0uL
+                                    }
+                            }
+                        }
+                    }.awaitAll()
+            }
         val refreshedCounts = linkedMapOf<String, ULong>()
-        localSigning.forEach { summary ->
-            val rawCount = rawCountsByHex?.get(summary.accountIdHex)?.unreadCount
-            refreshedCounts[summary.label] =
-                if (rawCount == 0uL) {
-                    0uL
-                } else {
-                    refreshEffectiveAccountUnreadCount(summary)
-                        ?: rawCount
-                        ?: previous[summary.label]
-                        ?: 0uL
-                }
-        }
+        refreshedPairs.forEach { (label, count) -> refreshedCounts[label] = count }
         // Re-read after the FFI suspension: a single-key merge
         // (updateAccountUnreadCount / refreshAccountUnreadCount) may have landed
         // while we were suspended. Those values are fresher than our snapshot, so
@@ -1709,26 +1722,28 @@ class WhiteNoiseAppState(
      * scoped to [summary.accountIdHex] instead of the currently-active account so
      * cross-account indicators stay honest for background accounts too (#662).
      */
-    private suspend fun refreshEffectiveAccountUnreadCount(summary: AccountSummaryFfi): ULong? {
+    private suspend fun refreshEffectiveAccountUnreadCount(
+        summary: AccountSummaryFfi,
+        memberGate: Semaphore = Semaphore(ACCOUNT_UNREAD_MEMBER_FANOUT),
+    ): ULong? {
         val ref = summary.label.takeIf { it.isNotBlank() } ?: return null
         return runCatching {
             marmotIo {
                 val rows = chatList(ref, includeArchived = true)
-                val membersByGroupId = mutableMapOf<String, List<AppGroupMemberRecordFfi>>()
-                rows.forEach { row ->
-                    if (!row.archived && row.unreadCount > 0uL && row.groupIdHex.isNotBlank()) {
-                        try {
-                            membersByGroupId[row.groupIdHex] = groupMembers(ref, row.groupIdHex)
-                        } catch (error: Throwable) {
-                            rethrowIfCancellation(error)
+                val membersByGroupId =
+                    loadUnreadMemberRosters(
+                        rows = rows,
+                        gate = memberGate,
+                        onFailure = { groupIdHex, error ->
                             appStateDebug(error) {
                                 "account unread member refresh failed " +
-                                    "account=${ref.take(8)} group=${row.groupIdHex.take(8)}: " +
+                                    "account=${ref.take(8)} group=${groupIdHex.take(8)}: " +
                                     error.readableMessage()
                             }
-                        }
+                        },
+                    ) { groupIdHex ->
+                        groupMembers(ref, groupIdHex)
                     }
-                }
                 accountUnreadCount(rows, summary.accountIdHex, membersByGroupId)
             }
         }.onFailure {
@@ -4145,6 +4160,11 @@ class WhiteNoiseAppState(
         private const val LANGUAGE_TAG_KEY = "language_tag"
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
         private const val PROFILE_PRESENTATION_WARM_FANOUT = 6
+
+        // Bulk account-unread refresh runs on cold start/account switch. Bound
+        // both dimensions of the FFI fan-out: accounts and per-account rosters.
+        private const val ACCOUNT_UNREAD_ACCOUNT_FANOUT = 4
+        private const val ACCOUNT_UNREAD_MEMBER_FANOUT = 4
         private const val MAX_PROFILE_PRESENTATION_CACHE_ENTRIES = 4096
         private const val MAX_USER_PROFILE_CACHE_ENTRIES = 4096
         private const val MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES = 1024
