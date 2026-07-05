@@ -208,13 +208,14 @@ object VoicePlaybackController {
                 // Focus denied — stay paused rather than playing unfocused.
                 return
             }
-            player?.start()
+            val activePlayer = player ?: return
+            if (!startCurrentPlayer(activePlayer)) return
             currentOwnerKey = ownerKey
             _state.value =
                 _state.value.copy(
                     key = key,
                     isPlaying = true,
-                    durationMs = player?.duration ?: _state.value.durationMs,
+                    durationMs = activePlayer.duration,
                 )
             startTicker()
             return
@@ -311,13 +312,28 @@ object VoicePlaybackController {
         startTicker()
     }
 
+    private fun startCurrentPlayer(mp: MediaPlayer): Boolean =
+        startPlayer(mp, "MediaPlayer resume failed") {
+            releasePlayerInternal()
+            _state.value = PlaybackState()
+        }
+
     private fun startPreparedNewPlayer(mp: MediaPlayer): Boolean =
+        startPlayer(mp, "MediaPlayer start failed") {
+            abandonFocus()
+            mp.runCatching { release() }
+            _state.value = PlaybackState()
+        }
+
+    private fun startPlayer(
+        mp: MediaPlayer,
+        failureMessage: String,
+        onFailure: () -> Unit,
+    ): Boolean =
         runCatching { mp.start() }
             .onFailure {
-                Log.w(TAG, "MediaPlayer start failed", it)
-                abandonFocus()
-                mp.runCatching { release() }
-                _state.value = PlaybackState()
+                Log.w(TAG, failureMessage, it)
+                onFailure()
             }.isSuccess
 
     private fun requestFocus(): Boolean {

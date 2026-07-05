@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.audio
 import android.media.AudioManager
 import android.media.MediaPlayer
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -16,6 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -86,6 +88,42 @@ class VoicePlaybackControllerFocusTest {
         assertFalse(startPreparedNewPlayer(mediaPlayer))
 
         assertTrue(mediaPlayer.released)
+        assertNull(controllerField("focusRequest"))
+        assertSame(focusRequest.audioFocusRequest, shadowAudioManager.lastAbandonedAudioFocusRequest)
+        assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
+    }
+
+    @Test
+    fun resumeStartFailureReleasesActivePlayerAndAbandonsFocus() {
+        val context = RuntimeEnvironment.getApplication()
+        val audioManager = context.getSystemService(AudioManager::class.java)
+        val shadowAudioManager = shadowOf(audioManager)
+        VoicePlaybackController.attach(context)
+
+        assertTrue(requestFocus())
+        val focusRequest = shadowAudioManager.lastAudioFocusRequest
+        assertNotNull(focusRequest)
+        val mediaPlayer = ThrowingStartMediaPlayer()
+        setControllerField("player", mediaPlayer)
+        setControllerField("currentKey", "voice-key")
+        setControllerField("currentOwnerKey", "old-owner")
+        setPlaybackState(
+            VoicePlaybackController.PlaybackState(
+                key = "voice-key",
+                isPlaying = false,
+                positionMs = 123,
+                durationMs = 456,
+            ),
+        )
+
+        runBlocking {
+            VoicePlaybackController.play("voice-key", File("unused.amr"), ownerKey = "new-owner")
+        }
+
+        assertTrue(mediaPlayer.released)
+        assertNull(controllerField("player"))
+        assertNull(controllerField("currentKey"))
+        assertNull(controllerField("currentOwnerKey"))
         assertNull(controllerField("focusRequest"))
         assertSame(focusRequest.audioFocusRequest, shadowAudioManager.lastAbandonedAudioFocusRequest)
         assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
