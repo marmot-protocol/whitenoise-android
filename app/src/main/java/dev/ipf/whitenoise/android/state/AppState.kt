@@ -2682,13 +2682,14 @@ class WhiteNoiseAppState(
         for (row in rows) {
             currentCoroutineContext().ensureActive()
             val groupIdHex = row.groupIdHex.takeIf { it.isNotBlank() } ?: continue
-            sweepExpiredForGroup(accountRef, groupIdHex)
+            sweepExpiredForGroup(accountRef, groupIdHex, row)
         }
     }
 
     private suspend fun sweepExpiredForGroup(
         accountRef: String,
         groupIdHex: String,
+        chatRow: ChatListRowFfi,
     ) {
         val retentionSecs =
             runCatching { marmotIo { groupDetails(accountRef, groupIdHex) }.group.disappearingMessageSecs }
@@ -2705,6 +2706,7 @@ class WhiteNoiseAppState(
                 groupIdHex,
                 retentionSecs,
                 System.currentTimeMillis(),
+                chatRow.lastReadTimelineAt,
             )
         ) {
             return
@@ -2747,6 +2749,7 @@ class WhiteNoiseAppState(
         groupIdHex: String,
         retentionSecs: ULong,
         nowMillis: Long,
+        lastReadTimelineAt: ULong?,
     ): Boolean {
         val rawCutoffSeconds = DisappearingMessageSweep.rawExpiryCutoffSeconds(nowMillis, retentionSecs) ?: return false
         val skewCutoffSeconds = DisappearingMessageSweep.expiryCutoffSeconds(nowMillis, retentionSecs) ?: return false
@@ -2786,9 +2789,16 @@ class WhiteNoiseAppState(
 
             when (
                 DisappearingMessageSweep.classifyScanPage(
-                    timelineAtSeconds = page.messages.map { it.timelineAt },
+                    rows =
+                        page.messages.map {
+                            DisappearingMessageSweep.TimelineScanRow(
+                                timelineAtSeconds = it.timelineAt,
+                                direction = it.direction,
+                            )
+                        },
                     rawCutoffSeconds = rawCutoffSeconds,
                     skewCutoffSeconds = skewCutoffSeconds,
+                    lastReadTimelineAt = lastReadTimelineAt,
                 )
             ) {
                 DisappearingMessageSweep.TimelineScanPageDecision.DeferSkewWindow -> {

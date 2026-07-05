@@ -8097,6 +8097,8 @@ private fun ConversationScreen(
                 initialMemberSnapshot =
                     chat.memberSnapshot
                         ?: appState.cachedGroupMemberSnapshot(appState.activeAccountRef, chat.group.groupIdHex),
+                initialLastReadMessageId = chat.projection?.lastReadMessageIdHex,
+                initialLastReadTimelineAt = chat.projection?.lastReadTimelineAt,
                 copy = controllerCopy,
             )
         }
