@@ -90,6 +90,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.net.IDN
+import java.net.InetAddress
 import java.net.URI
 import java.util.Locale
 import kotlin.coroutines.resume
@@ -488,9 +489,12 @@ enum class RelayListKind {
     Inbox,
 }
 
-internal fun normalizeRelayUrls(relays: Iterable<String>): List<String> =
+internal fun normalizeRelayUrls(
+    relays: Iterable<String>,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+): List<String> =
     relays
-        .mapNotNull(::canonicalRelayUrl)
+        .mapNotNull { canonicalRelayUrl(it, allowExternalRelayHosts) }
         .distinct()
 
 internal fun telemetryServiceVersion(
@@ -507,14 +511,92 @@ internal fun telemetryDeploymentEnvironment(value: String): String =
 
 internal fun telemetryDeviceModelIdentifier(model: String): String? = model.trim().takeIf { it.isNotEmpty() }
 
-internal fun isAcceptableRelayUrl(url: String): Boolean = canonicalRelayUrl(url) != null
+internal fun isAcceptableRelayUrl(
+    url: String,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+): Boolean = canonicalRelayUrl(url, allowExternalRelayHosts) != null
 
-private fun canonicalRelayUrl(url: String): String? {
+internal enum class RelayResolveTimeCheckResult {
+    Passed,
+    Blocked,
+    Unavailable,
+}
+
+/** Injectable DNS resolver for relay resolve-time SSRF checks (unit tests). */
+internal typealias RelayHostResolver = (String) -> Array<InetAddress>?
+
+/**
+ * Resolve-time SSRF guard for relay URLs about to be dialed. Call from the IO
+ * dispatcher (see [relayUrlsResolveTimeCheckResult]) after cheap
+ * [canonicalRelayUrl] / [normalizeRelayUrls] canonicalization.
+ */
+internal fun relayUrlResolveTimeCheckResult(
+    canonicalUrl: String,
+    resolve: RelayHostResolver = ::resolveRelayHost,
+): RelayResolveTimeCheckResult {
+    val host =
+        runCatching { URI(canonicalUrl).host?.removeSurrounding("[", "]") }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?: return RelayResolveTimeCheckResult.Blocked
+    val resolved = resolve(host) ?: return RelayResolveTimeCheckResult.Unavailable
+    if (resolved.isEmpty()) return RelayResolveTimeCheckResult.Unavailable
+    return if (resolved.none { HostSafety.isPrivateOrLoopbackAddress(it) }) {
+        RelayResolveTimeCheckResult.Passed
+    } else {
+        RelayResolveTimeCheckResult.Blocked
+    }
+}
+
+internal fun relayUrlPassesResolveTimeCheck(
+    canonicalUrl: String,
+    resolve: RelayHostResolver = ::resolveRelayHost,
+): Boolean = relayUrlResolveTimeCheckResult(canonicalUrl, resolve) == RelayResolveTimeCheckResult.Passed
+
+internal suspend fun relayUrlsResolveTimeCheckResult(
+    canonicalUrls: List<String>,
+    resolve: RelayHostResolver = ::resolveRelayHost,
+): RelayResolveTimeCheckResult =
+    withContext(Dispatchers.IO) {
+        var unavailable = false
+        for (canonicalUrl in canonicalUrls) {
+            when (relayUrlResolveTimeCheckResult(canonicalUrl, resolve)) {
+                RelayResolveTimeCheckResult.Passed -> Unit
+                RelayResolveTimeCheckResult.Blocked -> return@withContext RelayResolveTimeCheckResult.Blocked
+                RelayResolveTimeCheckResult.Unavailable -> unavailable = true
+            }
+        }
+        if (unavailable) RelayResolveTimeCheckResult.Unavailable else RelayResolveTimeCheckResult.Passed
+    }
+
+internal suspend fun relayUrlsPassResolveTimeChecks(
+    canonicalUrls: List<String>,
+    resolve: RelayHostResolver = ::resolveRelayHost,
+): Boolean = relayUrlsResolveTimeCheckResult(canonicalUrls, resolve) == RelayResolveTimeCheckResult.Passed
+
+private const val RELAY_HOSTS_UNAVAILABLE_MESSAGE =
+    "Couldn't verify relay hosts. Check your connection and try again."
+
+private val releaseRelayHosts: Set<String> by lazy {
+    MarmotClient.bootstrapRelays
+        .mapNotNull { runCatching { URI(it).host?.lowercase(Locale.ROOT) }.getOrNull() }
+        .toSet()
+}
+
+private fun relayHostPassesReleasePolicy(canonicalHost: String): Boolean = canonicalHost in releaseRelayHosts
+
+private fun resolveRelayHost(host: String): Array<InetAddress>? = runCatching { InetAddress.getAllByName(host) }.getOrNull()
+
+private fun canonicalRelayUrl(
+    url: String,
+    allowExternalRelayHosts: Boolean = BuildConfig.DEBUG,
+): String? {
     return runCatching {
         val uri = URI(url.trim())
         if (uri.scheme?.equals("wss", ignoreCase = true) != true || uri.userInfo != null) {
             return@runCatching null
         }
+        if (uri.port != -1 && uri.port != 443) return@runCatching null
         val host = uri.host ?: uri.rawAuthority?.relayHostCandidate() ?: return@runCatching null
         val hostWithoutBrackets = host.removeSurrounding("[", "]")
         if (hostWithoutBrackets.any { it.isWhitespace() }) return@runCatching null
@@ -531,6 +613,13 @@ private fun canonicalRelayUrl(url: String): String? {
         // never accept one that points the client at loopback or the local
         // network. See issue #82.
         if (HostSafety.isPrivateOrLoopbackHost(canonicalHost)) return@runCatching null
+        // Release builds cannot pin the native Marmot/nostr-sdk WebSocket dial to
+        // this app-side DNS answer, so only app-owned relay hosts are allowed to
+        // cross the UniFFI boundary. Debug builds keep external relays available
+        // for local/self-hosted testing.
+        if (!allowExternalRelayHosts && !relayHostPassesReleasePolicy(canonicalHost)) {
+            return@runCatching null
+        }
         val authorityHost = if (canonicalHost.contains(":")) "[$canonicalHost]" else canonicalHost
         val port =
             uri.port
@@ -2115,6 +2204,25 @@ class WhiteNoiseAppState(
             present(R.string.toast_relay_list_empty)
             return accountRelayLists()
         }
+        when (relayUrlsResolveTimeCheckResult(next)) {
+            RelayResolveTimeCheckResult.Passed -> Unit
+            RelayResolveTimeCheckResult.Blocked -> {
+                present(
+                    R.string.toast_relay_update_failed,
+                    R.string.error_remove_invalid_relay_urls_first,
+                    copyable = true,
+                )
+                return accountRelayLists()
+            }
+            RelayResolveTimeCheckResult.Unavailable -> {
+                present(
+                    R.string.toast_relay_update_failed,
+                    AppText.Plain(RELAY_HOSTS_UNAVAILABLE_MESSAGE),
+                    copyable = true,
+                )
+                return accountRelayLists()
+            }
+        }
         return runCatching {
             marmotIo {
                 when (kind) {
@@ -2150,6 +2258,33 @@ class WhiteNoiseAppState(
     ): Boolean {
         val account = activeAccountRef ?: return false
         val relays = normalizeRelayUrls(sourceRelays)
+        if (relays.isEmpty()) {
+            present(
+                R.string.toast_couldnt_delete_key_package,
+                R.string.error_remove_invalid_relay_urls_first,
+                copyable = true,
+            )
+            return false
+        }
+        when (relayUrlsResolveTimeCheckResult(relays)) {
+            RelayResolveTimeCheckResult.Passed -> Unit
+            RelayResolveTimeCheckResult.Blocked -> {
+                present(
+                    R.string.toast_couldnt_delete_key_package,
+                    R.string.error_remove_invalid_relay_urls_first,
+                    copyable = true,
+                )
+                return false
+            }
+            RelayResolveTimeCheckResult.Unavailable -> {
+                present(
+                    R.string.toast_couldnt_delete_key_package,
+                    AppText.Plain(RELAY_HOSTS_UNAVAILABLE_MESSAGE),
+                    copyable = true,
+                )
+                return false
+            }
+        }
         return runCatching {
             marmotIo { deleteAccountKeyPackage(account, eventIdHex, relays) }
             present(R.string.toast_key_package_deleted)
