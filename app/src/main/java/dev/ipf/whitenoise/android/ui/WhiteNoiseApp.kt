@@ -7474,7 +7474,7 @@ private fun MediaPreviewSheet(
                         .heightIn(min = 96.dp, max = 220.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                itemsIndexed(uris, key = { index, uri -> "image:$index:$uri" }) { index, uri ->
+                itemsIndexed(uris, key = { _, uri -> "image:$uri" }) { index, uri ->
                     StagingTile(
                         onRemove = { if (!sending) onRemoveAt(index) },
                     ) {
@@ -7487,7 +7487,7 @@ private fun MediaPreviewSheet(
                         )
                     }
                 }
-                itemsIndexed(documentUris, key = { index, uri -> "doc:$index:$uri" }) { index, uri ->
+                itemsIndexed(documentUris, key = { _, uri -> "doc:$uri" }) { index, uri ->
                     StagingTile(
                         onRemove = { if (!sending) onRemoveDocumentAt(index) },
                     ) {
