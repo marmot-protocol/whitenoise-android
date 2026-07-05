@@ -3,10 +3,19 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Semaphore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class AccountUnreadTest {
     @Test
@@ -89,6 +98,73 @@ class AccountUnreadTest {
             )
 
         assertEquals(0uL, count)
+    }
+
+    @Test
+    fun unreadRosterGroupIds_returnsDistinctUnreadUnarchivedNonBlankGroups() {
+        val rows =
+            listOf(
+                row(groupId = "group-a", unreadCount = 2uL),
+                row(groupId = "group-a", unreadCount = 4uL),
+                row(groupId = "group-zero", unreadCount = 0uL),
+                row(groupId = "group-archived", unreadCount = 9uL, archived = true),
+                row(groupId = " ", unreadCount = 1uL),
+                row(groupId = "group-b", unreadCount = 1uL),
+            )
+
+        assertEquals(listOf("group-a", "group-b"), unreadRosterGroupIds(rows))
+    }
+
+    @Test
+    fun loadUnreadMemberRosters_usesBoundedConcurrentReadsForDistinctGroups() {
+        runBlocking {
+            val rows =
+                listOf(
+                    row(groupId = "group-a", unreadCount = 2uL),
+                    row(groupId = "group-a", unreadCount = 4uL),
+                    row(groupId = "group-b", unreadCount = 1uL),
+                    row(groupId = "group-c", unreadCount = 1uL),
+                    row(groupId = "group-archived", unreadCount = 9uL, archived = true),
+                    row(groupId = " ", unreadCount = 1uL),
+                )
+            val started = ConcurrentLinkedQueue<String>()
+            val active = AtomicInteger(0)
+            val maxActive = AtomicInteger(0)
+            val firstTwoStarted = CountDownLatch(2)
+            val release = CompletableDeferred<Unit>()
+
+            val load =
+                async(Dispatchers.Default) {
+                    loadUnreadMemberRosters(
+                        rows = rows,
+                        gate = Semaphore(2),
+                    ) { groupId ->
+                        started += groupId
+                        val now = active.incrementAndGet()
+                        maxActive.updateAndGet { previous -> maxOf(previous, now) }
+                        firstTwoStarted.countDown()
+                        release.await()
+                        active.decrementAndGet()
+                        listOf(member("account-b"))
+                    }
+                }
+
+            assertTrue(
+                "expected two roster reads to start, saw ${started.toList()}",
+                firstTwoStarted.await(2, TimeUnit.SECONDS),
+            )
+            // The first two loads are parked on release; this yield only gives
+            // an incorrectly-unbounded third load a chance to start.
+            Thread.sleep(50)
+            assertEquals(2, started.size)
+            assertEquals(2, maxActive.get())
+
+            release.complete(Unit)
+            val membersByGroupId = load.await()
+
+            assertEquals(setOf("group-a", "group-b", "group-c"), started.toSet())
+            assertEquals(listOf("group-a", "group-b", "group-c"), membersByGroupId.keys.toList())
+        }
     }
 
     @Test
