@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceParser
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -693,6 +694,20 @@ internal fun mediaCacheKey(
     attachmentIndex: Int,
 ): String = "$account|$groupIdHex|$messageIdHex|$attachmentIndex"
 
+internal suspend fun removeMediaMemoryCacheKeys(
+    cacheKeys: Iterable<String>,
+    dispatcher: CoroutineDispatcher,
+    removePlaintext: (String) -> Unit,
+    removeThumbnail: (String) -> Unit,
+) {
+    withContext(dispatcher) {
+        cacheKeys.forEach { key ->
+            removePlaintext(key)
+            removeThumbnail(key)
+        }
+    }
+}
+
 private suspend fun decodeMediaThumbnailOffMain(plaintextBytes: ByteArray) =
     withContext(Dispatchers.Default) {
         MediaPipeline.decodeSampledBitmap(
@@ -725,14 +740,22 @@ private suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
             .getOrNull()
             ?.takeIf { it.isNotEmpty() }
             ?: return
-    withContext(Dispatchers.IO) {
-        media.forEach { rec ->
-            val key = mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
-            mediaPlaintextCache.remove(key)
-            mediaThumbnailCache.remove(key)
-            diskMediaCache.remove(key)
+    val cacheKeys =
+        media.map { rec ->
+            mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
         }
-        val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
+    // ByteSizeLruCache is backed by a non-thread-safe LinkedHashMap. Keep the
+    // in-memory L1 removals main-confined even though the disk L2 eviction below
+    // correctly runs on IO.
+    removeMediaMemoryCacheKeys(
+        cacheKeys = cacheKeys,
+        dispatcher = Dispatchers.Main.immediate,
+        removePlaintext = { key -> mediaPlaintextCache.remove(key) },
+        removeThumbnail = { key -> mediaThumbnailCache.remove(key) },
+    )
+    val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
+    withContext(Dispatchers.IO) {
+        cacheKeys.forEach { diskMediaCache.remove(it) }
         if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
     }
 }
