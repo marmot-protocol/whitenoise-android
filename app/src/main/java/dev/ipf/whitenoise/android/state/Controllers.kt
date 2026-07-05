@@ -1171,6 +1171,39 @@ internal fun duplicateSignatureKeyDisplayName(
  */
 internal fun SelfMembershipFfi.isNonMember(): Boolean = this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.LEFT
 
+internal data class ConversationMembershipSeed(
+    val members: List<AppGroupMemberRecordFfi>,
+    val membersLoaded: Boolean,
+    val seededSelfMember: Boolean,
+    val seededMembershipKnown: Boolean,
+    val membersVerified: Boolean,
+)
+
+internal fun conversationMembershipSeed(
+    initialGroup: AppGroupRecordFfi,
+    initialMemberSnapshot: GroupMemberSnapshot?,
+    activeAccountIdHex: String?,
+): ConversationMembershipSeed {
+    val initialMembers = initialMemberSnapshot?.members.orEmpty()
+    val projectedNonMember = initialGroup.selfMembership.isNonMember()
+    val seededMembers =
+        if (projectedNonMember) {
+            GroupProjector.membersWithoutActiveAccount(initialMembers, activeAccountIdHex)
+        } else {
+            initialMembers
+        }
+    val seededSelfMember =
+        !projectedNonMember &&
+            initialMembers.any { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
+    return ConversationMembershipSeed(
+        members = seededMembers,
+        membersLoaded = initialMemberSnapshot?.members?.isNotEmpty() == true,
+        seededSelfMember = seededSelfMember,
+        seededMembershipKnown = projectedNonMember || initialMemberSnapshot != null,
+        membersVerified = projectedNonMember,
+    )
+}
+
 internal class ConversationSelfLeftState(
     seededMembershipKnown: Boolean,
     seededSelfMember: Boolean,
@@ -2559,13 +2592,6 @@ class ConversationController(
 ) {
     var group by mutableStateOf(initialGroup)
         private set
-    var members by mutableStateOf<List<AppGroupMemberRecordFfi>>(initialMemberSnapshot?.members.orEmpty())
-        private set
-
-    // Use cached members immediately to avoid a blank composer gap while the
-    // first refresh verifies the roster.
-    var membersLoaded by mutableStateOf(initialMemberSnapshot?.members?.isNotEmpty() == true)
-        private set
 
     // Hex of the account active when this conversation opened. Captured like
     // conversationAccountRef so display/permission/"is me" helpers stay tied to
@@ -2573,23 +2599,28 @@ class ConversationController(
     // (which can differ from the controller's account before teardown).
     private val conversationAccountIdHex = appState.activeAccount?.accountIdHex
 
-    // True when the seeding snapshot positively places the active account in
-    // the roster. Lets the bottom bar show the active composer immediately for
-    // a known member while refreshMembers() verifies, without flashing the
-    // active composer for a group the user has already left (whose cached
-    // snapshot has self removed). Captured synchronously at construction — the
-    // only membership signal available before the first refresh round-trips
-    // (issue #545).
-    val seededSelfMember: Boolean =
-        initialMemberSnapshot?.members?.any {
-            GroupProjector.isActiveAccountMember(it, conversationAccountIdHex)
-        } == true
+    private val membershipSeed = conversationMembershipSeed(initialGroup, initialMemberSnapshot, conversationAccountIdHex)
 
-    // True when construction received a member snapshot at all — i.e. the local
-    // roster for this group was already known synchronously (warm from the chat
-    // list cache or the shared AppState snapshot). When true, `seededSelfMember`
-    // is an AUTHORITATIVE membership signal: self is either in the snapshot
-    // (member) or has been removed from it (the group the user left, #545).
+    var members by mutableStateOf<List<AppGroupMemberRecordFfi>>(membershipSeed.members)
+        private set
+
+    // Use cached members immediately to avoid a blank composer gap while the
+    // first refresh verifies the roster.
+    var membersLoaded by mutableStateOf(membershipSeed.membersLoaded)
+        private set
+
+    // True when the seeding signals positively place the active account in the
+    // roster. Lets the bottom bar show the active composer immediately for a
+    // known member while refreshMembers() verifies, without flashing the active
+    // composer for a group the user has already left. A projected non-member row
+    // (`selfMembership = REMOVED/LEFT`) is authoritative and overrides any stale
+    // member snapshot that still contains self.
+    val seededSelfMember: Boolean = membershipSeed.seededSelfMember
+
+    // True when construction received a synchronous membership signal: either a
+    // member snapshot (warm from the chat-list cache or shared AppState snapshot)
+    // or the chat-list projection's own self-membership says this account is no
+    // longer in the group. When true, `seededSelfMember` is authoritative.
     //
     // When false there is NO local membership signal yet (genuinely cold open:
     // first-ever open, fresh process, or a row tapped before its background
@@ -2601,7 +2632,7 @@ class ConversationController(
     // disabled notice (issue #623, the inverse of #545). Non-empty vs empty is
     // not the test: a non-null snapshot is membership-known even if leaving a
     // solo group emptied it.
-    val seededMembershipKnown: Boolean = initialMemberSnapshot != null
+    val seededMembershipKnown: Boolean = membershipSeed.seededMembershipKnown
 
     // Typed media references keyed by `messageIdHex`. Populated from Rust's
     // `listMedia` FFI — the only place the receive-side `source_epoch` is
@@ -2611,7 +2642,7 @@ class ConversationController(
     // with `missing encrypted media secret for epoch 0`.
     var mediaReferences: Map<String, List<MediaAttachmentReferenceFfi>> by mutableStateOf(emptyMap())
         private set
-    var membersVerified by mutableStateOf(false)
+    var membersVerified by mutableStateOf(membershipSeed.membersVerified)
         private set
 
     // Authoritative local self-leave marker (issue #787). Short-lived lifecycle
@@ -2627,13 +2658,14 @@ class ConversationController(
     // isSelfMember reads false and applyGroupDetails() refuses to re-add self,
     // keeping the left state durable.
     //
-    // Seeded from an authoritative snapshot that already excludes self
-    // (seededMembershipKnown && !seededSelfMember): re-opening a just-left group
-    // builds a NEW controller whose own success path never ran, so without this
-    // its first refreshMembers() would re-add self and revert the left state
-    // (the exact #787 repro). A present snapshot only omits self once a
-    // leave/eviction removed self from it, so this is a sound "not a member"
-    // signal — the same one the composer gate uses for its initial NOTICE.
+    // Seeded from an authoritative synchronous not-member signal
+    // (seededMembershipKnown && !seededSelfMember): either a snapshot that
+    // already excludes self, or the chat-list projection's own self-membership
+    // says REMOVED/LEFT. Re-opening a just-left/removed group builds a NEW
+    // controller whose own success path never ran, so without this its first
+    // refreshMembers() could re-add self and revert the left state (the exact
+    // #787 repro). These seed paths are the same local evidence the composer
+    // gate uses for its initial NOTICE.
     private val selfMembership = ConversationSelfLeftState(seededMembershipKnown, seededSelfMember)
     var timeline by mutableStateOf<List<TimelineMessage>>(emptyList())
         private set
