@@ -87,4 +87,24 @@ class DiagnosticFormatterTest {
         assertFalse(described.contains(secretHex))
         assertFalse(described.contains(longHex))
     }
+
+    @Test
+    fun redactError_scrubsBearerAuthorizationHeader() {
+        val jwtLike = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N"
+        val message = "request failed: Authorization: Bearer $jwtLike while contacting relay"
+        val redacted = DiagnosticFormatter.redactError(message)
+
+        assertEquals("request failed: Authorization: Bearer [redacted] while contacting relay", redacted)
+        assertFalse(redacted.contains(jwtLike))
+    }
+
+    @Test
+    fun redactError_scrubsBearerHeaderCaseInsensitively() {
+        val token = "abc.def.ghi"
+        val message = "error: authorization: bearer $token end"
+        val redacted = DiagnosticFormatter.redactError(message)
+
+        assertEquals("error: Authorization: Bearer [redacted] end", redacted)
+        assertFalse(redacted.contains(token))
+    }
 }

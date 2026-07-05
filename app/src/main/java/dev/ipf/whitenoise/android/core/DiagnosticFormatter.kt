@@ -41,6 +41,7 @@ object DiagnosticFormatter {
     private val HEX_SECRET = Regex("\\b[0-9a-fA-F]{64,}\\b")
     private val CREDENTIALS_IN_URL = Regex("(?i)([a-z][a-z0-9+.-]*://)[^\\s/@:]+:[^\\s/@]+@")
     private val TOKEN_ASSIGNMENT = Regex("(?i)\\b(authorization|bearer|token|auth[_-]?token|password|secret)=([^\\s&]+)")
+    private val BEARER_HEADER = Regex("(?i)\\bauthorization:\\s*bearer\\s+\\S+")
 
     /**
      * Scrub secret-shaped substrings (nsec, long hex, URL credentials, token
@@ -56,6 +57,7 @@ object DiagnosticFormatter {
                 .replace(NSEC_SECRET, REDACTED)
                 .replace(HEX_SECRET, REDACTED)
                 .replace(TOKEN_ASSIGNMENT) { "${it.groupValues[1]}=$REDACTED" }
+                .replace(BEARER_HEADER, "Authorization: Bearer $REDACTED")
         if (scrubbed.length <= MAX_ERROR_LEN) return scrubbed
         // Don't truncate mid surrogate pair — that would leave a lone surrogate.
         val end = if (Character.isHighSurrogate(scrubbed[MAX_ERROR_LEN - 1])) MAX_ERROR_LEN - 1 else MAX_ERROR_LEN
