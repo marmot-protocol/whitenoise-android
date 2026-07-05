@@ -3108,13 +3108,15 @@ class ConversationController(
             var connected = false
 
             coroutineScope {
-                snapshotStreamIds.forEach { streamId ->
-                    if (activeStreamIds.add(streamId)) {
-                        launch { watchAgentTextStream(account, streamId) }
-                    }
-                }
-                connected = true
-                runUntilFirstLiveSubscriptionEnds(
+                runUntilFirstLiveSubscriptionEndsWithAttemptJobs(
+                    startAttemptJobs = {
+                        snapshotStreamIds.forEach { streamId ->
+                            if (activeStreamIds.add(streamId)) {
+                                launch { watchAgentTextStream(account, streamId) }
+                            }
+                        }
+                        connected = true
+                    },
                     first = {
                         runTimelineSubscriptionPipeline(account, timelineStream)
                     },
