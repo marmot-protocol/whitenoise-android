@@ -48,11 +48,13 @@ object EmojiData {
         cache?.let { return it }
         return synchronized(this) {
             cache?.let { return it }
-            val parsed = runCatching { parseEmojiJson(readEmojiJson()) }.getOrDefault(emptyList())
-            if (parsed.isNotEmpty()) {
+            val parsed = runCatching { parseEmojiJson(readEmojiJson()) }.getOrNull()
+            if (parsed != null) {
                 cache = parsed
+                parsed
+            } else {
+                emptyList()
             }
-            parsed
         }
     }
 

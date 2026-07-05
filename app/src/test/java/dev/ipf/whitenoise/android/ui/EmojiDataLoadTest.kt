@@ -60,11 +60,30 @@ class EmojiDataLoadTest {
         assertEquals(1, reads)
     }
 
+    @Test
+    fun loadCachesSuccessfulEmptyParse() {
+        var reads = 0
+
+        val first =
+            EmojiData.load {
+                reads += 1
+                "[]"
+            }
+        val second =
+            EmojiData.load {
+                reads += 1
+                error("successful empty emoji parse should be served from cache")
+            }
+
+        assertTrue(first.isEmpty())
+        assertEquals(first, second)
+        assertEquals(1, reads)
+    }
+
     private fun resetEmojiCache() {
         val cacheField = EmojiData::class.java.getDeclaredField("cache")
         cacheField.isAccessible = true
-        runCatching { cacheField.set(null, null) }
-            .getOrElse { cacheField.set(EmojiData, null) }
+        cacheField.set(EmojiData, null)
     }
 
     private companion object {
