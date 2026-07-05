@@ -142,7 +142,7 @@ object GroupProjector {
      * from the rendered title. A raw `name.isBlank()` would miss those
      * non-whitespace-but-invisible names.
      */
-    private fun isUnnamed(name: String): Boolean = ProfileSanitizer.displayName(name) == null
+    internal fun isUnnamed(name: String): Boolean = ProfileSanitizer.displayName(name) == null
 
     /**
      * True when [members] is an implicit DM between the active account and
