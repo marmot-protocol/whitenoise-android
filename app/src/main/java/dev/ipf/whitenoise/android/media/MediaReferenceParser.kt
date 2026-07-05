@@ -98,7 +98,12 @@ object MediaReferenceParser {
                 if (split <= 0 || split == rest.lastIndex) return null
                 val kind = rest.substring(0, split)
                 val value = rest.substring(split + 1)
-                if (kind.isBlank() || !isDownloadableLocator(kind, value)) return null
+                if (kind.isBlank()) return null
+                // The native fetch path only supports blossom-v1 locators. Keep
+                // strict validation for fetchable locators, but ignore future or
+                // interoperating locator kinds instead of dropping the whole tag.
+                if (kind != BLOSSOM_LOCATOR_KIND) continue
+                if (!isDownloadableBlossomLocator(value)) return null
                 locators += MediaLocatorFfi(kind = kind, value = value)
                 continue
             }
@@ -142,11 +147,7 @@ object MediaReferenceParser {
      * cleartext fetch would leak the attachment URL and the downloader's IP to
      * any on-path observer, defeating the point of the encrypted transport.
      */
-    private fun isDownloadableLocator(
-        kind: String,
-        raw: String,
-    ): Boolean {
-        if (kind != BLOSSOM_LOCATOR_KIND) return false
+    private fun isDownloadableBlossomLocator(raw: String): Boolean {
         if (raw.isBlank()) return false
         val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return false
         if (uri.scheme?.lowercase() != "https") return false
