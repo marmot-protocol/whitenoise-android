@@ -681,7 +681,7 @@
     <string name="data_and_storage_settings_subtitle">Media auto-download</string>
     <string name="app_preferences">App</string>
     <string name="settings_version_label">Version %1$s</string>
-    <string name="settings_marmotkit_version_label" translatable="false">MarmotKit %1$s</string>
+    <string name="settings_mdk_version_label" translatable="false">MDK %1$s</string>
     <!-- Release-channel name shown on staging builds only; not a translatable word. -->
     <string name="settings_staging_badge" translatable="false">STAGING</string>
     <string name="support_the_project">Support the project</string>

@@ -17716,8 +17716,8 @@ private fun SettingsHomeScreen(
                     Text(
                         text =
                             stringResource(
-                                R.string.settings_marmotkit_version_label,
-                                BuildConfig.MARMOTKIT_SHORT_SHA,
+                                R.string.settings_mdk_version_label,
+                                BuildConfig.MDK_SHORT_SHA,
                             ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
