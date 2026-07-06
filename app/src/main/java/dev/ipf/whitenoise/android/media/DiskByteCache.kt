@@ -221,7 +221,13 @@ class DiskByteCache(
             } else {
                 null
             }
-        val filesToDelete = mutableListOf<File>()
+        // Stale `.tag` for THIS key: deleted unguarded because the key is live
+        // again (this put re-added it), so the liveness guard would wrongly skip
+        // it — but the new entry has no tag at that path, so it must go.
+        val staleTagFiles = mutableListOf<File>()
+        // Evicted OTHER keys: routed through the liveness guard so a concurrent
+        // same-key re-put's fresh file isn't unlinked by this deferred delete.
+        val evicted = mutableListOf<Pair<String, List<File>>>()
         synchronized(this) {
             // A concurrent clear() (sign-out / account switch) may have run while
             // we were writing — abort and drop temp artifacts rather than
@@ -240,7 +246,7 @@ class DiskByteCache(
                 // (regression from moving deletes off the monitor). Clean up
                 // only a STALE tag, and only when this put writes no new tag to
                 // that same path — a new tag would have overwritten it above.
-                if (ciphertextTag == null) filesToDelete += tagFileFor(file)
+                if (ciphertextTag == null) staleTagFiles += tagFileFor(file)
             }
             if (tagTmp != null && tagFile != null && !tagTmp.renameTo(tagFile)) {
                 abortPut(tmp, tagTmp)
@@ -256,9 +262,10 @@ class DiskByteCache(
             val size = bytes.size
             index[hashed] = Entry(file, size, ciphertextTag)
             residentBytes += size
-            filesToDelete += evictedEntryFiles()
+            evicted += evictedEntryFiles()
         }
-        deleteFiles(filesToDelete)
+        deleteFiles(staleTagFiles)
+        deleteStaleEntries(evicted)
     }
 
     /** Immediate write at the current generation. Deferred/background writes
@@ -345,25 +352,20 @@ class DiskByteCache(
 
     private fun filesFor(entry: Entry): List<File> = listOf(entry.file, tagFileFor(entry.file))
 
-    private fun addEntryFiles(
-        target: MutableList<File>,
-        entry: Entry,
-    ) {
-        target += entry.file
-        target += tagFileFor(entry.file)
-    }
-
-    private fun evictedEntryFiles(): List<File> {
+    /** LRU-evict down to [maxBytes], returning each evicted entry keyed by its
+     *  hashed name so the caller's deferred delete can skip a concurrent re-put
+     *  (see [deleteStaleEntries]). */
+    private fun evictedEntryFiles(): List<Pair<String, List<File>>> {
         if (residentBytes <= maxBytes) return emptyList()
-        val filesToDelete = mutableListOf<File>()
+        val evicted = mutableListOf<Pair<String, List<File>>>()
         val it = index.entries.iterator()
         while (it.hasNext() && residentBytes > maxBytes) {
-            val (_, entry) = it.next()
+            val (hashed, entry) = it.next()
             residentBytes -= entry.size
             it.remove()
-            addEntryFiles(filesToDelete, entry)
+            evicted += hashed to filesFor(entry)
         }
-        return filesToDelete
+        return evicted
     }
 
     @Synchronized
