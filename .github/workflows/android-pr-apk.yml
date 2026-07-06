@@ -1,0 +1,168 @@
+name: Android PR APK
+
+# Builds an unsigned dev-debug APK for every pull request and, for PRs raised
+# from the base repository, uploads it as a workflow artifact and posts a sticky
+# comment on the PR with a download link. Fork PRs still get the build (so CI
+# validates the change), but the artifact upload and comment are gated so they
+# only run for internal-branch PRs — this keeps secrets, tokens, and any
+# artifact-URL trust surface out of fork context. See android-ci.yml for the
+# credential-free validation matrix; this workflow is purely an installable
+# preview build on top of that.
+#
+# PR-specific behavior (see app/build.gradle.kts):
+#   - applicationId gets ".dev.pr<N>" appended so the APK installs side-by-side
+#     with the production and staging apps (and other PR previews).
+#   - versionCode = 100000 + GITHUB_RUN_NUMBER (monotonic across all PR builds).
+#   - Launcher label becomes "<N> White Noise" so testers can tell which PR is
+#     which on the home screen.
+#   - arm64-v8a only, to keep build time short. Testers on 32-bit devices are
+#     out of scope for preview builds.
+
+on:
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+
+# Superseded pushes to the same PR cancel the prior build so a long incremental
+# push chain does not queue redundant work.
+concurrency:
+  group: android-pr-apk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Default token permissions are read-only; the comment job below opts in to
+# pull-requests: write locally so nothing else can accidentally mutate PR state.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build unsigned PR APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      # AGP 9.x / Gradle 9.4.1 require JDK 17 (matches the other workflows).
+      - name: Set up JDK 17
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+        with:
+          # PR builds share the cache read-only so a compromised PR cannot
+          # poison the cache for downstream master builds.
+          cache-read-only: true
+
+      # The dev flavor already declares `splits.abi { include("arm64-v8a", ...) }`
+      # so `assembleDevDebug` produces one APK per ABI plus a universal APK; no
+      # `-Pandroid.injected.build.abi` flag is needed. Selecting the arm64-v8a
+      # split happens in the locate step below.
+      - name: Assemble dev debug APK
+        run: ./gradlew :app:assembleDevDebug --no-daemon --stacktrace
+
+      - name: Locate built APK
+        id: locate
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Search recursively — AGP output path conventions can shift between
+          # major versions, and this workflow needs to survive that.
+          apk_path=$(find app/build/outputs/apk -type f -name '*arm64-v8a*.apk' -print -quit)
+          if [[ -z "$apk_path" ]]; then
+            # Fallback: universal APK if the ABI split was not produced.
+            apk_path=$(find app/build/outputs/apk -type f -name '*universal*.apk' -print -quit)
+          fi
+          if [[ -z "$apk_path" ]]; then
+            printf 'No APK produced under app/build/outputs/apk. Tree:\n' >&2
+            find app/build/outputs -type f -name '*.apk' >&2 || true
+            exit 1
+          fi
+          apk_name=$(basename "$apk_path")
+          # Strip the .apk suffix so actions/upload-artifact appends its own
+          # .zip. The stem already carries pr<N>, flavor, ABI, date, and short
+          # SHA (see app/build.gradle.kts) so the downloaded artifact is
+          # `<same-stem>.zip` with the APK inside.
+          artifact_name=${apk_name%.apk}
+          printf 'apk_path=%s\n' "$apk_path" >> "$GITHUB_OUTPUT"
+          printf 'artifact_name=%s\n' "$artifact_name" >> "$GITHUB_OUTPUT"
+          printf 'Selected APK: %s\n' "$apk_path"
+          printf 'Artifact name: %s\n' "$artifact_name"
+
+      # Upload only for PRs raised from the base repository. Fork PRs still ran
+      # the build above (so CI validates the change), but the artifact link is
+      # only surfaced for internal PRs to keep the download-URL trust surface
+      # aligned with existing contributor trust.
+      - name: Upload PR APK artifact
+        id: upload
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.locate.outputs.artifact_name }}
+          path: ${{ steps.locate.outputs.apk_path }}
+          if-no-files-found: error
+          retention-days: 14
+
+  comment:
+    name: Post PR comment with download link
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Upsert sticky comment
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v8
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const runId = context.runId;
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+            const marker = '<!-- pr-apk-preview -->';
+            const body = [
+              marker,
+              `### Preview APK for PR #${prNumber}`,
+              '',
+              `Home-screen label: **${prNumber} White Noise** with the blueprint launcher icon — installs side-by-side with the production and staging apps.`,
+              '',
+              `Download the APK zip from the [workflow run](${runUrl}) (GitHub sign-in required). ARM64 only; retention 14 days.`,
+              '',
+              'Every push to this PR rebuilds and updates this comment.',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            }
