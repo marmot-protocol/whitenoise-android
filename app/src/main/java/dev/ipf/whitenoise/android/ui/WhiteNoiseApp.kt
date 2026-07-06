@@ -375,6 +375,7 @@ import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
@@ -5834,17 +5835,41 @@ private fun MediaVoiceBubble(
     val scope = rememberCoroutineScope()
     val pillKey = "$messageIdHex#$attachmentIndex"
 
-    var localFile by remember(pillKey) { mutableStateOf<java.io.File?>(null) }
+    val cachedFileOnEntry =
+        remember(pillKey, reference.mediaType) {
+            cachedVoiceAttachmentFile(
+                context = context,
+                messageIdHex = messageIdHex,
+                attachmentIndex = attachmentIndex,
+                reference = reference,
+            )
+        }
+    val cachedPlaintextOnEntry =
+        remember(pillKey, reference.mediaType) {
+            controller.hasCachedAttachment(messageIdHex, attachmentIndex)
+        }
+    var localFile by remember(pillKey, reference.mediaType) {
+        mutableStateOf(cachedFileOnEntry)
+    }
     var totalDurationMs by remember(pillKey) { mutableStateOf(0) }
     var loading by remember(pillKey) { mutableStateOf(false) }
     var failed by remember(pillKey) { mutableStateOf(false) }
     // Auto-download gate (#407): own clips always materialize (bytes are
-    // cached from the send), incoming honor the Audio matrix row. Re-keyed on
-    // the matrix so flipping a toggle re-gates an un-fetched clip. A tap on
-    // the bubble flips this to true so manual fetch/playback is always
-    // available even when auto-download is off.
+    // cached from the send), incoming honor the Audio matrix row unless the
+    // attachment is already local. A cached voice file or controller plaintext
+    // cache means re-entering the chat should start at Play instead of showing
+    // a fake Download affordance. Re-keyed on the matrix so flipping a toggle
+    // re-gates an un-fetched clip. A tap on the bubble flips this to true so
+    // manual fetch/playback is always available even when auto-download is off.
     var startDownload by remember(pillKey, appState.mediaAutoDownloadMatrix) {
-        mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio))
+        mutableStateOf(
+            shouldStartVoiceAttachmentDownload(
+                mine = mine,
+                audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio),
+                hasCachedAttachment = cachedPlaintextOnEntry,
+                hasCachedFile = cachedFileOnEntry != null,
+            ),
+        )
     }
 
     val playback by remember(pillKey) {
@@ -5885,6 +5910,33 @@ private fun MediaVoiceBubble(
                 .decode(file)
     }
     val waveform: FloatArray = realWaveform ?: pseudoWaveform
+
+    suspend fun clearBadVoiceCache(reason: String) {
+        Log.w(
+            "MediaVoiceBubble",
+            "$reason for cached voice msg=${messageIdHex.take(8)}#$attachmentIndex; clearing cache",
+        )
+        clearVoiceAttachmentCacheAfterPlaybackFailure(
+            context = context,
+            controller = controller,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        )
+        localFile = null
+        realWaveform = null
+        totalDurationMs = 0
+        failed = true
+        startDownload = mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio)
+    }
+
+    LaunchedEffect(pillKey, reference.mediaType) {
+        VoicePlaybackController.failures.collect { failure ->
+            if (failure.key == pillKey && failure.invalidatesCache) {
+                clearBadVoiceCache("playback error")
+            }
+        }
+    }
 
     LaunchedEffect(pillKey, reference.sourceEpoch, startDownload) {
         if (localFile != null) return@LaunchedEffect
@@ -5996,8 +6048,12 @@ private fun MediaVoiceBubble(
 
                                     if (file == null) return@launch
                                     localFile = file
-                                    dev.ipf.whitenoise.android.audio.VoicePlaybackController
-                                        .play(pillKey, file, ownerKey = controller.group.groupIdHex)
+                                    val playbackResult =
+                                        dev.ipf.whitenoise.android.audio.VoicePlaybackController
+                                            .play(pillKey, file, ownerKey = controller.group.groupIdHex)
+                                    if (shouldInvalidateVoiceAttachmentCache(playbackResult)) {
+                                        clearBadVoiceCache("playback start failed")
+                                    }
                                 }
                             },
                         ),
@@ -6134,18 +6190,20 @@ internal suspend fun materializeVoiceAttachment(
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
 ): java.io.File {
-    val cacheDir = java.io.File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }
-    val extension =
-        when {
-            reference.mediaType.contains("mp4", ignoreCase = true) -> "m4a"
-            reference.mediaType.contains("aac", ignoreCase = true) -> "aac"
-            reference.mediaType.contains("ogg", ignoreCase = true) -> "ogg"
-            reference.mediaType.contains("wav", ignoreCase = true) -> "wav"
-            else -> "bin"
-        }
-    val cacheFile = java.io.File(cacheDir, "$messageIdHex-$attachmentIndex.$extension")
-    if (cacheFile.exists() && cacheFile.length() > 0) return cacheFile
+    cachedVoiceAttachmentFile(
+        context = context,
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+    )?.let { return it }
 
+    val cacheFile =
+        voiceAttachmentCacheFile(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        )
     val retained =
         if (mine) {
             controller
@@ -6161,6 +6219,67 @@ internal suspend fun materializeVoiceAttachment(
     withContext(Dispatchers.IO) { cacheFile.writeBytes(bytes) }
     return cacheFile
 }
+
+internal fun cachedVoiceAttachmentFile(
+    context: android.content.Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): java.io.File? =
+    voiceAttachmentCacheFile(
+        context = context,
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+    ).takeIf { it.isFile && it.length() > 0L }
+
+internal fun shouldStartVoiceAttachmentDownload(
+    mine: Boolean,
+    audioAutoDownload: Boolean,
+    hasCachedAttachment: Boolean,
+    hasCachedFile: Boolean,
+): Boolean = mine || audioAutoDownload || hasCachedAttachment || hasCachedFile
+
+internal fun shouldInvalidateVoiceAttachmentCache(playbackResult: VoicePlaybackController.PlaybackStartResult): Boolean =
+    playbackResult == VoicePlaybackController.PlaybackStartResult.PrepareFailed ||
+        playbackResult == VoicePlaybackController.PlaybackStartResult.StartFailed
+
+internal suspend fun clearVoiceAttachmentCacheAfterPlaybackFailure(
+    context: android.content.Context,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+) {
+    withContext(Dispatchers.IO) {
+        voiceAttachmentCacheFile(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        ).delete()
+    }
+    controller.evictCachedAttachment(messageIdHex, attachmentIndex)
+}
+
+private fun voiceAttachmentCacheFile(
+    context: android.content.Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): java.io.File {
+    val cacheDir = java.io.File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }
+    return java.io.File(cacheDir, "$messageIdHex-$attachmentIndex.${voiceAttachmentExtension(reference)}")
+}
+
+private fun voiceAttachmentExtension(reference: MediaAttachmentReferenceFfi): String =
+    when {
+        reference.mediaType.contains("mp4", ignoreCase = true) -> "m4a"
+        reference.mediaType.contains("aac", ignoreCase = true) -> "aac"
+        reference.mediaType.contains("ogg", ignoreCase = true) -> "ogg"
+        reference.mediaType.contains("wav", ignoreCase = true) -> "wav"
+        else -> "bin"
+    }
 
 /** mm:ss formatter; durations cap below an hour for voice notes. */
 private fun formatVoiceTime(ms: Int): String {

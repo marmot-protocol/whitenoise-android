@@ -4436,6 +4436,22 @@ class ConversationController(
         return appState.diskMediaCache.contains(cacheKey)
     }
 
+    /**
+     * Drop decrypted bytes for one attachment after a decoder/playback failure.
+     * A corrupt cached plaintext hit must fall back to the normal Download/Retry
+     * path rather than recreating the same bad local media file forever.
+     */
+    suspend fun evictCachedAttachment(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ) {
+        val account = conversationAccountRef ?: return
+        val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
+        appState.mediaPlaintextCache.remove(cacheKey)
+        appState.mediaThumbnailCache.remove(cacheKey)
+        withContext(Dispatchers.IO) { appState.diskMediaCache.remove(cacheKey) }
+    }
+
     // Resolve-time SSRF guard before the native Blossom fetch. The imeta gate
     // only validates the literal host, so an attacker's public-looking locator
     // name can still resolve to loopback / RFC-1918. The native fetch re-resolves,

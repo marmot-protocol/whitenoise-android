@@ -116,10 +116,12 @@ class VoicePlaybackControllerFocusTest {
             ),
         )
 
-        runBlocking {
-            VoicePlaybackController.play("voice-key", File("unused.amr"), ownerKey = "new-owner")
-        }
+        val result =
+            runBlocking {
+                VoicePlaybackController.play("voice-key", File("unused.amr"), ownerKey = "new-owner")
+            }
 
+        assertEquals(VoicePlaybackController.PlaybackStartResult.StartFailed, result)
         assertTrue(mediaPlayer.released)
         assertNull(controllerField("player"))
         assertNull(controllerField("currentKey"))
