@@ -25,6 +25,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,6 +65,9 @@ internal fun ContactPickerScreen(
     // (members added later). Add-members and other pickers keep requiring a
     // selection (default false).
     allowEmptyConfirm: Boolean = false,
+    // Add-member paste/scan is an unambiguous target selection; group creation
+    // keeps the old manual selection behavior for identifier queries.
+    autoSelectResolvedIdentifier: Boolean = false,
     excludeAccountIdHexes: Set<String> = emptySet(),
     footer: (@Composable () -> Unit)? = null,
 ) {
@@ -183,28 +187,39 @@ internal fun ContactPickerScreen(
                                 memberHexes = excludeAccountIdHexes.toList(),
                                 resolvedHex = resolvedHex,
                             )
-                        val isSelected = resolvedHex.lowercase(Locale.ROOT) in selectedHexes
+                        val resolvedAccountIdHex = resolvedHex.lowercase(Locale.ROOT)
+                        val isSelected = resolvedAccountIdHex in selectedHexes
+                        val candidate =
+                            RecipientSearch.Candidate(
+                                accountIdHex = resolvedAccountIdHex,
+                                displayName = appState.displayName(resolvedAccountIdHex),
+                                npub = appState.npub(resolvedAccountIdHex),
+                            )
+                        if (
+                            shouldAutoSelectResolvedIdentifier(
+                                autoSelectResolvedIdentifier = autoSelectResolvedIdentifier,
+                                busy = busy,
+                                alreadyMember = alreadyMember,
+                                isSelected = isSelected,
+                            )
+                        ) {
+                            LaunchedEffect(resolvedAccountIdHex) {
+                                toggle(candidate)
+                            }
+                        }
                         ContactRow(
-                            title = appState.displayName(resolvedHex),
+                            title = candidate.displayName,
                             subtitle =
                                 if (alreadyMember) {
-                                    stringResource(R.string.add_member_already_in_group, appState.displayName(resolvedHex))
+                                    stringResource(R.string.add_member_already_in_group, candidate.displayName)
                                 } else {
-                                    IdentityFormatter.short(appState.npub(resolvedHex))
+                                    IdentityFormatter.short(candidate.npub)
                                 },
-                            avatarSeed = resolvedHex,
-                            avatarUrl = appState.avatarUrl(resolvedHex),
+                            avatarSeed = resolvedAccountIdHex,
+                            avatarUrl = appState.avatarUrl(resolvedAccountIdHex),
                             enabled = !busy && !alreadyMember,
-                            onClick = {
-                                toggle(
-                                    RecipientSearch.Candidate(
-                                        accountIdHex = resolvedHex,
-                                        displayName = appState.displayName(resolvedHex),
-                                        npub = appState.npub(resolvedHex),
-                                    ),
-                                )
-                            },
-                            onLongClick = { appState.presentProfile(appState.npub(resolvedHex)) },
+                            onClick = { toggle(candidate) },
+                            onLongClick = { appState.presentProfile(candidate.npub) },
                             trailing = {
                                 SelectionIndicator(selected = isSelected, dimmed = alreadyMember)
                             },
@@ -257,3 +272,10 @@ internal fun ContactPickerScreen(
         )
     }
 }
+
+internal fun shouldAutoSelectResolvedIdentifier(
+    autoSelectResolvedIdentifier: Boolean,
+    busy: Boolean,
+    alreadyMember: Boolean,
+    isSelected: Boolean,
+): Boolean = autoSelectResolvedIdentifier && !busy && !alreadyMember && !isSelected
