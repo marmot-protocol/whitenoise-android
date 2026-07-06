@@ -150,6 +150,61 @@ class MessageProjectorTest {
     }
 
     @Test
+    fun displayBodyUsesTypedMediaFallbackWhenCaptionAndFilenameMissing() {
+        val copy = MessageTextCopy.Default
+
+        fun media(mime: String) =
+            message(
+                id = "media-$mime",
+                plaintext = "",
+                tags = listOf(MessageTagFfi(listOf("imeta", "m $mime"))),
+            )
+
+        assertEquals("Photo", MessageProjector.displayBody(media("image/png"), copy))
+        assertEquals("Video", MessageProjector.displayBody(media("video/mp4"), copy))
+        assertEquals("Voice message", MessageProjector.displayBody(media("audio/mp4"), copy))
+        assertEquals("File", MessageProjector.displayBody(media("application/pdf"), copy))
+        assertEquals(
+            copy.mediaAttachment,
+            MessageProjector.displayBody(
+                message(
+                    id = "media-unknown",
+                    plaintext = "",
+                    tags = listOf(MessageTagFfi(listOf("imeta", "url https://example.invalid/x.bin"))),
+                ),
+                copy,
+            ),
+        )
+    }
+
+    @Test
+    fun previewTextUsesTypedMediaFallbackAndKeepsCaptionAndFilenamePrecedence() {
+        val copy = MessageTextCopy.Default
+        val captioned =
+            message(
+                id = "captioned",
+                plaintext = "sunset",
+                tags = listOf(MessageTagFfi(listOf("imeta", "m image/jpeg", "filename ignored.jpg"))),
+            )
+        val filenameOnly =
+            message(
+                id = "filename",
+                plaintext = "",
+                tags = listOf(MessageTagFfi(listOf("imeta", "m image/png", "filename scan.png"))),
+            )
+        val typedFallback =
+            message(
+                id = "typed",
+                plaintext = "",
+                tags = listOf(MessageTagFfi(listOf("imeta", "m video/mp4"))),
+            )
+
+        assertEquals("sunset", MessageProjector.previewText(captioned, copy))
+        assertEquals("scan.png", MessageProjector.previewText(filenameOnly, copy))
+        assertEquals("Video", MessageProjector.previewText(typedFallback, copy))
+    }
+
+    @Test
     fun previewTextRecognizesStreamStartAndFinalMessages() {
         val start =
             message(

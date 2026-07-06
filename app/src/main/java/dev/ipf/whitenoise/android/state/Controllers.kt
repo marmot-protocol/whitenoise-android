@@ -46,6 +46,7 @@ import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.LeaveAction
+import dev.ipf.whitenoise.android.core.MediaPreviewFallback
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
@@ -99,6 +100,15 @@ data class ChatListItem(
      * (non-deleted, non-blank), so fallback copy is never styled.
      */
     val previewTokens: MarkdownDocumentFfi? = null,
+    /**
+     * When the chat-list projection's last message has a blank body, the
+     * engine row carries no `imeta` tags. [ChatsController] resolves the kind
+     * and filename fallback off-main from the local timeline (same source of
+     * truth as the row) and attaches it here so [projectedPreviewText] can
+     * preserve the same caption -> filename -> media label precedence as
+     * [MessageProjector.previewText].
+     */
+    val resolvedMediaPreviewFallback: MediaPreviewFallback? = null,
     /**
      * Known removal evidence that the [memberSnapshot] roster alone can't
      * carry: a successful self-leave (including leaving as the sole member,
@@ -228,7 +238,8 @@ data class ChatListItem(
             MessageProjector.isGroupSystemKind(preview.kind) ->
                 GroupSystemEvents.previewText(preview.plaintext, copy.groupSystem)
             preview.plaintext.isNotBlank() -> preview.plaintext
-            else -> copy.message
+            resolvedMediaPreviewFallback != null -> resolvedMediaPreviewFallback.text(copy)
+            else -> MessageProjector.previewText(latest, copy, copy.message)
         }
     }
 }
@@ -275,6 +286,7 @@ internal fun chatListItemFromProjection(
     activeAccountIdHex: String? = null,
     members: List<AppGroupMemberRecordFfi>? = null,
     previewTokens: MarkdownDocumentFfi? = null,
+    resolvedMediaPreviewFallback: MediaPreviewFallback? = null,
     removed: Boolean = false,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
@@ -314,6 +326,7 @@ internal fun chatListItemFromProjection(
         memberSnapshot = members?.let(::GroupMemberSnapshot),
         projection = row,
         previewTokens = previewTokens,
+        resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
         removed = removed,
     )
 }
@@ -350,6 +363,18 @@ internal fun chatRowPreviewMarkdownSource(row: ChatListRowFfi): String? {
     if (preview.deleted) return null
     if (!MessageProjector.rendersRawBodyPreview(preview.kind)) return null
     return preview.plaintext.takeIf { it.isNotBlank() }
+}
+
+/**
+ * Message id of a row whose chat-list preview body is blank and must be
+ * resolved from the local timeline before a typed media label can render.
+ */
+internal fun chatRowNeedsMediaKindResolve(row: ChatListRowFfi): String? {
+    val preview = row.lastMessage ?: return null
+    if (preview.deleted) return null
+    if (preview.kind != 9uL) return null
+    if (preview.plaintext.isNotBlank()) return null
+    return preview.messageIdHex.takeIf { it.isNotBlank() }
 }
 
 /**
@@ -1362,9 +1387,15 @@ class ChatsController(
     // row from re-parsing on every recompute.
     private var previewTokensByText = mapOf<String, MarkdownDocumentFfi>()
 
+    // Resolved media fallbacks for blank chat-list preview rows, keyed by the
+    // last message id. Derived UI state over the live rows (pruned to ids still
+    // on screen), not a protocol cache — same lifecycle as [previewTokensByText].
+    private var mediaPreviewFallbackByMessageId = mapOf<String, MediaPreviewFallback>()
+
     // Same single-state invariant as [inFlightMemberFetches], keyed by
     // preview plaintext: pending → in flight (here) → cached.
     private val inFlightPreviewParses = mutableSetOf<String>()
+    private val inFlightMediaKindResolves = mutableSetOf<String>()
 
     // Monotonically increments on every `bind()`. Captured by each
     // [schedulePendingMemberFetches] job; once a later bind has happened
@@ -1704,6 +1735,7 @@ class ChatsController(
                 activeAccountIdHex = activeAccountIdHex,
                 members = memberCacheByGroup[row.groupIdHex],
                 previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
+                resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
                 removed = row.groupIdHex in removedGroupIds,
             )
         }
@@ -1723,6 +1755,7 @@ class ChatsController(
             activeAccountIdHex = activeAccountIdHex,
             members = memberCacheByGroup[row.groupIdHex],
             previewTokens = chatRowPreviewMarkdownSource(row)?.let { previewTokensByText[it] },
+            resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
             removed = row.groupIdHex in removedGroupIds,
         )
 
@@ -2279,6 +2312,8 @@ class ChatsController(
         inFlightMemberFetches.clear()
         previewTokensByText = emptyMap()
         inFlightPreviewParses.clear()
+        mediaPreviewFallbackByMessageId = emptyMap()
+        inFlightMediaKindResolves.clear()
     }
 
     private fun isActiveBindEpoch(epoch: Long): Boolean = !isCleared && bindEpoch == epoch && accountRef != null
@@ -2320,6 +2355,7 @@ class ChatsController(
         // haven't tokenized yet; each completion folds back via
         // scheduleRecompute() so a burst coalesces into one rebuild.
         schedulePendingPreviewParses()
+        schedulePendingMediaKindResolves()
     }
 
     /**
@@ -2433,6 +2469,73 @@ class ChatsController(
                     // bind() already cleared the set, so only the owning
                     // epoch may mutate it.
                     if (isActiveBindEpoch(epoch)) inFlightPreviewParses.remove(text)
+                }
+            }
+        }
+    }
+
+    /**
+     * Walk the current chat rows and, for any blank kind-9 preview without a
+     * cached media fallback or an in-flight resolve, read the latest local
+     * timeline record off-main so [projectedPreviewText] can preserve media
+     * filename and typed/generic label fallbacks. The chat-list projection
+     * stores plaintext only, so imeta tags must be read from the message store
+     * (source of truth) on demand.
+     */
+    private fun schedulePendingMediaKindResolves() {
+        if (accountRef == null) return
+        val epoch = bindEpoch
+        val account = accountRef!!
+        val liveMessageIds = chatRows.mapNotNull(::chatRowNeedsMediaKindResolve).toSet()
+        if (mediaPreviewFallbackByMessageId.keys.any { it !in liveMessageIds }) {
+            mediaPreviewFallbackByMessageId = mediaPreviewFallbackByMessageId.filterKeys { it in liveMessageIds }
+        }
+        val pendingRows =
+            chatRows.filter { row ->
+                val messageId = chatRowNeedsMediaKindResolve(row) ?: return@filter false
+                messageId !in mediaPreviewFallbackByMessageId && messageId !in inFlightMediaKindResolves
+            }
+        if (pendingRows.isEmpty()) return
+        pendingRows.forEach { row ->
+            val messageId = chatRowNeedsMediaKindResolve(row) ?: return@forEach
+            inFlightMediaKindResolves.add(messageId)
+            val groupIdHex = row.groupIdHex
+            recomputeScope.launch {
+                try {
+                    if (!isActiveBindEpoch(epoch)) return@launch
+                    val page =
+                        try {
+                            appState.marmotIo {
+                                timelineMessages(
+                                    account,
+                                    TimelineMessageQueryFfi(
+                                        groupIdHex = groupIdHex,
+                                        search = null,
+                                        before = null,
+                                        beforeMessageId = null,
+                                        after = null,
+                                        afterMessageId = null,
+                                        limit = 1u,
+                                    ),
+                                )
+                            }
+                        } catch (throwable: Throwable) {
+                            rethrowIfCancellation(throwable)
+                            null
+                        }
+                    if (!isActiveBindEpoch(epoch)) return@launch
+                    val fallback =
+                        page
+                            ?.messages
+                            ?.firstOrNull()
+                            ?.takeIf { it.messageIdHex == messageId }
+                            ?.let { MessageProjector.mediaPreviewFallback(TimelineProjector.toAppMessageRecord(it)) }
+                            ?: return@launch
+                    if (!isActiveBindEpoch(epoch)) return@launch
+                    mediaPreviewFallbackByMessageId = mediaPreviewFallbackByMessageId + (messageId to fallback)
+                    scheduleRecompute()
+                } finally {
+                    if (isActiveBindEpoch(epoch)) inFlightMediaKindResolves.remove(messageId)
                 }
             }
         }

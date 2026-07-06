@@ -129,7 +129,7 @@ object TimelineProjector {
         val body = fallback()
         if (body.isNotBlank()) return body
         return when {
-            mediaJson != null -> copy.mediaAttachment
+            mediaJson != null -> copy.mediaLabel(replyMediaKindFromJson(mediaJson))
             agentTextStreamJson != null -> copy.streamFinished
             kind == 1200uL -> copy.agentStreamStarted
             else -> copy.message
