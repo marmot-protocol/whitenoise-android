@@ -437,4 +437,61 @@ class MediaPipelineTest {
 
     private fun ByteArray.endsWithSubsequence(needle: ByteArray): Boolean =
         needle.isNotEmpty() && needle.size <= size && needle.indices.all { this[size - needle.size + it] == needle[it] }
+
+    // ---- animated image attachment detection --------------------------------
+
+    @Test
+    fun isAnimatedImageAttachment_gifMime_returnsTrue() {
+        assertTrue(MediaPipeline.isAnimatedImageAttachment("image/gif", ByteArray(0)))
+    }
+
+    @Test
+    fun isAnimatedImageAttachment_staticWebp_returnsFalse() {
+        val staticWebp =
+            "RIFF".encodeToByteArray() +
+                u32le(24) +
+                "WEBP".encodeToByteArray() +
+                webpChunk("VP8 ", byteArrayOf(0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+        assertFalse(MediaPipeline.isAnimatedImageAttachment("image/webp", staticWebp))
+    }
+
+    @Test
+    fun isAnimatedImageAttachment_animatedWebp_returnsTrue() {
+        val animatedWebp =
+            "RIFF".encodeToByteArray() +
+                u32le(20) +
+                "WEBP".encodeToByteArray() +
+                webpChunk("ANIM", byteArrayOf(0, 0, 0, 0))
+        assertTrue(MediaPipeline.isAnimatedImageAttachment("image/webp", animatedWebp))
+    }
+
+    @Test
+    fun canSeedStaticThumbnailFromMediaType_skipsByteDependentAnimatedFormats() {
+        assertFalse(MediaPipeline.canSeedStaticThumbnailFromMediaType("image/gif"))
+        assertFalse(MediaPipeline.canSeedStaticThumbnailFromMediaType("image/webp"))
+        assertFalse(MediaPipeline.canSeedStaticThumbnailFromMediaType("application/octet-stream"))
+        assertFalse(MediaPipeline.canSeedStaticThumbnailFromMediaType("   "))
+    }
+
+    @Test
+    fun canSeedStaticThumbnailFromMediaType_allowsKnownStaticImageFormats() {
+        assertTrue(MediaPipeline.canSeedStaticThumbnailFromMediaType("image/jpeg"))
+        assertTrue(MediaPipeline.canSeedStaticThumbnailFromMediaType("IMAGE/PNG"))
+    }
+
+    @Test
+    fun isGif_recognizesGif89aHeader() {
+        val header = "GIF89a".toByteArray(Charsets.US_ASCII)
+        assertTrue(MediaPipeline.isGif(header))
+    }
+
+    @Test
+    fun hasWebpAnimChunk_detectsAnimFourCc() {
+        val animatedWebp =
+            "RIFF".encodeToByteArray() +
+                u32le(20) +
+                "WEBP".encodeToByteArray() +
+                webpChunk("ANIM", byteArrayOf(0, 0, 0, 0))
+        assertTrue(MediaPipeline.hasWebpAnimChunk(animatedWebp))
+    }
 }
