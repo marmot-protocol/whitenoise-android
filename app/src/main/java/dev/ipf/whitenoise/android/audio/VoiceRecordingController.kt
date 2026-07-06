@@ -99,7 +99,20 @@ class VoiceRecordingController(
     private var focusRequest: AudioFocusRequest? = null
 
     init {
-        recorderScope.launch { sweepStaleVoiceTempFiles(outputDirectory) }
+        // Best-effort startup cleanup: a filesystem hiccup (e.g. a
+        // SecurityException from listFiles on a restricted directory) must not
+        // reach the scope's default handler and crash controller construction.
+        // Swallow non-cancellation failures; stale temp files get swept on a
+        // later init.
+        recorderScope.launch {
+            try {
+                sweepStaleVoiceTempFiles(outputDirectory)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                // ignore
+            }
+        }
     }
 
     // The in-flight stop() finalize (the post-release tail + encoder stop) and a
