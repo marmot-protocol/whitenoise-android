@@ -1716,6 +1716,10 @@ private fun MainShell(
     // before the live roster has necessarily settled. Suppresses the group-style
     // member-count subtitle during that transient 0/1-member window (#998).
     var selectedChatOpenedAsDmHint by remember { mutableStateOf(false) }
+    // Per-conversation scroll anchors for back-to-list re-entry (issue #1107).
+    // Keyed by account + group id; dropped when the reader leaves near-bottom so
+    // the normal unread/newest anchor still runs for chats left at the tail.
+    val conversationScrollSnapshots = remember { mutableStateMapOf<String, ConversationScrollSnapshot>() }
     // True while a tapped notification for a non-active account is mid-resolution
     // (switching account / awaiting its chat list). Holds a single stable loading
     // state over the multi-step route so the chat list never paints as an
@@ -1990,14 +1994,24 @@ private fun MainShell(
     }
 
     if (selectedChat != null) {
+        val openChat = selectedChat!!
+        val scrollKey = conversationScrollKey(appState.activeAccountRef, openChat.group.groupIdHex)
         ConversationScreen(
             appState = appState,
-            chat = selectedChat!!,
+            chat = openChat,
             focusMessageId = selectedChatFocusMessageId,
             highlightFocusMessage = selectedChatFocusHighlight,
             openedFromNotification = selectedChatOpenedFromNotification,
             justCreated = selectedChatJustCreated,
             openedAsDmHint = selectedChatOpenedAsDmHint,
+            restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
+            onSaveScrollSnapshot = { snapshot ->
+                if (snapshot == null) {
+                    conversationScrollSnapshots.remove(scrollKey)
+                } else {
+                    conversationScrollSnapshots[scrollKey] = snapshot
+                }
+            },
             onBack = {
                 selectedChat = null
                 selectedChatFocusMessageId = null
@@ -4085,6 +4099,63 @@ internal fun shouldClearFocusOnResume(
     restoringComposerFocus: Boolean,
     searchOpen: Boolean,
 ): Boolean = !restoringComposerFocus && !searchOpen
+
+/** UI-only scroll anchor for a conversation the user left while reading history. */
+internal data class ConversationScrollSnapshot(
+    val firstVisibleItemIndex: Int,
+    val firstVisibleItemScrollOffset: Int,
+    val anchorItemId: String? = null,
+    val anchorMessageIdHex: String? = null,
+)
+
+internal fun conversationScrollKey(
+    accountRef: String?,
+    groupIdHex: String,
+): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
+
+/**
+ * Snapshot to persist when leaving a conversation. Returns null when the reader
+ * was at/near the bottom so the normal unread/newest anchor runs on re-entry.
+ */
+internal fun conversationScrollSnapshotOnLeave(
+    firstVisibleItemIndex: Int,
+    firstVisibleItemScrollOffset: Int,
+    nearBottom: Boolean,
+    anchorItemId: String? = null,
+    anchorMessageIdHex: String? = null,
+): ConversationScrollSnapshot? =
+    if (nearBottom) {
+        null
+    } else {
+        ConversationScrollSnapshot(
+            firstVisibleItemIndex = firstVisibleItemIndex,
+            firstVisibleItemScrollOffset = firstVisibleItemScrollOffset,
+            anchorItemId = anchorItemId,
+            anchorMessageIdHex = anchorMessageIdHex,
+        )
+    }
+
+internal fun conversationScrollRestoreListIndex(
+    snapshot: ConversationScrollSnapshot,
+    renderedItemIds: List<String>,
+    renderedMessageIds: List<String> = emptyList(),
+    olderHeaderCount: Int,
+): Int {
+    val anchorIndex =
+        snapshot.anchorMessageIdHex
+            ?.takeIf { it.isNotBlank() }
+            ?.let(renderedMessageIds::indexOf)
+            ?.takeIf { it >= 0 }
+            ?: snapshot.anchorItemId
+                ?.let(renderedItemIds::indexOf)
+                ?.takeIf { it >= 0 }
+            ?: -1
+    return if (anchorIndex >= 0) {
+        1 + olderHeaderCount + anchorIndex
+    } else {
+        snapshot.firstVisibleItemIndex
+    }
+}
 
 /** Within this many items of the trailing edge counts as "at bottom". */
 private const val ConversationNearBottomItemSlack = 3
@@ -8066,6 +8137,10 @@ private fun ConversationScreen(
     // Reuses the shell's existing open-group lambda so this path matches the
     // shell-level sheet's onOpenGroup exactly.
     onOpenProfileGroup: (ChatListItem, Boolean) -> Unit = { _, _ -> },
+    // Scroll position captured when the user last left this chat while reading
+    // history (issue #1107). Null when none was saved or they left near-bottom.
+    restoredScrollSnapshot: ConversationScrollSnapshot? = null,
+    onSaveScrollSnapshot: (ConversationScrollSnapshot?) -> Unit = {},
 ) {
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     // Push the global snackbar host above the conversation composer so
@@ -8133,7 +8208,23 @@ private fun ConversationScreen(
     // Empty newly-created groups should route users into the existing member
     // invite flow instead of carrying a duplicate picker in the create sheet.
     var openAddMemberOnDetails by remember(chat.id) { mutableStateOf(false) }
-    val listState = rememberLazyListState()
+    // Re-open after back-to-list should land where the reader left off, unless
+    // this open path owns the anchor (search hit, just-created) or they left
+    // at/near the bottom — then the existing unread/newest anchor runs.
+    val scrollRestore =
+        restoredScrollSnapshot?.takeIf {
+            focusMessageId == null &&
+                !justCreated
+        }
+    val positionalScrollRestore =
+        scrollRestore?.takeIf {
+            it.anchorItemId.isNullOrBlank() && it.anchorMessageIdHex.isNullOrBlank()
+        }
+    val listState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = positionalScrollRestore?.firstVisibleItemIndex ?: 0,
+            initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
+        )
     // Single conversation-level owner of which message's action menu is open, so
     // only one popover can be open at a time. With the keyboard up the menu is
     // non-focusable (#284), so long-pressing several bubbles would otherwise
@@ -8226,6 +8317,29 @@ private fun ConversationScreen(
         // the unfiltered timeline.
         val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         readAnchorMessageId = nextReadAnchor(rendered, readAnchorMessageId, idx)
+    }
+    DisposableEffect(chat.id) {
+        onDispose {
+            val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+            val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
+            val firstTimelineIndex =
+                listState.firstVisibleItemIndex - 1 - (if (hasOlderHeader) 1 else 0)
+            val anchor = rendered.getOrNull(firstTimelineIndex)
+            onSaveScrollSnapshot(
+                conversationScrollSnapshotOnLeave(
+                    firstVisibleItemIndex = listState.firstVisibleItemIndex,
+                    firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
+                    nearBottom =
+                        isNearBottom(
+                            listState,
+                            rendered.size,
+                            hasOlderHeader,
+                        ),
+                    anchorItemId = anchor?.id,
+                    anchorMessageIdHex = anchor?.record?.messageIdHex,
+                ),
+            )
+        }
     }
     val unreadIncomingCount by remember {
         derivedStateOf {
@@ -9505,9 +9619,45 @@ private fun ConversationScreen(
             onDispose { resumeLifecycleOwner.lifecycle.removeObserver(observer) }
         }
     }
+    // Re-apply a saved scroll position once the timeline materializes (#1107).
+    // Seeding rememberLazyListState alone is not enough: the list can clamp
+    // while the window is still empty, and the first-open anchor would snap to
+    // bottom before the reader's position is restored.
+    LaunchedEffect(chat.id, scrollRestore) {
+        val restore = scrollRestore ?: return@LaunchedEffect
+        restore.anchorMessageIdHex
+            ?.takeIf { it.isNotBlank() }
+            ?.let { controller.loadUntilMessageAvailable(it) }
+        val targetIndex =
+            snapshotFlow {
+                val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+                if (rendered.isEmpty()) {
+                    null
+                } else {
+                    val liveOlderHeaderCount =
+                        if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+                    val liveBottomTimelineIndex = rendered.size + 1 + liveOlderHeaderCount
+                    conversationScrollRestoreListIndex(
+                        snapshot = restore,
+                        renderedItemIds = rendered.map { it.id },
+                        renderedMessageIds = rendered.map { it.record.messageIdHex },
+                        olderHeaderCount = liveOlderHeaderCount,
+                    ).coerceAtMost(liveBottomTimelineIndex)
+                }
+            }.filterNotNull()
+                .first()
+        listState.scrollToItem(targetIndex, restore.firstVisibleItemScrollOffset)
+        initialTimelineAnchored = true
+        val restoredRendered =
+            controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        lastFollowedLatestId = restoredRendered.lastOrNull()?.id
+    }
     LaunchedEffect(latestTimelineItemId) {
         if (renderedTimeline.isNotEmpty()) {
             if (!initialTimelineAnchored) {
+                if (scrollRestore != null) {
+                    return@LaunchedEffect
+                }
                 // First-time anchor on chat open. If there are unread
                 // messages, land at the first unread one so the user can
                 // read forward from there; otherwise drop them at the
