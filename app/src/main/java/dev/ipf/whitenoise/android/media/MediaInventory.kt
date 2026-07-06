@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.ui.markdownDepthExceeded
 import dev.ipf.whitenoise.android.ui.markdownInlineDepthExceeded
+import dev.ipf.whitenoise.android.ui.markdownVisibleSiblings
 
 /**
  * Pure, framework-free helper that classifies a conversation's local timeline
@@ -66,10 +67,17 @@ object MediaInventory {
         object : LinkedHashMap<RecordCacheKey, RecordInventory>(RECORD_CACHE_MAX_ENTRIES + 1, 0.75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<RecordCacheKey, RecordInventory>?): Boolean = size > RECORD_CACHE_MAX_ENTRIES
         }
+    private val recordUrlCache =
+        object : LinkedHashMap<RecordCacheKey, List<UrlEntry>>(RECORD_CACHE_MAX_ENTRIES + 1, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<RecordCacheKey, List<UrlEntry>>?): Boolean = size > RECORD_CACHE_MAX_ENTRIES
+        }
 
     fun clear() {
         synchronized(recordCache) {
             recordCache.clear()
+        }
+        synchronized(recordUrlCache) {
+            recordUrlCache.clear()
         }
     }
 
@@ -123,6 +131,14 @@ object MediaInventory {
         return Inventory(images, videos, voice, files, urls)
     }
 
+    fun urls(records: List<AppMessageRecordFfi>): List<UrlEntry> {
+        val urls = ArrayList<UrlEntry>()
+        for (record in records) {
+            urls.addAll(cachedRecordUrls(record))
+        }
+        return urls
+    }
+
     private fun cachedRecordInventory(record: AppMessageRecordFfi): RecordInventory {
         val key = RecordCacheKey(record.messageIdHex, record.recordedAt, record.receivedAt)
         synchronized(recordCache) {
@@ -135,13 +151,37 @@ object MediaInventory {
         return computed
     }
 
+    private fun cachedRecordUrls(record: AppMessageRecordFfi): List<UrlEntry> {
+        val key = RecordCacheKey(record.messageIdHex, record.recordedAt, record.receivedAt)
+        synchronized(recordCache) {
+            recordCache[key]?.let { return it.urls }
+        }
+        synchronized(recordUrlCache) {
+            recordUrlCache[key]?.let { return it }
+        }
+        val computed = buildRecordUrls(record)
+        synchronized(recordUrlCache) {
+            recordUrlCache[key] = computed
+        }
+        return computed
+    }
+
     private fun buildRecordInventory(record: AppMessageRecordFfi): RecordInventory {
         val media = ArrayList<MediaEntry>()
-        val urls = ArrayList<UrlEntry>()
         for (reference in MediaReferenceParser.parseAllImetaTags(record.tags)) {
             val kind = classify(reference)
             media.add(MediaEntry(record.messageIdHex, record.sender, record.recordedAt, kind, Source.Attachment(reference)))
         }
+        val bodyInventory = buildRecordBodyInventory(record)
+        media.addAll(bodyInventory.media)
+        return RecordInventory(media, bodyInventory.urls)
+    }
+
+    private fun buildRecordUrls(record: AppMessageRecordFfi): List<UrlEntry> = buildRecordBodyInventory(record).urls
+
+    private fun buildRecordBodyInventory(record: AppMessageRecordFfi): RecordInventory {
+        val media = ArrayList<MediaEntry>()
+        val urls = ArrayList<UrlEntry>()
         for (url in collectHttpUrls(record.contentTokens)) {
             if (isLoadableImageUrl(url)) {
                 media.add(MediaEntry(record.messageIdHex, record.sender, record.recordedAt, Kind.IMAGE, Source.LinkedUrl(url)))
@@ -183,7 +223,7 @@ object MediaInventory {
         // Backstop below the depth caps: untrusted nesting must never crash the
         // process, even if a walker arm is later missed.
         try {
-            document.blocks.forEach { collectFromBlock(it, out, depth = 0) }
+            markdownVisibleSiblings(document.blocks).forEach { collectFromBlock(it, out, depth = 0) }
         } catch (_: StackOverflowError) {
             // Keep whatever resolved before the overflow.
         }
@@ -197,13 +237,22 @@ object MediaInventory {
     ) {
         if (markdownDepthExceeded(depth)) return
         when (block) {
-            is MarkdownBlockFfi.Paragraph -> block.inlines.forEach { collectFromInline(it, out, depth = 0) }
-            is MarkdownBlockFfi.Heading -> block.inlines.forEach { collectFromInline(it, out, depth = 0) }
-            is MarkdownBlockFfi.BlockQuote -> block.blocks.forEach { collectFromBlock(it, out, depth + 1) }
-            is MarkdownBlockFfi.ListBlock -> block.items.forEach { item -> item.blocks.forEach { collectFromBlock(it, out, depth + 1) } }
+            is MarkdownBlockFfi.Paragraph -> markdownVisibleSiblings(block.inlines).forEach { collectFromInline(it, out, depth = 0) }
+            is MarkdownBlockFfi.Heading -> markdownVisibleSiblings(block.inlines).forEach { collectFromInline(it, out, depth = 0) }
+            is MarkdownBlockFfi.BlockQuote -> markdownVisibleSiblings(block.blocks).forEach { collectFromBlock(it, out, depth + 1) }
+            is MarkdownBlockFfi.ListBlock ->
+                markdownVisibleSiblings(block.items).forEach { item ->
+                    markdownVisibleSiblings(item.blocks).forEach { collectFromBlock(it, out, depth + 1) }
+                }
             is MarkdownBlockFfi.Table -> {
-                block.header.forEach { cell -> cell.inlines.forEach { collectFromInline(it, out, depth = 0) } }
-                block.rows.forEach { row -> row.forEach { cell -> cell.inlines.forEach { collectFromInline(it, out, depth = 0) } } }
+                markdownVisibleSiblings(block.header).forEach { cell ->
+                    markdownVisibleSiblings(cell.inlines).forEach { collectFromInline(it, out, depth = 0) }
+                }
+                markdownVisibleSiblings(block.rows).forEach { row ->
+                    markdownVisibleSiblings(row).forEach { cell ->
+                        markdownVisibleSiblings(cell.inlines).forEach { collectFromInline(it, out, depth = 0) }
+                    }
+                }
             }
             else -> Unit
         }
@@ -218,12 +267,12 @@ object MediaInventory {
         when (inline) {
             is MarkdownInlineFfi.Link -> {
                 addIfHttp(inline.dest, out)
-                inline.children.forEach { collectFromInline(it, out, depth + 1) }
+                markdownVisibleSiblings(inline.children).forEach { collectFromInline(it, out, depth + 1) }
             }
             is MarkdownInlineFfi.Autolink -> addIfHttp(inline.url, out)
-            is MarkdownInlineFfi.Emph -> inline.children.forEach { collectFromInline(it, out, depth + 1) }
-            is MarkdownInlineFfi.Strong -> inline.children.forEach { collectFromInline(it, out, depth + 1) }
-            is MarkdownInlineFfi.Strikethrough -> inline.children.forEach { collectFromInline(it, out, depth + 1) }
+            is MarkdownInlineFfi.Emph -> markdownVisibleSiblings(inline.children).forEach { collectFromInline(it, out, depth + 1) }
+            is MarkdownInlineFfi.Strong -> markdownVisibleSiblings(inline.children).forEach { collectFromInline(it, out, depth + 1) }
+            is MarkdownInlineFfi.Strikethrough -> markdownVisibleSiblings(inline.children).forEach { collectFromInline(it, out, depth + 1) }
             else -> Unit
         }
     }

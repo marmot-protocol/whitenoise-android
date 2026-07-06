@@ -41,6 +41,17 @@ class MarkdownInlineTextTest {
     }
 
     @Test
+    fun inlineRenderingStopsAtSiblingBreadthCap() {
+        val annotated =
+            build(
+                List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { MarkdownInlineFfi.Text("x") } +
+                    MarkdownInlineFfi.Text("never"),
+            )
+
+        assertEquals("x".repeat(MARKDOWN_MAX_CONTAINER_SIBLINGS), annotated.text)
+    }
+
+    @Test
     fun strongAppliesBoldOverItsRange() {
         val annotated =
             build(

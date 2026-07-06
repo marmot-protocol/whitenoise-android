@@ -452,12 +452,12 @@ private fun rememberMarkdownInlineText(
     ctx: MarkdownBodyContext,
 ): AnnotatedString {
     val contentColor = LocalContentColor.current
-    // Resolve mention display names during composition, not inside remember's
-    // calculation: the resolver reads Compose state (the profile revision), so
-    // the read must both subscribe this scope AND change a remember key when a
-    // profile arrives — otherwise the cached string would survive the
-    // recomposition and the mention would never upgrade from bech32 to name.
-    val mentionNames = resolveMentionNames(inlines, ctx.mentionDisplayName)
+    // Collecting mentions is a structural O(nodes) walk; keep that keyed only on
+    // the parsed inline tree. Resolving names still happens during composition so
+    // the resolver can subscribe to profile state and invalidate the rendered
+    // string when a profile arrives.
+    val mentionBech32s = remember(inlines) { markdownInlineMentionBech32s(inlines) }
+    val mentionNames = resolveMentionNames(mentionBech32s, ctx.mentionDisplayName)
     // Links must derive from the content color like every other accent:
     // colorScheme.primary disappears on the outgoing bubble, whose container
     // IS primary. Underline alone carries the affordance on both surfaces.
@@ -483,14 +483,16 @@ private fun rememberMarkdownInlineText(
 
 /** Mention bech32 → resolved display name (or null) for one inline tree. */
 private fun resolveMentionNames(
-    inlines: List<MarkdownInlineFfi>,
+    bech32s: Set<String>,
     resolve: ((String) -> String?)?,
 ): Map<String, String?> {
     if (resolve == null) return emptyMap()
-    val bech32s = mutableSetOf<String>()
-    collectMentionBech32s(inlines, bech32s, depth = 0)
     return bech32s.associateWith(resolve)
 }
+
+internal fun markdownInlineMentionBech32s(inlines: List<MarkdownInlineFfi>): Set<String> =
+    mutableSetOf<String>()
+        .also { collectMentionBech32s(inlines, it, depth = 0) }
 
 private fun collectMentionBech32s(
     inlines: List<MarkdownInlineFfi>,
@@ -498,7 +500,7 @@ private fun collectMentionBech32s(
     depth: Int,
 ) {
     if (markdownInlineDepthExceeded(depth)) return
-    inlines.forEach { inline ->
+    markdownVisibleSiblings(inlines).forEach { inline ->
         when (inline) {
             is MarkdownInlineFfi.NostrMention -> out += inline.entity.bech32
             is MarkdownInlineFfi.Emph -> collectMentionBech32s(inline.children, out, depth + 1)
@@ -624,7 +626,7 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
     // Bound inline recursion (nested emphasis/strong/link/image) against a
     // peer-crafted deep tree, mirroring the block-depth cap. See #156.
     if (markdownInlineDepthExceeded(depth)) return
-    inlines.forEach { inline ->
+    markdownVisibleSiblings(inlines).forEach { inline ->
         when (inline) {
             is MarkdownInlineFfi.Text -> append(inline.content)
             // Chat keeps the author's line breaks: a soft break renders as a
@@ -846,12 +848,12 @@ internal fun rememberMarkdownPreviewText(
     // Same name-resolution pattern as rememberMarkdownInlineText: resolve in
     // composition (subscribing to the profile revision) and key the cache on
     // the result so a late-arriving profile re-flattens the row.
+    val mentionBech32s = remember(document) { markdownDocumentMentionBech32s(document) }
     val mentionNames =
         if (mentionDisplayName == null) {
             emptyMap()
         } else {
-            val bech32s = markdownDocumentMentionBech32s(document)
-            bech32s.associateWith(mentionDisplayName)
+            mentionBech32s.associateWith(mentionDisplayName)
         }
     return remember(document, contentColor, mentionNames) {
         markdownDocumentToPreviewAnnotatedString(
@@ -1033,7 +1035,7 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
     // tree (e.g. emphasis nested thousands deep with no text) never spends the
     // length budget, so the budget alone can't bound this recursion. See #156.
     if (markdownInlineDepthExceeded(depth)) return
-    for (inline in inlines) {
+    for (inline in markdownVisibleSiblings(inlines)) {
         // This builds a segment (own builder, length starts at 0), so the
         // whole-document budget bounds each segment: stop walking once spent
         // and cap the unbounded leaf appends (text/code/math/autolink) so one

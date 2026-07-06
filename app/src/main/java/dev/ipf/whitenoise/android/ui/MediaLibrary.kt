@@ -179,7 +179,6 @@ private fun buildTiles(
     cachedReferences: Map<String, List<MediaAttachmentReferenceFfi>?>,
     myAccountId: String?,
 ): SharedMediaTiles {
-    val inventory = MediaInventory.build(records)
     val images = ArrayList<SharedMediaTile>()
     val videos = ArrayList<SharedMediaTile>()
     val voice = ArrayList<SharedMediaRow>()
@@ -217,7 +216,7 @@ private fun buildTiles(
     files.reverse()
     // URLs are sorted newest-first to match the lists; the inventory keeps
     // them in timeline order (oldest first).
-    val urls = inventory.urls.asReversed()
+    val urls = MediaInventory.urls(records).asReversed()
     // Bare image-URL links aren't rendered in any grid/list yet, so they don't
     // count toward `hasOther` — otherwise a links-only conversation would show
     // the "View shared media" entry into a library with every tab empty.

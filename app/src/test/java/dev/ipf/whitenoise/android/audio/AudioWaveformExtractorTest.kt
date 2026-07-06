@@ -7,11 +7,30 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.coroutines.cancellation.CancellationException
 
 class AudioWaveformExtractorTest {
+    @Test
+    fun waveformCacheKeyIncludesFileShapeForRetryAfterWrites() {
+        val file = File.createTempFile("waveform-cache", ".m4a")
+        try {
+            file.writeText("a")
+            file.setLastModified(1_000L)
+            val first = AudioWaveformExtractor.waveformCacheKey(file)
+            file.writeText("ab")
+            file.setLastModified(2_000L)
+
+            val second = AudioWaveformExtractor.waveformCacheKey(file)
+
+            assertFalse(first == second)
+        } finally {
+            file.delete()
+        }
+    }
+
     @Test
     fun dataSourceFailure_releasesExtractor() {
         val extractor = FakeExtractor(setDataSourceFailure = IllegalStateException("bad source"))
