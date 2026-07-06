@@ -57,6 +57,8 @@
     <string name="close_quick_actions">Schließen Sie Schnellaktionen</string>
     <string name="open_quick_actions">Schnellaktionen öffnen</string>
     <string name="scan_qr_code">QR-Code scannen</string>
+    <string name="show_my_qr_code">Meinen QR-Code anzeigen</string>
+    <string name="show_my_qr_code_helper">Zeige dies jemandem mit einem Nostr-Client, damit die Person einen Chat mit dir starten kann.</string>
     <string name="new_group">Neue Gruppe</string>
     <string name="invitation">Einladung</string>
     <string name="invited">Eingeladen</string>

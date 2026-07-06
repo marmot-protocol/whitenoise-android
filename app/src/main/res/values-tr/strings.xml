@@ -57,6 +57,8 @@
     <string name="close_quick_actions">Hızlı işlemleri kapat</string>
     <string name="open_quick_actions">Hızlı işlemleri aç</string>
     <string name="scan_qr_code">QR kodu tara</string>
+    <string name="show_my_qr_code">QR kodumu göster</string>
+    <string name="show_my_qr_code_helper">Sizinle sohbet başlatabilmesi için bunu Nostr istemcisi olan birine gösterin.</string>
     <string name="new_group">Yeni grup</string>
     <string name="invitation">Davet</string>
     <string name="invited">Davet edildi</string>

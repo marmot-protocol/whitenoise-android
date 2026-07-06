@@ -1,33 +1,44 @@
 package dev.ipf.whitenoise.android.ui
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -38,8 +49,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
@@ -52,6 +65,7 @@ import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.ui.theme.Dimens
+import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 private enum class NewChatStep { NewMessage, NewGroup }
 
@@ -134,9 +148,12 @@ private fun NewMessageScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showScanner by remember { mutableStateOf(false) }
+    var showMyQr by remember { mutableStateOf(false) }
     var creatingHex by remember { mutableStateOf<String?>(null) }
     var startChatError by remember { mutableStateOf<StartChatErrorUiState?>(null) }
     val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    val showMyQrLabel = stringResource(R.string.show_my_qr_code)
 
     // Back must stay installed (a disabled handler lets the event fall through
     // to the Activity) but no-op while a tapped person's chat is being created;
@@ -147,6 +164,7 @@ private fun NewMessageScreen(
     }
 
     val activeHex = appState.activeAccount?.accountIdHex
+    val myNpub = activeHex?.let(appState::npub)
     val candidates =
         remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
             deriveRecipientCandidates(appState, activeHex)
@@ -257,6 +275,14 @@ private fun NewMessageScreen(
                             icon = Icons.Default.QrCodeScanner,
                             title = stringResource(R.string.scan_qr_code),
                             onClick = { showScanner = true },
+                        )
+                    }
+                    item {
+                        FlowQuickActionRow(
+                            icon = Icons.Default.QrCode,
+                            title = showMyQrLabel,
+                            onClick = { showMyQr = true },
+                            enabled = myNpub != null,
                         )
                     }
                 }
@@ -381,6 +407,84 @@ private fun NewMessageScreen(
                 }
             },
         )
+    }
+    if (showMyQr && myNpub != null) {
+        MyQrCodeSheet(
+            npub = myNpub,
+            onDismiss = { showMyQr = false },
+            onCopy = { npub ->
+                clipboard.setText(AnnotatedString(npub))
+                appState.present(R.string.toast_copied_npub)
+            },
+            onShare = { uri ->
+                val sendIntent =
+                    Intent(Intent.ACTION_SEND)
+                        .setType("text/plain")
+                        .putExtra(Intent.EXTRA_TEXT, uri)
+                context.startActivity(Intent.createChooser(sendIntent, showMyQrLabel))
+            },
+        )
+    }
+}
+
+internal fun profileQrUri(npub: String): String = "nostr:$npub"
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MyQrCodeSheet(
+    npub: String,
+    onDismiss: () -> Unit,
+    onCopy: (String) -> Unit,
+    onShare: (String) -> Unit,
+) {
+    val qrUri = remember(npub) { profileQrUri(npub) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = amoledSheetContainerColor(),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.show_my_qr_code),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
+                }
+            }
+            Text(
+                stringResource(R.string.show_my_qr_code_helper),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            QrCodeImage(
+                content = qrUri,
+                contentDescription = stringResource(R.string.my_qr_code),
+            )
+            TextButton(onClick = { onCopy(npub) }) {
+                Text(IdentityFormatter.short(npub, prefix = 16, suffix = 14))
+            }
+            Button(
+                onClick = { onShare(qrUri) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.Share, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.share))
+            }
+        }
     }
 }
 
