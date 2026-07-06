@@ -5384,13 +5384,17 @@ class ConversationController(
         loadOlderPage()
     }
 
-    suspend fun loadUntilMessageAvailable(messageIdHex: String): Boolean {
+    suspend fun loadUntilMessageAvailable(
+        messageIdHex: String,
+        maxOlderPages: Int = ReplyNavigation.MaxOlderPages,
+    ): Boolean {
         var loadedPageCount = 0
         while (
             ReplyNavigation.shouldLoadOlder(
                 targetLoaded = timelineRecords.containsKey(messageIdHex),
                 hasMoreBefore = hasMoreBefore,
                 loadedPageCount = loadedPageCount,
+                maxOlderPages = maxOlderPages,
             )
         ) {
             if (!loadOlderPage()) break
@@ -5400,6 +5404,28 @@ class ConversationController(
     }
 
     fun replyTargetMessageId(item: TimelineMessage): String? = ReplyNavigation.targetMessageId(item.record, item.projected)
+
+    /**
+     * Resolve a focus/navigation source id to the message the reader should
+     * scroll to. Reaction notifications carry the kind-7 event id, which is not
+     * materialized in the timeline window — map it to the reacted-to parent via
+     * the `e` tag (#1113).
+     */
+    suspend fun scrollNavigationTarget(sourceMessageIdHex: String): Pair<String, Int> {
+        val record = lookupMessageRecord(sourceMessageIdHex)
+        val target = ReplyNavigation.scrollTargetMessageId(sourceMessageIdHex, record)
+        val maxOlderPages = ReplyNavigation.maxOlderPagesForRecord(record)
+        return target to maxOlderPages
+    }
+
+    /** Read a raw message record from the in-memory window or recent store tail. */
+    private suspend fun lookupMessageRecord(messageIdHex: String): AppMessageRecordFfi? {
+        messageById[messageIdHex]?.let { return it }
+        val account = conversationAccountRef ?: return null
+        return withContext(Dispatchers.IO) {
+            appState.marmotIo { messages(account, group.groupIdHex, 120u) }
+        }.firstOrNull { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
+    }
 
     private suspend fun loadOlderPage(): Boolean {
         if (!hasMoreBefore || isLoadingOlder) return false

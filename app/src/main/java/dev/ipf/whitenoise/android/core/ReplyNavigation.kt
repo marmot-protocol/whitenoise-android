@@ -6,6 +6,10 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 object ReplyNavigation {
     const val MaxOlderPages = 20
 
+    // Reaction taps land on an older parent message that may sit outside the
+    // initial timeline window; page further than reply/mention jumps (#1113).
+    const val MaxOlderPagesForReaction = 40
+
     fun centeredScrollOffset(
         viewportHeightPx: Int,
         itemHeightPx: Int? = null,
@@ -49,14 +53,27 @@ object ReplyNavigation {
         record: AppMessageRecordFfi,
         projected: TimelineMessageRecordFfi?,
     ): String? =
-        projected
-            ?.replyPreview
-            ?.messageIdHex
-            ?.takeIf { it.isNotBlank() }
+        MessageProjector.reactedToMessageId(record)
+            ?: projected
+                ?.replyPreview
+                ?.messageIdHex
+                ?.takeIf { it.isNotBlank() }
             ?: projected
                 ?.replyToMessageIdHex
                 ?.takeIf { it.isNotBlank() }
             ?: MessageProjector.replyTargetMessageId(record)
+
+    fun scrollTargetMessageId(
+        sourceMessageIdHex: String,
+        sourceRecord: AppMessageRecordFfi?,
+    ): String = MessageProjector.reactedToMessageId(sourceRecord ?: return sourceMessageIdHex) ?: sourceMessageIdHex
+
+    fun maxOlderPagesForRecord(record: AppMessageRecordFfi?): Int =
+        if (record != null && MessageProjector.isReaction(record)) {
+            MaxOlderPagesForReaction
+        } else {
+            MaxOlderPages
+        }
 
     fun shouldLoadOlder(
         targetLoaded: Boolean,

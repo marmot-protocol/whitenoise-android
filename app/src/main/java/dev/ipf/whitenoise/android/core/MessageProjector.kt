@@ -297,6 +297,9 @@ object MessageProjector {
 
     fun replyTargetMessageId(message: AppMessageRecordFfi): String? = tagValue(message, QuoteRefTag)
 
+    /** Kind-7 reaction events reference the reacted-to message via an `e` tag. */
+    fun reactedToMessageId(message: AppMessageRecordFfi): String? = if (isReaction(message)) tagValue(message, EventRefTag) else null
+
     fun deletedTargetMessageIds(message: AppMessageRecordFfi): List<String> {
         if (!isDelete(message)) return emptyList()
         return tagValues(message, EventRefTag)

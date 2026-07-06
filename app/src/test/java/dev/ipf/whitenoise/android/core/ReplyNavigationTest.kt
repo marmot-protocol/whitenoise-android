@@ -47,6 +47,51 @@ class ReplyNavigationTest {
     }
 
     @Test
+    fun reactionEventTargetUsesReactedToMessageId() {
+        assertEquals(
+            "parent-message",
+            ReplyNavigation.targetMessageId(
+                record =
+                    message(
+                        kind = 7uL,
+                        tags = listOf(MessageProjector.eventTag("parent-message")),
+                    ),
+                projected = null,
+            ),
+        )
+    }
+
+    @Test
+    fun scrollTargetMapsReactionSourceToParent() {
+        val reaction =
+            message(
+                kind = 7uL,
+                tags = listOf(MessageProjector.eventTag("parent-message")),
+            )
+        assertEquals(
+            "parent-message",
+            ReplyNavigation.scrollTargetMessageId("reaction-event", reaction),
+        )
+    }
+
+    @Test
+    fun scrollTargetKeepsNonReactionSourceId() {
+        val chat = message(kind = 9uL, tags = emptyList())
+        assertEquals("reply", ReplyNavigation.scrollTargetMessageId("reply", chat))
+    }
+
+    @Test
+    fun reactionNavigationUsesHigherOlderPageBudget() {
+        val reaction =
+            message(
+                kind = 7uL,
+                tags = listOf(MessageProjector.eventTag("parent-message")),
+            )
+        assertEquals(ReplyNavigation.MaxOlderPagesForReaction, ReplyNavigation.maxOlderPagesForRecord(reaction))
+        assertEquals(ReplyNavigation.MaxOlderPages, ReplyNavigation.maxOlderPagesForRecord(message(tags = emptyList(), kind = 9uL)))
+    }
+
+    @Test
     fun olderPageLookupStopsWhenFoundExhaustedOrBounded() {
         assertTrue(ReplyNavigation.shouldLoadOlder(targetLoaded = false, hasMoreBefore = true, loadedPageCount = 0))
         assertFalse(ReplyNavigation.shouldLoadOlder(targetLoaded = true, hasMoreBefore = true, loadedPageCount = 0))
@@ -146,19 +191,21 @@ class ReplyNavigationTest {
         assertEquals(-350, ReplyNavigation.centeredScrollOffset(viewportHeightPx = 1_000, itemHeightPx = estimate))
     }
 
-    private fun message(tags: List<MessageTagFfi>) =
-        AppMessageRecordFfi(
-            messageIdHex = "reply",
-            direction = "received",
-            groupIdHex = "group",
-            sender = "alice",
-            plaintext = "reply",
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
-            kind = 9uL,
-            tags = tags,
-            recordedAt = 1uL,
-            receivedAt = 1uL,
-        )
+    private fun message(
+        tags: List<MessageTagFfi> = emptyList(),
+        kind: ULong = 9uL,
+    ) = AppMessageRecordFfi(
+        messageIdHex = "reply",
+        direction = "received",
+        groupIdHex = "group",
+        sender = "alice",
+        plaintext = "reply",
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        kind = kind,
+        tags = tags,
+        recordedAt = 1uL,
+        receivedAt = 1uL,
+    )
 
     private fun timelineRecord(
         replyPreviewMessageId: String?,
