@@ -375,6 +375,7 @@ import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
@@ -5723,7 +5724,7 @@ private fun MediaVoiceBubble(
             )
         }
     val cachedPlaintextOnEntry =
-        remember(pillKey) {
+        remember(pillKey, reference.mediaType) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
     var localFile by remember(pillKey, reference.mediaType) {
@@ -5788,6 +5789,33 @@ private fun MediaVoiceBubble(
                 .decode(file)
     }
     val waveform: FloatArray = realWaveform ?: pseudoWaveform
+
+    suspend fun clearBadVoiceCache(reason: String) {
+        Log.w(
+            "MediaVoiceBubble",
+            "$reason for cached voice msg=${messageIdHex.take(8)}#$attachmentIndex; clearing cache",
+        )
+        clearVoiceAttachmentCacheAfterPlaybackFailure(
+            context = context,
+            controller = controller,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        )
+        localFile = null
+        realWaveform = null
+        totalDurationMs = 0
+        failed = true
+        startDownload = mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio)
+    }
+
+    LaunchedEffect(pillKey, reference.mediaType) {
+        VoicePlaybackController.failures.collect { failure ->
+            if (failure.key == pillKey && failure.invalidatesCache) {
+                clearBadVoiceCache("playback error")
+            }
+        }
+    }
 
     LaunchedEffect(pillKey, reference.sourceEpoch, startDownload) {
         if (localFile != null) return@LaunchedEffect
@@ -5899,8 +5927,12 @@ private fun MediaVoiceBubble(
 
                                     if (file == null) return@launch
                                     localFile = file
-                                    dev.ipf.whitenoise.android.audio.VoicePlaybackController
-                                        .play(pillKey, file, ownerKey = controller.group.groupIdHex)
+                                    val playbackResult =
+                                        dev.ipf.whitenoise.android.audio.VoicePlaybackController
+                                            .play(pillKey, file, ownerKey = controller.group.groupIdHex)
+                                    if (shouldInvalidateVoiceAttachmentCache(playbackResult)) {
+                                        clearBadVoiceCache("playback start failed")
+                                    }
                                 }
                             },
                         ),
@@ -6086,6 +6118,28 @@ internal fun shouldStartVoiceAttachmentDownload(
     hasCachedAttachment: Boolean,
     hasCachedFile: Boolean,
 ): Boolean = mine || audioAutoDownload || hasCachedAttachment || hasCachedFile
+
+internal fun shouldInvalidateVoiceAttachmentCache(playbackResult: VoicePlaybackController.PlaybackStartResult): Boolean =
+    playbackResult == VoicePlaybackController.PlaybackStartResult.PrepareFailed ||
+        playbackResult == VoicePlaybackController.PlaybackStartResult.StartFailed
+
+internal suspend fun clearVoiceAttachmentCacheAfterPlaybackFailure(
+    context: android.content.Context,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+) {
+    withContext(Dispatchers.IO) {
+        voiceAttachmentCacheFile(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        ).delete()
+    }
+    controller.evictCachedAttachment(messageIdHex, attachmentIndex)
+}
 
 private fun voiceAttachmentCacheFile(
     context: android.content.Context,

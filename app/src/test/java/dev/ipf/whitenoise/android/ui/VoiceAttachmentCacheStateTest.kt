@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -67,6 +68,34 @@ class VoiceAttachmentCacheStateTest {
                 audioAutoDownload = false,
                 hasCachedAttachment = false,
                 hasCachedFile = false,
+            ),
+        )
+    }
+
+    @Test
+    fun playbackPrepareFailureInvalidatesSeededCachedVoiceFile() {
+        val context = RuntimeEnvironment.getApplication()
+        val messageId = "voice-corrupt-cache"
+        val reference = mediaReference(mediaType = "audio/mp4")
+        val cached =
+            File(File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }, "$messageId-3.m4a")
+        cached.writeBytes(byteArrayOf(1, 2, 3))
+
+        assertEquals(cached, cachedVoiceAttachmentFile(context, messageId, 3, reference))
+        assertTrue(
+            shouldInvalidateVoiceAttachmentCache(
+                VoicePlaybackController.PlaybackStartResult.PrepareFailed,
+            ),
+        )
+        cached.delete()
+        assertNull(cachedVoiceAttachmentFile(context, messageId, 3, reference))
+    }
+
+    @Test
+    fun focusDenialDoesNotInvalidateCachedVoiceFile() {
+        assertFalse(
+            shouldInvalidateVoiceAttachmentCache(
+                VoicePlaybackController.PlaybackStartResult.FocusDenied,
             ),
         )
     }
