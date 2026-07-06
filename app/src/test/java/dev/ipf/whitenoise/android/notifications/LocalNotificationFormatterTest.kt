@@ -118,6 +118,37 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun mentionGetsItsOwnNotificationIdentityDistinctFromMessages() {
+        // Mentions route to their own channel, so they also need their own
+        // Android (tag, id); channel alone is not part of notification identity.
+        val message =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a"),
+            )
+        val mention =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", isMention = true),
+            )
+
+        assertEquals(LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID, message?.notificationId)
+        assertEquals(LocalNotificationFormatter.MENTION_NOTIFICATION_ID, mention?.notificationId)
+        assertNotEquals(message?.notificationId, mention?.notificationId)
+        assertNotEquals(message?.notificationTag, mention?.notificationTag)
+    }
+
+    @Test
+    fun mentionDismissalKeyMatchesThePostedMentionIdentity() {
+        val mention =
+            LocalNotificationFormatter.content(
+                update(trigger = NotificationTriggerFfi.NEW_MESSAGE, groupIdHex = "group-a", isMention = true),
+            )
+        val dismissal = LocalNotificationFormatter.mentionDismissalKey("account", "group-a")
+
+        assertEquals(mention?.notificationTag, dismissal.tag)
+        assertEquals(mention?.notificationId, dismissal.id)
+    }
+
+    @Test
     fun reactionsInTheSameConversationShareAReactionCard() {
         // Multiple reactions in one chat collapse onto the same reaction card
         // (distinct from the message card), so they stay independently mute-able
@@ -504,10 +535,11 @@ class LocalNotificationFormatterTest {
         sender: NotificationUserFfi = user(),
         isDm: Boolean = false,
         isFromSelf: Boolean = false,
+        isMention: Boolean = false,
         reactionEmoji: String? = null,
         reactedToPreview: String? = null,
     ) = NotificationUpdateFfi(
-        isMention = false,
+        isMention = isMention,
         notificationKey = notificationKey,
         conversationKey = "conversation:account:$groupIdHex",
         trigger = trigger,

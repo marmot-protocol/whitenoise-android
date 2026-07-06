@@ -37,6 +37,7 @@ class LocalNotificationPresenter(
     private val shortcutSnapshots = ConcurrentHashMap<String, ConversationShortcutSnapshot>()
     private val shortcutLastUsed = ConcurrentHashMap<String, Long>()
     private val shortcutAccessClock = AtomicLong()
+    private val tapTokens = NotificationTapTokens.create(context)
 
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)
@@ -61,8 +62,10 @@ class LocalNotificationPresenter(
         val manager = NotificationManagerCompat.from(context)
         val message = LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex)
         val reaction = LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex)
+        val mention = LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex)
         manager.cancel(message.tag, message.id)
         manager.cancel(reaction.tag, reaction.id)
+        manager.cancel(mention.tag, mention.id)
         dismissInvitesForGroup(accountRef, groupIdHex)
         notificationDebug { "dismissed group=${groupIdHex.take(8)}" }
         return true
@@ -171,7 +174,7 @@ class LocalNotificationPresenter(
                 // is a Binder round-trip and extractMessagingStyle re-serializes it.
                 val carried =
                     withContext(Dispatchers.Default) {
-                        existingMessagingStyle(notificationContent.notificationTag)?.messages
+                        existingMessagingStyle(notificationContent.notificationTag, notificationContent.notificationId)?.messages
                     }
                 conversationShortcutId(update)?.let { shortcutId ->
                     val locusId = LocusIdCompat(shortcutId)
@@ -340,12 +343,15 @@ class LocalNotificationPresenter(
         return style
     }
 
-    private fun existingMessagingStyle(tag: String): NotificationCompat.MessagingStyle? {
+    private fun existingMessagingStyle(
+        tag: String,
+        id: Int,
+    ): NotificationCompat.MessagingStyle? {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return null
         val existing =
             runCatching { manager.activeNotifications }
                 .getOrNull()
-                ?.firstOrNull { it.tag == tag && it.id == LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID }
+                ?.firstOrNull { it.tag == tag && it.id == id }
                 ?: return null
         return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing.notification)
     }
@@ -382,7 +388,7 @@ class LocalNotificationPresenter(
                 Intent(context, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     NotificationNavigation.fromUpdate(update)?.let { target ->
-                        NotificationNavigation.applyToIntent(this, target, content.notificationTag)
+                        NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))
                     }
                 }
             val shortcut =
@@ -502,7 +508,7 @@ class LocalNotificationPresenter(
                 // for messages) so the accumulating card always reopens the
                 // same conversation. PendingIntents compare by URI, not extras.
                 NotificationNavigation.fromUpdate(update)?.let { target ->
-                    NotificationNavigation.applyToIntent(this, target, tag)
+                    NotificationNavigation.applyToIntent(this, target, tag, tapTokens.tokenFor(tag))
                 }
             }
         return PendingIntent.getActivity(

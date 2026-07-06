@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -40,6 +41,12 @@ class AppStateSendLockCoverageTest {
                 RegexOption.DOT_MATCHES_ALL,
             ).containsMatchIn(body),
         )
+    }
+
+    @Test
+    fun notificationActionsAreBlockedWhileAppLockScreenIsVisible() {
+        assertTrue(notificationActionsAllowed(appLockScreenVisible = false))
+        assertFalse(notificationActionsAllowed(appLockScreenVisible = true))
     }
 
     private fun appStateFunctionBody(functionName: String): String {
