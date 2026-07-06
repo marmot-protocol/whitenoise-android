@@ -108,6 +108,28 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun replacingKey_keepsTheNewBytesReadableAndOnDisk() {
+        // Regression: the replace path scheduled the previous entry's file for
+        // deletion after the monitor, but same-key entries share the destination
+        // path, so the deferred delete removed the freshly-renamed bytes.
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        cache.put("k", ByteArray(40) { 1 })
+        val updated = ByteArray(70) { 2 }
+        cache.put("k", updated)
+
+        val out = cache.get("k")
+        assertNotNull("replaced value must still be readable", out)
+        assertTrue(out!!.contentEquals(updated))
+        assertTrue("a `.bin` must remain on disk after replace", dir.listFiles()?.any { it.name.endsWith(".bin") } ?: false)
+
+        // Survives a restart: a fresh cache over the same dir rehydrates it.
+        val reopened = DiskByteCache(dir, maxBytes = 1024)
+        val afterRestart = reopened.get("k")
+        assertNotNull("replaced value must survive restart", afterRestart)
+        assertTrue(afterRestart!!.contentEquals(updated))
+    }
+
+    @Test
     fun get_refreshesFileLastModifiedForReadRecency() {
         val cache = DiskByteCache(dir, maxBytes = 1024)
         cache.put("a", ByteArray(40))
@@ -365,6 +387,23 @@ class DiskByteCacheTest {
         cache.put("k", ByteArray(40))
         val tmpFiles = dir.listFiles()?.filter { it.name.endsWith(".tmp") }.orEmpty()
         assertTrue("no .tmp file should linger after successful put", tmpFiles.isEmpty())
+    }
+
+    @Test
+    fun tempFileNamesUseAProcessCounterForSameKeyWrites() {
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val method =
+            DiskByteCache::class.java
+                .getDeclaredMethod("uniqueTmpFile", String::class.java, String::class.java)
+                .apply { isAccessible = true }
+
+        val names =
+            (0 until 256).map {
+                (method.invoke(cache, "same-hash", "bin") as File).name
+            }
+
+        assertEquals(names.size, names.toSet().size)
+        assertTrue(names.all { it.startsWith("same-hash-bin-") && it.endsWith(".tmp") })
     }
 
     @Test

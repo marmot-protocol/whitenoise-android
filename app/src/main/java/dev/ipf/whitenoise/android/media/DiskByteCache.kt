@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.media
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * On-disk byte cache, bounded by total size. Persists across process
@@ -132,9 +133,13 @@ class DiskByteCache(
                 if (index[hashed] === entry) {
                     index.remove(hashed)
                     residentBytes -= entry.size
-                    runCatching { tagFileFor(entry.file).delete() }
                 }
             }
+            // Deliberately do NOT unlink the `.tag` here: a concurrent put()
+            // could recreate this key's `.bin`+`.tag` between the lock release
+            // and the delete, and removing the fresh tag would strand its
+            // plaintext past expiry. If the `.bin` truly vanished, the orphaned
+            // `.tag` is swept on the next rehydrate.
             null
         }
     }
@@ -216,6 +221,13 @@ class DiskByteCache(
             } else {
                 null
             }
+        // Stale `.tag` for THIS key: deleted unguarded because the key is live
+        // again (this put re-added it), so the liveness guard would wrongly skip
+        // it — but the new entry has no tag at that path, so it must go.
+        val staleTagFiles = mutableListOf<File>()
+        // Evicted OTHER keys: routed through the liveness guard so a concurrent
+        // same-key re-put's fresh file isn't unlinked by this deferred delete.
+        val evicted = mutableListOf<Pair<String, List<File>>>()
         synchronized(this) {
             // A concurrent clear() (sign-out / account switch) may have run while
             // we were writing — abort and drop temp artifacts rather than
@@ -227,8 +239,14 @@ class DiskByteCache(
             val existing = index.remove(hashed)
             if (existing != null) {
                 residentBytes -= existing.size
-                runCatching { existing.file.delete() }
-                runCatching { tagFileFor(existing.file).delete() }
+                // Do NOT delete existing.file: a same-key replace shares the
+                // destination path (deterministic hashed name), which
+                // `tmp.renameTo(file)` below overwrites in place. Scheduling it
+                // for the deferred delete removed the freshly-written bytes
+                // (regression from moving deletes off the monitor). Clean up
+                // only a STALE tag, and only when this put writes no new tag to
+                // that same path — a new tag would have overwritten it above.
+                if (ciphertextTag == null) staleTagFiles += tagFileFor(file)
             }
             if (tagTmp != null && tagFile != null && !tagTmp.renameTo(tagFile)) {
                 abortPut(tmp, tagTmp)
@@ -244,8 +262,10 @@ class DiskByteCache(
             val size = bytes.size
             index[hashed] = Entry(file, size, ciphertextTag)
             residentBytes += size
-            evictUntilUnderCap()
+            evicted += evictedEntryFiles()
         }
+        deleteFiles(staleTagFiles)
+        deleteStaleEntries(evicted)
     }
 
     /** Immediate write at the current generation. Deferred/background writes
@@ -267,12 +287,14 @@ class DiskByteCache(
      */
     fun remove(key: String) {
         ensureHydrated()
-        synchronized(this) {
-            val entry = index.remove(fileNameFor(key)) ?: return
-            residentBytes -= entry.size
-            runCatching { entry.file.delete() }
-            runCatching { tagFileFor(entry.file).delete() }
-        }
+        val hashed = fileNameFor(key)
+        val stale =
+            synchronized(this) {
+                val entry = index.remove(hashed) ?: return
+                residentBytes -= entry.size
+                listOf(hashed to listOf(entry.file, tagFileFor(entry.file)))
+            }
+        deleteStaleEntries(stale)
     }
 
     /**
@@ -286,21 +308,64 @@ class DiskByteCache(
     fun removeByCiphertextTags(ciphertextTags: Set<String>): Int {
         if (ciphertextTags.isEmpty()) return 0
         ensureHydrated()
-        synchronized(this) {
-            var removed = 0
-            val iterator = index.entries.iterator()
-            while (iterator.hasNext()) {
-                val entry = iterator.next().value
-                if (entry.tag != null && entry.tag in ciphertextTags) {
-                    runCatching { entry.file.delete() }
-                    runCatching { tagFileFor(entry.file).delete() }
-                    residentBytes -= entry.size
-                    iterator.remove()
-                    removed++
+        val stale = mutableListOf<Pair<String, List<File>>>()
+        val removed =
+            synchronized(this) {
+                var removed = 0
+                val iterator = index.entries.iterator()
+                while (iterator.hasNext()) {
+                    val (hashed, entry) = iterator.next()
+                    if (entry.tag != null && entry.tag in ciphertextTags) {
+                        stale += hashed to filesFor(entry)
+                        residentBytes -= entry.size
+                        iterator.remove()
+                        removed++
+                    }
                 }
+                removed
             }
-            return removed
+        deleteStaleEntries(stale)
+        return removed
+    }
+
+    private fun deleteFiles(files: List<File>) {
+        files.forEach { runCatching { it.delete() } }
+    }
+
+    /**
+     * Delete each removed entry's files outside the monitor (keeping bulk
+     * unlinks off the lock, per #1069), but skip any key a concurrent put() has
+     * re-created — its path now holds fresh bytes, and unlinking those would
+     * drop the just-written entry. One lock acquisition snapshots which keys are
+     * live again; the unlinks then run unlocked.
+     */
+    private fun deleteStaleEntries(stale: List<Pair<String, List<File>>>) {
+        if (stale.isEmpty()) return
+        val recreated =
+            synchronized(this) {
+                stale.mapNotNullTo(HashSet()) { (hashed, _) -> hashed.takeIf(index::containsKey) }
+            }
+        stale.forEach { (hashed, files) ->
+            if (hashed !in recreated) files.forEach { runCatching { it.delete() } }
         }
+    }
+
+    private fun filesFor(entry: Entry): List<File> = listOf(entry.file, tagFileFor(entry.file))
+
+    /** LRU-evict down to [maxBytes], returning each evicted entry keyed by its
+     *  hashed name so the caller's deferred delete can skip a concurrent re-put
+     *  (see [deleteStaleEntries]). */
+    private fun evictedEntryFiles(): List<Pair<String, List<File>>> {
+        if (residentBytes <= maxBytes) return emptyList()
+        val evicted = mutableListOf<Pair<String, List<File>>>()
+        val it = index.entries.iterator()
+        while (it.hasNext() && residentBytes > maxBytes) {
+            val (hashed, entry) = it.next()
+            residentBytes -= entry.size
+            it.remove()
+            evicted += hashed to filesFor(entry)
+        }
+        return evicted
     }
 
     @Synchronized
@@ -350,7 +415,7 @@ class DiskByteCache(
     ): File =
         File(
             cacheDir,
-            "$baseName-$kind-${System.nanoTime()}$TMP_SUFFIX",
+            "$baseName-$kind-${TMP_COUNTER.incrementAndGet()}-${System.nanoTime()}$TMP_SUFFIX",
         )
 
     private fun abortPut(
@@ -359,18 +424,6 @@ class DiskByteCache(
     ) {
         runCatching { tmp.delete() }
         tagTmp?.let { runCatching { it.delete() } }
-    }
-
-    private fun evictUntilUnderCap() {
-        if (residentBytes <= maxBytes) return
-        val it = index.entries.iterator()
-        while (it.hasNext() && residentBytes > maxBytes) {
-            val (_, entry) = it.next()
-            runCatching { entry.file.delete() }
-            runCatching { tagFileFor(entry.file).delete() }
-            residentBytes -= entry.size
-            it.remove()
-        }
     }
 
     private fun buildHydratedIndex(): HydratedIndex {
@@ -460,6 +513,7 @@ class DiskByteCache(
         const val TMP_SUFFIX = ".tmp"
         const val TAG_SUFFIX = ".tag"
         const val DEFAULT_MAX_ENTRY_BYTES: Long = 16L * 1024L * 1024L
+        val TMP_COUNTER = AtomicLong()
         val HEX =
             charArrayOf(
                 '0',

@@ -12,6 +12,7 @@ import java.net.SocketAddress
 import java.net.URL
 import java.nio.channels.SocketChannel
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.HandshakeCompletedListener
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
@@ -62,6 +63,15 @@ object SafeHttpsGet {
             "proxy-authorization",
         )
 
+    internal fun requestDeadlineMillis(
+        connectTimeoutMillis: Int,
+        readTimeoutMillis: Int,
+    ): Long =
+        maxOf(
+            connectTimeoutMillis.toLong() + readTimeoutMillis.toLong(),
+            readTimeoutMillis.toLong() * 2L,
+        ).coerceAtLeast(1L)
+
     fun get(
         url: String,
         maxBodyBytes: Int,
@@ -72,9 +82,12 @@ object SafeHttpsGet {
         hostAllowed: (URL) -> Boolean = { true },
     ): ByteArray? {
         val original = runCatching { URL(url) }.getOrNull() ?: return null
+        val requestDeadlineNanos =
+            System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(requestDeadlineMillis(connectTimeoutMillis, readTimeoutMillis))
         var currentSpec = url
         var hops = 0
         while (true) {
+            if (deadlineExceeded(requestDeadlineNanos)) return null
             val parsed = runCatching { URL(currentSpec) }.getOrNull() ?: return null
             if (parsed.protocol?.lowercase(Locale.ROOT) != "https") return null
             val host = parsed.host
@@ -111,7 +124,7 @@ object SafeHttpsGet {
                     code !in 200..299 -> return null
                     else -> {
                         if (connection.contentLengthLong > maxBodyBytes) return null
-                        return connection.inputStream.use { readBounded(it, maxBodyBytes) }
+                        return connection.inputStream.use { readBounded(it, maxBodyBytes, requestDeadlineNanos) }
                     }
                 }
             } catch (_: IOException) {
@@ -166,7 +179,7 @@ object SafeHttpsGet {
         for (address in addresses) {
             val connection =
                 pinnedConnection(parsed, address, connectTimeoutMillis, readTimeoutMillis, requestHeaders)
-                    ?: return null
+                    ?: continue
             try {
                 connection.connect()
                 return connection
@@ -242,11 +255,13 @@ object SafeHttpsGet {
     private fun readBounded(
         input: InputStream,
         limit: Int,
+        deadlineNanos: Long,
     ): ByteArray? {
         val output = ByteArrayOutputStream()
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
         var total = 0
         while (true) {
+            if (deadlineExceeded(deadlineNanos)) return null
             val read = input.read(buffer)
             if (read == -1) break
             total += read
@@ -255,6 +270,8 @@ object SafeHttpsGet {
         }
         return output.toByteArray()
     }
+
+    internal fun deadlineExceeded(deadlineNanos: Long): Boolean = System.nanoTime() - deadlineNanos >= 0
 
     /** [get] decoded as UTF-8, or null on any failure or oversize body. */
     fun getUtf8(
