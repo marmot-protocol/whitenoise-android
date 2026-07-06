@@ -26,8 +26,8 @@ class WhiteNoiseAppStatePreferencesTest {
     }
 
     @Test
-    fun allowChatScreenshotsDefaultsOff() {
-        assertFalse(ChatScreenshotPreferences.readAllowChatScreenshots(preferences))
+    fun allowChatScreenshotsDefaultsOn() {
+        assertTrue(ChatScreenshotPreferences.readAllowChatScreenshots(preferences))
     }
 
     @Test

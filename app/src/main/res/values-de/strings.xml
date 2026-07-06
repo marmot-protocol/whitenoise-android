@@ -250,8 +250,8 @@
     <string name="toast_app_lock_screen_lock_required">Richten Sie zuerst in den Android-Einstellungen eine Bildschirmsperre ein.</string>
     <string name="force_incognito_keyboard">Inkognito-Tastatur erzwingen</string>
     <string name="force_incognito_keyboard_subtitle">Verhindert, dass Ihre Tastatur lernt, vorschlägt oder synchronisiert, was Sie in dieser App eingeben. Wird von den meisten modernen Tastaturen beachtet; manche Drittanbieter-Tastaturen ignorieren diesen Hinweis möglicherweise.</string>
-    <string name="allow_chat_screenshots">Screenshots in Chats zulassen</string>
-    <string name="allow_chat_screenshots_subtitle">Standardmäßig werden Screenshots und Bildschirmaufzeichnungen in Chats blockiert. Aktiviere dies, wenn du Chats aufnehmen musst.</string>
+    <string name="allow_chat_screenshots">App-Vorschau in den letzten Apps ausblenden</string>
+    <string name="allow_chat_screenshots_subtitle">Blendet Chat-Vorschauen in den letzten Apps aus und blockiert Screenshots sowie Bildschirmaufzeichnungen in Chats.</string>
     <string name="telemetry">Telemetrie</string>
     <string name="telemetry_settings_subtitle">Relay-Verbindungstelemetrie teilen.</string>
     <string name="audit_logs">Prüfprotokolle</string>

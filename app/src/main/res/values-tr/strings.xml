@@ -250,8 +250,8 @@
     <string name="toast_app_lock_screen_lock_required">Önce Android Ayarları’nda bir ekran kilidi ayarlayın.</string>
     <string name="force_incognito_keyboard">Gizli klavyeyi zorunlu kıl</string>
     <string name="force_incognito_keyboard_subtitle">Klavyenizin bu uygulamada yazdıklarınızı öğrenmesini, önermesini veya eşitlemesini engeller. Çoğu modern klavye buna uyar; bazı üçüncü taraf klavyeler bu ipucunu yok sayabilir.</string>
-    <string name="allow_chat_screenshots">Sohbetlerde ekran görüntülerine izin ver</string>
-    <string name="allow_chat_screenshots_subtitle">Varsayılan olarak sohbet ekran görüntüleri ve ekran kayıtları engellenir. Sohbetleri yakalamanız gerekiyorsa bunu açın.</string>
+    <string name="allow_chat_screenshots">Son uygulamalarda uygulama önizlemesini gizle</string>
+    <string name="allow_chat_screenshots_subtitle">Sohbet önizlemelerini Son uygulamalarda gizler ve sohbetlerde ekran görüntülerini ve ekran kayıtlarını engeller.</string>
     <string name="telemetry">Telemetri</string>
     <string name="telemetry_settings_subtitle">Röle bağlantı telemetrisini paylaş.</string>
     <string name="audit_logs">Denetim günlükleri</string>

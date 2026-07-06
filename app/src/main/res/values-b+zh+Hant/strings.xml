@@ -249,8 +249,8 @@
     <string name="toast_app_lock_screen_lock_required">請先在 Android 設定中設定螢幕鎖。</string>
     <string name="force_incognito_keyboard">強制無痕鍵盤</string>
     <string name="force_incognito_keyboard_subtitle">防止鍵盤學習、建議或同步你在本應用程式中輸入的內容。大多數現代鍵盤會遵循此設定；某些第三方鍵盤可能會忽略此提示。</string>
-    <string name="allow_chat_screenshots">允許在聊天中截圖</string>
-    <string name="allow_chat_screenshots_subtitle">預設會封鎖聊天截圖和螢幕錄影。需要擷取聊天時請開啟此項。</string>
+    <string name="allow_chat_screenshots">在「最近任務」中隱藏應用程式預覽</string>
+    <string name="allow_chat_screenshots_subtitle">隱藏「最近任務」中的聊天預覽，並封鎖聊天截圖和螢幕錄影。</string>
     <string name="telemetry">遙測</string>
     <string name="telemetry_settings_subtitle">分享中繼連線遙測。</string>
     <string name="audit_logs">稽核日誌</string>

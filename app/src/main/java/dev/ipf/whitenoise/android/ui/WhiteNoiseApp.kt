@@ -18344,8 +18344,8 @@ private fun SecurityPrivacyScreen(
                     SettingsSwitchRow(
                         title = stringResource(R.string.allow_chat_screenshots),
                         subtitle = stringResource(R.string.allow_chat_screenshots_subtitle),
-                        checked = appState.allowChatScreenshotsInChats,
-                        onCheckedChange = { appState.updateAllowChatScreenshotsInChats(it) },
+                        checked = !appState.allowChatScreenshotsInChats,
+                        onCheckedChange = { appState.updateAllowChatScreenshotsInChats(!it) },
                     )
                     HorizontalDivider(Modifier.padding(vertical = 12.dp))
                     SettingsSwitchRow(

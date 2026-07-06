@@ -324,8 +324,8 @@
     <string name="toast_app_lock_screen_lock_required">Set a screen lock in Android Settings first.</string>
     <string name="force_incognito_keyboard">Force incognito keyboard</string>
     <string name="force_incognito_keyboard_subtitle">Prevents your keyboard from learning, suggesting, or syncing what you type in this app. Honored by most modern keyboards; some third-party keyboards may ignore this hint.</string>
-    <string name="allow_chat_screenshots">Allow screenshots in chats</string>
-    <string name="allow_chat_screenshots_subtitle">By default, chat screenshots and screen recordings are blocked. Turn this on if you need to capture chats.</string>
+    <string name="allow_chat_screenshots">Hide app preview in Recents</string>
+    <string name="allow_chat_screenshots_subtitle">Hides chat previews in Recents and blocks screenshots and screen recordings in chats.</string>
     <string name="telemetry">Share anonymous app telemetry</string>
     <string name="telemetry_settings_subtitle">Share relay connection telemetry.</string>
     <string name="audit_logs">Audit logs</string>
