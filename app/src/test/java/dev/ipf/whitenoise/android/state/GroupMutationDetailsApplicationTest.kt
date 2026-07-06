@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GroupMutationDetailsApplicationTest {
@@ -132,26 +133,98 @@ class GroupMutationDetailsApplicationTest {
         assertEquals(emptySet<String>(), restored.removedGroupIds)
     }
 
-    private fun group(admins: List<String>) =
-        AppGroupRecordFfi(
-            selfMembership = SelfMembershipFfi.MEMBER,
-            groupIdHex = "group",
-            endpoint = "endpoint",
-            name = "Test Group",
-            description = "A group",
-            admins = admins,
-            relays = listOf("wss://relay.example"),
-            nostrGroupIdHex = "nostr",
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            encryptedMedia = encryptedMedia(),
-            archived = false,
-            pendingConfirmation = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-            disappearingMessageSecs = 0uL,
-        )
+    @Test
+    fun conversationSeedTreatsProjectedRemovalAsVerifiedWithoutRoster() {
+        val seed =
+            conversationMembershipSeed(
+                initialGroup = group(admins = listOf("alice"), selfMembership = SelfMembershipFfi.REMOVED),
+                initialMemberSnapshot = null,
+                activeAccountIdHex = "alice",
+            )
+
+        assertTrue(seed.seededMembershipKnown)
+        assertFalse(seed.seededSelfMember)
+        assertTrue(seed.membersVerified)
+        assertFalse(seed.membersLoaded)
+        assertEquals(emptyList<AppGroupMemberRecordFfi>(), seed.members)
+    }
+
+    @Test
+    fun conversationSeedProjectedRemovalOverridesStaleSelfSnapshot() {
+        val alice = chatMember("alice", account = "alice", local = true)
+        val bob = chatMember("bob", account = "bob")
+
+        val seed =
+            conversationMembershipSeed(
+                initialGroup = group(admins = listOf("alice"), selfMembership = SelfMembershipFfi.LEFT),
+                initialMemberSnapshot = GroupMemberSnapshot(listOf(alice, bob)),
+                activeAccountIdHex = "alice",
+            )
+
+        assertTrue(seed.seededMembershipKnown)
+        assertFalse(seed.seededSelfMember)
+        assertTrue(seed.membersVerified)
+        assertTrue(seed.membersLoaded)
+        assertEquals(listOf(bob), seed.members)
+    }
+
+    @Test
+    fun conversationSeedConfirmsSelfMemberWithRoster() {
+        val alice = chatMember("alice", account = "alice", local = true)
+        val bob = chatMember("bob", account = "bob")
+
+        val seed =
+            conversationMembershipSeed(
+                initialGroup = group(admins = listOf("alice"), selfMembership = SelfMembershipFfi.MEMBER),
+                initialMemberSnapshot = GroupMemberSnapshot(listOf(alice, bob)),
+                activeAccountIdHex = "alice",
+            )
+
+        assertTrue(seed.seededMembershipKnown)
+        assertTrue(seed.seededSelfMember)
+        assertFalse(seed.membersVerified)
+        assertTrue(seed.membersLoaded)
+        assertEquals(listOf(alice, bob), seed.members)
+    }
+
+    @Test
+    fun conversationSeedDoesNotAssumeMemberWithoutRoster() {
+        val seed =
+            conversationMembershipSeed(
+                initialGroup = group(admins = listOf("alice"), selfMembership = SelfMembershipFfi.MEMBER),
+                initialMemberSnapshot = null,
+                activeAccountIdHex = "alice",
+            )
+
+        assertFalse(seed.seededMembershipKnown)
+        assertFalse(seed.seededSelfMember)
+        assertFalse(seed.membersVerified)
+        assertFalse(seed.membersLoaded)
+        assertEquals(emptyList<AppGroupMemberRecordFfi>(), seed.members)
+    }
+
+    private fun group(
+        admins: List<String>,
+        selfMembership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
+    ) = AppGroupRecordFfi(
+        selfMembership = selfMembership,
+        groupIdHex = "group",
+        endpoint = "endpoint",
+        name = "Test Group",
+        description = "A group",
+        admins = admins,
+        relays = listOf("wss://relay.example"),
+        nostrGroupIdHex = "nostr",
+        avatarUrl = null,
+        avatarDim = null,
+        avatarThumbhash = null,
+        encryptedMedia = encryptedMedia(),
+        archived = false,
+        pendingConfirmation = false,
+        welcomerAccountIdHex = null,
+        viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
+    )
 
     private fun chatMember(
         memberId: String,
