@@ -128,16 +128,18 @@ class DiskByteCache(
         } catch (_: IOException) {
             // File vanished (manual delete, OS cache reap, FS corruption).
             // Drop the index entry and report miss; the caller will re-fetch.
-            var filesToDelete: List<File> = emptyList()
             synchronized(this) {
                 // Only evict if a concurrent put() hasn't already replaced it.
                 if (index[hashed] === entry) {
                     index.remove(hashed)
                     residentBytes -= entry.size
-                    filesToDelete = listOf(tagFileFor(entry.file))
                 }
             }
-            deleteFiles(filesToDelete)
+            // Deliberately do NOT unlink the `.tag` here: a concurrent put()
+            // could recreate this key's `.bin`+`.tag` between the lock release
+            // and the delete, and removing the fresh tag would strand its
+            // plaintext past expiry. If the `.bin` truly vanished, the orphaned
+            // `.tag` is swept on the next rehydrate.
             null
         }
     }
@@ -231,8 +233,14 @@ class DiskByteCache(
             val existing = index.remove(hashed)
             if (existing != null) {
                 residentBytes -= existing.size
-                filesToDelete += existing.file
-                filesToDelete += tagFileFor(existing.file)
+                // Do NOT delete existing.file: a same-key replace shares the
+                // destination path (deterministic hashed name), which
+                // `tmp.renameTo(file)` below overwrites in place. Scheduling it
+                // for the deferred delete removed the freshly-written bytes
+                // (regression from moving deletes off the monitor). Clean up
+                // only a STALE tag, and only when this put writes no new tag to
+                // that same path — a new tag would have overwritten it above.
+                if (ciphertextTag == null) filesToDelete += tagFileFor(file)
             }
             if (tagTmp != null && tagFile != null && !tagTmp.renameTo(tagFile)) {
                 abortPut(tmp, tagTmp)
@@ -272,13 +280,14 @@ class DiskByteCache(
      */
     fun remove(key: String) {
         ensureHydrated()
-        val filesToDelete =
+        val hashed = fileNameFor(key)
+        val stale =
             synchronized(this) {
-                val entry = index.remove(fileNameFor(key)) ?: return
+                val entry = index.remove(hashed) ?: return
                 residentBytes -= entry.size
-                listOf(entry.file, tagFileFor(entry.file))
+                listOf(hashed to listOf(entry.file, tagFileFor(entry.file)))
             }
-        deleteFiles(filesToDelete)
+        deleteStaleEntries(stale)
     }
 
     /**
@@ -292,15 +301,15 @@ class DiskByteCache(
     fun removeByCiphertextTags(ciphertextTags: Set<String>): Int {
         if (ciphertextTags.isEmpty()) return 0
         ensureHydrated()
-        val filesToDelete = mutableListOf<File>()
+        val stale = mutableListOf<Pair<String, List<File>>>()
         val removed =
             synchronized(this) {
                 var removed = 0
                 val iterator = index.entries.iterator()
                 while (iterator.hasNext()) {
-                    val entry = iterator.next().value
+                    val (hashed, entry) = iterator.next()
                     if (entry.tag != null && entry.tag in ciphertextTags) {
-                        filesToDelete += filesFor(entry)
+                        stale += hashed to filesFor(entry)
                         residentBytes -= entry.size
                         iterator.remove()
                         removed++
@@ -308,12 +317,30 @@ class DiskByteCache(
                 }
                 removed
             }
-        deleteFiles(filesToDelete)
+        deleteStaleEntries(stale)
         return removed
     }
 
     private fun deleteFiles(files: List<File>) {
         files.forEach { runCatching { it.delete() } }
+    }
+
+    /**
+     * Delete each removed entry's files outside the monitor (keeping bulk
+     * unlinks off the lock, per #1069), but skip any key a concurrent put() has
+     * re-created — its path now holds fresh bytes, and unlinking those would
+     * drop the just-written entry. One lock acquisition snapshots which keys are
+     * live again; the unlinks then run unlocked.
+     */
+    private fun deleteStaleEntries(stale: List<Pair<String, List<File>>>) {
+        if (stale.isEmpty()) return
+        val recreated =
+            synchronized(this) {
+                stale.mapNotNullTo(HashSet()) { (hashed, _) -> hashed.takeIf(index::containsKey) }
+            }
+        stale.forEach { (hashed, files) ->
+            if (hashed !in recreated) files.forEach { runCatching { it.delete() } }
+        }
     }
 
     private fun filesFor(entry: Entry): List<File> = listOf(entry.file, tagFileFor(entry.file))

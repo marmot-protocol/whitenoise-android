@@ -5,11 +5,13 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import java.io.IOException
-import java.security.GeneralSecurityException
 
 private const val PREFS_NAME = "whitenoise.push.tokens"
 private const val SECURE_PREFS_NAME = "whitenoise.push.tokens.secure"
+
+// Plaintext prefs used only when the keystore-backed store can't be opened on
+// this device. Distinct file so it never aliases the encrypted store's bytes.
+private const val FALLBACK_PREFS_NAME = "whitenoise.push.tokens.fallback"
 private const val KEY_FCM_TOKEN = "fcm_token"
 private const val KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC = "pending_native_push_registration_sync"
 private const val KEY_PENDING_CLEARS = "pending_clears"
@@ -138,17 +140,30 @@ class PushTokenStore(
             val appContext = context.applicationContext
             val secure = openSecure(appContext)
             val legacy = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            migrateLegacyPushTokenPreferences(legacy, secure)
+            // Migration reads/writes the (possibly encrypted) store, which can
+            // throw on a corrupted value; a migration failure just defers the
+            // copy to a later launch (legacy is left intact), so never let it
+            // crash construction.
+            runCatching { migrateLegacyPushTokenPreferences(legacy, secure) }
             return PushTokenStore(secure)
         }
 
         private fun openSecure(context: Context): SharedPreferences =
             try {
                 createSecure(context)
-            } catch (error: GeneralSecurityException) {
-                recreateAfterCorruption(context)
-            } catch (error: IOException) {
-                recreateAfterCorruption(context)
+            } catch (primary: Exception) {
+                // A GeneralSecurityException/IOException is usually a corrupted
+                // store that one delete-and-recreate clears. But keystore-level
+                // faults — MasterKey build failing, a missing/broken
+                // AndroidKeyStore provider on some OEM/old/rooted devices, or
+                // master-key invalidation — throw again on recreate. create()
+                // runs in an AppState field initializer, so an uncaught throw
+                // here crashes app launch (the old plaintext prefs never threw,
+                // so this would be a regression). Degrade to plaintext prefs
+                // (pre-encryption behavior, the LOW risk this store accepted
+                // before) rather than taking the app down.
+                runCatching { recreateAfterCorruption(context) }
+                    .getOrElse { context.getSharedPreferences(FALLBACK_PREFS_NAME, Context.MODE_PRIVATE) }
             }
 
         private fun recreateAfterCorruption(context: Context): SharedPreferences {
