@@ -883,8 +883,6 @@
     <string name="group_details_subtitle">Gruppo · %1$d membri</string>
     <string name="add_group_description">Aggiungi la descrizione del gruppo</string>
     <string name="see_all_members">Vedi tutti i %1$d membri</string>
-    <string name="encryption">Crittografia</string>
-    <string name="encryption_e2ee_note">I messaggi sono crittografati end-to-end</string>
     <string name="chat_lock">Blocco chat</string>
     <string name="toast_disappearing_not_applied">Il gruppo è stato creato, ma non è stato possibile attivare i messaggi effimeri</string>
     <string name="search_members">Cerca membri</string>
