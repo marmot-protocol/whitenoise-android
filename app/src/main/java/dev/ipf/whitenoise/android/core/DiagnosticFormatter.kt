@@ -46,7 +46,12 @@ object DiagnosticFormatter {
     private val NSEC_SECRET = Regex("(?i)nsec1[0-9a-z]+\\b")
     private val HEX_SECRET = Regex("\\b[0-9a-fA-F]{64,}\\b")
     private val SEPARATED_HEX_SECRET = Regex("(?i)\\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){15,}\\b")
-    private val BASE64_SECRET = Regex("\\b[A-Za-z0-9+/]{40,}={0,2}\\b")
+
+    // No trailing \b after the padding: `=` is a non-word char, so a \b there
+    // only matched when another word char followed, letting the engine backtrack
+    // to zero `=` and leak the trailing `=`/`==` when the padding ended the token
+    // or was followed by whitespace/punctuation.
+    private val BASE64_SECRET = Regex("\\b[A-Za-z0-9+/]{40,}={0,2}")
     private val CREDENTIALS_IN_URL = Regex("(?i)([a-z][a-z0-9+.-]*://)[^\\s/@:]+:[^\\s/@]+@")
     private val TOKEN_ASSIGNMENT = Regex("(?i)\\b(authorization|bearer|token|auth[_-]?token|password|secret)=([^\\s&]+)")
     private val BEARER_HEADER = Regex("(?i)\\bauthorization:\\s*bearer\\s+\\S+")

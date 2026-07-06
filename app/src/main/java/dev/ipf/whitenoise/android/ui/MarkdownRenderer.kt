@@ -1024,7 +1024,10 @@ private fun AnnotatedString.Builder.appendPreviewCodeContent(
     // must not be regex-processed for a one-line row. The window is generous
     // because collapsing only shrinks text; a pathological mostly-whitespace
     // prefix just yields a shorter preview, which the row can afford.
-    val bounded = markdownSafeDisplayText(content, Int.MAX_VALUE).previewTake(maxLength * 8)
+    // Bound the RAW content BEFORE sanitizing, so stripUnsafe never scans a
+    // peer-crafted megabyte block in full for a one-line row. Sanitizing only
+    // shrinks, so the pre-clip window stays a safe upper bound (#1031 review).
+    val bounded = markdownSafeDisplayText(content.previewTake(maxLength * 8), Int.MAX_VALUE)
     // A code block is a multi-line region; the preview is one line. Collapse
     // every whitespace run (incl. newlines and indentation) to a single space
     // so `fun main() {\n  hi()\n}` reads as `fun main() { hi() }`.
@@ -1086,13 +1089,13 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
         // giant run can't blow past it either.
         if (length >= maxLength) return
         when (inline) {
-            is MarkdownInlineFfi.Text -> append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE).previewTake(maxLength - length))
+            is MarkdownInlineFfi.Text -> append(markdownSafeDisplayText(inline.content.previewTake(maxLength - length), Int.MAX_VALUE))
             // One-line preview: the author's line breaks flatten to spaces
             // (unlike the bubble renderer, which preserves them).
             MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append(' ')
             is MarkdownInlineFfi.Code ->
                 withStyle(codeStyle) {
-                    append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE).previewTake((maxLength - length).coerceAtLeast(0)))
+                    append(markdownSafeDisplayText(inline.content.previewTake((maxLength - length).coerceAtLeast(0)), Int.MAX_VALUE))
                 }
             is MarkdownInlineFfi.Emph ->
                 withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
@@ -1124,10 +1127,10 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
                     mentionDisplayName,
                     depth + 1,
                 )
-            is MarkdownInlineFfi.Autolink -> append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE).previewTake(maxLength - length))
+            is MarkdownInlineFfi.Autolink -> append(markdownSafeDisplayText(inline.url.previewTake(maxLength - length), Int.MAX_VALUE))
             is MarkdownInlineFfi.Math ->
                 withStyle(codeStyle) {
-                    append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE).previewTake((maxLength - length).coerceAtLeast(0)))
+                    append(markdownSafeDisplayText(inline.content.previewTake((maxLength - length).coerceAtLeast(0)), Int.MAX_VALUE))
                 }
             // Same visible text as the bubble (name or shortened bech32) but
             // inert: the row's only tap target is the chat itself.

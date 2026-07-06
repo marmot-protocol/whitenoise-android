@@ -120,4 +120,19 @@ class DiagnosticFormatterTest {
         assertFalse(redacted.contains(base64))
         assertEquals("failed key[redacted] seed=[redacted] blob=[redacted]", redacted)
     }
+
+    @Test
+    fun redactError_scrubsBase64PaddingAtBoundaryAndEndOfString() {
+        // Regression: the trailing \b after `={0,2}` let the engine backtrack to
+        // zero `=` when the padding ended the string or was followed by
+        // whitespace/punctuation, leaking the trailing `=`/`==`.
+        val padded = "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODk="
+        val doublePadded = "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3OA=="
+
+        // End of string.
+        assertEquals("token [redacted]", DiagnosticFormatter.redactError("token $padded"))
+        // Followed by whitespace, then punctuation.
+        assertEquals("a [redacted] b", DiagnosticFormatter.redactError("a $doublePadded b"))
+        assertEquals("[redacted].", DiagnosticFormatter.redactError("$padded."))
+    }
 }
