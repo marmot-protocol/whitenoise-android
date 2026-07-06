@@ -3007,7 +3007,9 @@ class ConversationController(
                     // read before secureDeleteExpired removes the rows.
                     refreshMediaReferences()
                     runCatching {
-                        appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) }
+                        appState.withGroupCommitLock(account, group.groupIdHex) {
+                            appState.marmotIo { secureDeleteExpired(account, group.groupIdHex) }
+                        }
                     }.onSuccess { result ->
                         // When the engine actually pruned rows, clear the
                         // conversation's accumulating tray card so it can't keep
@@ -4971,13 +4973,15 @@ class ConversationController(
             val updatedName = name.trim().takeIf { it.isNotEmpty() }
             val updatedDescription = description.trim().takeIf { it.isNotEmpty() }
             runCatching {
-                appState.marmotIo {
-                    updateGroupProfile(
-                        account,
-                        group.groupIdHex,
-                        updatedName,
-                        updatedDescription,
-                    )
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    appState.marmotIo {
+                        updateGroupProfile(
+                            account,
+                            group.groupIdHex,
+                            updatedName,
+                            updatedDescription,
+                        )
+                    }
                 }
                 appState.present(R.string.toast_group_updated)
                 true
@@ -4998,8 +5002,10 @@ class ConversationController(
             // optimization hints we don't compute on Android, so clear them.
             val normalized = url?.trim()?.takeIf { it.isNotEmpty() }
             runCatching {
-                appState.marmotIo {
-                    updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    appState.marmotIo {
+                        updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
+                    }
                 }
                 // Reflect the change locally so the avatar updates immediately,
                 // without waiting for the group-state subscription to converge.
@@ -5166,7 +5172,9 @@ class ConversationController(
             // before this completes, sending the retention change to the wrong store.
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatching {
-                appState.marmotIo { updateMessageRetention(account, group.groupIdHex, disappearingMessageSecs) }
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    appState.marmotIo { updateMessageRetention(account, group.groupIdHex, disappearingMessageSecs) }
+                }
                 val previousRetention = group.disappearingMessageSecs
                 group = group.copy(disappearingMessageSecs = disappearingMessageSecs)
                 // The engine prunes plaintext older than the new window during the
