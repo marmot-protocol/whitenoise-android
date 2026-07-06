@@ -107,4 +107,32 @@ class DiagnosticFormatterTest {
         assertEquals("error: Authorization: Bearer [redacted] end", redacted)
         assertFalse(redacted.contains(token))
     }
+
+    @Test
+    fun redactError_scrubsEmbeddedNsecSeparatedHexAndBase64Secrets() {
+        val nsec = "nsec1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+        val separatedHex = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+        val base64 = "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODkw"
+        val redacted = DiagnosticFormatter.redactError("failed key$nsec seed=$separatedHex blob=$base64")
+
+        assertFalse(redacted.contains(nsec))
+        assertFalse(redacted.contains(separatedHex))
+        assertFalse(redacted.contains(base64))
+        assertEquals("failed key[redacted] seed=[redacted] blob=[redacted]", redacted)
+    }
+
+    @Test
+    fun redactError_scrubsBase64PaddingAtBoundaryAndEndOfString() {
+        // Regression: the trailing \b after `={0,2}` let the engine backtrack to
+        // zero `=` when the padding ended the string or was followed by
+        // whitespace/punctuation, leaking the trailing `=`/`==`.
+        val padded = "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODk="
+        val doublePadded = "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3OA=="
+
+        // End of string.
+        assertEquals("token [redacted]", DiagnosticFormatter.redactError("token $padded"))
+        // Followed by whitespace, then punctuation.
+        assertEquals("a [redacted] b", DiagnosticFormatter.redactError("a $doublePadded b"))
+        assertEquals("[redacted].", DiagnosticFormatter.redactError("$padded."))
+    }
 }

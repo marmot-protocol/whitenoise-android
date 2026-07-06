@@ -191,7 +191,7 @@ internal fun decodeImageSearchResults(body: String): List<ImageSearchResult> {
                 thumbnailUrl = thumbnail,
                 sourceHost = sourceHostFor(sourcePage ?: image),
                 dimensionsLabel = dimensionsLabel(raw.optInt("width", 0), raw.optInt("height", 0)),
-                title = raw.optString("title", "").trim(),
+                title = ProfileSanitizer.stripUnsafe(raw.optString("title", "")).trim(),
             )
     }
     return out
@@ -199,7 +199,11 @@ internal fun decodeImageSearchResults(body: String): List<ImageSearchResult> {
 
 private fun sourceHostFor(raw: String?): String? {
     if (raw.isNullOrBlank()) return null
-    return runCatching { URI(raw.trim()).host }.getOrNull()?.takeIf { it.isNotBlank() }
+    val sanitized = ProfileSanitizer.stripUnsafe(raw).trim()
+    return runCatching { URI(sanitized).host }
+        .getOrNull()
+        ?.let { ProfileSanitizer.stripUnsafe(it).trim() }
+        ?.takeIf { it.isNotBlank() }
 }
 
 private fun dimensionsLabel(

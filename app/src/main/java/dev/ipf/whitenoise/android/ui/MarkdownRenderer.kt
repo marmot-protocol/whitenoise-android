@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -55,6 +56,7 @@ import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 
 /**
  * Compose renderer for the Markdown AST the Rust core attaches to every
@@ -147,7 +149,14 @@ internal fun MarkdownMessageBody(
             title = { Text(stringResource(R.string.link_confirm_title)) },
             // Show the full destination so a label spoofing a trusted URL can't
             // hide where the tap actually goes.
-            text = { Text(url, style = MaterialTheme.typography.bodyMedium) },
+            text = {
+                Text(
+                    markdownSafeDisplayText(url),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 6,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -201,6 +210,18 @@ internal fun markdownSiblingsElided(items: List<*>): Boolean = items.size > MARK
 internal const val MARKDOWN_MAX_INLINE_DEPTH = 64
 
 internal fun markdownInlineDepthExceeded(depth: Int): Boolean = depth >= MARKDOWN_MAX_INLINE_DEPTH
+
+internal const val MARKDOWN_LINK_CONFIRM_DISPLAY_MAX_LENGTH = 500
+
+internal fun markdownSafeDisplayText(
+    value: String,
+    maxLength: Int = MARKDOWN_LINK_CONFIRM_DISPLAY_MAX_LENGTH,
+): String {
+    val sanitized = ProfileSanitizer.stripUnsafe(value)
+    if (sanitized.codePointCount(0, sanitized.length) <= maxLength) return sanitized
+    val end = sanitized.offsetByCodePoints(0, maxLength)
+    return sanitized.substring(0, end)
+}
 
 /** Per-document inputs threaded through every block view. */
 private data class MarkdownBodyContext(
@@ -315,7 +336,7 @@ private fun MarkdownCodeBlockView(content: String) {
     Text(
         // The parser keeps the block's trailing newline; trimming it avoids a
         // phantom empty line inside the chip.
-        content.trimEnd('\n'),
+        markdownSafeDisplayText(content, Int.MAX_VALUE).trimEnd('\n'),
         style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
         modifier =
             Modifier
@@ -628,12 +649,12 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
     if (markdownInlineDepthExceeded(depth)) return
     markdownVisibleSiblings(inlines).forEach { inline ->
         when (inline) {
-            is MarkdownInlineFfi.Text -> append(inline.content)
+            is MarkdownInlineFfi.Text -> append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE))
             // Chat keeps the author's line breaks: a soft break renders as a
             // newline (not the CommonMark collapse-to-space) to match how the
             // plaintext fallback has always displayed.
             MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append('\n')
-            is MarkdownInlineFfi.Code -> withStyle(ctx.codeStyle) { append(inline.content) }
+            is MarkdownInlineFfi.Code -> withStyle(ctx.codeStyle) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
             is MarkdownInlineFfi.Emph ->
                 withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
                     appendMarkdownInlines(inline.children, ctx, depth + 1)
@@ -669,14 +690,14 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
                     }
                 if (isOpenableMarkdownLink(dest)) {
                     withLink(LinkAnnotation.Url(dest, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)) {
-                        append(inline.url)
+                        append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE))
                     }
                 } else {
                     // Non-allowlisted URIs stay visible but inert.
-                    append(inline.url)
+                    append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE))
                 }
             }
-            is MarkdownInlineFfi.Math -> withStyle(ctx.codeStyle) { append(inline.content) }
+            is MarkdownInlineFfi.Math -> withStyle(ctx.codeStyle) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
             is MarkdownInlineFfi.NostrMention -> appendNostrEntity(inline.entity, mention = true, ctx)
             is MarkdownInlineFfi.NostrUri -> appendNostrEntity(inline.entity, mention = false, ctx)
         }
@@ -1003,7 +1024,10 @@ private fun AnnotatedString.Builder.appendPreviewCodeContent(
     // must not be regex-processed for a one-line row. The window is generous
     // because collapsing only shrinks text; a pathological mostly-whitespace
     // prefix just yields a shorter preview, which the row can afford.
-    val bounded = content.previewTake(maxLength * 8)
+    // Bound the RAW content BEFORE sanitizing, so stripUnsafe never scans a
+    // peer-crafted megabyte block in full for a one-line row. Sanitizing only
+    // shrinks, so the pre-clip window stays a safe upper bound (#1031 review).
+    val bounded = markdownSafeDisplayText(content.previewTake(maxLength * 8), Int.MAX_VALUE)
     // A code block is a multi-line region; the preview is one line. Collapse
     // every whitespace run (incl. newlines and indentation) to a single space
     // so `fun main() {\n  hi()\n}` reads as `fun main() { hi() }`.
@@ -1065,12 +1089,14 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
         // giant run can't blow past it either.
         if (length >= maxLength) return
         when (inline) {
-            is MarkdownInlineFfi.Text -> append(inline.content.previewTake(maxLength - length))
+            is MarkdownInlineFfi.Text -> append(markdownSafeDisplayText(inline.content.previewTake(maxLength - length), Int.MAX_VALUE))
             // One-line preview: the author's line breaks flatten to spaces
             // (unlike the bubble renderer, which preserves them).
             MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append(' ')
             is MarkdownInlineFfi.Code ->
-                withStyle(codeStyle) { append(inline.content.previewTake((maxLength - length).coerceAtLeast(0))) }
+                withStyle(codeStyle) {
+                    append(markdownSafeDisplayText(inline.content.previewTake((maxLength - length).coerceAtLeast(0)), Int.MAX_VALUE))
+                }
             is MarkdownInlineFfi.Emph ->
                 withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
                     appendPreviewInlines(inline.children, codeStyle, maxLength, mentionDisplayName, depth + 1)
@@ -1101,9 +1127,11 @@ private fun AnnotatedString.Builder.appendPreviewInlines(
                     mentionDisplayName,
                     depth + 1,
                 )
-            is MarkdownInlineFfi.Autolink -> append(inline.url.previewTake(maxLength - length))
+            is MarkdownInlineFfi.Autolink -> append(markdownSafeDisplayText(inline.url.previewTake(maxLength - length), Int.MAX_VALUE))
             is MarkdownInlineFfi.Math ->
-                withStyle(codeStyle) { append(inline.content.previewTake((maxLength - length).coerceAtLeast(0))) }
+                withStyle(codeStyle) {
+                    append(markdownSafeDisplayText(inline.content.previewTake((maxLength - length).coerceAtLeast(0)), Int.MAX_VALUE))
+                }
             // Same visible text as the bubble (name or shortened bech32) but
             // inert: the row's only tap target is the chat itself.
             is MarkdownInlineFfi.NostrMention -> {

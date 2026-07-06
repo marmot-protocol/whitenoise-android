@@ -11035,7 +11035,11 @@ private fun GroupDetailsScreen(
                 }
                 pendingTranscriptShareFile?.delete()
                 pendingTranscriptShareFile = null
-                appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(error.message ?: error.javaClass.simpleName), copyable = true)
+                appState.present(
+                    R.string.toast_couldnt_export_transcript,
+                    AppText.Plain(DiagnosticFormatter.redactError(error.message ?: error.javaClass.simpleName)),
+                    copyable = true,
+                )
             } finally {
                 transcriptExportInFlight = false
             }

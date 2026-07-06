@@ -44,4 +44,21 @@ class ImageSearchClientTest {
         assertEquals("https://example.com/0.png", decoded.first().imageUrl)
         assertEquals("https://example.com/${MAX_IMAGE_SEARCH_RESULTS - 1}.png", decoded.last().imageUrl)
     }
+
+    @Test
+    fun decodedResultDisplayLabelsStripUnsafeUnicodeControls() {
+        val results =
+            JSONArray().put(
+                JSONObject()
+                    .put("image", "https://example.com/image.png")
+                    .put("thumbnail", "https://example.com/thumb.png")
+                    .put("url", "https://exa\u202Emple.com/page")
+                    .put("title", "Safe\u202E Title\u200B"),
+            )
+
+        val decoded = decodeImageSearchResults(JSONObject().put("results", results).toString()).single()
+
+        assertEquals("Safe Title", decoded.title)
+        assertEquals("example.com", decoded.sourceHost)
+    }
 }
