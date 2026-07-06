@@ -24,6 +24,12 @@ val localProperties =
         if (file.exists()) file.inputStream().use { load(it) }
     }
 
+val marmotKitVersionProperties =
+    Properties().apply {
+        val file = project.file("src/main/marmotkit/MARMOT_VERSION")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
+
 fun signingProperty(vararg keys: String): String? =
     keys
         .asSequence()
@@ -136,9 +142,14 @@ android {
         minSdk = 34
         targetSdk = 36
         versionCode = 7
-        versionName = "2026.6.22"
+        versionName = "2026.7.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "MARMOTKIT_SHORT_SHA",
+            (marmotKitVersionProperties.getProperty("mdk-short-sha") ?: "unknown").asBuildConfigString(),
+        )
     }
 
     flavorDimensions += "environment"

@@ -3,7 +3,7 @@
 
 set shell := ["bash", "-uc"]
 
-# Load .env so local secrets (e.g. DARKMATTER_AUDIT_LOG_AUTH_TOKEN) reach recipes.
+# Load .env so local White Noise secrets reach recipes.
 
 set dotenv-load := true
 
@@ -11,13 +11,11 @@ set dotenv-load := true
 
 export JAVA_HOME := env("JAVA_HOME", "/Applications/Android Studio.app/Contents/jbr/Contents/Home")
 
-# Feed the dev build's Goggles audit-log token. The dev flavor reads the env var
-# WHITENOISE_DEV_AUDIT_LOG_AUTH_TOKEN (app/build.gradle.kts; documented in README).
-# Honor that documented var if it's already set; otherwise map the .env value kept
-# under its DARKMATTER_ name; otherwise empty, so uploads skip rather than fail the
-# build. Falling back this way avoids clobbering an explicitly provided token.
+# Feed the dev build's Goggles audit-log token. The dev flavor reads this
+# WHITENOISE_* var directly (app/build.gradle.kts; documented in README).
+# Leave it empty when unset so uploads skip rather than fail the build.
 
-export WHITENOISE_DEV_AUDIT_LOG_AUTH_TOKEN := env("WHITENOISE_DEV_AUDIT_LOG_AUTH_TOKEN", env("DARKMATTER_AUDIT_LOG_AUTH_TOKEN", ""))
+export WHITENOISE_DEV_AUDIT_LOG_AUTH_TOKEN := env("WHITENOISE_DEV_AUDIT_LOG_AUTH_TOKEN", "")
 
 # Variant packages. Dev, production, and staging are separate application IDs so
 # all three installs can coexist on one device. Activity stays in the Kotlin
@@ -72,8 +70,7 @@ format:
     ./gradlew ktlintFormat
 
 # Build signed production and staging release APKs (per-ABI splits + universal).
-# Requires signing creds in local.properties. Rebuilds the marmot bindings +
-
+# Requires signing creds in local.properties. Rebuilds the MDK/Marmot bindings +
 # native libs.
 release:
     ./scripts/release.sh --flavor all

@@ -17726,6 +17726,17 @@ private fun SettingsHomeScreen(
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    Text(
+                        text =
+                            stringResource(
+                                R.string.settings_marmotkit_version_label,
+                                BuildConfig.MARMOTKIT_SHORT_SHA,
+                            ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     // Release-channel badge: `staging_build` is false in main
                     // resources and overridden to true only in the staging
                     // source set, so dev/production never render it.
