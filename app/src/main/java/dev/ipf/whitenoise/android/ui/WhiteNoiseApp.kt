@@ -9692,6 +9692,10 @@ private fun ConversationScreen(
 
     val openDetailsDescription = stringResource(R.string.details)
     Scaffold(
+        // The transcript consumes IME insets; the composer bottom bar is the sole
+        // owner of keyboard padding so the reply-preview chip and input row move
+        // as one cluster (#895, #1109).
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
             if (searchOpen) {
                 ConversationSearchTopBar(
@@ -9921,11 +9925,13 @@ private fun ConversationScreen(
             // because WhiteNoiseSnackbarHost pads for those itself.
             val chromeInsets = WindowInsets.navigationBars.union(WindowInsets.ime)
             Box(
-                Modifier.onSizeChanged { size ->
-                    val chromeBottom = chromeInsets.getBottom(density)
-                    snackbarBottomInset.value =
-                        with(density) { (size.height - chromeBottom).coerceAtLeast(0).toDp() }
-                },
+                Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged { size ->
+                        val chromeBottom = chromeInsets.getBottom(density)
+                        snackbarBottomInset.value =
+                            with(density) { (size.height - chromeBottom).coerceAtLeast(0).toDp() }
+                    },
             ) {
                 when {
                     // While search is open the composer steps aside for the match
@@ -10097,7 +10103,14 @@ private fun ConversationScreen(
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                // The composer bottomBar owns IME padding; consume here so the
+                // transcript does not count the keyboard a second time (#895).
+                .consumeWindowInsets(WindowInsets.ime),
+        ) {
             when {
                 controller.error != null -> ErrorContent(stringResource(R.string.couldnt_load_conversation), controller.error.orEmpty())
                 controller.group.pendingConfirmation && renderedTimeline.isEmpty() && !controller.isLoading && initialTimelineLoadStarted ->
@@ -10136,10 +10149,6 @@ private fun ConversationScreen(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
-                                    // The composer bottomBar owns the IME inset via its
-                                    // imePadding(); consume it here so the transcript does
-                                    // not count the keyboard a second time (#895).
-                                    .consumeWindowInsets(WindowInsets.ime)
                                     .padding(horizontal = 12.dp)
                                     .alpha(if (initialTimelineAnchored) 1f else 0f),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -15551,6 +15560,36 @@ private fun ComposerEmojiPickerPane(
 internal val ComposerEmojiPickerFallbackHeight = 320.dp
 internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
 
+/**
+ * Whether the composer bottom cluster (reply preview, edit banner, mention
+ * picker, and input row) should apply [imePadding]. Suppressed while the emoji
+ * pane owns the bottom region so the keyboard/emoji swap does not double-count
+ * insets (#808, #895, #1109).
+ */
+internal fun composerBottomClusterAppliesImePadding(showEmojiPane: Boolean): Boolean = !showEmojiPane
+
+internal fun composerBottomClusterModifier(
+    showEmojiPane: Boolean,
+    base: Modifier = Modifier,
+): Modifier {
+    val withNav = base.navigationBarsPadding()
+    return if (composerBottomClusterAppliesImePadding(showEmojiPane)) {
+        withNav.imePadding()
+    } else {
+        withNav
+    }
+}
+
+/**
+ * Starting a reply grows the bottom input cluster by inserting the preview card.
+ * Re-anchor only on the null -> non-null edge; recompositions while the same
+ * reply is active must not keep stealing scroll while the user types (#1109).
+ */
+internal fun shouldReanchorBottomInputForReplyTargetChange(
+    hadReplyTarget: Boolean,
+    hasReplyTarget: Boolean,
+): Boolean = hasReplyTarget && !hadReplyTarget
+
 internal fun composerEmojiPaneTargetHeight(
     currentImeHeight: Dp,
     rememberedImeHeight: Dp,
@@ -16433,6 +16472,7 @@ private fun ComposerBar(
             if (preEditFieldValue == null) preEditFieldValue = textFieldValue
             val prefill = editingInitialText.orEmpty()
             textFieldValue = TextFieldValue(text = prefill, selection = TextRange(prefill.length))
+            onBottomInputChanged()
             runCatching { composerFocus.requestFocus() }
         } else if (preEditFieldValue != null) {
             // Edit cancelled or submitted: restore the draft the user had
@@ -16550,11 +16590,13 @@ private fun ComposerBar(
     // re-toggle the keyboard while the user is already typing.
     var hadReplyTarget by remember { mutableStateOf(replyingTo != null) }
     LaunchedEffect(replyingTo) {
-        if (replyingTo != null && !hadReplyTarget) {
+        val hasReplyTarget = replyingTo != null
+        if (shouldReanchorBottomInputForReplyTargetChange(hadReplyTarget, hasReplyTarget)) {
+            onBottomInputChanged()
             runCatching { composerFocus.requestFocus() }
             keyboardController?.show()
         }
-        hadReplyTarget = replyingTo != null
+        hadReplyTarget = hasReplyTarget
     }
     // Single send path shared by the FAB and the Enter key (#404). Clears the
     // input/draft and scroll-to-newest ONLY after the controller confirms the
@@ -16629,10 +16671,7 @@ private fun ComposerBar(
         restoreKeyboardFromEmojiPane()
     }
     Column(
-        modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .then(if (showEmojiPane) Modifier else Modifier.imePadding()),
+        composerBottomClusterModifier(showEmojiPane, modifier.fillMaxWidth()),
     ) {
         Column(
             Modifier
