@@ -339,6 +339,16 @@ class MarkdownPreviewTextTest {
     }
 
     @Test
+    fun inlineMentionCollectorStopsAtBreadthCap() {
+        val npub = "npub1" + "q".repeat(58)
+        val inlines =
+            List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { MarkdownInlineFfi.Text("") } +
+                MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, npub))
+
+        assertEquals(emptySet<String>(), markdownInlineMentionBech32s(inlines))
+    }
+
+    @Test
     fun siblingRenderListIsCappedAndReportsElision() {
         val blocks = List(MARKDOWN_MAX_CONTAINER_SIBLINGS + 2) { paragraph("block-$it") }
 
@@ -404,6 +414,22 @@ class MarkdownPreviewTextTest {
                 blocks =
                     List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { MarkdownBlockFfi.ThematicBreak } +
                         paragraph("never reached"),
+            )
+
+        assertEquals("", annotated.text)
+    }
+
+    @Test
+    fun previewInlineWalkStopsAtBreadthCapEvenWhenSiblingsAreEmpty() {
+        val annotated =
+            build(
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            List(MARKDOWN_MAX_CONTAINER_SIBLINGS) { MarkdownInlineFfi.Emph(emptyList()) } +
+                                MarkdownInlineFfi.Text("never reached"),
+                        ),
+                    ),
             )
 
         assertEquals("", annotated.text)

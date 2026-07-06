@@ -53,6 +53,43 @@ class MediaInventoryTest {
     }
 
     @Test
+    fun urlOnlyExtractionReturnsLinksWithoutMediaBuckets() {
+        val urls =
+            MediaInventory.urls(
+                listOf(
+                    record(
+                        id = "m",
+                        attachments = listOf(attachment("image/png", "a.png")),
+                        body = link("https://example.com/article"),
+                    ),
+                ),
+            )
+
+        assertEquals(listOf("https://example.com/article"), urls.map { it.url })
+    }
+
+    @Test
+    fun urlExtractionStopsAtInlineBreadthCap() {
+        val body =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            List(dev.ipf.whitenoise.android.ui.MARKDOWN_MAX_CONTAINER_SIBLINGS) { MarkdownInlineFfi.Text("") } +
+                                MarkdownInlineFfi.Link(
+                                    dest = "https://example.com/never",
+                                    title = null,
+                                    children = listOf(MarkdownInlineFfi.Text("never")),
+                                ),
+                        ),
+                    ),
+            )
+
+        assertTrue(MediaInventory.urls(listOf(record(id = "m", body = body))).isEmpty())
+    }
+
+    @Test
     fun bodyImageUrlIsClassifiedAsImageNotUrl() {
         // A bare image link counts as an image (LinkedUrl source) and is kept out
         // of the URLs bucket so the same link isn't shown twice.

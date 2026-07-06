@@ -77,6 +77,7 @@ object VoicePlaybackController {
     private var currentOwnerKey: String? = null
     private var tickerJob: Job? = null
     private var currentSpeed: Float = 1f
+    private var playbackGeneration: Long = 0L
 
     // play() suspends while MediaPlayer prepares on IO; serialize callers so
     // only one prepared player can ever reach start()/assignment.
@@ -220,7 +221,9 @@ object VoicePlaybackController {
             startTicker()
             return
         }
+        val prepareGeneration = nextPlaybackGeneration()
         releasePlayerInternal()
+        _state.value = PlaybackState(key = key, isPlaying = false, speed = currentSpeed)
         val mp =
             withContext(Dispatchers.IO) {
                 runCatching {
@@ -250,6 +253,10 @@ object VoicePlaybackController {
                 _state.value = PlaybackState()
                 return
             }
+        if (prepareGeneration != playbackGeneration) {
+            mp.runCatching { release() }
+            return
+        }
         // MediaPlayer instantiated on Dispatchers.IO has no Looper → its
         // callbacks fire on an internal MediaPlayer thread. State that we
         // also touch from Main (player, currentKey, _state) must only be
@@ -367,7 +374,14 @@ object VoicePlaybackController {
 
     /** Pause the active player (no-op if nothing is active). */
     fun pause() {
-        val mp = player ?: return
+        nextPlaybackGeneration()
+        val mp =
+            player ?: run {
+                _state.value = _state.value.copy(isPlaying = false)
+                stopTicker()
+                abandonFocus()
+                return
+            }
         if (runCatching { mp.isPlaying }.getOrDefault(false)) {
             mp.pause()
             _state.value =
@@ -407,8 +421,14 @@ object VoicePlaybackController {
 
     /** Stop and release the active player. */
     fun stop() {
+        nextPlaybackGeneration()
         releasePlayerInternal()
         _state.value = PlaybackState()
+    }
+
+    private fun nextPlaybackGeneration(): Long {
+        playbackGeneration += 1L
+        return playbackGeneration
     }
 
     private fun releasePlayerInternal() {

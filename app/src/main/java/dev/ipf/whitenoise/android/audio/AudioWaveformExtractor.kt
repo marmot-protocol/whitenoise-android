@@ -43,6 +43,7 @@ object AudioWaveformExtractor {
     // internally synchronized, preserving the prior ConcurrentHashMap's
     // thread-safety guarantee.
     private const val CACHE_MAX_ENTRIES = 256
+    private val UNAVAILABLE_WAVEFORM = FloatArray(0)
 
     // android.media.AudioFormat.ENCODING_PCM_* values, redeclared so the pure
     // decode logic stays free of the Android framework (keeps decodeBlocking
@@ -56,7 +57,8 @@ object AudioWaveformExtractor {
     private val cache = LruCache<String, FloatArray>(CACHE_MAX_ENTRIES)
 
     suspend fun decode(file: File): FloatArray? {
-        cache.get(file.absolutePath)?.let { return it }
+        val cacheKey = waveformCacheKey(file)
+        cache.get(cacheKey)?.let { return it.takeIf { cached -> cached.isNotEmpty() } }
         val result =
             withContext(Dispatchers.IO) {
                 runCatching { decodeBlocking(file) { ensureActive() } }
@@ -65,9 +67,11 @@ object AudioWaveformExtractor {
                         Log.w(TAG, "decode failed", it)
                     }.getOrNull()
             }
-        if (result != null) cache.put(file.absolutePath, result)
+        cache.put(cacheKey, result ?: UNAVAILABLE_WAVEFORM)
         return result
     }
+
+    internal fun waveformCacheKey(file: File): String = "${file.absolutePath}:${file.length()}:${file.lastModified()}"
 
     private fun decodeBlocking(
         file: File,

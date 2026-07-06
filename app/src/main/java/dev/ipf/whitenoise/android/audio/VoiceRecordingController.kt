@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /** Hold-to-record controller. Slide left to cancel, slide up to lock,
  *  release to send. Auto-stops at [MAX_RECORDING_MS]. */
@@ -48,6 +49,24 @@ class VoiceRecordingController(
         // encoder, so the trailing word isn't clipped when they release as their
         // last syllable ends. Short enough to stay imperceptible as send latency.
         const val RECORDING_TAIL_MS: Long = 400L
+
+        internal val STALE_VOICE_TEMP_AGE_MS: Long = TimeUnit.HOURS.toMillis(24)
+
+        internal fun sweepStaleVoiceTempFiles(
+            outputDirectory: File,
+            nowMillis: Long = System.currentTimeMillis(),
+            staleAgeMillis: Long = STALE_VOICE_TEMP_AGE_MS,
+        ): Int {
+            val cutoff = nowMillis - staleAgeMillis
+            return outputDirectory
+                .listFiles { file ->
+                    file.isFile &&
+                        file.name.startsWith("voice-") &&
+                        file.name.endsWith(".${VoiceRecorder.FILE_EXTENSION}") &&
+                        file.lastModified() in 1 until cutoff
+                }?.count { runCatching { it.delete() }.getOrDefault(false) }
+                ?: 0
+        }
     }
 
     var isRecording: Boolean by mutableStateOf(false)
@@ -78,6 +97,10 @@ class VoiceRecordingController(
     private val recorderScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private var focusRequest: AudioFocusRequest? = null
+
+    init {
+        recorderScope.launch { sweepStaleVoiceTempFiles(outputDirectory) }
+    }
 
     // The in-flight stop() finalize (the post-release tail + encoder stop) and a
     // signal to cut its tail short when a new recording starts during it.
