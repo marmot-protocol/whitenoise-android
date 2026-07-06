@@ -239,6 +239,21 @@ internal fun NewGroupSetupScreen(
                 )
             }
             item { SectionHeader("${stringResource(R.string.members)} · ${members.size}") }
+            if (members.isEmpty()) {
+                // Members are optional — the group can be created empty and
+                // people added afterward from group details.
+                item {
+                    Text(
+                        stringResource(R.string.group_add_members_after_create),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
+                    )
+                }
+            }
             items(members, key = { it.accountIdHex }) { member ->
                 ContactRow(
                     title = appState.displayName(member.accountIdHex),

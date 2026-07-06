@@ -128,7 +128,6 @@
     <string name="scan_member_qr_code">Üye QR kodunu tara</string>
     <string name="error_one_valid_member_reference">Geçerli bir npub, profil bağlantısı veya ortak anahtar girin.</string>
     <string name="add_member">Üyeler ekle</string>
-    <string name="add_as_admin">Yönetici olarak ekle</string>
     <string name="adding_member">Üye ekleniyor...</string>
     <string name="add_member_already_in_group">%1$s zaten bu grupta</string>
     <string name="invite_pending">Davet bekliyor: %1$s</string>
@@ -894,4 +893,5 @@
     <string name="onboarding_slogan_uncensorable">Sansürlenemez</string>
     <string name="onboarding_slogan_secure_messaging">Güvenli Mesajlaşma</string>
     <string name="sign_in_error_public_key">Bu bir genel anahtar. Giriş yapmak için gizli anahtarınızı (nsec) girin.</string>
+    <string name="group_add_members_after_create">Üyeleri grubu oluşturduktan sonra ekleyebilirsiniz.</string>
 </resources>

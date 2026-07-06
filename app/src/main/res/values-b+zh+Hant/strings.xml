@@ -127,7 +127,6 @@
     <string name="scan_member_qr_code">掃描會員QR碼</string>
     <string name="error_one_valid_member_reference">輸入一個有效的 npub、個人資料連結或公鑰。</string>
     <string name="add_member">新增成員</string>
-    <string name="add_as_admin">以管理員身分新增</string>
     <string name="adding_member">正在加入成員...</string>
     <string name="add_member_already_in_group">%1$s 已在此群組中</string>
     <string name="invite_pending">邀請待處理：%1$s</string>
@@ -888,4 +887,5 @@
     <string name="onboarding_slogan_uncensorable">抗審查</string>
     <string name="onboarding_slogan_secure_messaging">安全通訊</string>
     <string name="sign_in_error_public_key">這是公鑰。請輸入你的私鑰（nsec）登入。</string>
+    <string name="group_add_members_after_create">建立群組後可以新增成員。</string>
 </resources>

@@ -128,7 +128,6 @@
     <string name="scan_member_qr_code">Scannen Sie den QR-Code des Mitglieds</string>
     <string name="error_one_valid_member_reference">Geben Sie einen gültigen npub, Profillink oder öffentlichen Schlüssel ein.</string>
     <string name="add_member">Mitglieder hinzufügen</string>
-    <string name="add_as_admin">Als Admin hinzufügen</string>
     <string name="adding_member">Mitglied wird hinzugefügt...</string>
     <string name="add_member_already_in_group">%1$s ist bereits in dieser Gruppe</string>
     <string name="invite_pending">Einladung ausstehend: %1$s</string>
@@ -894,4 +893,5 @@
     <string name="onboarding_slogan_uncensorable">Unzensierbar</string>
     <string name="onboarding_slogan_secure_messaging">Sichere Nachrichten</string>
     <string name="sign_in_error_public_key">Das ist ein öffentlicher Schlüssel. Gib deinen geheimen Schlüssel (nsec) ein, um dich anzumelden.</string>
+    <string name="group_add_members_after_create">Mitglieder kannst du nach dem Erstellen der Gruppe hinzufügen.</string>
 </resources>
