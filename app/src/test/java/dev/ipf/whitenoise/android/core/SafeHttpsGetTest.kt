@@ -61,6 +61,24 @@ class SafeHttpsGetTest {
         assertFalse(filtered.containsKey("Proxy-Authorization"))
     }
 
+    @Test
+    fun requestDeadlineUsesAnAbsoluteBudgetBeyondOneReadTimeout() {
+        assertEquals(
+            20_000L,
+            SafeHttpsGet.requestDeadlineMillis(connectTimeoutMillis = 5_000, readTimeoutMillis = 10_000),
+        )
+        assertEquals(
+            15_000L,
+            SafeHttpsGet.requestDeadlineMillis(connectTimeoutMillis = 12_000, readTimeoutMillis = 3_000),
+        )
+    }
+
+    @Test
+    fun deadlineExceededTreatsPastDeadlineAsExpired() {
+        assertTrue(SafeHttpsGet.deadlineExceeded(System.nanoTime() - 1_000_000L))
+        assertFalse(SafeHttpsGet.deadlineExceeded(System.nanoTime() + 60_000_000_000L))
+    }
+
     // ---- DNS-rebinding pin (#982): the connection dials the vetted IP while
     // ---- SNI / Host / certificate verification keep the original hostname.
 
