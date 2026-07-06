@@ -67,28 +67,32 @@ jobs:
           # poison the cache for downstream master builds.
           cache-read-only: true
 
-      - name: Assemble dev debug APK (arm64-v8a)
-        run: >-
-          ./gradlew :app:assembleDevDebug
-          --no-daemon
-          --stacktrace
-          -Pandroid.injected.build.abi=arm64-v8a
+      # The dev flavor already declares `splits.abi { include("arm64-v8a", ...) }`
+      # so `assembleDevDebug` produces one APK per ABI plus a universal APK; no
+      # `-Pandroid.injected.build.abi` flag is needed. Selecting the arm64-v8a
+      # split happens in the locate step below.
+      - name: Assemble dev debug APK
+        run: ./gradlew :app:assembleDevDebug --no-daemon --stacktrace
 
       - name: Locate built APK
         id: locate
         shell: bash
         run: |
           set -euo pipefail
-          apk_path=$(find app/build/outputs/apk/dev/debug -name '*arm64-v8a*.apk' -print -quit)
+          # Search recursively — AGP output path conventions can shift between
+          # major versions, and this workflow needs to survive that.
+          apk_path=$(find app/build/outputs/apk -type f -name '*arm64-v8a*.apk' -print -quit)
           if [[ -z "$apk_path" ]]; then
-            # Fallback: universal APK if the ABI split wasn't produced.
-            apk_path=$(find app/build/outputs/apk/dev/debug -name '*.apk' -print -quit)
+            # Fallback: universal APK if the ABI split was not produced.
+            apk_path=$(find app/build/outputs/apk -type f -name '*universal*.apk' -print -quit)
           fi
           if [[ -z "$apk_path" ]]; then
-            printf 'No APK produced under app/build/outputs/apk/dev/debug/\n' >&2
+            printf 'No APK produced under app/build/outputs/apk. Tree:\n' >&2
+            find app/build/outputs -type f -name '*.apk' >&2 || true
             exit 1
           fi
           printf 'apk_path=%s\n' "$apk_path" >> "$GITHUB_OUTPUT"
+          printf 'Selected APK: %s\n' "$apk_path"
 
       # Upload only for PRs raised from the base repository. Fork PRs still ran
       # the build above (so CI validates the change), but the artifact link is
