@@ -21,6 +21,7 @@ import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
+import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.state.APP_LOCK_ALLOWED_AUTHENTICATORS
@@ -37,6 +38,7 @@ class MainActivity : FragmentActivity() {
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
     private var appUnlockPromptActive = false
     private var appLockBackgroundSecureFlagRetained = false
+    private lateinit var notificationTapTokens: NotificationTapTokens
     private lateinit var appState: WhiteNoiseAppState
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,6 +49,7 @@ class MainActivity : FragmentActivity() {
         setTheme(preComposeThemeFor(readPersistedThemeMode(), initialSystemDarkTheme))
         super.onCreate(savedInstanceState)
         appState = (application as WhiteNoiseApplication).appState
+        notificationTapTokens = NotificationTapTokens.create(this)
         consumeIntent(intent)
         enableEdgeToEdge()
         applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
@@ -95,7 +98,10 @@ class MainActivity : FragmentActivity() {
      * already-queued target/link intact (see [routeInboundIntent]).
      */
     private fun consumeIntent(intent: Intent?) {
-        val parsedTarget = NotificationNavigation.parse(intent)
+        val parsedTarget =
+            NotificationNavigation.parse(intent) { notificationKey, tapToken ->
+                notificationTapTokens.isValid(notificationKey, tapToken)
+            }
         val routing =
             routeInboundIntent(
                 parsedTarget = parsedTarget,

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.notifications
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.RemoteInput
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
@@ -63,6 +64,13 @@ class NotificationActionReceiver : BroadcastReceiver() {
     ) {
         val application = appContext as? WhiteNoiseApplication ?: return
         val appState = application.appState
+        if (!appState.notificationActionsAllowed) {
+            Log.w(
+                "DMNotifyAction",
+                "notification action blocked by app lock kind=${action.kind} group=${action.target.groupIdHex.take(8)}",
+            )
+            return
+        }
         when (action.kind) {
             NotificationActionKind.REPLY -> handleReplyAction(appContext, appState, action, intent)
             NotificationActionKind.MARK_READ -> {
@@ -94,19 +102,30 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 ?.trim()
                 .orEmpty()
         if (reply.isBlank()) return
+        val replyKey = ReplyDispatchKey(action.target.accountRef, action.target.groupIdHex, reply)
+        if (!tryBeginReplyDispatch(replyKey)) {
+            Log.w(
+                "DMNotifyAction",
+                "duplicate notification reply ignored group=${action.target.groupIdHex.take(8)}",
+            )
+            return
+        }
 
         // Set as soon as the FFI send reports success. The finally block below
         // then owns RemoteInput cleanup even if best-effort mark-read stalls or
         // the reserved send/bootstrap phase times out after the send completed.
         var sentReplyText: String? = null
+        var completed: Boolean? = null
+        var sendDispatched = false
         try {
-            val completed =
+            completed =
                 // This timeout is cooperative: slow JNI/Binder work can run past
                 // it until the next suspension point. The split still reserves a
                 // best-effort dismiss window after a successful send, trading a
                 // shorter cold-start send phase for lower duplicate-send risk.
                 withTimeoutOrNull(REPLY_SEND_PHASE_BUDGET_MS) {
                     appState.ensureNotificationRuntimeStarted()
+                    sendDispatched = true
                     val sent =
                         appState.sendNotificationReply(
                             accountRef = action.target.accountRef,
@@ -151,6 +170,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 )
             }
         } finally {
+            finishReplyDispatch(replyKey, keepRecent = sentReplyText != null || (completed == null && sendDispatched))
             sentReplyText?.let {
                 dismissSentReplyNotification(appContext, action, it)
             }
@@ -198,6 +218,43 @@ class NotificationActionReceiver : BroadcastReceiver() {
             }
         }
     }
+
+    private data class ReplyDispatchKey(
+        val accountRef: String,
+        val groupIdHex: String,
+        val reply: String,
+    )
+
+    private companion object {
+        private val replyDispatches = mutableMapOf<ReplyDispatchKey, Long>()
+
+        fun tryBeginReplyDispatch(key: ReplyDispatchKey): Boolean =
+            synchronized(replyDispatches) {
+                pruneExpiredReplyDispatchesLocked()
+                if (key in replyDispatches) return@synchronized false
+                replyDispatches[key] = SystemClock.elapsedRealtime() + REPLY_DEDUP_WINDOW_MS
+                true
+            }
+
+        fun finishReplyDispatch(
+            key: ReplyDispatchKey,
+            keepRecent: Boolean,
+        ) {
+            synchronized(replyDispatches) {
+                if (keepRecent) {
+                    replyDispatches[key] = SystemClock.elapsedRealtime() + REPLY_DEDUP_WINDOW_MS
+                } else {
+                    replyDispatches.remove(key)
+                }
+                pruneExpiredReplyDispatchesLocked()
+            }
+        }
+
+        private fun pruneExpiredReplyDispatchesLocked() {
+            val now = SystemClock.elapsedRealtime()
+            replyDispatches.entries.removeAll { it.value <= now }
+        }
+    }
 }
 
 internal fun notificationReplyActionHandled(sent: Boolean): Boolean = sent
@@ -227,3 +284,4 @@ private val REPLY_SEND_PHASE_BUDGET_MS = notificationReplySendPhaseBudgetMs()
 private const val REPLY_DISMISS_RETRIES = 6
 private const val REPLY_DISMISS_RETRY_DELAY_MS = 100L
 private const val REPLY_DISMISS_SETTLE_MS = 350L
+private const val REPLY_DEDUP_WINDOW_MS = 30_000L

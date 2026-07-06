@@ -201,6 +201,13 @@ class ForegroundStartDecisionTest {
     }
 
     @Test
+    fun onlyPushWakeUsesPartialWakeLock() {
+        assertEquals(true, shouldHoldPushWakeLock(ForegroundStartTrigger.PushWake))
+        assertEquals(false, shouldHoldPushWakeLock(ForegroundStartTrigger.UserToggle))
+        assertEquals(false, shouldHoldPushWakeLock(ForegroundStartTrigger.SystemWake))
+    }
+
+    @Test
     fun stickySystemWakeRestartStopsWhenKeepConnectedIsDisabled() {
         assertEquals(
             true,
