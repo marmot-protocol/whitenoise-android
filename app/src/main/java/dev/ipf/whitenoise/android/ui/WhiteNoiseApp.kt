@@ -568,6 +568,10 @@ private fun rememberMessageTextCopy(): MessageTextCopy =
         agentStreamStarted = stringResource(R.string.agent_stream_started),
         streamFinished = stringResource(R.string.stream_finished),
         mediaAttachment = stringResource(R.string.media_attachment),
+        mediaPhoto = stringResource(R.string.reply_media_photo),
+        mediaVideo = stringResource(R.string.reply_media_video),
+        mediaVoice = stringResource(R.string.reply_media_voice),
+        mediaDocument = stringResource(R.string.reply_media_document),
         message = stringResource(R.string.generic_message),
         groupSystem = rememberGroupSystemCopy(),
     )

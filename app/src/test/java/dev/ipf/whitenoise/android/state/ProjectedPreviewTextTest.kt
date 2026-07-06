@@ -7,8 +7,10 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -90,6 +92,32 @@ class ProjectedPreviewTextTest {
     }
 
     @Test
+    fun blankMediaPreviewUsesTypedFallbackWhenLatestCarriesImetaTags() {
+        val item =
+            item(
+                preview = preview(plaintext = "", kind = 9uL),
+                latest =
+                    latest(
+                        plaintext = "",
+                        tags = listOf(MessageTagFfi(listOf("imeta", "m image/png"))),
+                    ),
+            )
+
+        assertEquals(copy.mediaPhoto, item.projectedPreviewText(copy))
+    }
+
+    @Test
+    fun blankMediaPreviewUsesResolvedMediaKindFromController() {
+        val item =
+            item(
+                preview = preview(plaintext = "", kind = 9uL),
+                resolvedMediaKind = ReplyMediaKind.Video,
+            )
+
+        assertEquals(copy.mediaVideo, item.projectedPreviewText(copy))
+    }
+
+    @Test
     fun withoutAProjectionThePreviewComesFromTheLatestRecord() {
         val item = item(preview = null, latest = latest(plaintext = "from latest"))
 
@@ -109,6 +137,7 @@ class ProjectedPreviewTextTest {
     private fun item(
         preview: ChatListMessagePreviewFfi?,
         latest: AppMessageRecordFfi? = null,
+        resolvedMediaKind: ReplyMediaKind? = null,
     ): ChatListItem =
         ChatListItem(
             group = group("group-a"),
@@ -117,6 +146,7 @@ class ProjectedPreviewTextTest {
             memberCount = 0,
             memberSnapshot = null,
             projection = preview?.let { row("group-a", it) },
+            resolvedMediaKind = resolvedMediaKind,
         )
 
     private fun preview(
@@ -134,19 +164,21 @@ class ProjectedPreviewTextTest {
         deleted = deleted,
     )
 
-    private fun latest(plaintext: String) =
-        AppMessageRecordFfi(
-            messageIdHex = "latest-message",
-            direction = "received",
-            groupIdHex = "group-a",
-            sender = "sender",
-            plaintext = plaintext,
-            contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
-            kind = 9uL,
-            tags = emptyList(),
-            recordedAt = 5uL,
-            receivedAt = 5uL,
-        )
+    private fun latest(
+        plaintext: String,
+        tags: List<MessageTagFfi> = emptyList(),
+    ) = AppMessageRecordFfi(
+        messageIdHex = "latest-message",
+        direction = "received",
+        groupIdHex = "group-a",
+        sender = "sender",
+        plaintext = plaintext,
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        kind = 9uL,
+        tags = tags,
+        recordedAt = 5uL,
+        receivedAt = 5uL,
+    )
 
     private fun row(
         groupId: String,

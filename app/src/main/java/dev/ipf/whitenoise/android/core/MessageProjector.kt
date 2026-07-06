@@ -17,10 +17,23 @@ data class MessageTextCopy(
     val agentStreamStarted: String,
     val streamFinished: String,
     val mediaAttachment: String,
+    val mediaPhoto: String = "Photo",
+    val mediaVideo: String = "Video",
+    val mediaVoice: String = "Voice message",
+    val mediaDocument: String = "File",
     val message: String,
     val groupSystem: GroupSystemCopy = GroupSystemCopy.Default,
 ) {
     fun reacted(value: String): String = String.format(reactedFormat, value)
+
+    fun mediaLabel(kind: ReplyMediaKind): String =
+        when (kind) {
+            ReplyMediaKind.Photo -> mediaPhoto
+            ReplyMediaKind.Video -> mediaVideo
+            ReplyMediaKind.Voice -> mediaVoice
+            ReplyMediaKind.Document -> mediaDocument
+            ReplyMediaKind.None -> mediaAttachment
+        }
 
     companion object {
         val Default =
@@ -32,6 +45,10 @@ data class MessageTextCopy(
                 agentStreamStarted = "Agent stream started",
                 streamFinished = "Stream finished",
                 mediaAttachment = "Media attachment",
+                mediaPhoto = "Photo",
+                mediaVideo = "Video",
+                mediaVoice = "Voice message",
+                mediaDocument = "File",
                 message = "Message",
             )
     }
@@ -64,10 +81,7 @@ object MessageProjector {
             // body. The conversation row builds the name-resolved summary;
             // this name-free form covers reply previews and copy-text.
             isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
-            isMedia(message) ->
-                message.plaintext.takeIf { it.isNotBlank() }
-                    ?: imetaField(message, "filename")
-                    ?: copy.mediaAttachment
+            isMedia(message) -> mediaBodyText(message, copy)
             else -> message.plaintext
         }
 
@@ -83,10 +97,7 @@ object MessageProjector {
             isStreamStart(message) -> copy.agentStreamStarted
             isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
             isStreamFinal(message) -> message.plaintext.ifBlank { copy.streamFinished }
-            isMedia(message) ->
-                message.plaintext.takeIf { it.isNotBlank() }
-                    ?: imetaField(message, "filename")
-                    ?: copy.mediaAttachment
+            isMedia(message) -> mediaBodyText(message, copy)
             else -> message.plaintext.ifBlank { copy.message }
         }
     }
@@ -309,6 +320,14 @@ object MessageProjector {
     fun streamTag(streamId: String): MessageTagFfi = MessageTagFfi(listOf(StreamTag, streamId))
 
     private fun isMedia(message: AppMessageRecordFfi): Boolean = message.kind == KindChat && message.tags.any { it.values.firstOrNull() == ImetaTag }
+
+    private fun mediaBodyText(
+        message: AppMessageRecordFfi,
+        copy: MessageTextCopy,
+    ): String =
+        message.plaintext.takeIf { it.isNotBlank() }
+            ?: imetaField(message, "filename")
+            ?: copy.mediaLabel(mediaKind(message))
 
     // Coarse media classification for a captionless record, so a surface that
     // shows a type-aware label (e.g. a notification body) can say "sent a
