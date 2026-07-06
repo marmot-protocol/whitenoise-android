@@ -10,6 +10,11 @@ object ReplyNavigation {
     // initial timeline window; page further than reply/mention jumps (#1113).
     const val MaxOlderPagesForReaction = 40
 
+    data class ScrollTarget(
+        val messageIdHex: String,
+        val maxOlderPages: Int,
+    )
+
     fun centeredScrollOffset(
         viewportHeightPx: Int,
         itemHeightPx: Int? = null,
@@ -53,20 +58,50 @@ object ReplyNavigation {
         record: AppMessageRecordFfi,
         projected: TimelineMessageRecordFfi?,
     ): String? =
-        MessageProjector.reactedToMessageId(record)
-            ?: projected
-                ?.replyPreview
-                ?.messageIdHex
-                ?.takeIf { it.isNotBlank() }
+        projected
+            ?.replyPreview
+            ?.messageIdHex
+            ?.takeIf { it.isNotBlank() }
             ?: projected
                 ?.replyToMessageIdHex
                 ?.takeIf { it.isNotBlank() }
             ?: MessageProjector.replyTargetMessageId(record)
 
+    fun scrollNavigationTarget(
+        sourceMessageIdHex: String,
+        sourceRecord: AppMessageRecordFfi?,
+    ): ScrollTarget {
+        if (sourceRecord == null) return ScrollTarget(sourceMessageIdHex, MaxOlderPages)
+        val targetMessageId = MessageProjector.reactedToMessageId(sourceRecord)
+        return ScrollTarget(
+            messageIdHex = targetMessageId ?: sourceMessageIdHex,
+            maxOlderPages = maxOlderPagesForRecord(sourceRecord),
+        )
+    }
+
     fun scrollTargetMessageId(
         sourceMessageIdHex: String,
         sourceRecord: AppMessageRecordFfi?,
-    ): String = MessageProjector.reactedToMessageId(sourceRecord ?: return sourceMessageIdHex) ?: sourceMessageIdHex
+    ): String = scrollNavigationTarget(sourceMessageIdHex, sourceRecord).messageIdHex
+
+    suspend fun loadScrollNavigationTarget(
+        sourceMessageIdHex: String,
+        lookupSourceRecord: suspend () -> AppMessageRecordFfi?,
+        loadUntilMessageAvailable: suspend (String, Int) -> Boolean,
+    ): String? {
+        var target = scrollNavigationTarget(sourceMessageIdHex, lookupSourceRecord())
+        if (!loadUntilMessageAvailable(target.messageIdHex, target.maxOlderPages)) return null
+
+        if (target.messageIdHex.equals(sourceMessageIdHex, ignoreCase = true)) {
+            val resolved = scrollNavigationTarget(sourceMessageIdHex, lookupSourceRecord())
+            if (!resolved.messageIdHex.equals(target.messageIdHex, ignoreCase = true)) {
+                if (!loadUntilMessageAvailable(resolved.messageIdHex, resolved.maxOlderPages)) return null
+                target = resolved
+            }
+        }
+
+        return target.messageIdHex
+    }
 
     fun maxOlderPagesForRecord(record: AppMessageRecordFfi?): Int =
         if (record != null && MessageProjector.isReaction(record)) {

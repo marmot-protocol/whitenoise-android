@@ -9280,8 +9280,7 @@ private fun ConversationScreen(
         navigateReplyJob =
             scope.launch {
                 val targetMessageId = controller.replyTargetMessageId(item)
-                val maxOlderPages = ReplyNavigation.maxOlderPagesForRecord(item.record)
-                if (targetMessageId == null || !controller.loadUntilMessageAvailable(targetMessageId, maxOlderPages)) {
+                if (targetMessageId == null || !controller.loadUntilMessageAvailable(targetMessageId)) {
                     appState.present(R.string.toast_original_message_unavailable)
                     return@launch
                 }
@@ -9811,8 +9810,8 @@ private fun ConversationScreen(
         // Let the initial unread/newest anchor run first so our scroll isn't
         // immediately overwritten by it.
         snapshotFlow { initialTimelineAnchored }.filter { it }.first()
-        val (target, maxOlderPages) = controller.scrollNavigationTarget(focus)
-        if (!controller.loadUntilMessageAvailable(target, maxOlderPages)) {
+        val target = controller.loadScrollNavigationTarget(focus)
+        if (target == null) {
             appState.present(R.string.toast_original_message_unavailable)
             return@LaunchedEffect
         }
