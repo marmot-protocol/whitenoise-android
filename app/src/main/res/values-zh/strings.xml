@@ -56,6 +56,8 @@
     <string name="close_quick_actions">关闭快速操作</string>
     <string name="open_quick_actions">打开快速操作</string>
     <string name="scan_qr_code">扫码</string>
+    <string name="show_my_qr_code">显示我的二维码</string>
+    <string name="show_my_qr_code_helper">向使用 Nostr 客户端的人展示此二维码，让对方可以和你开始聊天。</string>
     <string name="new_group">新建群组</string>
     <string name="invitation">邀请函</string>
     <string name="invited">已受邀</string>
