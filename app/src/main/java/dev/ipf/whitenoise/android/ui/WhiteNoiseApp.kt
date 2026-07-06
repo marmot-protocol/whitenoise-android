@@ -15481,6 +15481,7 @@ private fun EmojiPickerSheet(
     onCustomizeReactions: ((Boolean) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val scope = rememberCoroutineScope()
     LaunchedEffect(restoreExpanded, sheetState) {
         if (restoreExpanded) {
             runCatching { sheetState.expand() }
@@ -15503,10 +15504,19 @@ private fun EmojiPickerSheet(
                 },
             searchFieldAlwaysVisible = true,
             searchStartsOpen = false,
+            // Focusing the search field expands the sheet to full screen;
+            // imePadding then lifts the whole picker (grid + category rail)
+            // above the keyboard so nothing hides behind the IME (#1104). The
+            // sheet still opens at its partial detent for tap-to-react browsing.
+            onSearchActiveChange = { active ->
+                if (active) {
+                    scope.launch { runCatching { sheetState.expand() } }
+                }
+            },
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.9f)
+                    .fillMaxHeight()
                     .navigationBarsPadding()
                     .imePadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
