@@ -5,8 +5,11 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ImageDecoder
 import android.graphics.Matrix
 import android.graphics.PorterDuff
+import android.graphics.drawable.AnimatedImageDrawable
+import android.graphics.drawable.Drawable
 import android.media.ExifInterface
 import android.net.Uri
 import java.io.ByteArrayOutputStream
@@ -128,6 +131,9 @@ object MediaPipeline {
      */
     const val VIEWER_MAX_EDGE_PX: Int = 2560
 
+    /** Max longer-edge (px) for animated GIF/WebP decodes in chat attachments. */
+    const val ANIMATED_IMAGE_MAX_EDGE_PX: Int = 1080
+
     /**
      * Replace whatever extension the source carried with `.jpg`, since the
      * payload is always recompressed to JPEG. Without this swap, the imeta
@@ -215,6 +221,75 @@ object MediaPipeline {
                 null
             } ?: return null
         return scaleAndOrientBitmap(decoded, target.rawWidth, target.rawHeight, orientation)
+    }
+
+    /**
+     * True when [mediaType] / [bytes] identify an attachment that should use
+     * the animated [ImageDecoder] path (GIF always; WebP only when an ANIM
+     * chunk is present).
+     */
+    fun isAnimatedImageAttachment(
+        mediaType: String,
+        bytes: ByteArray,
+    ): Boolean {
+        if (mediaType.equals("image/gif", ignoreCase = true)) return true
+        if (mediaType.equals("image/webp", ignoreCase = true) && hasWebpAnimChunk(bytes)) return true
+        if (mediaType.isBlank() || mediaType.equals("application/octet-stream", ignoreCase = true)) {
+            if (isGif(bytes)) return true
+            if (hasWebpAnimChunk(bytes)) return true
+        }
+        return false
+    }
+
+    /**
+     * True when a decoded static thumbnail cache hit can be trusted before the
+     * attachment bytes are available. GIF is always animated; WebP, blank, and
+     * octet-stream need byte sniffing to distinguish static from animated. For
+     * those byte-dependent formats, seeding a Static presentation from an old
+     * thumbnail cache entry would prevent the download/decode pass from reaching
+     * the animated ImageDecoder path.
+     */
+    fun canSeedStaticThumbnailFromMediaType(mediaType: String): Boolean {
+        val normalized = mediaType.trim()
+        if (normalized.isEmpty()) return false
+        if (normalized.equals("image/gif", ignoreCase = true)) return false
+        if (normalized.equals("image/webp", ignoreCase = true)) return false
+        if (normalized.equals("application/octet-stream", ignoreCase = true)) return false
+        return true
+    }
+
+    /**
+     * Decode animated GIF/WebP bytes to an [AnimatedImageDrawable], downscaling
+     * so the longer edge is ≈ [maxEdgePx]. Returns null for static images or
+     * undecodable payloads.
+     */
+    fun decodeAnimatedDrawable(
+        bytes: ByteArray,
+        maxEdgePx: Int = ANIMATED_IMAGE_MAX_EDGE_PX,
+    ): Drawable? {
+        if (bytes.isEmpty()) return null
+        return try {
+            val source = ImageDecoder.createSource(bytes)
+            val drawable =
+                ImageDecoder.decodeDrawable(source) { decoder, info, _ ->
+                    val width = info.size.width
+                    val height = info.size.height
+                    if (width <= 0 || height <= 0) return@decodeDrawable
+                    val maxDim = maxOf(width, height)
+                    if (maxDim > maxEdgePx) {
+                        val scale = maxEdgePx.toFloat() / maxDim
+                        decoder.setTargetSize(
+                            (width * scale).toInt().coerceAtLeast(1),
+                            (height * scale).toInt().coerceAtLeast(1),
+                        )
+                    }
+                }
+            drawable as? AnimatedImageDrawable
+        } catch (_: OutOfMemoryError) {
+            null
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /**
@@ -752,6 +827,24 @@ object MediaPipeline {
     private fun isPng(bytes: ByteArray): Boolean = bytes.size >= PNG_SIGNATURE.size && PNG_SIGNATURE.indices.all { bytes[it] == PNG_SIGNATURE[it] }
 
     private fun isWebp(bytes: ByteArray): Boolean = bytes.size >= 12 && asciiEquals(bytes, 0, "RIFF") && asciiEquals(bytes, 8, "WEBP")
+
+    internal fun isGif(bytes: ByteArray): Boolean =
+        bytes.size >= 6 &&
+            (asciiEquals(bytes, 0, "GIF87a") || asciiEquals(bytes, 0, "GIF89a"))
+
+    internal fun hasWebpAnimChunk(bytes: ByteArray): Boolean {
+        if (!isWebp(bytes)) return false
+        var offset = 12
+        while (offset + 8 <= bytes.size) {
+            val fourcc = ascii(bytes, offset, 4)
+            val chunkSize = u32le(bytes, offset + 4).toInt()
+            if (fourcc == "ANIM") return true
+            if (chunkSize < 0) break
+            val padded = chunkSize + (chunkSize and 1)
+            offset += 8 + padded
+        }
+        return false
+    }
 
     internal fun jpegExifOrientation(bytes: ByteArray): Int? {
         if (!isJpeg(bytes)) return null
