@@ -312,7 +312,7 @@ class MarkdownInlineTextTest {
     }
 
     @Test
-    fun plaintextResolverIgnoresNpubRelayHintSuffixes() {
+    fun plaintextResolverIgnoresNpubRelayHintSuffixesWithoutEatingFollowingWords() {
         val npub = "npub1" + "q".repeat(58)
 
         val resolved =
@@ -322,6 +322,20 @@ class MarkdownInlineTextTest {
             )
 
         assertEquals("hello @Alice after", resolved)
+    }
+
+    @Test
+    fun plaintextResolverPreservesPunctuationAfterNpubRelayHintSuffixes() {
+        val npub = "npub1" + "q".repeat(58)
+
+        val resolved =
+            resolveMentionsInPlaintext(
+                "hello nostr:$npub?relay=wss://relay.example! next " +
+                    "nostr:$npub?relay=wss://relay.example, ok",
+                resolver = { bech32 -> "Alice".takeIf { bech32 == npub } },
+            )
+
+        assertEquals("hello @Alice! next @Alice, ok", resolved)
     }
 
     @Test

@@ -779,12 +779,14 @@ private const val PLAINTEXT_BECH32_BODY_CHARS = "ac-hj-np-z02-9"
 private const val PLAINTEXT_NPUB = "npub1[$PLAINTEXT_BECH32_BODY_CHARS]{58}"
 private const val PLAINTEXT_NPROFILE = "nprofile1[$PLAINTEXT_BECH32_BODY_CHARS]+"
 private const val PLAINTEXT_RELAY_HINT_SUFFIX = "\\?relay=\\S+"
+private const val PLAINTEXT_RELAY_HINT_TRAILING_PUNCTUATION = ".,;:!?)]}"
 
 // `@npub1…`, `nostr:npub1…`, and desktop/NIP-27 `nostr:nprofile1…` runs as
 // they appear in raw engine plaintext. npub bodies have a fixed 58-char bech32
 // payload; nprofile bodies are TLV-shaped and variable length, so validation is
-// left to the resolver rather than the regex. A `nostr:npub1…?relay=…` query is
-// a relay hint for the same profile reference; it is ignored for display/lookup.
+// left to the resolver rather than the regex. A `?relay=…` query appended to a
+// profile reference is a relay hint for the same account; it is ignored for
+// display/lookup while preserving any sentence punctuation after the hint.
 private val PLAINTEXT_PROFILE_MENTION =
     Regex(
         "(@|nostr:)((?:$PLAINTEXT_NPUB)|(?:$PLAINTEXT_NPROFILE))(?:$PLAINTEXT_RELAY_HINT_SUFFIX)?",
@@ -804,7 +806,14 @@ internal fun resolveMentionsInPlaintext(
 ): String =
     PLAINTEXT_PROFILE_MENTION.replace(text) { match ->
         val bech32 = match.groupValues[2]
-        "@" + (resolver?.invoke(bech32) ?: shortenedBech32(bech32))
+        val relayHintSuffix = match.value.removePrefix(match.groupValues[1] + bech32)
+        val trailingPunctuation =
+            relayHintSuffix
+                .takeIf { it.startsWith("?relay=", ignoreCase = true) }
+                ?.takeLastWhile { it in PLAINTEXT_RELAY_HINT_TRAILING_PUNCTUATION }
+                .orEmpty()
+        val visible = resolver?.invoke(bech32) ?: shortenedBech32(bech32)
+        "@$visible$trailingPunctuation"
     }
 
 private fun AnnotatedString.Builder.appendMarkdownLink(
