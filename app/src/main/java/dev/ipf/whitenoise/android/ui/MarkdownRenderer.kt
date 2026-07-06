@@ -779,6 +779,10 @@ private const val PLAINTEXT_BECH32_BODY_CHARS = "ac-hj-np-z02-9"
 private const val PLAINTEXT_NPUB = "npub1[$PLAINTEXT_BECH32_BODY_CHARS]{58}"
 private const val PLAINTEXT_NPROFILE = "nprofile1[$PLAINTEXT_BECH32_BODY_CHARS]+"
 private const val PLAINTEXT_RELAY_HINT_SUFFIX = "\\?relay=\\S+"
+
+// The suffix match consumes through the next whitespace, so sentence punctuation
+// after a relay hint is captured too. These characters are restored after the
+// hint is dropped from the rendered mention text.
 private const val PLAINTEXT_RELAY_HINT_TRAILING_PUNCTUATION = ".,;:!?)]}"
 
 // `@npub1…`, `nostr:npub1…`, and desktop/NIP-27 `nostr:nprofile1…` runs as
