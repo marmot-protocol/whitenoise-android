@@ -20,6 +20,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
@@ -4852,7 +4853,15 @@ internal fun MediaVideoGridTile(
     LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload, reloadToken, cachedPlaintextOnEntry) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
-        if (!mine && epoch == 0uL && !cachedPlaintextOnEntry) return@LaunchedEffect
+        // Re-probe the controller cache right before using the epoch-0 bypass;
+        // the remembered entry snapshot only decides initial UI/download policy.
+        if (
+            !mine &&
+            epoch == 0uL &&
+            !controller.hasCachedAttachment(messageIdHex, attachmentIndex)
+        ) {
+            return@LaunchedEffect
+        }
         runCatching {
             materializeVideoAttachment(
                 context = context,
@@ -5427,7 +5436,15 @@ private fun MediaVideoBubble(
     LaunchedEffect(pillKey, epoch, startDownload, cachedPlaintextOnEntry) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
-        if (!mine && epoch == 0uL && !cachedPlaintextOnEntry) return@LaunchedEffect
+        // Re-probe the controller cache right before using the epoch-0 bypass;
+        // the remembered entry snapshot only decides initial UI/download policy.
+        if (
+            !mine &&
+            epoch == 0uL &&
+            !controller.hasCachedAttachment(messageIdHex, attachmentIndex)
+        ) {
+            return@LaunchedEffect
+        }
         loading = true
         runCatching {
             materializeVideoAttachment(
@@ -5678,6 +5695,7 @@ private suspend fun materializeVideoAttachment(
     return file
 }
 
+@VisibleForTesting
 internal fun cachedVideoAttachmentFile(
     context: android.content.Context,
     messageIdHex: String,
@@ -5691,6 +5709,7 @@ internal fun cachedVideoAttachmentFile(
         reference = reference,
     ).takeIf { it.isFile && it.length() > 0L }
 
+@VisibleForTesting
 internal fun shouldStartVideoAttachmentDownload(
     mine: Boolean,
     videoAutoDownload: Boolean,
@@ -6942,8 +6961,22 @@ private fun VideoViewerPage(
     mine: Boolean,
 ) {
     val context = LocalContext.current
-    var localFile by remember(messageIdHex, attachmentIndex, reference.sourceEpoch) {
-        mutableStateOf<java.io.File?>(null)
+    val cachedFileOnEntry =
+        remember(messageIdHex, attachmentIndex, reference.mediaType) {
+            cachedVideoAttachmentFile(
+                context = context,
+                messageIdHex = messageIdHex,
+                attachmentIndex = attachmentIndex,
+                reference = reference,
+            )
+        }
+    var localFile by remember(
+        messageIdHex,
+        attachmentIndex,
+        reference.sourceEpoch,
+        reference.mediaType,
+    ) {
+        mutableStateOf(cachedFileOnEntry)
     }
     LaunchedEffect(messageIdHex, attachmentIndex, reference.sourceEpoch) {
         if (localFile != null) return@LaunchedEffect
