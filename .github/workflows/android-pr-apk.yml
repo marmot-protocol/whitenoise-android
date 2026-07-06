@@ -91,8 +91,16 @@ jobs:
             find app/build/outputs -type f -name '*.apk' >&2 || true
             exit 1
           fi
+          apk_name=$(basename "$apk_path")
+          # Strip the .apk suffix so actions/upload-artifact appends its own
+          # .zip. The stem already carries pr<N>, flavor, ABI, date, and short
+          # SHA (see app/build.gradle.kts) so the downloaded artifact is
+          # `<same-stem>.zip` with the APK inside.
+          artifact_name=${apk_name%.apk}
           printf 'apk_path=%s\n' "$apk_path" >> "$GITHUB_OUTPUT"
+          printf 'artifact_name=%s\n' "$artifact_name" >> "$GITHUB_OUTPUT"
           printf 'Selected APK: %s\n' "$apk_path"
+          printf 'Artifact name: %s\n' "$artifact_name"
 
       # Upload only for PRs raised from the base repository. Fork PRs still ran
       # the build above (so CI validates the change), but the artifact link is
@@ -103,7 +111,7 @@ jobs:
         if: github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: whitenoise-pr${{ github.event.pull_request.number }}-devDebug-arm64-v8a
+          name: ${{ steps.locate.outputs.artifact_name }}
           path: ${{ steps.locate.outputs.apk_path }}
           if-no-files-found: error
           retention-days: 14
@@ -129,9 +137,9 @@ jobs:
               marker,
               `### Preview APK for PR #${prNumber}`,
               '',
-              `Home-screen label: **${prNumber} White Noise** — installs side-by-side with the production and staging apps.`,
+              `Home-screen label: **${prNumber} White Noise** with the blueprint launcher icon — installs side-by-side with the production and staging apps.`,
               '',
-              `Download the \`whitenoise-pr${prNumber}-devDebug-arm64-v8a\` artifact from the [workflow run](${runUrl}) (GitHub sign-in required). ARM64 only; retention 14 days.`,
+              `Download the APK zip from the [workflow run](${runUrl}) (GitHub sign-in required). ARM64 only; retention 14 days.`,
               '',
               'Every push to this PR rebuilds and updates this comment.',
             ].join('\n');

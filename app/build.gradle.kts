@@ -396,6 +396,16 @@ android {
         }
     }
 
+    // PR preview builds reuse the staging flavor's blueprint launcher icon so
+    // the app on a tester's home screen is visually distinct from the
+    // production/local-dev icon. Layered on top of the dev flavor's own
+    // resources so anything else in src/dev/res still wins over src/staging/res.
+    if (prNumber != null) {
+        sourceSets.getByName("dev") {
+            res.srcDirs("src/staging/res")
+        }
+    }
+
     buildTypes {
         debug {
             // Debug builds keep each flavor's applicationId so the local
@@ -484,6 +494,20 @@ androidComponents {
             val stem = currentName.removeSuffix(".apk")
             val suffix = if (currentName.endsWith(".apk")) ".apk" else ""
             output.outputFileName.set("$stem-$buildDate-$shortSha$suffix")
+        }
+    }
+
+    // Mirror the release-build naming convention onto dev debug APKs during
+    // per-PR preview builds so testers can tell PR previews apart on disk in
+    // the same way they can tell master-branch staging APKs apart.
+    if (prNumber != null) {
+        onVariants(selector().withBuildType("debug").withFlavor("environment" to "dev")) { variant ->
+            variant.outputs.forEach { output ->
+                val currentName = output.outputFileName.get()
+                val stem = currentName.removeSuffix(".apk")
+                val suffix = if (currentName.endsWith(".apk")) ".apk" else ""
+                output.outputFileName.set("whitenoise-pr$prNumber-$stem-$buildDate-$shortSha$suffix")
+            }
         }
     }
 }
