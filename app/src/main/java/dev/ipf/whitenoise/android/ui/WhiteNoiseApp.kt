@@ -15495,36 +15495,32 @@ private fun EmojiPickerSheet(
         // visible collapse/re-expand.
         sheetState = sheetState,
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val density = LocalDensity.current
-            val currentImeHeight = with(density) { WindowInsets.ime.getBottom(this).toDp() }
-            val sheetHeight =
-                emojiPickerSheetHeight(
-                    maxAvailableHeight = maxHeight,
-                    currentImeHeight = currentImeHeight,
-                )
-            EmojiPickerContent(
-                onEmojiPicked = onEmojiPicked,
-                recordRecentPicks = recordRecentPicks,
-                onCustomizeReactions =
-                    onCustomizeReactions?.let { customize ->
-                        { customize(sheetState.currentValue == SheetValue.Expanded) }
-                    },
-                searchFieldAlwaysVisible = true,
-                searchStartsOpen = false,
-                onSearchActiveChange = { active ->
-                    if (active) {
-                        scope.launch { runCatching { sheetState.expand() } }
-                    }
+        EmojiPickerContent(
+            onEmojiPicked = onEmojiPicked,
+            recordRecentPicks = recordRecentPicks,
+            onCustomizeReactions =
+                onCustomizeReactions?.let { customize ->
+                    { customize(sheetState.currentValue == SheetValue.Expanded) }
                 },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(sheetHeight)
-                        .navigationBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-            )
-        }
+            searchFieldAlwaysVisible = true,
+            searchStartsOpen = false,
+            // Focusing the search field expands the sheet to full screen;
+            // imePadding then lifts the whole picker (grid + category rail)
+            // above the keyboard so nothing hides behind the IME (#1104). The
+            // sheet still opens at its partial detent for tap-to-react browsing.
+            onSearchActiveChange = { active ->
+                if (active) {
+                    scope.launch { runCatching { sheetState.expand() } }
+                }
+            },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+        )
     }
 }
 
@@ -15564,17 +15560,6 @@ private fun ComposerEmojiPickerPane(
 
 internal val ComposerEmojiPickerFallbackHeight = 320.dp
 internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
-
-internal fun emojiPickerSheetHeight(
-    maxAvailableHeight: Dp,
-    currentImeHeight: Dp,
-): Dp {
-    val restingHeight = maxAvailableHeight * 0.9f
-    if (currentImeHeight <= 0.dp) return restingHeight
-
-    val heightAboveIme = (maxAvailableHeight - currentImeHeight).coerceAtLeast(0.dp)
-    return heightAboveIme.coerceAtMost(restingHeight)
-}
 
 internal fun composerEmojiPaneTargetHeight(
     currentImeHeight: Dp,

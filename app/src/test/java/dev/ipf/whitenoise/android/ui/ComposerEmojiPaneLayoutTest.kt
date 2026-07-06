@@ -119,37 +119,4 @@ class ComposerEmojiPaneLayoutTest {
     fun searchModeAddsRoomForTheSearchFieldAndResults() {
         assertEquals(432.dp, ComposerEmojiPickerFallbackHeight + ComposerEmojiPickerSearchExtraHeight)
     }
-
-    @Test
-    fun reactionPickerSheetKeepsItsRestingHeightWhenKeyboardIsClosed() {
-        assertEquals(
-            720.dp,
-            emojiPickerSheetHeight(
-                maxAvailableHeight = 800.dp,
-                currentImeHeight = 0.dp,
-            ),
-        )
-    }
-
-    @Test
-    fun reactionPickerSheetShrinksToTheSpaceAboveTheKeyboard() {
-        assertEquals(
-            460.dp,
-            emojiPickerSheetHeight(
-                maxAvailableHeight = 800.dp,
-                currentImeHeight = 340.dp,
-            ),
-        )
-    }
-
-    @Test
-    fun reactionPickerSheetNeverExtendsPastTheVisibleSpaceAboveATallKeyboard() {
-        assertEquals(
-            180.dp,
-            emojiPickerSheetHeight(
-                maxAvailableHeight = 800.dp,
-                currentImeHeight = 620.dp,
-            ),
-        )
-    }
 }
