@@ -131,6 +131,16 @@ val allowUnsignedRelease =
     runtimeConfigProperty("WHITENOISE_ALLOW_UNSIGNED_RELEASE", "false")
         .equals("true", ignoreCase = true)
 
+// Per-PR preview build inputs. When CI sets PR_NUMBER on a pull-request build,
+// the dev flavor branches to a distinct applicationId, versionCode, versionName,
+// and launcher label so the resulting APK installs side-by-side with the
+// production/staging apps and is visually distinguishable on the home screen
+// (see .github/workflows/android-pr-apk.yml).
+val prNumber: String? = System.getenv("PR_NUMBER")?.takeIf { it.isNotBlank() }
+val prRunNumber: Int? = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val basePrVersionCode = 100_000
+val defaultAppName = "White Noise"
+
 android {
     namespace = "dev.ipf.whitenoise.android"
     compileSdk {
@@ -176,8 +186,23 @@ android {
     productFlavors {
         create("dev") {
             dimension = "environment"
-            applicationIdSuffix = ".dev"
-            versionNameSuffix = "-dev"
+            // On CI pull-request builds, PR_NUMBER isolates the APK to its own
+            // applicationId (side-by-side install), monotonic versionCode, and a
+            // launcher label prefixed by the PR number so the icon on a tester's
+            // home screen is unambiguous. Local dev builds fall through to the
+            // plain .dev suffix and default label.
+            if (prNumber != null) {
+                applicationIdSuffix = ".dev.pr$prNumber"
+                versionNameSuffix = "-dev-pr$prNumber"
+                manifestPlaceholders["appName"] = "$prNumber $defaultAppName"
+                if (prRunNumber != null) {
+                    versionCode = basePrVersionCode + prRunNumber
+                }
+            } else {
+                applicationIdSuffix = ".dev"
+                versionNameSuffix = "-dev"
+                manifestPlaceholders["appName"] = defaultAppName
+            }
             manifestPlaceholders["deepLinkScheme"] = "whitenoise-dev"
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-dev".asBuildConfigString())
             buildConfigField(
@@ -231,6 +256,7 @@ android {
             if (hasProductionReleaseSigning) {
                 signingConfig = signingConfigs.getByName("productionRelease")
             }
+            manifestPlaceholders["appName"] = defaultAppName
             manifestPlaceholders["deepLinkScheme"] = "whitenoise"
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise".asBuildConfigString())
 
@@ -320,6 +346,7 @@ android {
             if (hasStagingReleaseSigning) {
                 signingConfig = signingConfigs.getByName("stagingRelease")
             }
+            manifestPlaceholders["appName"] = defaultAppName
             manifestPlaceholders["deepLinkScheme"] = "whitenoise-staging"
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-staging".asBuildConfigString())
             buildConfigField(
