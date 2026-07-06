@@ -39,6 +39,9 @@ object LocalNotificationFormatter {
     const val REACTION_NOTIFICATION_ID = 1
     private const val REACTION_TAG_PREFIX = "reaction|"
 
+    const val MENTION_NOTIFICATION_ID = 2
+    private const val MENTION_TAG_PREFIX = "mention|"
+
     private val whitespaceRun = Regex("\\s+")
 
     // Invites stamp the account + group they're for into these extras so the
@@ -68,6 +71,15 @@ object LocalNotificationFormatter {
         NotificationDismissalKey(
             tag = REACTION_TAG_PREFIX + conversationDismissalKey(accountRef, groupIdHex).tag,
             id = REACTION_NOTIFICATION_ID,
+        )
+
+    fun mentionDismissalKey(
+        accountRef: String,
+        groupIdHex: String,
+    ): NotificationDismissalKey =
+        NotificationDismissalKey(
+            tag = MENTION_TAG_PREFIX + conversationDismissalKey(accountRef, groupIdHex).tag,
+            id = MENTION_NOTIFICATION_ID,
         )
 
     /**
@@ -133,21 +145,23 @@ object LocalNotificationFormatter {
         return LocalNotificationContent(
             // Messages from one conversation share a per-account, per-group tag
             // so they accumulate into a single MessagingStyle card instead of N
-            // independent alerts. Reactions in that same conversation get their
-            // own (prefixed tag, REACTION_NOTIFICATION_ID) so they form a
-            // separate card on the reactions channel and never mutate — or get
-            // mutated by — the normal message card. Invites stay individual.
+            // independent alerts. Reactions and mentions in that same conversation
+            // get their own prefixed identities so their channel-specific cards
+            // stay independent of the ordinary message card. Invites stay individual.
             notificationTag =
                 when {
                     update.trigger == NotificationTriggerFfi.GROUP_INVITE -> update.notificationKey
                     isReaction(update) ->
                         REACTION_TAG_PREFIX + conversationDismissalKey(update.accountRef, update.groupIdHex).tag
+                    update.isMention ->
+                        MENTION_TAG_PREFIX + conversationDismissalKey(update.accountRef, update.groupIdHex).tag
                     else -> conversationDismissalKey(update.accountRef, update.groupIdHex).tag
                 },
             notificationId =
                 when {
                     update.trigger == NotificationTriggerFfi.GROUP_INVITE -> 0
                     isReaction(update) -> REACTION_NOTIFICATION_ID
+                    update.isMention -> MENTION_NOTIFICATION_ID
                     else -> MESSAGE_NOTIFICATION_ID
                 },
             title = title,

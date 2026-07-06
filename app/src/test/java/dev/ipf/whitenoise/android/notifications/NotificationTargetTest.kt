@@ -128,6 +128,22 @@ class NotificationTargetTest {
         assertNull(target?.messageIdHex)
     }
 
+    @Test
+    fun trustedNotificationTap_requiresNonBlankKeyAndTrustedToken() {
+        assertFalse(NotificationNavigation.isTrustedNotificationTap(null, "trusted-token-123") { _, _ -> true })
+        assertFalse(NotificationNavigation.isTrustedNotificationTap(" ", "trusted-token-123") { _, _ -> true })
+        assertFalse(
+            NotificationNavigation.isTrustedNotificationTap("acct-a|group-1", "trusted-token-123") { _, token ->
+                token == "other-token"
+            },
+        )
+        assertTrue(
+            NotificationNavigation.isTrustedNotificationTap("acct-a|group-1", "trusted-token-123") { notificationKey, token ->
+                notificationKey == "acct-a|group-1" && token == "trusted-token-123"
+            },
+        )
+    }
+
     // ---- PendingIntent identity --------------------------------------------
 
     @Test

@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -93,30 +94,35 @@ class NotificationStreamForegroundService : Service() {
             ForegroundStartDecision.BootstrapAndKeep -> {
                 bootstrapJob =
                     serviceScope.launch {
-                        val keepConnectedEnabled = backgroundConnectionEnabledOffMain()
-                        if (
-                            shouldStopStickySystemWakeRestart(
-                                hasIntent = intent != null,
-                                trigger = trigger,
-                                backgroundConnectionEnabled = keepConnectedEnabled,
-                            )
-                        ) {
-                            stopSelf(startId)
-                            return@launch
+                        val wakeLock = acquirePushWakeLockIfNeeded(trigger)
+                        try {
+                            val keepConnectedEnabled = backgroundConnectionEnabledOffMain()
+                            if (
+                                shouldStopStickySystemWakeRestart(
+                                    hasIntent = intent != null,
+                                    trigger = trigger,
+                                    backgroundConnectionEnabled = keepConnectedEnabled,
+                                )
+                            ) {
+                                stopSelf(startId)
+                                return@launch
+                            }
+                            val stopAfterSync =
+                                shouldStopAfterOneShotForegroundStart(
+                                    oneShotRequested = isOneShotForegroundStart(syncNativePushRegistration, trigger),
+                                    backgroundConnectionEnabled = keepConnectedEnabled,
+                                )
+                            runCatching {
+                                val appState = (application as WhiteNoiseApplication).appState
+                                appState.ensureNotificationRuntimeStarted()
+                                drainPendingNativePushRegistrationSync(appState)
+                            }.onFailure {
+                                foregroundServiceDebug(it) { "notification runtime failed" }
+                            }
+                            if (stopAfterSync) stopSelf(startId)
+                        } finally {
+                            releaseWakeLock(wakeLock)
                         }
-                        val stopAfterSync =
-                            shouldStopAfterOneShotForegroundStart(
-                                oneShotRequested = isOneShotForegroundStart(syncNativePushRegistration, trigger),
-                                backgroundConnectionEnabled = keepConnectedEnabled,
-                            )
-                        runCatching {
-                            val appState = (application as WhiteNoiseApplication).appState
-                            appState.ensureNotificationRuntimeStarted()
-                            drainPendingNativePushRegistrationSync(appState)
-                        }.onFailure {
-                            foregroundServiceDebug(it) { "notification runtime failed" }
-                        }
-                        if (stopAfterSync) stopSelf(startId)
                     }
             }
             // Repeated onStartCommand calls (Android may redeliver) must not
@@ -126,24 +132,29 @@ class NotificationStreamForegroundService : Service() {
                 if (oneShotRequested) {
                     val inFlightBootstrap = bootstrapJob
                     serviceScope.launch {
-                        val keepConnectedEnabled = backgroundConnectionEnabledOffMain()
-                        val stopAfterSync =
-                            shouldStopAfterOneShotForegroundStart(
-                                oneShotRequested = oneShotRequested,
-                                backgroundConnectionEnabled = keepConnectedEnabled,
-                            )
-                        runCatching {
-                            inFlightBootstrap?.join()
-                            if (syncNativePushRegistration) {
-                                drainPendingNativePushRegistrationSync((application as WhiteNoiseApplication).appState)
+                        val wakeLock = acquirePushWakeLockIfNeeded(trigger)
+                        try {
+                            val keepConnectedEnabled = backgroundConnectionEnabledOffMain()
+                            val stopAfterSync =
+                                shouldStopAfterOneShotForegroundStart(
+                                    oneShotRequested = oneShotRequested,
+                                    backgroundConnectionEnabled = keepConnectedEnabled,
+                                )
+                            runCatching {
+                                inFlightBootstrap?.join()
+                                if (syncNativePushRegistration) {
+                                    drainPendingNativePushRegistrationSync((application as WhiteNoiseApplication).appState)
+                                }
+                            }.onFailure {
+                                foregroundServiceDebug(it) { "notification runtime one-shot completion failed" }
                             }
-                        }.onFailure {
-                            foregroundServiceDebug(it) { "notification runtime one-shot completion failed" }
+                            // A one-shot sync nudge that raced an existing bootstrap must not
+                            // keep the foreground service (and its notification) alive unless
+                            // the user enabled Keep Connected — same rule as BootstrapAndKeep.
+                            if (stopAfterSync) stopSelf(startId)
+                        } finally {
+                            releaseWakeLock(wakeLock)
                         }
-                        // A one-shot sync nudge that raced an existing bootstrap must not
-                        // keep the foreground service (and its notification) alive unless
-                        // the user enabled Keep Connected — same rule as BootstrapAndKeep.
-                        if (stopAfterSync) stopSelf(startId)
                     }
                 }
             }
@@ -192,6 +203,30 @@ class NotificationStreamForegroundService : Service() {
     }
 
     override fun onBind(intent: Intent?) = null
+
+    private fun acquirePushWakeLockIfNeeded(trigger: ForegroundStartTrigger): PowerManager.WakeLock? {
+        if (!shouldHoldPushWakeLock(trigger)) return null
+        val powerManager = getSystemService(PowerManager::class.java) ?: return null
+        return runCatching {
+            powerManager
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:notification-push-wake")
+                .apply {
+                    setReferenceCounted(false)
+                    acquire(PUSH_WAKE_LOCK_TIMEOUT_MS)
+                }
+        }.onFailure {
+            foregroundServiceDebug(it) { "push wake-lock acquire failed" }
+        }.getOrNull()
+    }
+
+    private fun releaseWakeLock(wakeLock: PowerManager.WakeLock?) {
+        if (wakeLock?.isHeld != true) return
+        runCatching {
+            wakeLock.release()
+        }.onFailure {
+            foregroundServiceDebug(it) { "push wake-lock release failed" }
+        }
+    }
 
     companion object {
         private const val NOTIFICATION_ID = 1001
@@ -280,6 +315,8 @@ internal fun isOneShotForegroundStart(
     trigger: ForegroundStartTrigger,
 ): Boolean = syncNativePushRegistrationRequested || trigger == ForegroundStartTrigger.PushWake
 
+internal fun shouldHoldPushWakeLock(trigger: ForegroundStartTrigger): Boolean = trigger == ForegroundStartTrigger.PushWake
+
 internal fun shouldStopStickySystemWakeRestart(
     hasIntent: Boolean,
     trigger: ForegroundStartTrigger,
@@ -353,6 +390,8 @@ private fun foregroundStartTrigger(intent: Intent?): ForegroundStartTrigger {
         else -> ForegroundStartTrigger.SystemWake
     }
 }
+
+private const val PUSH_WAKE_LOCK_TIMEOUT_MS = 15_000L
 
 private object BackgroundConnectionNotification {
     private const val CHANNEL_ID = "whitenoise.background_connection.v1"

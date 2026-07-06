@@ -860,6 +860,9 @@ class WhiteNoiseAppState(
     var appLockScreenVisible by mutableStateOf(false)
         private set
 
+    val notificationActionsAllowed: Boolean
+        get() = notificationActionsAllowed(appLockScreenVisible)
+
     var appUnlockError by mutableStateOf<AppText?>(null)
         private set
 
@@ -4379,3 +4382,5 @@ private inline fun appStateDebug(
 }
 
 private fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
+
+internal fun notificationActionsAllowed(appLockScreenVisible: Boolean): Boolean = !appLockScreenVisible

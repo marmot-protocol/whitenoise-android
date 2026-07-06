@@ -112,7 +112,9 @@ object NotificationNavigation {
     private const val EXTRA_GROUP_ID = "dev.ipf.whitenoise.android.extra.GROUP_ID_HEX"
     private const val EXTRA_MESSAGE_ID = "dev.ipf.whitenoise.android.extra.MESSAGE_ID_HEX"
     private const val EXTRA_KIND = "dev.ipf.whitenoise.android.extra.KIND"
+    private const val EXTRA_TAP_TOKEN = "dev.ipf.whitenoise.android.extra.TAP_TOKEN"
     private const val URI_SCHEME = "whitenoise-notify"
+    private const val URI_HOST_OPEN = "open"
 
     /**
      * Per-notification data URI. Android compares a PendingIntent's *data*
@@ -196,15 +198,22 @@ object NotificationNavigation {
         intent: Intent,
         target: NotificationTarget,
         notificationKey: String,
+        tapToken: String,
     ) {
         intent.action = ACTION_OPEN
         intent.data = Uri.parse(targetUriString(notificationKey))
+        intent.putExtra(EXTRA_TAP_TOKEN, tapToken)
         applyTargetExtras(intent, target)
     }
 
     /** Parse a tapped content [intent] back into a target (untrusted). */
-    fun parse(intent: Intent?): NotificationTarget? {
+    fun parse(
+        intent: Intent?,
+        isTrustedTapToken: (notificationKey: String, tapToken: String?) -> Boolean = { _, _ -> false },
+    ): NotificationTarget? {
         intent ?: return null
+        val notificationKey = notificationKeyFrom(intent) ?: return null
+        if (!isTrustedNotificationTap(notificationKey, intent.getStringExtra(EXTRA_TAP_TOKEN), isTrustedTapToken)) return null
         return parseExtras(
             action = intent.action,
             accountRef = intent.getStringExtra(EXTRA_ACCOUNT_REF),
@@ -212,5 +221,20 @@ object NotificationNavigation {
             messageIdHex = intent.getStringExtra(EXTRA_MESSAGE_ID),
             kindName = intent.getStringExtra(EXTRA_KIND),
         )
+    }
+
+    internal fun isTrustedNotificationTap(
+        notificationKey: String?,
+        tapToken: String?,
+        isTrustedTapToken: (notificationKey: String, tapToken: String?) -> Boolean,
+    ): Boolean {
+        val key = notificationKey?.takeIf { it.isNotBlank() } ?: return false
+        return isTrustedTapToken(key, tapToken)
+    }
+
+    internal fun notificationKeyFrom(intent: Intent): String? {
+        val uri = intent.data ?: return null
+        if (uri.scheme != URI_SCHEME || uri.host != URI_HOST_OPEN) return null
+        return uri.pathSegments.firstOrNull()?.takeIf { it.isNotBlank() }
     }
 }
