@@ -2732,20 +2732,23 @@ class WhiteNoiseAppState(
         ) {
             return
         }
-        runCatching { marmotIo { secureDeleteExpired(accountRef, groupIdHex) } }
-            .onSuccess { result ->
-                // Match the foreground sweep: when the engine actually pruned
-                // rows, clear the conversation's tray card so it can't keep
-                // pointing at a now-vanished message, and wipe the pruned
-                // attachments' decrypted bytes from the on-disk cache.
-                if (result.prunedMessages > 0uL) {
-                    dismissConversationNotifications(accountRef, groupIdHex)
-                }
-                evictExpiredDiskMediaCaches(result.mediaCiphertextSha256.toSet())
-            }.onFailure {
-                rethrowIfCancellation(it)
-                appStateDebug(it) { "sweep secureDeleteExpired failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
+        runCatching {
+            withGroupCommitLock(accountRef, groupIdHex) {
+                marmotIo { secureDeleteExpired(accountRef, groupIdHex) }
             }
+        }.onSuccess { result ->
+            // Match the foreground sweep: when the engine actually pruned
+            // rows, clear the conversation's tray card so it can't keep
+            // pointing at a now-vanished message, and wipe the pruned
+            // attachments' decrypted bytes from the on-disk cache.
+            if (result.prunedMessages > 0uL) {
+                dismissConversationNotifications(accountRef, groupIdHex)
+            }
+            evictExpiredDiskMediaCaches(result.mediaCiphertextSha256.toSet())
+        }.onFailure {
+            rethrowIfCancellation(it)
+            appStateDebug(it) { "sweep secureDeleteExpired failed group=${groupIdHex.take(8)}: ${it.readableMessage()}" }
+        }
     }
 
     /**

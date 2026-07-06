@@ -105,7 +105,9 @@ internal fun NewGroupSetupScreen(
                     // with the default (off) window, so say so instead of
                     // letting the user believe the timer is on.
                     runCatching {
-                        appState.marmotIo { updateMessageRetention(account, groupIdHex, retentionSecs.toULong()) }
+                        appState.withGroupCommitLock(account, groupIdHex) {
+                            appState.marmotIo { updateMessageRetention(account, groupIdHex, retentionSecs.toULong()) }
+                        }
                     }.onFailure {
                         appState.present(R.string.toast_disappearing_not_applied, copyable = true)
                     }
