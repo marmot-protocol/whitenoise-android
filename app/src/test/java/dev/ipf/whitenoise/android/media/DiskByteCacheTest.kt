@@ -368,6 +368,23 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun tempFileNamesUseAProcessCounterForSameKeyWrites() {
+        val cache = DiskByteCache(dir, maxBytes = 1024)
+        val method =
+            DiskByteCache::class.java
+                .getDeclaredMethod("uniqueTmpFile", String::class.java, String::class.java)
+                .apply { isAccessible = true }
+
+        val names =
+            (0 until 256).map {
+                (method.invoke(cache, "same-hash", "bin") as File).name
+            }
+
+        assertEquals(names.size, names.toSet().size)
+        assertTrue(names.all { it.startsWith("same-hash-bin-") && it.endsWith(".tmp") })
+    }
+
+    @Test
     fun removeByCiphertextTags_evictsTaggedEntriesOnly() {
         val cache = DiskByteCache(dir, maxBytes = 1024)
         cache.put("acct|grp|msg-1|0", ByteArray(30), cache.generation(), "hash-a")

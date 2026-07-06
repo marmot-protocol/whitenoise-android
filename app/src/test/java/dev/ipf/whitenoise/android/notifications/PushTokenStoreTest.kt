@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.SharedPreferences
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -172,6 +173,50 @@ class PushTokenStoreTest {
         store.recordPendingDisable("npub-b")
         assertEquals(setOf("npub-a"), store.pendingClears())
         assertEquals(setOf("npub-b"), store.pendingDisables())
+    }
+
+    @Test
+    fun migrationCopiesLegacyPlaintextPrefsToSecureStoreThenClearsLegacy() {
+        val legacy = FakeSharedPreferences()
+        val secure = FakeSharedPreferences()
+        PushTokenStore(legacy).apply {
+            setToken("fcm-legacy")
+            recordPendingNativePushRegistrationSync()
+            recordPendingClear("npub-clear")
+            recordPendingDisable("npub-disable")
+        }
+
+        migrateLegacyPushTokenPreferences(legacy, secure)
+
+        PushTokenStore(secure).apply {
+            assertEquals("fcm-legacy", lastToken())
+            assertEquals(true, nativePushRegistrationSyncPending())
+            assertEquals(setOf("npub-clear"), pendingClears())
+            assertEquals(setOf("npub-disable"), pendingDisables())
+        }
+        assertTrue("legacy plaintext prefs should be wiped after durable migration", legacy.all.isEmpty())
+    }
+
+    @Test
+    fun migrationDoesNotOverwriteExistingSecureValues() {
+        val legacy = FakeSharedPreferences()
+        val secure = FakeSharedPreferences()
+        PushTokenStore(legacy).apply {
+            setToken("fcm-legacy")
+            recordPendingClear("legacy-clear")
+        }
+        PushTokenStore(secure).apply {
+            setToken("fcm-secure")
+            recordPendingClear("secure-clear")
+        }
+
+        migrateLegacyPushTokenPreferences(legacy, secure)
+
+        PushTokenStore(secure).apply {
+            assertEquals("fcm-secure", lastToken())
+            assertEquals(setOf("secure-clear"), pendingClears())
+        }
+        assertFalse("legacy should be cleared even when secure values win", legacy.contains("fcm_token"))
     }
 
     // #167 regression: onNewToken runs on a Firebase background thread, so the

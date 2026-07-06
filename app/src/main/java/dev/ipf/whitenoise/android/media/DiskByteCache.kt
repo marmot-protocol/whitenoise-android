@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.media
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * On-disk byte cache, bounded by total size. Persists across process
@@ -127,14 +128,16 @@ class DiskByteCache(
         } catch (_: IOException) {
             // File vanished (manual delete, OS cache reap, FS corruption).
             // Drop the index entry and report miss; the caller will re-fetch.
+            var filesToDelete: List<File> = emptyList()
             synchronized(this) {
                 // Only evict if a concurrent put() hasn't already replaced it.
                 if (index[hashed] === entry) {
                     index.remove(hashed)
                     residentBytes -= entry.size
-                    runCatching { tagFileFor(entry.file).delete() }
+                    filesToDelete = listOf(tagFileFor(entry.file))
                 }
             }
+            deleteFiles(filesToDelete)
             null
         }
     }
@@ -216,6 +219,7 @@ class DiskByteCache(
             } else {
                 null
             }
+        val filesToDelete = mutableListOf<File>()
         synchronized(this) {
             // A concurrent clear() (sign-out / account switch) may have run while
             // we were writing — abort and drop temp artifacts rather than
@@ -227,8 +231,8 @@ class DiskByteCache(
             val existing = index.remove(hashed)
             if (existing != null) {
                 residentBytes -= existing.size
-                runCatching { existing.file.delete() }
-                runCatching { tagFileFor(existing.file).delete() }
+                filesToDelete += existing.file
+                filesToDelete += tagFileFor(existing.file)
             }
             if (tagTmp != null && tagFile != null && !tagTmp.renameTo(tagFile)) {
                 abortPut(tmp, tagTmp)
@@ -244,8 +248,9 @@ class DiskByteCache(
             val size = bytes.size
             index[hashed] = Entry(file, size, ciphertextTag)
             residentBytes += size
-            evictUntilUnderCap()
+            filesToDelete += evictedEntryFiles()
         }
+        deleteFiles(filesToDelete)
     }
 
     /** Immediate write at the current generation. Deferred/background writes
@@ -267,12 +272,13 @@ class DiskByteCache(
      */
     fun remove(key: String) {
         ensureHydrated()
-        synchronized(this) {
-            val entry = index.remove(fileNameFor(key)) ?: return
-            residentBytes -= entry.size
-            runCatching { entry.file.delete() }
-            runCatching { tagFileFor(entry.file).delete() }
-        }
+        val filesToDelete =
+            synchronized(this) {
+                val entry = index.remove(fileNameFor(key)) ?: return
+                residentBytes -= entry.size
+                listOf(entry.file, tagFileFor(entry.file))
+            }
+        deleteFiles(filesToDelete)
     }
 
     /**
@@ -286,21 +292,51 @@ class DiskByteCache(
     fun removeByCiphertextTags(ciphertextTags: Set<String>): Int {
         if (ciphertextTags.isEmpty()) return 0
         ensureHydrated()
-        synchronized(this) {
-            var removed = 0
-            val iterator = index.entries.iterator()
-            while (iterator.hasNext()) {
-                val entry = iterator.next().value
-                if (entry.tag != null && entry.tag in ciphertextTags) {
-                    runCatching { entry.file.delete() }
-                    runCatching { tagFileFor(entry.file).delete() }
-                    residentBytes -= entry.size
-                    iterator.remove()
-                    removed++
+        val filesToDelete = mutableListOf<File>()
+        val removed =
+            synchronized(this) {
+                var removed = 0
+                val iterator = index.entries.iterator()
+                while (iterator.hasNext()) {
+                    val entry = iterator.next().value
+                    if (entry.tag != null && entry.tag in ciphertextTags) {
+                        filesToDelete += filesFor(entry)
+                        residentBytes -= entry.size
+                        iterator.remove()
+                        removed++
+                    }
                 }
+                removed
             }
-            return removed
+        deleteFiles(filesToDelete)
+        return removed
+    }
+
+    private fun deleteFiles(files: List<File>) {
+        files.forEach { runCatching { it.delete() } }
+    }
+
+    private fun filesFor(entry: Entry): List<File> = listOf(entry.file, tagFileFor(entry.file))
+
+    private fun addEntryFiles(
+        target: MutableList<File>,
+        entry: Entry,
+    ) {
+        target += entry.file
+        target += tagFileFor(entry.file)
+    }
+
+    private fun evictedEntryFiles(): List<File> {
+        if (residentBytes <= maxBytes) return emptyList()
+        val filesToDelete = mutableListOf<File>()
+        val it = index.entries.iterator()
+        while (it.hasNext() && residentBytes > maxBytes) {
+            val (_, entry) = it.next()
+            residentBytes -= entry.size
+            it.remove()
+            addEntryFiles(filesToDelete, entry)
         }
+        return filesToDelete
     }
 
     @Synchronized
@@ -350,7 +386,7 @@ class DiskByteCache(
     ): File =
         File(
             cacheDir,
-            "$baseName-$kind-${System.nanoTime()}$TMP_SUFFIX",
+            "$baseName-$kind-${TMP_COUNTER.incrementAndGet()}-${System.nanoTime()}$TMP_SUFFIX",
         )
 
     private fun abortPut(
@@ -359,18 +395,6 @@ class DiskByteCache(
     ) {
         runCatching { tmp.delete() }
         tagTmp?.let { runCatching { it.delete() } }
-    }
-
-    private fun evictUntilUnderCap() {
-        if (residentBytes <= maxBytes) return
-        val it = index.entries.iterator()
-        while (it.hasNext() && residentBytes > maxBytes) {
-            val (_, entry) = it.next()
-            runCatching { entry.file.delete() }
-            runCatching { tagFileFor(entry.file).delete() }
-            residentBytes -= entry.size
-            it.remove()
-        }
     }
 
     private fun buildHydratedIndex(): HydratedIndex {
@@ -460,6 +484,7 @@ class DiskByteCache(
         const val TMP_SUFFIX = ".tmp"
         const val TAG_SUFFIX = ".tag"
         const val DEFAULT_MAX_ENTRY_BYTES: Long = 16L * 1024L * 1024L
+        val TMP_COUNTER = AtomicLong()
         val HEX =
             charArrayOf(
                 '0',
