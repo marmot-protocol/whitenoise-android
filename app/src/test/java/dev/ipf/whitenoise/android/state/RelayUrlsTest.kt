@@ -1,8 +1,12 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.core.MarmotClient
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.InetAddress
 
 class RelayUrlsTest {
     @Test
@@ -41,6 +45,41 @@ class RelayUrlsTest {
         assertEquals(false, isAcceptableRelayUrl("wss://user:pass@relay.example"))
         assertEquals(false, isAcceptableRelayUrl("wss://bad host.example"))
         assertEquals(false, isAcceptableRelayUrl("not a url"))
+        assertEquals(false, isAcceptableRelayUrl("wss://relay.example:7777"))
+        assertEquals(false, isAcceptableRelayUrl("wss://relay.example:8443"))
+    }
+
+    @Test
+    fun relayUrlValidationRejectsNonStandardPortsWithoutDns() {
+        assertEquals(emptyList<String>(), normalizeRelayUrls(listOf("wss://relay.example:7777")))
+    }
+
+    @Test
+    fun releaseRelayUrlValidationAllowsOnlyBootstrapHosts() {
+        assertTrue(
+            isAcceptableRelayUrl("wss://relay.us.whitenoise.chat", allowExternalRelayHosts = false),
+        )
+        assertTrue(
+            isAcceptableRelayUrl("wss://relay.eu.whitenoise.chat", allowExternalRelayHosts = false),
+        )
+        assertFalse(
+            isAcceptableRelayUrl("wss://relay.example", allowExternalRelayHosts = false),
+        )
+        assertEquals(
+            emptyList<String>(),
+            normalizeRelayUrls(listOf("wss://relay.example"), allowExternalRelayHosts = false),
+        )
+    }
+
+    @Test
+    fun debugRelayUrlValidationKeepsSelfHostedRelaysAvailable() {
+        assertTrue(
+            isAcceptableRelayUrl("wss://relay.example", allowExternalRelayHosts = true),
+        )
+        assertEquals(
+            listOf("wss://relay.example"),
+            normalizeRelayUrls(listOf("wss://relay.example"), allowExternalRelayHosts = true),
+        )
     }
 
     @Test
@@ -59,8 +98,79 @@ class RelayUrlsTest {
     }
 
     @Test
+    fun relayUrlResolveTimeCheckRejectsPrivateResolvedAddresses() {
+        val resolveToLoopback: RelayHostResolver = { arrayOf(ipv4(127, 0, 0, 1)) }
+        assertEquals(
+            RelayResolveTimeCheckResult.Blocked,
+            relayUrlResolveTimeCheckResult("wss://rebind.example", resolveToLoopback),
+        )
+        assertFalse(relayUrlPassesResolveTimeCheck("wss://rebind.example", resolveToLoopback))
+        runBlocking {
+            assertEquals(
+                RelayResolveTimeCheckResult.Blocked,
+                relayUrlsResolveTimeCheckResult(listOf("wss://rebind.example"), resolveToLoopback),
+            )
+            assertFalse(relayUrlsPassResolveTimeChecks(listOf("wss://rebind.example"), resolveToLoopback))
+        }
+    }
+
+    @Test
+    fun relayUrlResolveTimeCheckReportsDnsFailures() {
+        val failResolve: RelayHostResolver = { null }
+        assertEquals(
+            RelayResolveTimeCheckResult.Unavailable,
+            relayUrlResolveTimeCheckResult("wss://relay.example", failResolve),
+        )
+        assertFalse(relayUrlPassesResolveTimeCheck("wss://relay.example", failResolve))
+        runBlocking {
+            assertEquals(
+                RelayResolveTimeCheckResult.Unavailable,
+                relayUrlsResolveTimeCheckResult(listOf("wss://relay.example"), failResolve),
+            )
+            assertFalse(relayUrlsPassResolveTimeChecks(listOf("wss://relay.example"), failResolve))
+        }
+    }
+
+    @Test
+    fun relayUrlResolveTimeCheckAcceptsPublicResolvedAddresses() {
+        val resolveToPublic: RelayHostResolver = { arrayOf(ipv4(8, 8, 8, 8)) }
+        assertEquals(
+            RelayResolveTimeCheckResult.Passed,
+            relayUrlResolveTimeCheckResult("wss://relay.example", resolveToPublic),
+        )
+        assertTrue(relayUrlPassesResolveTimeCheck("wss://relay.example", resolveToPublic))
+        runBlocking {
+            assertEquals(
+                RelayResolveTimeCheckResult.Passed,
+                relayUrlsResolveTimeCheckResult(listOf("wss://relay.example"), resolveToPublic),
+            )
+            assertTrue(relayUrlsPassResolveTimeChecks(listOf("wss://relay.example"), resolveToPublic))
+        }
+    }
+
+    @Test
+    fun relayUrlResolveTimeCheckLeavesCheapValidationSynchronous() {
+        // UI validation must not require DNS; a hostname that would fail at
+        // resolve-time still passes the cheap gate.
+        assertTrue(isAcceptableRelayUrl("wss://rebind.example"))
+        val resolveToLoopback: RelayHostResolver = { arrayOf(ipv4(127, 0, 0, 1)) }
+        assertFalse(relayUrlPassesResolveTimeCheck("wss://rebind.example", resolveToLoopback))
+    }
+
+    private fun ipv4(
+        a: Int,
+        b: Int,
+        c: Int,
+        d: Int,
+    ): InetAddress = InetAddress.getByAddress(byteArrayOf(a.toByte(), b.toByte(), c.toByte(), d.toByte()))
+
+    @Test
     fun bootstrapRelaysSatisfyRelayUrlValidation() {
-        assertEquals(emptyList<String>(), MarmotClient.bootstrapRelays.filterNot(::isAcceptableRelayUrl))
+        assertEquals(emptyList<String>(), MarmotClient.bootstrapRelays.filterNot { isAcceptableRelayUrl(it) })
+        assertEquals(
+            emptyList<String>(),
+            MarmotClient.bootstrapRelays.filterNot { isAcceptableRelayUrl(it, allowExternalRelayHosts = false) },
+        )
     }
 
     @Test
