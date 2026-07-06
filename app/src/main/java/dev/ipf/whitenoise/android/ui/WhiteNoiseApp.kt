@@ -16180,82 +16180,92 @@ private fun EmojiPickerContent(
         onEmojiPicked(emoji)
     }
 
-    Column(
+    // Keep the rail out of the weighted grid column so the partial sheet detent
+    // reserves it before the emoji grid takes the remaining height.
+    Scaffold(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (searchFieldAlwaysVisible || searchOpen) {
-            EmojiSearchField(
-                value = searchQuery,
-                onValueChange = {
-                    if (searchFieldAlwaysVisible) searchOpen = true
-                    searchQuery = it
-                },
-                onClose = {
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0.dp),
+        bottomBar = {
+            EmojiCategoryRail(
+                onCustomizeReactions = onCustomizeReactions,
+                showSearch = !searchFieldAlwaysVisible,
+                searchSelected = searchOpen,
+                onSearch = { searchOpen = true },
+                showRecents = recents.isNotEmpty(),
+                recentsSelected = activeCategory == -1,
+                onRecents = {
                     searchOpen = false
                     keyboardController?.hide()
+                    activeCategory = -1
+                    scope.launch { gridState.scrollToItem(0) }
                 },
-                onSearchIntent = { searchOpen = true },
-                focusRequester = searchFocusRequester,
-                showBackButton = !searchFieldAlwaysVisible,
-                modifier = Modifier.fillMaxWidth(),
+                selectedGroup = activeCategory,
+                onGroup = { group ->
+                    searchOpen = false
+                    keyboardController?.hide()
+                    activeCategory = group
+                    scope.launch { gridState.scrollToItem(sectionHeaderIndex[group]) }
+                },
+                onBackspace = onBackspace,
+                modifier = Modifier.fillMaxWidth().height(42.dp),
             )
-        }
-        if (!searchOpen || searchQuery.isBlank()) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(8),
-                state = gridState,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            ) {
-                if (recents.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        EmojiSectionHeader(stringResource(R.string.emoji_category_recent))
-                    }
-                    items(recents, key = { "recent:$it" }) { emoji ->
-                        EmojiSearchResultCell(emoji = emoji, onClick = { pick(emoji) })
-                    }
-                }
-                for (group in 0 until EmojiData.GroupCount) {
-                    val groupEmoji = grouped[group].orEmpty()
-                    if (groupEmoji.isEmpty()) continue
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        EmojiSectionHeader(stringResource(emojiGroupTitleRes(group)))
-                    }
-                    items(groupEmoji, key = { it.emoji }) { entry ->
-                        EmojiSearchResultCell(emoji = entry.emoji, onClick = { pick(entry.emoji) })
-                    }
-                }
+        },
+    ) { contentPadding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (searchFieldAlwaysVisible || searchOpen) {
+                EmojiSearchField(
+                    value = searchQuery,
+                    onValueChange = {
+                        if (searchFieldAlwaysVisible) searchOpen = true
+                        searchQuery = it
+                    },
+                    onClose = {
+                        searchOpen = false
+                        keyboardController?.hide()
+                    },
+                    onSearchIntent = { searchOpen = true },
+                    focusRequester = searchFocusRequester,
+                    showBackButton = !searchFieldAlwaysVisible,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
-        } else {
-            EmojiSearchResultsGrid(
-                results = searchResults,
-                onEmojiPicked = { pick(it) },
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            )
+            if (!searchOpen || searchQuery.isBlank()) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(8),
+                    state = gridState,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                ) {
+                    if (recents.isNotEmpty()) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            EmojiSectionHeader(stringResource(R.string.emoji_category_recent))
+                        }
+                        items(recents, key = { "recent:$it" }) { emoji ->
+                            EmojiSearchResultCell(emoji = emoji, onClick = { pick(emoji) })
+                        }
+                    }
+                    for (group in 0 until EmojiData.GroupCount) {
+                        val groupEmoji = grouped[group].orEmpty()
+                        if (groupEmoji.isEmpty()) continue
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            EmojiSectionHeader(stringResource(emojiGroupTitleRes(group)))
+                        }
+                        items(groupEmoji, key = { it.emoji }) { entry ->
+                            EmojiSearchResultCell(emoji = entry.emoji, onClick = { pick(entry.emoji) })
+                        }
+                    }
+                }
+            } else {
+                EmojiSearchResultsGrid(
+                    results = searchResults,
+                    onEmojiPicked = { pick(it) },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
+            }
         }
-        EmojiCategoryRail(
-            onCustomizeReactions = onCustomizeReactions,
-            showSearch = !searchFieldAlwaysVisible,
-            searchSelected = searchOpen,
-            onSearch = { searchOpen = true },
-            showRecents = recents.isNotEmpty(),
-            recentsSelected = activeCategory == -1,
-            onRecents = {
-                searchOpen = false
-                keyboardController?.hide()
-                activeCategory = -1
-                scope.launch { gridState.scrollToItem(0) }
-            },
-            selectedGroup = activeCategory,
-            onGroup = { group ->
-                searchOpen = false
-                keyboardController?.hide()
-                activeCategory = group
-                scope.launch { gridState.scrollToItem(sectionHeaderIndex[group]) }
-            },
-            onBackspace = onBackspace,
-            modifier = Modifier.fillMaxWidth().height(42.dp),
-        )
     }
 }
 
