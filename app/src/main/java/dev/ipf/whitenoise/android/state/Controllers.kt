@@ -1390,7 +1390,7 @@ class ChatsController(
     // Resolved media fallbacks for blank chat-list preview rows, keyed by the
     // last message id. Derived UI state over the live rows (pruned to ids still
     // on screen), not a protocol cache — same lifecycle as [previewTokensByText].
-    private var mediaPreviewFallbackByMessageId = mapOf<String, MediaPreviewFallback?>()
+    private var mediaPreviewFallbackByMessageId = mapOf<String, MediaPreviewFallback>()
 
     // Same single-state invariant as [inFlightMemberFetches], keyed by
     // preview plaintext: pending → in flight (here) → cached.
@@ -2504,7 +2504,7 @@ class ChatsController(
                 try {
                     if (!isActiveBindEpoch(epoch)) return@launch
                     val page =
-                        runCatching {
+                        try {
                             appState.marmotIo {
                                 timelineMessages(
                                     account,
@@ -2519,7 +2519,10 @@ class ChatsController(
                                     ),
                                 )
                             }
-                        }.getOrNull()
+                        } catch (throwable: Throwable) {
+                            rethrowIfCancellation(throwable)
+                            null
+                        }
                     if (!isActiveBindEpoch(epoch)) return@launch
                     val fallback =
                         page
@@ -2527,6 +2530,7 @@ class ChatsController(
                             ?.firstOrNull()
                             ?.takeIf { it.messageIdHex == messageId }
                             ?.let { MessageProjector.mediaPreviewFallback(TimelineProjector.toAppMessageRecord(it)) }
+                            ?: return@launch
                     if (!isActiveBindEpoch(epoch)) return@launch
                     mediaPreviewFallbackByMessageId = mediaPreviewFallbackByMessageId + (messageId to fallback)
                     scheduleRecompute()
