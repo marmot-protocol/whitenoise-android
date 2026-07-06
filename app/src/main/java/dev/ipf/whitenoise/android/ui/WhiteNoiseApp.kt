@@ -4315,8 +4315,8 @@ private fun ReplyPreviewCard(
             dev.ipf.whitenoise.android.core.ReplyMediaKind.Document -> Icons.Default.Description
             dev.ipf.whitenoise.android.core.ReplyMediaKind.None -> null
         }
-    // Media path shows a label; only the plaintext body carries raw `@npub1…`
-    // runs, so resolve mentions there to match the bubble's rendering (#615).
+    // Media path shows a label; only the plaintext body carries raw profile
+    // mention runs, so resolve them to match the bubble's rendering (#615/#1090).
     val bodyText =
         remember(body, mediaLabel, mentionDisplayName) {
             mediaLabel ?: resolveMentionsInPlaintext(body, mentionDisplayName)
@@ -15114,9 +15114,10 @@ private fun ForwardMessageSheet(
                 border = amoledSurfaceBorderStroke(),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
             ) {
-                // Preview only: resolve `@npub1…` runs to display names so the
-                // confirmation reads like the bubble (#615). The forwarded text
-                // stays the verbatim `body` — onForward never sees this string.
+                // Preview only: resolve raw profile mention runs to display
+                // names so the confirmation reads like the bubble (#615/#1090).
+                // The forwarded text stays the verbatim `body` — onForward
+                // never sees this string.
                 Text(
                     resolveMentionsInPlaintext(body) { appState.mentionDisplayName(it) },
                     style = MaterialTheme.typography.bodyMedium,
