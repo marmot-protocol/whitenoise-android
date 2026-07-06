@@ -19,7 +19,7 @@ just install-debug         # install dev debug on connected device
 just run-debug             # install + launch dev debug
 just apk-production        # signed production arm64-v8a APK (fast)
 just apk-staging           # signed staging arm64-v8a APK (fast)
-just release               # signed production + staging APKs, rebuilds Marmot bindings
+just release               # signed production + staging APKs, rebuilds MDK bindings
 just release-fast          # signed production + staging APKs, reuses checked-in bindings
 just install-production    # install production arm64-v8a APK on connected device
 just install-staging       # install staging arm64-v8a APK on connected device
@@ -226,7 +226,7 @@ Builds the signed staging `arm64-v8a` APK. The output filename is `whitenoise-st
 just release
 ```
 
-Builds all signed production and staging APKs (per-ABI + universal) and rebuilds the Marmot bindings. Set `WHITENOISE_MARMOT_DIR` to the Marmot binding workspace before running this command.
+Builds all signed production and staging APKs (per-ABI + universal) and rebuilds the MDK/Marmot bindings. Set `WHITENOISE_MDK_DIR` to the MDK workspace before running this command.
 
 ```bash
 just release-fast
