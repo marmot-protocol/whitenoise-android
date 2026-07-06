@@ -875,8 +875,6 @@
     <string name="group_details_subtitle">群组 · %1$d 位成员</string>
     <string name="add_group_description">添加群组描述</string>
     <string name="see_all_members">查看全部 %1$d 位成员</string>
-    <string name="encryption">加密</string>
-    <string name="encryption_e2ee_note">消息均经过端到端加密</string>
     <string name="chat_lock">聊天锁定</string>
     <string name="toast_disappearing_not_applied">群组已创建，但无法开启阅后即焚消息</string>
     <string name="search_members">搜索成员</string>

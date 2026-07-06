@@ -881,8 +881,6 @@
     <string name="group_details_subtitle">Grup · %1$d üye</string>
     <string name="add_group_description">Grup açıklaması ekle</string>
     <string name="see_all_members">%1$d üyenin tümünü gör</string>
-    <string name="encryption">Şifreleme</string>
-    <string name="encryption_e2ee_note">Mesajlar uçtan uca şifrelenir</string>
     <string name="chat_lock">Sohbet kilidi</string>
     <string name="toast_disappearing_not_applied">Grup oluşturuldu ancak kaybolan mesajlar açılamadı</string>
     <string name="search_members">Üye ara</string>

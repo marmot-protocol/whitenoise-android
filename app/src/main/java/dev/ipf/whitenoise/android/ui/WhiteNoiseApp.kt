@@ -11344,11 +11344,6 @@ private fun GroupDetailsScreen(
                     },
             )
             SettingsActionRow(
-                icon = Icons.Default.Lock,
-                title = stringResource(R.string.encryption),
-                value = stringResource(R.string.encryption_e2ee_note),
-            )
-            SettingsActionRow(
                 icon = Icons.Default.Fingerprint,
                 title = stringResource(R.string.chat_lock),
                 enabled = false,
