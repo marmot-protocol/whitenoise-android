@@ -254,8 +254,8 @@
     <string name="toast_app_lock_screen_lock_required">Сначала настройте блокировку экрана в настройках Android.</string>
     <string name="force_incognito_keyboard">Принудительно включить инкогнито-клавиатуру</string>
     <string name="force_incognito_keyboard_subtitle">Запрещает клавиатуре запоминать, предлагать или синхронизировать то, что вы вводите в этом приложении. Учитывается большинством современных клавиатур; некоторые сторонние клавиатуры могут игнорировать эту подсказку.</string>
-    <string name="allow_chat_screenshots">Разрешить снимки экрана в чатах</string>
-    <string name="allow_chat_screenshots_subtitle">По умолчанию снимки экрана и запись экрана в чатах блокируются. Включите этот параметр, если нужно захватывать чаты.</string>
+    <string name="allow_chat_screenshots">Скрыть превью приложения в недавних</string>
+    <string name="allow_chat_screenshots_subtitle">Скрывает превью чатов в недавних приложениях и блокирует снимки экрана и запись экрана в чатах.</string>
     <string name="telemetry">Телеметрия</string>
     <string name="telemetry_settings_subtitle">Передавать телеметрию соединений с реле.</string>
     <string name="audit_logs">Журналы аудита</string>

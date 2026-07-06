@@ -156,7 +156,7 @@ internal data class ProfileGroupInviteOutcome(
 internal object ChatScreenshotPreferences {
     private const val KEY_ALLOW_CHAT_SCREENSHOTS = "allow_chat_screenshots"
 
-    fun readAllowChatScreenshots(preferences: SharedPreferences): Boolean = preferences.getBoolean(KEY_ALLOW_CHAT_SCREENSHOTS, false)
+    fun readAllowChatScreenshots(preferences: SharedPreferences): Boolean = preferences.getBoolean(KEY_ALLOW_CHAT_SCREENSHOTS, true)
 
     fun writeAllowChatScreenshots(
         preferences: SharedPreferences,
@@ -750,9 +750,10 @@ class WhiteNoiseAppState(
         private set
 
     /**
-     * User override for chat-surface FLAG_SECURE (#800). Default OFF keeps chat
-     * screenshots and screen recordings blocked; turning it ON clears the flag
-     * only for message surfaces. Identity / secret-key surfaces stay secure
+     * User override for chat-surface FLAG_SECURE (#800, #1091). Default ON
+     * permits chat screenshots and real Recents thumbnails; turning the
+     * "Hide app preview in Recents" setting ON clears this and keeps the flag
+     * set only for message surfaces. Identity / secret-key surfaces stay secure
      * unconditionally at their call sites.
      */
     var allowChatScreenshotsInChats by mutableStateOf(ChatScreenshotPreferences.readAllowChatScreenshots(preferences))
