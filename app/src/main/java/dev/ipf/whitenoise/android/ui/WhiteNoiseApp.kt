@@ -4811,7 +4811,22 @@ internal fun MediaVideoGridTile(
 ) {
     val context = LocalContext.current
     val epoch = reference.sourceEpoch
-    var localFile by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf<java.io.File?>(null) }
+    val cachedFileOnEntry =
+        remember(messageIdHex, attachmentIndex, reference.mediaType) {
+            cachedVideoAttachmentFile(
+                context = context,
+                messageIdHex = messageIdHex,
+                attachmentIndex = attachmentIndex,
+                reference = reference,
+            )
+        }
+    val cachedPlaintextOnEntry =
+        remember(messageIdHex, attachmentIndex) {
+            controller.hasCachedAttachment(messageIdHex, attachmentIndex)
+        }
+    var localFile by remember(messageIdHex, attachmentIndex, epoch, reference.mediaType) {
+        mutableStateOf(cachedFileOnEntry)
+    }
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
     // MediaImageGridTile). A sourceEpoch upgrade re-keys this state, so without
     // the cache seed the poster would reset to null and flash back to the
@@ -4823,14 +4838,21 @@ internal fun MediaVideoGridTile(
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     var startDownload by remember(messageIdHex, attachmentIndex, appState.mediaAutoDownloadMatrix) {
-        mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video))
+        mutableStateOf(
+            shouldStartVideoAttachmentDownload(
+                mine = mine,
+                videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
+                hasCachedAttachment = cachedPlaintextOnEntry,
+                hasCachedFile = cachedFileOnEntry != null,
+            ),
+        )
     }
     var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(0) }
 
-    LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload, reloadToken) {
+    LaunchedEffect(messageIdHex, attachmentIndex, epoch, startDownload, reloadToken, cachedPlaintextOnEntry) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
-        if (!mine && epoch == 0uL) return@LaunchedEffect
+        if (!mine && epoch == 0uL && !cachedPlaintextOnEntry) return@LaunchedEffect
         runCatching {
             materializeVideoAttachment(
                 context = context,
@@ -5356,7 +5378,22 @@ private fun MediaVideoBubble(
     val scope = rememberCoroutineScope()
     val pillKey = "$messageIdHex#$attachmentIndex"
     val epoch = reference.sourceEpoch
-    var localFile by remember(pillKey, epoch) { mutableStateOf<java.io.File?>(null) }
+    val cachedFileOnEntry =
+        remember(pillKey, reference.mediaType) {
+            cachedVideoAttachmentFile(
+                context = context,
+                messageIdHex = messageIdHex,
+                attachmentIndex = attachmentIndex,
+                reference = reference,
+            )
+        }
+    val cachedPlaintextOnEntry =
+        remember(pillKey) {
+            controller.hasCachedAttachment(messageIdHex, attachmentIndex)
+        }
+    var localFile by remember(pillKey, epoch, reference.mediaType) {
+        mutableStateOf(cachedFileOnEntry)
+    }
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
@@ -5370,18 +5407,27 @@ private fun MediaVideoBubble(
     var durationMs by remember(pillKey, epoch) { mutableStateOf(0L) }
     var playerOpen by remember(pillKey) { mutableStateOf(false) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
-    // Mirrors the image bubble's auto-download gate. When the policy says
-    // no (e.g. Wi-Fi-only on cellular), a tap flips startDownload=true so
-    // the user always has a path to fetch — never "looks present but can't
-    // be opened". See PR #191 reviewer feedback.
+    // Mirrors the image bubble's auto-download gate, but already-local bytes
+    // bypass the network-spend policy so chat re-entry starts at Play instead
+    // of showing a fake Download affordance. When the policy says no for an
+    // uncached video (e.g. Wi-Fi-only on cellular), a tap flips
+    // startDownload=true so the user always has a path to fetch — never
+    // "looks present but can't be opened". See PR #191 reviewer feedback.
     var startDownload by remember(pillKey, appState.mediaAutoDownloadMatrix) {
-        mutableStateOf(mine || appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video))
+        mutableStateOf(
+            shouldStartVideoAttachmentDownload(
+                mine = mine,
+                videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
+                hasCachedAttachment = cachedPlaintextOnEntry,
+                hasCachedFile = cachedFileOnEntry != null,
+            ),
+        )
     }
 
-    LaunchedEffect(pillKey, epoch, startDownload) {
+    LaunchedEffect(pillKey, epoch, startDownload, cachedPlaintextOnEntry) {
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
-        if (!mine && epoch == 0uL) return@LaunchedEffect
+        if (!mine && epoch == 0uL && !cachedPlaintextOnEntry) return@LaunchedEffect
         loading = true
         runCatching {
             materializeVideoAttachment(
@@ -5604,15 +5650,20 @@ private suspend fun materializeVideoAttachment(
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
 ): java.io.File {
-    val dir = java.io.File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }
-    val ext =
-        when {
-            reference.mediaType.contains("quicktime", ignoreCase = true) -> "mov"
-            reference.mediaType.contains("webm", ignoreCase = true) -> "webm"
-            else -> "mp4"
-        }
-    val file = java.io.File(dir, "$messageIdHex-$attachmentIndex.$ext")
-    if (file.exists() && file.length() > 0) return file
+    cachedVideoAttachmentFile(
+        context = context,
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+    )?.let { return it }
+
+    val file =
+        videoAttachmentCacheFile(
+            context = context,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+        )
     val retained =
         if (mine) {
             controller
@@ -5626,6 +5677,43 @@ private suspend fun materializeVideoAttachment(
     withContext(Dispatchers.IO) { file.writeBytes(bytes) }
     return file
 }
+
+internal fun cachedVideoAttachmentFile(
+    context: android.content.Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): java.io.File? =
+    videoAttachmentCacheFile(
+        context = context,
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+    ).takeIf { it.isFile && it.length() > 0L }
+
+internal fun shouldStartVideoAttachmentDownload(
+    mine: Boolean,
+    videoAutoDownload: Boolean,
+    hasCachedAttachment: Boolean,
+    hasCachedFile: Boolean,
+): Boolean = mine || videoAutoDownload || hasCachedAttachment || hasCachedFile
+
+private fun videoAttachmentCacheFile(
+    context: android.content.Context,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+): java.io.File {
+    val dir = java.io.File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }
+    return java.io.File(dir, "$messageIdHex-$attachmentIndex.${videoAttachmentExtension(reference)}")
+}
+
+private fun videoAttachmentExtension(reference: MediaAttachmentReferenceFfi): String =
+    when {
+        reference.mediaType.contains("quicktime", ignoreCase = true) -> "mov"
+        reference.mediaType.contains("webm", ignoreCase = true) -> "webm"
+        else -> "mp4"
+    }
 
 /**
  * Fullscreen player backed by Media3 ExoPlayer + PlayerView — the same
