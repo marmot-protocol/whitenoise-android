@@ -11119,6 +11119,7 @@ private fun GroupDetailsScreen(
             },
             confirmIcon = Icons.Default.Check,
             busy = adding || controller.mutationInFlight,
+            autoSelectResolvedIdentifier = true,
             excludeAccountIdHexes = controller.members.map { it.memberIdHex }.toSet(),
         )
         return
