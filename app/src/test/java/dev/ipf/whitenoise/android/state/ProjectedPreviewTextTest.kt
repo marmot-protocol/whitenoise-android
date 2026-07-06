@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.core.MediaPreviewFallback
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import org.junit.Assert.assertEquals
@@ -111,10 +112,32 @@ class ProjectedPreviewTextTest {
         val item =
             item(
                 preview = preview(plaintext = "", kind = 9uL),
-                resolvedMediaKind = ReplyMediaKind.Video,
+                resolvedMediaPreviewFallback = MediaPreviewFallback(kind = ReplyMediaKind.Video),
             )
 
         assertEquals(copy.mediaVideo, item.projectedPreviewText(copy))
+    }
+
+    @Test
+    fun blankMediaPreviewKeepsResolvedFilenameBeforeTypedFallback() {
+        val item =
+            item(
+                preview = preview(plaintext = "", kind = 9uL),
+                resolvedMediaPreviewFallback = MediaPreviewFallback(filename = "scan.png", kind = ReplyMediaKind.Photo),
+            )
+
+        assertEquals("scan.png", item.projectedPreviewText(copy))
+    }
+
+    @Test
+    fun blankMediaPreviewUsesGenericMediaFallbackWhenMimeIsUnknown() {
+        val item =
+            item(
+                preview = preview(plaintext = "", kind = 9uL),
+                resolvedMediaPreviewFallback = MediaPreviewFallback(kind = ReplyMediaKind.None),
+            )
+
+        assertEquals(copy.mediaAttachment, item.projectedPreviewText(copy))
     }
 
     @Test
@@ -137,7 +160,7 @@ class ProjectedPreviewTextTest {
     private fun item(
         preview: ChatListMessagePreviewFfi?,
         latest: AppMessageRecordFfi? = null,
-        resolvedMediaKind: ReplyMediaKind? = null,
+        resolvedMediaPreviewFallback: MediaPreviewFallback? = null,
     ): ChatListItem =
         ChatListItem(
             group = group("group-a"),
@@ -146,7 +169,7 @@ class ProjectedPreviewTextTest {
             memberCount = 0,
             memberSnapshot = null,
             projection = preview?.let { row("group-a", it) },
-            resolvedMediaKind = resolvedMediaKind,
+            resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
         )
 
     private fun preview(

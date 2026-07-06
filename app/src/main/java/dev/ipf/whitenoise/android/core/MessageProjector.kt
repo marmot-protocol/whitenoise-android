@@ -54,6 +54,13 @@ data class MessageTextCopy(
     }
 }
 
+data class MediaPreviewFallback(
+    val filename: String? = null,
+    val kind: ReplyMediaKind = ReplyMediaKind.None,
+) {
+    fun text(copy: MessageTextCopy): String = filename ?: copy.mediaLabel(kind)
+}
+
 object MessageProjector {
     private val KindDelete = 5uL
     private val KindReaction = 7uL
@@ -326,8 +333,18 @@ object MessageProjector {
         copy: MessageTextCopy,
     ): String =
         message.plaintext.takeIf { it.isNotBlank() }
-            ?: imetaField(message, "filename")
-            ?: copy.mediaLabel(mediaKind(message))
+            ?: mediaPreviewFallback(message)?.text(copy)
+            ?: copy.mediaAttachment
+
+    fun mediaPreviewFallback(message: AppMessageRecordFfi): MediaPreviewFallback? =
+        if (isMedia(message)) {
+            MediaPreviewFallback(
+                filename = imetaField(message, "filename"),
+                kind = mediaKind(message),
+            )
+        } else {
+            null
+        }
 
     // Coarse media classification for a captionless record, so a surface that
     // shows a type-aware label (e.g. a notification body) can say "sent a
