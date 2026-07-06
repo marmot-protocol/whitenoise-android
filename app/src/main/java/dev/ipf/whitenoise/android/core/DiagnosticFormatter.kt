@@ -43,8 +43,10 @@ object DiagnosticFormatter {
 
     private const val MAX_ERROR_LEN = 80
     private const val REDACTED = "[redacted]"
-    private val NSEC_SECRET = Regex("\\bnsec1[0-9a-zA-Z]+\\b")
+    private val NSEC_SECRET = Regex("(?i)nsec1[0-9a-z]+\\b")
     private val HEX_SECRET = Regex("\\b[0-9a-fA-F]{64,}\\b")
+    private val SEPARATED_HEX_SECRET = Regex("(?i)\\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){15,}\\b")
+    private val BASE64_SECRET = Regex("\\b[A-Za-z0-9+/]{40,}={0,2}\\b")
     private val CREDENTIALS_IN_URL = Regex("(?i)([a-z][a-z0-9+.-]*://)[^\\s/@:]+:[^\\s/@]+@")
     private val TOKEN_ASSIGNMENT = Regex("(?i)\\b(authorization|bearer|token|auth[_-]?token|password|secret)=([^\\s&]+)")
     private val BEARER_HEADER = Regex("(?i)\\bauthorization:\\s*bearer\\s+\\S+")
@@ -62,6 +64,8 @@ object DiagnosticFormatter {
                 .replace(CREDENTIALS_IN_URL) { "${it.groupValues[1]}$REDACTED@" }
                 .replace(NSEC_SECRET, REDACTED)
                 .replace(HEX_SECRET, REDACTED)
+                .replace(SEPARATED_HEX_SECRET, REDACTED)
+                .replace(BASE64_SECRET, REDACTED)
                 .replace(TOKEN_ASSIGNMENT) { "${it.groupValues[1]}=$REDACTED" }
                 .replace(BEARER_HEADER, "Authorization: Bearer $REDACTED")
         if (scrubbed.length <= MAX_ERROR_LEN) return scrubbed

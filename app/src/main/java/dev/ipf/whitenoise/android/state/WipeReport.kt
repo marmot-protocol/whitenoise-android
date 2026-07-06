@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
+import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 
 /**
  * The stages of the destructive Sign Out & Wipe, in the order the engine
@@ -65,7 +66,7 @@ internal fun wipeReport(outcome: WipeOutcomeFfi): WipeReport =
                     completedCount = outcome.groupsLeft.toInt(),
                     failures =
                         outcome.groupLeaveFailures.map {
-                            WipeFailureItem(shortWipeSubject(it.groupIdHex), it.reason)
+                            WipeFailureItem(shortWipeSubject(it.groupIdHex), DiagnosticFormatter.redactError(it.reason))
                         },
                 ),
                 WipeStageReport(
@@ -73,7 +74,7 @@ internal fun wipeReport(outcome: WipeOutcomeFfi): WipeReport =
                     completedCount = outcome.keyPackagesDeleted.toInt(),
                     failures =
                         outcome.keyPackageFailures.map {
-                            WipeFailureItem(shortWipeSubject(it.eventIdHex), it.reason)
+                            WipeFailureItem(shortWipeSubject(it.eventIdHex), DiagnosticFormatter.redactError(it.reason))
                         },
                 ),
                 WipeStageReport(
@@ -83,7 +84,12 @@ internal fun wipeReport(outcome: WipeOutcomeFfi): WipeReport =
                         if (outcome.localCleanup.completed) {
                             emptyList()
                         } else {
-                            listOf(WipeFailureItem(subject = null, reason = outcome.localCleanup.reason.orEmpty()))
+                            listOf(
+                                WipeFailureItem(
+                                    subject = null,
+                                    reason = DiagnosticFormatter.redactError(outcome.localCleanup.reason.orEmpty()),
+                                ),
+                            )
                         },
                 ),
             ),

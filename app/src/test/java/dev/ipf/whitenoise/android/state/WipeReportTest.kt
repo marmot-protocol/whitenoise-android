@@ -94,6 +94,42 @@ class WipeReportTest {
     }
 
     @Test
+    fun failureReasonsAreRedactedBeforeDisplay() {
+        val token = "nsec1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+        val report =
+            wipeReport(
+                outcome(
+                    groupLeaveFailures = listOf(GroupLeaveFailureFfi(groupIdHex = "ab".repeat(32), reason = "failed $token")),
+                    keyPackageFailures = listOf(RelayFailureFfi(eventIdHex = "cd".repeat(32), reason = "Authorization: Bearer secret-token")),
+                    localCompleted = false,
+                    localReason = "password=hunter2",
+                ),
+            )
+
+        assertEquals(
+            "failed [redacted]",
+            report.stages[0]
+                .failures
+                .single()
+                .reason,
+        )
+        assertEquals(
+            "Authorization: Bearer [redacted]",
+            report.stages[1]
+                .failures
+                .single()
+                .reason,
+        )
+        assertEquals(
+            "password=[redacted]",
+            report.stages[2]
+                .failures
+                .single()
+                .reason,
+        )
+    }
+
+    @Test
     fun incompleteLocalCleanupBecomesASubjectlessFailure() {
         val report = wipeReport(outcome(localCompleted = false, localReason = "sqlcipher busy"))
         val localStage = report.stages.single { it.stage == WipeStage.WipingLocalData }

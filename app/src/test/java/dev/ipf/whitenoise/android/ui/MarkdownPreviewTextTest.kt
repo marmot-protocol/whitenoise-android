@@ -104,6 +104,29 @@ class MarkdownPreviewTextTest {
     }
 
     @Test
+    fun previewStripsUnsafeBidiAndInvisibleControls() {
+        val annotated =
+            build(
+                listOf(
+                    MarkdownBlockFfi.Paragraph(
+                        listOf(
+                            MarkdownInlineFfi.Text("pay\u202Ecod.exe\u200B"),
+                            MarkdownInlineFfi.SoftBreak,
+                            MarkdownInlineFfi.Code("sha\u2066-256"),
+                        ),
+                    ),
+                    MarkdownBlockFfi.CodeBlock(
+                        kind = MarkdownCodeBlockKindFfi.FENCED,
+                        info = "",
+                        content = "https://example.com/\u202Egpj.exe",
+                    ),
+                ),
+            )
+
+        assertEquals("paycod.exe sha-256 https://example.com/gpj.exe", annotated.text)
+    }
+
+    @Test
     fun thematicBreakContributesNothing() {
         val annotated =
             build(

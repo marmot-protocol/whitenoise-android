@@ -52,6 +52,22 @@ class MarkdownInlineTextTest {
     }
 
     @Test
+    fun plainTextStripsUnsafeBidiAndInvisibleControls() {
+        val annotated =
+            build(
+                listOf(
+                    MarkdownInlineFfi.Text("pay\u202Ecod.exe\u200B"),
+                    MarkdownInlineFfi.SoftBreak,
+                    MarkdownInlineFfi.Code("sha\u2066-256"),
+                    MarkdownInlineFfi.Text(" "),
+                    MarkdownInlineFfi.Autolink("https://example.com/\u202Egpj.exe", MarkdownAutolinkKindFfi.URI),
+                ),
+            )
+
+        assertEquals("paycod.exe\nsha-256 https://example.com/gpj.exe", annotated.text)
+    }
+
+    @Test
     fun strongAppliesBoldOverItsRange() {
         val annotated =
             build(
@@ -137,6 +153,14 @@ class MarkdownInlineTextTest {
         assertEquals(CONFIRM_LINK_TAG_PREFIX + "https://example.com/page", (link.item as LinkAnnotation.Clickable).tag)
         assertEquals(0, link.start)
         assertEquals(7, link.end)
+    }
+
+    @Test
+    fun linkConfirmationDisplayStripsUnsafeCharactersAndCapsLength() {
+        assertEquals("https://trusted.example/evil.exe", markdownSafeDisplayText("https://trusted.example/\u202Eevil.exe"))
+
+        val long = "a".repeat(MARKDOWN_LINK_CONFIRM_DISPLAY_MAX_LENGTH + 5)
+        assertEquals(MARKDOWN_LINK_CONFIRM_DISPLAY_MAX_LENGTH, markdownSafeDisplayText(long).length)
     }
 
     @Test

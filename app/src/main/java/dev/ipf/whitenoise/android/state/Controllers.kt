@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
+import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
@@ -5339,7 +5340,11 @@ class ConversationController(
             }
         }.onFailure {
             it.rethrowIfCancellation()
-            appState.present(R.string.toast_couldnt_export_transcript, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
+            appState.present(
+                R.string.toast_couldnt_export_transcript,
+                AppText.Plain(DiagnosticFormatter.redactError(it.message ?: it.javaClass.simpleName)),
+                copyable = true,
+            )
         }.getOrNull()
     }
 
