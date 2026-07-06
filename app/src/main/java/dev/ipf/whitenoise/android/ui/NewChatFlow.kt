@@ -165,6 +165,7 @@ private fun NewMessageScreen(
 
     val activeHex = appState.activeAccount?.accountIdHex
     val myNpub = activeHex?.let(appState::npub)
+    val myQrUri = myNpub?.let(::nostrNpubUri)
     val candidates =
         remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
             deriveRecipientCandidates(appState, activeHex)
@@ -282,7 +283,7 @@ private fun NewMessageScreen(
                             icon = Icons.Default.QrCode,
                             title = showMyQrLabel,
                             onClick = { showMyQr = true },
-                            enabled = myNpub != null,
+                            enabled = myQrUri != null,
                         )
                     }
                 }
@@ -408,9 +409,10 @@ private fun NewMessageScreen(
             },
         )
     }
-    if (showMyQr && myNpub != null) {
+    if (showMyQr && myNpub != null && myQrUri != null) {
         MyQrCodeSheet(
             npub = myNpub,
+            qrUri = myQrUri,
             onDismiss = { showMyQr = false },
             onCopy = { npub ->
                 clipboard.setText(AnnotatedString(npub))
@@ -427,17 +429,24 @@ private fun NewMessageScreen(
     }
 }
 
-internal fun profileQrUri(npub: String): String = "nostr:$npub"
+/**
+ * New Message's self-QR intentionally emits the NIP-27 `nostr:npub…` form so
+ * scanned self-QRs start chats in White Noise and third-party Nostr clients.
+ * The existing profile QR sheet keeps using [ProfileLink.qrUri] because that
+ * surface shares a Marmot profile link instead. Reuse [ProfileLink.parse] here
+ * so the [WhiteNoiseAppState.npub] raw-hex fallback is never encoded as a QR.
+ */
+internal fun nostrNpubUri(npub: String): String? = ProfileLink.parse(npub)?.let { "nostr:${it.npub}" }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MyQrCodeSheet(
     npub: String,
+    qrUri: String,
     onDismiss: () -> Unit,
     onCopy: (String) -> Unit,
     onShare: (String) -> Unit,
 ) {
-    val qrUri = remember(npub) { profileQrUri(npub) }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
