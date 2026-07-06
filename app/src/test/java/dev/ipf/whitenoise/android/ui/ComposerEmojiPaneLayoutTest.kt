@@ -119,4 +119,17 @@ class ComposerEmojiPaneLayoutTest {
     fun searchModeAddsRoomForTheSearchFieldAndResults() {
         assertEquals(432.dp, ComposerEmojiPickerFallbackHeight + ComposerEmojiPickerSearchExtraHeight)
     }
+
+    @Test
+    fun emojiPickerSheetUsesOnlyTheVisiblePartialViewportBeforeExpansion() {
+        val partialFraction = emojiPickerSheetVisibleContentFraction(expanded = false)
+
+        assertEquals(0.5f / EmojiPickerSheetMaxHeightFraction, partialFraction, 0.0001f)
+        assertTrue(partialFraction < 1f)
+    }
+
+    @Test
+    fun emojiPickerSheetUsesTheFullSheetViewportWhenExpanded() {
+        assertEquals(1f, emojiPickerSheetVisibleContentFraction(expanded = true), 0.0001f)
+    }
 }

@@ -15955,6 +15955,9 @@ private fun EmojiPickerSheet(
             runCatching { sheetState.expand() }
         }
     }
+    val contentExpanded =
+        sheetState.currentValue == SheetValue.Expanded || sheetState.targetValue == SheetValue.Expanded
+    val visibleContentFraction = emojiPickerSheetVisibleContentFraction(expanded = contentExpanded)
     ModalBottomSheet(
         containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismissRequest,
@@ -15963,32 +15966,44 @@ private fun EmojiPickerSheet(
         // visible collapse/re-expand.
         sheetState = sheetState,
     ) {
-        EmojiPickerContent(
-            onEmojiPicked = onEmojiPicked,
-            recordRecentPicks = recordRecentPicks,
-            onCustomizeReactions =
-                onCustomizeReactions?.let { customize ->
-                    { customize(sheetState.currentValue == SheetValue.Expanded) }
-                },
-            searchFieldAlwaysVisible = true,
-            searchStartsOpen = false,
-            // Focusing the search field expands the sheet to full screen;
-            // imePadding then lifts the whole picker (grid + category rail)
-            // above the keyboard so nothing hides behind the IME (#1104). The
-            // sheet still opens at its partial detent for tap-to-react browsing.
-            onSearchActiveChange = { active ->
-                if (active) {
-                    scope.launch { runCatching { sheetState.expand() } }
-                }
-            },
+        Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight()
+                    .fillMaxHeight(EmojiPickerSheetMaxHeightFraction)
                     .navigationBarsPadding()
                     .imePadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
-        )
+        ) {
+            EmojiPickerContent(
+                onEmojiPicked = onEmojiPicked,
+                recordRecentPicks = recordRecentPicks,
+                onCustomizeReactions =
+                    onCustomizeReactions?.let { customize ->
+                        { customize(sheetState.currentValue == SheetValue.Expanded) }
+                    },
+                searchFieldAlwaysVisible = true,
+                searchStartsOpen = false,
+                // Material3 measures the sheet at its full requested height, then
+                // exposes only the top half at the partial detent. Keep the outer
+                // shell tall enough for expansion, but lay out the picker controls
+                // inside the actually visible partial viewport so the rail is not
+                // hidden below the fold.
+                // Focusing the search field expands the sheet to full screen;
+                // imePadding then lifts the whole picker (grid + category rail)
+                // above the keyboard so nothing hides behind the IME (#1104).
+                onSearchActiveChange = { active ->
+                    if (active) {
+                        scope.launch { runCatching { sheetState.expand() } }
+                    }
+                },
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight(visibleContentFraction),
+            )
+        }
     }
 }
 
@@ -16025,6 +16040,16 @@ private fun ComposerEmojiPickerPane(
         )
     }
 }
+
+internal const val EmojiPickerSheetMaxHeightFraction = 0.9f
+private const val EmojiPickerSheetPartialDetentFraction = 0.5f
+
+internal fun emojiPickerSheetVisibleContentFraction(expanded: Boolean): Float =
+    if (expanded) {
+        1f
+    } else {
+        (EmojiPickerSheetPartialDetentFraction / EmojiPickerSheetMaxHeightFraction).coerceIn(0f, 1f)
+    }
 
 internal val ComposerEmojiPickerFallbackHeight = 320.dp
 internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
