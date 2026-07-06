@@ -1327,7 +1327,9 @@ class WhiteNoiseAppState(
             for (groupIdHex in targets) {
                 val ok =
                     runCatching {
-                        marmotIo { sendText(account, groupIdHex, trimmed) }
+                        withGroupCommitLock(account, groupIdHex) {
+                            marmotIo { sendText(account, groupIdHex, trimmed) }
+                        }
                     }.isSuccess
                 if (!ok) failures += 1
             }
@@ -2902,7 +2904,9 @@ class WhiteNoiseAppState(
         val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
         val body = text.trim().takeIf { it.isNotEmpty() } ?: return false
         return runCatching {
-            marmotIo { sendText(account, group, body) }
+            withGroupCommitLock(account, group) {
+                marmotIo { sendText(account, group, body) }
+            }
             true
         }.onFailure {
             rethrowIfCancellation(it)
