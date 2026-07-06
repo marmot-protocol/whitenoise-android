@@ -2,7 +2,7 @@ package dev.ipf.whitenoise.android.core
 
 import android.content.Context
 import dev.ipf.marmotkit.Marmot
-import io.crates.keyring.Keyring
+import dev.ipf.marmotkit.MarmotAndroid
 import java.io.File
 
 class MarmotClient(
@@ -10,7 +10,7 @@ class MarmotClient(
     relayUrls: List<String> = bootstrapRelays,
 ) {
     init {
-        Keyring.initializeNdkContext(context.applicationContext)
+        MarmotAndroid.initialize(context.applicationContext)
     }
 
     val rootPath: String =
