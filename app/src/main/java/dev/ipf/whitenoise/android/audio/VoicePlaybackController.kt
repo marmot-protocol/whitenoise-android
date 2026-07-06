@@ -13,8 +13,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -62,8 +65,25 @@ object VoicePlaybackController {
         val speed: Float = 1f,
     )
 
+    enum class PlaybackStartResult {
+        Started,
+        Resumed,
+        PrepareFailed,
+        FocusDenied,
+        StartFailed,
+        Superseded,
+    }
+
+    data class PlaybackFailure(
+        val key: String,
+        val invalidatesCache: Boolean,
+    )
+
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
+
+    private val _failures = MutableSharedFlow<PlaybackFailure>(extraBufferCapacity = 8)
+    val failures: SharedFlow<PlaybackFailure> = _failures.asSharedFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -191,15 +211,13 @@ object VoicePlaybackController {
         key: String,
         file: File,
         ownerKey: String? = null,
-    ) {
-        playSerializer.withSerializedPlayback { playLocked(key, file, ownerKey) }
-    }
+    ): PlaybackStartResult = playSerializer.withSerializedPlayback { playLocked(key, file, ownerKey) }
 
     private suspend fun playLocked(
         key: String,
         file: File,
         ownerKey: String?,
-    ) {
+    ): PlaybackStartResult {
         if (currentKey == key && player != null) {
             // Re-acquire focus before resuming: a transient focus loss
             // auto-paused us (focusListener → pause()) and abandoned focus,
@@ -207,10 +225,10 @@ object VoicePlaybackController {
             // would let two streams play at once or get our start() clobbered.
             if (!requestFocus()) {
                 // Focus denied — stay paused rather than playing unfocused.
-                return
+                return PlaybackStartResult.FocusDenied
             }
-            val activePlayer = player ?: return
-            if (!startCurrentPlayer(activePlayer)) return
+            val activePlayer = player ?: return PlaybackStartResult.StartFailed
+            if (!startCurrentPlayer(activePlayer)) return PlaybackStartResult.StartFailed
             currentOwnerKey = ownerKey
             _state.value =
                 _state.value.copy(
@@ -219,7 +237,7 @@ object VoicePlaybackController {
                     durationMs = activePlayer.duration,
                 )
             startTicker()
-            return
+            return PlaybackStartResult.Resumed
         }
         val prepareGeneration = nextPlaybackGeneration()
         releasePlayerInternal()
@@ -251,11 +269,11 @@ object VoicePlaybackController {
                     }?.takeIf { isActive }
             } ?: run {
                 _state.value = PlaybackState()
-                return
+                return PlaybackStartResult.PrepareFailed
             }
         if (prepareGeneration != playbackGeneration) {
             mp.runCatching { release() }
-            return
+            return PlaybackStartResult.Superseded
         }
         // MediaPlayer instantiated on Dispatchers.IO has no Looper → its
         // callbacks fire on an internal MediaPlayer thread. State that we
@@ -286,8 +304,12 @@ object VoicePlaybackController {
                 // player's error tears playback down; a superseded player has
                 // already been released by the play() that replaced it.
                 if (player === p) {
+                    val failedKey = currentKey
                     releasePlayerInternal()
                     _state.value = PlaybackState()
+                    if (failedKey != null) {
+                        _failures.emit(PlaybackFailure(failedKey, invalidatesCache = true))
+                    }
                 }
             }
             true
@@ -295,9 +317,9 @@ object VoicePlaybackController {
         if (!requestFocus()) {
             mp.runCatching { release() }
             _state.value = PlaybackState()
-            return
+            return PlaybackStartResult.FocusDenied
         }
-        if (!startPreparedNewPlayer(mp)) return
+        if (!startPreparedNewPlayer(mp)) return PlaybackStartResult.StartFailed
         player = mp
         currentKey = key
         currentOwnerKey = ownerKey
@@ -317,6 +339,7 @@ object VoicePlaybackController {
                 speed = currentSpeed,
             )
         startTicker()
+        return PlaybackStartResult.Started
     }
 
     private fun startCurrentPlayer(mp: MediaPlayer): Boolean =
