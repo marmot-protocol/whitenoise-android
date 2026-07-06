@@ -21,11 +21,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -324,50 +322,21 @@ private fun NewMessageScreen(
                         )
                     }
                 } else if (identifierQuery || matches.isEmpty()) {
-                    item {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(Dimens.spaceXl),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
-                        ) {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(40.dp),
-                            )
+                    // Only surface a note when the user actually typed a query that
+                    // matched nothing. The blank / no-contacts state relies on the
+                    // New group + Scan QR quick actions above, so it needs no
+                    // centered hero, paste, or scan affordance here (all redundant).
+                    if (query.isNotBlank()) {
+                        item {
                             Text(
-                                stringResource(
-                                    if (query.isBlank()) R.string.recipient_search_empty_hint else R.string.no_matches,
-                                ),
+                                stringResource(R.string.no_matches),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm)) {
-                                TextButton(onClick = {
-                                    clipboard
-                                        .getText()
-                                        ?.text
-                                        ?.trim()
-                                        ?.takeIf { it.isNotEmpty() }
-                                        ?.let { query = it }
-                                }) {
-                                    Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Text(
-                                        stringResource(R.string.paste_npub),
-                                        modifier = Modifier.padding(start = Dimens.spaceXs),
-                                    )
-                                }
-                                TextButton(onClick = { showScanner = true }) {
-                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Text(
-                                        stringResource(R.string.scan_qr_code),
-                                        modifier = Modifier.padding(start = Dimens.spaceXs),
-                                    )
-                                }
-                            }
                         }
                     }
                 } else {
