@@ -910,8 +910,6 @@
     <string name="group_details_subtitle">Group · %1$d members</string>
     <string name="add_group_description">Add group description</string>
     <string name="see_all_members">See all %1$d members</string>
-    <string name="encryption">Encryption</string>
-    <string name="encryption_e2ee_note">Messages are end-to-end encrypted</string>
     <string name="chat_lock">Chat lock</string>
     <string name="toast_disappearing_not_applied">The group was created, but disappearing messages could not be turned on</string>
     <string name="search_members">Search members</string>
