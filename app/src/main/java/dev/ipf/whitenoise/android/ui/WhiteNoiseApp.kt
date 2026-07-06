@@ -4104,6 +4104,8 @@ internal fun shouldClearFocusOnResume(
 internal data class ConversationScrollSnapshot(
     val firstVisibleItemIndex: Int,
     val firstVisibleItemScrollOffset: Int,
+    val anchorItemId: String? = null,
+    val anchorMessageIdHex: String? = null,
 )
 
 internal fun conversationScrollKey(
@@ -4119,12 +4121,41 @@ internal fun conversationScrollSnapshotOnLeave(
     firstVisibleItemIndex: Int,
     firstVisibleItemScrollOffset: Int,
     nearBottom: Boolean,
+    anchorItemId: String? = null,
+    anchorMessageIdHex: String? = null,
 ): ConversationScrollSnapshot? =
     if (nearBottom) {
         null
     } else {
-        ConversationScrollSnapshot(firstVisibleItemIndex, firstVisibleItemScrollOffset)
+        ConversationScrollSnapshot(
+            firstVisibleItemIndex = firstVisibleItemIndex,
+            firstVisibleItemScrollOffset = firstVisibleItemScrollOffset,
+            anchorItemId = anchorItemId,
+            anchorMessageIdHex = anchorMessageIdHex,
+        )
     }
+
+internal fun conversationScrollRestoreListIndex(
+    snapshot: ConversationScrollSnapshot,
+    renderedItemIds: List<String>,
+    renderedMessageIds: List<String> = emptyList(),
+    olderHeaderCount: Int,
+): Int {
+    val anchorIndex =
+        snapshot.anchorMessageIdHex
+            ?.takeIf { it.isNotBlank() }
+            ?.let(renderedMessageIds::indexOf)
+            ?.takeIf { it >= 0 }
+            ?: snapshot.anchorItemId
+                ?.let(renderedItemIds::indexOf)
+                ?.takeIf { it >= 0 }
+            ?: -1
+    return if (anchorIndex >= 0) {
+        1 + olderHeaderCount + anchorIndex
+    } else {
+        snapshot.firstVisibleItemIndex
+    }
+}
 
 /** Within this many items of the trailing edge counts as "at bottom". */
 private const val ConversationNearBottomItemSlack = 3
@@ -8185,10 +8216,14 @@ private fun ConversationScreen(
             focusMessageId == null &&
                 !justCreated
         }
+    val positionalScrollRestore =
+        scrollRestore?.takeIf {
+            it.anchorItemId.isNullOrBlank() && it.anchorMessageIdHex.isNullOrBlank()
+        }
     val listState =
         rememberLazyListState(
-            initialFirstVisibleItemIndex = scrollRestore?.firstVisibleItemIndex ?: 0,
-            initialFirstVisibleItemScrollOffset = scrollRestore?.firstVisibleItemScrollOffset ?: 0,
+            initialFirstVisibleItemIndex = positionalScrollRestore?.firstVisibleItemIndex ?: 0,
+            initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
         )
     // Single conversation-level owner of which message's action menu is open, so
     // only one popover can be open at a time. With the keyboard up the menu is
@@ -8285,9 +8320,11 @@ private fun ConversationScreen(
     }
     DisposableEffect(chat.id) {
         onDispose {
-            val renderedCount =
-                controller.timeline.count { !MessageProjector.isEdit(it.record) }
+            val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
             val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
+            val firstTimelineIndex =
+                listState.firstVisibleItemIndex - 1 - (if (hasOlderHeader) 1 else 0)
+            val anchor = rendered.getOrNull(firstTimelineIndex)
             onSaveScrollSnapshot(
                 conversationScrollSnapshotOnLeave(
                     firstVisibleItemIndex = listState.firstVisibleItemIndex,
@@ -8295,9 +8332,11 @@ private fun ConversationScreen(
                     nearBottom =
                         isNearBottom(
                             listState,
-                            renderedCount,
+                            rendered.size,
                             hasOlderHeader,
                         ),
+                    anchorItemId = anchor?.id,
+                    anchorMessageIdHex = anchor?.record?.messageIdHex,
                 ),
             )
         }
@@ -9586,12 +9625,32 @@ private fun ConversationScreen(
     // bottom before the reader's position is restored.
     LaunchedEffect(chat.id, scrollRestore) {
         val restore = scrollRestore ?: return@LaunchedEffect
-        snapshotFlow { renderedTimeline.isNotEmpty() }
-            .filter { it }
-            .first()
-        listState.scrollToItem(restore.firstVisibleItemIndex, restore.firstVisibleItemScrollOffset)
+        restore.anchorMessageIdHex
+            ?.takeIf { it.isNotBlank() }
+            ?.let { controller.loadUntilMessageAvailable(it) }
+        val targetIndex =
+            snapshotFlow {
+                val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+                if (rendered.isEmpty()) {
+                    null
+                } else {
+                    val liveOlderHeaderCount =
+                        if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+                    val liveBottomTimelineIndex = rendered.size + 1 + liveOlderHeaderCount
+                    conversationScrollRestoreListIndex(
+                        snapshot = restore,
+                        renderedItemIds = rendered.map { it.id },
+                        renderedMessageIds = rendered.map { it.record.messageIdHex },
+                        olderHeaderCount = liveOlderHeaderCount,
+                    ).coerceAtMost(liveBottomTimelineIndex)
+                }
+            }.filterNotNull()
+                .first()
+        listState.scrollToItem(targetIndex, restore.firstVisibleItemScrollOffset)
         initialTimelineAnchored = true
-        lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
+        val restoredRendered =
+            controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        lastFollowedLatestId = restoredRendered.lastOrNull()?.id
     }
     LaunchedEffect(latestTimelineItemId) {
         if (renderedTimeline.isNotEmpty()) {
