@@ -147,7 +147,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",
-            "MARMOTKIT_SHORT_SHA",
+            "MDK_SHORT_SHA",
             (marmotKitVersionProperties.getProperty("mdk-short-sha") ?: "unknown").asBuildConfigString(),
         )
     }
