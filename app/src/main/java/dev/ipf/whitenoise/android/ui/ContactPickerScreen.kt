@@ -187,15 +187,23 @@ internal fun ContactPickerScreen(
                                 memberHexes = excludeAccountIdHexes.toList(),
                                 resolvedHex = resolvedHex,
                             )
-                        val isSelected = resolvedHex.lowercase(Locale.ROOT) in selectedHexes
+                        val resolvedAccountIdHex = resolvedHex.lowercase(Locale.ROOT)
+                        val isSelected = resolvedAccountIdHex in selectedHexes
                         val candidate =
                             RecipientSearch.Candidate(
-                                accountIdHex = resolvedHex,
-                                displayName = appState.displayName(resolvedHex),
-                                npub = appState.npub(resolvedHex),
+                                accountIdHex = resolvedAccountIdHex,
+                                displayName = appState.displayName(resolvedAccountIdHex),
+                                npub = appState.npub(resolvedAccountIdHex),
                             )
-                        if (autoSelectResolvedIdentifier && !busy && !alreadyMember && !isSelected) {
-                            LaunchedEffect(resolvedHex) {
+                        if (
+                            shouldAutoSelectResolvedIdentifier(
+                                autoSelectResolvedIdentifier = autoSelectResolvedIdentifier,
+                                busy = busy,
+                                alreadyMember = alreadyMember,
+                                isSelected = isSelected,
+                            )
+                        ) {
+                            LaunchedEffect(resolvedAccountIdHex) {
                                 toggle(candidate)
                             }
                         }
@@ -207,11 +215,11 @@ internal fun ContactPickerScreen(
                                 } else {
                                     IdentityFormatter.short(candidate.npub)
                                 },
-                            avatarSeed = resolvedHex,
-                            avatarUrl = appState.avatarUrl(resolvedHex),
+                            avatarSeed = resolvedAccountIdHex,
+                            avatarUrl = appState.avatarUrl(resolvedAccountIdHex),
                             enabled = !busy && !alreadyMember,
                             onClick = { toggle(candidate) },
-                            onLongClick = { appState.presentProfile(appState.npub(resolvedHex)) },
+                            onLongClick = { appState.presentProfile(candidate.npub) },
                             trailing = {
                                 SelectionIndicator(selected = isSelected, dimmed = alreadyMember)
                             },
@@ -264,3 +272,10 @@ internal fun ContactPickerScreen(
         )
     }
 }
+
+internal fun shouldAutoSelectResolvedIdentifier(
+    autoSelectResolvedIdentifier: Boolean,
+    busy: Boolean,
+    alreadyMember: Boolean,
+    isSelected: Boolean,
+): Boolean = autoSelectResolvedIdentifier && !busy && !alreadyMember && !isSelected
