@@ -466,6 +466,20 @@ class MediaPipelineTest {
     }
 
     @Test
+    fun canSeedStaticThumbnailFromMediaType_skipsByteDependentAnimatedFormats() {
+        assertFalse(MediaPipeline.canSeedStaticThumbnailFromMediaType("image/gif"))
+        assertFalse(MediaPipeline.canSeedStaticThumbnailFromMediaType("image/webp"))
+        assertFalse(MediaPipeline.canSeedStaticThumbnailFromMediaType("application/octet-stream"))
+        assertFalse(MediaPipeline.canSeedStaticThumbnailFromMediaType("   "))
+    }
+
+    @Test
+    fun canSeedStaticThumbnailFromMediaType_allowsKnownStaticImageFormats() {
+        assertTrue(MediaPipeline.canSeedStaticThumbnailFromMediaType("image/jpeg"))
+        assertTrue(MediaPipeline.canSeedStaticThumbnailFromMediaType("IMAGE/PNG"))
+    }
+
+    @Test
     fun isGif_recognizesGif89aHeader() {
         val header = "GIF89a".toByteArray(Charsets.US_ASCII)
         assertTrue(MediaPipeline.isGif(header))

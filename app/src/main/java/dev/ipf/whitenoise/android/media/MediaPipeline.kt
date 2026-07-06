@@ -242,6 +242,23 @@ object MediaPipeline {
     }
 
     /**
+     * True when a decoded static thumbnail cache hit can be trusted before the
+     * attachment bytes are available. GIF is always animated; WebP, blank, and
+     * octet-stream need byte sniffing to distinguish static from animated. For
+     * those byte-dependent formats, seeding a Static presentation from an old
+     * thumbnail cache entry would prevent the download/decode pass from reaching
+     * the animated ImageDecoder path.
+     */
+    fun canSeedStaticThumbnailFromMediaType(mediaType: String): Boolean {
+        val normalized = mediaType.trim()
+        if (normalized.isEmpty()) return false
+        if (normalized.equals("image/gif", ignoreCase = true)) return false
+        if (normalized.equals("image/webp", ignoreCase = true)) return false
+        if (normalized.equals("application/octet-stream", ignoreCase = true)) return false
+        return true
+    }
+
+    /**
      * Decode animated GIF/WebP bytes to an [AnimatedImageDrawable], downscaling
      * so the longer edge is ≈ [maxEdgePx]. Returns null for static images or
      * undecodable payloads.
@@ -268,6 +285,8 @@ object MediaPipeline {
                     }
                 }
             drawable as? AnimatedImageDrawable
+        } catch (_: OutOfMemoryError) {
+            null
         } catch (_: Exception) {
             null
         }

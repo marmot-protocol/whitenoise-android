@@ -4424,11 +4424,11 @@ private fun MediaImageBubble(
     val epoch = reference.sourceEpoch
     // Seed from the decoded-thumbnail cache so an already-fetched or just-sent
     // image paints on the first frame — no decode spinner, no visible "reload".
-    // Animated GIF/WebP skip the static thumbnail cache so they always decode
-    // through the ImageDecoder path.
+    // Animated GIF/WebP and byte-sniffed unknowns skip the static thumbnail
+    // cache so they always decode through the ImageDecoder path.
     var presentation by remember(key, attachmentIndex, epoch) {
         val cached =
-            if (!MediaPipeline.isAnimatedImageAttachment(reference.mediaType, ByteArray(0))) {
+            if (MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
                 controller.thumbnailFor(key, attachmentIndex)
             } else {
                 null
@@ -5042,7 +5042,7 @@ internal fun MediaImageGridTile(
     val tileSlot = "$messageIdHex#$attachmentIndex"
     var presentation by remember(decodeKey) {
         val cached =
-            if (!MediaPipeline.isAnimatedImageAttachment(reference.mediaType, ByteArray(0))) {
+            if (MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
                 controller.thumbnailFor(messageIdHex, attachmentIndex)
             } else {
                 null
