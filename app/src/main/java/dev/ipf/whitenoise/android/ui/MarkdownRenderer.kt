@@ -775,24 +775,34 @@ internal fun shortenedBech32(bech32: String): String {
     return trimmed.take(12) + "…" + trimmed.takeLast(6)
 }
 
-// `@npub1…` (and `nostr:npub1…`) runs as the composer stores them in plaintext.
-// Body is bech32's 58 data chars; the prefix is captured separately so the bare
-// npub can be handed to the resolver, which normalizes the npub form only.
-private val PLAINTEXT_NPUB_MENTION =
-    Regex("(@|nostr:)(npub1[ac-hj-np-z02-9]{58})", RegexOption.IGNORE_CASE)
+private const val PLAINTEXT_BECH32_BODY_CHARS = "ac-hj-np-z02-9"
+private const val PLAINTEXT_NPUB = "npub1[$PLAINTEXT_BECH32_BODY_CHARS]{58}"
+private const val PLAINTEXT_NPROFILE = "nprofile1[$PLAINTEXT_BECH32_BODY_CHARS]+"
+private const val PLAINTEXT_RELAY_HINT_SUFFIX = "\\?relay=\\S+"
+
+// `@npub1…`, `nostr:npub1…`, and desktop/NIP-27 `nostr:nprofile1…` runs as
+// they appear in raw engine plaintext. npub bodies have a fixed 58-char bech32
+// payload; nprofile bodies are TLV-shaped and variable length, so validation is
+// left to the resolver rather than the regex. A `nostr:npub1…?relay=…` query is
+// a relay hint for the same profile reference; it is ignored for display/lookup.
+private val PLAINTEXT_PROFILE_MENTION =
+    Regex(
+        "(@|nostr:)((?:$PLAINTEXT_NPUB)|(?:$PLAINTEXT_NPROFILE))(?:$PLAINTEXT_RELAY_HINT_SUFFIX)?",
+        RegexOption.IGNORE_CASE,
+    )
 
 /**
- * Resolves `@npub1…` / `nostr:npub1…` mentions in raw engine plaintext to
- * `@<display name>`, falling back to `@<shortened bech32>` when [resolver]
- * returns null — matching the message bubble's mention rendering exactly. Used
- * by surfaces that show plaintext without the markdown renderer (reply preview,
- * forward preview). Non-mention text is left untouched.
+ * Resolves `@npub1…`, `nostr:npub1…`, and `nostr:nprofile1…` mentions in raw
+ * engine plaintext to `@<display name>`, falling back to `@<shortened bech32>`
+ * when [resolver] returns null — matching the message bubble's mention
+ * rendering exactly. Used by surfaces that show plaintext without the markdown
+ * renderer (reply preview, forward preview). Non-mention text is left untouched.
  */
 internal fun resolveMentionsInPlaintext(
     text: String,
     resolver: ((String) -> String?)?,
 ): String =
-    PLAINTEXT_NPUB_MENTION.replace(text) { match ->
+    PLAINTEXT_PROFILE_MENTION.replace(text) { match ->
         val bech32 = match.groupValues[2]
         "@" + (resolver?.invoke(bech32) ?: shortenedBech32(bech32))
     }

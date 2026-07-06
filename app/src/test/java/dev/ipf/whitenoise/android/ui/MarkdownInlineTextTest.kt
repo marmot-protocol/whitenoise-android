@@ -290,6 +290,41 @@ class MarkdownInlineTextTest {
     }
 
     @Test
+    fun plaintextResolverHandlesNprofileNostrMentionsWithoutAtSigil() {
+        val nprofile = "nprofile1" + "q".repeat(70)
+
+        val resolved =
+            resolveMentionsInPlaintext(
+                "hello nostr:$nprofile!",
+                resolver = { bech32 -> "Bob".takeIf { bech32 == nprofile } },
+            )
+
+        assertEquals("hello @Bob!", resolved)
+    }
+
+    @Test
+    fun plaintextResolverFallsBackToShortenedNprofile() {
+        val nprofile = "nprofile1" + "z".repeat(70)
+
+        val resolved = resolveMentionsInPlaintext("hello nostr:$nprofile,", resolver = { null })
+
+        assertEquals("hello @nprofile1zzz…zzzzzz,", resolved)
+    }
+
+    @Test
+    fun plaintextResolverIgnoresNpubRelayHintSuffixes() {
+        val npub = "npub1" + "q".repeat(58)
+
+        val resolved =
+            resolveMentionsInPlaintext(
+                "hello nostr:$npub?relay=wss://relay.example after",
+                resolver = { bech32 -> "Alice".takeIf { bech32 == npub } },
+            )
+
+        assertEquals("hello @Alice after", resolved)
+    }
+
+    @Test
     fun unresolvedMentionRendersShortenedBech32InCodeStyleWithProfileAnnotation() {
         val npub = "npub1" + "q".repeat(58)
         val annotated =
