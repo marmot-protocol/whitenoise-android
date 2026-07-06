@@ -59,6 +59,11 @@ internal fun ContactPickerScreen(
     onConfirm: () -> Unit,
     confirmIcon: ImageVector = Icons.AutoMirrored.Filled.ArrowForward,
     busy: Boolean = false,
+    // When true the confirm FAB is enabled with no members selected, so the
+    // group-creation flow can proceed to naming and create a name-first group
+    // (members added later). Add-members and other pickers keep requiring a
+    // selection (default false).
+    allowEmptyConfirm: Boolean = false,
     excludeAccountIdHexes: Set<String> = emptySet(),
     footer: (@Composable () -> Unit)? = null,
 ) {
@@ -87,7 +92,7 @@ internal fun ContactPickerScreen(
             }
         }
     val selectedHexes = selected.map { it.accountIdHex.lowercase(Locale.ROOT) }.toSet()
-    val canConfirm = selected.isNotEmpty() && !busy
+    val canConfirm = (allowEmptyConfirm || selected.isNotEmpty()) && !busy
 
     fun toggle(candidate: RecipientSearch.Candidate) {
         val hex = candidate.accountIdHex.lowercase(Locale.ROOT)

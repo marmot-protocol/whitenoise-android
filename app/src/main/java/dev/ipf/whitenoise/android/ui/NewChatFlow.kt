@@ -132,6 +132,9 @@ internal fun NewGroupFlow(
             selected = selected,
             onBack = onClose,
             onConfirm = { setupOpen = true },
+            // Members are optional: you can proceed to name the group and create
+            // it with nobody selected, then add people afterward from the group.
+            allowEmptyConfirm = true,
         )
     }
 }

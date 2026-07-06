@@ -10907,10 +10907,13 @@ private fun GroupDetailsScreen(
     // Close details and raise the conversation's message search.
     onOpenSearch: (() -> Unit)? = null,
 ) {
-    var pendingMemberAsAdmin by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var showEditGroup by remember { mutableStateOf(false) }
-    var showAddMember by remember { mutableStateOf(false) }
+    // Auto-opened straight from the empty-group "Add members" CTA: render the
+    // picker on the first frame (no details-screen flash) and route its Back to
+    // the conversation instead of to the details body underneath.
+    var showAddMember by remember { mutableStateOf(autoOpenAddMember) }
+    val addMemberAutoOpened = remember { autoOpenAddMember }
     var membersExpanded by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var memberSearchOpen by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     var memberQuery by remember(controller.group.groupIdHex) { mutableStateOf("") }
@@ -10927,12 +10930,10 @@ private fun GroupDetailsScreen(
             showTransferAdmin = true
         }
     }
-    LaunchedEffect(autoOpenAddMember, controller.isSelfMember, controller.isSelfAdmin) {
-        if (autoOpenAddMember && controller.isSelfMember && controller.isSelfAdmin) {
-            pendingMemberAsAdmin = false
-            showAddMember = true
-            onAutoOpenAddMemberConsumed()
-        }
+    // Clear the parent trigger once on entry so re-opening details later doesn't
+    // re-auto-open the picker. The picker is already shown via the initial state.
+    LaunchedEffect(Unit) {
+        if (autoOpenAddMember) onAutoOpenAddMemberConsumed()
     }
     var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
     var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -11094,43 +11095,31 @@ private fun GroupDetailsScreen(
             title = stringResource(R.string.add_member),
             selected = addSelection,
             onBack = {
+                // When auto-opened from the empty-group CTA, Back returns to the
+                // conversation (via the details onBack) rather than exposing the
+                // details body the user never intended to see.
                 if (!adding) {
-                    showAddMember = false
-                    pendingMemberAsAdmin = false
+                    if (addMemberAutoOpened) onBack() else showAddMember = false
                 }
             },
             onConfirm = {
                 val refs = addSelection.map { it.accountIdHex }
+                // Members are added as regular members; admin is granted
+                // per-member afterward from the profile sheet. The old bulk
+                // "add as admin" toggle couldn't express per-member intent for
+                // a multi-select add, so it's gone.
                 runGroupMutation(
                     action = GroupMutationAction.InviteMember,
-                    mutation = { controller.inviteMembers(refs, addAsAdmin = pendingMemberAsAdmin) },
+                    mutation = { controller.inviteMembers(refs, addAsAdmin = false) },
                     onSuccess = {
                         pendingInvites = (pendingInvites + refs).distinct()
-                        pendingMemberAsAdmin = false
-                        showAddMember = false
+                        if (addMemberAutoOpened) onBack() else showAddMember = false
                     },
                 )
             },
             confirmIcon = Icons.Default.Check,
             busy = adding || controller.mutationInFlight,
             excludeAccountIdHexes = controller.members.map { it.memberIdHex }.toSet(),
-            footer = {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(stringResource(R.string.add_as_admin), style = MaterialTheme.typography.bodyLarge)
-                    Switch(
-                        checked = pendingMemberAsAdmin,
-                        onCheckedChange = { pendingMemberAsAdmin = it },
-                        enabled = !adding && !controller.mutationInFlight,
-                    )
-                }
-            },
         )
         return
     }
@@ -11302,7 +11291,6 @@ private fun GroupDetailsScreen(
                         icon = Icons.Default.PersonAdd,
                         label = stringResource(R.string.quick_action_add),
                         onClick = {
-                            pendingMemberAsAdmin = false
                             showAddMember = true
                         },
                         enabled = !mutationsBlocked,
@@ -11443,7 +11431,6 @@ private fun GroupDetailsScreen(
                     title = stringResource(R.string.add_member),
                     enabled = !mutationsBlocked,
                     onClick = {
-                        pendingMemberAsAdmin = false
                         showAddMember = true
                     },
                 )
