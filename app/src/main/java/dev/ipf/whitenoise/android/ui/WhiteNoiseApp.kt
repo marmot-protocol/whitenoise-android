@@ -19757,7 +19757,7 @@ private sealed interface AvatarViewerImageState {
 }
 
 @Composable
-private fun QrCodeImage(
+internal fun QrCodeImage(
     content: String,
     contentDescription: String = stringResource(R.string.profile_qr_code),
 ) {
