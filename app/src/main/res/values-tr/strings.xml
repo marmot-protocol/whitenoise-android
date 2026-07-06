@@ -894,4 +894,5 @@
     <string name="onboarding_slogan_uncensorable">Sansürlenemez</string>
     <string name="onboarding_slogan_secure_messaging">Güvenli Mesajlaşma</string>
     <string name="sign_in_error_public_key">Bu bir genel anahtar. Giriş yapmak için gizli anahtarınızı (nsec) girin.</string>
+    <string name="group_add_members_after_create">Üyeleri grubu oluşturduktan sonra ekleyebilirsiniz.</string>
 </resources>

@@ -888,4 +888,5 @@
     <string name="onboarding_slogan_uncensorable">防审查</string>
     <string name="onboarding_slogan_secure_messaging">安全通讯</string>
     <string name="sign_in_error_public_key">这是公钥。请输入你的私钥（nsec）登录。</string>
+    <string name="group_add_members_after_create">创建群组后可以添加成员。</string>
 </resources>

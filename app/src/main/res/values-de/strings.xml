@@ -894,4 +894,5 @@
     <string name="onboarding_slogan_uncensorable">Unzensierbar</string>
     <string name="onboarding_slogan_secure_messaging">Sichere Nachrichten</string>
     <string name="sign_in_error_public_key">Das ist ein öffentlicher Schlüssel. Gib deinen geheimen Schlüssel (nsec) ein, um dich anzumelden.</string>
+    <string name="group_add_members_after_create">Mitglieder kannst du nach dem Erstellen der Gruppe hinzufügen.</string>
 </resources>

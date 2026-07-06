@@ -908,4 +908,5 @@
     <string name="onboarding_slogan_uncensorable">Нецензурируемый</string>
     <string name="onboarding_slogan_secure_messaging">Безопасный Мессенджер</string>
     <string name="sign_in_error_public_key">Это открытый ключ. Введите свой секретный ключ (nsec) для входа.</string>
+    <string name="group_add_members_after_create">Участников можно добавить после создания группы.</string>
 </resources>
