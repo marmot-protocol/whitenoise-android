@@ -4424,8 +4424,18 @@ private fun MediaImageBubble(
     val epoch = reference.sourceEpoch
     // Seed from the decoded-thumbnail cache so an already-fetched or just-sent
     // image paints on the first frame — no decode spinner, no visible "reload".
-    var bitmap by remember(key, attachmentIndex, epoch) {
-        mutableStateOf(controller.thumbnailFor(key, attachmentIndex)?.asImageBitmap())
+    // Animated GIF/WebP skip the static thumbnail cache so they always decode
+    // through the ImageDecoder path.
+    var presentation by remember(key, attachmentIndex, epoch) {
+        val cached =
+            if (!MediaPipeline.isAnimatedImageAttachment(reference.mediaType, ByteArray(0))) {
+                controller.thumbnailFor(key, attachmentIndex)
+            } else {
+                null
+            }
+        mutableStateOf<DecodedAttachmentPresentation?>(
+            cached?.let { DecodedAttachmentPresentation.Static(it) },
+        )
     }
     var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
     var viewerOpen by remember(key, attachmentIndex) { mutableStateOf(false) }
@@ -4438,7 +4448,7 @@ private fun MediaImageBubble(
     }
 
     LaunchedEffect(key, attachmentIndex, epoch, startDownload, reloadToken) {
-        if (bitmap != null) return@LaunchedEffect // already have a decoded thumbnail
+        if (presentation != null) return@LaunchedEffect // already have decoded pixels
         if (!startDownload) return@LaunchedEffect
         // Own optimistic sends still have their bytes only in the pending list
         // (the projection hasn't reconciled them into the L1 cache yet). Use those
@@ -4461,15 +4471,17 @@ private fun MediaImageBubble(
         failed = false
         try {
             val data = pendingBytes ?: controller.downloadAttachment(key, attachmentIndex, reference)
-            // Decode a sampled bitmap sized to the bubble — a full 1920px
-            // image would be a ~14 MB ARGB_8888 bitmap per visible row.
             val decoded =
-                withContext(Dispatchers.Default) {
-                    MediaPipeline.decodeSampledBitmap(data, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
-                }
+                decodeMessageAttachmentImage(
+                    bytes = data,
+                    mediaType = reference.mediaType,
+                    staticMaxEdgePx = MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                )
             if (decoded != null) {
-                controller.cacheThumbnail(key, attachmentIndex, decoded)
-                bitmap = decoded.asImageBitmap()
+                if (decoded is DecodedAttachmentPresentation.Static) {
+                    controller.cacheThumbnail(key, attachmentIndex, decoded.bitmap)
+                }
+                presentation = decoded
             } else {
                 failed = true
             }
@@ -4499,7 +4511,7 @@ private fun MediaImageBubble(
         modifier = imageBubbleSizing(aspectRatioFromDim(reference.dim)),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            val current = bitmap
+            val current = presentation
             val placeholder = rememberThumbhashImage(reference.thumbhash)
             // Paint the blurred placeholder behind whatever loading-state is
             // shown so the bubble has a perceptual preview before the real
@@ -4512,10 +4524,10 @@ private fun MediaImageBubble(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            when {
-                current != null ->
+            when (current) {
+                is DecodedAttachmentPresentation.Static ->
                     Image(
-                        bitmap = current,
+                        bitmap = current.toImageBitmap(),
                         contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                         contentScale = ContentScale.Crop,
                         modifier =
@@ -4526,27 +4538,43 @@ private fun MediaImageBubble(
                                     onClick = { viewerOpen = true },
                                 ),
                     )
-                failed ->
-                    MediaCircleAction(
-                        icon = Icons.Default.Refresh,
-                        contentDescription = stringResource(R.string.media_tap_to_retry),
-                        onClick = {
-                            failed = false
-                            reloadToken++
-                        },
+                is DecodedAttachmentPresentation.Animated ->
+                    AnimatedDrawableAttachmentImage(
+                        drawable = current.drawable,
+                        contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
+                        contentScale = ContentScale.Crop,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .combinedClickable(
+                                    onLongClick = onLongPress,
+                                    onClick = { viewerOpen = true },
+                                ),
                     )
-                !startDownload ->
-                    MediaCircleAction(
-                        icon = Icons.Default.ArrowDownward,
-                        contentDescription = stringResource(R.string.media_tap_to_download),
-                        onClick = { startDownload = true },
-                    )
-                else ->
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(28.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                null ->
+                    when {
+                        failed ->
+                            MediaCircleAction(
+                                icon = Icons.Default.Refresh,
+                                contentDescription = stringResource(R.string.media_tap_to_retry),
+                                onClick = {
+                                    failed = false
+                                    reloadToken++
+                                },
+                            )
+                        !startDownload ->
+                            MediaCircleAction(
+                                icon = Icons.Default.ArrowDownward,
+                                contentDescription = stringResource(R.string.media_tap_to_download),
+                                onClick = { startDownload = true },
+                            )
+                        else ->
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                    }
             }
             if (uploading) {
                 Surface(
@@ -5012,8 +5040,16 @@ internal fun MediaImageGridTile(
     //     the user already consented to fetch.
     val decodeKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
     val tileSlot = "$messageIdHex#$attachmentIndex"
-    var bitmap by remember(decodeKey) {
-        mutableStateOf(controller.thumbnailFor(messageIdHex, attachmentIndex)?.asImageBitmap())
+    var presentation by remember(decodeKey) {
+        val cached =
+            if (!MediaPipeline.isAnimatedImageAttachment(reference.mediaType, ByteArray(0))) {
+                controller.thumbnailFor(messageIdHex, attachmentIndex)
+            } else {
+                null
+            }
+        mutableStateOf<DecodedAttachmentPresentation?>(
+            cached?.let { DecodedAttachmentPresentation.Static(it) },
+        )
     }
     var failed by remember(decodeKey) { mutableStateOf(false) }
     var reloadToken by remember(decodeKey) { mutableStateOf(0) }
@@ -5026,7 +5062,7 @@ internal fun MediaImageGridTile(
     }
 
     LaunchedEffect(decodeKey, startDownload, reloadToken) {
-        if (bitmap != null) return@LaunchedEffect
+        if (presentation != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
         val pendingBytes =
             if (mine) {
@@ -5042,12 +5078,16 @@ internal fun MediaImageGridTile(
         try {
             val data = pendingBytes ?: controller.downloadAttachment(messageIdHex, attachmentIndex, reference)
             val decoded =
-                withContext(Dispatchers.Default) {
-                    MediaPipeline.decodeSampledBitmap(data, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
-                }
+                decodeMessageAttachmentImage(
+                    bytes = data,
+                    mediaType = reference.mediaType,
+                    staticMaxEdgePx = MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                )
             if (decoded != null) {
-                controller.cacheThumbnail(messageIdHex, attachmentIndex, decoded)
-                bitmap = decoded.asImageBitmap()
+                if (decoded is DecodedAttachmentPresentation.Static) {
+                    controller.cacheThumbnail(messageIdHex, attachmentIndex, decoded.bitmap)
+                }
+                presentation = decoded
             } else {
                 failed = true
             }
@@ -5073,7 +5113,7 @@ internal fun MediaImageGridTile(
                 //     first tap fetches and the next tap (once decoded)
                 //     opens the viewer. Same UX as the single-image bubble.
                 onClick = {
-                    if (bitmap != null) {
+                    if (presentation != null) {
                         onTap()
                     } else if (!startDownload) {
                         startDownload = true
@@ -5082,7 +5122,7 @@ internal fun MediaImageGridTile(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        val current = bitmap
+        val current = presentation
         val placeholder = rememberThumbhashImage(reference.thumbhash)
         if (current == null && placeholder != null) {
             Image(
@@ -5092,34 +5132,44 @@ internal fun MediaImageGridTile(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        when {
-            current != null ->
+        when (current) {
+            is DecodedAttachmentPresentation.Static ->
                 Image(
-                    bitmap = current,
+                    bitmap = current.toImageBitmap(),
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-            failed ->
-                MediaCircleAction(
-                    icon = Icons.Default.Refresh,
-                    contentDescription = stringResource(R.string.media_tap_to_retry),
-                    onClick = {
-                        failed = false
-                        reloadToken++
-                    },
+            is DecodedAttachmentPresentation.Animated ->
+                AnimatedDrawableAttachmentImage(
+                    drawable = current.drawable,
+                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
                 )
-            !startDownload ->
-                MediaCircleAction(
-                    icon = Icons.Default.ArrowDownward,
-                    contentDescription = stringResource(R.string.media_tap_to_download),
-                    onClick = { startDownload = true },
-                )
-            else ->
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp,
-                )
+            null ->
+                when {
+                    failed ->
+                        MediaCircleAction(
+                            icon = Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.media_tap_to_retry),
+                            onClick = {
+                                failed = false
+                                reloadToken++
+                            },
+                        )
+                    !startDownload ->
+                        MediaCircleAction(
+                            icon = Icons.Default.ArrowDownward,
+                            contentDescription = stringResource(R.string.media_tap_to_download),
+                            onClick = { startDownload = true },
+                        )
+                    else ->
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                        )
+                }
         }
         if (overflowCount > 0 && current != null) {
             Box(
@@ -6942,23 +6992,33 @@ private fun ViewerPage(
     // its first decrypt at epoch 0 (typed reference not yet loaded) re-keys
     // and retries when the real reference arrives.
     val pageKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
-    var androidBitmap by remember(pageKey) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var presentation by remember(pageKey) { mutableStateOf<DecodedAttachmentPresentation?>(null) }
     var viewerFailed by remember(pageKey) { mutableStateOf(false) }
     var viewerReloadToken by remember(pageKey) { mutableStateOf(0) }
-    val bitmap = remember(androidBitmap) { androidBitmap?.asImageBitmap() }
+    val imageWidth =
+        when (val current = presentation) {
+            is DecodedAttachmentPresentation.Static -> current.bitmap.width
+            is DecodedAttachmentPresentation.Animated -> current.drawable.intrinsicWidth
+            null -> 0
+        }
+    val imageHeight =
+        when (val current = presentation) {
+            is DecodedAttachmentPresentation.Static -> current.bitmap.height
+            is DecodedAttachmentPresentation.Animated -> current.drawable.intrinsicHeight
+            null -> 0
+        }
     LaunchedEffect(pageKey, viewerReloadToken) {
         viewerFailed = false
         try {
             val data = attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
-            // Bounded sampled decode. A 5000px remote image decoded full-size
-            // is ~100 MB ARGB_8888 and OOMs mid-class devices; the viewer
-            // ceiling caps that while keeping quality high enough on phones.
             val decoded =
-                withContext(Dispatchers.Default) {
-                    MediaPipeline.decodeSampledBitmap(data, MediaPipeline.VIEWER_MAX_EDGE_PX)
-                }
+                decodeMessageAttachmentImage(
+                    bytes = data,
+                    mediaType = reference.mediaType,
+                    staticMaxEdgePx = MediaPipeline.VIEWER_MAX_EDGE_PX,
+                )
             if (decoded != null) {
-                androidBitmap = decoded
+                presentation = decoded
             } else {
                 viewerFailed = true
             }
@@ -6968,119 +7028,123 @@ private fun ViewerPage(
             viewerFailed = true
         }
     }
-    DisposableEffect(pageKey) {
-        onDispose { androidBitmap?.recycle() }
+    DisposableEffect(pageKey, presentation) {
+        val owned = presentation
+        onDispose {
+            when (owned) {
+                is DecodedAttachmentPresentation.Static -> owned.bitmap.recycle()
+                is DecodedAttachmentPresentation.Animated ->
+                    (owned.drawable as? android.graphics.drawable.AnimatedImageDrawable)?.stop()
+                null -> Unit
+            }
+        }
     }
 
+    val viewerGestureModifier =
+        Modifier
+            .fillMaxSize()
+            .pointerInput(pageKey) {
+                detectTapGestures(onDoubleTap = {
+                    latestOnScaleChange(1f)
+                    latestOnOffsetChange(Offset.Zero)
+                })
+            }.pointerInput(pageKey) {
+                awaitEachGesture {
+                    do {
+                        val event = awaitPointerEvent()
+                        val pressedCount =
+                            event.changes.count { it.pressed }
+                        if (pressedCount == 0) break
+                        val zoom = event.calculateZoom()
+                        val pan = event.calculatePan()
+                        val currentScale = latestScale
+                        val currentOffset = latestOffset
+                        val handleAsTransform =
+                            pressedCount >= 2 || currentScale > 1f
+                        if (!handleAsTransform) {
+                            continue
+                        }
+                        val nextScale = (currentScale * zoom).coerceIn(1f, 5f)
+                        if (nextScale != currentScale) latestOnScaleChange(nextScale)
+                        if (nextScale > 1f) {
+                            val viewportW = size.width.toFloat()
+                            val viewportH = size.height.toFloat()
+                            val imageAspect = imageWidth.toFloat() / imageHeight.toFloat()
+                            val viewportAspect = viewportW / viewportH
+                            val baseWidth: Float
+                            val baseHeight: Float
+                            if (imageAspect > viewportAspect) {
+                                baseWidth = viewportW
+                                baseHeight = viewportW / imageAspect
+                            } else {
+                                baseHeight = viewportH
+                                baseWidth = viewportH * imageAspect
+                            }
+                            val maxX = ((baseWidth * nextScale) - viewportW).coerceAtLeast(0f) / 2f
+                            val maxY = ((baseHeight * nextScale) - viewportH).coerceAtLeast(0f) / 2f
+                            latestOnOffsetChange(
+                                Offset(
+                                    (currentOffset.x + pan.x).coerceIn(-maxX, maxX),
+                                    (currentOffset.y + pan.y).coerceIn(-maxY, maxY),
+                                ),
+                            )
+                        } else if (currentOffset != Offset.Zero) {
+                            latestOnOffsetChange(Offset.Zero)
+                        }
+                        event.changes.forEach { it.consume() }
+                    } while (true)
+                }
+            }.graphicsLayer(
+                scaleX = scale,
+                scaleY = scale,
+                translationX = offset.x,
+                translationY = offset.y,
+            )
+
     Box(modifier = Modifier.fillMaxSize()) {
-        val current = bitmap
-        when {
-            current != null ->
+        when (val current = presentation) {
+            is DecodedAttachmentPresentation.Static ->
                 Image(
-                    bitmap = current,
+                    bitmap = current.toImageBitmap(),
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                     contentScale = ContentScale.Fit,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .pointerInput(pageKey) {
-                                detectTapGestures(onDoubleTap = {
-                                    latestOnScaleChange(1f)
-                                    latestOnOffsetChange(Offset.Zero)
-                                })
-                            }.pointerInput(pageKey) {
-                                // Hand-rolled gesture loop instead of
-                                // `detectTransformGestures` because the latter
-                                // consumes single-pointer drags unconditionally,
-                                // which steals horizontal swipes from the
-                                // HorizontalPager parent. Here:
-                                //   - Pinch (≥2 pointers): consume → zoom + pan.
-                                //   - Single-pointer at scale > 1: consume → pan.
-                                //   - Single-pointer at scale 1×: DO NOT consume →
-                                //     pager handles the swipe between attachments.
-                                //
-                                // All references to scale/offset/callbacks go
-                                // through `latest*` delegates so each loop
-                                // iteration sees the freshest values — see the
-                                // `rememberUpdatedState` setup above for why.
-                                awaitEachGesture {
-                                    do {
-                                        val event = awaitPointerEvent()
-                                        val pressedCount =
-                                            event.changes.count { it.pressed }
-                                        if (pressedCount == 0) break
-                                        val zoom = event.calculateZoom()
-                                        val pan = event.calculatePan()
-                                        val currentScale = latestScale
-                                        val currentOffset = latestOffset
-                                        val handleAsTransform =
-                                            pressedCount >= 2 || currentScale > 1f
-                                        if (!handleAsTransform) {
-                                            // Let the pager have it.
-                                            continue
-                                        }
-                                        val nextScale = (currentScale * zoom).coerceIn(1f, 5f)
-                                        if (nextScale != currentScale) latestOnScaleChange(nextScale)
-                                        if (nextScale > 1f) {
-                                            val viewportW = size.width.toFloat()
-                                            val viewportH = size.height.toFloat()
-                                            val imageAspect = current.width.toFloat() / current.height.toFloat()
-                                            val viewportAspect = viewportW / viewportH
-                                            val baseWidth: Float
-                                            val baseHeight: Float
-                                            if (imageAspect > viewportAspect) {
-                                                baseWidth = viewportW
-                                                baseHeight = viewportW / imageAspect
-                                            } else {
-                                                baseHeight = viewportH
-                                                baseWidth = viewportH * imageAspect
-                                            }
-                                            val maxX = ((baseWidth * nextScale) - viewportW).coerceAtLeast(0f) / 2f
-                                            val maxY = ((baseHeight * nextScale) - viewportH).coerceAtLeast(0f) / 2f
-                                            latestOnOffsetChange(
-                                                Offset(
-                                                    (currentOffset.x + pan.x).coerceIn(-maxX, maxX),
-                                                    (currentOffset.y + pan.y).coerceIn(-maxY, maxY),
-                                                ),
-                                            )
-                                        } else if (currentOffset != Offset.Zero) {
-                                            latestOnOffsetChange(Offset.Zero)
-                                        }
-                                        event.changes.forEach { it.consume() }
-                                    } while (true)
-                                }
-                            }.graphicsLayer(
-                                scaleX = scale,
-                                scaleY = scale,
-                                translationX = offset.x,
-                                translationY = offset.y,
-                            ),
+                    modifier = viewerGestureModifier,
                 )
-            viewerFailed ->
-                Column(
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Icon(
-                        Icons.Default.BrokenImage,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(48.dp),
-                    )
-                    Text(
-                        stringResource(R.string.media_save_failed),
-                        color = Color.White,
-                    )
-                    TextButton(onClick = { viewerReloadToken += 1 }) {
-                        Text(stringResource(R.string.media_tap_to_retry), color = Color.White)
-                    }
+            is DecodedAttachmentPresentation.Animated ->
+                AnimatedDrawableAttachmentImage(
+                    drawable = current.drawable,
+                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
+                    contentScale = ContentScale.Fit,
+                    modifier = viewerGestureModifier,
+                )
+            null ->
+                when {
+                    viewerFailed ->
+                        Column(
+                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.BrokenImage,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(48.dp),
+                            )
+                            Text(
+                                stringResource(R.string.media_save_failed),
+                                color = Color.White,
+                            )
+                            TextButton(onClick = { viewerReloadToken += 1 }) {
+                                Text(stringResource(R.string.media_tap_to_retry), color = Color.White)
+                            }
+                        }
+                    else ->
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center),
+                            color = Color.White,
+                        )
                 }
-            else ->
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = Color.White,
-                )
         }
     }
 }
