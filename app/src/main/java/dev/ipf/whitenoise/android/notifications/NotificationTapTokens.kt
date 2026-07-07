@@ -2,20 +2,39 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Base64
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.Base64
 
 class NotificationTapTokens(
     private val preferences: SharedPreferences,
     private val randomBytes: (ByteArray) -> Unit = secureRandom::nextBytes,
+    private val nowMillis: () -> Long = System::currentTimeMillis,
 ) {
     fun tokenFor(notificationKey: String): String {
         val key = storageKey(notificationKey)
-        preferences.getString(key, null)?.takeIf { isPlausibleToken(it) }?.let { return it }
+        val timeKey = storageTimeKey(notificationKey)
+        preferences.getString(key, null)?.takeIf { isPlausibleToken(it) }?.let {
+            preferences.edit().putLong(timeKey, nowMillis()).apply()
+            pruneIfNeeded()
+            return it
+        }
         val token = newToken()
-        preferences.edit().putString(key, token).apply()
+        preferences
+            .edit()
+            .putString(key, token)
+            .putLong(timeKey, nowMillis())
+            .apply()
+        pruneIfNeeded()
         return token
+    }
+
+    fun remove(notificationKey: String) {
+        preferences
+            .edit()
+            .remove(storageKey(notificationKey))
+            .remove(storageTimeKey(notificationKey))
+            .apply()
     }
 
     fun isValid(
@@ -26,15 +45,33 @@ class NotificationTapTokens(
         return expected == token?.takeIf { isPlausibleToken(it) }
     }
 
+    private fun pruneIfNeeded() {
+        val tokenKeys =
+            preferences.all.keys
+                .filter(::isTokenStorageKey)
+                .map { key -> key to preferences.getLong(timeStorageKeyForTokenStorageKey(key), Long.MIN_VALUE) }
+                .sortedBy { (_, lastUsed) -> lastUsed }
+        val overflow = tokenKeys.size - MAX_STORED_TOKENS
+        if (overflow <= 0) return
+        val editor = preferences.edit()
+        tokenKeys.take(overflow).forEach { (key, _) ->
+            editor.remove(key).remove(timeStorageKeyForTokenStorageKey(key))
+        }
+        editor.apply()
+    }
+
     private fun newToken(): String {
         val bytes = ByteArray(TOKEN_BYTES)
         randomBytes(bytes)
-        return Base64.encodeToString(bytes, Base64.NO_PADDING or Base64.NO_WRAP or Base64.URL_SAFE)
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
 
     companion object {
         private const val PREFERENCES_NAME = "notification_tap_tokens"
+        private const val TOKEN_KEY_PREFIX = "tap_"
+        private const val TOKEN_TIME_KEY_PREFIX = "tap_time_"
         private const val TOKEN_BYTES = 24
+        internal const val MAX_STORED_TOKENS = 512
 
         private val secureRandom = SecureRandom()
 
@@ -43,9 +80,15 @@ class NotificationTapTokens(
                 context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
             )
 
-        internal fun storageKey(notificationKey: String): String = "tap_" + sha256Hex(notificationKey)
+        internal fun storageKey(notificationKey: String): String = TOKEN_KEY_PREFIX + sha256Hex(notificationKey)
+
+        internal fun storageTimeKey(notificationKey: String): String = TOKEN_TIME_KEY_PREFIX + sha256Hex(notificationKey)
 
         internal fun isPlausibleToken(token: String): Boolean = token.length >= 16
+
+        private fun isTokenStorageKey(key: String): Boolean = key.startsWith(TOKEN_KEY_PREFIX) && !key.startsWith(TOKEN_TIME_KEY_PREFIX)
+
+        private fun timeStorageKeyForTokenStorageKey(key: String): String = TOKEN_TIME_KEY_PREFIX + key.removePrefix(TOKEN_KEY_PREFIX)
 
         private fun sha256Hex(value: String): String =
             MessageDigest

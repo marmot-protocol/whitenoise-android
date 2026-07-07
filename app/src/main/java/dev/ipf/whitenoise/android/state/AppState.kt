@@ -67,6 +67,7 @@ import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -76,10 +77,13 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -93,6 +97,7 @@ import java.net.IDN
 import java.net.InetAddress
 import java.net.URI
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 
 sealed interface AppPhase {
@@ -1014,6 +1019,8 @@ class WhiteNoiseAppState(
         java.util.concurrent.atomic
             .AtomicInteger(0)
     private val notificationJob = NotificationJobSlot()
+    private val notificationDrainSequence = AtomicLong(0)
+    private val notificationDrainSignals = MutableSharedFlow<Long>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     // Coalesces per-account unread refreshes across a notification burst so a
     // catch-up flood drains to one expensive (chat-list + per-group roster)
@@ -1703,6 +1710,19 @@ class WhiteNoiseAppState(
         refreshLocalNotificationSettings()
         drainPendingNativePushRegistrationSyncIfNeeded()
     }
+
+    suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMs: Long = NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS): Boolean =
+        coroutineScope {
+            val sequenceBeforeStart = notificationDrainSequence.get()
+            val drain =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    withTimeoutOrNull(timeoutMs) {
+                        notificationDrainSignals.first { it > sequenceBeforeStart }
+                    } != null
+                }
+            ensureNotificationRuntimeStarted()
+            drain.await()
+        }
 
     private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
         if (pushTokenStore.nativePushRegistrationSyncPending()) {
@@ -4137,6 +4157,11 @@ class WhiteNoiseAppState(
         // drains pending accounts off the subscription loop, so the loop stays
         // free to process the next update (#729).
         unreadRefreshScheduler.schedule(update.accountRef)
+        signalNotificationDrain()
+    }
+
+    private fun signalNotificationDrain() {
+        notificationDrainSignals.tryEmit(notificationDrainSequence.incrementAndGet())
     }
 
     private fun startNotificationListener() {
@@ -4360,6 +4385,7 @@ class WhiteNoiseAppState(
         private const val MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES = 1024
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
+        private const val NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS = 10_000L
         private const val MAX_RETAINED_CONVERSATION_STATES = 32
     }
 }
