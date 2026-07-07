@@ -5520,13 +5520,17 @@ class ConversationController(
         loadOlderPage()
     }
 
-    suspend fun loadUntilMessageAvailable(messageIdHex: String): Boolean {
+    suspend fun loadUntilMessageAvailable(
+        messageIdHex: String,
+        maxOlderPages: Int = ReplyNavigation.MaxOlderPages,
+    ): Boolean {
         var loadedPageCount = 0
         while (
             ReplyNavigation.shouldLoadOlder(
                 targetLoaded = timelineRecords.containsKey(messageIdHex),
                 hasMoreBefore = hasMoreBefore,
                 loadedPageCount = loadedPageCount,
+                maxOlderPages = maxOlderPages,
             )
         ) {
             if (!loadOlderPage()) break
@@ -5536,6 +5540,38 @@ class ConversationController(
     }
 
     fun replyTargetMessageId(item: TimelineMessage): String? = ReplyNavigation.targetMessageId(item.record, item.projected)
+
+    /**
+     * Load a focus/navigation source id and return the rendered message the
+     * reader should scroll to. Reaction notifications carry the kind-7 event id;
+     * if that source is only found after pagination, re-resolve it to the
+     * reacted-to parent via the `e` tag before the final scroll (#1113).
+     */
+    suspend fun loadScrollNavigationTarget(sourceMessageIdHex: String): String? =
+        ReplyNavigation.loadScrollNavigationTarget(
+            sourceMessageIdHex = sourceMessageIdHex,
+            lookupSourceRecord = { lookupMessageRecord(sourceMessageIdHex) },
+            loadUntilMessageAvailable = ::loadUntilMessageAvailable,
+        )
+
+    /** Read a raw message record from the in-memory window or recent store tail. */
+    private suspend fun lookupMessageRecord(messageIdHex: String): AppMessageRecordFfi? {
+        messageById[messageIdHex]?.let { return it }
+        val account = conversationAccountRef ?: return null
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                appState.marmotIo { messages(account, group.groupIdHex, 120u) }
+            }
+        }.onFailure {
+            it.rethrowIfCancellation()
+            Log.w(
+                "DMConversation",
+                "lookup message failed for ${group.groupIdHex.take(8)} message=${messageIdHex.take(8)}",
+                it,
+            )
+        }.getOrNull()
+            ?.firstOrNull { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
+    }
 
     private suspend fun loadOlderPage(): Boolean {
         if (!hasMoreBefore || isLoadingOlder) return false

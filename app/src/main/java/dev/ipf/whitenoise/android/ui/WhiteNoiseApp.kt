@@ -10057,11 +10057,12 @@ private fun ConversationScreen(
     // normal anchor. Local-only: loadUntilMessageAvailable paginates the
     // already-persisted store, never a relay fetch.
     LaunchedEffect(chat.id, focusMessageId) {
-        val target = focusMessageId ?: return@LaunchedEffect
+        val focus = focusMessageId ?: return@LaunchedEffect
         // Let the initial unread/newest anchor run first so our scroll isn't
         // immediately overwritten by it.
         snapshotFlow { initialTimelineAnchored }.filter { it }.first()
-        if (!controller.loadUntilMessageAvailable(target)) {
+        val target = controller.loadScrollNavigationTarget(focus)
+        if (target == null) {
             appState.present(R.string.toast_original_message_unavailable)
             return@LaunchedEffect
         }
