@@ -11,6 +11,17 @@ import org.junit.Test
 
 class MessageProjectorTest {
     @Test
+    fun reactedToMessageIdReadsEventTagOnKindSeven() {
+        assertEquals(
+            "m1",
+            MessageProjector.reactedToMessageId(
+                reaction(id = "r1", sender = "alice", target = "m1", emoji = "👍", at = 1u),
+            ),
+        )
+        assertNull(MessageProjector.reactedToMessageId(message(id = "m1", plaintext = "hi", kind = 9uL)))
+    }
+
+    @Test
     fun reactionTalliesNetAddsAndDeleteTombstonesBySender() {
         val records =
             listOf(
