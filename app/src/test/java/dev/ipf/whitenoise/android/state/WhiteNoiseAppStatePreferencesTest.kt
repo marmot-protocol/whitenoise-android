@@ -38,4 +38,13 @@ class WhiteNoiseAppStatePreferencesTest {
         ChatScreenshotPreferences.writeAllowChatScreenshots(preferences, false)
         assertFalse(ChatScreenshotPreferences.readAllowChatScreenshots(preferences))
     }
+
+    @Test
+    fun allowChatScreenshotsContextReaderUsesAppPreferences() {
+        val context = RuntimeEnvironment.getApplication().applicationContext
+
+        ChatScreenshotPreferences.writeAllowChatScreenshots(preferences, false)
+
+        assertFalse(ChatScreenshotPreferences.readAllowChatScreenshots(context))
+    }
 }
