@@ -87,12 +87,13 @@ class AmberExternalSigner(
         }
 
         // 2) Intent prompt on the foreground Activity; blocks THIS worker thread.
+        val requestId = newRequestId()
         val intent =
             when (op) {
-                SignerOp.SignEvent -> Nip55.buildSignEventIntent(packageName, content, newRequestId(), accountPubkey)
-                else -> Nip55.buildCryptoIntent(op, packageName, content, counterparty.orEmpty(), accountPubkey, newRequestId())
+                SignerOp.SignEvent -> Nip55.buildSignEventIntent(packageName, content, requestId, accountPubkey)
+                else -> Nip55.buildCryptoIntent(op, packageName, content, counterparty.orEmpty(), accountPubkey, requestId)
             }
-        return when (val outcome = coordinator.awaitApproval(intent, approvalTimeoutMs)) {
+        return when (val outcome = coordinator.awaitApproval(intent, approvalTimeoutMs, requestId)) {
             is AmberActivityCoordinator.Outcome.Completed -> parseCompleted(op, outcome.data, outcome.resultOk)
             AmberActivityCoordinator.Outcome.NoForegroundActivity ->
                 throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)

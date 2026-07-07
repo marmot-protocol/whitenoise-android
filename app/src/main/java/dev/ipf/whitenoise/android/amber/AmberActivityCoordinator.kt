@@ -32,7 +32,9 @@ import kotlin.concurrent.withLock
  * a time and no two workers race for the single launcher.
  */
 object AmberActivityCoordinator {
-    private val mainHandler = Handler(Looper.getMainLooper())
+    // Lazy so loading this object (e.g. for the pure result-correlation check)
+    // never touches the main Looper — that call only makes sense on-device.
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val promptLock = ReentrantLock()
 
     @Volatile
@@ -41,7 +43,10 @@ object AmberActivityCoordinator {
     // The single-slot rendezvous for the one prompt allowed at a time. Set under
     // [promptLock] before launching; read (without the lock) by [deliverResult]
     // on the main thread.
-    private val pending = AtomicReference<ArrayBlockingQueue<Delivery>?>(null)
+    // The single in-flight prompt: its rendezvous queue plus the request id we
+    // expect the result to echo back (EXTRA_ID). Set under [promptLock] before
+    // launching; read (without the lock) by [deliverResult] on the main thread.
+    private val pending = AtomicReference<Pending?>(null)
 
     /** Outcome of an Intent approval, as seen by the (worker-thread) caller. */
     sealed interface Outcome {
@@ -66,6 +71,11 @@ object AmberActivityCoordinator {
         data object LauncherGone : Delivery
     }
 
+    private data class Pending(
+        val queue: ArrayBlockingQueue<Delivery>,
+        val requestId: String?,
+    )
+
     fun attach(launcher: ActivityResultLauncher<Intent>) {
         this.launcher = launcher
     }
@@ -82,8 +92,27 @@ object AmberActivityCoordinator {
         resultOk: Boolean,
         data: Intent?,
     ) {
-        pending.get()?.offer(Delivery.Result(resultOk, data))
+        val active = pending.get() ?: return
+        // Correlate by request id: a late result from a prior, timed-out prompt
+        // must not satisfy the next caller. When both the active request and the
+        // result carry an id and they differ, drop it. (get_public_key sends no
+        // id, so its result is delivered without correlation.)
+        val resultId = data?.getStringExtra(Nip55.EXTRA_ID)
+        if (!shouldAcceptResult(active.requestId, resultId)) return
+        active.queue.offer(Delivery.Result(resultOk, data))
     }
+
+    /**
+     * Whether a delivered result should satisfy the active request. Drops a
+     * stale result from a prior (timed-out) prompt: when both the active request
+     * and the result carry an id and they differ, the result belongs to a
+     * different request. A missing id on either side (e.g. get_public_key, which
+     * sends none) is delivered without correlation.
+     */
+    internal fun shouldAcceptResult(
+        expectedId: String?,
+        resultId: String?,
+    ): Boolean = expectedId == null || resultId == null || expectedId == resultId
 
     /**
      * Show [intent] via the foreground launcher and block the CALLING (worker)
@@ -94,11 +123,13 @@ object AmberActivityCoordinator {
     fun awaitApproval(
         intent: Intent,
         timeoutMs: Long,
+        requestId: String?,
     ): Outcome =
         promptLock.withLock {
             if (launcher == null) return Outcome.NoForegroundActivity
             val queue = ArrayBlockingQueue<Delivery>(1)
-            pending.set(queue)
+            val slot = Pending(queue, requestId)
+            pending.set(slot)
             try {
                 mainHandler.post {
                     val active = launcher
@@ -119,7 +150,7 @@ object AmberActivityCoordinator {
                     null -> Outcome.TimedOut
                 }
             } finally {
-                pending.compareAndSet(queue, null)
+                pending.compareAndSet(slot, null)
             }
         }
 }
