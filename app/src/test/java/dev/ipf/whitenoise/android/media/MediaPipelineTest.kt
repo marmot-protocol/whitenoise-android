@@ -494,4 +494,16 @@ class MediaPipelineTest {
                 webpChunk("ANIM", byteArrayOf(0, 0, 0, 0))
         assertTrue(MediaPipeline.hasWebpAnimChunk(animatedWebp))
     }
+
+    @Test
+    fun hasWebpAnimChunk_returnsFalseForOversizedChunkWithoutThrowing() {
+        val craftedWebp =
+            "RIFF".encodeToByteArray() +
+                u32le(20) +
+                "WEBP".encodeToByteArray() +
+                "VP8 ".encodeToByteArray() +
+                byteArrayOf(0xff.toByte(), 0xff.toByte(), 0xff.toByte(), 0x7f)
+
+        assertFalse(MediaPipeline.hasWebpAnimChunk(craftedWebp))
+    }
 }
