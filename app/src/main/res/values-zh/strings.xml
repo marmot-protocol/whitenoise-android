@@ -886,4 +886,5 @@
     <string name="onboarding_slogan_secure_messaging">安全通讯</string>
     <string name="sign_in_error_public_key">这是公钥。请输入你的私钥（nsec）登录。</string>
     <string name="group_add_members_after_create">创建群组后可以添加成员。</string>
+    <string name="confirm_sole_admin_transfer_then_leave_message">你是唯一的管理员。%1$s 将成为管理员，你将退出群组。</string>
 </resources>
