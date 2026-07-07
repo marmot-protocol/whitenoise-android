@@ -8886,7 +8886,11 @@ private fun ConversationScreen(
         remainingBytes: Long,
     ): ImageAttachmentReadOutcome {
         val quality = appState.mediaQuality
-        if (quality.preservesOriginalImageBytes) {
+        // Animated images (GIF, animated WebP) can't survive the static JPEG
+        // recompress path — it flattens them to a single frame. Preserve them at
+        // any quality; the quality knob only governs static-image downscaling.
+        val animatedSource = MediaPipeline.isAnimatedImageSource(context.contentResolver, uri)
+        if (quality.preservesOriginalImageBytes || animatedSource) {
             val cap = remainingBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             when (val original = MediaPipeline.readOriginalImageForUpload(context.contentResolver, uri, cap)) {
                 is MediaPipeline.OriginalImageReadResult.Success ->
@@ -8902,7 +8906,10 @@ private fun ConversationScreen(
                 MediaPipeline.OriginalImageReadResult.TooLarge -> return ImageAttachmentReadOutcome(null, overflowed = true)
                 MediaPipeline.OriginalImageReadResult.Failed,
                 MediaPipeline.OriginalImageReadResult.Unsupported,
-                -> Unit // Fall back to JPEG re-encode so unsupported containers still strip metadata.
+                // Never flatten an animation to JPEG — fail the attachment instead
+                // of silently dropping the animation. Static sources still fall
+                // back to the JPEG re-encode so unsupported containers strip metadata.
+                -> if (animatedSource) return ImageAttachmentReadOutcome(null) else Unit
             }
         }
         val jpeg =

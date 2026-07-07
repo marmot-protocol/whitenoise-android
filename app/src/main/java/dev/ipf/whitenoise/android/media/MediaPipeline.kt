@@ -134,6 +134,9 @@ object MediaPipeline {
     /** Max longer-edge (px) for animated GIF/WebP decodes in chat attachments. */
     const val ANIMATED_IMAGE_MAX_EDGE_PX: Int = 1080
 
+    /** Header bytes read to sniff an animated source — GIF sig + WebP ANIM chunk sit near the start. */
+    private const val ANIMATED_SNIFF_MAX_BYTES: Int = 4096
+
     /**
      * Replace whatever extension the source carried with `.jpg`, since the
      * payload is always recompressed to JPEG. Without this swap, the imeta
@@ -239,6 +242,37 @@ object MediaPipeline {
             if (hasWebpAnimChunk(bytes)) return true
         }
         return false
+    }
+
+    /**
+     * Sniff the source header to decide whether [uri] is an animated image (GIF
+     * or animated WebP). Callers use this to keep animations off the static JPEG
+     * recompress path at any quality — a flatten would silently drop the motion.
+     * The GIF signature and the WebP `VP8X`/`ANIM` chunks live in the first few
+     * bytes, so a bounded header read is enough.
+     */
+    fun isAnimatedImageSource(
+        contentResolver: ContentResolver,
+        uri: Uri,
+    ): Boolean {
+        val header =
+            try {
+                contentResolver.openInputStream(uri)?.use { stream ->
+                    val buffer = ByteArray(ANIMATED_SNIFF_MAX_BYTES)
+                    var total = 0
+                    while (total < buffer.size) {
+                        val read = stream.read(buffer, total, buffer.size - total)
+                        if (read < 0) break
+                        total += read
+                    }
+                    buffer.copyOf(total)
+                }
+            } catch (_: java.io.IOException) {
+                null
+            } catch (_: SecurityException) {
+                null
+            } ?: return false
+        return isGif(header) || hasWebpAnimChunk(header)
     }
 
     /**
@@ -686,6 +720,9 @@ object MediaPipeline {
             OriginalImageKind.Jpeg -> stripJpegMetadata(bytes)
             OriginalImageKind.Png -> stripPngMetadata(bytes)
             OriginalImageKind.Webp -> stripWebpMetadata(bytes)
+            // GIF carries no EXIF/GPS and re-encoding would drop the NETSCAPE
+            // loop block — pass the bytes through so the animation survives.
+            OriginalImageKind.Gif -> bytes
             null -> null
         }
 
@@ -797,13 +834,14 @@ object MediaPipeline {
         return "${w}x$h"
     }
 
-    private enum class OriginalImageKind { Jpeg, Png, Webp }
+    private enum class OriginalImageKind { Jpeg, Png, Webp, Gif }
 
     private fun originalImageKind(bytes: ByteArray): OriginalImageKind? =
         when {
             isJpeg(bytes) -> OriginalImageKind.Jpeg
             isPng(bytes) -> OriginalImageKind.Png
             isWebp(bytes) -> OriginalImageKind.Webp
+            isGif(bytes) -> OriginalImageKind.Gif
             else -> null
         }
 
@@ -812,6 +850,7 @@ object MediaPipeline {
             OriginalImageKind.Jpeg -> "image/jpeg"
             OriginalImageKind.Png -> "image/png"
             OriginalImageKind.Webp -> "image/webp"
+            OriginalImageKind.Gif -> "image/gif"
             null -> null
         }
 
@@ -819,6 +858,7 @@ object MediaPipeline {
         when (mediaType) {
             "image/png" -> "image.png"
             "image/webp" -> "image.webp"
+            "image/gif" -> "image.gif"
             else -> "image.jpg"
         }
 
