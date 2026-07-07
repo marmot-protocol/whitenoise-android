@@ -5,14 +5,12 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ClipDescription
 import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.provider.Settings
 import android.text.format.DateUtils
 import android.util.Log
-import android.view.WindowManager
 import android.widget.NumberPicker
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -66,7 +64,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -221,16 +218,9 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SmallFloatingActionButton
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarData
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -241,13 +231,11 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
@@ -266,7 +254,6 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -394,7 +381,6 @@ import dev.ipf.whitenoise.android.core.ENCRYPTED_BACKUP_MIN_PASSPHRASE_LENGTH
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.EncryptedBackupPassphraseStrength
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.GroupSystemCopy
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
@@ -450,7 +436,6 @@ import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.ConversationControllerCopy
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -480,6 +465,34 @@ import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.state.wipeReport
+import dev.ipf.whitenoise.android.ui.common.AppLockScreen
+import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.CopyableValueRow
+import dev.ipf.whitenoise.android.ui.common.ErrorContent
+import dev.ipf.whitenoise.android.ui.common.FailureScreen
+import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.LocalSettingsRowsInsideSectionCard
+import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
+import dev.ipf.whitenoise.android.ui.common.ProfilePublicWarning
+import dev.ipf.whitenoise.android.ui.common.SectionCard
+import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
+import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
+import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
+import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
+import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
+import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
+import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
+import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
+import dev.ipf.whitenoise.android.ui.common.rememberGroupSystemCopy
+import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
+import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
+import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
+import dev.ipf.whitenoise.android.ui.common.sectionPanelColor
+import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
+import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
@@ -558,138 +571,6 @@ private val languageOptions =
         LanguageOption("zh", R.string.language_chinese_simplified),
         LanguageOption("zh-Hant", R.string.language_chinese_traditional),
     )
-
-@Composable
-private fun rememberGroupTitleCopy(): GroupTitleCopy =
-    GroupTitleCopy(
-        inviteFromFormat = stringResource(R.string.group_title_invite_from),
-        groupOfPeopleFormat = stringResource(R.string.group_title_people_count),
-        unknownTitle = stringResource(R.string.unknown),
-    )
-
-@Composable
-private fun rememberMessageTextCopy(): MessageTextCopy =
-    MessageTextCopy(
-        reactedFormat = stringResource(R.string.message_reacted),
-        reactionFallback = stringResource(R.string.message_reaction_fallback),
-        deleted = stringResource(R.string.message_deleted_preview),
-        invalidated = stringResource(R.string.message_invalidated_preview),
-        agentStreamStarted = stringResource(R.string.agent_stream_started),
-        streamFinished = stringResource(R.string.stream_finished),
-        mediaAttachment = stringResource(R.string.media_attachment),
-        mediaPhoto = stringResource(R.string.reply_media_photo),
-        mediaVideo = stringResource(R.string.reply_media_video),
-        mediaVoice = stringResource(R.string.reply_media_voice),
-        mediaDocument = stringResource(R.string.reply_media_document),
-        message = stringResource(R.string.generic_message),
-        groupSystem = rememberGroupSystemCopy(),
-    )
-
-@Composable
-private fun rememberGroupSystemCopy(): GroupSystemCopy =
-    GroupSystemCopy(
-        memberAddedFormat = stringResource(R.string.group_system_member_added),
-        memberAddedPassiveFormat = stringResource(R.string.group_system_member_added_passive),
-        memberRemovedFormat = stringResource(R.string.group_system_member_removed),
-        memberRemovedPassiveFormat = stringResource(R.string.group_system_member_removed_passive),
-        memberLeftFormat = stringResource(R.string.group_system_member_left),
-        adminAddedFormat = stringResource(R.string.group_system_admin_added),
-        adminAddedPassiveFormat = stringResource(R.string.group_system_admin_added_passive),
-        adminRemovedFormat = stringResource(R.string.group_system_admin_removed),
-        adminRemovedPassiveFormat = stringResource(R.string.group_system_admin_removed_passive),
-        renamedFormat = stringResource(R.string.group_system_renamed),
-        renamedPassiveFormat = stringResource(R.string.group_system_renamed_passive),
-        renamedDiffFormat = stringResource(R.string.group_system_renamed_diff),
-        renamedDiffPassiveFormat = stringResource(R.string.group_system_renamed_diff_passive),
-        namedFormat = stringResource(R.string.group_system_named),
-        namedPassiveFormat = stringResource(R.string.group_system_named_passive),
-        avatarChangedFormat = stringResource(R.string.group_system_avatar_changed),
-        avatarChangedPassive = stringResource(R.string.group_system_avatar_changed_passive),
-        youMemberAddedFormat = stringResource(R.string.group_system_you_member_added),
-        memberAddedYouFormat = stringResource(R.string.group_system_member_added_you),
-        memberAddedYouPassive = stringResource(R.string.group_system_member_added_you_passive),
-        youMemberRemovedFormat = stringResource(R.string.group_system_you_member_removed),
-        memberRemovedYouFormat = stringResource(R.string.group_system_member_removed_you),
-        memberRemovedYouPassive = stringResource(R.string.group_system_member_removed_you_passive),
-        youMemberLeft = stringResource(R.string.group_system_you_member_left),
-        youAdminAddedFormat = stringResource(R.string.group_system_you_admin_added),
-        adminAddedYouFormat = stringResource(R.string.group_system_admin_added_you),
-        adminAddedYouPassive = stringResource(R.string.group_system_admin_added_you_passive),
-        youAdminRemovedFormat = stringResource(R.string.group_system_you_admin_removed),
-        adminRemovedYouFormat = stringResource(R.string.group_system_admin_removed_you),
-        adminRemovedYouPassive = stringResource(R.string.group_system_admin_removed_you_passive),
-        youRenamedFormat = stringResource(R.string.group_system_you_renamed),
-        youRenamedDiffFormat = stringResource(R.string.group_system_you_renamed_diff),
-        youNamedFormat = stringResource(R.string.group_system_you_named),
-        youAvatarChanged = stringResource(R.string.group_system_you_avatar_changed),
-        disappearingSetFormat = stringResource(R.string.group_system_disappearing_set),
-        disappearingSetYouFormat = stringResource(R.string.group_system_disappearing_set_you),
-        disappearingSetPassiveFormat = stringResource(R.string.group_system_disappearing_set_passive),
-        disappearingOffFormat = stringResource(R.string.group_system_disappearing_off),
-        disappearingOffYou = stringResource(R.string.group_system_disappearing_off_you),
-        disappearingOffPassive = stringResource(R.string.group_system_disappearing_off_passive),
-        someone = stringResource(R.string.group_system_someone),
-        fallback = stringResource(R.string.group_system_fallback),
-    )
-
-@Composable
-private fun rememberConversationControllerCopy(): ConversationControllerCopy =
-    ConversationControllerCopy(
-        waitingForStream = stringResource(R.string.waiting_for_stream),
-        streamFailedFormat = stringResource(R.string.stream_failed_format),
-        couldntAddMemberDuplicateFormat = stringResource(R.string.toast_couldnt_add_member_duplicate_detail),
-    )
-
-@Composable
-private fun rememberRelativeTimeCopy(): dev.ipf.whitenoise.android.core.RelativeTimeCopy {
-    val future = stringResource(R.string.relative_time_future)
-    val now = stringResource(R.string.relative_time_now)
-    val yesterday = stringResource(R.string.relative_time_yesterday)
-    // Resolve the sub-day unit strings through getQuantityString so inflected
-    // locales render the correct grammatical form for the count. Past 24h,
-    // IdentityFormatter switches to localized day/date labels with no time.
-    val resources = LocalContext.current.resources
-    return remember(future, now, yesterday, resources) {
-        dev.ipf.whitenoise.android.core.RelativeTimeCopy(
-            future = future,
-            now = now,
-            yesterday = yesterday,
-            minutes = { count ->
-                resources.getQuantityString(R.plurals.relative_time_minutes, count, count)
-            },
-            hours = { count ->
-                resources.getQuantityString(R.plurals.relative_time_hours, count, count)
-            },
-        )
-    }
-}
-
-@Composable
-private fun rememberedRelativeTime(epochSeconds: ULong): String =
-    IdentityFormatter.relativeTime(
-        epochSeconds,
-        rememberRelativeTimeCopy(),
-        LocalConfiguration.current.locales[0],
-    )
-
-// Clock time only (locale-aware short form, e.g. "3:28 PM" / "15:28"). The
-// transcript groups messages under day separators, so a bubble footer doesn't
-// need the date — just the time. The full date stays available in message
-// details.
-@Composable
-private fun rememberedClockTime(epochSeconds: ULong): String {
-    val locale = LocalConfiguration.current.locales[0]
-    return remember(epochSeconds, locale) {
-        if (epochSeconds == 0uL) {
-            ""
-        } else {
-            Instant
-                .ofEpochSecond(epochSeconds.toLong())
-                .atZone(ZoneId.systemDefault())
-                .format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale))
-        }
-    }
-}
 
 private val AppThemeMode.labelRes: Int
     @StringRes
@@ -863,227 +744,6 @@ fun WhiteNoiseApp(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AppLockScreen(
-    error: AppText?,
-    onRetry: () -> Unit,
-) {
-    WindowSecureFlag()
-    val context = LocalContext.current
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Icon(
-                Icons.Default.Lock,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = stringResource(R.string.app_locked_title),
-                style = MaterialTheme.typography.headlineSmall,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.app_locked_body),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            error?.let {
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    text = it.resolve(context),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
-                )
-            }
-            Spacer(Modifier.height(24.dp))
-            Button(onClick = onRetry) {
-                Text(stringResource(R.string.app_lock_retry))
-            }
-        }
-    }
-}
-
-/**
- * Bottom inset the global snackbar host should reserve to clear any
- * persistent bottom chrome on the currently visible surface (e.g. the
- * conversation composer). Held as a `MutableState<Dp>` so screens
- * BELOW the host in the composition tree can push their chrome height
- * up to the parent-owned state — a plain CompositionLocal would only
- * flow values DOWN and couldn't reach the host. Default `0.dp` keeps
- * non-composer surfaces unaffected.
- *
- * See issue #122 (post-invite-accept toast overlapping message input).
- */
-internal val LocalSnackbarBottomInset =
-    staticCompositionLocalOf<MutableState<Dp>> {
-        // Safe fallback for hosts rendered outside the app shell —
-        // androidTest fixtures, Compose previews, or any future caller
-        // that uses [WhiteNoiseSnackbarHost] without going through
-        // [WhiteNoiseApp]'s provider. The host reads `.value`, so the
-        // factory must return a real MutableState rather than throw;
-        // 0.dp matches the no-composer surface behaviour.
-        mutableStateOf(0.dp)
-    }
-
-@Composable
-fun WhiteNoiseSnackbarHost(
-    hostState: SnackbarHostState,
-    modifier: Modifier = Modifier,
-    snackbar: @Composable (SnackbarData) -> Unit = { SwipeDismissibleSnackbar(it) },
-) {
-    val extraInset = LocalSnackbarBottomInset.current.value
-    SnackbarHost(
-        hostState = hostState,
-        modifier =
-            modifier
-                .navigationBarsPadding()
-                .imePadding()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp + extraInset),
-        snackbar = snackbar,
-    )
-}
-
-/**
- * Visuals for toasts pushed through `WhiteNoiseAppState.present`. Carries the
- * emit site's explicit [copyable] flag so [SwipeDismissibleSnackbar] can gate
- * its Copy affordance on the toast's kind (error/diagnostic vs. success or
- * transient confirmation) instead of guessing from the message body (#796).
- */
-internal data class ToastSnackbarVisuals(
-    override val message: String,
-    val copyable: Boolean = false,
-) : SnackbarVisuals {
-    override val actionLabel: String? = null
-    override val withDismissAction: Boolean = false
-    override val duration: SnackbarDuration = SnackbarDuration.Short
-}
-
-/**
- * Whether a snackbar should render the Copy affordance (#543, #796). Only
- * non-actionable toasts explicitly flagged copyable at their emit site — error
- * and diagnostic strings — qualify; plain `showSnackbar(message)` calls and
- * actionable snackbars never do.
- */
-internal fun snackbarShowsCopyAffordance(visuals: SnackbarVisuals): Boolean =
-    visuals.actionLabel == null && (visuals as? ToastSnackbarVisuals)?.copyable == true
-
-/**
- * A [Snackbar] the user can swipe away horizontally (issue #352). Material 3's
- * [SnackbarHost] does not wire up swipe-to-dismiss itself, so a snackbar
- * otherwise sits until it times out or an action is tapped. Wrapping it in a
- * [SwipeToDismissBox] restores the standard Material gesture: a horizontal
- * swipe in either direction calls [SnackbarData.dismiss], which resolves the
- * host's suspending `showSnackbar` with [SnackbarResult.Dismissed] (never
- * [SnackbarResult.ActionPerformed]), so any actionable snackbar treats a
- * swipe-away as "ignored", not as tapping the action.
- *
- * The box is re-keyed per [SnackbarData] so its dismiss state resets for each
- * new snackbar; without that, a settled-away state would carry over and the
- * next snackbar would never render.
- */
-@Composable
-fun SwipeDismissibleSnackbar(data: SnackbarData) {
-    val dismissState =
-        key(data) {
-            rememberSwipeToDismissBoxState(
-                confirmValueChange = { target ->
-                    if (target != SwipeToDismissBoxValue.Settled) {
-                        data.dismiss()
-                    }
-                    // Let the box animate the snackbar off in the swipe
-                    // direction; data.dismiss() pulls it from the host so it
-                    // does not re-enter once the gesture settles.
-                    true
-                },
-            )
-        }
-    SwipeToDismissBox(
-        state = dismissState,
-        backgroundContent = {},
-    ) {
-        if (snackbarShowsCopyAffordance(data.visuals)) {
-            // Error/diagnostic toasts flagged copyable at their emit site get
-            // a discoverable Copy affordance in the free action slot, plus a
-            // SelectionContainer for long-press copy (issues #543, #796).
-            val clipboard = LocalClipboardManager.current
-            val message = data.visuals.message
-            Snackbar(
-                action = {
-                    IconButton(onClick = { clipboard.setText(AnnotatedString(message)) }) {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = stringResource(R.string.copy),
-                        )
-                    }
-                },
-            ) {
-                SelectionContainer {
-                    Text(message)
-                }
-            }
-        } else {
-            // Everything else — actionable snackbars (e.g. the chat-list
-            // "Undo", whose action slot and SnackbarResult semantics must stay
-            // untouched) and non-copyable toasts like success confirmations —
-            // renders plain, with the message text still selectable.
-            SelectionContainer {
-                Snackbar(snackbarData = data)
-            }
-        }
-    }
-}
-
-@Composable
-fun LoadingScreen() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
-    }
-}
-
-@Composable
-private fun FailureScreen(
-    message: String,
-    onRetry: () -> Unit,
-    onRetryAction: suspend () -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(44.dp))
-            Text(stringResource(R.string.white_noise_couldnt_start), style = MaterialTheme.typography.titleLarge)
-            SelectionContainer {
-                Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Button(
-                onClick = {
-                    onRetry()
-                    scope.launch { onRetryAction() }
-                },
-            ) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.retry))
             }
         }
     }
@@ -1693,39 +1353,6 @@ internal fun PublicIdentifierFieldTrailingAction(
     }
 }
 
-@Composable
-private fun rememberClipboardCanOfferPaste(clipboardManager: android.content.ClipboardManager?): Boolean {
-    var canOfferPaste by remember(clipboardManager) {
-        mutableStateOf(clipboardManager.canOfferTextPaste())
-    }
-
-    DisposableEffect(clipboardManager) {
-        if (clipboardManager == null) {
-            onDispose { }
-        } else {
-            val listener =
-                android.content.ClipboardManager.OnPrimaryClipChangedListener {
-                    canOfferPaste = clipboardManager.canOfferTextPaste()
-                }
-            clipboardManager.addPrimaryClipChangedListener(listener)
-            canOfferPaste = clipboardManager.canOfferTextPaste()
-            onDispose { clipboardManager.removePrimaryClipChangedListener(listener) }
-        }
-    }
-
-    return canOfferPaste
-}
-
-private fun android.content.ClipboardManager?.canOfferTextPaste(): Boolean =
-    this?.primaryClipDescription?.hasMimeType(ClipboardPasteAffordance.TEXT_MIME_TYPE_PATTERN) ?: false
-
-private fun android.content.ClipboardManager.primaryClipPlainText(context: android.content.Context): String? =
-    primaryClip
-        ?.takeIf { it.itemCount > 0 }
-        ?.getItemAt(0)
-        ?.coerceToText(context)
-        ?.toString()
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainShell(
@@ -2202,7 +1829,9 @@ fun AccountAvatarButton(
 // Cap of non-active account avatars shown inline in the chat-list top bar; past
 // this the stack ends in a "+N" circle that opens the full switcher.
 private const val MAX_TOP_BAR_OTHER_ACCOUNTS = 3
+
 private val TOP_BAR_OTHER_ACCOUNT_SIZE = 34.dp
+
 private val TOP_BAR_OTHER_ACCOUNT_RING = 2.dp
 
 // How far each avatar overlaps the previous one to read as a single stacked group.
@@ -3295,10 +2924,6 @@ private fun ChatListTopBar(
     )
 }
 
-// Roomier than Material's default menu-item padding so conversation overflow
-// rows read as full lines of text rather than compact cells.
-private val conversationMenuItemPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp)
-
 /**
  * Inline top-bar search for a single conversation (#292): a back arrow plus an
  * auto-focused field (✕ clears). The result count and previous/next match
@@ -3823,23 +3448,6 @@ internal fun MentionBadge(modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun UnreadCountBadge(
-    unreadCount: ULong,
-    modifier: Modifier = Modifier,
-) {
-    val accessibleCount = unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
-    val description = pluralStringResource(R.plurals.unread_messages_count, accessibleCount, accessibleCount)
-    // Default Badge is error-red, which reads as an alert not a count.
-    Badge(
-        modifier = modifier.semantics { contentDescription = description },
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
-    ) {
-        Text(if (unreadCount > 99uL) "99+" else unreadCount.toString())
-    }
-}
-
-@Composable
 private fun EmptyChats(onCreate: () -> Unit) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -4296,7 +3904,9 @@ private val FAB_SNACKBAR_INSET = 80.dp
 // deeper than SNAP rows down we hard-jump to SNAP first, then animate the final
 // stretch, so a tap from hundreds of rows deep isn't a multi-second crawl.
 private const val CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX = 5
+
 private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
+
 private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
 
 private const val MEDIA_PICKER_MAX_ITEMS = 10
@@ -11035,40 +10645,6 @@ private fun ConversationScreen(
 }
 
 @Composable
-private fun ConfirmDialog(
-    title: String,
-    message: String,
-    confirmLabel: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-    destructive: Boolean = false,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(message) },
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm,
-                // Material 3 destructive affordance: error-colored confirm
-                // text for irreversible actions (leave group, remove member).
-                colors =
-                    if (destructive) {
-                        ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        )
-                    } else {
-                        ButtonDefaults.textButtonColors()
-                    },
-            ) { Text(confirmLabel) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
-}
-
-@Composable
 private fun InvitePreviewPlaceholder(inviterName: String?) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -11163,70 +10739,6 @@ private fun EmptyGroupConversation(onAddMembers: () -> Unit) {
                 Text(stringResource(R.string.add_member))
             }
         }
-    }
-}
-
-/**
- * Bottom action rail for form screens whose primary action must remain tappable
- * while a text field owns the IME. The scrollable content lives above this in the
- * Scaffold body; this bar follows navigation/IME insets like the composer and
- * reserves the Android transient-toast band below the primary action.
- */
-@Composable
-internal fun StickyFormActionBar(
-    modifier: Modifier = Modifier,
-    content: @Composable RowScope.() -> Unit,
-) {
-    val snackbarBottomInset = LocalSnackbarBottomInset.current
-    val density = LocalDensity.current
-    var actionBarHeight by remember { mutableStateOf(0.dp) }
-    DisposableEffect(actionBarHeight, snackbarBottomInset) {
-        if (actionBarHeight <= 0.dp) {
-            onDispose { }
-        } else {
-            val previousInset = snackbarBottomInset.value
-            if (actionBarHeight > previousInset) {
-                snackbarBottomInset.value = actionBarHeight
-            }
-            onDispose {
-                if (snackbarBottomInset.value == actionBarHeight) {
-                    snackbarBottomInset.value = previousInset
-                }
-            }
-        }
-    }
-
-    // Report the bar's height net of nav/IME insets: WhiteNoiseSnackbarHost
-    // already pads for those, so including them here would lift the toast a
-    // second keyboard-height above the bar instead of just clear of it (#796).
-    val chromeInsets = WindowInsets.navigationBars.union(WindowInsets.ime)
-    Surface(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .onSizeChanged { size ->
-                    val chromeBottom = chromeInsets.getBottom(density)
-                    actionBarHeight = with(density) { (size.height - chromeBottom).coerceAtLeast(0).toDp() }
-                },
-        border = amoledSurfaceBorderStroke(),
-        tonalElevation = 3.dp,
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .imePadding()
-                    .padding(
-                        start = Dimens.spaceLg,
-                        top = Dimens.spaceMd,
-                        end = Dimens.spaceLg,
-                        bottom = Dimens.spaceMd,
-                    ),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMd),
-            verticalAlignment = Alignment.CenterVertically,
-            content = content,
-        )
     }
 }
 
@@ -12978,49 +12490,6 @@ private fun GroupMutationErrorBanner(
             }
             IconButton(onClick = onDismiss) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
-            }
-        }
-    }
-}
-
-/**
- * Static notice shown at the top of the Edit Profile screen warning the user
- * that their kind:0 metadata is broadcast unencrypted to relays. Copy mirrors
- * Whitenoise Flutter (`profileIsPublic` / `profilePublicDescription`) for
- * cross-client parity. See #380. Informational (tonal secondary container),
- * not an error — it's expected behaviour the user should simply be aware of.
- */
-@Composable
-private fun ProfilePublicWarning() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Icon(
-                Icons.Default.Public,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    stringResource(R.string.profile_is_public),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    stringResource(R.string.profile_public_description),
-                    style = MaterialTheme.typography.bodySmall,
-                )
             }
         }
     }
@@ -16323,6 +15792,7 @@ private fun ComposerEmojiPickerPane(
 }
 
 internal const val EmojiPickerSheetMaxHeightFraction = 0.86f
+
 private const val EmojiPickerSheetPartialDetentFraction = 0.48f
 
 internal fun emojiPickerSheetVisibleContentFraction(expanded: Boolean): Float =
@@ -16333,6 +15803,7 @@ internal fun emojiPickerSheetVisibleContentFraction(expanded: Boolean): Float =
     }
 
 internal val ComposerEmojiPickerFallbackHeight = 320.dp
+
 internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
 
 /**
@@ -18051,88 +17522,6 @@ private fun LockHintAbove(
     }
 }
 
-// Anchored dropdown that does NOT collapse the soft keyboard while it is open.
-//
-// A default DropdownMenu opens a *focusable* popup window; Android dismisses the
-// IME the moment the window holding the focused composer loses focus. That
-// collapse strips the composer's imePadding and reflows the transcript down by
-// the keyboard height — so a menu/picker launched from the composer toolbar
-// (the attach clip, the conversation overflow) animates in over a shifted
-// layout, and dismissing it leaves the composer unfocused with the keyboard
-// down (#323). Same "modal UI launched from the composer toolbar steals IME
-// state instead of overlaying it" family as the voice-record bar (#207) and the
-// long-press popover (#284).
-//
-// focusable = false keeps the keyboard up but opens two gaps versus a focusable
-// menu, restored here exactly as ConversationLongPressMenu does for #284:
-//   1. Back dismissal — Popup's dismissOnBackPress is a no-op while the popup is
-//      non-focusable, so Back would fall through to the IME/activity instead of
-//      closing the menu. A host-window BackHandler closes it without touching
-//      IME focus.
-//   2. Outside-tap click-through — taps outside a non-focusable popup are
-//      delivered to the windows beneath it, so a dismiss tap would also activate
-//      the underlying content. A full-window, non-focusable scrim Popup placed
-//      below the menu consumes those taps: tapping it dismisses the menu and the
-//      press is consumed so it never reaches the content. The scrim is itself
-//      non-focusable, so it too preserves the open keyboard.
-//
-// Positioning, anchoring and the menu chrome stay DropdownMenu's — only its
-// focus behavior and dismissal plumbing change.
-@Composable
-private fun KeyboardPreservingDropdownMenu(
-    expanded: Boolean,
-    onDismissRequest: () -> Unit,
-    modifier: Modifier = Modifier,
-    offset: DpOffset = DpOffset(0.dp, 0.dp),
-    shape: Shape = MenuDefaults.shape,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    // BackHandler + scrim only exist while the menu is open. They render in
-    // their own popup windows, so they never disturb the anchor's layout.
-    if (expanded) {
-        BackHandler(enabled = true) { onDismissRequest() }
-        // Scrim: composed before the menu so the menu renders on top of it.
-        // Fills the window and swallows any tap as a pure dismissal.
-        Popup(
-            properties =
-                PopupProperties(
-                    focusable = false,
-                    // The scrim owns outside-tap dismissal; the menu's own
-                    // outside-tap detection is disabled below so a single tap is
-                    // handled exactly once, here, and consumed.
-                    dismissOnClickOutside = false,
-                ),
-            onDismissRequest = onDismissRequest,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTapGestures { onDismissRequest() }
-                        },
-            )
-        }
-    }
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismissRequest,
-        modifier = modifier,
-        offset = offset,
-        shape = shape,
-        border = amoledSurfaceBorderStroke(),
-        properties =
-            PopupProperties(
-                focusable = false,
-                // Outside taps are handled by the scrim above (which also blocks
-                // click-through); disabling the menu's own outside-dismiss keeps
-                // a single tap from being processed twice.
-                dismissOnClickOutside = false,
-            ),
-        content = content,
-    )
-}
-
 // BasicTextField (not Material3 TextField) so the pill height isn't pinned
 // to the 56dp filled-textfield minimum.
 @Composable
@@ -18854,8 +18243,6 @@ private val MediaAutoDownloadType.labelRes: Int
             MediaAutoDownloadType.Video -> R.string.media_type_video
             MediaAutoDownloadType.Document -> R.string.media_type_documents
         }
-
-private val LocalSettingsRowsInsideSectionCard = staticCompositionLocalOf { false }
 
 @Composable
 private fun Modifier.settingsRowAmoledSurfaceBorder(shape: Shape = RoundedCornerShape(12.dp)): Modifier =
@@ -20247,7 +19634,9 @@ private fun ProfileSharedGroupRow(
 }
 
 private const val AVATAR_VIEWER_MAX_BYTES = 8 * 1024 * 1024
+
 private const val AVATAR_VIEWER_CONNECT_TIMEOUT_MS = 5_000
+
 private const val AVATAR_VIEWER_READ_TIMEOUT_MS = 15_000
 
 @Composable
@@ -20781,79 +20170,6 @@ private fun CameraQrScanner(
         },
         modifier = Modifier.fillMaxSize(),
     )
-}
-
-private tailrec fun Context.lifecycleOwner(): LifecycleOwner? =
-    when (this) {
-        is LifecycleOwner -> this
-        is ContextWrapper -> baseContext.lifecycleOwner()
-        else -> null
-    }
-
-// Compose's `LocalContext.current` is whatever the host wired in — often
-// the Activity directly, but themed/wrapped contexts (test surfaces, custom
-// theme wrappers) return a `ContextWrapper`. A direct `as? Activity` cast on
-// those silently yields null, which for a FLAG_SECURE setter is the worst
-// failure mode (looks like it works, doesn't). Walk the wrapper chain.
-private tailrec fun Context.activity(): Activity? =
-    when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.activity()
-        else -> null
-    }
-
-private val windowSecureFlagRefCounts = java.util.WeakHashMap<android.view.Window, Int>()
-
-internal fun android.view.Window.retainSecureFlag() {
-    synchronized(windowSecureFlagRefCounts) {
-        val previous = windowSecureFlagRefCounts[this] ?: 0
-        windowSecureFlagRefCounts[this] = previous + 1
-        if (previous == 0) {
-            setFlags(
-                WindowManager.LayoutParams.FLAG_SECURE,
-                WindowManager.LayoutParams.FLAG_SECURE,
-            )
-        }
-    }
-}
-
-internal fun android.view.Window.releaseSecureFlag() {
-    synchronized(windowSecureFlagRefCounts) {
-        val previous = windowSecureFlagRefCounts[this] ?: return
-        if (previous <= 1) {
-            windowSecureFlagRefCounts.remove(this)
-            clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        } else {
-            windowSecureFlagRefCounts[this] = previous - 1
-        }
-    }
-}
-
-/**
- * Applies or clears `FLAG_SECURE` on the host activity window for the duration
- * of this composition. `FLAG_SECURE` blocks the OS Recents/overview thumbnail,
- * screenshots, screen recording, and casting from capturing the window's
- * contents. Identity / secret-key surfaces call this unconditionally; chat
- * surfaces pass the user's screenshot preference so the setting applies live.
- */
-@Composable
-private fun WindowSecureFlag(enabled: Boolean = true) {
-    val context = LocalContext.current
-    DisposableEffect(context, enabled) {
-        val window = context.activity()?.window
-        if (enabled) {
-            window?.retainSecureFlag()
-        }
-        onDispose {
-            // No symmetric restore for enabled=false: this is the shared
-            // activity window, so each secure surface must assert the flag for
-            // itself instead of resurrecting stale state when a permissive
-            // chat surface leaves composition.
-            if (enabled) {
-                window?.releaseSecureFlag()
-            }
-        }
-    }
 }
 
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
@@ -22041,7 +21357,7 @@ private fun EncryptedBackupPassphraseStrength.progress(): Float =
     }
 
 @Composable
-private fun EncryptedBackupPassphraseStrength.color(): Color =
+internal fun EncryptedBackupPassphraseStrength.color(): Color =
     when (this) {
         EncryptedBackupPassphraseStrength.TooShort -> MaterialTheme.colorScheme.error
         EncryptedBackupPassphraseStrength.Weak -> MaterialTheme.colorScheme.error
@@ -22305,53 +21621,6 @@ private fun wipeOutcomeStageSummary(stage: WipeStageReport): String =
                 if (stage.hasIssues) R.string.wipe_outcome_local_wipe_incomplete else R.string.wipe_outcome_local_wipe_done,
             )
     }
-
-@Composable
-private fun CopyableValueRow(
-    label: String,
-    value: String,
-    clipboard: androidx.compose.ui.platform.ClipboardManager,
-    appState: WhiteNoiseAppState,
-    displayValue: String = value,
-) {
-    val copyLabel = stringResource(R.string.copy)
-    // Identifier rows (npub, group id, public key) keep the value and trailing
-    // copy icon on one line. The text may tail-ellipsize when space is tight,
-    // but it must never wrap a stray character onto a second row (#799). Callers
-    // may provide a pre-shortened displayValue when they need middle ellipsis.
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clickable(
-                onClickLabel = copyLabel,
-                role = Role.Button,
-            ) {
-                clipboard.setText(AnnotatedString(value))
-                appState.presentText(AppText.Resource(R.string.toast_copied_value, listOf(label)))
-            }.semantics(mergeDescendants = true) {
-                contentDescription = "$label, $value"
-            },
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                displayValue,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                softWrap = false,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                Icons.Default.ContentCopy,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
 
 private data class DonationMethod(
     val label: String,
@@ -23176,171 +22445,3 @@ private fun DiagnosticRow(
         }
     }
 }
-
-// Section panels read as white cards on a recessed page in light, and as a
-// raised neutral card over the darker page in dark/AMOLED — the same "panel
-// one step above the page" relationship, resolved per theme by luminance since
-// "lighter == elevated" can't be expressed the same way in both.
-@Composable
-internal fun sectionPanelColor(): Color =
-    if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-        MaterialTheme.colorScheme.surfaceContainerLowest
-    } else {
-        MaterialTheme.colorScheme.surfaceContainer
-    }
-
-@Composable
-internal fun SectionCard(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
-        colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(Dimens.spaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            CompositionLocalProvider(LocalSettingsRowsInsideSectionCard provides true) {
-                content()
-            }
-        }
-    }
-}
-
-@Composable
-internal fun SectionCardWithAction(
-    title: String,
-    action: @Composable RowScope.() -> Unit,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth().amoledSurfaceBorder(RoundedCornerShape(12.dp)),
-        colors = CardDefaults.elevatedCardColors(containerColor = sectionPanelColor()),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(Dimens.spaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    title,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                action()
-            }
-            CompositionLocalProvider(LocalSettingsRowsInsideSectionCard provides true) {
-                content()
-            }
-        }
-    }
-}
-
-@Composable
-private fun ErrorContent(
-    title: String,
-    message: String,
-) {
-    // Failed-load errors often carry engine/relay identifiers users need to
-    // paste into a bug report. Make the message selectable (long-press copy)
-    // and surface a discoverable Copy button. See #543.
-    val clipboard = LocalClipboardManager.current
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(40.dp))
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            SelectionContainer {
-                Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            TextButton(onClick = { clipboard.setText(AnnotatedString(message)) }) {
-                Icon(
-                    Icons.Default.ContentCopy,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.copy))
-            }
-        }
-    }
-}
-
-private val AvatarPalette =
-    listOf(
-        Color(0xFF006A6A),
-        Color(0xFF8C4A00),
-        Color(0xFF5B5FC7),
-        Color(0xFF006D3B),
-        Color(0xFF9A4055),
-    )
-
-@Composable
-internal fun Avatar(
-    title: String,
-    seed: String,
-    size: androidx.compose.ui.unit.Dp,
-    pictureUrl: String? = null,
-) {
-    val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
-    // Seed from the in-memory cache so re-entering a screen shows an
-    // already-loaded avatar immediately, with no placeholder flash and no
-    // re-fetch. key(seed, pictureUrl) re-creates the state holder when either
-    // the row/account identity or URL changes, so a reused Column slot cannot
-    // keep the previous member's bitmap while the new one loads. The outer key
-    // is intentional: produceState keys restart the load coroutine, but the
-    // state holder itself must also be recreated to re-seed from the new cache
-    // key instead of displaying the old bitmap transiently.
-    val image by key(seed, pictureUrl) {
-        produceState(AvatarImageLoader.peek(pictureUrl)) {
-            if (value == null && pictureUrl != null) value = AvatarImageLoader.load(pictureUrl)
-        }
-    }
-    Box(
-        modifier = Modifier.size(size).clip(CircleShape).background(color),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (image != null) {
-            Image(
-                bitmap = image!!,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-        } else {
-            // Derive the font size from the avatar diameter so wide letter
-            // pairs (e.g. "MW", "WW") fit inside the circle (#312). The 0.4
-            // ratio keeps the worst-case 2-letter pair clear of the bounds at
-            // every render size used in the app (36dp..96dp).
-            //
-            // The avatar's outer Modifier.size(...) is in dp and therefore
-            // does NOT scale with the user's accessibility font scale, but a
-            // raw `.sp` value would — pushing wide pairs back outside the
-            // circle for users on large-font settings. Divide the derived
-            // value by `fontScale` so the rendered size is constant in dp
-            // and tracks the avatar's actual size, then cap at titleMedium so
-            // the existing look is preserved on the large profile/group-detail
-            // avatars where titleMedium already fits comfortably. The cap is
-            // taken in the same dp-constant space, so it also resists font
-            // scale.
-            val fontScale = LocalDensity.current.fontScale
-            val titleMediumSp = MaterialTheme.typography.titleMedium.fontSize
-            val fittedFontSize =
-                minOf(size.value * 0.4f, titleMediumSp.value * fontScale).sp / fontScale
-            Text(
-                IdentityFormatter.initials(title),
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.titleMedium,
-                fontSize = fittedFontSize,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-internal fun avatarPaletteIndex(
-    seedHash: Int,
-    paletteSize: Int,
-): Int = Math.floorMod(seedHash, paletteSize)
