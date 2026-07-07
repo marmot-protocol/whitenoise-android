@@ -223,6 +223,19 @@ class MediaPipelineTest {
     }
 
     @Test
+    fun originalGifStrip_passesAnimationBytesThroughUnchanged() {
+        // GIF is a recognized original kind and must survive the metadata-strip
+        // step byte-for-byte — a re-encode would flatten the animation and drop
+        // the NETSCAPE loop block.
+        val gif = "GIF89a".encodeToByteArray() + byteArrayOf(0x21, 0xff.toByte(), 0x0b, 0x00, 0x2c, 0x3b)
+
+        val stripped = MediaPipeline.stripOriginalImageMetadata(gif)!!
+
+        assertTrue(MediaPipeline.isGif(gif))
+        assertTrue(gif.contentEquals(stripped))
+    }
+
+    @Test
     fun originalJpegStrip_continuesFilteringAfterScanAndDropsTrailingBytes() {
         val scan1 = byteArrayOf(0x11, 0xff.toByte(), 0x00, 0x22)
         val scan2 = byteArrayOf(0x33, 0xff.toByte(), 0xd9.toByte())
