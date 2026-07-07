@@ -880,6 +880,9 @@
     <string name="search_members">搜索成员</string>
     <string name="recent_chats">最近聊天</string>
     <string name="onboarding_login">登录</string>
+    <string name="onboarding_login_with_amber">使用 Amber 登录</string>
+    <string name="toast_couldnt_login_amber">无法使用 Amber 登录</string>
+    <string name="toast_amber_sign_in_cancelled">已取消 Amber 登录</string>
     <string name="onboarding_sign_up">注册</string>
     <string name="onboarding_slogan_decentralized">去中心化</string>
     <string name="onboarding_slogan_uncensorable">防审查</string>

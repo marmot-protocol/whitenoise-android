@@ -663,6 +663,76 @@ internal open class UniffiForeignFutureStructVoid(
 internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
     fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructVoid.UniffiByValue,)
 }
+internal interface UniffiCallbackInterfaceExternalAccountSignerFfiMethod0 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceExternalAccountSignerFfiMethod1 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`unsignedEventJson`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceExternalAccountSignerFfiMethod2 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`publicKey`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceExternalAccountSignerFfiMethod3 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`publicKey`: RustBuffer.ByValue,`encryptedContent`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceExternalAccountSignerFfiMethod4 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`publicKey`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceExternalAccountSignerFfiMethod5 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`publicKey`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+@Structure.FieldOrder("publicKey", "signEvent", "nip04Encrypt", "nip04Decrypt", "nip44Encrypt", "nip44Decrypt", "uniffiFree")
+internal open class UniffiVTableCallbackInterfaceExternalAccountSignerFfi(
+    @JvmField internal var `publicKey`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod0? = null,
+    @JvmField internal var `signEvent`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod1? = null,
+    @JvmField internal var `nip04Encrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod2? = null,
+    @JvmField internal var `nip04Decrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod3? = null,
+    @JvmField internal var `nip44Encrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod4? = null,
+    @JvmField internal var `nip44Decrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod5? = null,
+    @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+) : Structure() {
+    class UniffiByValue(
+        `publicKey`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod0? = null,
+        `signEvent`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod1? = null,
+        `nip04Encrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod2? = null,
+        `nip04Decrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod3? = null,
+        `nip44Encrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod4? = null,
+        `nip44Decrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod5? = null,
+        `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+    ): UniffiVTableCallbackInterfaceExternalAccountSignerFfi(`publicKey`,`signEvent`,`nip04Encrypt`,`nip04Decrypt`,`nip44Encrypt`,`nip44Decrypt`,`uniffiFree`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceExternalAccountSignerFfi) {
+        `publicKey` = other.`publicKey`
+        `signEvent` = other.`signEvent`
+        `nip04Encrypt` = other.`nip04Encrypt`
+        `nip04Decrypt` = other.`nip04Decrypt`
+        `nip44Encrypt` = other.`nip44Encrypt`
+        `nip44Decrypt` = other.`nip44Decrypt`
+        `uniffiFree` = other.`uniffiFree`
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -997,6 +1067,7 @@ internal interface UniffiLib : Library {
             .also { lib: UniffiLib ->
                 uniffiCheckContractApiVersion(lib)
                 uniffiCheckApiChecksums(lib)
+                uniffiCallbackInterfaceExternalAccountSignerFfi.register(lib)
                 }
         }
         
@@ -1038,6 +1109,24 @@ internal interface UniffiLib : Library {
     ): Unit
     fun uniffi_marmot_uniffi_fn_method_eventssubscription_next(`ptr`: Pointer,
     ): Long
+    fun uniffi_marmot_uniffi_fn_clone_externalaccountsignerffi(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): Pointer
+    fun uniffi_marmot_uniffi_fn_free_externalaccountsignerffi(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_marmot_uniffi_fn_init_callback_vtable_externalaccountsignerffi(`vtable`: UniffiVTableCallbackInterfaceExternalAccountSignerFfi,
+    ): Unit
+    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_public_key(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_sign_event(`ptr`: Pointer,`unsignedEventJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip04_encrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip04_decrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`encryptedContent`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip44_encrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip44_decrypt(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_clone_groupstatesubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
     ): Pointer
     fun uniffi_marmot_uniffi_fn_free_groupstatesubscription(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
@@ -1098,6 +1187,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_display_name(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_download_group_blossom_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_download_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_edit_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,
@@ -1129,6 +1220,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_list_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_login(`ptr`: Pointer,`identity`: RustBuffer.ByValue,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_login_external_signer(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`signer`: Pointer,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_mark_timeline_message_read(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`messageIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1163,6 +1256,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_react_to_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`emoji`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_refresh_profile(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,`relays`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_marmot_uniffi_fn_method_marmot_register_external_signer(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`signer`: Pointer,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_relay_health(`ptr`: Pointer,
     ): Long
@@ -1418,6 +1513,18 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_eventssubscription_next(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_public_key(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_sign_event(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip04_encrypt(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip04_decrypt(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip44_encrypt(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip44_decrypt(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_groupstatesubscription_next(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_groupstatesubscription_snapshot(
@@ -1468,6 +1575,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_display_name(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_download_group_blossom_image(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_download_media(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_edit_message(
@@ -1499,6 +1608,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_list_media(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_login(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_login_external_signer(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_mark_timeline_message_read(
     ): Short
@@ -1533,6 +1644,8 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_react_to_message(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_refresh_profile(
+    ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_register_external_signer(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_relay_health(
     ): Short
@@ -1691,6 +1804,24 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_eventssubscription_next() != 16714.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_public_key() != 3690.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_sign_event() != 4107.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip04_encrypt() != 51930.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip04_decrypt() != 43776.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip44_encrypt() != 30197.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_externalaccountsignerffi_nip44_decrypt() != 30219.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_groupstatesubscription_next() != 58132.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1715,7 +1846,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_relay_lists() != 47794.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_unread_summary() != 17362.toShort()) {
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_account_unread_summary() != 15239.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_audit_log_files() != 25846.toShort()) {
@@ -1766,6 +1897,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_display_name() != 65469.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_download_group_blossom_image() != 5312.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_download_media() != 56125.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1812,6 +1946,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_login() != 33167.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_login_external_signer() != 44038.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_mark_timeline_message_read() != 32522.toShort()) {
@@ -1863,6 +2000,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_refresh_profile() != 33641.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_register_external_signer() != 831.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_relay_health() != 9336.toShort()) {
@@ -3566,6 +3706,517 @@ public object FfiConverterTypeEventsSubscription: FfiConverter<EventsSubscriptio
 //
 
 
+public interface ExternalAccountSignerFfi {
+    
+    /**
+     * Return the signer account public key as hex or npub.
+     */
+    fun `publicKey`(): kotlin.String
+    
+    /**
+     * Sign a serialized unsigned Nostr event and return the signed event JSON.
+     *
+     * MDK uses this for normal Nostr publishing, relay auth, push ownership,
+     * Blossom upload auth, and account identity proofs.
+     */
+    fun `signEvent`(`unsignedEventJson`: kotlin.String): kotlin.String
+    
+    /**
+     * NIP-04 encrypt/decrypt support for legacy Nostr surfaces.
+     *
+     * Current MDK protocol flows do not require NIP-04. Clients that cannot
+     * support it should return a clear unsupported signer error.
+     */
+    fun `nip04Encrypt`(`publicKey`: kotlin.String, `content`: kotlin.String): kotlin.String
+    
+    fun `nip04Decrypt`(`publicKey`: kotlin.String, `encryptedContent`: kotlin.String): kotlin.String
+    
+    /**
+     * NIP-44 encrypt/decrypt support for gift-wrap and encrypted app data.
+     */
+    fun `nip44Encrypt`(`publicKey`: kotlin.String, `content`: kotlin.String): kotlin.String
+    
+    fun `nip44Decrypt`(`publicKey`: kotlin.String, `payload`: kotlin.String): kotlin.String
+    
+    companion object
+}
+
+open class ExternalAccountSignerFfiImpl: Disposable, AutoCloseable, ExternalAccountSignerFfi {
+
+    constructor(pointer: Pointer) {
+        this.pointer = pointer
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    }
+
+    /**
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noPointer: NoPointer) {
+        this.pointer = null
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    }
+
+    protected val pointer: Pointer?
+    protected val cleanable: UniffiCleaner.Cleanable
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithPointer(block: (ptr: Pointer) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the pointer being freed concurrently.
+        try {
+            return block(this.uniffiClonePointer())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val pointer: Pointer?) : Runnable {
+        override fun run() {
+            pointer?.let { ptr ->
+                uniffiRustCall { status ->
+                    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_free_externalaccountsignerffi(ptr, status)
+                }
+            }
+        }
+    }
+
+    fun uniffiClonePointer(): Pointer {
+        return uniffiRustCall() { status ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_clone_externalaccountsignerffi(pointer!!, status)
+        }
+    }
+
+    
+    /**
+     * Return the signer account public key as hex or npub.
+     */
+    @Throws(MarmotKitException::class)override fun `publicKey`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_public_key(
+        it, _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Sign a serialized unsigned Nostr event and return the signed event JSON.
+     *
+     * MDK uses this for normal Nostr publishing, relay auth, push ownership,
+     * Blossom upload auth, and account identity proofs.
+     */
+    @Throws(MarmotKitException::class)override fun `signEvent`(`unsignedEventJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_sign_event(
+        it, FfiConverterString.lower(`unsignedEventJson`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * NIP-04 encrypt/decrypt support for legacy Nostr surfaces.
+     *
+     * Current MDK protocol flows do not require NIP-04. Clients that cannot
+     * support it should return a clear unsupported signer error.
+     */
+    @Throws(MarmotKitException::class)override fun `nip04Encrypt`(`publicKey`: kotlin.String, `content`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip04_encrypt(
+        it, FfiConverterString.lower(`publicKey`),FfiConverterString.lower(`content`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(MarmotKitException::class)override fun `nip04Decrypt`(`publicKey`: kotlin.String, `encryptedContent`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip04_decrypt(
+        it, FfiConverterString.lower(`publicKey`),FfiConverterString.lower(`encryptedContent`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * NIP-44 encrypt/decrypt support for gift-wrap and encrypted app data.
+     */
+    @Throws(MarmotKitException::class)override fun `nip44Encrypt`(`publicKey`: kotlin.String, `content`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip44_encrypt(
+        it, FfiConverterString.lower(`publicKey`),FfiConverterString.lower(`content`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(MarmotKitException::class)override fun `nip44Decrypt`(`publicKey`: kotlin.String, `payload`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCallWithError(MarmotKitException) { _status ->
+    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_externalaccountsignerffi_nip44_decrypt(
+        it, FfiConverterString.lower(`publicKey`),FfiConverterString.lower(`payload`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+
+    
+    
+    companion object
+    
+}
+// Magic number for the Rust proxy to call using the same mechanism as every other method,
+// to free the callback once it's dropped by Rust.
+internal const val IDX_CALLBACK_FREE = 0
+// Callback return codes
+internal const val UNIFFI_CALLBACK_SUCCESS = 0
+internal const val UNIFFI_CALLBACK_ERROR = 1
+internal const val UNIFFI_CALLBACK_UNEXPECTED_ERROR = 2
+
+/**
+ * @suppress
+ */
+public abstract class FfiConverterCallbackInterface<CallbackInterface: Any>: FfiConverter<CallbackInterface, Long> {
+    internal val handleMap = UniffiHandleMap<CallbackInterface>()
+
+    internal fun drop(handle: Long) {
+        handleMap.remove(handle)
+    }
+
+    override fun lift(value: Long): CallbackInterface {
+        return handleMap.get(value)
+    }
+
+    override fun read(buf: ByteBuffer) = lift(buf.getLong())
+
+    override fun lower(value: CallbackInterface) = handleMap.insert(value)
+
+    override fun allocationSize(value: CallbackInterface) = 8UL
+
+    override fun write(value: CallbackInterface, buf: ByteBuffer) {
+        buf.putLong(lower(value))
+    }
+}
+
+// Put the implementation in an object so we don't pollute the top-level namespace
+internal object uniffiCallbackInterfaceExternalAccountSignerFfi {
+    internal object `publicKey`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod0 {
+        override fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeExternalAccountSignerFfi.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`publicKey`(
+                )
+            }
+            val writeReturn = { value: kotlin.String -> uniffiOutReturn.setValue(FfiConverterString.lower(value)) }
+            uniffiTraitInterfaceCallWithError(
+                uniffiCallStatus,
+                makeCall,
+                writeReturn,
+                { e: MarmotKitException -> FfiConverterTypeMarmotKitError.lower(e) }
+            )
+        }
+    }
+    internal object `signEvent`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod1 {
+        override fun callback(`uniffiHandle`: Long,`unsignedEventJson`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeExternalAccountSignerFfi.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`signEvent`(
+                    FfiConverterString.lift(`unsignedEventJson`),
+                )
+            }
+            val writeReturn = { value: kotlin.String -> uniffiOutReturn.setValue(FfiConverterString.lower(value)) }
+            uniffiTraitInterfaceCallWithError(
+                uniffiCallStatus,
+                makeCall,
+                writeReturn,
+                { e: MarmotKitException -> FfiConverterTypeMarmotKitError.lower(e) }
+            )
+        }
+    }
+    internal object `nip04Encrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod2 {
+        override fun callback(`uniffiHandle`: Long,`publicKey`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeExternalAccountSignerFfi.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`nip04Encrypt`(
+                    FfiConverterString.lift(`publicKey`),
+                    FfiConverterString.lift(`content`),
+                )
+            }
+            val writeReturn = { value: kotlin.String -> uniffiOutReturn.setValue(FfiConverterString.lower(value)) }
+            uniffiTraitInterfaceCallWithError(
+                uniffiCallStatus,
+                makeCall,
+                writeReturn,
+                { e: MarmotKitException -> FfiConverterTypeMarmotKitError.lower(e) }
+            )
+        }
+    }
+    internal object `nip04Decrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod3 {
+        override fun callback(`uniffiHandle`: Long,`publicKey`: RustBuffer.ByValue,`encryptedContent`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeExternalAccountSignerFfi.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`nip04Decrypt`(
+                    FfiConverterString.lift(`publicKey`),
+                    FfiConverterString.lift(`encryptedContent`),
+                )
+            }
+            val writeReturn = { value: kotlin.String -> uniffiOutReturn.setValue(FfiConverterString.lower(value)) }
+            uniffiTraitInterfaceCallWithError(
+                uniffiCallStatus,
+                makeCall,
+                writeReturn,
+                { e: MarmotKitException -> FfiConverterTypeMarmotKitError.lower(e) }
+            )
+        }
+    }
+    internal object `nip44Encrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod4 {
+        override fun callback(`uniffiHandle`: Long,`publicKey`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeExternalAccountSignerFfi.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`nip44Encrypt`(
+                    FfiConverterString.lift(`publicKey`),
+                    FfiConverterString.lift(`content`),
+                )
+            }
+            val writeReturn = { value: kotlin.String -> uniffiOutReturn.setValue(FfiConverterString.lower(value)) }
+            uniffiTraitInterfaceCallWithError(
+                uniffiCallStatus,
+                makeCall,
+                writeReturn,
+                { e: MarmotKitException -> FfiConverterTypeMarmotKitError.lower(e) }
+            )
+        }
+    }
+    internal object `nip44Decrypt`: UniffiCallbackInterfaceExternalAccountSignerFfiMethod5 {
+        override fun callback(`uniffiHandle`: Long,`publicKey`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeExternalAccountSignerFfi.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`nip44Decrypt`(
+                    FfiConverterString.lift(`publicKey`),
+                    FfiConverterString.lift(`payload`),
+                )
+            }
+            val writeReturn = { value: kotlin.String -> uniffiOutReturn.setValue(FfiConverterString.lower(value)) }
+            uniffiTraitInterfaceCallWithError(
+                uniffiCallStatus,
+                makeCall,
+                writeReturn,
+                { e: MarmotKitException -> FfiConverterTypeMarmotKitError.lower(e) }
+            )
+        }
+    }
+
+    internal object uniffiFree: UniffiCallbackInterfaceFree {
+        override fun callback(handle: Long) {
+            FfiConverterTypeExternalAccountSignerFfi.handleMap.remove(handle)
+        }
+    }
+
+    internal var vtable = UniffiVTableCallbackInterfaceExternalAccountSignerFfi.UniffiByValue(
+        `publicKey`,
+        `signEvent`,
+        `nip04Encrypt`,
+        `nip04Decrypt`,
+        `nip44Encrypt`,
+        `nip44Decrypt`,
+        uniffiFree,
+    )
+
+    // Registers the foreign callback with the Rust side.
+    // This method is generated for each callback interface.
+    internal fun register(lib: UniffiLib) {
+        lib.uniffi_marmot_uniffi_fn_init_callback_vtable_externalaccountsignerffi(vtable)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeExternalAccountSignerFfi: FfiConverter<ExternalAccountSignerFfi, Pointer> {
+    internal val handleMap = UniffiHandleMap<ExternalAccountSignerFfi>()
+
+    override fun lower(value: ExternalAccountSignerFfi): Pointer {
+        return Pointer(handleMap.insert(value))
+    }
+
+    override fun lift(value: Pointer): ExternalAccountSignerFfi {
+        return ExternalAccountSignerFfiImpl(value)
+    }
+
+    override fun read(buf: ByteBuffer): ExternalAccountSignerFfi {
+        // The Rust code always writes pointers as 8 bytes, and will
+        // fail to compile if they don't fit.
+        return lift(Pointer(buf.getLong()))
+    }
+
+    override fun allocationSize(value: ExternalAccountSignerFfi) = 8UL
+
+    override fun write(value: ExternalAccountSignerFfi, buf: ByteBuffer) {
+        // The Rust code always expects pointers written as 8 bytes,
+        // and will fail to compile if they don't fit.
+        buf.putLong(Pointer.nativeValue(lower(value)))
+    }
+}
+
+
+// This template implements a class for working with a Rust struct via a Pointer/Arc<T>
+// to the live Rust struct on the other side of the FFI.
+//
+// Each instance implements core operations for working with the Rust `Arc<T>` and the
+// Kotlin Pointer to work with the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque pointer to the underlying Rust struct.
+//     Method calls need to read this pointer from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its pointer should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the pointer, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the pointer, but is interrupted
+//      before it can pass the pointer over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read pointer value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
 public interface GroupStateSubscriptionInterface {
     
     suspend fun `next`(): AppGroupRecordFfi?
@@ -3855,8 +4506,9 @@ public interface MarmotInterface {
      * (mdk#461). Each entry's `unread_count` is read from that
      * account's materialized chat-list projection, so this does not require
      * switching into, or loading a full session/timeline for, any account —
-     * non-active (not-`running`) accounts are reported too. Only
-     * local-signing accounts are included, matching `list_accounts`.
+     * non-active (not-`running`) accounts are reported too. Sign-capable
+     * local and external-signer accounts are included, matching
+     * `list_accounts`.
      */
     fun `accountUnreadSummary`(): List<AccountUnreadFfi>
     
@@ -3947,6 +4599,16 @@ public interface MarmotInterface {
      * `None` when nothing is known yet — call `refresh_directory` to fetch.
      */
     fun `displayName`(`accountIdHex`: kotlin.String): kotlin.String?
+    
+    /**
+     * Fetch and decrypt the group's encrypted Blossom avatar
+     * (`marmot.group.blossom.image.v1`) into raw image bytes (PNG/JPEG/…).
+     * Errors when the group has no Blossom image set. Presence and the
+     * content hash (for caching) are on `AppGroupRecordFfi::image_hash_hex`;
+     * when the group also carries a URL avatar, the URL takes precedence
+     * for rendering.
+     */
+    suspend fun `downloadGroupBlossomImage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): kotlin.ByteArray
     
     /**
      * Fetch an encrypted media blob and decrypt it using the group's
@@ -4044,6 +4706,17 @@ public interface MarmotInterface {
     suspend fun `login`(`identity`: kotlin.String, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountSummaryFfi
     
     /**
+     * Log in with an external account signer such as Amber/NIP-55.
+     *
+     * MDK stores only the account public key and device-local database
+     * encryption material. All Nostr signing/decryption and MLS
+     * account-identity proof signing are routed through `signer`; apps must
+     * call this again after process restart before the external account can
+     * publish, decrypt welcomes, or start its worker.
+     */
+    suspend fun `loginExternalSigner`(`publicKey`: kotlin.String, `signer`: ExternalAccountSignerFfi, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>): AccountSummaryFfi
+    
+    /**
      * Mark a kind-9 timeline message visible/read. Own kind-9 messages can
      * advance the marker too, which clears any earlier unread messages.
      */
@@ -4139,6 +4812,15 @@ public interface MarmotInterface {
      * freshly-fetched metadata (name, picture, etc.) for that account.
      */
     suspend fun `refreshProfile`(`accountIdHex`: kotlin.String, `relays`: List<kotlin.String>)
+    
+    /**
+     * Re-register an external signer for an already-known external account.
+     *
+     * This is the restore path after app/process restart. It does not create a
+     * new account; it only installs the signer callback so runtime work can
+     * resume for the account.
+     */
+    suspend fun `registerExternalSigner`(`accountRef`: kotlin.String, `signer`: ExternalAccountSignerFfi)
     
     /**
      * Live relay-plane connection health (connected / connecting /
@@ -4702,8 +5384,9 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
      * (mdk#461). Each entry's `unread_count` is read from that
      * account's materialized chat-list projection, so this does not require
      * switching into, or loading a full session/timeline for, any account —
-     * non-active (not-`running`) accounts are reported too. Only
-     * local-signing accounts are included, matching `list_accounts`.
+     * non-active (not-`running`) accounts are reported too. Sign-capable
+     * local and external-signer accounts are included, matching
+     * `list_accounts`.
      */
     @Throws(MarmotKitException::class)override fun `accountUnreadSummary`(): List<AccountUnreadFfi> {
             return FfiConverterSequenceTypeAccountUnreadFfi.lift(
@@ -5080,6 +5763,35 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
+     * Fetch and decrypt the group's encrypted Blossom avatar
+     * (`marmot.group.blossom.image.v1`) into raw image bytes (PNG/JPEG/…).
+     * Errors when the group has no Blossom image set. Presence and the
+     * content hash (for caching) are on `AppGroupRecordFfi::image_hash_hex`;
+     * when the group also carries a URL avatar, the URL takes precedence
+     * for rendering.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `downloadGroupBlossomImage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : kotlin.ByteArray {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_download_group_blossom_image(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterByteArray.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Fetch an encrypted media blob and decrypt it using the group's
      * encrypted media component secret.
      */
@@ -5424,6 +6136,36 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_login(
                 thisPtr,
                 FfiConverterString.lower(`identity`),FfiConverterSequenceString.lower(`defaultRelays`),FfiConverterSequenceString.lower(`bootstrapRelays`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeAccountSummaryFfi.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Log in with an external account signer such as Amber/NIP-55.
+     *
+     * MDK stores only the account public key and device-local database
+     * encryption material. All Nostr signing/decryption and MLS
+     * account-identity proof signing are routed through `signer`; apps must
+     * call this again after process restart before the external account can
+     * publish, decrypt welcomes, or start its worker.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `loginExternalSigner`(`publicKey`: kotlin.String, `signer`: ExternalAccountSignerFfi, `defaultRelays`: List<kotlin.String>, `bootstrapRelays`: List<kotlin.String>) : AccountSummaryFfi {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_login_external_signer(
+                thisPtr,
+                FfiConverterString.lower(`publicKey`),FfiConverterTypeExternalAccountSignerFfi.lower(`signer`),FfiConverterSequenceString.lower(`defaultRelays`),FfiConverterSequenceString.lower(`bootstrapRelays`),
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -5787,6 +6529,35 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
             UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_refresh_profile(
                 thisPtr,
                 FfiConverterString.lower(`accountIdHex`),FfiConverterSequenceString.lower(`relays`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_void(future) },
+        // lift function
+        { Unit },
+        
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Re-register an external signer for an already-known external account.
+     *
+     * This is the restore path after app/process restart. It does not create a
+     * new account; it only installs the signer callback so runtime work can
+     * resume for the account.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `registerExternalSigner`(`accountRef`: kotlin.String, `signer`: ExternalAccountSignerFfi) {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_register_external_signer(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterTypeExternalAccountSignerFfi.lower(`signer`),
             )
         },
         { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_void(future, callback, continuation) },
@@ -8063,6 +8834,7 @@ data class AccountSummaryFfi (
     var `label`: kotlin.String, 
     var `accountIdHex`: kotlin.String, 
     var `localSigning`: kotlin.Boolean, 
+    var `externalSigning`: kotlin.Boolean, 
     var `signedOut`: kotlin.Boolean, 
     var `running`: kotlin.Boolean
 ) {
@@ -8081,6 +8853,7 @@ public object FfiConverterTypeAccountSummaryFfi: FfiConverterRustBuffer<AccountS
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -8088,6 +8861,7 @@ public object FfiConverterTypeAccountSummaryFfi: FfiConverterRustBuffer<AccountS
             FfiConverterString.allocationSize(value.`label`) +
             FfiConverterString.allocationSize(value.`accountIdHex`) +
             FfiConverterBoolean.allocationSize(value.`localSigning`) +
+            FfiConverterBoolean.allocationSize(value.`externalSigning`) +
             FfiConverterBoolean.allocationSize(value.`signedOut`) +
             FfiConverterBoolean.allocationSize(value.`running`)
     )
@@ -8096,6 +8870,7 @@ public object FfiConverterTypeAccountSummaryFfi: FfiConverterRustBuffer<AccountS
             FfiConverterString.write(value.`label`, buf)
             FfiConverterString.write(value.`accountIdHex`, buf)
             FfiConverterBoolean.write(value.`localSigning`, buf)
+            FfiConverterBoolean.write(value.`externalSigning`, buf)
             FfiConverterBoolean.write(value.`signedOut`, buf)
             FfiConverterBoolean.write(value.`running`, buf)
     }
@@ -8369,6 +9144,12 @@ data class AppGroupRecordFfi (
     var `avatarUrl`: kotlin.String?, 
     var `avatarDim`: kotlin.String?, 
     var `avatarThumbhash`: kotlin.String?, 
+    /**
+     * Content hash of the encrypted Blossom avatar
+     * (`marmot.group.blossom.image.v1`), `None` when absent. Doubles as a
+     * cache key; fetch + decrypt via `Marmot::download_group_blossom_image`.
+     */
+    var `imageHashHex`: kotlin.String?, 
     var `encryptedMedia`: AppGroupEncryptedMediaComponentFfi, 
     /**
      * Per-group disappearing-message retention in seconds
@@ -8405,6 +9186,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterTypeAppGroupEncryptedMediaComponentFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterBoolean.read(buf),
@@ -8426,6 +9208,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.allocationSize(value.`avatarUrl`) +
             FfiConverterOptionalString.allocationSize(value.`avatarDim`) +
             FfiConverterOptionalString.allocationSize(value.`avatarThumbhash`) +
+            FfiConverterOptionalString.allocationSize(value.`imageHashHex`) +
             FfiConverterTypeAppGroupEncryptedMediaComponentFfi.allocationSize(value.`encryptedMedia`) +
             FfiConverterULong.allocationSize(value.`disappearingMessageSecs`) +
             FfiConverterBoolean.allocationSize(value.`archived`) +
@@ -8446,6 +9229,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.write(value.`avatarUrl`, buf)
             FfiConverterOptionalString.write(value.`avatarDim`, buf)
             FfiConverterOptionalString.write(value.`avatarThumbhash`, buf)
+            FfiConverterOptionalString.write(value.`imageHashHex`, buf)
             FfiConverterTypeAppGroupEncryptedMediaComponentFfi.write(value.`encryptedMedia`, buf)
             FfiConverterULong.write(value.`disappearingMessageSecs`, buf)
             FfiConverterBoolean.write(value.`archived`, buf)
@@ -13422,6 +14206,41 @@ sealed class MarmotKitException: kotlin.Exception() {
             get() = "details=${ `details` }"
     }
     
+    /**
+     * The account is configured for external signing, but this runtime has no
+     * registered callback for it yet. Typed so clients can prompt the user to
+     * reconnect Amber instead of surfacing a generic runtime failure.
+     */
+    class ExternalSignerUnavailable(
+        
+        val `account`: kotlin.String
+        ) : MarmotKitException() {
+        override val message
+            get() = "account=${ `account` }"
+    }
+    
+    /**
+     * The external signer returned a different public key than the account it
+     * was registered for. Typed so clients can treat this as a hard account
+     * mismatch rather than a retryable runtime error.
+     */
+    class ExternalSignerMismatch(
+        ) : MarmotKitException() {
+        override val message
+            get() = ""
+    }
+    
+    /**
+     * The user rejected/cancelled an external signer prompt. Typed separately
+     * from runtime failures so clients can keep the user in the flow or offer a
+     * retry without treating the account as broken.
+     */
+    class ExternalSignerRejected(
+        ) : MarmotKitException() {
+        override val message
+            get() = ""
+    }
+    
     class Runtime(
         
         val `details`: kotlin.String
@@ -13506,7 +14325,12 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
             21 -> MarmotKitException.Io(
                 FfiConverterString.read(buf),
                 )
-            22 -> MarmotKitException.Runtime(
+            22 -> MarmotKitException.ExternalSignerUnavailable(
+                FfiConverterString.read(buf),
+                )
+            23 -> MarmotKitException.ExternalSignerMismatch()
+            24 -> MarmotKitException.ExternalSignerRejected()
+            25 -> MarmotKitException.Runtime(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -13619,6 +14443,19 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
                 + FfiConverterString.allocationSize(value.`details`)
+            )
+            is MarmotKitException.ExternalSignerUnavailable -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`account`)
+            )
+            is MarmotKitException.ExternalSignerMismatch -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+            )
+            is MarmotKitException.ExternalSignerRejected -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
             )
             is MarmotKitException.Runtime -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
@@ -13735,8 +14572,21 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.Runtime -> {
+            is MarmotKitException.ExternalSignerUnavailable -> {
                 buf.putInt(22)
+                FfiConverterString.write(value.`account`, buf)
+                Unit
+            }
+            is MarmotKitException.ExternalSignerMismatch -> {
+                buf.putInt(23)
+                Unit
+            }
+            is MarmotKitException.ExternalSignerRejected -> {
+                buf.putInt(24)
+                Unit
+            }
+            is MarmotKitException.Runtime -> {
+                buf.putInt(25)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }

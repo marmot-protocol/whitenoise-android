@@ -218,6 +218,7 @@ class GroupMutationDetailsApplicationTest {
         avatarUrl = null,
         avatarDim = null,
         avatarThumbhash = null,
+        imageHashHex = null,
         encryptedMedia = encryptedMedia(),
         archived = false,
         pendingConfirmation = false,

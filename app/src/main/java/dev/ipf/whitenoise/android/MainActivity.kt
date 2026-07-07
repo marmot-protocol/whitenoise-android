@@ -8,6 +8,8 @@ import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.DisposableEffect
@@ -19,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
+import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
@@ -45,6 +48,7 @@ class MainActivity : FragmentActivity() {
     }
     private lateinit var notificationTapTokens: NotificationTapTokens
     private lateinit var appState: WhiteNoiseAppState
+    private lateinit var amberSignerLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val initialSystemDarkTheme = resources.configuration.isNightModeActive
@@ -59,6 +63,16 @@ class MainActivity : FragmentActivity() {
             allowChatScreenshots = ChatScreenshotPreferences.readAllowChatScreenshots(this),
         )
         notificationTapTokens = NotificationTapTokens.create(this)
+        // NIP-55 (Amber) approval prompts route through this launcher. Registered
+        // here and attached to the app-scoped coordinator; results are fed back on
+        // the main thread. Detached in onDestroy so a background signer callback
+        // finds no launcher (and throws a typed unavailable error) rather than a
+        // stale one.
+        amberSignerLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                AmberActivityCoordinator.deliverResult(result.resultCode == RESULT_OK, result.data)
+            }
+        AmberActivityCoordinator.attach(amberSignerLauncher)
         consumeIntent(intent)
         enableEdgeToEdge()
         applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
@@ -158,6 +172,7 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onDestroy() {
+        if (::amberSignerLauncher.isInitialized) AmberActivityCoordinator.detach(amberSignerLauncher)
         releaseAppLockBackgroundSecureFlag()
         if (::appState.isInitialized && appState.onAllowChatScreenshotsChanged === allowChatScreenshotsCallback) {
             appState.onAllowChatScreenshotsChanged = null

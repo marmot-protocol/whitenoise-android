@@ -888,6 +888,9 @@
     <string name="search_members">Buscar miembros</string>
     <string name="recent_chats">Chats recientes</string>
     <string name="onboarding_login">Iniciar sesión</string>
+    <string name="onboarding_login_with_amber">Iniciar sesión con Amber</string>
+    <string name="toast_couldnt_login_amber">No se pudo iniciar sesión con Amber</string>
+    <string name="toast_amber_sign_in_cancelled">Inicio de sesión con Amber cancelado</string>
     <string name="onboarding_sign_up">Registrarse</string>
     <string name="onboarding_slogan_decentralized">Descentralizado</string>
     <string name="onboarding_slogan_uncensorable">Incensurable</string>

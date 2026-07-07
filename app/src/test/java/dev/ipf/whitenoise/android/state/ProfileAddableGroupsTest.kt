@@ -143,6 +143,7 @@ class ProfileAddableGroupsTest {
         avatarUrl = null,
         avatarDim = null,
         avatarThumbhash = null,
+        imageHashHex = null,
         encryptedMedia = encryptedMedia(),
         archived = false,
         pendingConfirmation = pending,
