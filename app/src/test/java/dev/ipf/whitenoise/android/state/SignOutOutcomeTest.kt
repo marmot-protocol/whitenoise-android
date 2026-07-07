@@ -69,6 +69,7 @@ class OtherAccountAvatarsTest {
         label: String,
         signedOut: Boolean = false,
         localSigning: Boolean = true,
+        externalSigning: Boolean = false,
     ): AccountSummaryFfi =
         AccountSummaryFfi(
             label = label,
@@ -76,6 +77,7 @@ class OtherAccountAvatarsTest {
             localSigning = localSigning,
             signedOut = signedOut,
             running = true,
+            externalSigning = externalSigning,
         )
 
     @Test

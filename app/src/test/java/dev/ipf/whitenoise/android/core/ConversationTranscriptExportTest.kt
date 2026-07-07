@@ -339,6 +339,7 @@ class ConversationTranscriptExportTest {
         avatarUrl = null,
         avatarDim = null,
         avatarThumbhash = null,
+        imageHashHex = null,
         encryptedMedia =
             AppGroupEncryptedMediaComponentFfi(
                 componentId = 0x8008u,

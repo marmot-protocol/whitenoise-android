@@ -191,6 +191,7 @@ class ChatListUnreadSuppressionTest {
             avatarUrl = null,
             avatarDim = null,
             avatarThumbhash = null,
+            imageHashHex = null,
             encryptedMedia = encryptedMedia(),
             archived = false,
             pendingConfirmation = false,

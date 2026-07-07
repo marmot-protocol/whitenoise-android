@@ -18,6 +18,16 @@
         android:name="android.hardware.microphone"
         android:required="false" />
 
+    <!-- Package visibility (Android 11+) for the NIP-55 external signer (Amber):
+         queryIntentActivities and the nostrsigner: intents/content providers
+         need the signer app to be visible to this package. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="nostrsigner" />
+        </intent>
+    </queries>
+
     <application
         android:name=".WhiteNoiseApplication"
         android:allowBackup="false"
