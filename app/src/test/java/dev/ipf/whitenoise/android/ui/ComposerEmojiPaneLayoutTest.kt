@@ -124,7 +124,7 @@ class ComposerEmojiPaneLayoutTest {
     fun emojiPickerSheetUsesOnlyTheVisiblePartialViewportBeforeExpansion() {
         val partialFraction = emojiPickerSheetVisibleContentFraction(expanded = false)
 
-        assertEquals(0.5f / EmojiPickerSheetMaxHeightFraction, partialFraction, 0.0001f)
+        assertEquals(0.48f / EmojiPickerSheetMaxHeightFraction, partialFraction, 0.0001f)
         assertTrue(partialFraction < 1f)
     }
 

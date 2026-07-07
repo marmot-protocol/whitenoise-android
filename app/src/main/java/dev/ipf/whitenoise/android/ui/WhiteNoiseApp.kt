@@ -138,6 +138,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
@@ -147,6 +148,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
@@ -161,17 +163,21 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.SportsSoccer
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
@@ -282,6 +288,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -14566,6 +14573,12 @@ private fun MessageBubble(
                 if (emojiPickerOpen && !readOnly) {
                     EmojiPickerSheet(
                         restoreExpanded = restoreReactionPickerExpanded,
+                        messageReactionEmojis =
+                            item.projected
+                                ?.reactions
+                                ?.byEmoji
+                                .orEmpty()
+                                .map { it.emoji },
                         onDismissRequest = {
                             restoreReactionPickerExpanded = false
                             emojiPickerOpen = false
@@ -15946,6 +15959,7 @@ private fun EmojiPickerSheet(
     onEmojiPicked: (String) -> Unit,
     recordRecentPicks: Boolean = true,
     restoreExpanded: Boolean = false,
+    messageReactionEmojis: List<String> = emptyList(),
     onCustomizeReactions: ((Boolean) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -15973,11 +15987,12 @@ private fun EmojiPickerSheet(
                     .fillMaxHeight(EmojiPickerSheetMaxHeightFraction)
                     .navigationBarsPadding()
                     .imePadding()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
         ) {
             EmojiPickerContent(
                 onEmojiPicked = onEmojiPicked,
                 recordRecentPicks = recordRecentPicks,
+                messageReactionEmojis = messageReactionEmojis,
                 onCustomizeReactions =
                     onCustomizeReactions?.let { customize ->
                         { customize(sheetState.currentValue == SheetValue.Expanded) }
@@ -16041,8 +16056,8 @@ private fun ComposerEmojiPickerPane(
     }
 }
 
-internal const val EmojiPickerSheetMaxHeightFraction = 0.9f
-private const val EmojiPickerSheetPartialDetentFraction = 0.5f
+internal const val EmojiPickerSheetMaxHeightFraction = 0.86f
+private const val EmojiPickerSheetPartialDetentFraction = 0.48f
 
 internal fun emojiPickerSheetVisibleContentFraction(expanded: Boolean): Float =
     if (expanded) {
@@ -16130,6 +16145,7 @@ private fun EmojiPickerContent(
     onEmojiPicked: (String) -> Unit,
     modifier: Modifier = Modifier,
     recordRecentPicks: Boolean = true,
+    messageReactionEmojis: List<String> = emptyList(),
     onBackspace: (() -> Unit)? = null,
     onCustomizeReactions: (() -> Unit)? = null,
     searchStartsOpen: Boolean = false,
@@ -16149,6 +16165,10 @@ private fun EmojiPickerContent(
             EmojiData.search(browseEmoji, searchQuery)
         }
     val grouped = remember(browseEmoji) { browseEmoji.groupBy { it.group } }
+    val messageReactions =
+        remember(messageReactionEmojis) {
+            messageReactionEmojis.filter { it.isNotBlank() }.distinct()
+        }
     var recents by remember(context) { mutableStateOf(emptyList<String>()) }
     LaunchedEffect(context) {
         recents = withContext(Dispatchers.IO) { RecentEmojiPreferences.load(context).filter { it.isNotBlank() } }
@@ -16160,9 +16180,10 @@ private fun EmojiPickerContent(
     // straight to it. Layout: recents (header + cells) then each group (header +
     // cells); every header and every emoji counts as one grid item.
     val sectionHeaderIndex =
-        remember(grouped, recents) {
+        remember(grouped, messageReactions, recents) {
             IntArray(EmojiData.GroupCount).also { arr ->
-                var index = if (recents.isEmpty()) 0 else 1 + recents.size
+                var index = if (messageReactions.isEmpty()) 0 else 1 + messageReactions.size
+                if (recents.isNotEmpty()) index += 1 + recents.size
                 for (group in 0 until EmojiData.GroupCount) {
                     arr[group] = index
                     val count = grouped[group]?.size ?: 0
@@ -16180,11 +16201,12 @@ private fun EmojiPickerContent(
             searchQuery = ""
         }
     }
-    LaunchedEffect(gridState, sectionHeaderIndex, recents.size) {
+    LaunchedEffect(gridState, sectionHeaderIndex, messageReactions.size, recents.size) {
         snapshotFlow { gridState.firstVisibleItemIndex }
             .collect { index ->
+                val recentsHeaderIndex = if (messageReactions.isEmpty()) 0 else 1 + messageReactions.size
                 activeCategory =
-                    if (recents.isNotEmpty() && index < (sectionHeaderIndex.firstOrNull() ?: 0)) {
+                    if (recents.isNotEmpty() && index >= recentsHeaderIndex && index < (sectionHeaderIndex.firstOrNull() ?: 0)) {
                         -1
                     } else {
                         sectionHeaderIndex
@@ -16223,7 +16245,9 @@ private fun EmojiPickerContent(
                     searchOpen = false
                     keyboardController?.hide()
                     activeCategory = -1
-                    scope.launch { gridState.scrollToItem(0) }
+                    scope.launch {
+                        gridState.scrollToItem(if (messageReactions.isEmpty()) 0 else 1 + messageReactions.size)
+                    }
                 },
                 selectedGroup = activeCategory,
                 onGroup = { group ->
@@ -16233,13 +16257,13 @@ private fun EmojiPickerContent(
                     scope.launch { gridState.scrollToItem(sectionHeaderIndex[group]) }
                 },
                 onBackspace = onBackspace,
-                modifier = Modifier.fillMaxWidth().height(42.dp),
+                modifier = Modifier.fillMaxWidth().height(54.dp),
             )
         },
     ) { contentPadding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(contentPadding),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (searchFieldAlwaysVisible || searchOpen) {
                 EmojiSearchField(
@@ -16260,10 +16284,19 @@ private fun EmojiPickerContent(
             }
             if (!searchOpen || searchQuery.isBlank()) {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(8),
+                    columns = GridCells.Fixed(9),
                     state = gridState,
                     modifier = Modifier.fillMaxWidth().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
+                    if (messageReactions.isNotEmpty()) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            EmojiSectionHeader(stringResource(R.string.emoji_category_this_message))
+                        }
+                        items(messageReactions, key = { "message-reaction:$it" }) { emoji ->
+                            EmojiSearchResultCell(emoji = emoji, onClick = { pick(emoji) })
+                        }
+                    }
                     if (recents.isNotEmpty()) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             EmojiSectionHeader(stringResource(R.string.emoji_category_recent))
@@ -16305,15 +16338,14 @@ private fun EmojiSearchField(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.height(42.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = modifier.height(64.dp).padding(top = 14.dp, bottom = 6.dp),
+        color = Color(0xFF303337),
         shape = RoundedCornerShape(22.dp),
-        border = amoledSurfaceBorderStroke(),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             IconButton(
                 onClick = if (showBackButton) onClose else onSearchIntent,
@@ -16327,8 +16359,8 @@ private fun EmojiSearchField(
                         } else {
                             stringResource(R.string.emoji_search_hint)
                         },
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
+                    modifier = Modifier.size(26.dp),
                 )
             }
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
@@ -16339,7 +16371,7 @@ private fun EmojiSearchField(
                     textStyle =
                         LocalTextStyle.current.copy(
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 13.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Medium,
                         ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
@@ -16354,7 +16386,7 @@ private fun EmojiSearchField(
                         stringResource(R.string.emoji_search_hint),
                         style =
                             LocalTextStyle.current.copy(
-                                fontSize = 13.sp,
+                                fontSize = 18.sp,
                                 fontWeight = FontWeight.Medium,
                             ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
@@ -16366,7 +16398,7 @@ private fun EmojiSearchField(
                     Icon(
                         Icons.Default.Close,
                         contentDescription = stringResource(R.string.emoji_search_clear),
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -16391,9 +16423,10 @@ private fun EmojiSearchResultsGrid(
         return
     }
     LazyVerticalGrid(
-        columns = GridCells.Fixed(8),
+        columns = GridCells.Fixed(9),
         modifier = modifier,
         contentPadding = PaddingValues(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items(results, key = { it.emoji }) { entry ->
             EmojiSearchResultCell(
@@ -16437,7 +16470,10 @@ private fun EmojiCategoryRail(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier,
+        modifier =
+            modifier
+                .background(Color(0xFF202126))
+                .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -16445,7 +16481,7 @@ private fun EmojiCategoryRail(
             EmojiRailIconButton(
                 onClick = onCustomizeReactions,
                 selected = false,
-                modifier = Modifier.weight(1f).height(38.dp),
+                modifier = Modifier.weight(1f).height(42.dp),
             ) {
                 Icon(
                     Icons.Default.Settings,
@@ -16458,7 +16494,7 @@ private fun EmojiCategoryRail(
             EmojiRailIconButton(
                 onClick = onSearch,
                 selected = searchSelected,
-                modifier = Modifier.weight(1f).height(38.dp),
+                modifier = Modifier.weight(1f).height(42.dp),
             ) {
                 Icon(
                     Icons.Default.Search,
@@ -16469,17 +16505,19 @@ private fun EmojiCategoryRail(
         }
         if (showRecents) {
             EmojiCategoryTab(
-                icon = "🕘",
+                icon = Icons.Default.History,
+                contentDescription = stringResource(R.string.emoji_category_recent),
                 selected = recentsSelected,
-                modifier = Modifier.weight(1f).height(38.dp),
+                modifier = Modifier.weight(1f).height(42.dp),
                 onClick = onRecents,
             )
         }
-        EmojiData.groupTabIcons.forEachIndexed { group, icon ->
+        for (group in 0 until EmojiData.GroupCount) {
             EmojiCategoryTab(
-                icon = icon,
+                icon = emojiGroupIcon(group),
+                contentDescription = stringResource(emojiGroupTitleRes(group)),
                 selected = selectedGroup == group,
-                modifier = Modifier.weight(1f).height(38.dp),
+                modifier = Modifier.weight(1f).height(42.dp),
                 onClick = { onGroup(group) },
             )
         }
@@ -16487,7 +16525,7 @@ private fun EmojiCategoryRail(
             EmojiRailIconButton(
                 onClick = onBackspace,
                 selected = false,
-                modifier = Modifier.weight(1f).height(38.dp),
+                modifier = Modifier.weight(1f).height(42.dp),
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Backspace,
@@ -16507,19 +16545,19 @@ private fun EmojiRailIconButton(
     content: @Composable () -> Unit,
 ) {
     Surface(
-        modifier = modifier.padding(horizontal = 1.dp).clip(RoundedCornerShape(11.dp)).clickable(onClick = onClick),
-        shape = RoundedCornerShape(11.dp),
+        modifier = modifier.padding(horizontal = 1.dp).clip(CircleShape).clickable(onClick = onClick),
+        shape = CircleShape,
         color =
             if (selected) {
-                MaterialTheme.colorScheme.secondaryContainer
+                Color(0xFF424652)
             } else {
                 Color.Transparent
             },
         contentColor =
             if (selected) {
-                MaterialTheme.colorScheme.onSecondaryContainer
+                MaterialTheme.colorScheme.onSurface
             } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f)
             },
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -16530,7 +16568,8 @@ private fun EmojiRailIconButton(
 
 @Composable
 private fun EmojiCategoryTab(
-    icon: String,
+    icon: ImageVector,
+    contentDescription: String,
     selected: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
@@ -16540,10 +16579,10 @@ private fun EmojiCategoryTab(
         selected = selected,
         modifier = modifier,
     ) {
-        Text(
+        Icon(
             icon,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(24.dp),
         )
     }
 }
@@ -16552,12 +16591,25 @@ private fun EmojiCategoryTab(
 private fun EmojiSectionHeader(title: String) {
     Text(
         text = title,
-        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 10.dp, bottom = 6.dp),
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f),
     )
 }
+
+private fun emojiGroupIcon(group: Int): ImageVector =
+    when (group) {
+        0 -> Icons.Default.EmojiEmotions
+        1 -> Icons.Default.Person
+        2 -> Icons.Default.Pets
+        3 -> Icons.Default.Restaurant
+        4 -> Icons.Default.DirectionsCar
+        5 -> Icons.Default.SportsSoccer
+        6 -> Icons.Default.Favorite
+        7 -> Icons.Default.Tag
+        else -> Icons.Default.Public
+    }
 
 @StringRes
 private fun emojiGroupTitleRes(group: Int): Int =
