@@ -49,6 +49,105 @@ class AppStateSendLockCoverageTest {
         assertFalse(notificationActionsAllowed(appLockScreenVisible = true))
     }
 
+    @Test
+    fun backgroundDisappearingSweepLocksSecureDelete() {
+        val body = appStateFunctionBody("sweepExpiredForGroup")
+
+        assertTrue(
+            "background disappearing sweeps must serialize secureDeleteExpired through the per-group commit lock",
+            Regex(
+                """withGroupCommitLock\s*\(\s*accountRef\s*,\s*groupIdHex\s*\).*""" +
+                    """marmotIo\s*\{\s*secureDeleteExpired\s*\(\s*accountRef\s*,\s*groupIdHex\s*\)\s*\}""",
+                RegexOption.DOT_MATCHES_ALL,
+            ).containsMatchIn(body),
+        )
+    }
+
+    @Test
+    fun foregroundDisappearingSweepLocksSecureDelete() {
+        val body = controllerFunctionBody("runForegroundDisappearingMessageSweep")
+
+        assertTrue(
+            "foreground disappearing sweeps must serialize secureDeleteExpired through the per-group commit lock",
+            Regex(
+                """appState\.withGroupCommitLock\s*\(\s*account\s*,\s*group\.groupIdHex\s*\).*""" +
+                    """appState\.marmotIo\s*\{\s*secureDeleteExpired\s*\(\s*account\s*,\s*group\.groupIdHex\s*\)\s*\}""",
+                RegexOption.DOT_MATCHES_ALL,
+            ).containsMatchIn(body),
+        )
+    }
+
+    @Test
+    fun loadOlderPageRoutesPaginateThroughActiveSubscriptionGuard() {
+        val loadOlder = controllerFunctionBody("loadOlderPage")
+        val guard = controllerFunctionBody("paginateOlderIfSubscriptionActive")
+        val controllersSource = controllersSource().readText()
+
+        assertTrue(
+            "loadOlderPage must not call paginateBackwards directly on a captured subscription",
+            "paginateOlderIfSubscriptionActive(subscription)" in loadOlder && "subscription.paginateBackwards" !in loadOlder,
+        )
+        assertTrue(
+            "paginate guard must serialize paginate against close and re-check the active timeline subscription identity",
+            "timelineSubscriptionActiveCallMutex.withLock" in controllersSource &&
+                "timelineSubscription === subscription" in guard &&
+                "subscription.paginateBackwards(ConversationTimelinePageLimit)" in guard,
+        )
+    }
+
+    @Test
+    fun closeTimelineSubscriptionWaitsNonCancellablyForActiveCallMutex() {
+        val close = controllerFunctionBody("closeTimelineSubscriptionSafely")
+
+        assertTrue(
+            "timeline subscription close must wrap mutex acquisition and close in NonCancellable",
+            "withContext(NonCancellable)" in close &&
+                close.indexOf("withContext(NonCancellable)") < close.indexOf("timelineSubscriptionActiveCallMutex.withLock") &&
+                close.indexOf("timelineSubscriptionActiveCallMutex.withLock") < close.indexOf("timelineStream.close()"),
+        )
+    }
+
+    @Test
+    fun readAnchorsArePrunedWithTimelineWindow() {
+        val applyTimelinePage = controllerFunctionBody("applyTimelinePage")
+        val trimLiveTimelineWindow = controllerFunctionBody("trimLiveTimelineWindow")
+        val removeProjectedRecord = controllerFunctionBody("removeProjectedRecord")
+        val pruneReadAnchorsToWindow = controllerFunctionBody("pruneReadAnchorsToWindow")
+
+        assertTrue(
+            "window replacements must prune read anchors after the authoritative page is applied",
+            "pruneReadAnchorsToWindow()" in applyTimelinePage,
+        )
+        assertTrue(
+            "live timeline trims must prune read anchors for removed messages",
+            "pruneReadAnchorsToWindow()" in trimLiveTimelineWindow,
+        )
+        assertTrue(
+            "single-record removals must drop the removed message read anchor",
+            "readAnchoredAtSeconds.remove(messageIdHex)" in removeProjectedRecord,
+        )
+        assertTrue(
+            "read-anchor pruning must retain current timeline records and optimistic records only",
+            "HashSet(timelineRecords.keys)" in pruneReadAnchorsToWindow &&
+                "optimisticMessages.values.forEach" in pruneReadAnchorsToWindow &&
+                "readAnchoredAtSeconds.keys.retainAll(retained)" in pruneReadAnchorsToWindow,
+        )
+    }
+
+    @Test
+    fun mediaKindResolveFanoutSwallowsUnexpectedProjectionFailures() {
+        val body = controllerFunctionBody("schedulePendingMediaKindResolves")
+
+        assertTrue(
+            "media-kind resolve fanout must rethrow cancellation but swallow unexpected projection failures",
+            Regex(
+                """catch\s*\(\s*e:\s*CancellationException\s*\)\s*\{\s*throw\s+e\s*\}.*""" +
+                    """catch\s*\(\s*_:\s*Throwable\s*\)""",
+                RegexOption.DOT_MATCHES_ALL,
+            ).containsMatchIn(body),
+        )
+    }
+
     private fun appStateFunctionBody(functionName: String): String {
         val source = appStateSource().readText()
         val start =
@@ -68,6 +167,26 @@ class AppStateSendLockCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    private fun controllerFunctionBody(functionName: String): String {
+        val source = controllersSource().readText()
+        val start =
+            Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
+                .find(source)
+                ?.range
+                ?.first
+                ?: error("Missing function $functionName")
+        val braceStart = source.indexOf('{', start)
+        require(braceStart >= 0) { "Missing body for $functionName" }
+        return source.kotlinBlockFrom(braceStart, "function $functionName")
+    }
+
+    private fun controllersSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing Controllers.kt source file")
 
     private fun String.kotlinBlockFrom(
         openBrace: Int,

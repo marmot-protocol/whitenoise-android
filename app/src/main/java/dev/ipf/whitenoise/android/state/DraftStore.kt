@@ -39,7 +39,7 @@ class DraftStore internal constructor(
     private val persistence: DraftPersistence,
 ) {
     private val lock = Any()
-    private val drafts = mutableMapOf<String, MutableState<String?>>()
+    private val drafts = LinkedHashMap<String, MutableState<String?>>(16, 0.75f, true)
 
     init {
         persistence.read().forEach { (k, value) -> drafts[k] = mutableStateOf(value) }
@@ -48,7 +48,12 @@ class DraftStore internal constructor(
     // Per-key state so reads/writes are observed independently. Creating an
     // empty state on a miss is what lets a composable that read a not-yet-set
     // draft recompose once it is set.
-    private fun stateFor(k: String): MutableState<String?> = synchronized(lock) { drafts.getOrPut(k) { mutableStateOf(null) } }
+    private fun stateFor(k: String): MutableState<String?> =
+        synchronized(lock) {
+            drafts
+                .getOrPut(k) { mutableStateOf(null) }
+                .also { pruneEmptyDraftStatesLocked() }
+        }
 
     fun get(
         accountIdHex: String,
@@ -68,13 +73,18 @@ class DraftStore internal constructor(
         // Keep persistence writes inside the same lock as the cache mutation so
         // set/clear cannot interleave between the in-memory and backing-store updates.
         synchronized(lock) {
-            val state = drafts.getOrPut(k) { mutableStateOf(null) }
             if (text.isBlank()) {
+                val state = drafts[k] ?: return@synchronized
                 if (state.value != null) {
                     state.value = null
                     persistence.write(k, null)
+                    pruneEmptyDraftStatesLocked()
                 }
-            } else if (state.value != text) {
+                return@synchronized
+            }
+
+            val state = drafts.getOrPut(k) { mutableStateOf(null) }
+            if (state.value != text) {
                 state.value = text
                 persistence.write(k, text)
             }
@@ -94,8 +104,18 @@ class DraftStore internal constructor(
                 if (state.value == snapshottedValue) {
                     state.value = null
                     persistence.write(k, null)
+                    pruneEmptyDraftStatesLocked()
                 }
             }
+        }
+    }
+
+    private fun pruneEmptyDraftStatesLocked() {
+        if (drafts.size <= MAX_IN_MEMORY_DRAFT_STATES) return
+        val iterator = drafts.entries.iterator()
+        while (drafts.size > MAX_IN_MEMORY_DRAFT_STATES && iterator.hasNext()) {
+            val entry = iterator.next()
+            if (entry.value.value == null) iterator.remove()
         }
     }
 
@@ -105,6 +125,8 @@ class DraftStore internal constructor(
     ): String = "$accountIdHex $groupIdHex"
 
     companion object {
+        internal const val MAX_IN_MEMORY_DRAFT_STATES = 512
+
         fun forContext(context: Context): DraftStore = DraftStore(EncryptedDraftPersistence(context.applicationContext))
     }
 }
