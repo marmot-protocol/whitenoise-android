@@ -13,6 +13,15 @@ import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
+import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientPreviewState
+import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
+import dev.ipf.whitenoise.android.ui.chats.newchat.canSubmitNewChatSheet
+import dev.ipf.whitenoise.android.ui.chats.newchat.groupContainsResolvedMember
+import dev.ipf.whitenoise.android.ui.chats.newchat.newChatMemberRefs
+import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
+import dev.ipf.whitenoise.android.ui.chats.newchat.recipientPreviewAllowsSubmit
+import dev.ipf.whitenoise.android.ui.chats.newchat.recipientPreviewState
+import dev.ipf.whitenoise.android.ui.chats.newchat.resolvedRecipientRefs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

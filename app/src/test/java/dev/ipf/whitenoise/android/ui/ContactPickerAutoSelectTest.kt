@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.ui.chats.newchat.shouldAutoSelectResolvedIdentifier
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

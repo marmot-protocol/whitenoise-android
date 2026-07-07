@@ -1,4 +1,4 @@
-package dev.ipf.whitenoise.android.ui
+package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler

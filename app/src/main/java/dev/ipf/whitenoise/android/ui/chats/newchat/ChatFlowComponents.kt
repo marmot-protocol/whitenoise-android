@@ -1,4 +1,4 @@
-package dev.ipf.whitenoise.android.ui
+package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
