@@ -1055,6 +1055,8 @@ internal open class UniffiVTableCallbackInterfaceExternalAccountSignerFfi(
 
 
 
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1185,6 +1187,8 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_display_name(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_marmot_uniffi_fn_method_marmot_download_group_blossom_image(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
+    ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_download_media(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`reference`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_edit_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,
@@ -1571,6 +1575,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_display_name(
     ): Short
+    fun uniffi_marmot_uniffi_checksum_method_marmot_download_group_blossom_image(
+    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_download_media(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_edit_message(
@@ -1889,6 +1895,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_display_name() != 65469.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_download_group_blossom_image() != 5312.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_download_media() != 56125.toShort()) {
@@ -4592,6 +4601,16 @@ public interface MarmotInterface {
     fun `displayName`(`accountIdHex`: kotlin.String): kotlin.String?
     
     /**
+     * Fetch and decrypt the group's encrypted Blossom avatar
+     * (`marmot.group.blossom.image.v1`) into raw image bytes (PNG/JPEG/…).
+     * Errors when the group has no Blossom image set. Presence and the
+     * content hash (for caching) are on `AppGroupRecordFfi::image_hash_hex`;
+     * when the group also carries a URL avatar, the URL takes precedence
+     * for rendering.
+     */
+    suspend fun `downloadGroupBlossomImage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): kotlin.ByteArray
+    
+    /**
      * Fetch an encrypted media blob and decrypt it using the group's
      * encrypted media component secret.
      */
@@ -5741,6 +5760,35 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     )
     }
     
+
+    
+    /**
+     * Fetch and decrypt the group's encrypted Blossom avatar
+     * (`marmot.group.blossom.image.v1`) into raw image bytes (PNG/JPEG/…).
+     * Errors when the group has no Blossom image set. Presence and the
+     * content hash (for caching) are on `AppGroupRecordFfi::image_hash_hex`;
+     * when the group also carries a URL avatar, the URL takes precedence
+     * for rendering.
+     */
+    @Throws(MarmotKitException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `downloadGroupBlossomImage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String) : kotlin.ByteArray {
+        return uniffiRustCallAsync(
+        callWithPointer { thisPtr ->
+            UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_download_group_blossom_image(
+                thisPtr,
+                FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.INSTANCE.ffi_marmot_uniffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterByteArray.lift(it) },
+        // Error FFI converter
+        MarmotKitException.ErrorHandler,
+    )
+    }
 
     
     /**
@@ -9096,6 +9144,12 @@ data class AppGroupRecordFfi (
     var `avatarUrl`: kotlin.String?, 
     var `avatarDim`: kotlin.String?, 
     var `avatarThumbhash`: kotlin.String?, 
+    /**
+     * Content hash of the encrypted Blossom avatar
+     * (`marmot.group.blossom.image.v1`), `None` when absent. Doubles as a
+     * cache key; fetch + decrypt via `Marmot::download_group_blossom_image`.
+     */
+    var `imageHashHex`: kotlin.String?, 
     var `encryptedMedia`: AppGroupEncryptedMediaComponentFfi, 
     /**
      * Per-group disappearing-message retention in seconds
@@ -9132,6 +9186,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterTypeAppGroupEncryptedMediaComponentFfi.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterBoolean.read(buf),
@@ -9153,6 +9208,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.allocationSize(value.`avatarUrl`) +
             FfiConverterOptionalString.allocationSize(value.`avatarDim`) +
             FfiConverterOptionalString.allocationSize(value.`avatarThumbhash`) +
+            FfiConverterOptionalString.allocationSize(value.`imageHashHex`) +
             FfiConverterTypeAppGroupEncryptedMediaComponentFfi.allocationSize(value.`encryptedMedia`) +
             FfiConverterULong.allocationSize(value.`disappearingMessageSecs`) +
             FfiConverterBoolean.allocationSize(value.`archived`) +
@@ -9173,6 +9229,7 @@ public object FfiConverterTypeAppGroupRecordFfi: FfiConverterRustBuffer<AppGroup
             FfiConverterOptionalString.write(value.`avatarUrl`, buf)
             FfiConverterOptionalString.write(value.`avatarDim`, buf)
             FfiConverterOptionalString.write(value.`avatarThumbhash`, buf)
+            FfiConverterOptionalString.write(value.`imageHashHex`, buf)
             FfiConverterTypeAppGroupEncryptedMediaComponentFfi.write(value.`encryptedMedia`, buf)
             FfiConverterULong.write(value.`disappearingMessageSecs`, buf)
             FfiConverterBoolean.write(value.`archived`, buf)

@@ -424,6 +424,7 @@ private fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         avatarUrl = null,
         avatarDim = null,
         avatarThumbhash = null,
+        imageHashHex = null,
         encryptedMedia = defaultEncryptedMediaComponent(),
         archived = row.archived,
         pendingConfirmation = row.pendingConfirmation,
