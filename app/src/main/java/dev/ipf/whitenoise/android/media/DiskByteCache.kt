@@ -236,18 +236,7 @@ class DiskByteCache(
                 abortPut(tmp, tagTmp)
                 return
             }
-            val existing = index.remove(hashed)
-            if (existing != null) {
-                residentBytes -= existing.size
-                // Do NOT delete existing.file: a same-key replace shares the
-                // destination path (deterministic hashed name), which
-                // `tmp.renameTo(file)` below overwrites in place. Scheduling it
-                // for the deferred delete removed the freshly-written bytes
-                // (regression from moving deletes off the monitor). Clean up
-                // only a STALE tag, and only when this put writes no new tag to
-                // that same path — a new tag would have overwritten it above.
-                if (ciphertextTag == null) staleTagFiles += tagFileFor(file)
-            }
+            val existing = index[hashed]
             if (tagTmp != null && tagFile != null && !tagTmp.renameTo(tagFile)) {
                 abortPut(tmp, tagTmp)
                 return
@@ -258,6 +247,18 @@ class DiskByteCache(
                 // sidecar points at a nonexistent entry.
                 tagFile?.let { runCatching { it.delete() } }
                 return
+            }
+            if (existing != null) {
+                index.remove(hashed)
+                residentBytes -= existing.size
+                // Do NOT delete existing.file: a same-key replace shares the
+                // destination path (deterministic hashed name), which
+                // `tmp.renameTo(file)` above overwrote in place. Scheduling it
+                // for the deferred delete removed the freshly-written bytes
+                // (regression from moving deletes off the monitor). Clean up
+                // only a STALE tag, and only when this put writes no new tag to
+                // that same path — a new tag would have overwritten it above.
+                if (ciphertextTag == null) staleTagFiles += tagFileFor(file)
             }
             val size = bytes.size
             index[hashed] = Entry(file, size, ciphertextTag)

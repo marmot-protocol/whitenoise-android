@@ -7,6 +7,8 @@ import android.util.Log
 import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.ByteBuffer
@@ -44,6 +46,7 @@ object AudioWaveformExtractor {
     // thread-safety guarantee.
     private const val CACHE_MAX_ENTRIES = 256
     private val UNAVAILABLE_WAVEFORM = FloatArray(0)
+    private val decodeGate = Semaphore(2)
 
     // android.media.AudioFormat.ENCODING_PCM_* values, redeclared so the pure
     // decode logic stays free of the Android framework (keeps decodeBlocking
@@ -61,13 +64,17 @@ object AudioWaveformExtractor {
         cache.get(cacheKey)?.let { return it.takeIf { cached -> cached.isNotEmpty() } }
         val result =
             withContext(Dispatchers.IO) {
-                runCatching { decodeBlocking(file) { ensureActive() } }
-                    .onFailure {
-                        if (it is CancellationException) throw it
-                        Log.w(TAG, "decode failed", it)
-                    }.getOrNull()
+                try {
+                    decodeGate
+                        .withPermit {
+                            decodeBlocking(file) { ensureActive() }
+                        }.also { cache.put(cacheKey, it ?: UNAVAILABLE_WAVEFORM) }
+                } catch (throwable: Throwable) {
+                    if (throwable is CancellationException) throw throwable
+                    Log.w(TAG, "decode failed", throwable)
+                    null
+                }
             }
-        cache.put(cacheKey, result ?: UNAVAILABLE_WAVEFORM)
         return result
     }
 

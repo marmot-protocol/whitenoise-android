@@ -834,14 +834,17 @@ object MediaPipeline {
 
     internal fun hasWebpAnimChunk(bytes: ByteArray): Boolean {
         if (!isWebp(bytes)) return false
-        var offset = 12
-        while (offset + 8 <= bytes.size) {
-            val fourcc = ascii(bytes, offset, 4)
-            val chunkSize = u32le(bytes, offset + 4).toInt()
+        val byteCount = bytes.size.toLong()
+        var offset = 12L
+        while (offset + 8L <= byteCount) {
+            val offsetInt = offset.toInt()
+            val fourcc = ascii(bytes, offsetInt, 4)
+            val chunkSize = u32le(bytes, offsetInt + 4)
             if (fourcc == "ANIM") return true
-            if (chunkSize < 0) break
-            val padded = chunkSize + (chunkSize and 1)
-            offset += 8 + padded
+            val padded = chunkSize + (chunkSize and 1L)
+            val nextOffset = offset + 8L + padded
+            if (nextOffset <= offset || nextOffset > byteCount) break
+            offset = nextOffset
         }
         return false
     }

@@ -32,6 +32,25 @@ class AudioWaveformExtractorTest {
     }
 
     @Test
+    fun decodeDoesNotCacheTransientFailures() {
+        val source =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/audio/AudioWaveformExtractor.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/audio/AudioWaveformExtractor.kt"),
+            ).firstOrNull { it.exists() }?.readText()
+                ?: error("Missing AudioWaveformExtractor.kt source file")
+        val decode = source.kotlinFunctionBody("decode")
+
+        assertTrue("decode must gate scarce MediaCodec work", Regex("""decodeGate\s*\.\s*withPermit""").containsMatchIn(decode))
+        assertTrue(
+            "decode should cache null/empty only on successful decode, not after the transient-exception catch",
+            Regex("""cache\.put\s*\(\s*cacheKey,\s*it\s*\?:\s*UNAVAILABLE_WAVEFORM\s*\)""").find(decode)!!.range.first <
+                decode.indexOf("catch (throwable: Throwable)") &&
+                "cache.put(cacheKey, result ?: UNAVAILABLE_WAVEFORM)" !in decode,
+        )
+    }
+
+    @Test
     fun dataSourceFailure_releasesExtractor() {
         val extractor = FakeExtractor(setDataSourceFailure = IllegalStateException("bad source"))
         val resources = FakeResources(extractor = extractor)
@@ -251,6 +270,32 @@ private fun shortPcm(vararg samples: Int): ByteBuffer {
     samples.forEach { buf.putShort(it.toShort()) }
     buf.flip()
     return buf
+}
+
+private fun String.kotlinFunctionBody(functionName: String): String {
+    val start =
+        Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
+            .find(this)
+            ?.range
+            ?.first
+            ?: error("Missing function $functionName")
+    val braceStart = indexOf('{', start)
+    require(braceStart >= 0) { "Missing body for $functionName" }
+    var depth = 0
+    var index = braceStart
+    while (index < length) {
+        when (this[index]) {
+            '{' -> depth += 1
+            '}' -> {
+                depth -= 1
+                index += 1
+                if (depth == 0) return substring(braceStart, index)
+                continue
+            }
+        }
+        index += 1
+    }
+    error("Unterminated function $functionName")
 }
 
 private data class FakeFormat(
