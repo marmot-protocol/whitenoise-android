@@ -3809,7 +3809,7 @@ private fun ChatRow(
 }
 
 @Composable
-private fun MentionBadge(modifier: Modifier = Modifier) {
+internal fun MentionBadge(modifier: Modifier = Modifier) {
     val description = stringResource(R.string.chat_list_mention_badge)
     // Tertiary accent so a mention reads as distinct from the primary-colored
     // unread count sitting beside it.
@@ -3823,7 +3823,7 @@ private fun MentionBadge(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun UnreadCountBadge(
+internal fun UnreadCountBadge(
     unreadCount: ULong,
     modifier: Modifier = Modifier,
 ) {
@@ -4462,7 +4462,7 @@ private fun isOwnReplySender(
 }
 
 @Composable
-private fun ReplyPreviewCard(
+internal fun ReplyPreviewCard(
     senderTitle: String,
     isOwn: Boolean,
     body: String,
@@ -6502,7 +6502,7 @@ private fun formatVoiceTime(ms: Int): String {
 }
 
 @Composable
-private fun VoiceWaveform(
+internal fun VoiceWaveform(
     bars: FloatArray,
     progress: Float,
     playedColor: Color,
@@ -6851,7 +6851,7 @@ private fun MediaPendingPlaceholder(
 private fun isImagePendingAttachment(attachment: PendingAttachment): Boolean = attachment.mediaType.startsWith("image/", ignoreCase = true)
 
 @Composable
-private fun PendingFilePill(
+internal fun PendingFilePill(
     fileName: String,
     mediaType: String,
     sizeBytes: Long,
@@ -12867,7 +12867,7 @@ private fun GroupImageSearchTile(
 }
 
 @Composable
-private fun GroupDetailsHeader(
+internal fun GroupDetailsHeader(
     title: String,
     subtitle: String,
     description: String,
@@ -17073,7 +17073,7 @@ private fun BoxScope.MediaFooterOverlay(
  * time, and (outgoing only) the send-status icon, in a subtle tint.
  */
 @Composable
-private fun MessageInlineFooter(
+internal fun MessageInlineFooter(
     timeText: String,
     color: Color,
     showStatus: Boolean,
@@ -17220,7 +17220,7 @@ internal fun insertComposerEmoji(
 }
 
 @Composable
-private fun ComposerBar(
+internal fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
     messageTextCopy: MessageTextCopy,
     onCancelReply: () -> Unit,
@@ -18754,7 +18754,7 @@ private fun FontSizeScreen(
 // border) so the preview tracks what real chat text looks like at the selected
 // step. Body text uses the same bodyLarge style as message bubbles.
 @Composable
-private fun FontSizePreviewBubble(
+internal fun FontSizePreviewBubble(
     text: String,
     mine: Boolean,
 ) {
@@ -19541,7 +19541,7 @@ private fun AccountSelectorSheet(
 }
 
 @Composable
-private fun SettingsRow(
+internal fun SettingsRow(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
