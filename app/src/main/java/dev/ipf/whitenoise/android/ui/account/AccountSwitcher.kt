@@ -1,0 +1,217 @@
+package dev.ipf.whitenoise.android.ui.account
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.otherAccountAvatars
+import dev.ipf.whitenoise.android.ui.common.Avatar
+
+@Composable
+fun AccountAvatarButton(
+    title: String,
+    seed: String,
+    pictureUrl: String?,
+    size: Dp = 40.dp,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    // Per-account unread dot (#592, #805): a small accent dot on the active
+    // account's avatar when that account itself has unread — the same
+    // per-account aggregate the other-account avatars use. Hidden when the
+    // active account has no unread (the caller passes false).
+    showUnreadDot: Boolean = false,
+) {
+    val openSettingsDescription = stringResource(R.string.open_settings)
+    val accountUnreadDescription =
+        stringResource(R.string.account_unread_indicator)
+    val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
+    val avatarContentDescription =
+        if (showUnreadDot) {
+            "$openSettingsDescription, $accountUnreadDescription"
+        } else {
+            openSettingsDescription
+        }
+    IconButton(
+        onClick = onClick,
+        modifier =
+            modifier
+                .size(56.dp)
+                .semantics { contentDescription = avatarContentDescription },
+    ) {
+        Box {
+            Avatar(
+                title = title,
+                seed = seed,
+                size = size,
+                pictureUrl = safePictureUrl,
+            )
+            if (showUnreadDot) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(x = 1.dp, y = 1.dp)
+                            .size(12.dp)
+                            // Border in the bar background so the dot reads as
+                            // a separate marker against a busy avatar.
+                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                )
+            }
+        }
+    }
+}
+
+// Cap of non-active account avatars shown inline in the chat-list top bar; past
+// this the stack ends in a "+N" circle that opens the full switcher.
+private const val MAX_TOP_BAR_OTHER_ACCOUNTS = 3
+
+private val TOP_BAR_OTHER_ACCOUNT_SIZE = 34.dp
+
+private val TOP_BAR_OTHER_ACCOUNT_RING = 2.dp
+
+// How far each avatar overlaps the previous one to read as a single stacked group.
+private val TOP_BAR_OTHER_ACCOUNT_OVERLAP = 12.dp
+
+// Other signed-in accounts, stacked beside the active-account avatar (#343): tap
+// to switch (lands on that account's chat list), long-press for the full
+// switcher, each carrying its own unread dot. Hidden when the active account is
+// the only one signed in.
+@Composable
+internal fun OtherAccountAvatarsRow(
+    appState: WhiteNoiseAppState,
+    onSwitchAccount: (String) -> Unit,
+    onOpenSwitcher: () -> Unit,
+) {
+    // Signed-in accounts other than the active one. Empty while a destructive
+    // wipe transiently nulls the active account, so no frame can flash the
+    // just-wiped (or a still-stale previously-wiped) account (#809).
+    val others = otherAccountAvatars(appState.accounts, appState.activeAccount?.label)
+    if (others.isEmpty()) return
+    val shown = others.take(MAX_TOP_BAR_OTHER_ACCOUNTS)
+    val overflow = others.size - shown.size
+    // Natural draw order stacks each avatar on top of the previous, so the "+N"
+    // (drawn last) sits fully on top and stays legible. Each avatar's left edge —
+    // and its unread dot — stays visible under the one in front.
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(-TOP_BAR_OTHER_ACCOUNT_OVERLAP),
+    ) {
+        shown.forEach { account ->
+            OtherAccountAvatar(
+                title = appState.displayName(account.accountIdHex),
+                seed = account.accountIdHex,
+                pictureUrl = appState.avatarUrl(account.accountIdHex),
+                showUnreadDot = appState.accountShowsUnreadDot(account.label),
+                onClick = { onSwitchAccount(account.label) },
+                onLongClick = onOpenSwitcher,
+            )
+        }
+        if (overflow > 0) {
+            OverflowAccountChip(count = overflow, onClick = onOpenSwitcher)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun OtherAccountAvatar(
+    title: String,
+    seed: String,
+    pictureUrl: String?,
+    showUnreadDot: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    val switchDescription = "${stringResource(R.string.switch_account)}: $title"
+    Box(
+        modifier =
+            Modifier
+                // Ring in the bar background so stacked avatars read as separate.
+                .size(TOP_BAR_OTHER_ACCOUNT_SIZE)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .semantics { contentDescription = switchDescription },
+        contentAlignment = Alignment.Center,
+    ) {
+        Avatar(
+            title = title,
+            seed = seed,
+            size = TOP_BAR_OTHER_ACCOUNT_SIZE - TOP_BAR_OTHER_ACCOUNT_RING * 2,
+            pictureUrl = pictureUrl,
+        )
+        if (showUnreadDot) {
+            // Bottom-start: the left edge stays exposed when the next avatar
+            // stacks on top, so the dot isn't hidden under it.
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .size(10.dp)
+                        .border(TOP_BAR_OTHER_ACCOUNT_RING, MaterialTheme.colorScheme.surface, CircleShape)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+            )
+        }
+    }
+}
+
+@Composable
+private fun OverflowAccountChip(
+    count: Int,
+    onClick: () -> Unit,
+) {
+    val description = stringResource(R.string.switch_account)
+    Box(
+        modifier =
+            Modifier
+                .size(TOP_BAR_OTHER_ACCOUNT_SIZE)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(TOP_BAR_OTHER_ACCOUNT_SIZE - TOP_BAR_OTHER_ACCOUNT_RING * 2)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "+$count",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
