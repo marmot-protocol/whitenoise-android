@@ -58,7 +58,19 @@ data class MediaPreviewFallback(
     val filename: String? = null,
     val kind: ReplyMediaKind = ReplyMediaKind.None,
 ) {
-    fun text(copy: MessageTextCopy): String = filename ?: copy.mediaLabel(kind)
+    // Photo/Video/Voice filenames are auto-generated (voice-<ms>ms.m4a, swapped
+    // numeric .jpg) and never user-meaningful — prefer the typed label. Only a
+    // document filename is worth showing; None keeps the filename fallback.
+    fun text(copy: MessageTextCopy): String =
+        when (kind) {
+            ReplyMediaKind.Photo,
+            ReplyMediaKind.Video,
+            ReplyMediaKind.Voice,
+            -> copy.mediaLabel(kind)
+            ReplyMediaKind.Document,
+            ReplyMediaKind.None,
+            -> filename ?: copy.mediaLabel(kind)
+        }
 }
 
 object MessageProjector {
