@@ -94,25 +94,27 @@ object AmberActivityCoordinator {
     ) {
         val active = pending.get() ?: return
         // Correlate by request id: a late result from a prior, timed-out prompt
-        // must not satisfy the next caller. When both the active request and the
-        // result carry an id and they differ, drop it. (get_public_key sends no
-        // id, so its result is delivered without correlation.)
+        // must not satisfy the next caller. An id-bearing request accepts only a
+        // result that echoes its id; get_public_key sends no id, so its result
+        // (which likewise carries none) matches on both being null.
         val resultId = data?.getStringExtra(Nip55.EXTRA_ID)
         if (!shouldAcceptResult(active.requestId, resultId)) return
         active.queue.offer(Delivery.Result(resultOk, data))
     }
 
     /**
-     * Whether a delivered result should satisfy the active request. Drops a
-     * stale result from a prior (timed-out) prompt: when both the active request
-     * and the result carry an id and they differ, the result belongs to a
-     * different request. A missing id on either side (e.g. get_public_key, which
-     * sends none) is delivered without correlation.
+     * Whether a delivered result should satisfy the active request: their ids
+     * must match exactly. NIP-55 signers echo the request's `EXTRA_ID`, so a
+     * result belongs to the active request only when it carries the same id.
+     * get_public_key sends no id, so both sides are null and match; every other
+     * pairing — a mismatched id (a prior, timed-out request's late result) or a
+     * one-sided missing id — is dropped, so a stale result can never satisfy an
+     * id-bearing request.
      */
     internal fun shouldAcceptResult(
         expectedId: String?,
         resultId: String?,
-    ): Boolean = expectedId == null || resultId == null || expectedId == resultId
+    ): Boolean = expectedId == resultId
 
     /**
      * Show [intent] via the foreground launcher and block the CALLING (worker)

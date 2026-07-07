@@ -23,11 +23,17 @@ class AmberActivityCoordinatorTest {
     }
 
     @Test
-    fun missingIdsAreDeliveredWithoutCorrelation() {
-        // get_public_key sends no id; some signer results may omit it. Either
-        // side missing => deliver (no correlation possible), never drop.
+    fun getPublicKeyBothMissingIsAccepted() {
+        // get_public_key sends no id and its result echoes none: both null match.
         assertTrue(AmberActivityCoordinator.shouldAcceptResult(expectedId = null, resultId = null))
-        assertTrue(AmberActivityCoordinator.shouldAcceptResult(expectedId = "req-A", resultId = null))
-        assertTrue(AmberActivityCoordinator.shouldAcceptResult(expectedId = null, resultId = "req-A"))
+    }
+
+    @Test
+    fun oneSidedMissingIdIsDropped() {
+        // An id-bearing request whose result omits the id (a stale prompt's late
+        // result), and a no-id request meeting an id-bearing result, are both
+        // stale/mismatched — never delivered.
+        assertFalse(AmberActivityCoordinator.shouldAcceptResult(expectedId = "req-A", resultId = null))
+        assertFalse(AmberActivityCoordinator.shouldAcceptResult(expectedId = null, resultId = "req-A"))
     }
 }
