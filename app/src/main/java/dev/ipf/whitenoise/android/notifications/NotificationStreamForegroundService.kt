@@ -114,7 +114,7 @@ class NotificationStreamForegroundService : Service() {
                                 )
                             runCatching {
                                 val appState = (application as WhiteNoiseApplication).appState
-                                appState.ensureNotificationRuntimeStarted()
+                                startNotificationRuntimeForTrigger(appState, trigger)
                                 drainPendingNativePushRegistrationSync(appState)
                             }.onFailure {
                                 foregroundServiceDebug(it) { "notification runtime failed" }
@@ -141,9 +141,11 @@ class NotificationStreamForegroundService : Service() {
                                     backgroundConnectionEnabled = keepConnectedEnabled,
                                 )
                             runCatching {
+                                val appState = (application as WhiteNoiseApplication).appState
                                 inFlightBootstrap?.join()
+                                startNotificationRuntimeForTrigger(appState, trigger)
                                 if (syncNativePushRegistration) {
-                                    drainPendingNativePushRegistrationSync((application as WhiteNoiseApplication).appState)
+                                    drainPendingNativePushRegistrationSync(appState)
                                 }
                             }.onFailure {
                                 foregroundServiceDebug(it) { "notification runtime one-shot completion failed" }
@@ -167,6 +169,17 @@ class NotificationStreamForegroundService : Service() {
         withContext(Dispatchers.Default) {
             BackgroundConnectionPreferences.isEnabled(applicationContext)
         }
+
+    private suspend fun startNotificationRuntimeForTrigger(
+        appState: WhiteNoiseAppState,
+        trigger: ForegroundStartTrigger,
+    ) {
+        if (trigger == ForegroundStartTrigger.PushWake) {
+            appState.ensureNotificationRuntimeStartedAndAwaitPushDrain()
+        } else {
+            appState.ensureNotificationRuntimeStarted()
+        }
+    }
 
     private suspend fun drainPendingNativePushRegistrationSync(appState: WhiteNoiseAppState) {
         val inMemorySyncRequested = pendingNativePushRegistrationSync

@@ -93,7 +93,10 @@ class LocalNotificationPresenter(
                 )
             }?.let { inviteNotifications ->
                 val compat = NotificationManagerCompat.from(context)
-                inviteNotifications.forEach { compat.cancel(it.tag, it.id) }
+                inviteNotifications.forEach {
+                    compat.cancel(it.tag, it.id)
+                    it.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
+                }
             }
     }
 
