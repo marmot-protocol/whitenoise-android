@@ -51,6 +51,40 @@ class DraftStoreTest {
     }
 
     @Test
+    fun repeatedReadMissesDoNotGrowInMemoryStateWithoutBound() {
+        val s = store()
+
+        repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
+            assertNull(s.get(accountIdHex = "a", groupIdHex = "missing-$index"))
+        }
+
+        assertEquals(DraftStore.MAX_IN_MEMORY_DRAFT_STATES, s.draftStateCountForTest())
+    }
+
+    @Test
+    fun repeatedBlankWritesForAbsentDraftsDoNotCreateEmptyStates() {
+        val s = store()
+
+        repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
+            s.set(accountIdHex = "a", groupIdHex = "missing-$index", text = " ")
+        }
+
+        assertEquals(0, s.draftStateCountForTest())
+    }
+
+    @Test
+    fun pruningReadMissesKeepsNonEmptyDraftStates() {
+        val s = store()
+        s.set("a", "kept", "draft")
+
+        repeat(DraftStore.MAX_IN_MEMORY_DRAFT_STATES + 25) { index ->
+            s.get(accountIdHex = "a", groupIdHex = "missing-$index")
+        }
+
+        assertEquals("draft", s.get("a", "kept"))
+    }
+
+    @Test
     fun setThenGetRoundTrips() {
         val s = store()
         s.set("a", "g", "hello")
@@ -264,6 +298,14 @@ class DraftStoreTest {
         @Suppress("UNCHECKED_CAST")
         val drafts = draftsField.get(this) as MutableMap<String, MutableState<String?>>
         drafts[key] = state
+    }
+
+    private fun DraftStore.draftStateCountForTest(): Int {
+        val draftsField = DraftStore::class.java.getDeclaredField("drafts").apply { isAccessible = true }
+
+        @Suppress("UNCHECKED_CAST")
+        val drafts = draftsField.get(this) as Map<String, MutableState<String?>>
+        return drafts.size
     }
 
     private class ReplacingOnFirstReadState(

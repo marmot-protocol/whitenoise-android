@@ -76,7 +76,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -2534,6 +2536,11 @@ class ChatsController(
                     if (!isActiveBindEpoch(epoch)) return@launch
                     mediaPreviewFallbackByMessageId = mediaPreviewFallbackByMessageId + (messageId to fallback)
                     scheduleRecompute()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    // Best-effort. Leave the fallback absent so the next bind
+                    // can retry; the row keeps the generic media preview.
                 } finally {
                     if (isActiveBindEpoch(epoch)) inFlightMediaKindResolves.remove(messageId)
                 }
@@ -2905,6 +2912,7 @@ class ConversationController(
     @Volatile
     private var timelineSubscription: TimelineMessagesSubscription? = null
     private val liveSubscriptionLock = Any()
+    private val timelineSubscriptionActiveCallMutex = Mutex()
     private var groupStateSubscription: GroupStateSubscription? = null
     private var startJob: Job? = null
     private var conversationScope: CoroutineScope? = null
@@ -3230,15 +3238,14 @@ class ConversationController(
                 accountTeardownRequested = true
                 val current = Triple(groupStateSubscription, timelineSubscription, startJob)
                 groupStateSubscription = null
-                timelineSubscription = null
                 startJob = null
                 current
             }
         val (groupSubscription, timelineStream, job) = teardown
         withContext(NonCancellable + Dispatchers.IO) {
             runCatching { groupSubscription?.close() }
-            runCatching { timelineStream?.close() }
         }
+        closeTimelineSubscriptionSafely(timelineStream)
         if (shouldCancelLiveSubscriptionJob(job, coroutineContext[Job])) {
             job?.cancelAndJoin()
         }
@@ -3406,14 +3413,11 @@ class ConversationController(
             if (groupStateSubscription === groupSubscription) {
                 groupStateSubscription = null
             }
-            if (timelineSubscription === timelineStream) {
-                timelineSubscription = null
-            }
         }
         withContext(NonCancellable + Dispatchers.IO) {
             runCatching { groupSubscription?.close() }
-            runCatching { timelineStream?.close() }
         }
+        closeTimelineSubscriptionSafely(timelineStream)
     }
 
     private suspend fun cleanupConversationSubscriptions() {
@@ -3425,11 +3429,24 @@ class ConversationController(
         val closingSubscription =
             synchronized(liveSubscriptionLock) {
                 val current = timelineSubscription
-                timelineSubscription = null
                 current
             }
-        withContext(NonCancellable + Dispatchers.IO) {
-            runCatching { closingSubscription?.close() }
+        closeTimelineSubscriptionSafely(closingSubscription)
+    }
+
+    private suspend fun closeTimelineSubscriptionSafely(timelineStream: TimelineMessagesSubscription?) {
+        if (timelineStream == null) return
+        withContext(NonCancellable) {
+            timelineSubscriptionActiveCallMutex.withLock {
+                synchronized(liveSubscriptionLock) {
+                    if (timelineSubscription === timelineStream) {
+                        timelineSubscription = null
+                    }
+                }
+                withContext(Dispatchers.IO) {
+                    runCatching { timelineStream.close() }
+                }
+            }
         }
     }
 
@@ -5535,10 +5552,7 @@ class ConversationController(
             // materialized window backwards by `count` and returns the new
             // authoritative window — already deduped, sorted, head-anchored,
             // and cap-trimmed. We render it directly via replaceWindow=true.
-            val page =
-                withContext(Dispatchers.IO) {
-                    subscription.paginateBackwards(ConversationTimelinePageLimit)
-                }
+            val page = paginateOlderIfSubscriptionActive(subscription) ?: return false
             hasLoadedOlderPages = true
             applyTimelinePage(page, replaceWindow = true, updatePagination = true)
             // The cached `mediaReferences` map only carries entries for
@@ -5563,6 +5577,18 @@ class ConversationController(
             isLoadingOlder = false
         }
     }
+
+    private suspend fun paginateOlderIfSubscriptionActive(subscription: TimelineMessagesSubscription): TimelinePageFfi? =
+        timelineSubscriptionActiveCallMutex.withLock {
+            val stillActive =
+                synchronized(liveSubscriptionLock) {
+                    !accountTeardownRequested && timelineSubscription === subscription
+                }
+            if (!stillActive) return@withLock null
+            withContext(Dispatchers.IO) {
+                subscription.paginateBackwards(ConversationTimelinePageLimit)
+            }
+        }
 
     private suspend fun refreshCurrentTimeline(account: String): List<String> {
         val page =
@@ -5673,6 +5699,7 @@ class ConversationController(
         if (updatePagination) {
             hasMoreBefore = page.hasMoreBefore
         }
+        pruneReadAnchorsToWindow()
         pruneConfirmedOptimisticMessages()
         pruneConfirmedOptimisticReactions()
         recomputeReactions()
@@ -6054,6 +6081,7 @@ class ConversationController(
         projectedMessageIds.remove(messageIdHex)
         localTimelineOrderOverrides.remove(messageIdHex)
         localTimelineTimestampOverrides.remove(messageIdHex)
+        readAnchoredAtSeconds.remove(messageIdHex)
         timelineItemsById.remove(itemId)
         timelineOrder.remove(itemId)
     }
@@ -6076,6 +6104,14 @@ class ConversationController(
             .take(overflow)
             .mapNotNull { it.projected?.messageIdHex }
             .forEach(::removeProjectedRecord)
+        pruneReadAnchorsToWindow()
+    }
+
+    private fun pruneReadAnchorsToWindow() {
+        if (readAnchoredAtSeconds.isEmpty()) return
+        val retained = HashSet(timelineRecords.keys)
+        optimisticMessages.values.forEach { retained.add(it.record.messageIdHex) }
+        readAnchoredAtSeconds.keys.retainAll(retained)
     }
 
     // Drop optimistic edits whose target message has left the window (no longer
