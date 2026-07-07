@@ -164,6 +164,11 @@ internal object ChatScreenshotPreferences {
 
     fun readAllowChatScreenshots(preferences: SharedPreferences): Boolean = preferences.getBoolean(KEY_ALLOW_CHAT_SCREENSHOTS, true)
 
+    fun readAllowChatScreenshots(context: Context): Boolean =
+        readAllowChatScreenshots(
+            context.applicationContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE),
+        )
+
     fun writeAllowChatScreenshots(
         preferences: SharedPreferences,
         enabled: Boolean,
@@ -852,6 +857,8 @@ class WhiteNoiseAppState(
      */
     var allowChatScreenshotsInChats by mutableStateOf(ChatScreenshotPreferences.readAllowChatScreenshots(preferences))
         private set
+
+    var onAllowChatScreenshotsChanged: ((Boolean) -> Unit)? = null
 
     var requireAppUnlock by mutableStateOf(preferences.getBoolean(REQUIRE_APP_UNLOCK_KEY, false))
         private set
@@ -2363,6 +2370,7 @@ class WhiteNoiseAppState(
     fun updateAllowChatScreenshotsInChats(enabled: Boolean) {
         allowChatScreenshotsInChats = enabled
         ChatScreenshotPreferences.writeAllowChatScreenshots(preferences, enabled)
+        onAllowChatScreenshotsChanged?.invoke(enabled)
     }
 
     fun refreshAppLockCredentialAvailability() {

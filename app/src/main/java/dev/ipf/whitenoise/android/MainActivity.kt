@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.state.APP_LOCK_ALLOWED_AUTHENTICATORS
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AppThemeMode
+import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.releaseSecureFlag
@@ -38,6 +39,10 @@ class MainActivity : FragmentActivity() {
     private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
     private var appUnlockPromptActive = false
     private var appLockBackgroundSecureFlagRetained = false
+    private var recentsPreferenceSecureFlagRetained = false
+    private val allowChatScreenshotsCallback: (Boolean) -> Unit = { enabled ->
+        applyRecentsPreferenceSecureFlag(allowChatScreenshots = enabled)
+    }
     private lateinit var notificationTapTokens: NotificationTapTokens
     private lateinit var appState: WhiteNoiseAppState
 
@@ -49,6 +54,10 @@ class MainActivity : FragmentActivity() {
         setTheme(preComposeThemeFor(readPersistedThemeMode(), initialSystemDarkTheme))
         super.onCreate(savedInstanceState)
         appState = (application as WhiteNoiseApplication).appState
+        appState.onAllowChatScreenshotsChanged = allowChatScreenshotsCallback
+        applyRecentsPreferenceSecureFlag(
+            allowChatScreenshots = ChatScreenshotPreferences.readAllowChatScreenshots(this),
+        )
         notificationTapTokens = NotificationTapTokens.create(this)
         consumeIntent(intent)
         enableEdgeToEdge()
@@ -122,6 +131,7 @@ class MainActivity : FragmentActivity() {
         super.onStart()
         if (::appState.isInitialized) {
             appState.setAppInForeground(true)
+            applyRecentsPreferenceSecureFlag(appState.allowChatScreenshotsInChats)
             if (!appState.appLockScreenVisible) releaseAppLockBackgroundSecureFlag()
         }
     }
@@ -133,7 +143,10 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::appState.isInitialized && !appState.appLockScreenVisible) releaseAppLockBackgroundSecureFlag()
+        if (::appState.isInitialized) {
+            applyRecentsPreferenceSecureFlag(appState.allowChatScreenshotsInChats)
+            if (!appState.appLockScreenVisible) releaseAppLockBackgroundSecureFlag()
+        }
     }
 
     override fun onStop() {
@@ -146,6 +159,10 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         releaseAppLockBackgroundSecureFlag()
+        if (::appState.isInitialized && appState.onAllowChatScreenshotsChanged === allowChatScreenshotsCallback) {
+            appState.onAllowChatScreenshotsChanged = null
+        }
+        releaseRecentsPreferenceSecureFlag()
         super.onDestroy()
     }
 
@@ -229,6 +246,22 @@ class MainActivity : FragmentActivity() {
         if (appLockBackgroundSecureFlagRetained) {
             window.releaseSecureFlag()
             appLockBackgroundSecureFlagRetained = false
+        }
+    }
+
+    private fun applyRecentsPreferenceSecureFlag(allowChatScreenshots: Boolean) {
+        if (allowChatScreenshots) {
+            releaseRecentsPreferenceSecureFlag()
+        } else if (!recentsPreferenceSecureFlagRetained) {
+            window.retainSecureFlag()
+            recentsPreferenceSecureFlagRetained = true
+        }
+    }
+
+    private fun releaseRecentsPreferenceSecureFlag() {
+        if (recentsPreferenceSecureFlagRetained) {
+            window.releaseSecureFlag()
+            recentsPreferenceSecureFlagRetained = false
         }
     }
 

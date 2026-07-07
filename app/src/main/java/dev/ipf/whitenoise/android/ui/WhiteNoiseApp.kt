@@ -15574,6 +15574,12 @@ private fun ForwardMessageSheet(
     // Opens at half height with a drag up to full — a long chat list stays
     // reachable without the sheet swallowing the conversation behind it.
     val sheetState = rememberModalBottomSheetState()
+    var searchFocused by remember { mutableStateOf(false) }
+    val expanded = sheetState.currentValue == SheetValue.Expanded || sheetState.targetValue == SheetValue.Expanded
+    val targetListMaxHeight = if (expanded) 420.dp else 152.dp
+    LaunchedEffect(searchFocused) {
+        if (searchFocused) sheetState.expand()
+    }
     val activeAccountIdHex = appState.activeAccount?.accountIdHex
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -15583,9 +15589,7 @@ private fun ForwardMessageSheet(
         Column(
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight()
-                    .padding(bottom = 12.dp),
+                    .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
@@ -15618,10 +15622,16 @@ private fun ForwardMessageSheet(
                 value = query,
                 onValueChange = { query = it },
                 placeholder = stringResource(R.string.forward_search_chats),
-                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
+                modifier =
+                    Modifier
+                        .padding(horizontal = Dimens.spaceLg)
+                        .onFocusChanged { searchFocused = it.isFocused },
             )
             LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier =
+                    Modifier
+                        .heightIn(max = targetListMaxHeight)
+                        .fillMaxWidth(),
                 contentPadding = PaddingValues(bottom = Dimens.spaceLg),
             ) {
                 if (targets.isEmpty() || filtered.isEmpty()) {
@@ -15662,31 +15672,44 @@ private fun ForwardMessageSheet(
                     }
                 }
             }
-            Button(
-                onClick = {
-                    onForward(selected.toList())
-                    onDismiss()
-                },
-                enabled = selected.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+
+            Surface(
+                color = amoledSheetContainerColor(),
+                shadowElevation = 6.dp,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .imePadding(),
             ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Forward,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    if (selected.isEmpty()) {
-                        stringResource(R.string.forward)
-                    } else {
-                        pluralStringResource(
-                            R.plurals.forward_to_chats_count,
-                            selected.size,
-                            selected.size,
-                        )
+                Button(
+                    onClick = {
+                        onForward(selected.toList())
+                        onDismiss()
                     },
-                )
+                    enabled = selected.isNotEmpty(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Forward,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (selected.isEmpty()) {
+                            stringResource(R.string.forward)
+                        } else {
+                            pluralStringResource(
+                                R.plurals.forward_to_chats_count,
+                                selected.size,
+                                selected.size,
+                            )
+                        },
+                    )
+                }
             }
         }
     }
