@@ -42,6 +42,7 @@ import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.amber.AmberSignerController
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -763,6 +764,7 @@ class WhiteNoiseAppState(
     private val nativePushSyncMutex = Mutex()
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
     private val pushTokenStore = PushTokenStore.create(appContext)
+    private val amberSigner = AmberSignerController(appContext)
 
     // Per-account (platform, token, server-pubkey, relay-hint) fingerprint
     // of the most recent successful `upsertPushRegistration`. Skip redundant
@@ -1674,6 +1676,11 @@ class WhiteNoiseAppState(
             appStateDebug {
                 "accounts loaded count=${accounts.size} active=$activeAccountRef labels=${accounts.map { it.label.take(8) to it.running }}"
             }
+            // Re-install external-signer callbacks now that accounts are known,
+            // BEFORE the reconciliation below (setActiveAccount can sign in a
+            // signed-out account / re-key media, warmProfile publishes) drives any
+            // signing for an external-signing account.
+            reregisterExternalSigners()
             if (accounts.isEmpty()) {
                 localNotificationSettings = null
                 phase = AppPhase.Onboarding
@@ -1771,6 +1778,75 @@ class WhiteNoiseAppState(
             // echo the unredacted message.
             appStateDebug { "identity import failed: ${DiagnosticFormatter.redactError(error.readableMessage())}" }
             false
+        }
+    }
+
+    /** Whether a NIP-55 external signer (Amber) is installed — gates the UI entry point. */
+    fun isAmberSignerInstalled(): Boolean = amberSigner.isSignerInstalled()
+
+    /**
+     * Log in with the NIP-55 external signer (Amber). Mirrors [importIdentity]:
+     * ask the signer for its public key (foreground prompt), register the
+     * external-signer callback, then create the local account via
+     * `loginExternalSigner` (which signs its kind:450 identity proof through the
+     * signer — so a returned summary proves the signer works, and a failure
+     * leaves no account behind).
+     *
+     * Typed engine/protocol errors are surfaced distinctly: a user cancel/reject
+     * is a gentle "cancelled" toast (the account is untouched); every other
+     * failure (unavailable / mismatch / runtime) is a copyable failure toast.
+     */
+    suspend fun loginWithAmber() {
+        try {
+            val reportedPubkey = withContext(Dispatchers.IO) { amberSigner.requestPublicKey() }
+            // Normalize npub/hex to the canonical hex the account is keyed by, so
+            // the login-time signer and the startup re-registration signer share
+            // the same current_user.
+            val pubkeyHex =
+                marmotIo { accountIdHex(reportedPubkey) }
+                    ?: throw MarmotKitException.Runtime("signer returned an invalid public key")
+            val summary =
+                marmotIo {
+                    loginExternalSigner(
+                        pubkeyHex,
+                        amberSigner.buildSigner(pubkeyHex),
+                        MarmotClient.bootstrapRelays,
+                        MarmotClient.bootstrapRelays,
+                    )
+                }
+            refreshAccounts()
+            setActiveAccount(summary.label)
+            refreshLocalNotificationSettings()
+            phase = AppPhase.Ready
+            present(R.string.toast_identity_imported)
+            warmProfile(summary.accountIdHex)
+        } catch (error: Throwable) {
+            rethrowIfCancellation(error)
+            if (error is MarmotKitException.ExternalSignerRejected) {
+                present(R.string.toast_amber_sign_in_cancelled)
+            } else {
+                appStateDebug(error) { "amber login failed: ${error.readableMessage()}" }
+                present(R.string.toast_couldnt_login_amber, AppText.Plain(error.readableMessage()), copyable = true)
+            }
+        }
+    }
+
+    /**
+     * Re-install the NIP-55 signer callback for every external-signing account
+     * after an engine (re)start. MDK persists only the account pubkey for these
+     * accounts, so the `ExternalAccountSignerFfi` must be re-registered before
+     * any signing happens. Best-effort per account: a failure (e.g. Amber
+     * uninstalled) is logged and leaves the account intact rather than aborting
+     * bootstrap; that account's signing will later surface a typed error.
+     */
+    private suspend fun reregisterExternalSigners() {
+        accounts.filter { it.externalSigning }.forEach { account ->
+            runCatching {
+                marmotIo { registerExternalSigner(account.label, amberSigner.buildSigner(account.accountIdHex)) }
+            }.onFailure {
+                rethrowIfCancellation(it)
+                appStateDebug(it) { "external signer re-register failed for ${account.label.take(8)}: ${it.readableMessage()}" }
+            }
         }
     }
 

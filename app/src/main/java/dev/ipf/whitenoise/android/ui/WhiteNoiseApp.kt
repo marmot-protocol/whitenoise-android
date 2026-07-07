@@ -1092,7 +1092,7 @@ private fun FailureScreen(
 // Single in-flight onboarding action so the two buttons can never both read as
 // busy: each button's spinner keys off its own action, and the shared value
 // disables the other while one runs.
-private enum class OnboardingAction { Idle, Creating, Importing }
+private enum class OnboardingAction { Idle, Creating, Importing, AmberLogin }
 
 // Adaptive cap for the onboarding + sign-in surfaces: on a phone the hero and
 // actions fill the width, but on tablets / unfolded foldables / desktop windows
@@ -1106,6 +1106,9 @@ private fun OnboardingScreen(appState: WhiteNoiseAppState) {
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
     val scope = rememberCoroutineScope()
+    // Signer availability can't change while onboarding is on screen, so read it
+    // once (the query hits the PackageManager).
+    val amberSignerAvailable = remember { appState.isAmberSignerInstalled() }
 
     OnboardingContent(
         identity = identity,
@@ -1140,6 +1143,18 @@ private fun OnboardingScreen(appState: WhiteNoiseAppState) {
                 }
             }
         },
+        loggingInWithAmber = inFlightAction == OnboardingAction.AmberLogin,
+        amberSignerAvailable = amberSignerAvailable,
+        onLoginWithAmber = {
+            inFlightAction = OnboardingAction.AmberLogin
+            scope.launch {
+                try {
+                    appState.loginWithAmber()
+                } finally {
+                    inFlightAction = OnboardingAction.Idle
+                }
+            }
+        },
     )
 }
 
@@ -1166,10 +1181,14 @@ fun OnboardingContent(
     onImportIdentity: (String) -> Unit,
     importErrorRes: Int? = null,
     onImportErrorChange: (Int?) -> Unit = {},
+    loggingInWithAmber: Boolean = false,
+    amberSignerAvailable: Boolean = false,
+    onLoginWithAmber: () -> Unit = {},
 ) {
     var signingIn by remember { mutableStateOf(signingInBusy) }
-    val busy = creatingIdentity || signingInBusy
+    val busy = creatingIdentity || signingInBusy || loggingInWithAmber
     val creatingIdentityDescription = stringResource(R.string.creating_identity)
+    val amberLoginDescription = stringResource(R.string.onboarding_login_with_amber)
 
     if (signingIn) {
         SignInContent(
@@ -1274,6 +1293,32 @@ fun OnboardingContent(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
+                    }
+                    // Alternative login via an installed NIP-55 external signer
+                    // (Amber). Only offered when such a signer is present.
+                    if (amberSignerAvailable) {
+                        OutlinedButton(
+                            onClick = onLoginWithAmber,
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                        ) {
+                            if (loggingInWithAmber) {
+                                CircularProgressIndicator(
+                                    modifier =
+                                        Modifier
+                                            .size(20.dp)
+                                            .semantics { contentDescription = amberLoginDescription },
+                                    strokeWidth = 2.dp,
+                                )
+                                Spacer(Modifier.width(10.dp))
+                            }
+                            Text(
+                                stringResource(R.string.onboarding_login_with_amber),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
                 }
             }
@@ -19241,7 +19286,7 @@ private fun AccountSelectorSheet(
                                         UnreadCountBadge(unreadCount)
                                         Spacer(Modifier.width(8.dp))
                                     }
-                                    if (!account.localSigning) {
+                                    if (!account.localSigning && !account.externalSigning) {
                                         Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)
                                         Spacer(Modifier.width(8.dp))
                                     }

@@ -900,6 +900,9 @@
     <string name="search_members">Поиск участников</string>
     <string name="recent_chats">Недавние чаты</string>
     <string name="onboarding_login">Войти</string>
+    <string name="onboarding_login_with_amber">Войти через Amber</string>
+    <string name="toast_couldnt_login_amber">Не удалось войти через Amber</string>
+    <string name="toast_amber_sign_in_cancelled">Вход через Amber отменён</string>
     <string name="onboarding_sign_up">Регистрация</string>
     <string name="onboarding_slogan_decentralized">Децентрализованный</string>
     <string name="onboarding_slogan_uncensorable">Нецензурируемый</string>
