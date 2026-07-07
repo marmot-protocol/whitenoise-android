@@ -2296,6 +2296,9 @@ private fun ChatsScreen(
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<ChatListItem?>(null) }
+    // #1131: sole-admin-with-others Delete routes here instead of blocking —
+    // transfer admin (auto for one candidate, picker for 3+) then leave + wipe.
+    var soleAdminDelete by remember { mutableStateOf<SoleAdminDeletePrompt?>(null) }
     // Search expand/collapse + live query. The search input is anchored in
     // the top bar; tapping the magnifier swaps the chrome (account avatar
     // + nav icons) for a TextField that filters in real time on title +
@@ -2669,7 +2672,17 @@ private fun ChatsScreen(
                                     onMarkRead = {
                                         appState.launchMutation { controller.markAllRead(item) }
                                     },
-                                    onDelete = { pendingDelete = item },
+                                    onDelete = {
+                                        // Sole admin with others still present? Route to the
+                                        // transfer-then-leave flow (#1131) instead of the plain
+                                        // confirm, which would block deep in the controller.
+                                        appState.launchMutation {
+                                            when (val candidates = controller.soleAdminTransferCandidates(item.group.groupIdHex)) {
+                                                null -> pendingDelete = item
+                                                else -> soleAdminDelete = SoleAdminDeletePrompt(item, candidates)
+                                            }
+                                        }
+                                    },
                                 )
                             }
                         }
@@ -2741,6 +2754,42 @@ private fun ChatsScreen(
             },
             onDismiss = { pendingDelete = null },
         )
+    }
+
+    soleAdminDelete?.let { prompt ->
+        val groupId = prompt.item.group.groupIdHex
+        if (prompt.candidates.size == 1) {
+            val newAdmin = prompt.candidates.first()
+            ConfirmDialog(
+                title = stringResource(R.string.delete_group_dialog_title),
+                message =
+                    stringResource(
+                        R.string.confirm_sole_admin_transfer_then_leave_message,
+                        appState.displayName(newAdmin.memberIdHex),
+                    ),
+                confirmLabel = stringResource(R.string.delete_group_confirm),
+                destructive = true,
+                onConfirm = {
+                    soleAdminDelete = null
+                    appState.launchMutation {
+                        controller.transferAdminThenDeleteFromChatList(groupId, newAdmin)
+                    }
+                },
+                onDismiss = { soleAdminDelete = null },
+            )
+        } else {
+            SoleAdminDeletePicker(
+                candidates = prompt.candidates,
+                appState = appState,
+                onPick = { member ->
+                    soleAdminDelete = null
+                    appState.launchMutation {
+                        controller.transferAdminThenDeleteFromChatList(groupId, member)
+                    }
+                },
+                onDismiss = { soleAdminDelete = null },
+            )
+        }
     }
 }
 
@@ -11403,6 +11452,11 @@ private fun GroupDetailsScreen(
     // leave path and the Admins prompt so a trapped sole admin can hand the
     // role to another member (issue #417).
     var showTransferAdmin by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    // #1131: when set, the transfer-admin picker is being used as the first step
+    // of a sole-admin Leave (3+ members) — picking transfers admin then leaves,
+    // rather than the standalone transfer-only action. Holds the group name for
+    // the leave call/toast.
+    var transferThenLeaveName by remember(controller.group.groupIdHex) { mutableStateOf<String?>(null) }
     // Honor the caller's request to jump straight into the transfer picker
     // (sole admin routed here from the blocked top-level Leave gate). Gated on
     // the sole-admin predicate so a stale flag can't pop the sheet once the
@@ -11480,12 +11534,25 @@ private fun GroupDetailsScreen(
     fun requestLeave(displayName: String) {
         controller.clearLastMutationError()
         appState.launchMutation {
-            pendingConfirm =
-                when (controller.leaveAction()) {
-                    LeaveAction.SoleMemberDeletesGroup -> DetailsConfirm.LeaveSoleMember(displayName)
-                    LeaveAction.SoleAdminMustTransfer -> DetailsConfirm.LeaveSoleAdmin(displayName)
-                    LeaveAction.Standard -> DetailsConfirm.Leave(displayName)
+            when (controller.leaveAction()) {
+                LeaveAction.SoleMemberDeletesGroup -> pendingConfirm = DetailsConfirm.LeaveSoleMember(displayName)
+                // #1131: instead of the old Cancel-only dead-end, offer transfer
+                // then leave. One candidate → a single confirm; 3+ → the picker in
+                // leave mode. The (unexpected) no-candidate case keeps the old gate.
+                LeaveAction.SoleAdminMustTransfer -> {
+                    val candidates = controller.transferAdminCandidates()
+                    when {
+                        candidates.size == 1 ->
+                            pendingConfirm = DetailsConfirm.LeaveSoleAdminTransfer(displayName, candidates.first())
+                        candidates.size >= 2 -> {
+                            transferThenLeaveName = displayName
+                            showTransferAdmin = true
+                        }
+                        else -> pendingConfirm = DetailsConfirm.LeaveSoleAdmin(displayName)
+                    }
                 }
+                LeaveAction.Standard -> pendingConfirm = DetailsConfirm.Leave(displayName)
+            }
         }
     }
 
@@ -12182,9 +12249,25 @@ private fun GroupDetailsScreen(
             busy = activeMutation != null || controller.mutationInFlight,
             onPick = { member ->
                 showTransferAdmin = false
-                pendingConfirm = DetailsConfirm.TransferAdmin(member)
+                val leaveName = transferThenLeaveName
+                transferThenLeaveName = null
+                if (leaveName != null) {
+                    // Sole-admin Leave, 3+ members (#1131): transfer then leave as
+                    // one action. controller.group updates in-place after the
+                    // transfer, so the subsequent leave's gate sees the new admin.
+                    runGroupMutation(
+                        action = GroupMutationAction.Leave,
+                        mutation = { controller.transferAdmin(member) && controller.leaveGroup(displayName = leaveName) },
+                        onSuccess = { onLeft() },
+                    )
+                } else {
+                    pendingConfirm = DetailsConfirm.TransferAdmin(member)
+                }
             },
-            onDismiss = { showTransferAdmin = false },
+            onDismiss = {
+                showTransferAdmin = false
+                transferThenLeaveName = null
+            },
         )
     }
 
@@ -12309,10 +12392,9 @@ private fun GroupDetailsScreen(
                     destructive = true,
                 )
             is DetailsConfirm.LeaveSoleAdmin ->
-                // Sole admin with other members: leaving would strand the group
-                // with no admin. This is an informational gate — no Leave button.
-                // The fix is to promote another member via their row's "Make
-                // admin" action, after which the standard Leave flow applies.
+                // Fallback for the (unexpected) no-transfer-candidate case — still
+                // an informational gate. The normal sole-admin Leave now routes to
+                // LeaveSoleAdminTransfer or the picker in leave mode (#1131).
                 AlertDialog(
                     onDismissRequest = { pendingConfirm = null },
                     title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
@@ -12322,6 +12404,26 @@ private fun GroupDetailsScreen(
                             Text(stringResource(R.string.cancel))
                         }
                     },
+                )
+            is DetailsConfirm.LeaveSoleAdminTransfer ->
+                ConfirmDialog(
+                    title = stringResource(R.string.confirm_leave_sole_admin_title),
+                    message =
+                        stringResource(
+                            R.string.confirm_sole_admin_transfer_then_leave_message,
+                            controller.memberDisplayName(confirm.newAdmin),
+                        ),
+                    confirmLabel = stringResource(R.string.leave),
+                    onConfirm = {
+                        pendingConfirm = null
+                        runGroupMutation(
+                            action = GroupMutationAction.Leave,
+                            mutation = { controller.transferAdmin(confirm.newAdmin) && controller.leaveGroup(displayName = confirm.groupName) },
+                            onSuccess = { onLeft() },
+                        )
+                    },
+                    onDismiss = { pendingConfirm = null },
+                    destructive = true,
                 )
         }
     }
@@ -12944,6 +13046,15 @@ private sealed class DetailsConfirm {
     ) : DetailsConfirm()
 
     /**
+     * Sole-admin Leave with exactly one transfer candidate (#1131): a single
+     * confirm makes [newAdmin] admin and leaves the group in one step.
+     */
+    data class LeaveSoleAdminTransfer(
+        val groupName: String,
+        val newAdmin: AppGroupMemberRecordFfi,
+    ) : DetailsConfirm()
+
+    /**
      * Sole-member leave: the active account is the only member left, so
      * leaving dissolves the group entirely. Confirm → local cleanup; no MLS
      * commit is attempted because there is no other member to coordinate with.
@@ -13401,6 +13512,85 @@ private fun TransferAdminSheet(
                             }
                         }
                     }
+            }
+        }
+    }
+}
+
+/** The chat-list Delete flow when the active account is the sole admin (#1131). */
+private data class SoleAdminDeletePrompt(
+    val item: ChatListItem,
+    val candidates: List<AppGroupMemberRecordFfi>,
+)
+
+/**
+ * Picker shown when deleting a group as sole admin of a 3+ member group (#1131):
+ * choose who becomes admin before leaving. Self-contained (resolves member
+ * identity off [appState]) so the chat-list surface doesn't depend on a
+ * ConversationController the way [TransferAdminSheet] does.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SoleAdminDeletePicker(
+    candidates: List<AppGroupMemberRecordFfi>,
+    appState: WhiteNoiseAppState,
+    onPick: (AppGroupMemberRecordFfi) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = amoledSheetContainerColor(),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(R.string.transfer_admin),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                stringResource(R.string.transfer_admin_picker_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+            ) {
+                GroupMemberIdentityRows(candidates) { _, member ->
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(role = Role.Button) { onPick(member) }
+                                .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Avatar(
+                            title = appState.displayName(member.memberIdHex),
+                            seed = member.memberIdHex,
+                            size = 40.dp,
+                            pictureUrl = appState.avatarUrl(member.memberIdHex),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                appState.displayName(member.memberIdHex),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                appState.shortNpub(member.memberIdHex),
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
             }
         }
     }

@@ -922,4 +922,5 @@
     <string name="onboarding_slogan_secure_messaging">Secure Messaging</string>
     <string name="sign_in_error_public_key">That\'s a public key. Enter your secret key (nsec) to sign in.</string>
     <string name="group_add_members_after_create">You can add members after creating the group.</string>
+    <string name="confirm_sole_admin_transfer_then_leave_message">You\'re the only admin. %1$s becomes admin and you leave the group.</string>
 </resources>
