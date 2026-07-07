@@ -2170,6 +2170,83 @@ class ChatsController(
     }
 
     /**
+     * The members eligible to receive admin when the active account is the sole
+     * admin of [groupIdHex] with others still present, or null for the normal
+     * path (not sole admin, roster read failed, or no one to transfer to). Reads
+     * the live roster, matching [leaveGroup]'s own membership read (#1131).
+     */
+    suspend fun soleAdminTransferCandidates(groupIdHex: String): List<AppGroupMemberRecordFfi>? {
+        val account = accountRef ?: return null
+        val group = groupRecordsById[groupIdHex] ?: return null
+        val activeAccountIdHex = appState.activeAccount?.accountIdHex
+        val members =
+            runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }.getOrNull() ?: return null
+        if (!GroupProjector.isSoleAdminWithOtherMembers(group, activeAccountIdHex, members.size)) return null
+        return members.filter { GroupProjector.canTransferAdminTo(group, it, activeAccountIdHex) }.ifEmpty { null }
+    }
+
+    /**
+     * Sole-admin escape hatch for chat-list Delete (#1131): grant admin to
+     * [newAdmin], self-demote, then leave and wipe locally — one action, under the
+     * group commit lock. Self-contained rather than composing [leaveGroup]: that
+     * re-reads the stale [groupRecordsById] (applyLocalGroupUpdate refreshes the
+     * row projection, not the record map) and would re-block on the pre-transfer
+     * admin list. After the transfer the active account is a non-admin member with
+     * [newAdmin] in charge, so a plain MLS leave always applies.
+     */
+    suspend fun transferAdminThenDeleteFromChatList(
+        groupIdHex: String,
+        newAdmin: AppGroupMemberRecordFfi,
+    ): Boolean {
+        val account = accountRef ?: return false
+        val group = groupRecordsById[groupIdHex] ?: return false
+        val activeAccountIdHex = appState.activeAccount?.accountIdHex
+        if (!GroupProjector.canTransferAdminTo(group, newAdmin, activeAccountIdHex)) {
+            appState.present(R.string.toast_couldnt_update_admin, R.string.toast_cant_transfer_admin, copyable = true)
+            return false
+        }
+        // Hide the row immediately so it can't be reopened mid-operation; restore
+        // it if the transfer/leave fails (mirrors deleteGroupFromChatList, #894).
+        val removedRow = chatRowsByGroup[chatRowKey(groupIdHex)]
+        removeChatRow(groupIdHex)
+        var grantedBeforeLeave = false
+        val left =
+            runCatching {
+                appState.withGroupCommitLock(account, groupIdHex) {
+                    val promote = appState.marmotIo { promoteAdminDetailed(account, groupIdHex, newAdmin.memberIdHex) }
+                    grantedBeforeLeave = true
+                    appState.applyLocalGroupUpdate(promote.details.group)
+                    // Grant has landed on the MLS group; finish demote + leave even
+                    // if the scope is cancelled so we never strand two admins or a
+                    // half-completed leave.
+                    withContext(NonCancellable) {
+                        val demote = appState.marmotIo { selfDemoteAdminDetailed(account, groupIdHex) }
+                        appState.applyLocalGroupUpdate(demote.details.group)
+                        appState.marmotIo { leaveGroup(account, groupIdHex) }
+                    }
+                }
+                true
+            }.getOrElse {
+                if (it is CancellationException) throw it
+                appState.present(
+                    if (grantedBeforeLeave) R.string.toast_granted_but_couldnt_step_down else R.string.toast_couldnt_update_admin,
+                    AppText.Plain(it.message ?: it.javaClass.simpleName),
+                    copyable = true,
+                )
+                removedRow?.let { foldChatRow(it) }
+                false
+            }
+        if (!left) return false
+        // Left the group; drop local data. Best-effort — the row is already gone
+        // and we're out of the group, so a wipe failure only leaves local remnants.
+        runCatching { appState.deleteGroupLocalWithClientCleanup(account, groupIdHex) }
+            .exceptionOrNull()
+            ?.let { if (it is CancellationException) throw it }
+        appState.present(R.string.toast_chat_deleted_local)
+        return true
+    }
+
+    /**
      * Flip the chat-list row for [groupIdHex] to its left state after a leave
      * initiated from another surface (the conversation Details screen), where
      * the engine pushes no chat-list update for a self-leave so the row would

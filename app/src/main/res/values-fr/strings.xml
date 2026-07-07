@@ -894,4 +894,5 @@
     <string name="onboarding_slogan_secure_messaging">Messagerie Sécurisée</string>
     <string name="sign_in_error_public_key">Ceci est une clé publique. Saisissez votre clé secrète (nsec) pour vous connecter.</string>
     <string name="group_add_members_after_create">Vous pourrez ajouter des membres après avoir créé le groupe.</string>
+    <string name="confirm_sole_admin_transfer_then_leave_message">Vous êtes le seul administrateur. %1$s devient admin et vous quittez le groupe.</string>
 </resources>
