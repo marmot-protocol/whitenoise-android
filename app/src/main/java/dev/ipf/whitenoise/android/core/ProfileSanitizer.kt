@@ -42,6 +42,7 @@ object ProfileSanitizer {
         // Reject embedded credentials (`https://user:pass@host`): they can leak
         // to the host and let `user@` mask the real authority.
         if (!uri.rawUserInfo.isNullOrEmpty()) return null
+        if (uri.port != -1 && uri.port != 443) return null
         // SSRF guard: never let an avatar URL point the app at loopback or the
         // local network. See issue #89.
         if (HostSafety.isPrivateOrLoopbackHost(host)) return null

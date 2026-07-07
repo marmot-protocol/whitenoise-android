@@ -103,6 +103,13 @@ class ProfileSanitizerTest {
     }
 
     @Test
+    fun imageUrlsRejectExplicitNonStandardPorts() {
+        assertEquals("https://example.com/avatar.png", ProfileSanitizer.imageUrl("https://example.com/avatar.png"))
+        assertEquals("https://example.com:443/avatar.png", ProfileSanitizer.imageUrl("https://example.com:443/avatar.png"))
+        assertNull(ProfileSanitizer.imageUrl("https://example.com:9200/avatar.png"))
+    }
+
+    @Test
     fun messageBodyPreservesNormalNewlinesButClampsBlankRuns() {
         assertEquals("one\n\ntwo", ProfileSanitizer.messageBody(" one\n\n\n\ntwo "))
     }

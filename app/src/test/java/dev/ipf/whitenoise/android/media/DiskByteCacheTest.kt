@@ -130,6 +130,24 @@ class DiskByteCacheTest {
     }
 
     @Test
+    fun replacingKeyDefersIndexRemovalUntilAfterRenamesSucceed() {
+        val source =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/media/DiskByteCache.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/media/DiskByteCache.kt"),
+            ).firstOrNull { it.exists() }?.readText()
+                ?: error("Missing DiskByteCache.kt source file")
+        val body = source.kotlinFunctionBody("put")
+
+        assertTrue(
+            "same-key replacement must inspect the existing entry before renames but remove it only after tmp.renameTo(file) succeeds",
+            body.indexOf("val existing = index[hashed]") < body.indexOf("!tmp.renameTo(file)") &&
+                body.indexOf("!tmp.renameTo(file)") < body.indexOf("index.remove(hashed)") &&
+                body.indexOf("index.remove(hashed)") < body.indexOf("index[hashed] = Entry(file, size, ciphertextTag)"),
+        )
+    }
+
+    @Test
     fun get_refreshesFileLastModifiedForReadRecency() {
         val cache = DiskByteCache(dir, maxBytes = 1024)
         cache.put("a", ByteArray(40))
@@ -487,6 +505,32 @@ class DiskByteCacheTest {
                 .getInstance("SHA-256")
                 .digest(value.toByteArray())
         return digest.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+    }
+
+    private fun String.kotlinFunctionBody(functionName: String): String {
+        val start =
+            Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
+                .find(this)
+                ?.range
+                ?.first
+                ?: error("Missing function $functionName")
+        val braceStart = indexOf('{', start)
+        require(braceStart >= 0) { "Missing body for $functionName" }
+        var depth = 0
+        var index = braceStart
+        while (index < length) {
+            when (this[index]) {
+                '{' -> depth += 1
+                '}' -> {
+                    depth -= 1
+                    index += 1
+                    if (depth == 0) return substring(braceStart, index)
+                    continue
+                }
+            }
+            index += 1
+        }
+        error("Unterminated function $functionName")
     }
 
     private class BlockingListFilesDir(
