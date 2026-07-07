@@ -8,7 +8,7 @@ import java.io.File
 class ForwardMessageSheetCoverageTest {
     @Test
     fun forwardActionStaysInVisibleSheetContentAboveImeInsets() {
-        val body = whiteNoiseAppSource().readText().functionBody("ForwardMessageSheet")
+        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet")
 
         assertTrue(
             "the forward sheet must not pin the action to the expanded sheet height, which hides it at the partial detent",
@@ -30,7 +30,7 @@ class ForwardMessageSheetCoverageTest {
 
     @Test
     fun searchFocusExpandsForwardSheet() {
-        val body = whiteNoiseAppSource().readText().functionBody("ForwardMessageSheet")
+        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet")
 
         assertTrue(
             "the forward sheet should expand when search receives focus so the keyboard pushes the sheet up instead of covering actions",
@@ -45,7 +45,7 @@ class ForwardMessageSheetCoverageTest {
 
     @Test
     fun forwardButtonRemainsOutsideScrollableTargetList() {
-        val body = whiteNoiseAppSource().readText().functionBody("ForwardMessageSheet")
+        val body = messageActionsSource().readText().functionBody("ForwardMessageSheet")
         val listIndex = body.indexOf("LazyColumn(")
         val buttonIndex = body.indexOf("Button(", listIndex)
 
@@ -55,10 +55,10 @@ class ForwardMessageSheetCoverageTest {
         )
     }
 
-    private fun whiteNoiseAppSource(): File =
+    private fun messageActionsSource(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing WhiteNoiseApp.kt source file")
+            ?: error("Missing MessageActions.kt source file")
 }

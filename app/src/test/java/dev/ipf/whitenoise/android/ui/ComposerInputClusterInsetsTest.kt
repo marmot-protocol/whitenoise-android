@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerBottomClusterAppliesImePadding
+import dev.ipf.whitenoise.android.ui.conversation.composer.shouldReanchorBottomInputForReplyTargetChange
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

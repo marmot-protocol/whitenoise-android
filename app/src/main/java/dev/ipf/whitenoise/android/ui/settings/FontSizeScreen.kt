@@ -33,7 +33,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SectionCard
-import dev.ipf.whitenoise.android.ui.messageBubbleBorder
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 internal val AppFontScale.labelRes: Int
