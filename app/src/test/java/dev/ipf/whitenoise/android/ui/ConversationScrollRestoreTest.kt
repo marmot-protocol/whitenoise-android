@@ -1,5 +1,9 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
+import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
+import dev.ipf.whitenoise.android.ui.conversation.conversationScrollRestoreListIndex
+import dev.ipf.whitenoise.android.ui.conversation.conversationScrollSnapshotOnLeave
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

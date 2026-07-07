@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientPreviewAllowsSubmit
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientPreviewState
 import dev.ipf.whitenoise.android.ui.chats.newchat.resolvedRecipientRefs
+import dev.ipf.whitenoise.android.ui.conversation.shouldShowConversationMembersSubtitle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
