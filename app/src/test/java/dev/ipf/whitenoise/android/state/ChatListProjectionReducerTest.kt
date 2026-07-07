@@ -382,6 +382,7 @@ class ChatListProjectionReducerTest {
         avatarUrl = null,
         avatarDim = null,
         avatarThumbhash = null,
+        imageHashHex = null,
         encryptedMedia = encryptedMedia(),
         archived = archived,
         pendingConfirmation = pendingConfirmation,
