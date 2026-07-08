@@ -246,22 +246,14 @@ object GroupProjector {
 
     /**
      * Whether Leave/Delete should dissolve the group with a local wipe instead
-     * of attempting an MLS leave commit (issues #811 / #1171). Prefers an
-     * authoritative roster when present; callers can pass a trusted cached
-     * [memberCountFallback] when the roster is unavailable (use a value > 1 for
-     * unknown counts so we do not silently skip a required MLS leave).
+     * of attempting an MLS leave commit (issues #811 / #1171). This requires an
+     * authoritative live roster containing exactly the active account; cached
+     * counts or snapshots can be stale and must not choose the local-wipe path.
      */
     fun shouldDissolveAsSoleMember(
         roster: List<AppGroupMemberRecordFfi>?,
         activeAccountIdHex: String?,
-        memberCountFallback: Int,
-    ): Boolean {
-        roster?.let { members ->
-            if (isSelfSoleMember(members, activeAccountIdHex)) return true
-            if (members.isNotEmpty()) return false
-        }
-        return memberCountFallback <= 1
-    }
+    ): Boolean = roster != null && isSelfSoleMember(roster, activeAccountIdHex)
 
     /**
      * The roster with the active account dropped. Used on a successful leave

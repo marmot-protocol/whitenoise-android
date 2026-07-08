@@ -226,7 +226,7 @@ class GroupProjectorTest {
     }
 
     @Test
-    fun shouldDissolveAsSoleMemberPrefersAuthoritativeRosterOverStaleCount() {
+    fun shouldDissolveAsSoleMemberUsesAuthoritativeRosterOnly() {
         val self = member(memberId = "credential-a", account = "alice", local = true)
         val other = member(memberId = "bob", account = "bob", local = false)
 
@@ -234,46 +234,34 @@ class GroupProjectorTest {
             GroupProjector.shouldDissolveAsSoleMember(
                 roster = listOf(self),
                 activeAccountIdHex = "alice",
-                memberCountFallback = 3,
             ),
         )
         assertFalse(
             GroupProjector.shouldDissolveAsSoleMember(
                 roster = listOf(self, other),
                 activeAccountIdHex = "alice",
-                memberCountFallback = 1,
             ),
         )
     }
 
     @Test
-    fun shouldDissolveAsSoleMemberFallsBackToCountWhenRosterIsMissingOrEmpty() {
-        assertTrue(
+    fun shouldDissolveAsSoleMemberRejectsMissingEmptyOrWrongRoster() {
+        assertFalse(
             GroupProjector.shouldDissolveAsSoleMember(
                 roster = null,
                 activeAccountIdHex = "alice",
-                memberCountFallback = 1,
             ),
         )
-        assertTrue(
+        assertFalse(
             GroupProjector.shouldDissolveAsSoleMember(
                 roster = emptyList(),
                 activeAccountIdHex = "alice",
-                memberCountFallback = 0,
             ),
         )
         assertFalse(
             GroupProjector.shouldDissolveAsSoleMember(
-                roster = null,
+                roster = listOf(member(memberId = "bob", account = "bob", local = false)),
                 activeAccountIdHex = "alice",
-                memberCountFallback = 3,
-            ),
-        )
-        assertFalse(
-            GroupProjector.shouldDissolveAsSoleMember(
-                roster = null,
-                activeAccountIdHex = "alice",
-                memberCountFallback = Int.MAX_VALUE,
             ),
         )
     }
