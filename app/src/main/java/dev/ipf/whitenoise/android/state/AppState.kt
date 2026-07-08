@@ -181,26 +181,55 @@ internal object ChatScreenshotPreferences {
 internal object LongMessageCollapsePreferences {
     private const val KEY_PREFIX = "collapse_long_messages:"
 
+    fun normalizedAccountRef(accountRef: String?): String? =
+        accountRef
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+
     fun normalizedGroupId(groupIdHex: String): String? =
         groupIdHex
             .trim()
             .lowercase(Locale.ROOT)
             .takeIf { it.isNotEmpty() }
 
+    fun preferenceKey(
+        accountRef: String?,
+        groupIdHex: String,
+    ): String? {
+        val account = normalizedAccountRef(accountRef) ?: return null
+        val group = normalizedGroupId(groupIdHex) ?: return null
+        return "$KEY_PREFIX$account:$group"
+    }
+
     fun readCollapseLongMessages(
         preferences: SharedPreferences,
+        accountRef: String?,
         groupIdHex: String,
     ): Boolean {
-        val key = preferenceKey(groupIdHex) ?: return true
-        return preferences.getBoolean(key, true)
+        val key = preferenceKey(accountRef, groupIdHex) ?: return true
+        return readCollapseLongMessagesByKey(preferences, key)
     }
+
+    fun readCollapseLongMessagesByKey(
+        preferences: SharedPreferences,
+        key: String,
+    ): Boolean = preferences.getBoolean(key, true)
 
     fun writeCollapseLongMessages(
         preferences: SharedPreferences,
+        accountRef: String?,
         groupIdHex: String,
         enabled: Boolean,
     ) {
-        val key = preferenceKey(groupIdHex) ?: return
+        val key = preferenceKey(accountRef, groupIdHex) ?: return
+        writeCollapseLongMessagesByKey(preferences, key, enabled)
+    }
+
+    fun writeCollapseLongMessagesByKey(
+        preferences: SharedPreferences,
+        key: String,
+        enabled: Boolean,
+    ) {
         val edit = preferences.edit()
         if (enabled) {
             edit.remove(key)
@@ -209,8 +238,6 @@ internal object LongMessageCollapsePreferences {
         }
         edit.apply()
     }
-
-    private fun preferenceKey(groupIdHex: String): String? = normalizedGroupId(groupIdHex)?.let { KEY_PREFIX + it }
 }
 
 internal data class ProfileGroupInviteToast(
@@ -1015,7 +1042,7 @@ class WhiteNoiseAppState(
     private val groupMemberSnapshots = BoundedEntryCache<String, GroupMemberSnapshot>(MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES)
     private val groupMemberSnapshotLock = Any()
     private val conversationStateLock = Any()
-    private val collapseLongMessagesByGroup = mutableStateMapOf<String, Boolean>()
+    private val collapseLongMessagesByAccountGroup = mutableStateMapOf<String, Boolean>()
     private val optimisticMessagesByConversation = mutableMapOf<String, SnapshotStateMap<String, TimelineMessage>>()
     private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
     private val timelineOrderOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
@@ -2670,23 +2697,23 @@ class WhiteNoiseAppState(
     }
 
     /**
-     * Local UI preference for the per-group long-message collapse gate (#1180).
-     * Default ON preserves the existing Read More behavior for every group until
-     * the user disables it from that group's details screen.
+     * Local UI preference for the active account's per-group long-message collapse
+     * gate (#1180). Default ON preserves the existing Read More behavior for every
+     * account/group until the user disables it from that group's details screen.
      */
     fun collapseLongMessagesInGroup(groupIdHex: String): Boolean {
-        val key = LongMessageCollapsePreferences.normalizedGroupId(groupIdHex) ?: return true
-        return collapseLongMessagesByGroup[key]
-            ?: LongMessageCollapsePreferences.readCollapseLongMessages(preferences, key)
+        val key = LongMessageCollapsePreferences.preferenceKey(activeAccountRef, groupIdHex) ?: return true
+        return collapseLongMessagesByAccountGroup[key]
+            ?: LongMessageCollapsePreferences.readCollapseLongMessagesByKey(preferences, key)
     }
 
     fun updateCollapseLongMessagesInGroup(
         groupIdHex: String,
         enabled: Boolean,
     ) {
-        val key = LongMessageCollapsePreferences.normalizedGroupId(groupIdHex) ?: return
-        collapseLongMessagesByGroup[key] = enabled
-        LongMessageCollapsePreferences.writeCollapseLongMessages(preferences, key, enabled)
+        val key = LongMessageCollapsePreferences.preferenceKey(activeAccountRef, groupIdHex) ?: return
+        collapseLongMessagesByAccountGroup[key] = enabled
+        LongMessageCollapsePreferences.writeCollapseLongMessagesByKey(preferences, key, enabled)
     }
 
     /**

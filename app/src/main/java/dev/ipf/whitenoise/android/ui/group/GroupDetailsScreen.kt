@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.WrapText
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
@@ -632,7 +633,7 @@ internal fun GroupDetailsScreen(
                     },
             )
             GroupSwitchActionRow(
-                icon = Icons.Default.Description,
+                icon = Icons.AutoMirrored.Filled.WrapText,
                 title = stringResource(R.string.collapse_long_messages),
                 subtitle = stringResource(R.string.collapse_long_messages_subtitle),
                 checked = collapseLongMessages,
