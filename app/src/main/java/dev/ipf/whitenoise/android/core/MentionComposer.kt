@@ -22,14 +22,16 @@ object MentionComposer {
     /**
      * A member the composer can mention. Built by the UI from the group's
      * member roster (`memberIdHex` → [npub] via the FFI, [displayName] via the
-     * profile cache, [nip05] from published profile metadata). Kept free of any
-     * FFI/Compose type so the filter is unit-testable.
+     * profile cache, [nip05] from published profile metadata, [avatarUrl] via
+     * the profile cache). Kept free of any FFI/Compose type so the filter is
+     * unit-testable.
      */
     data class Candidate(
         val accountIdHex: String,
         val npub: String,
         val displayName: String,
         val nip05: String? = null,
+        val avatarUrl: String? = null,
     )
 
     /**

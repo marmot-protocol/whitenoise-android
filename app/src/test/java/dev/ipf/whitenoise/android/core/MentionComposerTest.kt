@@ -96,6 +96,15 @@ class MentionComposerTest {
     }
 
     @Test
+    fun filterPreservesAvatarUrlOnMatchedCandidates() {
+        val withAvatar = alice.copy(avatarUrl = "https://example.com/alice.png")
+        assertEquals(
+            listOf(withAvatar),
+            MentionComposer.filter("alice", listOf(withAvatar)),
+        )
+    }
+
+    @Test
     fun filtersByDisplayNameCaseInsensitiveContains() {
         assertEquals(listOf(bob), MentionComposer.filter("rob", candidates))
         assertEquals(listOf(alice), MentionComposer.filter("ALI", candidates))
