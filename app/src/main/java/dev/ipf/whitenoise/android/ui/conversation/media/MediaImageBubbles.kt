@@ -415,68 +415,10 @@ internal fun MasonryImageLayout(
     }
 }
 
-@Composable
-private fun MediaImageGridBubble(
-    item: TimelineMessage,
-    attachments: List<IndexedValue<MediaAttachmentReferenceFfi>>,
-    controller: ConversationController,
-    appState: WhiteNoiseAppState,
-    mine: Boolean,
-    onLongPress: () -> Unit = {},
-) {
-    val record = item.record
-    // Show up to four tiles before collapsing the remainder into a "+N"
-    // overlay on the fourth tile. Higher counts trip the overflow chip in
-    // the 2×2 layout below (#527).
-    val visible = attachments.take(4)
-    val overflow = (attachments.size - visible.size).coerceAtLeast(0)
-    var viewerOpenAt by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
-
-    val tileAt: @Composable (Int, Modifier) -> Unit = { tileIndex, tileModifier ->
-        val entry = visible[tileIndex]
-        val showOverflow = tileIndex == visible.lastIndex && overflow > 0
-        MediaImageGridTile(
-            messageIdHex = record.messageIdHex,
-            attachmentIndex = entry.index,
-            reference = entry.value,
-            controller = controller,
-            appState = appState,
-            mine = mine,
-            onTap = { viewerOpenAt = tileIndex },
-            overflowCount = if (showOverflow) overflow else 0,
-            modifier = tileModifier,
-            onLongPress = onLongPress,
-        )
-    }
-
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        MasonryImageLayout(visibleCount = visible.size, onLongPress = onLongPress, tile = tileAt)
-    }
-
-    viewerOpenAt?.let { index ->
-        FullScreenImageViewer(
-            controller = controller,
-            appState = appState,
-            messageIdHex = record.messageIdHex,
-            attachments = attachments,
-            startIndex = index,
-            onDismiss = { viewerOpenAt = null },
-            sender = record.sender,
-            recordedAt = record.recordedAt,
-            mine = mine,
-        )
-    }
-}
-
 /**
  * Mixed image + video album bubble. Each tile picks its renderer based on
  * MIME — image tiles open the image viewer, video tiles tap-to-play in the
- * fullscreen ExoPlayer. Layout is the same masonry as MediaImageGridBubble.
+ * fullscreen ExoPlayer. Layout is the shared [MasonryImageLayout] masonry.
  */
 @Composable
 internal fun MediaVisualGridBubble(

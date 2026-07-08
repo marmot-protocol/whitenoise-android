@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.account
 
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -145,9 +146,11 @@ internal fun AccountSelectorSheet(
     LaunchedEffect(Unit) {
         try {
             appState.refreshAccounts()
-        } catch (error: Throwable) {
-            if (error is kotlin.coroutines.cancellation.CancellationException) throw error
+        } catch (error: kotlin.coroutines.cancellation.CancellationException) {
+            throw error
+        } catch (error: Exception) {
             // Keep the cached account list rather than failing the sheet.
+            Log.w("AccountSelectorSheet", "refreshAccounts failed, using cached list", error)
         } finally {
             refreshingAccounts = false
         }

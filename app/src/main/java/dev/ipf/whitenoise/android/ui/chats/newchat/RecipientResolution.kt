@@ -224,8 +224,8 @@ internal sealed interface RecipientPreviewState {
 
 /**
  * Whether [RecipientPreviewState] permits the surrounding action button to be
- * enabled. Loaded and NoProfile are confirmable; Empty/Resolving/Invalid are
- * not. The card's gate is AND-ed into the existing per-surface enable
+ * enabled. Loaded and NoProfile are confirmable; Resolving/Invalid are not;
+ * Empty passes through. The card's gate is AND-ed into the existing per-surface enable
  * predicates so the button can never fire on an unresolved/invalid identifier
  * (issue #631), while an unparsed plain-text input (Empty) still defers to the
  * surface's own validation.

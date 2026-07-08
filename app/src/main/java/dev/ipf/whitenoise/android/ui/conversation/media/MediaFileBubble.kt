@@ -113,6 +113,7 @@ internal fun MediaFileBubble(
             failed = false
         }.onFailure {
             if (it is kotlinx.coroutines.CancellationException) throw it
+            failed = true
             Log.w("MediaFileBubble", "auto-download failed for msg=${messageIdHex.take(8)}#$attachmentIndex", it)
         }
         inFlight = false

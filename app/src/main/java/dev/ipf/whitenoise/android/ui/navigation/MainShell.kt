@@ -186,7 +186,9 @@ internal fun MainShell(
                 selectedChatFocusMessageId = null
                 selectedChatJustCreated = false
                 selectedChatOpenedAsDmHint = false
-                appState.setActiveAccount(step.accountRef)
+                // This effect is keyed on activeAccountRef, so an inline suspend
+                // switch would cancel itself the moment the ref flips.
+                appState.launchMutation { appState.setActiveAccount(step.accountRef) }
             }
             NotificationNavStep.AwaitChatList -> Unit // re-fires when list state settles
             is NotificationNavStep.OpenConversation -> {

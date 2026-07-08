@@ -43,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -75,7 +76,7 @@ import kotlinx.coroutines.withContext
 @Composable
 private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
     val context = LocalContext.current
-    var bitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
+    var bitmap by remember(uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
     LaunchedEffect(uri) {
         bitmap =
             withContext(Dispatchers.Default) {
@@ -97,7 +98,7 @@ private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
                                     android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
                                     edge,
                                     edge,
-                                )?.asImageBitmap()
+                                )
                         } finally {
                             runCatching { mmr.release() }
                         }
@@ -119,12 +120,19 @@ private fun rememberLocalPreviewBitmap(uri: android.net.Uri): ImageBitmap? {
                                 context.contentResolver,
                                 uri,
                                 MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-                            )?.asImageBitmap()
+                            )
                     }.getOrNull()
                 }
             }
     }
-    return bitmap
+    // Recycle the decoded buffer on key change and dispose instead of leaving
+    // it to the GC, mirroring rememberSampledBitmap. Capture the instance so a
+    // key change recycles the previous bitmap, not the replacement.
+    DisposableEffect(bitmap) {
+        val decoded = bitmap
+        onDispose { decoded?.recycle() }
+    }
+    return remember(bitmap) { bitmap?.asImageBitmap() }
 }
 
 @Composable
