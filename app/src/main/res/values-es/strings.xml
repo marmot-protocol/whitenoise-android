@@ -884,6 +884,8 @@
     <string name="add_group_description">Añadir descripción del grupo</string>
     <string name="see_all_members">Ver los %1$d miembros</string>
     <string name="chat_lock">Bloqueo del chat</string>
+    <string name="collapse_long_messages">Contraer mensajes largos</string>
+    <string name="collapse_long_messages_subtitle">Mostrar un acceso «Leer más» para los mensajes largos en este chat</string>
     <string name="toast_disappearing_not_applied">El grupo se creó, pero no se pudieron activar los mensajes temporales</string>
     <string name="search_members">Buscar miembros</string>
     <string name="recent_chats">Chats recientes</string>

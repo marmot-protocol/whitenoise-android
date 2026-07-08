@@ -876,6 +876,8 @@
     <string name="add_group_description">新增群組描述</string>
     <string name="see_all_members">查看全部 %1$d 位成員</string>
     <string name="chat_lock">聊天鎖定</string>
+    <string name="collapse_long_messages">摺疊長訊息</string>
+    <string name="collapse_long_messages_subtitle">在此聊天中為長訊息顯示「閱讀更多」捷徑</string>
     <string name="toast_disappearing_not_applied">群組已建立，但無法開啟閱後即焚訊息</string>
     <string name="search_members">搜尋成員</string>
     <string name="recent_chats">最近的聊天</string>
