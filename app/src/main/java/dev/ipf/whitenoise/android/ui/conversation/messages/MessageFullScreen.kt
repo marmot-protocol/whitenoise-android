@@ -90,6 +90,7 @@ internal fun MessageFullScreenView(
     onCopy: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
+    bottomBar: @Composable () -> Unit,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -200,6 +201,7 @@ internal fun MessageFullScreenView(
                     windowInsets = WindowInsets(0, 0, 0, 0),
                 )
             },
+            bottomBar = bottomBar,
         ) { padding ->
             Column(
                 modifier =
