@@ -3124,7 +3124,7 @@ class ConversationController(
         val memberCount =
             if (account != null) {
                 runCatching { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
-                    .onFailure { it.rethrowIfCancellation() }
+                    .onFailure(::rethrowIfCancellation)
                     .getOrNull()
                     ?.size
             } else {
@@ -5085,7 +5085,7 @@ class ConversationController(
             // sole-admin transfer gate and dissolve the group with local cleanup.
             val liveMembers =
                 runCatching { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
-                    .onFailure { it.rethrowIfCancellation() }
+                    .onFailure(::rethrowIfCancellation)
                     .getOrNull()
             val memberCount = liveMembers?.size ?: members.size
             val soleMember = liveMembers != null && GroupProjector.isSelfSoleMember(liveMembers, activeAccountIdHex)
