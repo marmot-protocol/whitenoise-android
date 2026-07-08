@@ -971,6 +971,33 @@ internal fun compareTimelineMessages(
         it.record.recordedAt
     }, { it.timelineOrder }, { it.id })
 
+private fun TimelineMessage.projectedMessageIdHex(): String? = projected?.messageIdHex
+
+/**
+ * Oldest live timeline message ids to drop so at most [maxLiveItems] non-[protectedIds]
+ * rows remain. Deliberately-loaded history (captured when the user scrolls up via
+ * [loadOlderPage]) is never trimmed; only rows added by live Upserts after that are
+ * capped (#1163).
+ */
+internal fun timelineMessageIdsExceedingLiveCap(
+    items: Collection<TimelineMessage>,
+    protectedIds: Set<String>,
+    maxLiveItems: Int,
+): List<String> {
+    if (maxLiveItems < 0) return emptyList()
+    val live =
+        items.filter {
+            val id = it.projectedMessageIdHex()
+            id != null && id !in protectedIds
+        }
+    val overflow = live.size - maxLiveItems
+    if (overflow <= 0) return emptyList()
+    return live
+        .sortedWith(::compareTimelineMessages)
+        .take(overflow)
+        .mapNotNull { it.projectedMessageIdHex() }
+}
+
 internal fun AppMessageRecordFfi.withRecordedAtOverride(recordedAt: ULong?): AppMessageRecordFfi = recordedAt?.let { copy(recordedAt = it) } ?: this
 
 /**
@@ -3013,6 +3040,11 @@ class ConversationController(
     // without bound. See #200.
     private val removedStreamIds = BoundedStreamTombstones()
     private var hasLoadedOlderPages = false
+
+    // Snapshot of message ids in the deliberately-loaded history window after the
+    // last successful loadOlderPage(). Live Upserts after that are capped separately
+    // so indexes and messageById cannot grow without bound (#1163).
+    private val protectedTimelineMessageIds = mutableSetOf<String>()
 
     // Last message id we successfully marked as read on the Rust side.
     // Dedupes scroll-driven [markReadUpTo] calls so settling on the same row
@@ -5669,6 +5701,8 @@ class ConversationController(
             val page = paginateOlderIfSubscriptionActive(subscription) ?: return false
             hasLoadedOlderPages = true
             applyTimelinePage(page, replaceWindow = true, updatePagination = true)
+            protectedTimelineMessageIds.clear()
+            protectedTimelineMessageIds.addAll(timelineRecords.keys)
             // The cached `mediaReferences` map only carries entries for
             // messages that have been listMedia-projected at some prior
             // point. Older-page rows landing fresh here would otherwise
@@ -5721,6 +5755,7 @@ class ConversationController(
                 )
             }
         hasLoadedOlderPages = false
+        protectedTimelineMessageIds.clear()
         val streamIds = applyTimelinePage(page, replaceWindow = true, updatePagination = true)
         // Full-window replacement: re-seed the typed media cache too so any
         // freshly-projected media in the new window resolves to its real
@@ -5902,13 +5937,10 @@ class ConversationController(
         recomputeReactions(reactionTargets)
         // The engine streams Upserts for new messages but never Removes ones that
         // scroll out, so the live indexes grow without bound for a conversation
-        // kept open while messages arrive. Cap the live window to the newest
-        // entries; scrolling up triggers loadOlder(), whose replaceWindow rebuild
-        // restores the authoritative window. Skipped once the user has expanded
-        // the window via loadOlder so deliberately-loaded history isn't trimmed.
-        if (!hasLoadedOlderPages) {
-            trimLiveTimelineWindow(LIVE_TIMELINE_WINDOW_CAP)
-        }
+        // kept open while messages arrive. Cap live rows to the newest entries;
+        // after loadOlder(), deliberately-loaded history is preserved and only
+        // post-pagination live Upserts are trimmed (#1163 / #537).
+        trimLiveTimelineWindow(LIVE_TIMELINE_WINDOW_CAP)
         // Live Upsert/Projection batches add to messageById but never trim it;
         // prune to the (now-bounded) window + optimistic records so it doesn't
         // grow unbounded for an actively-watched conversation (#373).
@@ -6208,16 +6240,16 @@ class ConversationController(
         }
     }
 
-    // Drop the oldest projected records beyond [maxItems], using the same total
-    // order the publish sorts by, so only the newest window is retained.
+    // Drop the oldest live-projected records beyond [maxItems], using the same
+    // total order the publish sorts by. When older history was deliberately
+    // loaded, [protectedTimelineMessageIds] is excluded from the trim.
     private fun trimLiveTimelineWindow(maxItems: Int) {
-        val overflow = timelineItemsById.size - maxItems
-        if (overflow <= 0) return
-        timelineItemsById.values
-            .sortedWith(::compareTimelineMessages)
-            .take(overflow)
-            .mapNotNull { it.projected?.messageIdHex }
-            .forEach(::removeProjectedRecord)
+        val protectedIds = if (hasLoadedOlderPages) protectedTimelineMessageIds else emptySet()
+        timelineMessageIdsExceedingLiveCap(
+            items = timelineItemsById.values,
+            protectedIds = protectedIds,
+            maxLiveItems = maxItems,
+        ).forEach(::removeProjectedRecord)
         pruneReadAnchorsToWindow()
     }
 
