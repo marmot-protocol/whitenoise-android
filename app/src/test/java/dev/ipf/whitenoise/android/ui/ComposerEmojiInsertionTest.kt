@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.ipf.whitenoise.android.ui.conversation.composer.insertComposerEmoji
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

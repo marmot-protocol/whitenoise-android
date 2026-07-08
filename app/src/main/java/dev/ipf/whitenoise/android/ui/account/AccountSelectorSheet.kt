@@ -1,0 +1,262 @@
+package dev.ipf.whitenoise.android.ui.account
+
+import android.util.Log
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
+import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
+import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
+import dev.ipf.whitenoise.android.ui.settings.settingsRowAmoledSurfaceBorder
+import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
+import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
+import kotlinx.coroutines.CancellationException
+
+@Composable
+fun SettingsAccountHeader(
+    title: String,
+    subtitle: String,
+    seed: String,
+    pictureUrl: String?,
+    onOpenAccountSelector: () -> Unit,
+    onOpenQr: () -> Unit,
+    onEditProfilePicture: () -> Unit = {},
+) {
+    val switchAccountDescription = stringResource(R.string.switch_account)
+    val safePictureUrl = ProfileSanitizer.imageUrl(pictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
+    var viewerOpen by remember(safePictureUrl) { mutableStateOf(false) }
+    ListItem(
+        modifier =
+            Modifier
+                .settingsRowAmoledSurfaceBorder()
+                .clickable(onClick = onOpenAccountSelector)
+                .semantics { contentDescription = switchAccountDescription },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        leadingContent = {
+            Box(
+                modifier =
+                    Modifier
+                        .clip(CircleShape)
+                        .clickable(
+                            enabled = avatarImageAvailable,
+                            onClickLabel = stringResource(R.string.profile_view_picture),
+                            role = Role.Button,
+                        ) { viewerOpen = true },
+            ) {
+                Avatar(
+                    title = title,
+                    seed = seed,
+                    size = 52.dp,
+                    pictureUrl = safePictureUrl,
+                )
+            }
+        },
+        headlineContent = { Text(title) },
+        supportingContent = { Text(subtitle, fontFamily = FontFamily.Monospace) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ExpandMore, contentDescription = null)
+                IconButton(onClick = onOpenQr) {
+                    Icon(Icons.Default.QrCode, contentDescription = stringResource(R.string.my_qr_code))
+                }
+            }
+        },
+    )
+    if (viewerOpen && safePictureUrl != null && avatarImageAvailable) {
+        AvatarFullScreenViewer(
+            title = title,
+            seed = seed,
+            pictureUrl = safePictureUrl,
+            onDismiss = { viewerOpen = false },
+            editActionLabel = stringResource(R.string.profile_picture_edit),
+            onEditPicture = {
+                viewerOpen = false
+                onEditProfilePicture()
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun AccountSelectorSheet(
+    appState: WhiteNoiseAppState,
+    onDismiss: () -> Unit,
+    onAddAccount: () -> Unit,
+    onAccountSwitched: () -> Unit,
+) {
+    // Local in-flight signal for the expressive loading state: refreshAccounts
+    // itself exposes none, and this sheet is the only caller that needs one.
+    var refreshingAccounts by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        try {
+            appState.refreshAccounts()
+        } catch (error: kotlin.coroutines.cancellation.CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            // Keep the cached account list rather than failing the sheet.
+            Log.w("AccountSelectorSheet", "refreshAccounts failed, using cached list", error)
+        } finally {
+            refreshingAccounts = false
+        }
+    }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = amoledSheetContainerColor(),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleLarge)
+            if (refreshingAccounts) {
+                Box(Modifier.fillMaxWidth().heightIn(min = 120.dp), contentAlignment = Alignment.Center) {
+                    LoadingIndicator()
+                }
+            } else {
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                    items(appState.accounts, key = { it.label }) { account ->
+                        val unreadCount = appState.unreadCountForAccount(account.label)
+                        val isActiveAccount = account.label == appState.activeAccountRef
+                        ListItem(
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .amoledSurfaceBorder(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        // Run on the process-lifetime mutation scope, not this
+                                        // sheet's rememberCoroutineScope. setActiveAccount flips
+                                        // activeAccountRef partway through and keeps suspending
+                                        // (profile warm, notification refresh, push sync); the
+                                        // account-change nav reset in MainShell then disposes this
+                                        // sheet, which would cancel a sheet-scoped coroutine before
+                                        // the switch cleanup finishes (#547). onDismiss /
+                                        // onAccountSwitched only set parent composition state, so
+                                        // they are safe to run from the mutation scope.
+                                        appState.launchMutation {
+                                            appState.setActiveAccount(account.label)
+                                            onDismiss()
+                                            // Land on the newly-active account's chat list
+                                            // instead of leaving the user on Settings (#316).
+                                            onAccountSwitched()
+                                        }
+                                    },
+                            colors =
+                                ListItemDefaults.colors(
+                                    // Tonal highlight so the active account reads at a
+                                    // glance, not only from the trailing check.
+                                    containerColor =
+                                        if (isActiveAccount) {
+                                            MaterialTheme.colorScheme.secondaryContainer
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                ),
+                            leadingContent = {
+                                Avatar(
+                                    title = appState.displayName(account.accountIdHex),
+                                    seed = account.accountIdHex,
+                                    size = 44.dp,
+                                    pictureUrl = appState.avatarUrl(account.accountIdHex),
+                                )
+                            },
+                            headlineContent = { Text(appState.displayName(account.accountIdHex)) },
+                            supportingContent = {
+                                Text(
+                                    appState.shortNpub(account.accountIdHex),
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            trailingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (unreadCount > 0uL) {
+                                        UnreadCountBadge(unreadCount)
+                                        Spacer(Modifier.width(8.dp))
+                                    }
+                                    if (!account.localSigning && !account.externalSigning) {
+                                        Text(stringResource(R.string.read_only), style = MaterialTheme.typography.labelSmall)
+                                        Spacer(Modifier.width(8.dp))
+                                    }
+                                    if (account.signedOut) {
+                                        Text(stringResource(R.string.signed_out), style = MaterialTheme.typography.labelSmall)
+                                        Spacer(Modifier.width(8.dp))
+                                    }
+                                    if (isActiveAccount) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = stringResource(R.string.active),
+                                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        )
+                                    }
+                                }
+                            },
+                        )
+                        HorizontalDivider()
+                    }
+                }
+            }
+            FilledTonalButton(
+                onClick = onAddAccount,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.add_account))
+            }
+        }
+    }
+}

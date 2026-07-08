@@ -1,6 +1,14 @@
 package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerSearchExtraHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheetMaxHeightFraction
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneTargetHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerSheetVisibleContentFraction
+import dev.ipf.whitenoise.android.ui.conversation.composer.shouldSwapComposerEmojiPaneToIme
+import dev.ipf.whitenoise.android.ui.conversation.composer.updatedComposerRememberedImeHeight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.whitenoise.android.ui.group.GroupMemberIdentityRows
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

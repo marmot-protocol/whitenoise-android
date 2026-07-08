@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.ui.common.avatarPaletteIndex
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

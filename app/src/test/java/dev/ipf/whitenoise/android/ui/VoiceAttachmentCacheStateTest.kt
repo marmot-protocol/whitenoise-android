@@ -3,6 +3,9 @@ package dev.ipf.whitenoise.android.ui
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.ui.conversation.media.cachedVoiceAttachmentFile
+import dev.ipf.whitenoise.android.ui.conversation.media.shouldInvalidateVoiceAttachmentCache
+import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartVoiceAttachmentDownload
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

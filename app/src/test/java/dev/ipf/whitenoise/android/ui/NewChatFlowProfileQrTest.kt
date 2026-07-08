@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.ui.chats.newchat.nostrNpubUri
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

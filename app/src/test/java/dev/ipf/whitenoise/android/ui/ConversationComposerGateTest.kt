@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
+import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
