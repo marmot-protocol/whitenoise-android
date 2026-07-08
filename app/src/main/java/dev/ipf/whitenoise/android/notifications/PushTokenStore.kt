@@ -14,6 +14,7 @@ private const val SECURE_PREFS_NAME = "whitenoise.push.tokens.secure"
 private const val FALLBACK_PREFS_NAME = "whitenoise.push.tokens.fallback"
 private const val KEY_FCM_TOKEN = "fcm_token"
 private const val KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC = "pending_native_push_registration_sync"
+private const val KEY_PENDING_PUSH_WAKE_CATCH_UP = "pending_push_wake_catch_up"
 private const val KEY_PENDING_CLEARS = "pending_clears"
 private const val KEY_PENDING_DISABLES = "pending_native_push_disables"
 
@@ -72,6 +73,29 @@ class PushTokenStore(
     fun clearPendingNativePushRegistrationSync() {
         synchronized(LOCK) {
             preferences.edit().remove(KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC).apply()
+        }
+    }
+
+    /**
+     * True when a MIP-05 push wake arrived but Android rejected the foreground
+     * stream start before the notification runtime could fetch/drain it. The
+     * next runtime-start, connectivity, or foreground catch-up trigger retries
+     * the fetch instead of losing that wake. See #1160.
+     */
+    fun pushWakeCatchUpPending(): Boolean = preferences.getBoolean(KEY_PENDING_PUSH_WAKE_CATCH_UP, false)
+
+    // commit() (not apply()) so the #1160 retry marker is durable before the
+    // Firebase background service returns and the process can be killed.
+    @SuppressLint("ApplySharedPref")
+    fun recordPendingPushWakeCatchUp() {
+        synchronized(LOCK) {
+            preferences.edit().putBoolean(KEY_PENDING_PUSH_WAKE_CATCH_UP, true).commit()
+        }
+    }
+
+    fun clearPendingPushWakeCatchUp() {
+        synchronized(LOCK) {
+            preferences.edit().remove(KEY_PENDING_PUSH_WAKE_CATCH_UP).apply()
         }
     }
 
@@ -198,6 +222,7 @@ internal fun migrateLegacyPushTokenPreferences(
     var wrote = false
     copyStringIfMissing(legacyValues, secure, editor, KEY_FCM_TOKEN).also { wrote = wrote || it }
     copyBooleanIfMissing(legacyValues, secure, editor, KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC).also { wrote = wrote || it }
+    copyBooleanIfMissing(legacyValues, secure, editor, KEY_PENDING_PUSH_WAKE_CATCH_UP).also { wrote = wrote || it }
     copyStringSetIfMissing(legacyValues, secure, editor, KEY_PENDING_CLEARS).also { wrote = wrote || it }
     copyStringSetIfMissing(legacyValues, secure, editor, KEY_PENDING_DISABLES).also { wrote = wrote || it }
     if (!wrote || editor.commit()) {

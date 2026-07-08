@@ -67,11 +67,32 @@ class MarmotFirebaseMessagingService : FirebaseMessagingService() {
     private fun wakeForegroundStream() {
         try {
             val started = NotificationStreamForegroundService.start(applicationContext, ForegroundStartTrigger.PushWake)
-            if (!started) {
-                Log.w(TAG, "Failed to start foreground stream from push wake")
+            if (shouldRecordPendingPushWakeCatchUp(ForegroundStartTrigger.PushWake, started)) {
+                recordPendingPushWakeCatchUp()
             }
         } catch (error: Exception) {
-            Log.w(TAG, "Failed to start foreground stream from push wake", error)
+            recordPendingPushWakeCatchUp(error)
+        }
+    }
+
+    private fun recordPendingPushWakeCatchUp(error: Throwable? = null) {
+        val recordError =
+            runCatching {
+                PushTokenStore.create(applicationContext).recordPendingPushWakeCatchUp()
+            }.exceptionOrNull()
+        val message =
+            if (recordError == null) {
+                "Failed to start foreground stream from push wake; durable catch-up retry recorded"
+            } else {
+                "Failed to start foreground stream from push wake; durable catch-up retry could not be recorded"
+            }
+        if (error == null) {
+            Log.w(TAG, message)
+        } else {
+            Log.w(TAG, message, error)
+        }
+        if (recordError != null) {
+            Log.w(TAG, "Failed to record durable push wake catch-up retry", recordError)
         }
     }
 

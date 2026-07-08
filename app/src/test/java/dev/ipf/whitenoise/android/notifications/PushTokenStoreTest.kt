@@ -55,6 +55,26 @@ class PushTokenStoreTest {
     }
 
     @Test
+    fun pushWakeCatchUpPendingDefaultsToFalse() {
+        assertEquals(false, store().pushWakeCatchUpPending())
+    }
+
+    @Test
+    fun recordPendingPushWakeCatchUpSetsTheDurableFlag() {
+        val store = store()
+        store.recordPendingPushWakeCatchUp()
+        assertEquals(true, store.pushWakeCatchUpPending())
+    }
+
+    @Test
+    fun clearPendingPushWakeCatchUpResetsTheDurableFlag() {
+        val store = store()
+        store.recordPendingPushWakeCatchUp()
+        store.clearPendingPushWakeCatchUp()
+        assertEquals(false, store.pushWakeCatchUpPending())
+    }
+
+    @Test
     fun recordPendingClearAddsTheRef() {
         val store = store()
         store.recordPendingClear("npub-a")
@@ -182,6 +202,7 @@ class PushTokenStoreTest {
         PushTokenStore(legacy).apply {
             setToken("fcm-legacy")
             recordPendingNativePushRegistrationSync()
+            recordPendingPushWakeCatchUp()
             recordPendingClear("npub-clear")
             recordPendingDisable("npub-disable")
         }
@@ -191,6 +212,7 @@ class PushTokenStoreTest {
         PushTokenStore(secure).apply {
             assertEquals("fcm-legacy", lastToken())
             assertEquals(true, nativePushRegistrationSyncPending())
+            assertEquals(true, pushWakeCatchUpPending())
             assertEquals(setOf("npub-clear"), pendingClears())
             assertEquals(setOf("npub-disable"), pendingDisables())
         }

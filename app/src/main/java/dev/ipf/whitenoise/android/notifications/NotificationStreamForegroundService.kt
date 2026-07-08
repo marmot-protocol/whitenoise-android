@@ -62,6 +62,9 @@ class NotificationStreamForegroundService : Service() {
             }.isSuccess
         val syncNativePushRegistration = shouldSyncNativePushRegistration(intent?.action)
         if (syncNativePushRegistration) pendingNativePushRegistrationSync = true
+        if (shouldRecordPendingPushWakeCatchUp(trigger, startedForeground)) {
+            recordPendingPushWakeCatchUp(applicationContext)
+        }
         when (
             decideForegroundStart(
                 startForegroundSucceeded = startedForeground,
@@ -330,6 +333,11 @@ internal fun isOneShotForegroundStart(
 
 internal fun shouldHoldPushWakeLock(trigger: ForegroundStartTrigger): Boolean = trigger == ForegroundStartTrigger.PushWake
 
+internal fun shouldRecordPendingPushWakeCatchUp(
+    trigger: ForegroundStartTrigger,
+    foregroundStartAccepted: Boolean,
+): Boolean = trigger == ForegroundStartTrigger.PushWake && !foregroundStartAccepted
+
 internal fun shouldStopStickySystemWakeRestart(
     hasIntent: Boolean,
     trigger: ForegroundStartTrigger,
@@ -413,6 +421,14 @@ internal fun pushWakeLockTimeoutMs(
 private const val PUSH_WAKE_DRAIN_TIMEOUT_MS = 10_000L
 private const val PUSH_WAKE_BOOTSTRAP_BUDGET_MS = 5_000L
 private const val PUSH_WAKE_NATIVE_PUSH_SYNC_BUDGET_MS = 15_000L
+
+private fun recordPendingPushWakeCatchUp(context: Context) {
+    runCatching {
+        PushTokenStore.create(context).recordPendingPushWakeCatchUp()
+    }.onFailure {
+        foregroundServiceDebug(it) { "pending push wake catch-up retry record failed" }
+    }
+}
 
 private object BackgroundConnectionNotification {
     private const val CHANNEL_ID = "whitenoise.background_connection.v1"

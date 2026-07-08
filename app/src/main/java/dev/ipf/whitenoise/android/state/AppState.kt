@@ -1644,12 +1644,15 @@ class WhiteNoiseAppState(
      * caller can always `await` this without it becoming a hard gate.
      */
     suspend fun catchUpAccounts() {
+        catchUpAccountsBestEffort()
+    }
+
+    private suspend fun catchUpAccountsBestEffort(): Boolean =
         runCatching { marmotIo { catchUpAccounts() } }
             .onFailure {
                 rethrowIfCancellation(it)
                 appStateDebug(it) { "catchUpAccounts failed: ${it.readableMessage()}" }
-            }
-    }
+            }.isSuccess
 
     /**
      * Best-effort account catch-up when the app returns to the foreground.
@@ -1670,7 +1673,10 @@ class WhiteNoiseAppState(
         }
         isForegroundCatchUpRunning = true
         try {
-            catchUpAccounts()
+            val pendingPushWakeCatchUp = pushTokenStore.pushWakeCatchUpPending()
+            if (catchUpAccountsBestEffort() && pendingPushWakeCatchUp) {
+                pushTokenStore.clearPendingPushWakeCatchUp()
+            }
         } finally {
             isForegroundCatchUpRunning = false
         }
@@ -1778,7 +1784,10 @@ class WhiteNoiseAppState(
     suspend fun ensureNotificationRuntimeStarted() {
         if (client == null) {
             bootstrap()
-            if (client != null) drainPendingNativePushRegistrationSyncIfNeeded()
+            if (client != null) {
+                drainPendingNativePushRegistrationSyncIfNeeded()
+                drainPendingPushWakeCatchUpIfNeeded()
+            }
             return
         }
         localNotificationPresenter.ensureChannels()
@@ -1787,6 +1796,7 @@ class WhiteNoiseAppState(
         if (accounts.isEmpty()) refreshAccounts()
         refreshLocalNotificationSettings()
         drainPendingNativePushRegistrationSyncIfNeeded()
+        drainPendingPushWakeCatchUpIfNeeded()
     }
 
     suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(timeoutMs: Long = NOTIFICATION_PUSH_DRAIN_TIMEOUT_MILLIS): Boolean =
@@ -1805,6 +1815,14 @@ class WhiteNoiseAppState(
     private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
         if (pushTokenStore.nativePushRegistrationSyncPending()) {
             syncNativePushRegistrationIfEnabled()
+        }
+    }
+
+    private suspend fun drainPendingPushWakeCatchUpIfNeeded() {
+        if (!pushTokenStore.pushWakeCatchUpPending()) return
+        if (catchUpAccountsBestEffort()) {
+            pushTokenStore.clearPendingPushWakeCatchUp()
+            appStateDebug { "pending push wake catch-up drained" }
         }
     }
 
@@ -2811,6 +2829,7 @@ class WhiteNoiseAppState(
             hasActiveNetworkSnapshot = network != null
             activeNetworkTypesSnapshot =
                 network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
+            if (network != null) schedulePendingPushWakeCatchUpDrain()
         }.onFailure {
             // Restricted profiles can throw from the connectivity queries; the
             // empty snapshots are the same conservative offline default the
@@ -2825,6 +2844,7 @@ class WhiteNoiseAppState(
                         // follows; until then only the yes/no bit is known and
                         // the empty type set conservatively blocks auto-download.
                         hasActiveNetworkSnapshot = true
+                        schedulePendingPushWakeCatchUpDrain()
                     }
 
                     override fun onCapabilitiesChanged(
@@ -2833,6 +2853,7 @@ class WhiteNoiseAppState(
                     ) {
                         hasActiveNetworkSnapshot = true
                         activeNetworkTypesSnapshot = networkTypesFor(networkCapabilities)
+                        schedulePendingPushWakeCatchUpDrain()
                     }
 
                     override fun onLost(network: android.net.Network) {
@@ -2846,6 +2867,11 @@ class WhiteNoiseAppState(
             // rather than crash; it just won't track later connectivity changes.
             appStateDebug(it) { "default network callback registration failed: ${it.readableMessage()}" }
         }
+    }
+
+    private fun schedulePendingPushWakeCatchUpDrain() {
+        if (!pushTokenStore.pushWakeCatchUpPending()) return
+        notificationScope.launch { ensureNotificationRuntimeStarted() }
     }
 
     private fun networkTypesFor(caps: android.net.NetworkCapabilities): Set<MediaAutoDownloadNetwork> =
