@@ -207,6 +207,28 @@ class ConversationScrollRestoreTest {
         assertEquals(
             8,
             conversationJumpToNewestTargetListIndex(
+                unreadIncomingCount = 3,
+                readAnchorMessageId = null,
+                renderedMessageIds = listOf("older", "previous", "read"),
+                visibleListIndices = setOf(1, 2),
+                olderHeaderCount = 1,
+                bottomTimelineIndex = 8,
+            ),
+        )
+        assertEquals(
+            8,
+            conversationJumpToNewestTargetListIndex(
+                unreadIncomingCount = 3,
+                readAnchorMessageId = "",
+                renderedMessageIds = listOf("older", "previous", "read"),
+                visibleListIndices = setOf(1, 2),
+                olderHeaderCount = 1,
+                bottomTimelineIndex = 8,
+            ),
+        )
+        assertEquals(
+            8,
+            conversationJumpToNewestTargetListIndex(
                 unreadIncomingCount = 0,
                 readAnchorMessageId = "read",
                 renderedMessageIds = listOf("older", "previous", "read"),
