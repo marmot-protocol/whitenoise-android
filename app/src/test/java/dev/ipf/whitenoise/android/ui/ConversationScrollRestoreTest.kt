@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
+import dev.ipf.whitenoise.android.ui.conversation.conversationJumpToNewestTargetListIndex
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollRestoreListIndex
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollSnapshotOnLeave
@@ -132,6 +133,86 @@ class ConversationScrollRestoreTest {
                 snapshot = snapshot,
                 renderedItemIds = (0 until 50).map { "msg:$it" },
                 olderHeaderCount = 1,
+            ),
+        )
+    }
+
+    @Test
+    fun jumpToNewestWithUnreadTargetsLastReadAnchorFirst() {
+        assertEquals(
+            1 + 1 + 2,
+            conversationJumpToNewestTargetListIndex(
+                unreadIncomingCount = 3,
+                readAnchorMessageId = "read",
+                renderedMessageIds =
+                    listOf(
+                        "older",
+                        "previous",
+                        "read",
+                        "unread-1",
+                        "unread-2",
+                        "unread-3",
+                    ),
+                visibleListIndices = setOf(1, 2),
+                olderHeaderCount = 1,
+                bottomTimelineIndex = 8,
+            ),
+        )
+    }
+
+    @Test
+    fun jumpToNewestFromLastReadAnchorTargetsBottom() {
+        assertEquals(
+            8,
+            conversationJumpToNewestTargetListIndex(
+                unreadIncomingCount = 3,
+                readAnchorMessageId = "read",
+                renderedMessageIds =
+                    listOf(
+                        "older",
+                        "previous",
+                        "read",
+                        "unread-1",
+                        "unread-2",
+                        "unread-3",
+                    ),
+                visibleListIndices = setOf(4, 5, 6),
+                olderHeaderCount = 1,
+                bottomTimelineIndex = 8,
+            ),
+        )
+    }
+
+    @Test
+    fun jumpToNewestWithoutReadableAnchorTargetsBottom() {
+        assertEquals(
+            8,
+            conversationJumpToNewestTargetListIndex(
+                unreadIncomingCount = 3,
+                readAnchorMessageId = "missing",
+                renderedMessageIds =
+                    listOf(
+                        "older",
+                        "previous",
+                        "read",
+                        "unread-1",
+                        "unread-2",
+                        "unread-3",
+                    ),
+                visibleListIndices = setOf(1, 2),
+                olderHeaderCount = 1,
+                bottomTimelineIndex = 8,
+            ),
+        )
+        assertEquals(
+            8,
+            conversationJumpToNewestTargetListIndex(
+                unreadIncomingCount = 0,
+                readAnchorMessageId = "read",
+                renderedMessageIds = listOf("older", "previous", "read"),
+                visibleListIndices = setOf(1, 2),
+                olderHeaderCount = 1,
+                bottomTimelineIndex = 8,
             ),
         )
     }
