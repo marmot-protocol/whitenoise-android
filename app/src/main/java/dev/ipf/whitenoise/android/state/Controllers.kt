@@ -2144,7 +2144,9 @@ class ChatsController(
         // to the caller's hint only if the membership read fails.
         val activeIdHex = appState.activeAccount?.accountIdHex
         val liveMembers =
-            runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }.getOrNull()
+            runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }
+                .onFailure(::rethrowIfCancellation)
+                .getOrNull()
         val stillMember =
             liveMembers
                 ?.any { it.memberIdHex.equals(activeIdHex, ignoreCase = true) }
@@ -2181,7 +2183,10 @@ class ChatsController(
         val group = groupRecordsById[groupIdHex] ?: return null
         val activeAccountIdHex = appState.activeAccount?.accountIdHex
         val members =
-            runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }.getOrNull() ?: return null
+            runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }
+                .onFailure(::rethrowIfCancellation)
+                .getOrNull()
+                ?: return null
         if (!GroupProjector.isSoleAdminWithOtherMembers(group, activeAccountIdHex, members.size)) return null
         return members.filter { GroupProjector.canTransferAdminTo(group, it, activeAccountIdHex) }.ifEmpty { null }
     }
@@ -3119,6 +3124,7 @@ class ConversationController(
         val memberCount =
             if (account != null) {
                 runCatching { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
+                    .onFailure { it.rethrowIfCancellation() }
                     .getOrNull()
                     ?.size
             } else {
@@ -5078,7 +5084,9 @@ class ConversationController(
             // you there is no one to coordinate an MLS commit with, so bypass the
             // sole-admin transfer gate and dissolve the group with local cleanup.
             val liveMembers =
-                runCatching { appState.marmotIo { groupMembers(account, group.groupIdHex) } }.getOrNull()
+                runCatching { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
+                    .onFailure { it.rethrowIfCancellation() }
+                    .getOrNull()
             val memberCount = liveMembers?.size ?: members.size
             val soleMember = liveMembers != null && GroupProjector.isSelfSoleMember(liveMembers, activeAccountIdHex)
             if (!soleMember && !GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)) {
