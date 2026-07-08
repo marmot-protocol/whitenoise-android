@@ -50,6 +50,32 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun destructiveWipeDropsSyncedPushFingerprintUnderNativePushMutex() {
+        val body = appStateFunctionBody("signOutAndWipeActiveAccount")
+        val serializedWipeIndex = body.indexOf("nativePushSyncMutex.withSerializedNativePushWipe")
+        val removalIndex = body.indexOf("perAccountSyncedFingerprints.remove(wipedRef)")
+        val tokenClearIndex = body.indexOf("pushTokenStore.clear()")
+
+        assertTrue(
+            "destructive wipes must serialize push cache mutation with native push sync",
+            serializedWipeIndex >= 0,
+        )
+        assertTrue(
+            "destructive wipes must drop the wiped account's cached push fingerprint",
+            removalIndex > serializedWipeIndex,
+        )
+        assertTrue(
+            "the fingerprint must be dropped before the durable token cache is cleared",
+            tokenClearIndex > removalIndex,
+        )
+        assertFalse(
+            "withSerializedNativePushWipe already holds the mutex; nesting withLock would deadlock",
+            Regex("""nativePushSyncMutex\.withLock\s*\{\s*perAccountSyncedFingerprints\.remove\(wipedRef\)\s*}""")
+                .containsMatchIn(body),
+        )
+    }
+
+    @Test
     fun backgroundDisappearingSweepLocksSecureDelete() {
         val body = appStateFunctionBody("sweepExpiredForGroup")
 
