@@ -2284,6 +2284,7 @@ internal fun ConversationScreen(
                                                         npub = appState.npub(member.memberIdHex),
                                                         displayName = appState.chatMemberTitleCached(member.memberIdHex),
                                                         nip05 = appState.userProfile(member.memberIdHex)?.nip05,
+                                                        avatarUrl = appState.avatarUrl(member.memberIdHex),
                                                     )
                                                 }
                                         }

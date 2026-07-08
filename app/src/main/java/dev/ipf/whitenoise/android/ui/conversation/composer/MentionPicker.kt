@@ -77,7 +77,12 @@ internal fun MentionPicker(
                                 .semantics { contentDescription = mentionLabel }
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                     ) {
-                        Avatar(title = candidate.displayName, seed = candidate.accountIdHex, size = 36.dp)
+                        Avatar(
+                            title = candidate.displayName,
+                            seed = candidate.accountIdHex,
+                            size = 36.dp,
+                            pictureUrl = candidate.avatarUrl,
+                        )
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
