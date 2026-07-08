@@ -158,17 +158,57 @@ class AudioWaveformExtractorTest {
         result!!
         assertEquals(AudioWaveformExtractor.BARS, result.size)
         assertEquals(1.0f, result[0], 0.0001f)
-        assertEquals(0.05f, result[1], 0.0001f)
+        assertEquals(1.0f, result[1], 0.0001f)
         assertTrue(extractor.released)
+        assertTrue(codec.released)
+    }
+
+    @Test
+    fun shortClipWithFewerChunksThanBars_doesNotLeaveSparseFloorBars() {
+        // ~2s mono @ 16 kHz: ~31 codec buffers of ~1024 frames. First-frame-only
+        // bucketing maps chunk i to bar floor(i * 1024 * 64 / totalFrames), so
+        // only every ~2nd bar fills and the rest stay at FLOOR (comb). See #1161.
+        val framesPerChunk = 1024
+        val chunkCount = 31
+        val extractor = FakeExtractor(formats = listOf(FakeFormat(mime = "audio/mp4a-latm")))
+        val outputs =
+            (0 until chunkCount).map { index ->
+                val pcm = shortPcmFrames(framesPerChunk, sampleAmplitude = 2_000 + index % 50)
+                pcm to
+                    AudioDecoderOutputInfo(
+                        offset = 0,
+                        size = framesPerChunk * 2,
+                        presentationTimeUs = 0,
+                        endOfStream = index == chunkCount - 1,
+                    )
+            }
+        val codec = FakeCodec(outputs = outputs)
+        val resources = FakeResources(extractor = extractor, codec = codec)
+
+        val result =
+            AudioWaveformExtractor.decodeBlocking(
+                filePath = "/tmp/short-voice.m4a",
+                resources = resources,
+            )
+
+        assertNotNull(result)
+        result!!
+        val floor = 0.05f
+        val floorBarCount = result.count { it <= floor + 0.0001f }
+        assertTrue(
+            "uniform short clip should not leave most bars at floor (got $floorBarCount/${AudioWaveformExtractor.BARS})",
+            floorBarCount < AudioWaveformExtractor.BARS / 4,
+        )
         assertTrue(codec.released)
     }
 
     @Test
     fun missingDuration_spreadsEnergyAcrossBarsByFrameIndex() {
         // Two equal-length chunks: a loud one first, a quiet one second. The
-        // extractor buckets by decoded-frame index, so the first lands at bar 0
-        // and the second near the middle — energy must NOT collapse into the
-        // last bar (the pre-fix behavior when KEY_DURATION was absent). See #277.
+        // extractor buckets by decoded-frame index, so the loud first chunk spans
+        // the first half and the quiet second chunk spans the second half — energy
+        // must NOT collapse into the final bar (the pre-fix behavior when
+        // KEY_DURATION was absent). See #277.
         val extractor = FakeExtractor(formats = listOf(FakeFormat(mime = "audio/mp4a-latm")))
         val loud = shortPcm(3_000, 3_000)
         val quiet = shortPcm(1_000, 1_000)
@@ -189,7 +229,7 @@ class AudioWaveformExtractorTest {
         result!!
         assertEquals(1.0f, result[0], 0.0001f) // loud chunk, normalized to the max
         assertTrue("middle bar should carry the quieter second chunk", result[32] > 0.05f)
-        assertEquals("last bar must stay at floor, not absorb everything", 0.05f, result[63], 0.0001f)
+        assertTrue("last bar should carry the quieter second chunk", result[63] > 0.05f)
         assertTrue(codec.released)
     }
 
@@ -216,8 +256,8 @@ class AudioWaveformExtractorTest {
         assertNotNull(result)
         result!!
         assertEquals(AudioWaveformExtractor.BARS, result.size)
-        assertEquals(1.0f, result[0], 0.0001f) // peak |−1.0| dominates the single bucket
-        assertEquals(0.05f, result[1], 0.0001f)
+        assertEquals(1.0f, result[0], 0.0001f) // peak |−1.0| dominates the single buffer
+        assertEquals(1.0f, result[1], 0.0001f)
         assertTrue(codec.released)
     }
 
@@ -268,6 +308,16 @@ class AudioWaveformExtractorTest {
 private fun shortPcm(vararg samples: Int): ByteBuffer {
     val buf = ByteBuffer.allocate(samples.size * 2).order(ByteOrder.LITTLE_ENDIAN)
     samples.forEach { buf.putShort(it.toShort()) }
+    buf.flip()
+    return buf
+}
+
+private fun shortPcmFrames(
+    frameCount: Int,
+    sampleAmplitude: Int,
+): ByteBuffer {
+    val buf = ByteBuffer.allocate(frameCount * 2).order(ByteOrder.LITTLE_ENDIAN)
+    repeat(frameCount) { buf.putShort(sampleAmplitude.toShort()) }
     buf.flip()
     return buf
 }
