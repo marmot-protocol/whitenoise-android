@@ -154,6 +154,55 @@ internal data class SignOutOutcome(
     val phase: AppPhase,
 )
 
+private const val IDENTITY_BOOTSTRAP_PUBLISH_MAX_ATTEMPTS = 3
+private const val IDENTITY_BOOTSTRAP_RETRY_INITIAL_DELAY_MILLIS = 1_000L
+private const val IDENTITY_BOOTSTRAP_RETRY_MAX_DELAY_MILLIS = 8_000L
+
+internal data class IdentityCreationRelayPlan(
+    val createDefaultRelays: List<String>,
+    val createBootstrapRelays: List<String>,
+    val publishDefaultRelays: List<String>,
+    val publishBootstrapRelays: List<String>,
+)
+
+internal fun fastIdentityCreationRelayPlan(bootstrapRelays: List<String>): IdentityCreationRelayPlan {
+    // The current UniFFI createIdentity API still requires a non-empty default relay list for
+    // brand-new local keys. Keep the synchronous path to the first configured relay, then repair
+    // the full bootstrap relay footprint in the background.
+    val createRelays = bootstrapRelays.take(1)
+    return IdentityCreationRelayPlan(
+        createDefaultRelays = createRelays,
+        createBootstrapRelays = createRelays,
+        publishDefaultRelays = bootstrapRelays,
+        publishBootstrapRelays = bootstrapRelays,
+    )
+}
+
+internal fun accountSummariesWithCreatedIdentity(
+    current: List<AccountSummaryFfi>,
+    created: AccountSummaryFfi,
+): List<AccountSummaryFfi> {
+    val existingIndex =
+        current.indexOfFirst {
+            it.label == created.label || it.accountIdHex.equals(created.accountIdHex, ignoreCase = true)
+        }
+    if (existingIndex < 0) return current + created
+    return current.toMutableList().also { it[existingIndex] = created }
+}
+
+internal fun identityBootstrapRetryDelayMillis(
+    failedAttemptIndex: Int,
+    initialDelayMillis: Long = IDENTITY_BOOTSTRAP_RETRY_INITIAL_DELAY_MILLIS,
+    maxDelayMillis: Long = IDENTITY_BOOTSTRAP_RETRY_MAX_DELAY_MILLIS,
+): Long {
+    require(failedAttemptIndex >= 0) { "failedAttemptIndex must be non-negative" }
+    var delayMillis = initialDelayMillis
+    repeat(failedAttemptIndex) {
+        delayMillis = (delayMillis * 2).coerceAtMost(maxDelayMillis)
+    }
+    return delayMillis
+}
+
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
     val failures: Int,
@@ -1958,17 +2007,97 @@ class WhiteNoiseAppState(
     }
 
     suspend fun createIdentity() {
+        val startedAt = System.currentTimeMillis()
         try {
-            val summary = marmotIo { createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
-            refreshAccounts()
-            setActiveAccount(summary.label)
-            refreshLocalNotificationSettings()
+            val relayPlan = fastIdentityCreationRelayPlan(MarmotClient.bootstrapRelays)
+            val summary = marmotIo { createIdentity(relayPlan.createDefaultRelays, relayPlan.createBootstrapRelays) }
+            activateCreatedIdentity(summary)
             phase = AppPhase.Ready
             present(R.string.toast_identity_created)
-            warmProfile(summary.accountIdHex)
+            appStateDebug { "identity created locally in ${System.currentTimeMillis() - startedAt}ms" }
+            launchIdentityBootstrapPublish(summary, relayPlan)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
             present(R.string.toast_couldnt_create_identity, AppText.Plain(error.readableMessage()), copyable = true)
+        }
+    }
+
+    private fun activateCreatedIdentity(summary: AccountSummaryFfi) {
+        if (summary.label != activeAccountRef) {
+            clearInMemoryMediaCaches()
+            clearCrossAccountCaches()
+        }
+        accounts = accountSummariesWithCreatedIdentity(accounts, summary)
+        activeAccountRef = summary.label
+        preferences.edit().putString(ACTIVE_ACCOUNT_KEY, summary.label).apply()
+        localNotificationSettings = null
+        reloadMediaAutoDownloadMatrix()
+    }
+
+    private fun launchIdentityBootstrapPublish(
+        summary: AccountSummaryFfi,
+        relayPlan: IdentityCreationRelayPlan,
+    ) {
+        mutationsScope.launch {
+            publishIdentityBootstrapWithRetry(summary, relayPlan)
+            runCatching { refreshAccounts() }
+                .onFailure {
+                    rethrowIfCancellation(it)
+                    appStateDebug(it) { "post-create account refresh failed: ${it.readableMessage()}" }
+                }
+            if (activeAccountRef == summary.label) {
+                runCatching {
+                    configurePrivacyRuntime()
+                    refreshLocalNotificationSettings()
+                    warmProfile(summary.accountIdHex)
+                    syncNativePushRegistrationIfEnabled()
+                }.onFailure {
+                    rethrowIfCancellation(it)
+                    appStateDebug(it) { "post-create account warm-up failed: ${it.readableMessage()}" }
+                }
+            }
+        }
+    }
+
+    private suspend fun publishIdentityBootstrapWithRetry(
+        summary: AccountSummaryFfi,
+        relayPlan: IdentityCreationRelayPlan,
+    ) {
+        var lastError: Throwable? = null
+        repeat(IDENTITY_BOOTSTRAP_PUBLISH_MAX_ATTEMPTS) { attemptIndex ->
+            val startedAt = System.currentTimeMillis()
+            val result = runCatching { publishIdentityBootstrap(summary, relayPlan) }
+            if (result.isSuccess) {
+                appStateDebug {
+                    "identity bootstrap published attempt=${attemptIndex + 1} in ${System.currentTimeMillis() - startedAt}ms"
+                }
+                return
+            }
+            val error = result.exceptionOrNull() ?: return@repeat
+            rethrowIfCancellation(error)
+            lastError = error
+            appStateDebug(error) {
+                "identity bootstrap publish failed attempt=${attemptIndex + 1}: ${error.readableMessage()}"
+            }
+            if (attemptIndex < IDENTITY_BOOTSTRAP_PUBLISH_MAX_ATTEMPTS - 1) {
+                delay(identityBootstrapRetryDelayMillis(attemptIndex))
+            }
+        }
+        lastError?.let {
+            present(R.string.toast_relay_update_failed, AppText.Plain(it.readableMessage()), copyable = true)
+        }
+    }
+
+    private suspend fun publishIdentityBootstrap(
+        summary: AccountSummaryFfi,
+        relayPlan: IdentityCreationRelayPlan,
+    ) {
+        marmotIo {
+            publishRelayLists(summary.label, relayPlan.publishDefaultRelays, relayPlan.publishBootstrapRelays)
+            userProfile(summary.accountIdHex)?.let { profile ->
+                publishUserProfile(summary.label, profile, relayPlan.publishDefaultRelays, relayPlan.publishBootstrapRelays)
+            }
+            republishKeyPackage(summary.label)
         }
     }
 
