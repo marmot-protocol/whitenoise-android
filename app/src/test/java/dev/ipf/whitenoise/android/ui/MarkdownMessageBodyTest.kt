@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import dev.ipf.marmotkit.MarkdownAlignmentFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownListItemFfi
@@ -34,6 +35,25 @@ class MarkdownMessageBodyTest {
             }
         }
         composeRule.waitForIdle()
+    }
+
+    @Test
+    fun codeAndMathBlocksStripUnsafeCharactersAndTrimParserTrailingNewline() {
+        render(
+            listOf(
+                MarkdownBlockFfi.CodeBlock(
+                    kind = MarkdownCodeBlockKindFfi.FENCED,
+                    info = "kotlin",
+                    content = "pay\u202Ecod.exe\nline 2\n",
+                ),
+                MarkdownBlockFfi.MathBlock("x\u2066 + y\n"),
+            ),
+        )
+
+        composeRule.onAllNodesWithText("paycod.exe\nline 2").assertCountEquals(1)
+        composeRule.onAllNodesWithText("pay\u202Ecod.exe\nline 2\n").assertCountEquals(0)
+        composeRule.onAllNodesWithText("x + y").assertCountEquals(1)
+        composeRule.onAllNodesWithText("x\u2066 + y\n").assertCountEquals(0)
     }
 
     @Test

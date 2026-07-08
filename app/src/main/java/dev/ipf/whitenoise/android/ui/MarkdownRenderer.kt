@@ -333,10 +333,13 @@ internal fun markdownHeadingTextStyle(
 
 @Composable
 private fun MarkdownCodeBlockView(content: String) {
+    // The parser keeps the block's trailing newline; trimming it avoids a
+    // phantom empty line inside the chip. Code/math blocks can be large, so
+    // cache the sanitization work instead of repeating it on every recomposition.
+    val text = remember(content) { markdownSafeDisplayText(content, Int.MAX_VALUE).trimEnd('\n') }
+
     Text(
-        // The parser keeps the block's trailing newline; trimming it avoids a
-        // phantom empty line inside the chip.
-        markdownSafeDisplayText(content, Int.MAX_VALUE).trimEnd('\n'),
+        text,
         style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
         modifier =
             Modifier
