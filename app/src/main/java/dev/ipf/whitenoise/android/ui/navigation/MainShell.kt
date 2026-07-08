@@ -287,11 +287,14 @@ internal fun MainShell(
         }
     }
 
-    DisposableEffect(selectedChat?.id) {
+    // Follow the selection directly so a chat-to-chat switch never hops
+    // through null — a notification update landing in that hop would beat
+    // suppression and post for the conversation being opened.
+    LaunchedEffect(selectedChat?.id) {
         appState.setActiveConversation(selectedChat?.group?.groupIdHex)
-        onDispose {
-            if (selectedChat != null) appState.setActiveConversation(null)
-        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { appState.setActiveConversation(null) }
     }
 
     // Pop in-shell navigation back to the chat-list root when the active
