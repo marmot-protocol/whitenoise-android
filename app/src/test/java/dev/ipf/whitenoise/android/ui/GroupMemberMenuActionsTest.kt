@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
+import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

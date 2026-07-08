@@ -33,8 +33,8 @@ import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
-import dev.ipf.whitenoise.android.ui.releaseSecureFlag
-import dev.ipf.whitenoise.android.ui.retainSecureFlag
+import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
+import dev.ipf.whitenoise.android.ui.common.retainSecureFlag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 
 class MainActivity : FragmentActivity() {

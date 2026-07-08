@@ -1,0 +1,380 @@
+package dev.ipf.whitenoise.android.ui.conversation.media
+
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.key.type
+import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
+import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.media.MediaPipeline
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+
+/** Saves a nullable Uri across process death (camera capture round-trip). */
+internal val NullableUriSaver: Saver<android.net.Uri?, String> =
+    Saver(
+        save = { it?.toString() ?: "" },
+        restore = { s -> s.takeIf { it.isNotEmpty() }?.let(android.net.Uri::parse) },
+    )
+
+/**
+ * Saves a nullable [java.io.File] across process death by its absolute path.
+ * Used so the camera capture's temp-file handle survives the round-trip and a
+ * capture cancelled after process death can still delete the empty temp
+ * instead of leaking it (issue #531).
+ */
+internal val NullableFileSaver: Saver<java.io.File?, String> =
+    Saver(
+        save = { it?.absolutePath ?: "" },
+        restore = { s -> s.takeIf { it.isNotEmpty() }?.let { path -> java.io.File(path) } },
+    )
+
+// Persist a multi-pick selection across rotation / process death. Empty list
+// encodes "no preview shown" so the parent re-render skips the sheet on
+// restore. Uses '\n' as the separator — content URIs don't contain newlines.
+internal val UriListSaver: Saver<List<android.net.Uri>, String> =
+    Saver(
+        save = { encodeUriListTokens(it.map { uri -> uri.toString() }) },
+        restore = { s -> decodeUriListTokens(s).map(android.net.Uri::parse) },
+    )
+
+/**
+ * Pure string codec backing [UriListSaver], split out from the [android.net.Uri]
+ * conversion so the separator and empty-list contract is unit-testable on the
+ * JVM (the Android `Uri` stubs are non-functional in local unit tests). Joins
+ * tokens with '\n'; an empty list encodes to "".
+ */
+internal fun encodeUriListTokens(tokens: List<String>): String = tokens.joinToString("\n")
+
+/**
+ * Inverse of [encodeUriListTokens]. An empty input decodes to an empty list
+ * (the "no preview shown" sentinel); blank tokens are dropped so a trailing or
+ * doubled separator can't yield empty URI strings.
+ */
+internal fun decodeUriListTokens(encoded: String): List<String> =
+    if (encoded.isEmpty()) {
+        emptyList()
+    } else {
+        encoded.split('\n').filter { it.isNotEmpty() }
+    }
+
+/**
+ * Write [bytes] to a temp file in the cache directory and fire `ACTION_VIEW`
+ * for it via the app's FileProvider so an external app (PDF reader, etc.)
+ * can open it.
+ *
+ * Distinguishes "no app claims this MIME" ([OpenAttachmentResult.NoHandler])
+ * from "we couldn't even try" ([OpenAttachmentResult.Error]) so the caller
+ * can surface the right toast.
+ *
+ * `resolveActivity`/`queryIntentActivities` are intentionally NOT used to
+ * pre-flight the launch: under Android 11+ package visibility they return
+ * null for any handler whose package isn't declared in `<queries>`, even
+ * when the activity exists and `startActivity` would launch it. Catching
+ * `ActivityNotFoundException` from `startActivity` is the authoritative
+ * "nothing handles this MIME" signal.
+ *
+ * Suspends because the temp-file write can be a multi-megabyte hop —
+ * documents and videos picked from the document bubble are read whole
+ * into a `ByteArray` and need to land on disk before the intent fires.
+ * Doing that on the main dispatcher would jank the UI for the whole
+ * write; the `Dispatchers.IO` jump moves it off the main thread.
+ *
+ * The temp file is owned by the cache cleanup pass triggered on screen
+ * exit; we don't track it per-call because the handing-off intent may
+ * need it alive for an unbounded duration after this function returns.
+ */
+internal suspend fun openAttachmentExternally(
+    context: android.content.Context,
+    bytes: ByteArray,
+    fileName: String,
+    mediaType: String,
+): OpenAttachmentResult {
+    val uri =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
+                val name = MediaPipeline.safeDisplayName(fileName)
+                val file = java.io.File.createTempFile("open_", "_$name", dir)
+                file.writeBytes(bytes)
+                fileProviderUri(context, file)
+            }.getOrNull()
+        } ?: return OpenAttachmentResult.Error
+    val mime = mediaType.ifBlank { "application/octet-stream" }
+    val intent =
+        android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mime)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    return try {
+        context.startActivity(intent)
+        OpenAttachmentResult.Opened
+    } catch (_: android.content.ActivityNotFoundException) {
+        OpenAttachmentResult.NoHandler
+    } catch (_: SecurityException) {
+        // FileProvider grant rejected, or target activity has no permission
+        // to access this URI for some reason. Surfacing this as a generic
+        // error is more useful than crashing.
+        OpenAttachmentResult.Error
+    }
+}
+
+/**
+ * Persist [bytes] to the device gallery (Pictures/White Noise). Returns success.
+ * Uses the IS_PENDING dance so other apps never see a half-written entry, and
+ * sanitizes the remote-supplied [fileName] to a basename.
+ */
+internal fun saveImageToGallery(
+    context: android.content.Context,
+    bytes: ByteArray,
+    fileName: String,
+    mediaType: String,
+): Boolean {
+    val resolver = context.contentResolver
+    val values =
+        android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, MediaPipeline.safeDisplayName(fileName))
+            // Preserve the attachment's real MIME (a peer may send PNG/WebP/HEIC),
+            // so gallery indexing matches the actual bytes.
+            put(android.provider.MediaStore.Images.Media.MIME_TYPE, mediaType.ifBlank { MediaPipeline.RECOMPRESSED_MIME })
+            put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/White Noise")
+            put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
+        }
+    val uri =
+        resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: return false
+    return try {
+        resolver.openOutputStream(uri).use { out ->
+            if (out == null) throw java.io.IOException("null output stream")
+            out.write(bytes)
+        }
+        values.clear()
+        values.put(android.provider.MediaStore.Images.Media.IS_PENDING, 0)
+        resolver.update(uri, values, null, null)
+        true
+    } catch (_: Throwable) {
+        resolver.delete(uri, null, null) // don't leave a pending orphan
+        false
+    }
+}
+
+/** Persist a decrypted video to the public Movies/White Noise folder via the
+ *  Video MediaStore so it shows up in the system gallery. Mirrors the image
+ *  save flow's IS_PENDING dance. */
+internal fun saveVideoToGallery(
+    context: android.content.Context,
+    bytes: ByteArray,
+    fileName: String,
+    mediaType: String,
+): Boolean {
+    val resolver = context.contentResolver
+    val values =
+        android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, MediaPipeline.safeDisplayName(fileName))
+            put(android.provider.MediaStore.Video.Media.MIME_TYPE, mediaType.ifBlank { "video/mp4" })
+            put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/White Noise")
+            put(android.provider.MediaStore.Video.Media.IS_PENDING, 1)
+        }
+    val uri =
+        resolver.insert(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+            ?: return false
+    return try {
+        resolver.openOutputStream(uri).use { out ->
+            if (out == null) throw java.io.IOException("null output stream")
+            out.write(bytes)
+        }
+        values.clear()
+        values.put(android.provider.MediaStore.Video.Media.IS_PENDING, 0)
+        resolver.update(uri, values, null, null)
+        true
+    } catch (_: Throwable) {
+        resolver.delete(uri, null, null)
+        false
+    }
+}
+
+/**
+ * Share [bytes] via a FileProvider Uri using the system share sheet.
+ *
+ * Suspends because the temp-file write is multi-megabyte for any non-trivial
+ * attachment; doing it on the main dispatcher would stall the UI for the
+ * write. The `startActivity` call has to run on Main, so the I/O is hopped
+ * to `Dispatchers.IO` and the chooser is fired back on Main.
+ */
+internal suspend fun shareImage(
+    context: android.content.Context,
+    bytes: ByteArray,
+    fileName: String,
+    mediaType: String,
+) {
+    val uri =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
+                // Unique temp keyed off a sanitized basename — avoids
+                // collisions and path traversal from a remote-supplied
+                // filename.
+                val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
+                file.outputStream().use { it.write(bytes) }
+                androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file,
+                )
+            }.getOrNull()
+        } ?: return
+    runCatching {
+        val intent =
+            android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = mediaType.ifBlank { MediaPipeline.RECOMPRESSED_MIME }
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        context.startActivity(
+            android.content.Intent.createChooser(intent, null).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+    }
+}
+
+/** Create a cache file for a camera capture. Returns null if it can't be made. */
+internal fun createImageCaptureFile(context: android.content.Context): java.io.File? =
+    try {
+        val dir = java.io.File(context.cacheDir, "camera").apply { mkdirs() }
+        java.io.File.createTempFile("capture_", ".jpg", dir)
+    } catch (_: Throwable) {
+        null
+    }
+
+internal fun fileProviderUri(
+    context: android.content.Context,
+    file: java.io.File,
+): android.net.Uri =
+    androidx.core.content.FileProvider
+        .getUriForFile(context, "${context.packageName}.fileprovider", file)
+
+/**
+ * Best-effort wipe of decrypted camera-capture temp files from cache.
+ *
+ * Intentionally does NOT touch `shared_media`. Those entries back live
+ * FileProvider URIs the system may still be reading after the user backs
+ * out of a chat (an external PDF reader holding the granted URI, the
+ * system share-sheet target, etc.). Yanking the file out from under
+ * those readers caused the "opened PDF goes blank when I leave the chat"
+ * class of bug — the [sweepStaleSharedMedia] janitor cleans those on a
+ * stale-age basis at app start instead.
+ */
+internal fun clearMediaTempFiles(context: android.content.Context) {
+    runCatching { java.io.File(context.cacheDir, "camera").deleteRecursively() }
+}
+
+/**
+ * Delete `shared_media` files older than [maxAgeMillis]. Called once at
+ * app start so transient FileProvider temps for opened/shared
+ * attachments don't accumulate across sessions, without racing the
+ * external readers that may still be using them in the current session.
+ */
+internal fun sweepStaleSharedMedia(
+    context: android.content.Context,
+    maxAgeMillis: Long,
+) {
+    runCatching {
+        val cutoff = System.currentTimeMillis() - maxAgeMillis
+        // Same age-based reaper covers the decrypted voice cache too —
+        // those bytes are plaintext E2EE-decrypted audio and shouldn't
+        // linger past the last MediaPlayer that opened them.
+        listOf(MediaCacheDirs.SHARED, ConversationTranscriptExport.CacheDirName, MediaCacheDirs.VOICE, MediaCacheDirs.VIDEO).forEach { name ->
+            val dir = java.io.File(context.cacheDir, name)
+            if (!dir.isDirectory) return@forEach
+            dir.listFiles()?.forEach { entry ->
+                if (entry.isFile && entry.lastModified() < cutoff) {
+                    runCatching { entry.delete() }
+                }
+            }
+        }
+    }
+}
+
+/** Files in `shared_media` older than this are considered safe to delete —
+ *  any external reader has had ample time to finish loading the bytes. */
+internal const val SHARED_MEDIA_MAX_AGE_MS: Long = 10L * 60L * 1000L
+
+/** Read the user-visible filename a content Uri exposes via OpenableColumns,
+ *  falling back to the Uri's path segment. Null when neither is available.
+ *
+ *  Guarded against a revoked grant: a Photo Picker / SAF Uri staged before
+ *  process death (issue #531) comes back as a ghost whose session-scoped read
+ *  permission is gone, so `query()` throws `SecurityException` (or the backing
+ *  provider may be dead — `IllegalArgumentException` / `NullPointerException`).
+ *  We swallow it and fall through to the path-segment fallback so the staging
+ *  preview renders a placeholder name instead of crashing; the actual decode
+ *  still fails gracefully into the existing toast path. */
+internal fun queryDisplayName(
+    contentResolver: android.content.ContentResolver,
+    uri: android.net.Uri,
+): String? {
+    runCatching {
+        contentResolver
+            .query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val name = cursor.getString(0)
+                    if (!name.isNullOrBlank()) return name
+                }
+            }
+    }
+    return uri.lastPathSegment
+}
+
+/**
+ * Best-effort byte size of a content Uri, queried via `OpenableColumns.SIZE`.
+ * Returns -1 when the provider doesn't report a size (some virtual / streamed
+ * providers omit it); callers must then enforce a cap via the bounded read.
+ *
+ * Also returns -1 when the Uri's grant has been revoked (a ghost Uri restored
+ * after process death — see [queryDisplayName] / issue #531): the bounded read
+ * downstream is itself `SecurityException`-guarded and will reject the file, so
+ * treating a revoked grant as "size unknown" routes it into the same graceful
+ * rejection rather than crashing the send coroutine.
+ */
+internal fun queryContentSize(
+    contentResolver: android.content.ContentResolver,
+    uri: android.net.Uri,
+): Long {
+    runCatching {
+        contentResolver
+            .query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                    return cursor.getLong(0)
+                }
+            }
+    }
+    return -1L
+}
+
+/** `ContentResolver.getType` for a content Uri whose read grant may have been
+ *  revoked (a ghost staging Uri restored after process death — issue #531).
+ *  The platform docs say `getType` can throw `SecurityException` for a Uri the
+ *  caller can no longer access; an unguarded call on a ghost Uri crashes the
+ *  preview composition or the send coroutine before the already-guarded decode
+ *  gets a chance to degrade. Returns "" on any failure so callers treat the
+ *  ghost as an unknown / non-video type and let the guarded decode reject it
+ *  into the existing decode-failure toast. */
+internal fun safeGetType(
+    contentResolver: android.content.ContentResolver,
+    uri: android.net.Uri,
+): String = coerceResolvedMime { contentResolver.getType(uri) }
+
+/** Pure swallow-and-default kernel behind [safeGetType], split out so the
+ *  ghost-Uri contract (issue #531) — a throwing or null resolver lookup must
+ *  collapse to "" rather than propagate — is unit-testable on the JVM without
+ *  Robolectric, mirroring the `UriListSaver` codec split. */
+internal inline fun coerceResolvedMime(getType: () -> String?): String = runCatching(getType).getOrNull().orEmpty()

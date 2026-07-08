@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.ui.conversation.media.cachedVideoAttachmentFile
+import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartVideoAttachmentDownload
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

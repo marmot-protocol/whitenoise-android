@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.ui.conversation.shouldShowStickyDayRibbon
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

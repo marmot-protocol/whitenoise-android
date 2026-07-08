@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.ui.conversation.composer.shouldClearFocusOnResume
+import dev.ipf.whitenoise.android.ui.conversation.composer.shouldRestoreComposerFocusOnResume
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

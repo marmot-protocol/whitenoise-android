@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.ui.conversation.media.decodeUriListTokens
+import dev.ipf.whitenoise.android.ui.conversation.media.encodeUriListTokens
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

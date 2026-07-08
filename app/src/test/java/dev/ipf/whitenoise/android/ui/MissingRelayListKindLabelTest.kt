@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.MissingRelayListKindFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.settings.labelRes
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

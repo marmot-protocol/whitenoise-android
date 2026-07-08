@@ -1,0 +1,361 @@
+package dev.ipf.whitenoise.android.ui.chats
+
+import androidx.annotation.StringRes
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ChatListFilter
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
+import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
+import dev.ipf.whitenoise.android.ui.settings.labelRes
+import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import kotlinx.coroutines.flow.filter
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ChatListTopBar(
+    appState: WhiteNoiseAppState,
+    searchOpen: Boolean,
+    searchQuery: String,
+    searchFocusRequester: FocusRequester,
+    onSearchQueryChange: (String) -> Unit,
+    onSearchOpen: () -> Unit,
+    onSearchClose: () -> Unit,
+    onMic: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onSwitchAccount: (String) -> Unit,
+) {
+    TopAppBar(
+        title = {
+            when {
+                searchOpen ->
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .focusRequester(searchFocusRequester),
+                        singleLine = true,
+                        placeholder = { Text(stringResource(R.string.chat_list_search_hint)) },
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                            ),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Sentences,
+                                imeAction = ImeAction.Search,
+                            ),
+                    )
+                // Other signed-in accounts sit immediately right of the active
+                // avatar (the navigationIcon), i.e. on the left of the bar.
+                else ->
+                    OtherAccountAvatarsRow(
+                        appState = appState,
+                        onSwitchAccount = onSwitchAccount,
+                        onOpenSwitcher = onOpenSettings,
+                    )
+            }
+        },
+        navigationIcon = {
+            when {
+                searchOpen ->
+                    IconButton(onClick = onSearchClose) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back),
+                        )
+                    }
+                else -> {
+                    val active = appState.activeAccount
+                    AccountAvatarButton(
+                        title = active?.let { appState.displayName(it.accountIdHex) } ?: stringResource(R.string.app_name),
+                        seed = active?.accountIdHex ?: "whitenoise",
+                        pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
+                        size = 44.dp,
+                        onClick = onOpenSettings,
+                        // Per-account dot: light only when the active account
+                        // itself has unread, same shared decision the other
+                        // avatars use — not "some other account has unread" (#805).
+                        showUnreadDot = appState.accountShowsUnreadDot(active?.label),
+                    )
+                }
+            }
+        },
+        actions = {
+            if (searchOpen) {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { onSearchQueryChange("") }) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(R.string.chat_list_search_clear),
+                        )
+                    }
+                }
+                IconButton(onClick = onMic) {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = stringResource(R.string.chat_list_search_voice),
+                    )
+                }
+            } else {
+                IconButton(onClick = onSearchOpen) {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = stringResource(R.string.chat_list_search_open),
+                    )
+                }
+            }
+        },
+    )
+}
+
+/**
+ * Inline top-bar search for a single conversation (#292): a back arrow plus an
+ * auto-focused field (✕ clears). The result count and previous/next match
+ * navigation live on the bottom bar above the keyboard
+ * ([ConversationSearchNavBar]); the IME "search" action steps to the next
+ * match so the on-screen keyboard alone can walk the results.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ConversationSearchTopBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit,
+    onClose: () -> Unit,
+    onSearchAction: () -> Unit,
+    focusRequester: FocusRequester,
+) {
+    val hasQuery = query.isNotBlank()
+    TopAppBar(
+        title = {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.conversation_search_hint)) },
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                    ),
+                // Clear sits inline in the field; match navigation and the
+                // result count live on the bottom bar above the keyboard.
+                trailingIcon = {
+                    if (hasQuery) {
+                        IconButton(onClick = onClear) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.conversation_search_clear),
+                            )
+                        }
+                    }
+                },
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Search,
+                    ),
+                keyboardActions = KeyboardActions(onSearch = { onSearchAction() }),
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onClose) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.conversation_search_close),
+                )
+            }
+        },
+    )
+}
+
+/**
+ * Search match navigation pinned above the keyboard while in-chat search is
+ * open: a centered result count with previous/next steppers on the trailing
+ * edge. Lives in the conversation `bottomBar` slot in place of the composer,
+ * mirroring the composer's `navigationBarsPadding().imePadding()` so it rides
+ * up with the soft keyboard rather than hiding behind it.
+ */
+@Composable
+internal fun ConversationSearchNavBar(
+    matchCount: Int,
+    activeIndex: Int,
+    hasQuery: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+) {
+    val navEnabled = matchCount > 0
+    Surface(
+        border = amoledSurfaceBorderStroke(),
+        tonalElevation = 3.dp,
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(start = 16.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text =
+                    when {
+                        !hasQuery -> ""
+                        matchCount > 0 ->
+                            stringResource(
+                                R.string.conversation_search_match_count,
+                                activeIndex + 1,
+                                matchCount,
+                            )
+                        else -> stringResource(R.string.conversation_search_no_matches)
+                    },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onPrev, enabled = navEnabled) {
+                Icon(
+                    Icons.Default.KeyboardArrowUp,
+                    contentDescription = stringResource(R.string.conversation_search_prev),
+                )
+            }
+            IconButton(onClick = onNext, enabled = navEnabled) {
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.conversation_search_next),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ChatListFilterChips(
+    filter: ChatListFilter,
+    onChange: (ChatListFilter) -> Unit,
+    activeUnreadCount: Int,
+    hasArchived: Boolean,
+    archivedUnreadCount: Int,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ChatListFilterChip(filter, ChatListFilter.All, R.string.chat_list_filter_all, onChange)
+        ChatListFilterChip(
+            filter,
+            ChatListFilter.Unread,
+            R.string.chat_list_filter_unread,
+            onChange,
+            trailingCount = activeUnreadCount,
+        )
+        ChatListFilterChip(filter, ChatListFilter.Groups, R.string.chat_list_filter_groups, onChange)
+        if (hasArchived || filter == ChatListFilter.Archived) {
+            ChatListFilterChip(
+                filter,
+                ChatListFilter.Archived,
+                R.string.archived,
+                onChange,
+                trailingCount = archivedUnreadCount,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChatListFilterChip(
+    current: ChatListFilter,
+    value: ChatListFilter,
+    @StringRes labelRes: Int,
+    onChange: (ChatListFilter) -> Unit,
+    enabled: Boolean = true,
+    trailingCount: Int = 0,
+) {
+    val selected = current == value
+    FilterChip(
+        selected = selected,
+        onClick = { onChange(value) },
+        enabled = enabled,
+        label = { Text(stringResource(labelRes)) },
+        trailingIcon =
+            if (trailingCount > 0) {
+                {
+                    Text(
+                        text = if (trailingCount > 99) "99+" else trailingCount.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            } else {
+                null
+            },
+        shape = RoundedCornerShape(percent = 50),
+        border = null,
+        colors =
+            FilterChipDefaults.filterChipColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+    )
+}
