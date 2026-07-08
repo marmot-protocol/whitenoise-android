@@ -219,8 +219,63 @@ class GroupProjectorTest {
         // was stuck in their own group. There is no one to orphan, so leaving
         // (dissolving the group) must be allowed...
         assertTrue(GroupProjector.canLeaveGroup(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 1))
+        assertTrue(GroupProjector.canLeaveGroup(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 0))
         // ...and they must not be asked to self-demote the last admin first.
         assertFalse(GroupProjector.requiresSelfDemoteBeforeLeave(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 1))
+        assertFalse(GroupProjector.requiresSelfDemoteBeforeLeave(group(admins = listOf("alice")), activeAccountIdHex = "alice", memberCount = 0))
+    }
+
+    @Test
+    fun shouldDissolveAsSoleMemberPrefersAuthoritativeRosterOverStaleCount() {
+        val self = member(memberId = "credential-a", account = "alice", local = true)
+        val other = member(memberId = "bob", account = "bob", local = false)
+
+        assertTrue(
+            GroupProjector.shouldDissolveAsSoleMember(
+                roster = listOf(self),
+                activeAccountIdHex = "alice",
+                memberCountFallback = 3,
+            ),
+        )
+        assertFalse(
+            GroupProjector.shouldDissolveAsSoleMember(
+                roster = listOf(self, other),
+                activeAccountIdHex = "alice",
+                memberCountFallback = 1,
+            ),
+        )
+    }
+
+    @Test
+    fun shouldDissolveAsSoleMemberFallsBackToCountWhenRosterIsMissingOrEmpty() {
+        assertTrue(
+            GroupProjector.shouldDissolveAsSoleMember(
+                roster = null,
+                activeAccountIdHex = "alice",
+                memberCountFallback = 1,
+            ),
+        )
+        assertTrue(
+            GroupProjector.shouldDissolveAsSoleMember(
+                roster = emptyList(),
+                activeAccountIdHex = "alice",
+                memberCountFallback = 0,
+            ),
+        )
+        assertFalse(
+            GroupProjector.shouldDissolveAsSoleMember(
+                roster = null,
+                activeAccountIdHex = "alice",
+                memberCountFallback = 3,
+            ),
+        )
+        assertFalse(
+            GroupProjector.shouldDissolveAsSoleMember(
+                roster = null,
+                activeAccountIdHex = "alice",
+                memberCountFallback = Int.MAX_VALUE,
+            ),
+        )
     }
 
     @Test
@@ -235,6 +290,14 @@ class GroupProjectorTest {
         assertTrue(
             GroupProjector.isSelfSoleMember(
                 listOf(member(memberId = "ALICE", account = null, local = true)),
+                activeAccountIdHex = "alice",
+            ),
+        )
+        // MLS seat id can differ from the Nostr account id carried in `account`
+        // (#1171): sole-member dissolve must still recognize self.
+        assertTrue(
+            GroupProjector.isSelfSoleMember(
+                listOf(member(memberId = "credential-a", account = "alice", local = true)),
                 activeAccountIdHex = "alice",
             ),
         )
@@ -633,6 +696,13 @@ class GroupProjectorTest {
     @Test
     fun activeAccountMemberMatchesByMemberIdHex() {
         val self = member(memberId = "alice", account = "alice", local = true)
+
+        assertTrue(GroupProjector.isActiveAccountMember(self, activeAccountIdHex = "alice"))
+    }
+
+    @Test
+    fun activeAccountMemberMatchesResolvedAccountWhenSeatIdDiffers() {
+        val self = member(memberId = "credential-a", account = "alice", local = true)
 
         assertTrue(GroupProjector.isActiveAccountMember(self, activeAccountIdHex = "alice"))
     }

@@ -2075,7 +2075,12 @@ class ChatsController(
             // coordinate an MLS commit with, so a normal leave would fail (and
             // the sole-admin transfer block must not apply either). Dissolve the
             // group with local cleanup instead of an MLS leave/self-demote.
-            val soleMember = GroupProjector.isSelfSoleMember(members, activeAccountIdHex)
+            val soleMember =
+                GroupProjector.shouldDissolveAsSoleMember(
+                    members,
+                    activeAccountIdHex,
+                    memberCount,
+                )
             if (!soleMember && !GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)) {
                 appState.present(
                     R.string.toast_make_another_admin_before_leaving,
@@ -2157,14 +2162,21 @@ class ChatsController(
             runCatching { appState.marmotIo { groupMembers(account, groupIdHex) } }
                 .onFailure(::rethrowIfCancellation)
                 .getOrNull()
+        val cachedMembers = memberCacheByGroup[groupIdHex]
+        val roster = liveMembers ?: cachedMembers
+        val memberCount = roster?.size ?: Int.MAX_VALUE
         val stillMember =
-            liveMembers
-                ?.any { it.memberIdHex.equals(activeIdHex, ignoreCase = true) }
+            roster?.any { GroupProjector.isActiveAccountMember(it, activeIdHex) }
                 ?: leaveFirstHint
         // #811: a sole-member group has no one to commit an MLS leave with, so
         // skip the leave entirely and let the deleteGroupLocal wipe below
         // dissolve it. Attempting leaveGroup here would fail and block delete.
-        val soleMember = liveMembers != null && GroupProjector.isSelfSoleMember(liveMembers, activeIdHex)
+        val soleMember =
+            GroupProjector.shouldDissolveAsSoleMember(
+                roster,
+                activeIdHex,
+                memberCount,
+            )
         if (stillMember && !soleMember && !leaveGroup(groupIdHex)) {
             removedRow?.let { foldChatRow(it) }
             return false
@@ -2197,6 +2209,7 @@ class ChatsController(
                 .onFailure(::rethrowIfCancellation)
                 .getOrNull()
                 ?: return null
+        if (GroupProjector.shouldDissolveAsSoleMember(members, activeAccountIdHex, members.size)) return null
         if (!GroupProjector.isSoleAdminWithOtherMembers(group, activeAccountIdHex, members.size)) return null
         return members.filter { GroupProjector.canTransferAdminTo(group, it, activeAccountIdHex) }.ifEmpty { null }
     }
@@ -5097,8 +5110,16 @@ class ConversationController(
                 runCatching { appState.marmotIo { groupMembers(account, group.groupIdHex) } }
                     .onFailure(::rethrowIfCancellation)
                     .getOrNull()
+            val roster = liveMembers ?: members.takeIf { it.isNotEmpty() }
             val memberCount = liveMembers?.size ?: members.size
-            val soleMember = liveMembers != null && GroupProjector.isSelfSoleMember(liveMembers, activeAccountIdHex)
+            val dissolveMemberCount =
+                if (roster != null || membersLoaded) memberCount else Int.MAX_VALUE
+            val soleMember =
+                GroupProjector.shouldDissolveAsSoleMember(
+                    roster,
+                    activeAccountIdHex,
+                    dissolveMemberCount,
+                )
             if (!soleMember && !GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)) {
                 appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
                 return false
