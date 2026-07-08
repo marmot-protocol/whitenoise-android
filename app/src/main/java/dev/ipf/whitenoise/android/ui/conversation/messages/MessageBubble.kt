@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -89,8 +91,11 @@ import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
+import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
+import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPendingPlaceholder
@@ -137,6 +142,12 @@ internal fun MessageBubble(
     onQuickReactionsSave: (List<String>) -> Unit,
     onQuickReactionsReset: () -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
+    composerGate: ComposerGate,
+    inviteMutationInFlight: Boolean,
+    onJoinInvite: () -> Unit,
+    onDeclineInvite: () -> Unit,
+    mentionCandidates: List<MentionComposer.Candidate>,
+    mentionPickerEnabled: Boolean,
     collapseLongMessages: Boolean = true,
     readOnly: Boolean = false,
 ) {
@@ -1262,26 +1273,7 @@ internal fun MessageBubble(
                         controller.editingMessageId?.let { id ->
                             controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                         }
-                    val mentionPickerEnabled = !controller.isDm
-                    val mentionCandidates =
-                        if (mentionPickerEnabled) {
-                            val revision = appState.profileRevisionForCompose
-                            val activeAccountIdHex = appState.activeAccount?.accountIdHex
-                            remember(controller.members, revision, activeAccountIdHex) {
-                                controller.members
-                                    .filterNot { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                                    .map { member ->
-                                        MentionComposer.Candidate(
-                                            accountIdHex = member.memberIdHex,
-                                            npub = appState.npub(member.memberIdHex),
-                                            displayName = appState.chatMemberTitleCached(member.memberIdHex),
-                                            nip05 = appState.userProfile(member.memberIdHex)?.nip05,
-                                        )
-                                    }
-                            }
-                        } else {
-                            emptyList()
-                        }
+                    val canUseExpandedComposer = !readOnly && composerGate == ComposerGate.COMPOSER
                     MessageFullScreenView(
                         senderDisplayName = appState.displayName(record.sender),
                         senderSeed = record.sender,
@@ -1290,42 +1282,64 @@ internal fun MessageBubble(
                         timeText = rememberedClockTime(record.recordedAt),
                         showStatus = mine && !deleted && !invalidated,
                         status = item.status,
-                        canReply = !readOnly,
-                        canReact = !readOnly,
-                        canDelete = !readOnly && mine && record.messageIdHex.isNotBlank() && !deleted,
+                        canReply = canUseExpandedComposer,
+                        canReact = canUseExpandedComposer,
+                        canDelete = canUseExpandedComposer && mine && record.messageIdHex.isNotBlank() && !deleted,
                         onReply = {
-                            beginReply()
+                            if (canUseExpandedComposer) {
+                                beginReply()
+                            }
                         },
                         onReact = {
-                            if (!readOnly) {
+                            if (canUseExpandedComposer) {
                                 expandedFullView = false
                                 emojiPickerOpen = true
                             }
                         },
                         onCopy = ::copyMessageText,
                         onDelete = {
-                            expandedFullView = false
-                            appState.launchMutation { controller.deleteMessage(record) }
+                            if (canUseExpandedComposer) {
+                                expandedFullView = false
+                                appState.launchMutation { controller.deleteMessage(record) }
+                            }
                         },
                         onDismiss = { expandedFullView = false },
                         bottomBar = {
-                            if (!readOnly) {
-                                ComposerBar(
-                                    replyingTo = controller.replyingTo,
-                                    messageTextCopy = messageTextCopy,
-                                    onCancelReply = { controller.replyingTo = null },
-                                    onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
-                                    initialDraft = appState.draftFor(groupIdHex).orEmpty(),
-                                    onDraftChange = { appState.setDraft(groupIdHex, it) },
-                                    draftKey = groupIdHex,
-                                    editingMessageId = controller.editingMessageId,
-                                    editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                                    onCancelEdit = { controller.editingMessageId = null },
-                                    appState = appState,
-                                    mentionCandidates = mentionCandidates,
-                                    mentionPickerEnabled = mentionPickerEnabled,
-                                    enterKeyBehavior = appState.enterKeyBehavior,
-                                )
+                            when (composerGate) {
+                                ComposerGate.PENDING ->
+                                    Spacer(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .navigationBarsPadding()
+                                            .imePadding()
+                                            .height(64.dp),
+                                    )
+                                ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                                ComposerGate.INVITE ->
+                                    InvitePreviewActionBar(
+                                        mutationInFlight = inviteMutationInFlight,
+                                        onJoin = onJoinInvite,
+                                        onDecline = onDeclineInvite,
+                                    )
+                                ComposerGate.COMPOSER ->
+                                    if (!readOnly) {
+                                        ComposerBar(
+                                            replyingTo = controller.replyingTo,
+                                            messageTextCopy = messageTextCopy,
+                                            onCancelReply = { controller.replyingTo = null },
+                                            onSend = { text, onAccepted -> appState.launchMutation { controller.send(text, onAccepted) } },
+                                            initialDraft = appState.draftFor(groupIdHex).orEmpty(),
+                                            onDraftChange = { appState.setDraft(groupIdHex, it) },
+                                            draftKey = groupIdHex,
+                                            editingMessageId = controller.editingMessageId,
+                                            editingInitialText = editingRecord?.let { controller.displayedText(it) },
+                                            onCancelEdit = { controller.editingMessageId = null },
+                                            appState = appState,
+                                            mentionCandidates = mentionCandidates,
+                                            mentionPickerEnabled = mentionPickerEnabled,
+                                            enterKeyBehavior = appState.enterKeyBehavior,
+                                        )
+                                    }
                             }
                         },
                     )

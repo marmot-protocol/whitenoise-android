@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -98,6 +97,7 @@ internal fun MessageFullScreenView(
             DialogProperties(
                 usePlatformDefaultWidth = false,
                 dismissOnBackPress = true,
+                decorFitsSystemWindows = false,
             ),
     ) {
         var overflowOpen by remember { mutableStateOf(false) }
@@ -195,10 +195,6 @@ internal fun MessageFullScreenView(
                             }
                         }
                     },
-                    // The Dialog window already sits below the status bar, so the
-                    // bar's own status-bar inset would double the gap and inflate
-                    // its height. Zero it to render at the standard compact height.
-                    windowInsets = WindowInsets(0, 0, 0, 0),
                 )
             },
             bottomBar = bottomBar,
