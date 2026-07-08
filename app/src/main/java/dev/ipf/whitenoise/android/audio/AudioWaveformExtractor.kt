@@ -15,6 +15,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
+import kotlin.math.ceil
 
 /**
  * Decodes a small voice clip to PCM and produces a 64-bar normalized
@@ -218,16 +219,31 @@ object AudioWaveformExtractor {
             // Track BOTH the peak per bucket and the running sum. Peak amplitude
             // produces visually punchier bars than mean-abs (real speech has
             // many quiet samples between syllables; mean averages them down).
-            // Each chunk lands in the bucket for its first frame, so chunk
-            // position maps to bar position proportionally to time.
+            // Each chunk spans a frame range; credit every bar bucket that range
+            // overlaps so short clips (fewer chunks than BARS) do not comb.
             val peaks = FloatArray(BARS)
             val sums = DoubleArray(BARS)
-            val counts = IntArray(BARS)
+            val weights = DoubleArray(BARS)
             for (i in chunkFrameStarts.indices) {
-                val bucket = ((chunkFrameStarts[i] * BARS) / totalFrames).toInt().coerceIn(0, BARS - 1)
-                if (chunkPeaks[i] > peaks[bucket]) peaks[bucket] = chunkPeaks[i]
-                sums[bucket] += chunkSums[i]
-                counts[bucket] += chunkFrameCounts[i]
+                val chunkStart = chunkFrameStarts[i].toDouble()
+                val chunkEnd = (chunkFrameStarts[i] + chunkFrameCounts[i]).coerceAtMost(totalFrames).toDouble()
+                if (chunkEnd <= chunkStart) continue
+                val firstBucket = ((chunkStart * BARS) / totalFrames).toInt().coerceIn(0, BARS - 1)
+                val lastBucket =
+                    (ceil((chunkEnd * BARS) / totalFrames.toDouble()).toInt() - 1)
+                        .coerceIn(0, BARS - 1)
+                val chunkMean = chunkSums[i] / chunkFrameCounts[i]
+                for (bucket in firstBucket..lastBucket) {
+                    val bucketFrameStart = bucket.toDouble() * totalFrames / BARS
+                    val bucketFrameEnd = (bucket + 1).toDouble() * totalFrames / BARS
+                    val overlapStart = maxOf(chunkStart, bucketFrameStart)
+                    val overlapEnd = minOf(chunkEnd, bucketFrameEnd)
+                    val overlapFrames = overlapEnd - overlapStart
+                    if (overlapFrames <= 0.0) continue
+                    if (chunkPeaks[i] > peaks[bucket]) peaks[bucket] = chunkPeaks[i]
+                    sums[bucket] += chunkMean * overlapFrames
+                    weights[bucket] += overlapFrames
+                }
             }
 
             // Hybrid signal: peak per bucket biased by mean (peak * 0.7 +
@@ -237,7 +253,7 @@ object AudioWaveformExtractor {
             // dynamics, not raw linear power.
             val hybrid =
                 FloatArray(BARS) { i ->
-                    val mean = if (counts[i] > 0) (sums[i] / counts[i]).toFloat() else 0f
+                    val mean = if (weights[i] > 0.0) (sums[i] / weights[i]).toFloat() else 0f
                     peaks[i] * 0.7f + mean * 0.3f
                 }
             val maxV = hybrid.maxOrNull()?.takeIf { it > 0f } ?: return null
