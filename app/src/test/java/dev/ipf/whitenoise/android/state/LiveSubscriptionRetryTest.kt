@@ -28,6 +28,49 @@ class LiveSubscriptionRetryTest {
     }
 
     @Test
+    fun completedAttemptResetsDelayOnlyAfterLiveUpdate() {
+        assertEquals(4_000L, liveSubscriptionRetryDelayMillisAfterAttempt(4_000L, receivedUpdate = false))
+        assertEquals(500L, liveSubscriptionRetryDelayMillisAfterAttempt(4_000L, receivedUpdate = true))
+    }
+
+    @Test
+    fun streamAttemptEndingBeforeAnyLiveUpdateKeepsCurrentDelay() {
+        runBlocking {
+            var receivedLiveUpdate = false
+            runUntilFirstLiveSubscriptionEnds(
+                first = {
+                    // Simulates subscribe + snapshot succeeding, then the live
+                    // chat-list stream closing before nextUpdate returns data.
+                },
+                second = {
+                    CompletableDeferred<Unit>().await()
+                },
+            )
+
+            assertFalse(receivedLiveUpdate)
+            assertEquals(4_000L, liveSubscriptionRetryDelayMillisAfterAttempt(4_000L, receivedLiveUpdate))
+        }
+    }
+
+    @Test
+    fun streamAttemptWithLiveUpdateResetsDelayAfterConsumerLoop() {
+        runBlocking {
+            var receivedLiveUpdate = false
+            runUntilFirstLiveSubscriptionEnds(
+                first = {
+                    receivedLiveUpdate = true
+                },
+                second = {
+                    CompletableDeferred<Unit>().await()
+                },
+            )
+
+            assertTrue(receivedLiveUpdate)
+            assertEquals(500L, liveSubscriptionRetryDelayMillisAfterAttempt(4_000L, receivedLiveUpdate))
+        }
+    }
+
+    @Test
     fun accountScopedRetryStopsWhenControllerUnbinds() {
         assertEquals(true, shouldRetryLiveSubscriptionForAccount("alice", "alice"))
         assertEquals(false, shouldRetryLiveSubscriptionForAccount("alice", null))

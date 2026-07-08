@@ -1481,6 +1481,7 @@ class ChatsController(
             while (coroutineContext.isActive && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                 var chatListSubscription: ChatListSubscription? = null
                 var chatsSubscription: ChatsSubscription? = null
+                var receivedLiveUpdate = false
                 try {
                     val chatListStream =
                         appState.marmotIo { subscribeChatList(accountRef, includeArchived = true) }
@@ -1513,7 +1514,6 @@ class ChatsController(
                     isLoading = false
                     error = null
                     recompute()
-                    retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
 
                     coroutineScope {
                         runUntilFirstLiveSubscriptionEnds(
@@ -1523,6 +1523,7 @@ class ChatsController(
                                         withContext(Dispatchers.IO) {
                                             chatListStream.nextUpdate()
                                         } ?: break
+                                    receivedLiveUpdate = true
                                     when (update) {
                                         is ChatListSubscriptionUpdateFfi.Row -> {
                                             val row = update.row
@@ -1547,6 +1548,7 @@ class ChatsController(
                                         withContext(Dispatchers.IO) {
                                             chatStream.next()
                                         } ?: break
+                                    receivedLiveUpdate = true
                                     requestGroupProfiles(update)
                                     chatsDebug { "chat update account=${accountRef.take(8)} ${update.debugSummary()}" }
                                     foldGroup(update)
@@ -1583,6 +1585,14 @@ class ChatsController(
                     }
                 }
                 if (!coroutineContext.isActive || !shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) break
+                // Reset only after a real live update, not after a successful
+                // bind/snapshot. A relay that connects and immediately closes
+                // should keep backing off instead of pinning retries at 500ms.
+                retryDelayMs =
+                    liveSubscriptionRetryDelayMillisAfterAttempt(
+                        currentRetryDelayMs = retryDelayMs,
+                        receivedUpdate = receivedLiveUpdate,
+                    )
                 chatsDebug { "chat subscriptions ended; retrying in ${retryDelayMs}ms account=${accountRef.take(8)}" }
                 delay(retryDelayMs)
                 retryDelayMs = nextLiveSubscriptionRetryDelayMillis(retryDelayMs)

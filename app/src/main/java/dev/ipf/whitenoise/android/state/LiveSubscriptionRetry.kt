@@ -25,6 +25,17 @@ internal const val LIVE_SUBSCRIPTION_MAX_RETRY_DELAY_MS: Long = 8_000L
 internal fun nextLiveSubscriptionRetryDelayMillis(current: Long): Long = nextRetryBackoffMillis(current, LIVE_SUBSCRIPTION_MAX_RETRY_DELAY_MS)
 
 /**
+ * Delay to use after a live subscription attempt completes. A snapshot-only
+ * bind is not proof of a healthy live stream, so it must preserve the current
+ * retry delay and keep exponential backoff intact. Only an actual live update
+ * resets the delay to the floor.
+ */
+internal fun liveSubscriptionRetryDelayMillisAfterAttempt(
+    currentRetryDelayMs: Long,
+    receivedUpdate: Boolean,
+): Long = if (receivedUpdate) LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS else currentRetryDelayMs
+
+/**
  * Whether an account-scoped live subscription loop should reconnect after one
  * iteration ends. A destructive account teardown clears the controller's bound
  * account before closing its active handles; the old loop must not immediately
