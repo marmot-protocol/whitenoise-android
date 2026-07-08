@@ -52,12 +52,12 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.SettingsDetail
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.account.SettingsAccountHeader
 import dev.ipf.whitenoise.android.ui.common.LocalSettingsRowsInsideSectionCard
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.sectionPanelColor
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.profile.ProfileEditScreen
 import dev.ipf.whitenoise.android.ui.profile.ProfileQrSheet
