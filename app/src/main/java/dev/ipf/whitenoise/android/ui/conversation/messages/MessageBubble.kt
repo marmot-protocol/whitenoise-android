@@ -135,6 +135,7 @@ internal fun MessageBubble(
     onQuickReactionsSave: (List<String>) -> Unit,
     onQuickReactionsReset: () -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
+    collapseLongMessages: Boolean = true,
     readOnly: Boolean = false,
 ) {
     val amoledSurfaceTheme = isAmoledSurfaceTheme()
@@ -882,8 +883,9 @@ internal fun MessageBubble(
                 var bodyFullLayout by remember(record.messageIdHex) { mutableStateOf<TextLayoutResult?>(null) }
                 // A long body collapses to MESSAGE_COLLAPSE_LINE_LIMIT lines
                 // with an inline Read More that opens the full-screen view;
-                // tombstones and edit/info copy never collapse (#325).
-                val collapsible = !deleted && !invalidated
+                // tombstones, edit/info copy, and groups with the local collapse
+                // setting disabled never collapse (#325, #1180).
+                val collapsible = collapseLongMessages && !deleted && !invalidated
                 val readMoreLabel = stringResource(R.string.message_read_more)
                 val readMoreStyle =
                     SpanStyle(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)

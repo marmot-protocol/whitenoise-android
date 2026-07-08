@@ -912,6 +912,8 @@
     <string name="add_group_description">Add group description</string>
     <string name="see_all_members">See all %1$d members</string>
     <string name="chat_lock">Chat lock</string>
+    <string name="collapse_long_messages">Collapse long messages</string>
+    <string name="collapse_long_messages_subtitle">Show a Read More shortcut for long messages in this chat</string>
     <string name="toast_disappearing_not_applied">The group was created, but disappearing messages could not be turned on</string>
     <string name="search_members">Search members</string>
     <string name="recent_chats">Recent chats</string>

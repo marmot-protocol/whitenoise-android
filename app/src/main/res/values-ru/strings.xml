@@ -896,6 +896,8 @@
     <string name="add_group_description">Добавить описание группы</string>
     <string name="see_all_members">Показать всех участников (%1$d)</string>
     <string name="chat_lock">Блокировка чата</string>
+    <string name="collapse_long_messages">Сворачивать длинные сообщения</string>
+    <string name="collapse_long_messages_subtitle">Показывать кнопку «Читать дальше» для длинных сообщений в этом чате</string>
     <string name="toast_disappearing_not_applied">Группа создана, но исчезающие сообщения включить не удалось</string>
     <string name="search_members">Поиск участников</string>
     <string name="recent_chats">Недавние чаты</string>

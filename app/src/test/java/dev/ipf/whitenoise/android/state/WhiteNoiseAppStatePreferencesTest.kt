@@ -47,4 +47,25 @@ class WhiteNoiseAppStatePreferencesTest {
 
         assertFalse(ChatScreenshotPreferences.readAllowChatScreenshots(context))
     }
+
+    @Test
+    fun longMessageCollapseDefaultsOnPerGroup() {
+        assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "group-a"))
+    }
+
+    @Test
+    fun longMessageCollapsePersistsPerGroup() {
+        LongMessageCollapsePreferences.writeCollapseLongMessages(preferences, "group-a", false)
+
+        assertFalse(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "group-a"))
+        assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "group-b"))
+    }
+
+    @Test
+    fun longMessageCollapseReenabledReturnsToDefault() {
+        LongMessageCollapsePreferences.writeCollapseLongMessages(preferences, "group-a", false)
+        LongMessageCollapsePreferences.writeCollapseLongMessages(preferences, "group-a", true)
+
+        assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "group-a"))
+    }
 }

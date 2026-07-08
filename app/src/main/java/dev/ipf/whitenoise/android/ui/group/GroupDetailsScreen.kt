@@ -57,6 +57,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -72,6 +73,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -518,6 +520,7 @@ internal fun GroupDetailsScreen(
         val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin
         val mutationsBlocked = activeMutation != null || controller.mutationInFlight
         val isDm = GroupProjector.isDm(controller.members.size, controller.group.name)
+        val collapseLongMessages = appState.collapseLongMessagesInGroup(controller.group.groupIdHex)
         Column(
             Modifier
                 .fillMaxSize()
@@ -627,6 +630,15 @@ internal fun GroupDetailsScreen(
                     } else {
                         null
                     },
+            )
+            GroupSwitchActionRow(
+                icon = Icons.Default.Description,
+                title = stringResource(R.string.collapse_long_messages),
+                subtitle = stringResource(R.string.collapse_long_messages_subtitle),
+                checked = collapseLongMessages,
+                onCheckedChange = {
+                    appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
+                },
             )
             SettingsActionRow(
                 icon = Icons.Default.Fingerprint,
@@ -1278,6 +1290,40 @@ private fun GroupMutationErrorBanner(
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
             }
         }
+    }
+}
+
+@Composable
+private fun GroupSwitchActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .clickable(role = Role.Switch) { onCheckedChange(!checked) }
+                .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLg),
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
     }
 }
 

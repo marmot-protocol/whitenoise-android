@@ -268,6 +268,7 @@ internal fun ConversationScreen(
                 copy = controllerCopy,
             )
         }
+    val collapseLongMessages = appState.collapseLongMessagesInGroup(chat.group.groupIdHex)
     // When the developer streaming-debug toggle flips, re-publish the timeline.
     // Turning it off drops the transient QUIC debug rows so they don't linger.
     LaunchedEffect(controller, appState.streamingDebugEnabled) {
@@ -2514,6 +2515,7 @@ internal fun ConversationScreen(
                                         onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                         onQuickReactionsReset = { resetQuickReactionEmojis() },
                                         onReplyPreviewClick = { navigateToReplyTarget(it) },
+                                        collapseLongMessages = collapseLongMessages,
                                         readOnly = controller.group.pendingConfirmation,
                                     )
                                 }
