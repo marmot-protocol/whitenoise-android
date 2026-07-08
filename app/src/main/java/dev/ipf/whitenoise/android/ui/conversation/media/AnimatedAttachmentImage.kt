@@ -1,4 +1,4 @@
-package dev.ipf.whitenoise.android.ui
+package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.graphics.Bitmap
 import android.graphics.drawable.AnimatedImageDrawable

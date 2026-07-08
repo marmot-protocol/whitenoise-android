@@ -1,4 +1,4 @@
-package dev.ipf.whitenoise.android.ui
+package dev.ipf.whitenoise.android.ui.medialibrary
 
 import android.content.Intent
 import android.net.Uri
@@ -79,6 +79,18 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.SectionCard
 import dev.ipf.whitenoise.android.ui.common.SectionCardWithAction
+import dev.ipf.whitenoise.android.ui.conversation.media.FullScreenMediaViewer
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageGridTile
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoGridTile
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
+import dev.ipf.whitenoise.android.ui.conversation.media.OpenAttachmentResult
+import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
+import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.openAttachmentExternally
+import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
+import dev.ipf.whitenoise.android.ui.conversation.media.saveVideoToGallery
+import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
+import dev.ipf.whitenoise.android.ui.conversation.media.shortMediaTypeLabel
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
