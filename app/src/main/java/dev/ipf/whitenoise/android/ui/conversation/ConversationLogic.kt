@@ -82,6 +82,36 @@ internal fun conversationScrollRestoreListIndex(
     }
 }
 
+/**
+ * Target for the jump-to-newest affordance.
+ *
+ * With unread messages, the first tap should preserve reading context by
+ * landing on the last row the reader had already reached. Once that row is
+ * visible, the next tap proceeds to the physical bottom. If the read anchor is
+ * unavailable (trimmed/not loaded), fall back to the bottom rather than guessing.
+ */
+internal fun conversationJumpToNewestTargetListIndex(
+    unreadIncomingCount: Int,
+    readAnchorMessageId: String?,
+    renderedMessageIds: List<String>,
+    visibleListIndices: Collection<Int>,
+    olderHeaderCount: Int,
+    bottomTimelineIndex: Int,
+): Int {
+    if (unreadIncomingCount > 0) {
+        val anchorTimelineIndex =
+            readAnchorMessageId
+                ?.takeIf { it.isNotBlank() }
+                ?.let(renderedMessageIds::indexOf)
+                ?.takeIf { it >= 0 }
+        if (anchorTimelineIndex != null) {
+            val anchorListIndex = 1 + olderHeaderCount + anchorTimelineIndex
+            if (anchorListIndex !in visibleListIndices) return anchorListIndex
+        }
+    }
+    return bottomTimelineIndex
+}
+
 /** Within this many items of the trailing edge counts as "at bottom". */
 private const val ConversationNearBottomItemSlack = 3
 
