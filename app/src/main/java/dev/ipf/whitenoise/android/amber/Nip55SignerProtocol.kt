@@ -67,6 +67,14 @@ sealed interface ActivityResultOutcome {
 object Nip55 {
     const val SCHEME = "nostrsigner"
 
+    /**
+     * Conservative UTF-8 byte budget for event/content embedded in a NIP-55
+     * foreground Intent's `nostrsigner:` data URI. Intent extras cross Binder
+     * with a shared ~1 MB per-process limit; oversized payloads must not be
+     * launched via Intent when ContentResolver is unavailable.
+     */
+    const val MAX_INTENT_FALLBACK_CONTENT_UTF8_BYTES = 256 * 1024
+
     const val PREFS_FILE = "amber_signer_prefs"
     const val PREFS_KEY_PACKAGE = "signer_package_name"
 
@@ -135,6 +143,9 @@ object Nip55 {
         permissions.put(JSONObject().put("type", "nip44_decrypt"))
         return permissions.toString()
     }
+
+    /** True when [content] is small enough to embed in a foreground Intent data URI. */
+    fun contentFitsIntentFallbackBudget(content: String): Boolean = content.toByteArray(Charsets.UTF_8).size <= MAX_INTENT_FALLBACK_CONTENT_UTF8_BYTES
 
     fun buildGetPublicKeyIntent(permissionsJson: String): Intent =
         Intent(Intent.ACTION_VIEW, Uri.parse("$SCHEME:")).apply {

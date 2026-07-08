@@ -86,6 +86,10 @@ class AmberExternalSigner(
             ContentRowOutcome.Unavailable -> Unit // fall through to the Intent prompt
         }
 
+        if (!Nip55.contentFitsIntentFallbackBudget(content)) {
+            throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)
+        }
+
         // 2) Intent prompt on the foreground Activity; blocks THIS worker thread.
         val requestId = newRequestId()
         val intent =
