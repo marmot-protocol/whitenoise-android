@@ -99,6 +99,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
+import java.time.Instant
+import java.time.ZoneId
 import java.util.Calendar
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
@@ -129,12 +131,22 @@ internal data class SharedMediaRow(
     val sender: String,
 )
 
+internal data class MediaMonthSection<T>(
+    val monthKey: Int,
+    val items: List<T>,
+)
+
 internal data class SharedMediaTiles(
     val images: List<SharedMediaTile>,
     val videos: List<SharedMediaTile>,
     val voice: List<SharedMediaRow>,
     val files: List<SharedMediaRow>,
     val urls: List<MediaInventory.UrlEntry>,
+    val imageSections: List<MediaMonthSection<SharedMediaTile>>,
+    val videoSections: List<MediaMonthSection<SharedMediaTile>>,
+    val voiceSections: List<MediaMonthSection<SharedMediaRow>>,
+    val fileSections: List<MediaMonthSection<SharedMediaRow>>,
+    val urlSections: List<MediaMonthSection<IndexedValue<MediaInventory.UrlEntry>>>,
     // True when the conversation carries media beyond the rendered image/video
     // grids — voice, files, urls, or bare image-URL links that aren't gridded.
     // Carried so the section can decide between the strip, the single
@@ -168,7 +180,20 @@ internal fun rememberSharedMediaTiles(
     // thread and surface an empty result until it lands (consumers treat empty
     // as "hide section / empty tabs", so the brief initial state is graceful).
     val tiles by produceState(
-        initialValue = SharedMediaTiles(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), hasOther = false),
+        initialValue =
+            SharedMediaTiles(
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                hasOther = false,
+            ),
         controller.timeline,
         controller.mediaReferences,
         myAccountId,
@@ -241,9 +266,40 @@ private fun buildTiles(
         voice = voice,
         files = files,
         urls = urls,
+        imageSections = groupIntoMonthSections(images) { it.recordedAt },
+        videoSections = groupIntoMonthSections(videos) { it.recordedAt },
+        voiceSections = groupIntoMonthSections(voice) { it.recordedAt },
+        fileSections = groupIntoMonthSections(files) { it.recordedAt },
+        urlSections = groupIntoMonthSections(urls.withIndex().toList()) { it.value.recordedAt },
         hasOther = voice.isNotEmpty() || files.isNotEmpty() || urls.isNotEmpty(),
     )
 }
+
+// Month bucketing keyed off the local-time calendar so the separators match
+// what the user sees on each message. `recordedAt` is epoch SECONDS.
+internal fun monthKeyForMedia(recordedAtSeconds: ULong): Int {
+    val zdt = Instant.ofEpochSecond(recordedAtSeconds.toLong()).atZone(mediaMonthGroupingZone)
+    // monthLabel() decodes the month with Calendar.MONTH (0-based).
+    return zdt.year * 100 + (zdt.monthValue - 1)
+}
+
+// Group already-newest-first items by calendar month, preserving order so
+// section headers read newest → oldest. Runs during tile projection on a
+// background dispatcher — composition only renders the pre-built sections.
+internal fun <T> groupIntoMonthSections(
+    items: List<T>,
+    recordedAtOf: (T) -> ULong,
+): List<MediaMonthSection<T>> {
+    if (items.isEmpty()) return emptyList()
+    val sections = LinkedHashMap<Int, ArrayList<T>>()
+    for (item in items) {
+        val key = monthKeyForMedia(recordedAtOf(item))
+        sections.getOrPut(key) { ArrayList() }.add(item)
+    }
+    return sections.map { (key, bucket) -> MediaMonthSection(key, bucket) }
+}
+
+private val mediaMonthGroupingZone: ZoneId = ZoneId.systemDefault()
 
 private val ThumbStripSize = 96.dp
 
@@ -452,7 +508,7 @@ internal fun MediaLibraryRoute(
             when (MediaTab.entries[selectedTab]) {
                 MediaTab.Images ->
                     MediaTileGrid(
-                        tiles = tiles.images,
+                        sections = tiles.imageSections,
                         gridState = imagesGridState,
                         controller = controller,
                         appState = appState,
@@ -461,7 +517,7 @@ internal fun MediaLibraryRoute(
                     )
                 MediaTab.Videos ->
                     MediaTileGrid(
-                        tiles = tiles.videos,
+                        sections = tiles.videoSections,
                         gridState = videosGridState,
                         controller = controller,
                         appState = appState,
@@ -470,7 +526,7 @@ internal fun MediaLibraryRoute(
                     )
                 MediaTab.Voice ->
                     VoiceLibraryTab(
-                        rows = tiles.voice,
+                        tiles = tiles,
                         listState = voiceListState,
                         controller = controller,
                         appState = appState,
@@ -478,14 +534,14 @@ internal fun MediaLibraryRoute(
                     )
                 MediaTab.Files ->
                     FileLibraryTab(
-                        rows = tiles.files,
+                        tiles = tiles,
                         listState = filesListState,
                         controller = controller,
                         appState = appState,
                     )
                 MediaTab.Urls ->
                     UrlLibraryTab(
-                        urls = tiles.urls,
+                        tiles = tiles,
                         listState = urlsListState,
                         appState = appState,
                     )
@@ -496,26 +552,17 @@ internal fun MediaLibraryRoute(
 
 @Composable
 private fun MediaTileGrid(
-    tiles: List<SharedMediaTile>,
+    sections: List<MediaMonthSection<SharedMediaTile>>,
     gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     emptyLabel: String,
     onTapTile: (SharedMediaTile) -> Unit,
 ) {
-    if (tiles.isEmpty()) {
+    if (sections.isEmpty()) {
         EmptyPlaceholder(emptyLabel)
         return
     }
-    // Group already-newest-first tiles by calendar month, preserving order so
-    // the section headers read newest → oldest down the grid.
-    val sections =
-        remember(tiles) {
-            tiles
-                .groupBy { monthKey(it.recordedAt) }
-                .entries
-                .toList()
-        }
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         state = gridState,
@@ -524,17 +571,17 @@ private fun MediaTileGrid(
         verticalArrangement = Arrangement.spacedBy(2.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        sections.forEach { (key, monthTiles) ->
-            item(key = "header-$key", span = { GridItemSpan(maxLineSpan) }) {
+        sections.forEach { section ->
+            item(key = "header-${section.monthKey}", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
-                    monthLabel(key),
+                    monthLabel(section.monthKey),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
                 )
             }
-            gridItems(monthTiles, key = { "${it.messageIdHex}#${it.attachmentIndex}" }) { tile ->
+            gridItems(section.items, key = { "${it.messageIdHex}#${it.attachmentIndex}" }) { tile ->
                 Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(4.dp))) {
                     if (tile.isVideo) {
                         MediaVideoGridTile(
@@ -579,57 +626,48 @@ private fun EmptyPlaceholder(label: String) {
 // per section, matching the grids' separators. [keyOf] keys each row stably.
 @Composable
 private fun <T> MonthSectionedColumn(
-    items: List<T>,
+    sections: List<MediaMonthSection<T>>,
     listState: androidx.compose.foundation.lazy.LazyListState,
     emptyLabel: String,
-    monthOf: (T) -> ULong,
     keyOf: (T) -> Any,
     row: @Composable (T) -> Unit,
 ) {
-    if (items.isEmpty()) {
+    if (sections.isEmpty()) {
         EmptyPlaceholder(emptyLabel)
         return
     }
-    val sections =
-        remember(items) {
-            items
-                .groupBy { monthKey(monthOf(it)) }
-                .entries
-                .toList()
-        }
     LazyColumn(
         state = listState,
         contentPadding = PaddingValues(vertical = 4.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        sections.forEach { (key, monthItems) ->
-            item(key = "header-$key") {
+        sections.forEach { section ->
+            item(key = "header-${section.monthKey}") {
                 Text(
-                    monthLabel(key),
+                    monthLabel(section.monthKey),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                 )
             }
-            items(monthItems, key = { keyOf(it) }) { row(it) }
+            items(section.items, key = { keyOf(it) }) { row(it) }
         }
     }
 }
 
 @Composable
 private fun VoiceLibraryTab(
-    rows: List<SharedMediaRow>,
+    tiles: SharedMediaTiles,
     listState: androidx.compose.foundation.lazy.LazyListState,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     onJumpToMessage: (String) -> Unit,
 ) {
     MonthSectionedColumn(
-        items = rows,
+        sections = tiles.voiceSections,
         listState = listState,
         emptyLabel = stringResource(R.string.shared_media_empty_voice),
-        monthOf = { it.recordedAt },
         keyOf = { "${it.messageIdHex}#${it.attachmentIndex}" },
     ) { row ->
         VoiceLibraryRow(
@@ -753,16 +791,15 @@ private fun VoiceLibraryRow(
 
 @Composable
 private fun FileLibraryTab(
-    rows: List<SharedMediaRow>,
+    tiles: SharedMediaTiles,
     listState: androidx.compose.foundation.lazy.LazyListState,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
 ) {
     MonthSectionedColumn(
-        items = rows,
+        sections = tiles.fileSections,
         listState = listState,
         emptyLabel = stringResource(R.string.shared_media_empty_files),
-        monthOf = { it.recordedAt },
         keyOf = { "${it.messageIdHex}#${it.attachmentIndex}" },
     ) { row ->
         FileLibraryRow(
@@ -954,7 +991,7 @@ private fun FileLibraryRow(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UrlLibraryTab(
-    urls: List<MediaInventory.UrlEntry>,
+    tiles: SharedMediaTiles,
     listState: androidx.compose.foundation.lazy.LazyListState,
     appState: WhiteNoiseAppState,
 ) {
@@ -962,12 +999,9 @@ private fun UrlLibraryTab(
     val clipboard = LocalClipboardManager.current
     val couldntOpenMessage = stringResource(R.string.media_couldnt_open)
     MonthSectionedColumn(
-        // The same URL can appear twice in one message, so include the
-        // occurrence position to keep list keys unique.
-        items = urls.withIndex().toList(),
+        sections = tiles.urlSections,
         listState = listState,
         emptyLabel = stringResource(R.string.shared_media_empty_urls),
-        monthOf = { it.value.recordedAt },
         keyOf = { "${it.index}#${it.value.messageIdHex}#${it.value.url}" },
     ) { indexed ->
         val entry = indexed.value
@@ -1105,14 +1139,7 @@ private fun relativeTimestamp(
         .formatDateTime(context, millis, flags)
 }
 
-// Month bucketing keyed off the local-time calendar so the separators match
-// what the user sees on each message. `recordedAt` is epoch SECONDS.
-private fun monthKey(recordedAtSeconds: ULong): Int {
-    val cal = Calendar.getInstance()
-    cal.timeInMillis = recordedAtSeconds.toLong() * 1000L
-    return cal.get(Calendar.YEAR) * 100 + cal.get(Calendar.MONTH)
-}
-
+// Localized month/year header for a [monthKeyForMedia] key.
 private fun monthLabel(key: Int): String {
     val year = key / 100
     val month = key % 100
