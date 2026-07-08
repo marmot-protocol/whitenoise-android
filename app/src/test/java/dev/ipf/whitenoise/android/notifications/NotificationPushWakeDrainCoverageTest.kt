@@ -58,6 +58,53 @@ class NotificationPushWakeDrainCoverageTest {
         )
     }
 
+    @Test
+    fun rejectedForegroundServicePushWakeRecordRunsOffMainBeforeStopping() {
+        val onStart = serviceFunctionBody("onStartCommand")
+        val stopAfterRecord = serviceFunctionBody("stopAfterRecordingPendingPushWakeCatchUp")
+
+        assertTrue(
+            "onStartCommand must not run PushTokenStore.create/commit inline on the main thread",
+            "stopAfterRecordingPendingPushWakeCatchUp(startId)" in onStart &&
+                "recordPendingPushWakeCatchUp(applicationContext)" !in onStart,
+        )
+        assertTrue(
+            "rejected push-wake starts must persist the marker off-main before stopSelf cancels the service scope",
+            "serviceScope.launch(Dispatchers.Default)" in stopAfterRecord &&
+                "recordPendingPushWakeCatchUp(applicationContext)" in stopAfterRecord &&
+                "withContext(Dispatchers.Main.immediate)" in stopAfterRecord &&
+                "stopSelf(startId)" in stopAfterRecord,
+        )
+    }
+
+    @Test
+    fun pendingPushWakeDrainUsesSingleFlightAndGenerationClear() {
+        val appState = appStateSource().readText()
+        val drain = appStateFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
+        val clearObserved = appStateFunctionBody("clearPendingPushWakeCatchUpIfObserved")
+        val schedule = appStateFunctionBody("schedulePendingPushWakeCatchUpDrain")
+
+        assertTrue(
+            "drain must capture the durable marker generation it observed before catch-up",
+            "pendingPushWakeCatchUpGeneration()" in drain &&
+                "clearPendingPushWakeCatchUpIfObserved(pendingGeneration)" in drain,
+        )
+        assertTrue(
+            "clear helper must only clear the observed durable marker generation",
+            "clearPendingPushWakeCatchUp(pendingGeneration)" in clearObserved,
+        )
+        assertTrue(
+            "connectivity callbacks must coalesce repeated pending-drain requests",
+            "pushWakeCatchUpDrainJob.startIfInactive" in schedule &&
+                "notificationScope.launch" in schedule &&
+                "ensureNotificationRuntimeStarted()" in schedule,
+        )
+        assertTrue(
+            "foreground catch-up must use the same generation clear helper as runtime-start drains",
+            "clearPendingPushWakeCatchUpIfObserved" in appState,
+        )
+    }
+
     private fun serviceFunctionBody(functionName: String): String = serviceSource().readText().kotlinFunctionBody(functionName)
 
     private fun appStateFunctionBody(functionName: String): String = appStateSource().readText().kotlinFunctionBody(functionName)

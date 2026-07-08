@@ -62,9 +62,7 @@ class NotificationStreamForegroundService : Service() {
             }.isSuccess
         val syncNativePushRegistration = shouldSyncNativePushRegistration(intent?.action)
         if (syncNativePushRegistration) pendingNativePushRegistrationSync = true
-        if (shouldRecordPendingPushWakeCatchUp(trigger, startedForeground)) {
-            recordPendingPushWakeCatchUp(applicationContext)
-        }
+        val recordPendingPushWakeCatchUp = shouldRecordPendingPushWakeCatchUp(trigger, startedForeground)
         when (
             decideForegroundStart(
                 startForegroundSucceeded = startedForeground,
@@ -83,7 +81,11 @@ class NotificationStreamForegroundService : Service() {
                 if (shouldReconcileBackgroundConnectionRejection(trigger)) {
                     (application as? WhiteNoiseApplication)?.appState?.onBackgroundConnectionStartRejected()
                 }
-                stopSelf(startId)
+                if (recordPendingPushWakeCatchUp) {
+                    stopAfterRecordingPendingPushWakeCatchUp(startId)
+                } else {
+                    stopSelf(startId)
+                }
                 return START_NOT_STICKY
             }
             ForegroundStartDecision.RejectNativePushSyncAndStop -> {
@@ -198,6 +200,13 @@ class NotificationStreamForegroundService : Service() {
         // token to the MIP-05 server, so sync explicitly here. Idempotent: a
         // no-op when the token/server/relay fingerprint is unchanged.
         appState.syncNativePushRegistrationIfEnabled()
+    }
+
+    private fun stopAfterRecordingPendingPushWakeCatchUp(startId: Int) {
+        serviceScope.launch(Dispatchers.Default) {
+            recordPendingPushWakeCatchUp(applicationContext)
+            withContext(Dispatchers.Main.immediate) { stopSelf(startId) }
+        }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {

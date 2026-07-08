@@ -67,6 +67,51 @@ class PushTokenStoreTest {
     }
 
     @Test
+    fun pendingPushWakeCatchUpGenerationAdvancesOnEachRecord() {
+        val store = store()
+        assertEquals(0L, store.pendingPushWakeCatchUpGeneration())
+
+        store.recordPendingPushWakeCatchUp()
+        val first = store.pendingPushWakeCatchUpGeneration()
+        store.recordPendingPushWakeCatchUp()
+        val second = store.pendingPushWakeCatchUpGeneration()
+
+        assertTrue(first > 0L)
+        assertTrue(second > first)
+    }
+
+    @Test
+    fun clearPendingPushWakeCatchUpOnlyClearsTheObservedGeneration() {
+        val store = store()
+        store.recordPendingPushWakeCatchUp()
+        val observedGeneration = store.pendingPushWakeCatchUpGeneration()
+        store.recordPendingPushWakeCatchUp()
+
+        assertEquals(false, store.clearPendingPushWakeCatchUp(observedGeneration))
+        assertEquals(true, store.pushWakeCatchUpPending())
+
+        val currentGeneration = store.pendingPushWakeCatchUpGeneration()
+        assertEquals(true, store.clearPendingPushWakeCatchUp(currentGeneration))
+        assertEquals(false, store.pushWakeCatchUpPending())
+    }
+
+    @Test
+    fun legacyPushWakeBooleanActsAsAnObservedGeneration() {
+        val legacy = FakeSharedPreferences()
+        val secure = FakeSharedPreferences()
+        legacy.edit().putBoolean("pending_push_wake_catch_up", true).commit()
+
+        migrateLegacyPushTokenPreferences(legacy, secure)
+
+        val store = PushTokenStore(secure)
+        val legacyGeneration = store.pendingPushWakeCatchUpGeneration()
+        assertTrue(legacyGeneration > 0L)
+        store.recordPendingPushWakeCatchUp()
+        assertEquals(false, store.clearPendingPushWakeCatchUp(legacyGeneration))
+        assertEquals(true, store.pushWakeCatchUpPending())
+    }
+
+    @Test
     fun clearPendingPushWakeCatchUpResetsTheDurableFlag() {
         val store = store()
         store.recordPendingPushWakeCatchUp()
@@ -359,7 +404,7 @@ class PushTokenStoreTest {
         override fun getLong(
             key: String?,
             defValue: Long,
-        ): Long = defValue
+        ): Long = (values[key] as? Long) ?: defValue
 
         override fun getFloat(
             key: String?,

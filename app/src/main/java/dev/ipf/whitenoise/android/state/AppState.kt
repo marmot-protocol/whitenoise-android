@@ -1092,6 +1092,7 @@ class WhiteNoiseAppState(
         java.util.concurrent.atomic
             .AtomicInteger(0)
     private val notificationJob = NotificationJobSlot()
+    private val pushWakeCatchUpDrainJob = NotificationJobSlot()
     private val notificationDrainSequence = AtomicLong(0)
     private val notificationDrainSignals = MutableSharedFlow<Long>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
@@ -1673,9 +1674,9 @@ class WhiteNoiseAppState(
         }
         isForegroundCatchUpRunning = true
         try {
-            val pendingPushWakeCatchUp = pushTokenStore.pushWakeCatchUpPending()
-            if (catchUpAccountsBestEffort() && pendingPushWakeCatchUp) {
-                pushTokenStore.clearPendingPushWakeCatchUp()
+            val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+            if (catchUpAccountsBestEffort()) {
+                clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
             }
         } finally {
             isForegroundCatchUpRunning = false
@@ -1819,10 +1820,19 @@ class WhiteNoiseAppState(
     }
 
     private suspend fun drainPendingPushWakeCatchUpIfNeeded() {
-        if (!pushTokenStore.pushWakeCatchUpPending()) return
+        val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+        if (pendingGeneration == 0L) return
         if (catchUpAccountsBestEffort()) {
-            pushTokenStore.clearPendingPushWakeCatchUp()
+            clearPendingPushWakeCatchUpIfObserved(pendingGeneration)
+        }
+    }
+
+    private fun clearPendingPushWakeCatchUpIfObserved(pendingGeneration: Long) {
+        if (pendingGeneration == 0L) return
+        if (pushTokenStore.clearPendingPushWakeCatchUp(pendingGeneration)) {
             appStateDebug { "pending push wake catch-up drained" }
+        } else {
+            appStateDebug { "newer pending push wake catch-up remains queued" }
         }
     }
 
@@ -2871,7 +2881,9 @@ class WhiteNoiseAppState(
 
     private fun schedulePendingPushWakeCatchUpDrain() {
         if (!pushTokenStore.pushWakeCatchUpPending()) return
-        notificationScope.launch { ensureNotificationRuntimeStarted() }
+        pushWakeCatchUpDrainJob.startIfInactive {
+            notificationScope.launch { ensureNotificationRuntimeStarted() }
+        }
     }
 
     private fun networkTypesFor(caps: android.net.NetworkCapabilities): Set<MediaAutoDownloadNetwork> =

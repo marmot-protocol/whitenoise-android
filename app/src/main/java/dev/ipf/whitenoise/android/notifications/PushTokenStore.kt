@@ -15,8 +15,11 @@ private const val FALLBACK_PREFS_NAME = "whitenoise.push.tokens.fallback"
 private const val KEY_FCM_TOKEN = "fcm_token"
 private const val KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC = "pending_native_push_registration_sync"
 private const val KEY_PENDING_PUSH_WAKE_CATCH_UP = "pending_push_wake_catch_up"
+private const val KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION = "pending_push_wake_catch_up_generation"
 private const val KEY_PENDING_CLEARS = "pending_clears"
 private const val KEY_PENDING_DISABLES = "pending_native_push_disables"
+private const val NO_PENDING_PUSH_WAKE_CATCH_UP = 0L
+private const val LEGACY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION = 1L
 
 /**
  * Persisted FCM token cache. The [MarmotFirebaseMessagingService] writes here
@@ -82,22 +85,70 @@ class PushTokenStore(
      * next runtime-start, connectivity, or foreground catch-up trigger retries
      * the fetch instead of losing that wake. See #1160.
      */
-    fun pushWakeCatchUpPending(): Boolean = preferences.getBoolean(KEY_PENDING_PUSH_WAKE_CATCH_UP, false)
+    fun pushWakeCatchUpPending(): Boolean = pendingPushWakeCatchUpGeneration() != NO_PENDING_PUSH_WAKE_CATCH_UP
+
+    /**
+     * Monotonic pending-marker generation observed by drains. A drain must clear
+     * only the generation it saw before catch-up; if another rejected wake lands
+     * during the relay fetch, the newer generation stays pending.
+     */
+    fun pendingPushWakeCatchUpGeneration(): Long = synchronized(LOCK) { pendingPushWakeCatchUpGenerationLocked() }
 
     // commit() (not apply()) so the #1160 retry marker is durable before the
     // Firebase background service returns and the process can be killed.
     @SuppressLint("ApplySharedPref")
     fun recordPendingPushWakeCatchUp() {
         synchronized(LOCK) {
-            preferences.edit().putBoolean(KEY_PENDING_PUSH_WAKE_CATCH_UP, true).commit()
+            val nextGeneration = nextPushWakeCatchUpGeneration(pendingPushWakeCatchUpGenerationLocked())
+            preferences
+                .edit()
+                .putLong(KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION, nextGeneration)
+                .remove(KEY_PENDING_PUSH_WAKE_CATCH_UP)
+                .commit()
         }
     }
 
     fun clearPendingPushWakeCatchUp() {
         synchronized(LOCK) {
-            preferences.edit().remove(KEY_PENDING_PUSH_WAKE_CATCH_UP).apply()
+            clearPendingPushWakeCatchUpLocked()
         }
     }
+
+    fun clearPendingPushWakeCatchUp(generation: Long): Boolean {
+        if (generation == NO_PENDING_PUSH_WAKE_CATCH_UP) return false
+        synchronized(LOCK) {
+            if (pendingPushWakeCatchUpGenerationLocked() != generation) return false
+            clearPendingPushWakeCatchUpLocked()
+            return true
+        }
+    }
+
+    private fun clearPendingPushWakeCatchUpLocked() {
+        // apply() is intentionally enough for clears: losing a clear only causes
+        // a redundant catch-up retry, while losing a record would lose a wake.
+        preferences
+            .edit()
+            .remove(KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION)
+            .remove(KEY_PENDING_PUSH_WAKE_CATCH_UP)
+            .apply()
+    }
+
+    private fun pendingPushWakeCatchUpGenerationLocked(): Long {
+        val generation = preferences.getLong(KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION, NO_PENDING_PUSH_WAKE_CATCH_UP)
+        if (generation > NO_PENDING_PUSH_WAKE_CATCH_UP) return generation
+        return if (preferences.getBoolean(KEY_PENDING_PUSH_WAKE_CATCH_UP, false)) {
+            LEGACY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION
+        } else {
+            NO_PENDING_PUSH_WAKE_CATCH_UP
+        }
+    }
+
+    private fun nextPushWakeCatchUpGeneration(current: Long): Long =
+        if (current in LEGACY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION until Long.MAX_VALUE) {
+            current + 1
+        } else {
+            LEGACY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION
+        }
 
     /**
      * Account refs whose `clearPushRegistration` FFI call previously failed.
@@ -223,6 +274,7 @@ internal fun migrateLegacyPushTokenPreferences(
     copyStringIfMissing(legacyValues, secure, editor, KEY_FCM_TOKEN).also { wrote = wrote || it }
     copyBooleanIfMissing(legacyValues, secure, editor, KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC).also { wrote = wrote || it }
     copyBooleanIfMissing(legacyValues, secure, editor, KEY_PENDING_PUSH_WAKE_CATCH_UP).also { wrote = wrote || it }
+    copyLongIfMissing(legacyValues, secure, editor, KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION).also { wrote = wrote || it }
     copyStringSetIfMissing(legacyValues, secure, editor, KEY_PENDING_CLEARS).also { wrote = wrote || it }
     copyStringSetIfMissing(legacyValues, secure, editor, KEY_PENDING_DISABLES).also { wrote = wrote || it }
     if (!wrote || editor.commit()) {
@@ -251,6 +303,18 @@ private fun copyBooleanIfMissing(
     if (secure.contains(key)) return false
     val value = values[key] as? Boolean ?: return false
     editor.putBoolean(key, value)
+    return true
+}
+
+private fun copyLongIfMissing(
+    values: Map<String, *>,
+    secure: SharedPreferences,
+    editor: SharedPreferences.Editor,
+    key: String,
+): Boolean {
+    if (secure.contains(key)) return false
+    val value = values[key] as? Long ?: return false
+    editor.putLong(key, value)
     return true
 }
 
