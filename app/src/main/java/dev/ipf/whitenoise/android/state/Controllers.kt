@@ -1585,6 +1585,9 @@ class ChatsController(
                     }
                 }
                 if (!coroutineContext.isActive || !shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) break
+                // Reset only after a real live update, not after a successful
+                // bind/snapshot. A relay that connects and immediately closes
+                // should keep backing off instead of pinning retries at 500ms.
                 retryDelayMs =
                     liveSubscriptionRetryDelayMillisAfterAttempt(
                         currentRetryDelayMs = retryDelayMs,
