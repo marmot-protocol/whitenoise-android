@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -2580,38 +2579,51 @@ internal fun ConversationScreen(
                                     }
                                 }
                                 if (!nearBottom) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.secondaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        shadowElevation = 2.dp,
+                                    val jumpToNewestLabel = stringResource(R.string.jump_to_newest)
+                                    Box(
                                         modifier =
                                             Modifier
-                                                .size(34.dp)
+                                                .size(42.dp)
+                                                .semantics { contentDescription = jumpToNewestLabel }
                                                 .clickable {
                                                     scope.launch {
-                                                        val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                                                        listState.animateScrollToItem(lastIndex)
+                                                        val targetIndex =
+                                                            conversationJumpToNewestTargetListIndex(
+                                                                unreadIncomingCount = unreadIncomingCount,
+                                                                readAnchorMessageId = readAnchorMessageId,
+                                                                renderedMessageIds = renderedTimeline.map { it.record.messageIdHex },
+                                                                visibleListIndices =
+                                                                    listState.layoutInfo.visibleItemsInfo
+                                                                        .map { it.index }
+                                                                        .toSet(),
+                                                                olderHeaderCount = olderHeaderCount,
+                                                                bottomTimelineIndex = bottomTimelineIndex,
+                                                            )
+                                                        listState.animateScrollToItem(targetIndex)
                                                     }
                                                 },
+                                        contentAlignment = Alignment.Center,
                                     ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                Icons.Default.ArrowDownward,
-                                                contentDescription = stringResource(R.string.jump_to_newest),
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                            if (unreadIncomingCount > 0) {
-                                                Badge(
-                                                    modifier =
-                                                        Modifier
-                                                            .align(Alignment.TopEnd)
-                                                            .offset(x = 10.dp, y = (-10).dp),
-                                                ) {
-                                                    Text(
-                                                        if (unreadIncomingCount > 99) "99+" else unreadIncomingCount.toString(),
-                                                    )
-                                                }
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.secondaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            shadowElevation = 2.dp,
+                                            modifier = Modifier.size(34.dp),
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    Icons.Default.ArrowDownward,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp),
+                                                )
+                                            }
+                                        }
+                                        if (unreadIncomingCount > 0) {
+                                            Badge(modifier = Modifier.align(Alignment.TopEnd)) {
+                                                Text(
+                                                    if (unreadIncomingCount > 99) "99+" else unreadIncomingCount.toString(),
+                                                )
                                             }
                                         }
                                     }
