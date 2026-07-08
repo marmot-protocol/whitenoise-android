@@ -882,6 +882,8 @@
     <string name="add_group_description">Gruppenbeschreibung hinzufügen</string>
     <string name="see_all_members">Alle %1$d Mitglieder anzeigen</string>
     <string name="chat_lock">Chatsperre</string>
+    <string name="collapse_long_messages">Lange Nachrichten einklappen</string>
+    <string name="collapse_long_messages_subtitle">Für lange Nachrichten in diesem Chat eine „Mehr lesen“-Verknüpfung anzeigen</string>
     <string name="toast_disappearing_not_applied">Die Gruppe wurde erstellt, aber verschwindende Nachrichten konnten nicht aktiviert werden</string>
     <string name="search_members">Mitglieder suchen</string>
     <string name="recent_chats">Letzte Chats</string>

@@ -47,4 +47,43 @@ class WhiteNoiseAppStatePreferencesTest {
 
         assertFalse(ChatScreenshotPreferences.readAllowChatScreenshots(context))
     }
+
+    @Test
+    fun longMessageCollapseDefaultsOnPerAccountGroup() {
+        assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "account-a", "group-a"))
+    }
+
+    @Test
+    fun longMessageCollapsePersistsPerAccountGroup() {
+        LongMessageCollapsePreferences.writeCollapseLongMessages(preferences, "account-a", "group-a", false)
+
+        assertFalse(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "account-a", "group-a"))
+        assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "account-a", "group-b"))
+        assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "account-b", "group-a"))
+    }
+
+    @Test
+    fun longMessageCollapseReenabledReturnsToDefault() {
+        LongMessageCollapsePreferences.writeCollapseLongMessages(preferences, "account-a", "group-a", false)
+        LongMessageCollapsePreferences.writeCollapseLongMessages(preferences, "account-a", "group-a", true)
+
+        assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "account-a", "group-a"))
+    }
+
+    @Test
+    fun longMessageCollapseNormalizesIds() {
+        LongMessageCollapsePreferences.writeCollapseLongMessages(preferences, " account-a ", " GROUP-A ", false)
+
+        assertFalse(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "account-a", "group-a"))
+    }
+
+    @Test
+    fun longMessageCollapseIgnoresBlankAccountOrGroup() {
+        LongMessageCollapsePreferences.writeCollapseLongMessages(preferences, "", "group-a", false)
+        LongMessageCollapsePreferences.writeCollapseLongMessages(preferences, "account-a", "   ", false)
+
+        assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "account-a", "group-a"))
+        assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "", "group-a"))
+        assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "account-a", ""))
+    }
 }
