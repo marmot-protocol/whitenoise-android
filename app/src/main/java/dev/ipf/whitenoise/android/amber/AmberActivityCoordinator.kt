@@ -98,23 +98,31 @@ object AmberActivityCoordinator {
         // result that echoes its id; get_public_key sends no id, so its result
         // (which likewise carries none) matches on both being null.
         val resultId = data?.getStringExtra(Nip55.EXTRA_ID)
-        if (!shouldAcceptResult(active.requestId, resultId)) return
+        if (!shouldAcceptResult(active.requestId, resultId)) {
+            // A dropped result means the waiting caller will burn the full
+            // approval timeout — loud enough to find in a field logcat.
+            android.util.Log.w(
+                "AmberSigner",
+                "dropped signer result: expectedId=${active.requestId} resultId=$resultId ok=$resultOk",
+            )
+            return
+        }
         active.queue.offer(Delivery.Result(resultOk, data))
     }
 
     /**
-     * Whether a delivered result should satisfy the active request: their ids
-     * must match exactly. NIP-55 signers echo the request's `EXTRA_ID`, so a
-     * result belongs to the active request only when it carries the same id.
-     * get_public_key sends no id, so both sides are null and match; every other
-     * pairing — a mismatched id (a prior, timed-out request's late result) or a
-     * one-sided missing id — is dropped, so a stale result can never satisfy an
-     * id-bearing request.
+     * Whether a delivered result should satisfy the active request. An
+     * id-bearing request accepts only a result echoing the same `EXTRA_ID`, so
+     * a prior, timed-out request's late result can never satisfy it.
+     * get_public_key sends no id, and signers answer it with a self-generated
+     * id — so a no-id request accepts whatever arrives while it is the single
+     * pending prompt (the prompt lock serializes prompts, so there is nothing
+     * else the result could belong to).
      */
     internal fun shouldAcceptResult(
         expectedId: String?,
         resultId: String?,
-    ): Boolean = expectedId == resultId
+    ): Boolean = expectedId == null || expectedId == resultId
 
     /**
      * Show [intent] via the foreground launcher and block the CALLING (worker)
