@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -53,6 +54,7 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
+import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
 import dev.ipf.whitenoise.android.ui.onboarding.IdentityEntryForm
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
 import dev.ipf.whitenoise.android.ui.onboarding.importIdentityErrorRes
@@ -65,6 +67,7 @@ internal fun AddIdentitySheet(
     onDismiss: () -> Unit,
 ) {
     WindowSecureFlag()
+    val context = LocalContext.current
     var identity by remember { mutableStateOf("") }
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
@@ -85,7 +88,9 @@ internal fun AddIdentitySheet(
         importErrorRes = null
         appState.launchMutation {
             try {
-                if (!appState.importIdentity(identity)) {
+                if (appState.importIdentity(identity)) {
+                    clearSensitiveClipboard(context)
+                } else {
                     importErrorRes = importIdentityErrorRes(identity)
                 }
             } finally {

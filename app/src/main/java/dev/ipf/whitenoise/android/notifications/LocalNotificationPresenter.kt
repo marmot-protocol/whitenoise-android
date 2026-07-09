@@ -109,8 +109,9 @@ class LocalNotificationPresenter(
         reactedToPreviewOverride: String? = null,
         mediaKind: ReplyMediaKind = ReplyMediaKind.None,
         recipientAccountSubtext: String? = null,
+        redactContent: Boolean = false,
     ): Boolean {
-        val content =
+        val formattedContent =
             LocalNotificationFormatter.content(
                 update = update,
                 context = context,
@@ -120,7 +121,7 @@ class LocalNotificationPresenter(
                 mediaKind = mediaKind,
                 conversationTitleOverride = conversationTitleOverride,
             )
-        val formatterReturnedContent = content != null
+        val formatterReturnedContent = formattedContent != null
         val canPost = formatterReturnedContent && canPostNotifications()
         // Channels are created during AppState bootstrap / runtime start
         // (AppState.bootstrap() and ensureNotificationRuntimeStarted() both
@@ -141,7 +142,17 @@ class LocalNotificationPresenter(
                 notificationDebug { "skip key=${update.notificationKey.take(16)} reason=$reason" }
                 return false
             }
-        val notificationContent = content ?: return false
+        val rawNotificationContent = formattedContent ?: return false
+        val notificationContent =
+            if (redactContent) {
+                LocalNotificationFormatter.redactedContent(
+                    rawNotificationContent,
+                    appName = context.getString(R.string.app_name),
+                    body = context.getString(R.string.notification_hidden_content),
+                )
+            } else {
+                rawNotificationContent
+            }
         val builder =
             NotificationCompat
                 .Builder(context, decision.channelId)
@@ -157,7 +168,7 @@ class LocalNotificationPresenter(
                 .setPublicVersion(redactedPublicVersion(decision.channelId, decision.category))
                 .setSilent(false)
         // Name the recipient identity in the header when multi-account (#836).
-        if (!recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
+        if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) builder.setSubText(recipientAccountSubtext)
 
         when (val style = decision.style) {
             // Reactions get their own self-contained card (own tag/id on the
@@ -176,30 +187,38 @@ class LocalNotificationPresenter(
                 // Resolve the carried-forward history off-main: activeNotifications
                 // is a Binder round-trip and extractMessagingStyle re-serializes it.
                 val carried =
-                    withContext(Dispatchers.Default) {
-                        existingMessagingStyle(notificationContent.notificationTag, notificationContent.notificationId)?.messages
+                    if (redactContent) {
+                        null
+                    } else {
+                        withContext(Dispatchers.Default) {
+                            existingMessagingStyle(notificationContent.notificationTag, notificationContent.notificationId)?.messages
+                        }
                     }
-                conversationShortcutId(update)?.let { shortcutId ->
-                    val locusId = LocusIdCompat(shortcutId)
-                    builder
-                        .setShortcutId(shortcutId)
-                        .setLocusId(locusId)
-                        .addPerson(senderPerson(notificationContent))
-                    withContext(Dispatchers.Default) {
-                        publishConversationShortcut(update, notificationContent, shortcutId, locusId)
+                if (!redactContent) {
+                    conversationShortcutId(update)?.let { shortcutId ->
+                        val locusId = LocusIdCompat(shortcutId)
+                        builder
+                            .setShortcutId(shortcutId)
+                            .setLocusId(locusId)
+                            .addPerson(senderPerson(notificationContent))
+                        withContext(Dispatchers.Default) {
+                            publishConversationShortcut(update, notificationContent, shortcutId, locusId)
+                        }
                     }
                 }
                 builder.setStyle(messagingStyle(update, notificationContent, conversationTitleOverride, decision.historyCap, carried))
-                NotificationActions
-                    .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
-                    ?.let { actionTarget ->
-                        decision.actions.forEach { action ->
-                            when (action) {
-                                NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget))
-                                NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
+                if (!redactContent) {
+                    NotificationActions
+                        .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
+                        ?.let { actionTarget ->
+                            decision.actions.forEach { action ->
+                                when (action) {
+                                    NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget))
+                                    NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
+                                }
                             }
                         }
-                    }
+                }
             }
 
             is NotificationStyleChoice.InviteWithExtras -> {

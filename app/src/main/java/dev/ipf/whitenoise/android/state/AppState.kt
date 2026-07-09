@@ -4286,16 +4286,17 @@ class WhiteNoiseAppState(
                 "updateAccount=${update.accountRef.take(8)} post=$shouldPost"
         }
         if (shouldPost) {
-            val senderNameOverride = notificationSenderName(update)
-            val systemText = notificationGroupSystemText(update, senderNameOverride)
+            val redactNotificationContent = appLockScreenVisible
+            val senderNameOverride = if (redactNotificationContent) null else notificationSenderName(update)
+            val systemText = if (redactNotificationContent) null else notificationGroupSystemText(update, senderNameOverride)
             val previewTextOverride =
-                systemText?.body ?: if (LocalNotificationFormatter.needsPreviewTextResolution(update)) {
+                systemText?.body ?: if (!redactNotificationContent && LocalNotificationFormatter.needsPreviewTextResolution(update)) {
                     notificationPreviewText(update.previewText)
                 } else {
                     null
                 }
             val reactedToPreviewOverride =
-                if (LocalNotificationFormatter.needsReactedToPreviewResolution(update)) {
+                if (!redactNotificationContent && LocalNotificationFormatter.needsReactedToPreviewResolution(update)) {
                     notificationPreviewText(update.reactedToPreview)
                 } else {
                     null
@@ -4304,23 +4305,32 @@ class WhiteNoiseAppState(
             // attachment, so classify just those (a single history read) to name
             // the media type in the body. Text messages never reach the fetch.
             val mediaKind =
-                if (systemText == null && LocalNotificationFormatter.needsPreviewTextResolution(update) && previewTextOverride.isNullOrBlank()) {
+                if (!redactNotificationContent &&
+                    systemText == null &&
+                    LocalNotificationFormatter.needsPreviewTextResolution(update) &&
+                    previewTextOverride.isNullOrBlank()
+                ) {
                     notificationMediaKind(update)
                 } else {
                     ReplyMediaKind.None
                 }
             localNotificationPresenter.show(
                 update,
-                systemText?.title ?: notificationConversationTitle(update),
+                if (redactNotificationContent) null else (systemText?.title ?: notificationConversationTitle(update)),
                 senderNameOverride,
                 previewTextOverride,
                 reactedToPreviewOverride,
                 mediaKind,
                 recipientAccountSubtext =
-                    LocalNotificationFormatter.recipientAccountSubtext(
-                        signedInAccountCount = accounts.count { it.localSigning && !it.signedOut && it.label.isNotBlank() },
-                        recipientLabel = notificationRecipientName(update.accountRef),
-                    ),
+                    if (redactNotificationContent) {
+                        null
+                    } else {
+                        LocalNotificationFormatter.recipientAccountSubtext(
+                            signedInAccountCount = accounts.count { it.localSigning && !it.signedOut && it.label.isNotBlank() },
+                            recipientLabel = notificationRecipientName(update.accountRef),
+                        )
+                    },
+                redactContent = redactNotificationContent,
             )
         }
         // Coalesce the unread refresh across a burst instead of paying the

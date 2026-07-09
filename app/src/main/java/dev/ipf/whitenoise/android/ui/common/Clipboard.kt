@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import android.content.ClipData
 import android.content.Context
+import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -41,3 +43,12 @@ internal fun android.content.ClipboardManager.primaryClipPlainText(context: andr
         ?.getItemAt(0)
         ?.coerceToText(context)
         ?.toString()
+
+internal fun clearSensitiveClipboard(context: Context) {
+    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java) ?: return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        clipboard.clearPrimaryClip()
+    } else {
+        clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+    }
+}
