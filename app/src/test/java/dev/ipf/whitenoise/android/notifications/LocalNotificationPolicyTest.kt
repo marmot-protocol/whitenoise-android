@@ -17,6 +17,7 @@ class LocalNotificationPolicyTest {
                 appInForeground = true,
                 activeConversationGroupIdHex = "active-group",
                 activeConversationAccountRef = "account-a",
+                appLockScreenVisible = false,
             ),
         )
     }
@@ -29,6 +30,7 @@ class LocalNotificationPolicyTest {
                 appInForeground = true,
                 activeConversationGroupIdHex = "active-group",
                 activeConversationAccountRef = "account-a",
+                appLockScreenVisible = false,
             ),
         )
     }
@@ -43,6 +45,7 @@ class LocalNotificationPolicyTest {
                 appInForeground = true,
                 activeConversationGroupIdHex = "active-group",
                 activeConversationAccountRef = "account-a",
+                appLockScreenVisible = false,
             ),
         )
     }
@@ -55,6 +58,20 @@ class LocalNotificationPolicyTest {
                 appInForeground = false,
                 activeConversationGroupIdHex = "active-group",
                 activeConversationAccountRef = "account-a",
+                appLockScreenVisible = false,
+            ),
+        )
+    }
+
+    @Test
+    fun appLockScreenVisibleNotificationIsSuppressed() {
+        assertFalse(
+            LocalNotificationPolicy.shouldPost(
+                update(groupIdHex = "other-group", accountRef = "account-a"),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = true,
             ),
         )
     }
@@ -105,6 +122,7 @@ class LocalNotificationPolicyTest {
             appInForeground = state.inForeground,
             activeConversationGroupIdHex = state.activeConversationGroupIdHex,
             activeConversationAccountRef = state.activeConversationAccountRef,
+            appLockScreenVisible = false,
         )
 
     private fun update(

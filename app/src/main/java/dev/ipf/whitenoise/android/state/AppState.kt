@@ -4321,12 +4321,13 @@ class WhiteNoiseAppState(
                 appInForeground = appInForeground,
                 activeConversationGroupIdHex = activeConversation,
                 activeConversationAccountRef = activeConversationAccountRef,
+                appLockScreenVisible = appLockScreenVisible,
             )
         appStateDebug {
             "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
                 "foreground=$appInForeground active=${activeConversation?.take(8) ?: "<none>"} " +
                 "activeAccount=${activeConversationAccountRef?.take(8) ?: "<none>"} " +
-                "updateAccount=${update.accountRef.take(8)} post=$shouldPost"
+                "updateAccount=${update.accountRef.take(8)} appLock=$appLockScreenVisible post=$shouldPost"
         }
         if (shouldPost) {
             val skipEnrichmentForLock = appLockScreenVisible
