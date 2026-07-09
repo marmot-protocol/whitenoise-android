@@ -4286,17 +4286,17 @@ class WhiteNoiseAppState(
                 "updateAccount=${update.accountRef.take(8)} post=$shouldPost"
         }
         if (shouldPost) {
-            val redactNotificationContent = appLockScreenVisible
-            val senderNameOverride = if (redactNotificationContent) null else notificationSenderName(update)
-            val systemText = if (redactNotificationContent) null else notificationGroupSystemText(update, senderNameOverride)
+            val skipEnrichmentForLock = appLockScreenVisible
+            val senderNameOverride = if (skipEnrichmentForLock) null else notificationSenderName(update)
+            val systemText = if (skipEnrichmentForLock) null else notificationGroupSystemText(update, senderNameOverride)
             val previewTextOverride =
-                systemText?.body ?: if (!redactNotificationContent && LocalNotificationFormatter.needsPreviewTextResolution(update)) {
+                systemText?.body ?: if (!skipEnrichmentForLock && LocalNotificationFormatter.needsPreviewTextResolution(update)) {
                     notificationPreviewText(update.previewText)
                 } else {
                     null
                 }
             val reactedToPreviewOverride =
-                if (!redactNotificationContent && LocalNotificationFormatter.needsReactedToPreviewResolution(update)) {
+                if (!skipEnrichmentForLock && LocalNotificationFormatter.needsReactedToPreviewResolution(update)) {
                     notificationPreviewText(update.reactedToPreview)
                 } else {
                     null
@@ -4305,7 +4305,7 @@ class WhiteNoiseAppState(
             // attachment, so classify just those (a single history read) to name
             // the media type in the body. Text messages never reach the fetch.
             val mediaKind =
-                if (!redactNotificationContent &&
+                if (!skipEnrichmentForLock &&
                     systemText == null &&
                     LocalNotificationFormatter.needsPreviewTextResolution(update) &&
                     previewTextOverride.isNullOrBlank()
@@ -4314,13 +4314,18 @@ class WhiteNoiseAppState(
                 } else {
                     ReplyMediaKind.None
                 }
+            // A lock can arrive while the suspend enrichment above is running.
+            // Re-check before posting; if we skipped enrichment because the app
+            // was locked earlier, keep the post redacted even if it has since
+            // unlocked because the rich fields were intentionally not resolved.
+            val redactNotificationContent = skipEnrichmentForLock || appLockScreenVisible
             localNotificationPresenter.show(
                 update,
                 if (redactNotificationContent) null else (systemText?.title ?: notificationConversationTitle(update)),
-                senderNameOverride,
-                previewTextOverride,
-                reactedToPreviewOverride,
-                mediaKind,
+                if (redactNotificationContent) null else senderNameOverride,
+                if (redactNotificationContent) null else previewTextOverride,
+                if (redactNotificationContent) null else reactedToPreviewOverride,
+                if (redactNotificationContent) ReplyMediaKind.None else mediaKind,
                 recipientAccountSubtext =
                     if (redactNotificationContent) {
                         null

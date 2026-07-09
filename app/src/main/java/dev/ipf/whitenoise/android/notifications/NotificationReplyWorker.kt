@@ -45,9 +45,13 @@ class NotificationReplyWorker(
             if (sent) {
                 markReadAfterReply(application, action)
                 dismissSentReplyNotification(applicationContext, action, reply)
+                notificationReplyActionHandled(sent = true)
+                Result.success()
+            } else {
+                notificationReplyActionHandled(sent = false)
+                if (BuildConfig.DEBUG) Log.w(TAG, "reply send returned false group=${action.target.groupIdHex.take(8)}")
+                Result.retry()
             }
-            notificationReplyActionHandled(sent = sent)
-            Result.success()
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {

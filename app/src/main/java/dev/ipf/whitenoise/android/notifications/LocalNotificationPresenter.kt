@@ -206,7 +206,18 @@ class LocalNotificationPresenter(
                         }
                     }
                 }
-                builder.setStyle(messagingStyle(update, notificationContent, conversationTitleOverride, decision.historyCap, carried))
+                builder.setStyle(
+                    messagingStyle(
+                        update,
+                        notificationContent,
+                        if (redactContent) null else conversationTitleOverride,
+                        decision.historyCap,
+                        carried,
+                    ),
+                )
+                if (redactContent) {
+                    builder.addExtras(Bundle().apply { putBoolean(EXTRA_CONTENT_REDACTED, true) })
+                }
                 if (!redactContent) {
                     NotificationActions
                         .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
@@ -375,6 +386,7 @@ class LocalNotificationPresenter(
                 .getOrNull()
                 ?.firstOrNull { it.tag == tag && it.id == id }
                 ?: return null
+        if (existing.notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) return null
         return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing.notification)
     }
 
@@ -550,6 +562,8 @@ private data class ConversationShortcutSnapshot(
     val senderName: String,
     val senderKey: String,
 )
+
+private const val EXTRA_CONTENT_REDACTED = "dev.ipf.whitenoise.android.notify.content_redacted"
 
 private inline fun notificationDebug(message: () -> String) {
     if (BuildConfig.DEBUG) Log.i("DMLocalNotify", message())
