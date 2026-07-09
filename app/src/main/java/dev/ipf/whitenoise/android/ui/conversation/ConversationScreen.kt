@@ -365,13 +365,17 @@ internal fun ConversationScreen(
     //   immediately advances HWM to the last timeline index, so the badge
     //   shows 0 — matching the convention that an "open chat" is read up to
     //   the visible row, not the last delivered row.
-    // Size of the rendered (edit-filtered) list. Derived once per timeline
-    // change and shared by every position calculation, so the filter never
-    // re-runs on the scroll path. Read as a State, so the derived blocks below
-    // stay reactive to it.
-    val renderedSize by remember {
-        derivedStateOf { controller.timeline.count { !MessageProjector.isEdit(it.record) } }
-    }
+    // Edits (kind-1009) are derived state, not chat — they mutate the
+    // original message's body via [editsByTarget] and must not occupy a slot
+    // in the lazy list. A naive `return@items` still reserves the slot, which
+    // (combined with `Arrangement.spacedBy`) leaves a visible gap. Filter
+    // them out up front and base every index/scroll calculation on the
+    // filtered list so what we count matches what we render.
+    val renderedTimeline =
+        remember(controller.timeline) {
+            controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        }
+    val renderedSize = renderedTimeline.size
     val nearBottom by remember {
         derivedStateOf {
             // Match the rendered list size, otherwise bottomTimelineIndex
@@ -406,8 +410,7 @@ internal fun ConversationScreen(
         // read pointer never moves backwards. See [nextReadAnchor]. Resolve the
         // visible row against the filtered (rendered) list it indexes into, not
         // the unfiltered timeline.
-        val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        readAnchorMessageId = nextReadAnchor(rendered, readAnchorMessageId, idx)
+        readAnchorMessageId = nextReadAnchor(renderedTimeline, readAnchorMessageId, idx)
     }
     DisposableEffect(chat.id) {
         onDispose {
@@ -766,7 +769,10 @@ internal fun ConversationScreen(
                     // neighbor" semantics.
                     var nextIdx = completedIdx + 1
                     while (nextIdx < controller.timeline.size &&
-                        MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)
+                        (
+                            MessageProjector.isEdit(controller.timeline[nextIdx].record) ||
+                                MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)
+                        )
                     ) {
                         nextIdx++
                     }
@@ -1389,16 +1395,6 @@ internal fun ConversationScreen(
             controller.onCleared()
         }
     }
-    // Edits (kind-1009) are derived state, not chat — they mutate the
-    // original message's body via [editsByTarget] and must not occupy a slot
-    // in the lazy list. A naive `return@items` still reserves the slot, which
-    // (combined with `Arrangement.spacedBy`) leaves a visible gap. Filter
-    // them out up front and base every index/scroll calculation on the
-    // filtered list so what we count matches what we render.
-    val renderedTimeline =
-        remember(controller.timeline) {
-            controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        }
     val latestTimelineItemId = renderedTimeline.lastOrNull()?.id
     val transcriptLocale = LocalConfiguration.current.locales[0]
     val olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0

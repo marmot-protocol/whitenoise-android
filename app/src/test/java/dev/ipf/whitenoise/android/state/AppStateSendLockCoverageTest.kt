@@ -78,6 +78,69 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun failedSendDiscardTracksPendingOnlyWhenRetryStillExists() {
+        val body = controllerFunctionBody("discardFailedSend")
+
+        assertTrue(
+            "discardFailedSend must not retain a discardedDuringRetry key after the retry entry has already completed",
+            "val current = optimisticMessages[key]" in body &&
+                "MessageStatus.Pending -> if (current != null) discardedDuringRetry.add(key)" in body,
+        )
+    }
+
+    @Test
+    fun markLatestVisibleReadDeadPathStaysDeleted() {
+        val source = controllersSource().readText()
+
+        assertFalse(
+            "markLatestVisibleRead zeroes unread state from a stale open-chat path and should stay deleted",
+            Regex("""\bfun\s+markLatestVisibleRead\s*\(""").containsMatchIn(source),
+        )
+    }
+
+    @Test
+    fun appStateClientReferenceIsVolatile() {
+        val source = appStateSource().readText()
+
+        assertTrue(
+            "Marmot client is written on IO and read off-mutex, so visibility must be explicit",
+            Regex("""@Volatile\s+private\s+var\s+client:\s*MarmotClient\?""").containsMatchIn(source),
+        )
+    }
+
+    @Test
+    fun conversationReadAnchorUsesHoistedRenderedTimeline() {
+        val source = conversationScreenSource().readText()
+        val renderedTimelineIndex = source.indexOf("val renderedTimeline =")
+        val readAnchorEffectIndex = source.indexOf("LaunchedEffect(currentHighestVisibleTimelineIndex)")
+        val readAnchorEffect = source.substring(readAnchorEffectIndex, source.indexOf("DisposableEffect(chat.id)", readAnchorEffectIndex))
+
+        assertTrue(
+            "read-anchor effect must reuse the hoisted edit-filtered renderedTimeline instead of allocating a fresh filtered list on scroll",
+            renderedTimelineIndex >= 0 &&
+                renderedTimelineIndex < readAnchorEffectIndex &&
+                "readAnchorMessageId = nextReadAnchor(renderedTimeline, readAnchorMessageId, idx)" in readAnchorEffect &&
+                "filterNot { MessageProjector.isEdit(it.record) }" !in readAnchorEffect,
+        )
+    }
+
+    @Test
+    fun voiceAutoChainSkipsDerivedEditRows() {
+        val source = conversationScreenSource().readText()
+        val autoChain =
+            source.substring(
+                source.indexOf("Auto-chain voice playback"),
+                source.indexOf("val nextMsg", source.indexOf("Auto-chain voice playback")),
+            )
+
+        assertTrue(
+            "auto-chain should skip invisible edit and group-system rows before checking the immediate visible voice neighbor",
+            "MessageProjector.isEdit(controller.timeline[nextIdx].record)" in autoChain &&
+                "MessageProjector.isGroupSystem(controller.timeline[nextIdx].record)" in autoChain,
+        )
+    }
+
+    @Test
     fun loadOlderPageRoutesPaginateThroughActiveSubscriptionGuard() {
         val loadOlder = controllerFunctionBody("loadOlderPage")
         val guard = controllerFunctionBody("paginateOlderIfSubscriptionActive")
@@ -187,6 +250,13 @@ class AppStateSendLockCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing Controllers.kt source file")
+
+    private fun conversationScreenSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing ConversationScreen.kt source file")
 
     private fun String.kotlinBlockFrom(
         openBrace: Int,

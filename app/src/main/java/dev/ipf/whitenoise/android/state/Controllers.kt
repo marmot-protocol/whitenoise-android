@@ -5066,7 +5066,7 @@ class ConversationController(
         val tempId = current?.record?.messageIdHex ?: item.record.messageIdHex
         when (status) {
             MessageStatus.Failed -> Unit
-            MessageStatus.Pending -> discardedDuringRetry.add(key)
+            MessageStatus.Pending -> if (current != null) discardedDuringRetry.add(key)
             else -> return
         }
         rollbackOptimisticChatListPreview(key, tempId)
@@ -5970,20 +5970,6 @@ class ConversationController(
             appState.marmotIo { initializeChatReadState(account, group.groupIdHex) }
         }.onFailure {
             Log.w("DMConversation", "initialize read state failed for ${group.groupIdHex.take(8)}", it)
-        }
-    }
-
-    private suspend fun markLatestVisibleRead(account: String) {
-        val latest =
-            timelineRecords.values.maxWithOrNull(
-                compareBy<TimelineMessageRecordFfi> { it.timelineAt }.thenBy { it.messageIdHex },
-            ) ?: return
-        val messageId = latest.messageIdHex.takeIf { it.isNotBlank() } ?: return
-        runCatching {
-            appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, messageId) }
-            appState.dismissConversationNotifications(account, group.groupIdHex)
-        }.onFailure {
-            Log.w("DMConversation", "mark read failed for ${group.groupIdHex.take(8)} message=${messageId.take(8)}", it)
         }
     }
 

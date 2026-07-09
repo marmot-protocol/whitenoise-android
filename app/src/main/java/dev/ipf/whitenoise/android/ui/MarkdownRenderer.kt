@@ -57,6 +57,7 @@ import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import java.util.Locale
 
 /**
  * Compose renderer for the Markdown AST the Rust core attaches to every
@@ -834,7 +835,7 @@ internal fun resolveMentionsInPlaintext(
     text: String,
     resolver: ((String) -> String?)?,
 ): String =
-    PLAINTEXT_PROFILE_MENTION.replace(text) { match ->
+    PLAINTEXT_PROFILE_MENTION.replace(ProfileSanitizer.stripUnsafe(text)) { match ->
         val bech32 = match.groupValues[2]
         val relayHintSuffix = match.value.removePrefix(match.groupValues[1] + bech32)
         val trailingPunctuation =
@@ -1178,7 +1179,7 @@ internal fun isOpenableMarkdownLink(dest: String): Boolean {
     val trimmed = dest.trim()
     val colon = trimmed.indexOf(':')
     if (colon <= 0) return false
-    return trimmed.substring(0, colon).lowercase() in openableMarkdownLinkSchemes
+    return trimmed.substring(0, colon).lowercase(Locale.ROOT) in openableMarkdownLinkSchemes
 }
 
 /**

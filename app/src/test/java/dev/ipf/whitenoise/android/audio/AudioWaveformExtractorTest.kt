@@ -51,6 +51,22 @@ class AudioWaveformExtractorTest {
     }
 
     @Test
+    fun decodeComputesFileStatCacheKeyOnIoDispatcher() {
+        val source =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/audio/AudioWaveformExtractor.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/audio/AudioWaveformExtractor.kt"),
+            ).firstOrNull { it.exists() }?.readText()
+                ?: error("Missing AudioWaveformExtractor.kt source file")
+        val decode = source.kotlinFunctionBody("decode")
+
+        assertTrue(
+            "waveformCacheKey(file) calls file.length()/lastModified(), so decode must compute it inside Dispatchers.IO",
+            decode.indexOf("withContext(Dispatchers.IO)") < decode.indexOf("val cacheKey = waveformCacheKey(file)"),
+        )
+    }
+
+    @Test
     fun dataSourceFailure_releasesExtractor() {
         val extractor = FakeExtractor(setDataSourceFailure = IllegalStateException("bad source"))
         val resources = FakeResources(extractor = extractor)
@@ -322,7 +338,7 @@ private fun shortPcmFrames(
     return buf
 }
 
-private fun String.kotlinFunctionBody(functionName: String): String {
+internal fun String.kotlinFunctionBody(functionName: String): String {
     val start =
         Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
             .find(this)
