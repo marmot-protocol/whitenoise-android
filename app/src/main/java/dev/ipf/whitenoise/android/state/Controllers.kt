@@ -1169,6 +1169,30 @@ internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGr
             },
     )
 
+/**
+ * Returns true when a pushed group record should pay the forced OpenMLS replay
+ * before reading group details.
+ *
+ * AppGroupRecordFfi does not carry the full roster, epoch, member count, or a
+ * roster revision. That means Android cannot use this record to prove an update
+ * is not a non-admin member add/remove, so the subscription loop still refreshes
+ * groupDetails() for every emitted update. This helper only gates the extra
+ * groupMlsState() eviction probe: display-only record changes can use the cheap
+ * details refresh, while local membership/admin transitions and unchanged
+ * records keep the replay path because they may be membership-bearing.
+ */
+internal fun groupStateUpdateNeedsEvictionProbe(
+    previous: AppGroupRecordFfi,
+    update: AppGroupRecordFfi,
+): Boolean =
+    previous == update ||
+        previous.groupIdHex != update.groupIdHex ||
+        previous.pendingConfirmation != update.pendingConfirmation ||
+        previous.selfMembership != update.selfMembership ||
+        previous.admins.normalizedMemberIds() != update.admins.normalizedMemberIds()
+
+private fun List<String>.normalizedMemberIds(): Set<String> = mapNotNull { it.trim().takeIf(String::isNotEmpty)?.lowercase() }.toSet()
+
 internal fun cacheAppliedGroupMembers(
     appState: WhiteNoiseAppState,
     account: String,
@@ -3534,8 +3558,11 @@ class ConversationController(
                 withContext(Dispatchers.IO) {
                     groupStream.next()
                 } ?: break
+            val previousGroup = group
             applyGroupState(update)
-            refreshMembers()
+            refreshMembers(
+                probeEviction = groupStateUpdateNeedsEvictionProbe(previousGroup, update),
+            )
         }
     }
 
@@ -6615,13 +6642,18 @@ class ConversationController(
         return result
     }
 
-    private suspend fun refreshMembers() {
+    private suspend fun refreshMembers(probeEviction: Boolean = true) {
         val account = conversationAccountRef ?: return
         runCatching {
-            // Force OpenMLS replay before trusting cached group details. For an
-            // evicted account this is where Rust currently reports
-            // GroupStateError::UseAfterEviction, which we map to read-only UI.
-            appState.marmotIo { groupMlsState(account, group.groupIdHex) }
+            if (probeEviction) {
+                // Force OpenMLS replay before trusting cached group details.
+                // For an evicted account this is where Rust currently reports
+                // GroupStateError::UseAfterEviction, which we map to read-only
+                // UI. Display-only group-record updates skip this replay but
+                // still read details below so non-admin roster changes are not
+                // hidden behind AppGroupRecordFfi's coarse shape.
+                appState.marmotIo { groupMlsState(account, group.groupIdHex) }
+            }
             val details = appState.marmotIo { groupDetails(account, group.groupIdHex) }
             val applied = applyGroupDetails(account, details)
             appState.applyLocalGroupDetails(account, applied.group, applied.members)
