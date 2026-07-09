@@ -221,6 +221,8 @@
     <string name="toast_forwarded_partial">Переслано в %1$s чатов; некоторые не удалось</string>
     <string name="toast_forward_failed">Не удалось переслать сообщение</string>
     <string name="delete">Удалить</string>
+    <string name="delete_for_me">Удалить у меня</string>
+    <string name="delete_for_everyone">Удалить для всех</string>
     <string name="sent">Отправлено</string>
     <string name="send_failed">Не удалось отправить сообщение. Попробуйте снова.</string>
     <string name="sending">Отправка</string>

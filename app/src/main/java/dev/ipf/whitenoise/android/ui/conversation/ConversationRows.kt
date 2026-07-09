@@ -2,8 +2,10 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.text.format.DateUtils
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -19,10 +21,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -154,11 +159,13 @@ internal fun DaySeparator(label: String) {
  * reads the profile revision, so the row re-renders when a name loads. An
  * unparseable payload renders the generic fallback, never the raw content.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun GroupSystemRow(
     record: AppMessageRecordFfi,
     appState: WhiteNoiseAppState,
     groupSystem: GroupSystemEventFfi? = null,
+    onDeleteForMe: (() -> Unit)? = null,
 ) {
     val copy = rememberGroupSystemCopy()
     val event =
@@ -186,6 +193,7 @@ internal fun GroupSystemRow(
         } else {
             copy.fallback
         }
+    var actionMenuOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     Column(
         modifier =
             Modifier
@@ -193,18 +201,42 @@ internal fun GroupSystemRow(
                 .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = summary,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier =
-                Modifier
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
-                    ).padding(horizontal = 10.dp, vertical = 4.dp),
-        )
+        Box {
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .then(
+                            if (onDeleteForMe != null && record.messageIdHex.isNotBlank()) {
+                                Modifier.combinedClickable(
+                                    onClick = {},
+                                    onLongClick = { actionMenuOpen = true },
+                                )
+                            } else {
+                                Modifier
+                            },
+                        ).background(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(12.dp),
+                        ).padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+            DropdownMenu(
+                expanded = actionMenuOpen,
+                onDismissRequest = { actionMenuOpen = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.delete_for_me)) },
+                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                    onClick = {
+                        actionMenuOpen = false
+                        onDeleteForMe?.invoke()
+                    },
+                )
+            }
+        }
         // Developer-mode only: keep the one-line summary as the default and tuck
         // the MLS commit dump behind a per-row tap (#857). Saveable row-keyed UI
         // state lets an expanded row survive lazy-list disposal without leaking to others.

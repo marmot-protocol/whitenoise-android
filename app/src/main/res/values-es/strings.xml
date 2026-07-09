@@ -217,6 +217,8 @@
     <string name="toast_forwarded_partial">Reenviado a %1$s chats; algunos fallaron</string>
     <string name="toast_forward_failed">No se pudo reenviar el mensaje</string>
     <string name="delete">Eliminar</string>
+    <string name="delete_for_me">Eliminar para mí</string>
+    <string name="delete_for_everyone">Eliminar para todos</string>
     <string name="sent">Enviado</string>
     <string name="send_failed">Error al enviar el mensaje. Por favor, inténtalo de nuevo.</string>
     <string name="sending">Enviando</string>

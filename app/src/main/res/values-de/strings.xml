@@ -217,6 +217,8 @@
     <string name="toast_forwarded_partial">An %1$s Chats weitergeleitet; einige fehlgeschlagen</string>
     <string name="toast_forward_failed">Nachricht konnte nicht weitergeleitet werden</string>
     <string name="delete">Löschen</string>
+    <string name="delete_for_me">Für mich löschen</string>
+    <string name="delete_for_everyone">Für alle löschen</string>
     <string name="sent">Gesendet</string>
     <string name="send_failed">Nachricht konnte nicht gesendet werden. Bitte erneut versuchen.</string>
     <string name="sending">Wird gesendet</string>
