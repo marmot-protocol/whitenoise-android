@@ -62,6 +62,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
@@ -887,13 +888,20 @@ internal fun MessageBubble(
                 }
                 // Last-line geometry of the body so the footer can sit on
                 // that line when it fits, not merely when the widest line does.
-                var lastLineLayout by remember(record.messageIdHex) { mutableStateOf<TextLayoutResult?>(null) }
+                var lastLineLayout by remember(record.messageIdHex, bodyTextToRender) {
+                    mutableStateOf<TextLayoutResult?>(null)
+                }
                 // Overflow decision is derived from a measurement of the FULL
                 // body only. Keeping it separate from lastLineLayout (which
                 // the currently-rendered text updates) avoids a recompose
                 // loop: once we clip, the clipped text no longer overflows,
                 // which would otherwise flip the decision back and forth.
-                var bodyFullLayout by remember(record.messageIdHex) { mutableStateOf<TextLayoutResult?>(null) }
+                // Key it on the rendered text too: edit overlays can swap in a
+                // shorter body before the next Text measurement, and an old
+                // layout's line end must not index into the new string.
+                var bodyFullLayout by remember(record.messageIdHex, bodyTextToRender) {
+                    mutableStateOf<TextLayoutResult?>(null)
+                }
                 // A long body collapses to MESSAGE_COLLAPSE_LINE_LIMIT lines
                 // with Read More in the bottom footer row opening the full-screen view;
                 // tombstones, edit/info copy, and groups with the local collapse
@@ -1005,9 +1013,10 @@ internal fun MessageBubble(
                                 // to the action menu rather than expanding the bubble.
                                 val clippedText =
                                     remember(bodyTextToRender, layout) {
-                                        bodyTextToRender
-                                            .substring(0, layout.getLineEnd(MESSAGE_COLLAPSE_LINE_LIMIT - 1, visibleEnd = true))
-                                            .trimEnd()
+                                        clippedMessageBodyText(
+                                            bodyText = bodyTextToRender,
+                                            lineEnd = layout.getLineEnd(MESSAGE_COLLAPSE_LINE_LIMIT - 1, visibleEnd = true),
+                                        )
                                     }
                                 Text(
                                     clippedText,
@@ -1034,7 +1043,11 @@ internal fun MessageBubble(
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = readMoreStyle.color,
                                 fontWeight = readMoreStyle.fontWeight,
-                                modifier = Modifier.clickable { expandedFullView = true },
+                                modifier =
+                                    Modifier.clickable(
+                                        onClickLabel = readMoreLabel,
+                                        role = Role.Button,
+                                    ) { expandedFullView = true },
                             )
                         }
                         // Body text is always start-aligned inside the bubble,
@@ -1477,6 +1490,11 @@ internal fun MessageBubble(
         }
     }
 }
+
+internal fun clippedMessageBodyText(
+    bodyText: String,
+    lineEnd: Int,
+): String = bodyText.substring(0, lineEnd.coerceIn(0, bodyText.length)).trimEnd()
 
 // A body longer than this many rendered lines collapses to a Read More that
 // opens the full-screen view rather than spilling down the transcript (#325).
