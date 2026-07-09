@@ -158,9 +158,12 @@ jobs:
           # Content-address the APK locally so the published URL provably points
           # at our bytes regardless of what the server returns (#1172 CR).
           apk_sha256=$(sha256sum "$APK_PATH" | awk '{print $1}')
-          returned=$("$nak" blossom upload "$APK_PATH" \
+          # Feed the APK via stdin, not as a positional arg: on CI runners stdin
+          # is not a TTY, and nak treats a piped stdin + file args as a conflict
+          # ("do not pass arguments when piping from stdin"). Verified (#1172).
+          returned=$("$nak" blossom upload \
                        --server "$BLOSSOM_SERVER" \
-                       --sec "$BLOSSOM_UPLOAD_NSEC" | jq -r '.sha256 // empty')
+                       --sec "$BLOSSOM_UPLOAD_NSEC" < "$APK_PATH" | jq -r '.sha256 // empty')
           if [[ "$returned" != "$apk_sha256" ]]; then
             echo "Blossom upload sha mismatch: local=$apk_sha256 returned=$returned" >&2
             exit 1
