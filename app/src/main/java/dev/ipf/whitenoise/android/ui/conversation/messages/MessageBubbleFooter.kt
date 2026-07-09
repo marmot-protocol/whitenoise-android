@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.AlignmentLine
+import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
@@ -164,3 +166,98 @@ internal fun bubbleFooterInlineWidth(
 ): Int =
     maxOf(contentWidth, lastLineRight + gap + footerWidth, minWidth)
         .coerceAtMost(maxWidth)
+
+/**
+ * Lays collapsed body text above a bottom row with Read More pinned start and
+ * the regular footer pinned end. The row stays as narrow as its content unless
+ * the body is wider, preserving wrap-content bubbles while keeping the two
+ * affordances on the same baseline.
+ */
+@Composable
+internal fun BubbleCollapsedFooterLayout(
+    readMore: @Composable () -> Unit,
+    footer: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Layout(
+        modifier = modifier,
+        content = {
+            Box { content() }
+            readMore()
+            footer()
+        },
+    ) { measurables, constraints ->
+        val contentPlaceable = measurables[0].measure(constraints.copy(minWidth = 0))
+        val readMorePlaceable = measurables[1].measure(Constraints())
+        val footerPlaceable = measurables[2].measure(Constraints())
+        val gap = BubbleFooterGap.roundToPx()
+        val width =
+            bubbleCollapsedFooterWidth(
+                contentWidth = contentPlaceable.width,
+                readMoreWidth = readMorePlaceable.width,
+                footerWidth = footerPlaceable.width,
+                minWidth = constraints.minWidth,
+                maxWidth = constraints.maxWidth,
+                gap = gap,
+            )
+        val readMoreBaseline = readMorePlaceable[FirstBaseline]
+        val footerBaseline = footerPlaceable[FirstBaseline]
+        val rowMetrics =
+            collapsedFooterRowMetrics(
+                readMoreHeight = readMorePlaceable.height,
+                readMoreBaseline = readMoreBaseline,
+                footerHeight = footerPlaceable.height,
+                footerBaseline = footerBaseline,
+            )
+
+        layout(width, contentPlaceable.height + rowMetrics.height) {
+            contentPlaceable.placeRelative(0, 0)
+            readMorePlaceable.placeRelative(0, contentPlaceable.height + rowMetrics.readMoreY)
+            footerPlaceable.placeRelative(width - footerPlaceable.width, contentPlaceable.height + rowMetrics.footerY)
+        }
+    }
+}
+
+internal fun bubbleCollapsedFooterWidth(
+    contentWidth: Int,
+    readMoreWidth: Int,
+    footerWidth: Int,
+    minWidth: Int,
+    maxWidth: Int,
+    gap: Int,
+): Int =
+    maxOf(contentWidth, readMoreWidth + gap + footerWidth, minWidth)
+        .coerceAtMost(maxWidth)
+
+private data class CollapsedFooterRowMetrics(
+    val height: Int,
+    val readMoreY: Int,
+    val footerY: Int,
+)
+
+private fun collapsedFooterRowMetrics(
+    readMoreHeight: Int,
+    readMoreBaseline: Int,
+    footerHeight: Int,
+    footerBaseline: Int,
+): CollapsedFooterRowMetrics {
+    val hasBaselines =
+        readMoreBaseline != AlignmentLine.Unspecified && footerBaseline != AlignmentLine.Unspecified
+    if (!hasBaselines) {
+        val height = maxOf(readMoreHeight, footerHeight)
+        return CollapsedFooterRowMetrics(
+            height = height,
+            readMoreY = (height - readMoreHeight) / 2,
+            footerY = (height - footerHeight) / 2,
+        )
+    }
+
+    val aboveBaseline = maxOf(readMoreBaseline, footerBaseline)
+    val belowBaseline = maxOf(readMoreHeight - readMoreBaseline, footerHeight - footerBaseline)
+    return CollapsedFooterRowMetrics(
+        height = aboveBaseline + belowBaseline,
+        readMoreY = aboveBaseline - readMoreBaseline,
+        footerY = aboveBaseline - footerBaseline,
+    )
+}
