@@ -76,6 +76,38 @@ class LocalNotificationPolicyTest {
         )
     }
 
+    @Test
+    fun mutedConversationNotificationIsSuppressed() {
+        assertFalse(
+            LocalNotificationPolicy.shouldPost(
+                update(groupIdHex = "muted-group", accountRef = "account-a"),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                isConversationMuted = { accountRef, groupIdHex ->
+                    accountRef == "account-a" && groupIdHex == "muted-group"
+                },
+            ),
+        )
+    }
+
+    @Test
+    fun mutedConversationOnOtherAccountStillPosts() {
+        assertTrue(
+            LocalNotificationPolicy.shouldPost(
+                update(groupIdHex = "muted-group", accountRef = "account-b"),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                isConversationMuted = { accountRef, groupIdHex ->
+                    accountRef == "account-a" && groupIdHex == "muted-group"
+                },
+            ),
+        )
+    }
+
     // End-to-end lifecycle checks (issue #821): drive the suppression state
     // through the reported sequences and assert the post decision, so the policy
     // and the lifecycle transitions are pinned together.
