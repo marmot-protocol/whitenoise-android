@@ -94,6 +94,96 @@ class TimelineProjectorTest {
         assertEquals("Deleted a message", TimelineProjector.displayBody(record))
     }
 
+    @Test
+    fun replyPreviewSuppressesRawGroupSystemJson() {
+        val actorHex = "a1".repeat(32)
+        val groupSystemJson =
+            """{"v":1,"system_type":"group_avatar_changed","text":"Group avatar changed",""" +
+                """"data":{"actor":"$actorHex"}}"""
+        val record =
+            timelineRecord(
+                replyPreview =
+                    replyPreview(
+                        plaintext = groupSystemJson,
+                        kind = 1210uL,
+                    ),
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(sender = "alice", body = "The group avatar changed"),
+            TimelineProjector.replyPreview(record),
+        )
+    }
+
+    @Test
+    fun replyPreviewFramesReactionEmoji() {
+        val record =
+            timelineRecord(
+                replyPreview =
+                    replyPreview(
+                        plaintext = "👍",
+                        kind = 7uL,
+                    ),
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(sender = "alice", body = "Reacted 👍"),
+            TimelineProjector.replyPreview(record),
+        )
+    }
+
+    @Test
+    fun replyPreviewUsesDeletedCopyForDeleteKind() {
+        val record =
+            timelineRecord(
+                replyPreview =
+                    replyPreview(
+                        plaintext = "forged delete body",
+                        kind = 5uL,
+                    ),
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(sender = "alice", body = "Deleted a message"),
+            TimelineProjector.replyPreview(record),
+        )
+    }
+
+    @Test
+    fun deletedReplyPreviewUsesDeletedCopy() {
+        val record =
+            timelineRecord(
+                replyPreview =
+                    replyPreview(
+                        plaintext = "Parent message",
+                        kind = 9uL,
+                        deleted = true,
+                    ),
+            )
+
+        assertEquals(
+            TimelineReplyDisplay(sender = "alice", body = "Deleted a message"),
+            TimelineProjector.replyPreview(record),
+        )
+    }
+
+    private fun replyPreview(
+        plaintext: String,
+        kind: ULong = 9uL,
+        sender: String = "alice",
+        deleted: Boolean = false,
+    ) = TimelineReplyPreviewFfi(
+        messageIdHex = "parent",
+        sender = sender,
+        plaintext = plaintext,
+        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+        kind = kind,
+        mediaJson = null,
+        media = emptyList(),
+        agentTextStreamJson = null,
+        deleted = deleted,
+    )
+
     private fun timelineRecord(
         id: String = "message",
         plaintext: String = "hello",
