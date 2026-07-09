@@ -10,51 +10,59 @@ import org.junit.Test
 
 class GroupStateMemberRefreshGateTest {
     @Test
-    fun displayOnlyGroupUpdatesDoNotTriggerRosterRefresh() {
+    fun displayOnlyGroupUpdatesSkipForcedEvictionProbe() {
         val previous = group(name = "Before", avatarUrl = "https://example.com/before.png")
         val renamed = previous.copy(name = "After", avatarUrl = "https://example.com/after.png")
 
-        assertFalse(groupStateUpdateMayChangeMembers(previous, renamed))
+        assertFalse(groupStateUpdateNeedsEvictionProbe(previous, renamed))
     }
 
     @Test
-    fun adminOrderOnlyDoesNotTriggerRosterRefresh() {
+    fun unchangedGroupUpdatesKeepForcedEvictionProbe() {
+        val previous = group()
+        val updated = previous.copy()
+
+        assertTrue(groupStateUpdateNeedsEvictionProbe(previous, updated))
+    }
+
+    @Test
+    fun adminOrderOnlySkipsForcedEvictionProbe() {
         val previous = group(admins = listOf("alice", "bob"))
         val reordered = previous.copy(admins = listOf("BOB", " alice "))
 
-        assertFalse(groupStateUpdateMayChangeMembers(previous, reordered))
+        assertFalse(groupStateUpdateNeedsEvictionProbe(previous, reordered))
     }
 
     @Test
-    fun adminMembershipChangesTriggerRosterRefresh() {
+    fun adminMembershipChangesTriggerForcedEvictionProbe() {
         val previous = group(admins = listOf("alice"))
         val updated = previous.copy(admins = listOf("alice", "bob"))
 
-        assertTrue(groupStateUpdateMayChangeMembers(previous, updated))
+        assertTrue(groupStateUpdateNeedsEvictionProbe(previous, updated))
     }
 
     @Test
-    fun confirmationStateChangesTriggerRosterRefresh() {
+    fun confirmationStateChangesTriggerForcedEvictionProbe() {
         val previous = group(pendingConfirmation = true)
         val updated = previous.copy(pendingConfirmation = false)
 
-        assertTrue(groupStateUpdateMayChangeMembers(previous, updated))
+        assertTrue(groupStateUpdateNeedsEvictionProbe(previous, updated))
     }
 
     @Test
-    fun selfMembershipChangesTriggerRosterRefreshForEvictionProbe() {
+    fun selfMembershipChangesTriggerForcedEvictionProbe() {
         val previous = group(selfMembership = SelfMembershipFfi.MEMBER)
         val updated = previous.copy(selfMembership = SelfMembershipFfi.REMOVED)
 
-        assertTrue(groupStateUpdateMayChangeMembers(previous, updated))
+        assertTrue(groupStateUpdateNeedsEvictionProbe(previous, updated))
     }
 
     @Test
-    fun groupIdentityChangesTriggerRosterRefresh() {
+    fun groupIdentityChangesTriggerForcedEvictionProbe() {
         val previous = group(groupIdHex = "group-a")
         val updated = previous.copy(groupIdHex = "group-b")
 
-        assertTrue(groupStateUpdateMayChangeMembers(previous, updated))
+        assertTrue(groupStateUpdateNeedsEvictionProbe(previous, updated))
     }
 
     private fun group(
