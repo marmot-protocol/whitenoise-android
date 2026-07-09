@@ -247,6 +247,49 @@ class ConversationTranscriptExportTest {
         }
 
     @Test
+    fun fetchAllMessagesKeepsUniqueRowsFromStalledCursorPage() =
+        runBlocking {
+            val newestId = "44".repeat(32)
+            val lateUniqueId = "33".repeat(32)
+            val stalledOldestId = "22".repeat(32)
+            val groupId = "aa".repeat(32)
+            val reader =
+                FakeTranscriptTimelineReader(
+                    pages =
+                        mutableListOf(
+                            TimelinePageFfi(
+                                messages =
+                                    listOf(
+                                        timelineRecord(messageIdHex = newestId, timelineAt = 4uL),
+                                        timelineRecord(messageIdHex = stalledOldestId, timelineAt = 2uL),
+                                    ),
+                                hasMoreBefore = true,
+                                hasMoreAfter = false,
+                            ),
+                            TimelinePageFfi(
+                                messages =
+                                    listOf(
+                                        timelineRecord(messageIdHex = lateUniqueId, timelineAt = 3uL),
+                                        timelineRecord(messageIdHex = stalledOldestId, timelineAt = 2uL),
+                                    ),
+                                hasMoreBefore = true,
+                                hasMoreAfter = false,
+                            ),
+                        ),
+                )
+
+            val messages =
+                ConversationTranscriptExport.fetchAllMessages(
+                    timelineReader = reader,
+                    accountRef = "account-1",
+                    groupIdHex = groupId,
+                )
+
+            assertEquals(listOf(stalledOldestId, lateUniqueId, newestId), messages.map { it.messageIdHex })
+            assertEquals(2, reader.queries.size)
+        }
+
+    @Test
     fun writeTemporaryFileUsesTranscriptCacheDirAndStableName() {
         val root =
             kotlin.io.path

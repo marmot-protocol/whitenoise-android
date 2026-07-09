@@ -823,6 +823,7 @@ class WhiteNoiseAppState(
             maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
         )
 
+    @Volatile
     private var client: MarmotClient? = null
 
     // Serializes bootstrap so two concurrent callers can't both pass the

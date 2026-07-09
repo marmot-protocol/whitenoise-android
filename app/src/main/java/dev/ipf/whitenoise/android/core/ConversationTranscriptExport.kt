@@ -73,11 +73,11 @@ object ConversationTranscriptExport {
             val oldest = oldestMessage(page.messages)
             val nextBefore = oldest.timelineAt
             val nextBeforeMessageId = oldest.messageIdHex
+            appendUnique(page.messages)
             if (before == nextBefore && beforeMessageId == nextBeforeMessageId) {
                 break
             }
 
-            appendUnique(page.messages)
             before = nextBefore
             beforeMessageId = nextBeforeMessageId
         }
