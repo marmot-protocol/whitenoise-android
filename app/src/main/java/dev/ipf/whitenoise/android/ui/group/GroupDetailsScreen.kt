@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
@@ -64,6 +65,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -522,6 +524,11 @@ internal fun GroupDetailsScreen(
         val mutationsBlocked = activeMutation != null || controller.mutationInFlight
         val isDm = GroupProjector.isDm(controller.members.size, controller.group.name)
         val collapseLongMessages = appState.collapseLongMessagesInGroup(controller.group.groupIdHex)
+        val mutedKeys by appState.chatMutePreferences.mutedConversations.collectAsState()
+        val conversationMuted =
+            remember(appState.activeAccountRef, controller.group.groupIdHex, mutedKeys) {
+                appState.isConversationMuted(controller.group.groupIdHex)
+            }
         Column(
             Modifier
                 .fillMaxSize()
@@ -639,6 +646,15 @@ internal fun GroupDetailsScreen(
                 checked = collapseLongMessages,
                 onCheckedChange = {
                     appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
+                },
+            )
+            GroupSwitchActionRow(
+                icon = Icons.Default.NotificationsOff,
+                title = stringResource(R.string.mute_notifications),
+                subtitle = stringResource(R.string.mute_notifications_subtitle),
+                checked = conversationMuted,
+                onCheckedChange = {
+                    appState.setConversationMuted(controller.group.groupIdHex, it)
                 },
             )
             SettingsActionRow(

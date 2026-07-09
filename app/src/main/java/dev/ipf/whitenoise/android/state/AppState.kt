@@ -831,6 +831,7 @@ class WhiteNoiseAppState(
     private val bootstrapMutex = Mutex()
     private val nativePushSyncMutex = Mutex()
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
+    internal val chatMutePreferences = ChatMutePreferences(appContext)
     private val pushTokenStore = PushTokenStore.create(appContext)
     private val amberSigner = AmberSignerController(appContext)
 
@@ -2753,6 +2754,19 @@ class WhiteNoiseAppState(
         LongMessageCollapsePreferences.writeCollapseLongMessagesByKey(preferences, key, enabled)
     }
 
+    fun isConversationMuted(groupIdHex: String): Boolean {
+        val accountRef = activeAccountRef ?: return false
+        return chatMutePreferences.isMuted(accountRef, groupIdHex)
+    }
+
+    fun setConversationMuted(
+        groupIdHex: String,
+        muted: Boolean,
+    ) {
+        val accountRef = activeAccountRef ?: return
+        chatMutePreferences.setMuted(accountRef, groupIdHex, muted)
+    }
+
     /**
      * Toggle one cell of the active account's auto-download matrix, persist it
      * immediately, and update the observable state so open bubbles re-gate.
@@ -4322,6 +4336,7 @@ class WhiteNoiseAppState(
                 activeConversationGroupIdHex = activeConversation,
                 activeConversationAccountRef = activeConversationAccountRef,
                 appLockScreenVisible = appLockScreenVisible,
+                isConversationMuted = chatMutePreferences::isMuted,
             )
         appStateDebug {
             "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +

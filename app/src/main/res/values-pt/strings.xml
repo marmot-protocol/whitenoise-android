@@ -42,6 +42,8 @@
     <string name="recipient_search_empty_hint">Cole um npub para adicionar alguém com quem ainda não conversou.</string>
     <string name="chat_row_action_archive">Arquivar</string>
     <string name="chat_row_action_unarchive">Desarquivar</string>
+    <string name="chat_row_action_mute">Silenciar</string>
+    <string name="chat_row_action_unmute">Ativar som</string>
     <string name="chat_row_action_mark_read">Marcar como lido</string>
     <string name="chat_row_action_delete_group">Excluir grupo</string>
     <string name="delete_group_dialog_title">Excluir grupo?</string>
@@ -886,6 +888,9 @@
     <string name="see_all_members">Ver todos os %1$d membros</string>
     <string name="chat_lock">Bloqueio de conversa</string>
     <string name="collapse_long_messages">Recolher mensagens longas</string>
+    <string name="mute_notifications">Silenciar notificações</string>
+    <string name="mute_notifications_subtitle">Parar notificações do sistema para este chat</string>
+    <string name="chat_muted_badge">Silenciado</string>
     <string name="collapse_long_messages_subtitle">Mostrar um atalho «Ler mais» para mensagens longas nesta conversa</string>
     <string name="toast_disappearing_not_applied">O grupo foi criado, mas não foi possível ativar as mensagens temporárias</string>
     <string name="search_members">Pesquisar membros</string>
