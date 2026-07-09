@@ -101,37 +101,16 @@ jobs:
             find app/build/outputs -type f -name '*.apk' >&2 || true
             exit 1
           fi
-          apk_name=$(basename "$apk_path")
-          # Strip the .apk suffix so actions/upload-artifact appends its own
-          # .zip. The stem already carries pr<N>, flavor, ABI, date, and short
-          # SHA (see app/build.gradle.kts) so the downloaded artifact is
-          # `<same-stem>.zip` with the APK inside.
-          artifact_name=${apk_name%.apk}
           printf 'apk_path=%s\n' "$apk_path" >> "$GITHUB_OUTPUT"
-          printf 'artifact_name=%s\n' "$artifact_name" >> "$GITHUB_OUTPUT"
           printf 'Selected APK: %s\n' "$apk_path"
-          printf 'Artifact name: %s\n' "$artifact_name"
 
-      # Upload only for PRs raised from the base repository. Fork PRs still ran
-      # the build above (so CI validates the change), but the artifact link is
-      # only surfaced for internal PRs to keep the download-URL trust surface
-      # aligned with existing contributor trust.
-      - name: Upload PR APK artifact
-        id: upload
-        if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: ${{ steps.locate.outputs.artifact_name }}
-          path: ${{ steps.locate.outputs.apk_path }}
-          if-no-files-found: error
-          retention-days: 14
-
-      # Blossom preview link (#1172): also upload the arm64 APK to a public
-      # Blossom server so testers get a one-tap, content-addressed install URL
-      # with no GitHub sign-in. Internal PRs only, and only when the preview
-      # upload key is present — a safe no-op otherwise, so existing PR builds are
-      # unaffected until the secret is configured. The comment job promotes this
-      # URL to the primary download when set, keeping the artifact as fallback.
+      # Preview distribution (#1172): upload the arm64 APK to a public Blossom
+      # server so testers get a one-tap, content-addressed install URL with no
+      # GitHub sign-in. This is the sole channel — the GitHub artifact was
+      # dropped to avoid storage cost, so preview links are ephemeral (the blob
+      # expires; each push re-uploads a fresh one). Internal PRs only (needs the
+      # upload key); fork PRs still build above for CI validation but don't
+      # upload. The comment job surfaces this URL.
       - name: Upload PR APK to Blossom
         id: blossom
         if: >-
@@ -198,8 +177,8 @@ jobs:
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
             const marker = '<!-- pr-apk-preview -->';
             const download = blossomUrl
-              ? `**[Install directly](${blossomUrl})** — one tap, no GitHub sign-in (public, content-addressed \`.apk\`). Fallback: the APK zip from the [workflow run](${runUrl}) (sign-in required, 14-day retention).`
-              : `Download the APK zip from the [workflow run](${runUrl}) (GitHub sign-in required, 14-day retention).`;
+              ? `**[Install directly](${blossomUrl})** — one tap, no GitHub sign-in (public, content-addressed \`.apk\`).`
+              : `The preview upload didn't run for this [build](${runUrl}) — re-run the workflow to refresh this link.`;
             const body = [
               marker,
               `### Preview APK for PR #${prNumber}`,
