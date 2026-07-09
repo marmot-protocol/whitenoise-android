@@ -321,15 +321,19 @@ class NotificationTargetTest {
     }
 
     @Test
-    fun replyActionBudget_reservesDismissHeadroomInsideGoAsyncBudget() {
-        // Use production defaults so this catches drift in the receiver's
-        // cooperative send/dismiss budget wiring, not just helper arithmetic.
-        val dismissBudget = notificationReplyDismissBudgetMs()
-        val sendBudget = notificationReplySendPhaseBudgetMs(dismissBudgetMs = dismissBudget)
+    fun replyWorkerInput_roundTripsActionAndDedupesSameReply() {
+        val action =
+            NotificationAction(
+                kind = NotificationActionKind.REPLY,
+                target = NotificationTarget("acct-a", "group-1", "msg-1", NotificationTargetKind.MESSAGE),
+                notificationTag = "acct-a|group-1",
+                notificationId = 0,
+            )
+        val sameReply = NotificationReplyWorker.notificationReplyWorkName(action, " hello ")
 
-        assertEquals(950L, dismissBudget)
-        assertEquals(6_750L, sendBudget)
-        assertEquals(300L, 8_000L - sendBudget - dismissBudget)
+        assertEquals(action, NotificationReplyWorker.notificationReplyActionFromInput(NotificationReplyWorker.notificationReplyInputData(action, "hello")))
+        assertEquals(sameReply, NotificationReplyWorker.notificationReplyWorkName(action, "hello"))
+        assertNotEquals(sameReply, NotificationReplyWorker.notificationReplyWorkName(action, "different"))
     }
 
     // ---- resolveNotificationNav (routing FSM) -------------------------------

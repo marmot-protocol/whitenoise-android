@@ -109,6 +109,21 @@ object LocalNotificationFormatter {
         recipientLabel: String?,
     ): String? = recipientLabel?.takeIf { it.isNotBlank() && signedInAccountCount > 1 }
 
+    fun redactedContent(
+        content: LocalNotificationContent,
+        appName: String,
+        body: String,
+    ): LocalNotificationContent =
+        content.copy(
+            title = appName,
+            body = body,
+            senderName = appName,
+            senderKey = "",
+            selfName = appName,
+            selfKey = "",
+            conversationTitle = null,
+        )
+
     fun content(
         update: NotificationUpdateFfi,
         context: Context? = null,

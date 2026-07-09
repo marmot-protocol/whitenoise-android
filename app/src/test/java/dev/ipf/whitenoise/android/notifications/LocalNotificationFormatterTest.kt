@@ -21,6 +21,29 @@ class LocalNotificationFormatterTest {
     }
 
     @Test
+    fun redactedContentDropsSenderBodyAndConversationTitle() {
+        val content =
+            LocalNotificationFormatter.content(
+                update(
+                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                    groupName = "Launch",
+                    previewText = "Secret launch window",
+                    sender = user(displayName = "Alice"),
+                ),
+            )!!
+
+        val redacted = LocalNotificationFormatter.redactedContent(content, appName = "White Noise", body = "New notification")
+
+        assertEquals("White Noise", redacted.title)
+        assertEquals("New notification", redacted.body)
+        assertEquals("White Noise", redacted.senderName)
+        assertEquals("", redacted.senderKey)
+        assertNull(redacted.conversationTitle)
+        assertEquals(content.notificationTag, redacted.notificationTag)
+        assertEquals(content.notificationId, redacted.notificationId)
+    }
+
+    @Test
     fun messageNotificationUsesSenderGroupAndPreviewText() {
         val content =
             LocalNotificationFormatter.content(
