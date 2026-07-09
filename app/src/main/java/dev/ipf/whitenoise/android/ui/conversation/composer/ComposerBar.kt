@@ -34,6 +34,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -153,6 +155,26 @@ internal fun insertComposerEmoji(
     return value.copy(text = updatedText, selection = TextRange(caret), composition = null)
 }
 
+/**
+ * Hoisted composer text state (#1206). Sharing one instance across the main
+ * composer and the long-message reader's composer keeps their in-progress text
+ * and edit-restore state from drifting — both `ComposerBar`s delegate their
+ * `textFieldValue`/`preEditFieldValue` to the same backing [MutableState].
+ */
+@Stable
+internal class ComposerTextState(
+    initial: TextFieldValue,
+) {
+    val valueState: MutableState<TextFieldValue> = mutableStateOf(initial)
+    val preEditState: MutableState<TextFieldValue?> = mutableStateOf(null)
+}
+
+@Composable
+internal fun rememberComposerTextState(
+    draftKey: Any?,
+    initialDraft: String,
+): ComposerTextState = remember(draftKey) { ComposerTextState(TextFieldValue(initialDraft)) }
+
 @Composable
 internal fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
@@ -193,6 +215,10 @@ internal fun ComposerBar(
     // resume observer can tell whether the keyboard was up when we were paused.
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onBottomInputChanged: () -> Unit = {},
+    // #1206: shared so the long-message reader's composer and the main composer
+    // don't keep divergent text/edit state. Defaults to a private per-instance
+    // state, preserving standalone behavior for any other caller.
+    textState: ComposerTextState = rememberComposerTextState(draftKey, initialDraft),
 ) {
     var attachMenuOpen by remember { mutableStateOf(false) }
     var composerEmojiPickerOpen by remember { mutableStateOf(false) }
@@ -203,13 +229,13 @@ internal fun ComposerBar(
     // a re-tap on a different message rebases the caret too. Keyed on
     // draftKey so switching to a different chat re-hydrates the text field
     // from that chat's saved draft rather than carrying state across.
-    var textFieldValue by remember(draftKey) { mutableStateOf(TextFieldValue(initialDraft)) }
+    var textFieldValue by textState.valueState
     val text = textFieldValue.text
     // Snapshot the in-flight composer state (full TextFieldValue — text +
     // caret) when entering edit mode so cancelling restores both. Keyed on
     // the message id so a tap-Edit on a different message snapshots a fresh
     // baseline.
-    var preEditFieldValue by remember(draftKey) { mutableStateOf<TextFieldValue?>(null) }
+    var preEditFieldValue by textState.preEditState
     // Claim focus on edit-entry so the IME opens with the caret at the end
     // of the prefill, without making the user tap the field a second time.
     // `composerFocus` is now hoisted in via a parameter (#589) so the
