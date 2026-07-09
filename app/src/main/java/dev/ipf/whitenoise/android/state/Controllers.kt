@@ -4534,6 +4534,12 @@ class ConversationController(
         }
     }
 
+    fun hideMessageForMe(messageIdHex: String) {
+        val target = messageIdHex.takeIf { it.isNotBlank() } ?: return
+        appState.hideMessageForMe(conversationAccountRef, group.groupIdHex, target)
+        publishTimelineFromIndexes()
+    }
+
     /**
      * Publish a kind-1009 edit replacing the body of [targetMessageId] with
      * [content]. The runtime enforces the wire-level constraint that the
@@ -6433,7 +6439,16 @@ class ConversationController(
                     )
                 }
             }
-        val aggregated = aggregateEdits(live.map { it.record })
+        val hiddenIds = appState.hiddenMessageIdsInGroup(conversationAccountRef, group.groupIdHex)
+        val visible =
+            if (hiddenIds.isEmpty()) {
+                live
+            } else {
+                live.filter { message ->
+                    isTimelineMessageVisible(message.record.messageIdHex, hiddenIds)
+                }
+            }
+        val aggregated = aggregateEdits(visible.map { it.record })
         // Drop any optimistic edit the real kind-1009 has now caught up to:
         // once `aggregateEdits` reports the same latest text, the overlay is
         // redundant and would otherwise mask a later remote edit. Failed/Pending
@@ -6443,7 +6458,7 @@ class ConversationController(
             .map { it.key }
             .forEach(optimisticEdits::remove)
         timeline =
-            (live + streamDebugTimelineItems.values)
+            (visible + streamDebugTimelineItems.values)
                 .map { it.withOptimisticEditStatus() }
                 .distinctBy { it.id }
                 .sortedWith(::compareTimelineMessages)

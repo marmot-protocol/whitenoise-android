@@ -83,11 +83,13 @@ internal fun MessageFullScreenView(
     status: MessageStatus,
     canReply: Boolean,
     canReact: Boolean,
-    canDelete: Boolean,
+    canDeleteForMe: Boolean,
+    canDeleteForEveryone: Boolean,
     onReply: () -> Unit,
     onReact: () -> Unit,
     onCopy: () -> Unit,
-    onDelete: () -> Unit,
+    onDeleteForMe: () -> Unit,
+    onDeleteForEveryone: () -> Unit,
     onDismiss: () -> Unit,
     bottomBar: @Composable () -> Unit,
 ) {
@@ -183,13 +185,23 @@ internal fun MessageFullScreenView(
                                     onCopy()
                                 },
                             )
-                            if (canDelete) {
+                            if (canDeleteForMe) {
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.delete)) },
+                                    text = { Text(stringResource(R.string.delete_for_me)) },
                                     leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
                                     onClick = {
                                         overflowOpen = false
-                                        onDelete()
+                                        onDeleteForMe()
+                                    },
+                                )
+                            }
+                            if (canDeleteForEveryone) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.delete_for_everyone)) },
+                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                    onClick = {
+                                        overflowOpen = false
+                                        onDeleteForEveryone()
                                     },
                                 )
                             }

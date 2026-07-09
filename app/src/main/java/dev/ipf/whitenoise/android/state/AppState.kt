@@ -1045,6 +1045,7 @@ class WhiteNoiseAppState(
     private val groupMemberSnapshotLock = Any()
     private val conversationStateLock = Any()
     private val collapseLongMessagesByAccountGroup = mutableStateMapOf<String, Boolean>()
+    private val hiddenMessageIdsByAccountGroup = mutableStateMapOf<String, Set<String>>()
     private val optimisticMessagesByConversation = mutableMapOf<String, SnapshotStateMap<String, TimelineMessage>>()
     private val projectedMessageIdsByConversation = mutableMapOf<String, MutableSet<String>>()
     private val timelineOrderOverridesByConversation = mutableMapOf<String, MutableMap<String, ULong>>()
@@ -2358,6 +2359,7 @@ class WhiteNoiseAppState(
                 return null
             }
         wipeDecryptedMediaFromDisk()
+        clearHiddenMessagesForAccount(wipedRef)
         val refreshedAccounts = runCatching { marmotIo { listAccounts() } }.getOrDefault(emptyList())
         accounts = refreshedAccounts
         refreshAccountUnreadCounts(refreshedAccounts)
@@ -2765,6 +2767,34 @@ class WhiteNoiseAppState(
     ) {
         val accountRef = activeAccountRef ?: return
         chatMutePreferences.setMuted(accountRef, groupIdHex, muted)
+    }
+
+    fun hiddenMessageIdsInGroup(
+        accountRef: String?,
+        groupIdHex: String,
+    ): Set<String> {
+        val key = MessageHidePreferences.preferenceKey(accountRef, groupIdHex) ?: return emptySet()
+        return hiddenMessageIdsByAccountGroup[key]
+            ?: MessageHidePreferences.readHiddenMessageIdsByKey(preferences, key)
+    }
+
+    fun hideMessageForMe(
+        accountRef: String?,
+        groupIdHex: String,
+        messageIdHex: String,
+    ): Set<String> {
+        val key = MessageHidePreferences.preferenceKey(accountRef, groupIdHex) ?: return emptySet()
+        val updated = MessageHidePreferences.hideMessage(preferences, accountRef, groupIdHex, messageIdHex)
+        hiddenMessageIdsByAccountGroup[key] = updated
+        return updated
+    }
+
+    fun clearHiddenMessagesForAccount(accountRef: String) {
+        MessageHidePreferences.clearAccount(preferences, accountRef)
+        val prefix = MessageHidePreferences.accountKeyPrefix(accountRef) ?: return
+        hiddenMessageIdsByAccountGroup.keys
+            .filter { it.startsWith(prefix) }
+            .forEach(hiddenMessageIdsByAccountGroup::remove)
     }
 
     /**
