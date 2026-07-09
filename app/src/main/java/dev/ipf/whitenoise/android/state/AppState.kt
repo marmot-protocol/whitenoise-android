@@ -2305,6 +2305,9 @@ class WhiteNoiseAppState(
                 runCatching { marmotIo { signOutAndWipe(wipedRef) } }
                     .onSuccess {
                         pushTokenStore.clearPendingDisable(wipedRef)
+                        // The wipe invalidates server-side registration state for this account.
+                        // withSerializedNativePushWipe already holds nativePushSyncMutex here.
+                        perAccountSyncedFingerprints.remove(wipedRef)
                         pushTokenStore.clear()
                     }
             }
