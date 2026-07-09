@@ -225,7 +225,7 @@ class NotificationStreamForegroundService : Service() {
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:notification-push-wake")
                 .apply {
                     setReferenceCounted(false)
-                    acquire(PUSH_WAKE_LOCK_TIMEOUT_MS)
+                    acquire(pushWakeLockTimeoutMs())
                 }
         }.onFailure {
             foregroundServiceDebug(it) { "push wake-lock acquire failed" }
@@ -404,7 +404,15 @@ private fun foregroundStartTrigger(intent: Intent?): ForegroundStartTrigger {
     }
 }
 
-private const val PUSH_WAKE_LOCK_TIMEOUT_MS = 15_000L
+internal fun pushWakeLockTimeoutMs(
+    pushDrainTimeoutMs: Long = PUSH_WAKE_DRAIN_TIMEOUT_MS,
+    bootstrapBudgetMs: Long = PUSH_WAKE_BOOTSTRAP_BUDGET_MS,
+    nativePushSyncBudgetMs: Long = PUSH_WAKE_NATIVE_PUSH_SYNC_BUDGET_MS,
+): Long = pushDrainTimeoutMs + bootstrapBudgetMs + nativePushSyncBudgetMs
+
+private const val PUSH_WAKE_DRAIN_TIMEOUT_MS = 10_000L
+private const val PUSH_WAKE_BOOTSTRAP_BUDGET_MS = 5_000L
+private const val PUSH_WAKE_NATIVE_PUSH_SYNC_BUDGET_MS = 15_000L
 
 private object BackgroundConnectionNotification {
     private const val CHANNEL_ID = "whitenoise.background_connection.v1"

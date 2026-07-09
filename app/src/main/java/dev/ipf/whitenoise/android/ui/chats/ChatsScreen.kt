@@ -191,16 +191,13 @@ internal fun ChatsScreen(
     // state. Keying on `profileRev` re-fires the filter when the
     // backing presentation cache invalidates.
     val profileRev = appState.profileRevisionForCompose
-    // Debounced async message-body search. Re-runs whenever the query or the
-    // source list changes; the trimmed query is the unit of work, so edits
-    // that don't change the trimmed needle (e.g. trailing spaces) don't
-    // re-query. A blank query clears results immediately (no debounce) so the
-    // snippet lines vanish the moment the field is emptied. The 275 ms wait
-    // sits inside the existing chat-list input-debounce band (250–300 ms);
-    // each keystroke cancels the prior in-flight search via the LaunchedEffect
-    // key change, so only the settled query hits the FFI.
+    // Debounced async message-body search. Key the expensive per-chat FFI fanout
+    // by the query and stable group-id membership, not the live row list object:
+    // unrelated chat-list republishes or row reordering must not restart a
+    // full-corpus body search while the user is typing (#1201).
     val trimmedQuery = searchQuery.trim()
-    LaunchedEffect(trimmedQuery, sourceList) {
+    val bodySearchGroupIds = remember(sourceList) { sourceList.map { it.id }.sorted() }
+    LaunchedEffect(trimmedQuery, showArchived, bodySearchGroupIds) {
         if (trimmedQuery.isEmpty()) {
             bodyMatches = emptyMap()
             return@LaunchedEffect

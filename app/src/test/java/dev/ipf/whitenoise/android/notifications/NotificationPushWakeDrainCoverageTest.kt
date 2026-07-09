@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -30,6 +31,12 @@ class NotificationPushWakeDrainCoverageTest {
                 RegexOption.DOT_MATCHES_ALL,
             ).containsMatchIn(source),
         )
+    }
+
+    @Test
+    fun pushWakeLockTimeoutCoversDrainBootstrapAndNativePushSyncBudgets() {
+        assertEquals(30_000L, pushWakeLockTimeoutMs())
+        assertEquals(35_000L, pushWakeLockTimeoutMs(pushDrainTimeoutMs = 10_000L, bootstrapBudgetMs = 5_000L, nativePushSyncBudgetMs = 20_000L))
     }
 
     @Test
