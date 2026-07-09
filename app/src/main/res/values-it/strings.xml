@@ -42,6 +42,8 @@
     <string name="recipient_search_empty_hint">Incolla un npub per aggiungere qualcuno con cui non hai ancora chattato.</string>
     <string name="chat_row_action_archive">Archivia</string>
     <string name="chat_row_action_unarchive">Ripristina</string>
+    <string name="chat_row_action_mute">Silenzia</string>
+    <string name="chat_row_action_unmute">Riattiva notifiche</string>
     <string name="chat_row_action_mark_read">Segna come letto</string>
     <string name="chat_row_action_delete_group">Elimina gruppo</string>
     <string name="delete_group_dialog_title">Eliminare il gruppo?</string>
@@ -886,6 +888,9 @@
     <string name="see_all_members">Vedi tutti i %1$d membri</string>
     <string name="chat_lock">Blocco chat</string>
     <string name="collapse_long_messages">Comprimi i messaggi lunghi</string>
+    <string name="mute_notifications">Silenzia notifiche</string>
+    <string name="mute_notifications_subtitle">Interrompi le notifiche di sistema per questa chat</string>
+    <string name="chat_muted_badge">Silenziato</string>
     <string name="collapse_long_messages_subtitle">Mostra una scorciatoia «Leggi tutto» per i messaggi lunghi in questa chat</string>
     <string name="toast_disappearing_not_applied">Il gruppo è stato creato, ma non è stato possibile attivare i messaggi effimeri</string>
     <string name="search_members">Cerca membri</string>

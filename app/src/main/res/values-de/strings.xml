@@ -42,6 +42,8 @@
     <string name="recipient_search_empty_hint">Füge per npub jemanden hinzu, mit dem du noch nicht geschrieben hast.</string>
     <string name="chat_row_action_archive">Archivieren</string>
     <string name="chat_row_action_unarchive">Aus dem Archiv</string>
+    <string name="chat_row_action_mute">Stummschalten</string>
+    <string name="chat_row_action_unmute">Stummschaltung aufheben</string>
     <string name="chat_row_action_mark_read">Als gelesen markieren</string>
     <string name="chat_row_action_delete_group">Gruppe löschen</string>
     <string name="delete_group_dialog_title">Gruppe löschen?</string>
@@ -884,6 +886,9 @@
     <string name="see_all_members">Alle %1$d Mitglieder anzeigen</string>
     <string name="chat_lock">Chatsperre</string>
     <string name="collapse_long_messages">Lange Nachrichten einklappen</string>
+    <string name="mute_notifications">Benachrichtigungen stummschalten</string>
+    <string name="mute_notifications_subtitle">OS-Benachrichtigungen für diesen Chat stoppen</string>
+    <string name="chat_muted_badge">Stummgeschaltet</string>
     <string name="collapse_long_messages_subtitle">Für lange Nachrichten in diesem Chat eine „Mehr lesen“-Verknüpfung anzeigen</string>
     <string name="toast_disappearing_not_applied">Die Gruppe wurde erstellt, aber verschwindende Nachrichten konnten nicht aktiviert werden</string>
     <string name="search_members">Mitglieder suchen</string>

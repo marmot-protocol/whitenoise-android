@@ -42,6 +42,8 @@
     <string name="recipient_search_empty_hint">Вставьте npub, чтобы добавить того, с кем вы ещё не общались.</string>
     <string name="chat_row_action_archive">Архивировать</string>
     <string name="chat_row_action_unarchive">Восстановить</string>
+    <string name="chat_row_action_mute">Отключить уведомления</string>
+    <string name="chat_row_action_unmute">Включить уведомления</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
     <string name="chat_row_action_delete_group">Удалить группу</string>
     <string name="delete_group_dialog_title">Удалить группу?</string>
@@ -898,6 +900,9 @@
     <string name="see_all_members">Показать всех участников (%1$d)</string>
     <string name="chat_lock">Блокировка чата</string>
     <string name="collapse_long_messages">Сворачивать длинные сообщения</string>
+    <string name="mute_notifications">Отключить уведомления</string>
+    <string name="mute_notifications_subtitle">Не показывать системные уведомления для этого чата</string>
+    <string name="chat_muted_badge">Без звука</string>
     <string name="collapse_long_messages_subtitle">Показывать кнопку «Читать дальше» для длинных сообщений в этом чате</string>
     <string name="toast_disappearing_not_applied">Группа создана, но исчезающие сообщения включить не удалось</string>
     <string name="search_members">Поиск участников</string>

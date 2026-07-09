@@ -9,8 +9,10 @@ object LocalNotificationPolicy {
         activeConversationGroupIdHex: String?,
         activeConversationAccountRef: String?,
         appLockScreenVisible: Boolean,
+        isConversationMuted: (accountRef: String, groupIdHex: String) -> Boolean = { _, _ -> false },
     ): Boolean {
         if (appLockScreenVisible) return false
+        if (isConversationMuted(update.accountRef, update.groupIdHex)) return false
 
         // Suppress only the conversation the user is actively viewing — and only
         // for the account that is viewing it. A group is shared by every local

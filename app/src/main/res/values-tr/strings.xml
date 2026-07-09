@@ -42,6 +42,8 @@
     <string name="recipient_search_empty_hint">Henüz sohbet etmediğiniz birini eklemek için bir npub yapıştırın.</string>
     <string name="chat_row_action_archive">Arşivle</string>
     <string name="chat_row_action_unarchive">Arşivden çıkar</string>
+    <string name="chat_row_action_mute">Sessize al</string>
+    <string name="chat_row_action_unmute">Sesi aç</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
     <string name="chat_row_action_delete_group">Grubu sil</string>
     <string name="delete_group_dialog_title">Grup silinsin mi?</string>
@@ -884,6 +886,9 @@
     <string name="see_all_members">%1$d üyenin tümünü gör</string>
     <string name="chat_lock">Sohbet kilidi</string>
     <string name="collapse_long_messages">Uzun mesajları daralt</string>
+    <string name="mute_notifications">Bildirimleri sessize al</string>
+    <string name="mute_notifications_subtitle">Bu sohbet için işletim sistemi bildirimlerini durdur</string>
+    <string name="chat_muted_badge">Sessize alındı</string>
     <string name="collapse_long_messages_subtitle">Bu sohbette uzun mesajlar için “Devamını oku” kısayolu göster</string>
     <string name="toast_disappearing_not_applied">Grup oluşturuldu ancak kaybolan mesajlar açılamadı</string>
     <string name="search_members">Üye ara</string>

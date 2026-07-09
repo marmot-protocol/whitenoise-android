@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -7,12 +8,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MarkChatRead
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
@@ -24,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +54,7 @@ import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
@@ -77,12 +82,20 @@ internal fun ChatRowWithMenu(
     onOpen: () -> Unit,
     onMenuArchiveToggle: () -> Unit,
     onMarkRead: () -> Unit,
+    onMuteToggle: () -> Unit,
     onDelete: () -> Unit,
     // Non-null when this row matched the chat-list search on a message body
     // (issue #290); drives the highlighted snippet line under the row.
     bodyMatch: MessageBodyMatch? = null,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    val mutedKeys by appState.chatMutePreferences.mutedConversations.collectAsState()
+    val accountRef = appState.activeAccountRef
+    val isMuted =
+        remember(accountRef, item.group.groupIdHex, mutedKeys) {
+            accountRef != null &&
+                ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedKeys
+        }
     Box {
         ChatRow(
             item = item,
@@ -90,6 +103,7 @@ internal fun ChatRowWithMenu(
             onClick = onOpen,
             onLongClick = { menuOpen = true },
             bodyMatch = bodyMatch,
+            isMuted = isMuted,
         )
         DropdownMenu(
             expanded = menuOpen,
@@ -130,6 +144,24 @@ internal fun ChatRowWithMenu(
                     },
                 )
             }
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(
+                            if (isMuted) {
+                                R.string.chat_row_action_unmute
+                            } else {
+                                R.string.chat_row_action_mute
+                            },
+                        ),
+                    )
+                },
+                leadingIcon = { Icon(Icons.Default.NotificationsOff, contentDescription = null) },
+                onClick = {
+                    menuOpen = false
+                    onMuteToggle()
+                },
+            )
             DropdownMenuItem(
                 text = {
                     Text(
@@ -178,6 +210,7 @@ internal fun ChatRow(
     appState: WhiteNoiseAppState,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
+    isMuted: Boolean = false,
     // Message-body search hit for this row (issue #290): when present, a
     // second supporting line shows the matched message with the needle
     // highlighted, so the user can see why the chat appeared in the results.
@@ -241,6 +274,20 @@ internal fun ChatRow(
                     // A group's own avatar URL wins over the member-derived avatar.
                     pictureUrl = item.group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) },
                 )
+                if (isMuted) {
+                    Icon(
+                        imageVector = Icons.Default.NotificationsOff,
+                        contentDescription = stringResource(R.string.chat_muted_badge),
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surface)
+                                .padding(2.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         },
         headlineContent = {

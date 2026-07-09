@@ -475,6 +475,12 @@ internal fun ChatsScreen(
                                     onMarkRead = {
                                         appState.launchMutation { controller.markAllRead(item) }
                                     },
+                                    onMuteToggle = {
+                                        appState.setConversationMuted(
+                                            item.group.groupIdHex,
+                                            !appState.isConversationMuted(item.group.groupIdHex),
+                                        )
+                                    },
                                     onDelete = {
                                         // Sole admin with others still present? Route to the
                                         // transfer-then-leave flow (#1131) instead of the plain
