@@ -224,7 +224,10 @@ object GroupProjector {
         activeAccountIdHex: String?,
     ): Boolean {
         val active = activeAccountIdHex?.takeIf { it.isNotBlank() } ?: return false
-        return member.memberIdHex.equals(active, ignoreCase = true)
+        // memberIdHex is the MLS seat id and can differ from the Nostr account id
+        // carried in `account`; mirror [isAdmin]'s memberRef matching (#1171).
+        return member.memberIdHex.equals(active, ignoreCase = true) ||
+            memberRef(member).equals(active, ignoreCase = true)
     }
 
     /**
@@ -240,6 +243,17 @@ object GroupProjector {
         members: List<AppGroupMemberRecordFfi>,
         activeAccountIdHex: String?,
     ): Boolean = members.size == 1 && isActiveAccountMember(members[0], activeAccountIdHex)
+
+    /**
+     * Whether Leave/Delete should dissolve the group with a local wipe instead
+     * of attempting an MLS leave commit (issues #811 / #1171). This requires an
+     * authoritative live roster containing exactly the active account; cached
+     * counts or snapshots can be stale and must not choose the local-wipe path.
+     */
+    fun shouldDissolveAsSoleMember(
+        roster: List<AppGroupMemberRecordFfi>?,
+        activeAccountIdHex: String?,
+    ): Boolean = roster != null && isSelfSoleMember(roster, activeAccountIdHex)
 
     /**
      * The roster with the active account dropped. Used on a successful leave
@@ -290,7 +304,7 @@ object GroupProjector {
         if (!isAdminRef(group, activeAccountIdHex)) return true
         // A sole admin who is also the only remaining member can always leave:
         // dissolving the group orphans no one. Without this they'd be stuck.
-        if (memberCount == 1) return true
+        if (memberCount <= 1) return true
         return uniqueAdminCount(group) > 1
     }
 
@@ -300,7 +314,7 @@ object GroupProjector {
         memberCount: Int,
     ): Boolean {
         // No one to hand admin to when you're the only member — just leave.
-        if (memberCount == 1) return false
+        if (memberCount <= 1) return false
         return isAdminRef(group, activeAccountIdHex)
     }
 
@@ -327,7 +341,7 @@ object GroupProjector {
     ): LeaveAction {
         // Sole member wins over the admin gate: dissolving a one-person group
         // strands no one, so it's always a (destructive) leave, never a
-        // transfer-admin block. Mirrors canLeaveGroup's memberCount == 1 branch.
+        // transfer-admin block. Mirrors canLeaveGroup's memberCount <= 1 branch.
         if (memberCount <= 1) return LeaveAction.SoleMemberDeletesGroup
         if (isAdminRef(group, activeAccountIdHex) && uniqueAdminCount(group) <= 1) {
             return LeaveAction.SoleAdminMustTransfer
