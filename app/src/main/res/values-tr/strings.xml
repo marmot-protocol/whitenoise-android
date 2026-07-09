@@ -217,6 +217,8 @@
     <string name="toast_forwarded_partial">%1$s sohbete iletildi; bazıları başarısız oldu</string>
     <string name="toast_forward_failed">Mesaj iletilemedi</string>
     <string name="delete">Sil</string>
+    <string name="delete_for_me">Benim için sil</string>
+    <string name="delete_for_everyone">Herkes için sil</string>
     <string name="sent">Gönderildi</string>
     <string name="send_failed">Mesaj gönderilemedi. Lütfen tekrar deneyin.</string>
     <string name="sending">Gönderiliyor</string>

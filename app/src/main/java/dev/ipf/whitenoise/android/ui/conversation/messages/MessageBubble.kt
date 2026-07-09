@@ -1235,7 +1235,8 @@ internal fun MessageBubble(
                     alignEnd = mine,
                     canReply = !readOnly,
                     canReact = !readOnly,
-                    canDelete = !readOnly && mine && record.messageIdHex.isNotBlank() && !deleted,
+                    canDeleteForMe = !readOnly && record.messageIdHex.isNotBlank() && !deleted,
+                    canDeleteForEveryone = !readOnly && mine && record.messageIdHex.isNotBlank() && !deleted,
                     canEdit = !readOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
                     canForward = !readOnly && forwardBody != null,
                     quickReactionEmojis = quickReactionEmojis,
@@ -1260,7 +1261,11 @@ internal fun MessageBubble(
                     onCopyText = ::copyMessageText,
                     onForward = ::beginForward,
                     onInfo = ::openInfoSheet,
-                    onDelete = {
+                    onDeleteForMe = {
+                        onActionMenuOpenChange(false)
+                        controller.hideMessageForMe(record.messageIdHex)
+                    },
+                    onDeleteForEveryone = {
                         onActionMenuOpenChange(false)
                         // launchMutation so the MLS commit + Nostr publish
                         // survive navigating away from the conversation —
@@ -1288,7 +1293,8 @@ internal fun MessageBubble(
                         status = item.status,
                         canReply = canUseExpandedComposer,
                         canReact = canUseExpandedComposer,
-                        canDelete = canUseExpandedComposer && mine && record.messageIdHex.isNotBlank() && !deleted,
+                        canDeleteForMe = !readOnly && record.messageIdHex.isNotBlank() && !deleted,
+                        canDeleteForEveryone = canUseExpandedComposer && mine && record.messageIdHex.isNotBlank() && !deleted,
                         onReply = {
                             if (canUseExpandedComposer) {
                                 beginReply()
@@ -1301,7 +1307,13 @@ internal fun MessageBubble(
                             }
                         },
                         onCopy = ::copyMessageText,
-                        onDelete = {
+                        onDeleteForMe = {
+                            if (!readOnly) {
+                                expandedFullView = false
+                                controller.hideMessageForMe(record.messageIdHex)
+                            }
+                        },
+                        onDeleteForEveryone = {
                             if (canUseExpandedComposer) {
                                 expandedFullView = false
                                 appState.launchMutation { controller.deleteMessage(record) }

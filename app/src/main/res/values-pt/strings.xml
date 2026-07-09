@@ -217,6 +217,8 @@
     <string name="toast_forwarded_partial">Encaminhado para %1$s conversas; algumas falharam</string>
     <string name="toast_forward_failed">Nao foi possivel encaminhar a mensagem</string>
     <string name="delete">Excluir</string>
+    <string name="delete_for_me">Excluir para mim</string>
+    <string name="delete_for_everyone">Excluir para todos</string>
     <string name="sent">Enviado</string>
     <string name="send_failed">Falha ao enviar mensagem. Por favor, tente novamente.</string>
     <string name="sending">Enviando</string>

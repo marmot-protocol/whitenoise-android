@@ -99,7 +99,8 @@ internal fun MessageActionMenu(
     alignEnd: Boolean,
     canReply: Boolean,
     canReact: Boolean,
-    canDelete: Boolean,
+    canDeleteForMe: Boolean,
+    canDeleteForEveryone: Boolean,
     canEdit: Boolean,
     canForward: Boolean,
     quickReactionEmojis: List<String>,
@@ -111,7 +112,8 @@ internal fun MessageActionMenu(
     onForward: () -> Unit,
     onCopyText: () -> Unit,
     onInfo: () -> Unit,
-    onDelete: () -> Unit,
+    onDeleteForMe: () -> Unit,
+    onDeleteForEveryone: () -> Unit,
 ) {
     // focusable = false keeps the soft keyboard up while this menu is open.
     // A focusable popup window steals window focus from the conversation's
@@ -201,7 +203,8 @@ internal fun MessageActionMenu(
         //   - a HorizontalDivider (1.dp)
         //   - the action buttons (each 48.dp min) in a spacedBy(2.dp) Column:
         //       Copy and Info always; +Reply when canReply; +Edit when canEdit;
-        //       +Forward when canForward; +Delete when canDelete
+        //       +Forward when canForward; +Delete for me when canDeleteForMe;
+        //       +Delete for everyone when canDeleteForEveryone
         //   - the outer Column's 8.dp padding (top + bottom) and its two
         //     spacedBy(8.dp) gaps between the three sections.
         // Keep this in sync with the menu Column below if its layout changes.
@@ -212,7 +215,8 @@ internal fun MessageActionMenu(
                         (if (canReply) 1 else 0) +
                         (if (canEdit) 1 else 0) +
                         (if (canForward) 1 else 0) +
-                        (if (canDelete) 1 else 0)
+                        (if (canDeleteForMe) 1 else 0) +
+                        (if (canDeleteForEveryone) 1 else 0)
                 val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1).coerceAtLeast(0) * 2).dp
                 val reactionSectionHeight = if (canReact) 36.dp + 1.dp + 8.dp else 0.dp
                 val totalHeight = (8.dp + 8.dp) + 8.dp + reactionSectionHeight + actionsColumnHeight
@@ -342,11 +346,18 @@ internal fun MessageActionMenu(
                             icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             onClick = onInfo,
                         )
-                        if (canDelete) {
+                        if (canDeleteForMe) {
                             MessageActionButton(
-                                label = stringResource(R.string.delete),
+                                label = stringResource(R.string.delete_for_me),
                                 icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                onClick = onDelete,
+                                onClick = onDeleteForMe,
+                            )
+                        }
+                        if (canDeleteForEveryone) {
+                            MessageActionButton(
+                                label = stringResource(R.string.delete_for_everyone),
+                                icon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                onClick = onDeleteForEveryone,
                             )
                         }
                     }
