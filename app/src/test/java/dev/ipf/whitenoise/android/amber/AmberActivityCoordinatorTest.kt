@@ -29,11 +29,18 @@ class AmberActivityCoordinatorTest {
     }
 
     @Test
-    fun oneSidedMissingIdIsDropped() {
+    fun idBearingRequestDropsResultWithoutId() {
         // An id-bearing request whose result omits the id (a stale prompt's late
-        // result), and a no-id request meeting an id-bearing result, are both
-        // stale/mismatched — never delivered.
+        // result) is never delivered.
         assertFalse(AmberActivityCoordinator.shouldAcceptResult(expectedId = "req-A", resultId = null))
-        assertFalse(AmberActivityCoordinator.shouldAcceptResult(expectedId = null, resultId = "req-A"))
+    }
+
+    @Test
+    fun noIdRequestAcceptsSignerGeneratedResultId() {
+        // get_public_key sends no id, but signers answer it with a
+        // self-generated id. The prompt lock keeps a single prompt pending, so
+        // the no-id request accepts whatever id the result carries — dropping
+        // it would block the caller for the full approval timeout.
+        assertTrue(AmberActivityCoordinator.shouldAcceptResult(expectedId = null, resultId = "d0438f"))
     }
 }
