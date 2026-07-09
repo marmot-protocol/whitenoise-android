@@ -94,6 +94,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
 import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubble
@@ -134,6 +135,9 @@ internal fun MessageBubble(
     item: TimelineMessage,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    // #1206: shared composer text state so the full-screen reader's composer
+    // stays in sync with the main composer instead of holding a divergent field.
+    composerTextState: ComposerTextState,
     highlighted: Boolean,
     quickReactionEmojis: List<String>,
     isActionMenuOpen: Boolean,
@@ -1331,6 +1335,7 @@ internal fun MessageBubble(
                                             initialDraft = appState.draftFor(groupIdHex).orEmpty(),
                                             onDraftChange = { appState.setDraft(groupIdHex, it) },
                                             draftKey = groupIdHex,
+                                            textState = composerTextState,
                                             editingMessageId = controller.editingMessageId,
                                             editingInitialText = editingRecord?.let { controller.displayedText(it) },
                                             onCancelEdit = { controller.editingMessageId = null },
