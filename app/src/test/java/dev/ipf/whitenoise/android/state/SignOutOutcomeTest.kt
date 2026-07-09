@@ -91,6 +91,31 @@ class OtherAccountAvatarsTest {
     }
 
     @Test
+    fun showsExternallySignedAccountsBesideTheActiveOne() {
+        val others =
+            otherAccountAvatars(
+                accounts =
+                    listOf(
+                        account("A"),
+                        account("Amber", localSigning = false, externalSigning = true),
+                        account("read-only", localSigning = false),
+                    ),
+                activeLabel = "A",
+            )
+
+        assertEquals(listOf("Amber"), others.map { it.label })
+    }
+
+    @Test
+    fun signedInSigningAccountIncludesExternalSignersButNotReadOnlyOrSignedOut() {
+        assertTrue(account("local").isSignedInSigningAccount())
+        assertTrue(account("amber", localSigning = false, externalSigning = true).isSignedInSigningAccount())
+        assertFalse(account("read-only", localSigning = false).isSignedInSigningAccount())
+        assertFalse(account("signed-out", signedOut = true).isSignedInSigningAccount())
+        assertFalse(account("", externalSigning = true).isSignedInSigningAccount())
+    }
+
+    @Test
     fun excludesSignedOutReadOnlyAndBlankLabelAccounts() {
         val others =
             otherAccountAvatars(
