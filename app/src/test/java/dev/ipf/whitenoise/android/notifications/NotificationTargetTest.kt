@@ -9,6 +9,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class NotificationTargetTest {
     // ---- routeInboundIntent -------------------------------------------------
@@ -321,18 +322,87 @@ class NotificationTargetTest {
     }
 
     @Test
-    fun replyActionBudget_reservesDismissHeadroomInsideGoAsyncBudget() {
-        // Use production defaults so this catches drift in the receiver's
-        // cooperative send/dismiss budget wiring, not just helper arithmetic.
-        val dismissBudget = notificationReplyDismissBudgetMs()
-        val sendBudget = notificationReplySendPhaseBudgetMs(dismissBudgetMs = dismissBudget)
+    fun replyDismissBudget_coversDirectReplyNotificationLifetimeExtension() {
+        // Direct reply send is no longer inside the BroadcastReceiver goAsync
+        // budget, but the worker still has to clear Android's direct-reply
+        // lifetime extension before cancelling the notification.
+        assertEquals(950L, notificationReplyDismissBudgetMs())
+    }
 
-        assertEquals(950L, dismissBudget)
-        assertEquals(6_750L, sendBudget)
-        assertEquals(300L, 8_000L - sendBudget - dismissBudget)
+    @Test
+    fun replyWorkName_isStableOpaqueAndReplySpecific() {
+        val first = notificationReplyUniqueWorkName("acct-a", "group-1", "hello marmot")
+        val same = notificationReplyUniqueWorkName("acct-a", "group-1", "hello marmot")
+        val sameWithWhitespace = notificationReplyUniqueWorkName("acct-a", "group-1", "  hello marmot\n")
+        val differentReply = notificationReplyUniqueWorkName("acct-a", "group-1", "different")
+
+        assertEquals(first, same)
+        assertEquals(first, sameWithWhitespace)
+        assertNotEquals(first, differentReply)
+        assertTrue(first.startsWith("notification_reply:"))
+        assertFalse("reply plaintext must not leak into the persisted unique work name", "hello marmot" in first)
+    }
+
+    @Test
+    fun replyWorkData_trimsAndCarriesWorkerInputs() {
+        val action =
+            NotificationAction(
+                NotificationActionKind.REPLY,
+                NotificationTarget("acct-a", "group-1", "m1", NotificationTargetKind.MESSAGE),
+                "acct-a|group-1",
+                42,
+            )
+
+        val data = notificationReplyWorkData(action, "  hello marmot  ")
+
+        assertEquals("acct-a", data.getString("account_ref"))
+        assertEquals("group-1", data.getString("group_id_hex"))
+        assertEquals("m1", data.getString("message_id_hex"))
+        assertEquals("acct-a|group-1", data.getString("notification_tag"))
+        assertEquals(42, data.getInt("notification_id", Int.MIN_VALUE))
+        assertEquals("hello marmot", data.getString("reply_text"))
+    }
+
+    @Test
+    fun replyRetryPolicy_failsTerminalAttempt() {
+        assertTrue(notificationReplyShouldRetry(1))
+        assertTrue(notificationReplyShouldRetry(2))
+        assertFalse(notificationReplyShouldRetry(3))
+        assertFalse(notificationReplyShouldRetry(4))
+    }
+
+    @Test
+    fun replyReceiverEnqueuesWorkerWithoutInlineFfiSend() {
+        val receiver = notificationActionReceiverSource().readText()
+        val enqueueReplyAction =
+            receiver
+                .substringAfter("private fun enqueueReplyAction")
+                .substringBefore("private fun handleMarkReadAsync")
+
+        assertTrue("reply broadcasts must enqueue durable background work", "NotificationReplyWorker.enqueue" in enqueueReplyAction)
+        assertFalse("reply broadcasts must not send through JNI inside goAsync", "sendNotificationReply" in enqueueReplyAction)
+        assertFalse(
+            "reply broadcasts must not bootstrap the notification runtime inside goAsync",
+            "ensureNotificationRuntimeStarted" in enqueueReplyAction,
+        )
+        assertTrue("the worker owns the actual send", "sendNotificationReply" in notificationReplyWorkerSource().readText())
     }
 
     // ---- resolveNotificationNav (routing FSM) -------------------------------
+
+    private fun notificationActionReceiverSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/notifications/NotificationActionReceiver.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationActionReceiver.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing NotificationActionReceiver.kt source file")
+
+    private fun notificationReplyWorkerSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReplyWorker.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReplyWorker.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing NotificationReplyWorker.kt source file")
 
     private val target = NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.MESSAGE)
 
