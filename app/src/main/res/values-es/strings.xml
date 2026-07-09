@@ -122,7 +122,7 @@
     <string name="profile_edit_nickname">Editar apodo</string>
     <string name="profile_nickname_dialog_title">Establecer apodo</string>
     <string name="profile_nickname_hint">Apodo</string>
-    <string name="profile_nickname_private_hint">Solo tú ves esto en este dispositivo. Al borrarlo, se restaura su nombre de perfil.</string>
+    <string name="profile_nickname_private_hint">Solo tú ves esto en este dispositivo. Al borrarlo, se restaura su nombre de perfil. Los apodos guardados se limpian y se limitan a 80 caracteres.</string>
     <string name="dismiss">Cerrar</string>
     <string name="edit">Editar</string>
     <string name="save_group">Guardar grupo</string>

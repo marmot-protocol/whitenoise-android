@@ -765,6 +765,26 @@ internal class ConversationStateRetention(
     }
 }
 
+internal data class ProfilePresentationRevision(
+    val profiles: Int,
+    val contactNicknames: Int,
+)
+
+internal fun contactNicknameAccountRefForAccess(
+    accountRef: String?,
+    accounts: List<AccountSummaryFfi>,
+    contactPubkeyHex: String,
+): String? {
+    val account = accountRef ?: return null
+    if (isLocalContactAccount(accounts, contactPubkeyHex)) return null
+    return account
+}
+
+internal fun isLocalContactAccount(
+    accounts: List<AccountSummaryFfi>,
+    accountIdHex: String,
+): Boolean = accounts.any { it.accountIdHex.equals(accountIdHex, ignoreCase = true) }
+
 class WhiteNoiseAppState(
     context: Context,
 ) {
@@ -1028,8 +1048,8 @@ class WhiteNoiseAppState(
      * derivation when a profile update or private contact nickname edit lands
      * (e.g. the chat-list search filter must re-evaluate its visible title).
      */
-    val profileRevisionForCompose: Int
-        get() = profileRevision + contactNicknameRevision
+    internal val profileRevisionForCompose: ProfilePresentationRevision
+        get() = ProfilePresentationRevision(profileRevision, contactNicknameRevision)
     private val profilePresentations = BoundedEntryCache<String, ProfilePresentation>(MAX_PROFILE_PRESENTATION_CACHE_ENTRIES)
 
     // Materialized profile metadata, populated off-main by [refreshProfile].
@@ -3734,8 +3754,7 @@ class WhiteNoiseAppState(
         accountIdHex: String,
         nickname: String,
     ) {
-        val account = activeAccountRef ?: return
-        if (isLocalAccount(accountIdHex)) return
+        val account = contactNicknameAccountRefForAccess(activeAccountRef, accounts, accountIdHex) ?: return
         if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
             contactNicknameRevision += 1
         }
@@ -3753,12 +3772,15 @@ class WhiteNoiseAppState(
         accountRef: String?,
         accountIdHex: String,
     ): String? {
+        // Intentional Compose snapshot read: cached title helpers are often
+        // called from remember{} blocks that otherwise wouldn't observe local
+        // nickname edits.
         contactNicknameRevision
-        if (isLocalAccount(accountIdHex)) return null
-        return ContactNicknamePreferences.readNickname(preferences, accountRef, accountIdHex)
+        val account = contactNicknameAccountRefForAccess(accountRef, accounts, accountIdHex) ?: return null
+        return ContactNicknamePreferences.readNickname(preferences, account, accountIdHex)
     }
 
-    private fun isLocalAccount(accountIdHex: String): Boolean = accounts.any { it.accountIdHex.equals(accountIdHex, ignoreCase = true) }
+    private fun isLocalAccount(accountIdHex: String): Boolean = isLocalContactAccount(accounts, accountIdHex)
 
     // Pure read for use inside remember{}: returns the cached display name or the
     // short npub. Reads the presentation map directly (not profilePresentation(),

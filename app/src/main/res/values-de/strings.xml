@@ -122,7 +122,7 @@
     <string name="profile_edit_nickname">Spitznamen bearbeiten</string>
     <string name="profile_nickname_dialog_title">Spitznamen festlegen</string>
     <string name="profile_nickname_hint">Spitzname</string>
-    <string name="profile_nickname_private_hint">Nur du siehst das auf diesem Gerät. Wenn du es leerst, wird wieder der Profilname angezeigt.</string>
+    <string name="profile_nickname_private_hint">Nur du siehst das auf diesem Gerät. Wenn du es leerst, wird wieder der Profilname angezeigt. Gespeicherte Spitznamen werden bereinigt und auf 80 Zeichen begrenzt.</string>
     <string name="dismiss">Schließen</string>
     <string name="edit">Bearbeiten</string>
     <string name="save_group">Gruppe speichern</string>

@@ -122,7 +122,7 @@
     <string name="profile_edit_nickname">Takma adı düzenle</string>
     <string name="profile_nickname_dialog_title">Takma ad belirle</string>
     <string name="profile_nickname_hint">Takma ad</string>
-    <string name="profile_nickname_private_hint">Bunu bu cihazda yalnızca siz görürsünüz. Temizlemek profil adını geri yükler.</string>
+    <string name="profile_nickname_private_hint">Bunu bu cihazda yalnızca siz görürsünüz. Temizlemek profil adını geri yükler. Kaydedilen takma adlar temizlenir ve 80 karakterle sınırlanır.</string>
     <string name="dismiss">Kapat</string>
     <string name="edit">Düzenle</string>
     <string name="save_group">Grubu Kaydet</string>

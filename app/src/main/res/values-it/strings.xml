@@ -122,7 +122,7 @@
     <string name="profile_edit_nickname">Modifica soprannome</string>
     <string name="profile_nickname_dialog_title">Imposta soprannome</string>
     <string name="profile_nickname_hint">Soprannome</string>
-    <string name="profile_nickname_private_hint">Solo tu lo vedi su questo dispositivo. Cancellandolo ripristini il nome del profilo.</string>
+    <string name="profile_nickname_private_hint">Solo tu lo vedi su questo dispositivo. Cancellandolo ripristini il nome del profilo. I soprannomi salvati vengono puliti e limitati a 80 caratteri.</string>
     <string name="dismiss">Chiudi</string>
     <string name="edit">Modifica</string>
     <string name="save_group">Salva gruppo</string>

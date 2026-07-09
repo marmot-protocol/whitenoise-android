@@ -138,7 +138,7 @@
     <string name="profile_edit_nickname">Edit nickname</string>
     <string name="profile_nickname_dialog_title">Set nickname</string>
     <string name="profile_nickname_hint">Nickname</string>
-    <string name="profile_nickname_private_hint">Only you see this on this device. Clearing it restores their profile name.</string>
+    <string name="profile_nickname_private_hint">Only you see this on this device. Clearing it restores their profile name. Saved nicknames are cleaned and capped at 80 characters.</string>
     <string name="dismiss">Dismiss</string>
     <string name="edit">Edit</string>
     <string name="save_group">Save Group</string>

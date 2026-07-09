@@ -122,7 +122,7 @@
     <string name="profile_edit_nickname">Modifier le pseudo</string>
     <string name="profile_nickname_dialog_title">Définir un pseudo</string>
     <string name="profile_nickname_hint">Pseudo</string>
-    <string name="profile_nickname_private_hint">Vous seul le voyez sur cet appareil. L’effacer rétablit son nom de profil.</string>
+    <string name="profile_nickname_private_hint">Vous seul le voyez sur cet appareil. L’effacer rétablit son nom de profil. Les surnoms enregistrés sont nettoyés et limités à 80 caractères.</string>
     <string name="dismiss">Fermer</string>
     <string name="edit">Modifier</string>
     <string name="save_group">Enregistrer le groupe</string>

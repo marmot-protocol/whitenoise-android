@@ -124,7 +124,7 @@
     <string name="profile_edit_nickname">Изменить псевдоним</string>
     <string name="profile_nickname_dialog_title">Задать псевдоним</string>
     <string name="profile_nickname_hint">Псевдоним</string>
-    <string name="profile_nickname_private_hint">Это видно только вам на этом устройстве. Очистка вернёт имя из профиля.</string>
+    <string name="profile_nickname_private_hint">Это видно только вам на этом устройстве. Очистка вернёт имя из профиля. Сохранённые псевдонимы очищаются и ограничиваются 80 символами.</string>
     <string name="dismiss">Закрыть</string>
     <string name="edit">Изменить</string>
     <string name="save_group">Сохранить группу</string>

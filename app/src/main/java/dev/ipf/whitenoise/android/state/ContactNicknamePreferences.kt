@@ -75,5 +75,8 @@ internal object ContactNicknamePreferences {
             .lowercase(Locale.ROOT)
             .takeIf { it.isNotEmpty() }
 
+    // Key by the Marmot account ref/label rather than account hex: writes use
+    // WhiteNoiseAppState.activeAccountRef, notification updates carry
+    // update.accountRef, and sign-out/wipe cleanup receives the same ref.
     private fun accountKeyPrefix(accountRef: String): String = "$KeyPrefix${accountRef.length}:$accountRef:"
 }

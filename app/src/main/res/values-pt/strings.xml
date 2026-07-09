@@ -122,7 +122,7 @@
     <string name="profile_edit_nickname">Editar apelido</string>
     <string name="profile_nickname_dialog_title">Definir apelido</string>
     <string name="profile_nickname_hint">Apelido</string>
-    <string name="profile_nickname_private_hint">Só você vê isso neste dispositivo. Limpar restaura o nome do perfil.</string>
+    <string name="profile_nickname_private_hint">Só você vê isso neste dispositivo. Limpar restaura o nome do perfil. Apelidos salvos são limpos e limitados a 80 caracteres.</string>
     <string name="dismiss">Fechar</string>
     <string name="edit">Editar</string>
     <string name="save_group">Salvar grupo</string>
