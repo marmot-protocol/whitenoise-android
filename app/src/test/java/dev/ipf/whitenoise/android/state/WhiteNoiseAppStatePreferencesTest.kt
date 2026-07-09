@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -85,5 +86,40 @@ class WhiteNoiseAppStatePreferencesTest {
         assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "account-a", "group-a"))
         assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "", "group-a"))
         assertTrue(LongMessageCollapsePreferences.readCollapseLongMessages(preferences, "account-a", ""))
+    }
+
+    @Test
+    fun contactNicknameDefaultsAbsent() {
+        assertEquals(null, ContactNicknamePreferences.readNickname(preferences, "account-a", "contact-a"))
+    }
+
+    @Test
+    fun contactNicknamePersistsPerAccountAndContact() {
+        ContactNicknamePreferences.writeNickname(preferences, "account-a", "CONTACT-A", "Alex Cousin")
+        ContactNicknamePreferences.writeNickname(preferences, "account-b", "contact-a", "Alex Coworker")
+        ContactNicknamePreferences.writeNickname(preferences, "account-a", "contact-b", "Other Alex")
+
+        assertEquals("Alex Cousin", ContactNicknamePreferences.readNickname(preferences, "account-a", "contact-a"))
+        assertEquals("Alex Coworker", ContactNicknamePreferences.readNickname(preferences, "account-b", "contact-a"))
+        assertEquals("Other Alex", ContactNicknamePreferences.readNickname(preferences, "account-a", "contact-b"))
+    }
+
+    @Test
+    fun contactNicknameBlankClearsOverride() {
+        ContactNicknamePreferences.writeNickname(preferences, "account-a", "contact-a", "Alex Cousin")
+        ContactNicknamePreferences.writeNickname(preferences, "account-a", "contact-a", "   ")
+
+        assertEquals(null, ContactNicknamePreferences.readNickname(preferences, "account-a", "contact-a"))
+    }
+
+    @Test
+    fun contactNicknameClearAllForAccountDoesNotClearSimilarPrefixes() {
+        ContactNicknamePreferences.writeNickname(preferences, "a", "contact-a", "short")
+        ContactNicknamePreferences.writeNickname(preferences, "a:long", "contact-a", "long")
+
+        ContactNicknamePreferences.clearAllForAccount(preferences, "a")
+
+        assertEquals(null, ContactNicknamePreferences.readNickname(preferences, "a", "contact-a"))
+        assertEquals("long", ContactNicknamePreferences.readNickname(preferences, "a:long", "contact-a"))
     }
 }

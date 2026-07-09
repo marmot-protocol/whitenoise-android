@@ -130,6 +130,15 @@
     <string name="profile_add_to_groups_confirm_message">%1$s will be added to %2$s. This is visible to all members.</string>
     <string name="profile_add_to_groups_confirm_label">Add to groups</string>
     <string name="profile_view_picture">View profile picture</string>
+    <string name="profile_private_nickname">Private nickname</string>
+    <string name="profile_name_from_profile">Name (from profile): %1$s</string>
+    <string name="profile_your_nickname">Your nickname: %1$s</string>
+    <string name="profile_nickname_not_set">Not set</string>
+    <string name="profile_set_nickname">Set nickname</string>
+    <string name="profile_edit_nickname">Edit nickname</string>
+    <string name="profile_nickname_dialog_title">Set nickname</string>
+    <string name="profile_nickname_hint">Nickname</string>
+    <string name="profile_nickname_private_hint">Only you see this on this device. Clearing it restores their profile name.</string>
     <string name="dismiss">Dismiss</string>
     <string name="edit">Edit</string>
     <string name="save_group">Save Group</string>

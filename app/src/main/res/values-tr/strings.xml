@@ -114,6 +114,15 @@
     <string name="profile_add_to_groups_confirm_message">%1$s, %2$s gruplarına eklenecek. Bu tüm üyeler tarafından görülebilir.</string>
     <string name="profile_add_to_groups_confirm_label">Gruplara ekle</string>
     <string name="profile_view_picture">Profil resmini görüntüle</string>
+    <string name="profile_private_nickname">Özel takma ad</string>
+    <string name="profile_name_from_profile">Ad (profilden): %1$s</string>
+    <string name="profile_your_nickname">Takma adınız: %1$s</string>
+    <string name="profile_nickname_not_set">Ayarlanmadı</string>
+    <string name="profile_set_nickname">Takma ad belirle</string>
+    <string name="profile_edit_nickname">Takma adı düzenle</string>
+    <string name="profile_nickname_dialog_title">Takma ad belirle</string>
+    <string name="profile_nickname_hint">Takma ad</string>
+    <string name="profile_nickname_private_hint">Bunu bu cihazda yalnızca siz görürsünüz. Temizlemek profil adını geri yükler.</string>
     <string name="dismiss">Kapat</string>
     <string name="edit">Düzenle</string>
     <string name="save_group">Grubu Kaydet</string>

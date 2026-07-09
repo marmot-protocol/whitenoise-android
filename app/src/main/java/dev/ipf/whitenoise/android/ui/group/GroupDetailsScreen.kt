@@ -740,8 +740,8 @@ internal fun GroupDetailsScreen(
             // ordering consistent across device locales (e.g. Turkish I).
             val activeAccountIdHex = appState.activeAccount?.accountIdHex
             // Prefetch member profiles here so the title map below can stay a
-            // pure read (chatMemberTitleCached); the profile-revision key
-            // recomposes the sort once names land.
+            // pure read (contactDisplayNameCached); the profile/nickname
+            // revision key recomposes the sort once names or local aliases land.
             LaunchedEffect(controller.members) {
                 appState.requestProfiles(controller.members.map { it.memberIdHex })
             }
@@ -754,7 +754,7 @@ internal fun GroupDetailsScreen(
                     val titlesByHex =
                         controller.members.associate {
                             it.memberIdHex to
-                                appState.chatMemberTitleCached(it.memberIdHex).lowercase(Locale.ROOT)
+                                appState.contactDisplayNameCached(it.memberIdHex).lowercase(Locale.ROOT)
                         }
                     controller.members.sortedWith(
                         compareBy(
@@ -770,7 +770,7 @@ internal fun GroupDetailsScreen(
                 when {
                     memberNeedle.isNotEmpty() ->
                         displayedMembers.filter {
-                            appState.chatMemberTitleCached(it.memberIdHex).contains(memberNeedle, ignoreCase = true)
+                            appState.contactDisplayNameCached(it.memberIdHex).contains(memberNeedle, ignoreCase = true)
                         }
                     membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT -> displayedMembers
                     else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)

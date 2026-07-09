@@ -114,6 +114,15 @@
     <string name="profile_add_to_groups_confirm_message">%1$s será adicionado a %2$s. Isso ficará visível para todos os membros.</string>
     <string name="profile_add_to_groups_confirm_label">Adicionar a grupos</string>
     <string name="profile_view_picture">Ver foto do perfil</string>
+    <string name="profile_private_nickname">Apelido privado</string>
+    <string name="profile_name_from_profile">Nome (do perfil): %1$s</string>
+    <string name="profile_your_nickname">Seu apelido: %1$s</string>
+    <string name="profile_nickname_not_set">Não definido</string>
+    <string name="profile_set_nickname">Definir apelido</string>
+    <string name="profile_edit_nickname">Editar apelido</string>
+    <string name="profile_nickname_dialog_title">Definir apelido</string>
+    <string name="profile_nickname_hint">Apelido</string>
+    <string name="profile_nickname_private_hint">Só você vê isso neste dispositivo. Limpar restaura o nome do perfil.</string>
     <string name="dismiss">Fechar</string>
     <string name="edit">Editar</string>
     <string name="save_group">Salvar grupo</string>
