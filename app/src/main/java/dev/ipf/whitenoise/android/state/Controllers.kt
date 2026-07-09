@@ -6445,8 +6445,7 @@ class ConversationController(
                 live
             } else {
                 live.filter { message ->
-                    val normalized = MessageHidePreferences.normalizedMessageId(message.record.messageIdHex)
-                    normalized == null || normalized !in hiddenIds
+                    isTimelineMessageVisible(message.record.messageIdHex, hiddenIds)
                 }
             }
         val aggregated = aggregateEdits(visible.map { it.record })

@@ -100,13 +100,16 @@ internal object MessageHidePreferences {
     }
 }
 
+internal fun isTimelineMessageVisible(
+    messageIdHex: String,
+    hiddenIds: Set<String>,
+): Boolean {
+    if (hiddenIds.isEmpty()) return true
+    val normalized = MessageHidePreferences.normalizedMessageId(messageIdHex)
+    return normalized == null || normalized !in hiddenIds
+}
+
 internal fun filterHiddenTimelineMessageIds(
     messageIds: Collection<String>,
     hiddenIds: Set<String>,
-): List<String> {
-    if (hiddenIds.isEmpty()) return messageIds.toList()
-    return messageIds.filter { id ->
-        val normalized = MessageHidePreferences.normalizedMessageId(id)
-        normalized == null || normalized !in hiddenIds
-    }
-}
+): List<String> = messageIds.filter { id -> isTimelineMessageVisible(id, hiddenIds) }
