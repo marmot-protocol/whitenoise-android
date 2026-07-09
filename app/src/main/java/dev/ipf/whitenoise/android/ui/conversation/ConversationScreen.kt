@@ -131,6 +131,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
+import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldClearFocusOnResume
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldRestoreComposerFocusOnResume
@@ -1954,6 +1955,16 @@ internal fun ConversationScreen(
             requestProfiles = composerGate == ComposerGate.COMPOSER,
         )
 
+    // #1206: one composer text state shared by the main composer and the
+    // long-message reader's composer, so in-progress text never drifts between
+    // them. Created at screen scope so both the bottom-bar composer and the
+    // per-message reader can receive the same instance.
+    val composerTextState =
+        rememberComposerTextState(
+            draftKey = controller.group.groupIdHex,
+            initialDraft = appState.draftFor(controller.group.groupIdHex).orEmpty(),
+        )
+
     val openDetailsDescription = stringResource(R.string.details)
     Scaffold(
         // The transcript consumes IME insets; the composer bottom bar is the sole
@@ -2264,6 +2275,7 @@ internal fun ConversationScreen(
                                     initialDraft = appState.draftFor(groupIdHex).orEmpty(),
                                     onDraftChange = { appState.setDraft(groupIdHex, it) },
                                     draftKey = groupIdHex,
+                                    textState = composerTextState,
                                     editingMessageId = controller.editingMessageId,
                                     editingInitialText = editingRecord?.let { controller.displayedText(it) },
                                     onCancelEdit = { controller.editingMessageId = null },
@@ -2465,6 +2477,7 @@ internal fun ConversationScreen(
                                         item = item,
                                         controller = controller,
                                         appState = appState,
+                                        composerTextState = composerTextState,
                                         highlighted = item.record.messageIdHex == highlightedMessageId,
                                         quickReactionEmojis = quickReactionEmojis,
                                         isActionMenuOpen = openActionMenuId == item.record.messageIdHex,
