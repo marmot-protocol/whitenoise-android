@@ -95,9 +95,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
-import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.LeaveAction
-import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageSearch
@@ -133,6 +131,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
+import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldClearFocusOnResume
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldRestoreComposerFocusOnResume
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewSheet
@@ -1939,6 +1938,22 @@ internal fun ConversationScreen(
         return
     }
 
+    val composerGate =
+        conversationComposerGate(
+            pendingInvite = controller.group.pendingConfirmation,
+            membersVerified = controller.membersVerified,
+            isSelfMember = controller.isSelfMember,
+            seededSelfMember = controller.seededSelfMember,
+            seededMembershipKnown = controller.seededMembershipKnown,
+            assumeMemberUntilVerified = openedFromNotification,
+        )
+    val mentionPicker =
+        rememberConversationMentionPickerState(
+            controller = controller,
+            appState = appState,
+            requestProfiles = composerGate == ComposerGate.COMPOSER,
+        )
+
     val openDetailsDescription = stringResource(R.string.details)
     Scaffold(
         // The transcript consumes IME insets; the composer bottom bar is the sole
@@ -2207,16 +2222,7 @@ internal fun ConversationScreen(
                     // `canSendMessages` guard still keeps any actual mutation safe
                     // until membership is verified.
                     else ->
-                        when (
-                            conversationComposerGate(
-                                pendingInvite = controller.group.pendingConfirmation,
-                                membersVerified = controller.membersVerified,
-                                isSelfMember = controller.isSelfMember,
-                                seededSelfMember = controller.seededSelfMember,
-                                seededMembershipKnown = controller.seededMembershipKnown,
-                                assumeMemberUntilVerified = openedFromNotification,
-                            )
-                        ) {
+                        when (composerGate) {
                             // Reserve the composer's resting height while membership
                             // is still unknown (e.g. right after an account switch),
                             // so the bottom inset is stable and the composer doesn't
@@ -2249,47 +2255,6 @@ internal fun ConversationScreen(
                                 val editingRecord =
                                     controller.editingMessageId?.let { id ->
                                         controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
-                                    }
-                                // #414: candidates for the @-mention picker — the group's
-                                // own roster minus the local account (you can't mention
-                                // yourself). Keyed on the roster + profile revision so a
-                                // late-arriving display name / nip05 re-derives the list.
-                                // The list already arrives most-recently-active first from
-                                // the roster, and MentionComposer.filter preserves order.
-                                val mentionPickerEnabled = !controller.isDm
-                                val mentionMemberIds =
-                                    remember(controller.members) {
-                                        controller.members.map { it.memberIdHex }
-                                    }
-                                LaunchedEffect(mentionPickerEnabled, mentionMemberIds) {
-                                    if (mentionPickerEnabled) {
-                                        appState.requestProfiles(mentionMemberIds)
-                                    }
-                                }
-                                val mentionCandidates =
-                                    if (mentionPickerEnabled) {
-                                        val revision = appState.profileRevisionForCompose
-                                        val activeAccountIdHex = appState.activeAccount?.accountIdHex
-                                        remember(controller.members, revision, activeAccountIdHex) {
-                                            controller.members
-                                                // Exclude only the active account, not every member
-                                                // flagged `local`. Marmot sets `local` for any identity
-                                                // present on the device, which on some rosters marks all
-                                                // members local and would empty the mention list entirely.
-                                                // Mirrors the isActiveAccountMember gate used for admin actions.
-                                                .filterNot { GroupProjector.isActiveAccountMember(it, activeAccountIdHex) }
-                                                .map { member ->
-                                                    MentionComposer.Candidate(
-                                                        accountIdHex = member.memberIdHex,
-                                                        npub = appState.npub(member.memberIdHex),
-                                                        displayName = appState.chatMemberTitleCached(member.memberIdHex),
-                                                        nip05 = appState.userProfile(member.memberIdHex)?.nip05,
-                                                        avatarUrl = appState.avatarUrl(member.memberIdHex),
-                                                    )
-                                                }
-                                        }
-                                    } else {
-                                        emptyList()
                                     }
                                 ComposerBar(
                                     replyingTo = controller.replyingTo,
@@ -2336,8 +2301,8 @@ internal fun ConversationScreen(
                                     },
                                     voiceRecordingController = voiceRecordingController,
                                     appState = appState,
-                                    mentionCandidates = mentionCandidates,
-                                    mentionPickerEnabled = mentionPickerEnabled,
+                                    mentionCandidates = mentionPicker.candidates,
+                                    mentionPickerEnabled = mentionPicker.enabled,
                                     autoFocusOnEnter = justCreated,
                                     enterKeyBehavior = appState.enterKeyBehavior,
                                     // #589: hoisted focus plumbing — the requester lets the
@@ -2515,6 +2480,16 @@ internal fun ConversationScreen(
                                         onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                         onQuickReactionsReset = { resetQuickReactionEmojis() },
                                         onReplyPreviewClick = { navigateToReplyTarget(it) },
+                                        composerGate = composerGate,
+                                        inviteMutationInFlight = controller.mutationInFlight,
+                                        onJoinInvite = { appState.launchMutation { controller.acceptInvite() } },
+                                        onDeclineInvite = {
+                                            appState.launchMutation {
+                                                if (controller.declineInvite()) onBack()
+                                            }
+                                        },
+                                        mentionCandidates = mentionPicker.candidates,
+                                        mentionPickerEnabled = mentionPicker.enabled,
                                         collapseLongMessages = collapseLongMessages,
                                         readOnly = controller.group.pendingConfirmation,
                                     )
