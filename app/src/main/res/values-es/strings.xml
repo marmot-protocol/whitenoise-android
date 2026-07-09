@@ -413,6 +413,7 @@
     <string name="notification_channel_invites_description">Invitaciones de grupo y bienvenidas</string>
     <string name="notification_group_invite">Has sido invitado a un chat seguro</string>
     <string name="notification_new_message">Nuevo mensaje</string>
+    <string name="notification_hidden_content">Nueva notificación</string>
     <string name="notification_group_renamed">Grupo renombrado</string>
     <string name="notification_group_renamed_body">%1$s cambió el nombre: “%2$s” → “%3$s”</string>
     <string name="notification_sent_picture">envió una foto</string>
