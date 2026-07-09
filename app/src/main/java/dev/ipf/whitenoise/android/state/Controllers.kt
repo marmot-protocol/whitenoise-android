@@ -1169,6 +1169,21 @@ internal fun applyAuthoritativeGroupDetails(details: GroupDetailsFfi): AppliedGr
             },
     )
 
+/**
+ * Returns true when a pushed group record changed one of the membership-bearing
+ * fields Android can observe without forcing a fresh groupDetails() read.
+ */
+internal fun groupStateUpdateMayChangeMembers(
+    previous: AppGroupRecordFfi,
+    update: AppGroupRecordFfi,
+): Boolean =
+    previous.groupIdHex != update.groupIdHex ||
+        previous.pendingConfirmation != update.pendingConfirmation ||
+        previous.selfMembership != update.selfMembership ||
+        previous.admins.normalizedMemberIds() != update.admins.normalizedMemberIds()
+
+private fun List<String>.normalizedMemberIds(): Set<String> = mapNotNull { it.trim().takeIf(String::isNotEmpty)?.lowercase() }.toSet()
+
 internal fun cacheAppliedGroupMembers(
     appState: WhiteNoiseAppState,
     account: String,
@@ -3534,8 +3549,11 @@ class ConversationController(
                 withContext(Dispatchers.IO) {
                     groupStream.next()
                 } ?: break
+            val previousGroup = group
             applyGroupState(update)
-            refreshMembers()
+            if (groupStateUpdateMayChangeMembers(previousGroup, update)) {
+                refreshMembers()
+            }
         }
     }
 
