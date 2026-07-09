@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -189,6 +190,7 @@ internal fun ComposerBar(
     onPickFromGallery: (() -> Unit)? = null,
     onCaptureFromCamera: (() -> Unit)? = null,
     onPickDocument: (() -> Unit)? = null,
+    onPasteImageUris: ((List<Uri>) -> Unit)? = null,
     voiceRecordingController: dev.ipf.whitenoise.android.audio.VoiceRecordingController? = null,
     editingMessageId: String? = null,
     editingInitialText: String? = null,
@@ -621,6 +623,7 @@ internal fun ComposerBar(
                         onCaptureFromCamera = onCaptureFromCamera,
                         onPickFromGallery = onPickFromGallery,
                         onPickDocument = onPickDocument,
+                        onPasteImageUris = onPasteImageUris?.takeIf { editingMessageId == null && !isRecordingVoice },
                         // #414: tint inserted `@npub1…` chips so they read as a
                         // single styled token while composing. Only when the picker
                         // is enabled (groups) — DMs never insert chips.
