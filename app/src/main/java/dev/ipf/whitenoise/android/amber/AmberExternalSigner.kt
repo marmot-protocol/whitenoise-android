@@ -82,7 +82,7 @@ class AmberExternalSigner(
                 else -> arrayOf(content, counterparty.orEmpty(), accountPubkey)
             }
         when (val row = Nip55.queryViaContentResolver(appContext, op, packageName, args)) {
-            is ContentRowOutcome.Value -> return row.value
+            is ContentRowOutcome.Value -> return validateSignerValue(op, row.value)
             ContentRowOutcome.Unavailable -> Unit // fall through to the Intent prompt
         }
 
@@ -94,7 +94,7 @@ class AmberExternalSigner(
                 else -> Nip55.buildCryptoIntent(op, packageName, content, counterparty.orEmpty(), accountPubkey, requestId)
             }
         return when (val outcome = coordinator.awaitApproval(intent, approvalTimeoutMs, requestId)) {
-            is AmberActivityCoordinator.Outcome.Completed -> parseCompleted(op, outcome.data, outcome.resultOk)
+            is AmberActivityCoordinator.Outcome.Completed -> parseCompleted(op, outcome.data, outcome.resultOk, packageName)
             AmberActivityCoordinator.Outcome.NoForegroundActivity ->
                 throw MarmotKitException.ExternalSignerUnavailable(accountPubkey)
             AmberActivityCoordinator.Outcome.TimedOut ->
@@ -106,6 +106,7 @@ class AmberExternalSigner(
         op: SignerOp,
         data: Intent?,
         resultOk: Boolean,
+        expectedPackageName: String,
     ): String =
         when (
             val parsed =
@@ -117,12 +118,35 @@ class AmberExternalSigner(
                     packageExtra = data?.getStringExtra(Nip55.EXTRA_PACKAGE),
                 )
         ) {
-            is ActivityResultOutcome.Value -> parsed.value
+            is ActivityResultOutcome.Value -> {
+                validateSignerPackageEcho(parsed.packageName, expectedPackageName)
+                validateSignerValue(op, parsed.value)
+            }
             // Not reachable for sign/crypto ops, but keep the branch total.
             is ActivityResultOutcome.PublicKey -> parsed.pubkey
             ActivityResultOutcome.Rejected -> throw MarmotKitException.ExternalSignerRejected()
             is ActivityResultOutcome.Malformed -> throw MarmotKitException.Runtime(parsed.reason)
         }
+
+    private fun validateSignerValue(
+        op: SignerOp,
+        value: String,
+    ): String {
+        if (op != SignerOp.SignEvent) return value
+        signedEventPubkeyMismatchReason(value, accountPubkey)?.let { reason ->
+            throw MarmotKitException.Runtime(reason)
+        }
+        return value
+    }
+
+    private fun validateSignerPackageEcho(
+        packageName: String?,
+        expectedPackageName: String,
+    ) {
+        signerPackageEchoMismatchReason(packageName, expectedPackageName)?.let { reason ->
+            throw MarmotKitException.Runtime(reason)
+        }
+    }
 
     private fun newRequestId(): String = UUID.randomUUID().toString()
 
