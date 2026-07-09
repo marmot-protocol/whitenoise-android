@@ -42,9 +42,17 @@ jobs:
     name: Build unsigned PR APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      # Direct Blossom install URL (#1172). Empty when the upload step is skipped
+      # (fork PR, or no BLOSSOM_UPLOAD_NSEC secret); the comment job checks that.
+      blossom_url: ${{ steps.blossom.outputs.url }}
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
       GITHUB_RUN_NUMBER: ${{ github.run_number }}
+      # #1172: throwaway *preview* upload key (NOT the release/Zapstore key).
+      # Job-level so the step `if` can gate on it. Absent on fork PRs and until
+      # the maintainer adds the secret, so the Blossom step is a safe no-op.
+      BLOSSOM_UPLOAD_NSEC: ${{ secrets.BLOSSOM_UPLOAD_NSEC }}
 
     steps:
       - name: Checkout
@@ -116,6 +124,46 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # Blossom preview link (#1172): also upload the arm64 APK to a public
+      # Blossom server so testers get a one-tap, content-addressed install URL
+      # with no GitHub sign-in. Internal PRs only, and only when the preview
+      # upload key is present — a safe no-op otherwise, so existing PR builds are
+      # unaffected until the secret is configured. The comment job promotes this
+      # URL to the primary download when set, keeping the artifact as fallback.
+      - name: Upload PR APK to Blossom
+        id: blossom
+        if: >-
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          env.BLOSSOM_UPLOAD_NSEC != ''
+        env:
+          # nostr.download: permissionless, non-Cloudflare Blossom that accepts
+          # ~50 MB APK blobs with anonymous GET and native blob expiry — verified
+          # against a real upload (#1172). Cloudflare-fronted servers (blossom.band)
+          # cap request bodies at 100 MB and WAF-block programmatic uploads.
+          BLOSSOM_SERVER: https://nostr.download
+          APK_PATH: ${{ steps.locate.outputs.apk_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # nak performs the Blossom kind-24242 signed PUT. Pinned to a verified
+          # release; ubuntu-latest ships Go.
+          go install github.com/fiatjaf/nak@v0.20.0
+          nak="$(go env GOPATH)/bin/nak"
+          sha=$("$nak" blossom upload "$APK_PATH" \
+                  --server "$BLOSSOM_SERVER" \
+                  --sec "$BLOSSOM_UPLOAD_NSEC" | jq -r '.sha256 // empty')
+          if [[ -z "$sha" ]]; then
+            echo "Blossom upload returned no sha256" >&2
+            exit 1
+          fi
+          # Blossom serves by hash — the extension is cosmetic — so request it as
+          # .apk: the browser/Android then names the download <sha>.apk and offers
+          # a one-tap install. The blob is stored as application/zip (an APK is a
+          # ZIP), but the URL extension drives the installer. Verified (#1172).
+          url="${BLOSSOM_SERVER}/${sha}.apk"
+          printf 'url=%s\n' "$url" >> "$GITHUB_OUTPUT"
+          printf '::notice::Blossom install URL: %s\n' "$url"
+
   comment:
     name: Post PR comment with download link
     needs: build
@@ -127,19 +175,26 @@ jobs:
     steps:
       - name: Upsert sticky comment
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v8
+        env:
+          # #1172: set when the build job uploaded to Blossom; empty otherwise.
+          BLOSSOM_URL: ${{ needs.build.outputs.blossom_url }}
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
             const runId = context.runId;
+            const blossomUrl = process.env.BLOSSOM_URL;
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
             const marker = '<!-- pr-apk-preview -->';
+            const download = blossomUrl
+              ? `**[Install directly](${blossomUrl})** — one tap, no GitHub sign-in (content-addressed \`.apk\`). Fallback: the APK zip from the [workflow run](${runUrl}).`
+              : `Download the APK zip from the [workflow run](${runUrl}) (GitHub sign-in required).`;
             const body = [
               marker,
               `### Preview APK for PR #${prNumber}`,
               '',
               `Home-screen label: **${prNumber} White Noise** with the blueprint launcher icon — installs side-by-side with the production and staging apps.`,
               '',
-              `Download the APK zip from the [workflow run](${runUrl}) (GitHub sign-in required). ARM64 only; retention 14 days.`,
+              `${download} ARM64 only; retention 14 days.`,
               '',
               'Every push to this PR rebuilds and updates this comment.',
             ].join('\n');
