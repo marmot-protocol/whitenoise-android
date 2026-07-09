@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipDescription
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
@@ -378,3 +381,30 @@ internal fun safeGetType(
  *  collapse to "" rather than propagate — is unit-testable on the JVM without
  *  Robolectric, mirroring the `UriListSaver` codec split. */
 internal inline fun coerceResolvedMime(getType: () -> String?): String = runCatching(getType).getOrNull().orEmpty()
+
+/**
+ * Predicate for image payloads delivered through Compose's receive-content path.
+ *
+ * Prefer the resolver's concrete MIME when available: it is per-Uri and catches
+ * mixed clip payloads. Fall back to the clip's declared image MIME only when
+ * the resolver is silent/guarded, which keeps text/document paste flowing to
+ * the text field while still accepting clipboard providers that expose only a
+ * clip-level image description.
+ */
+internal fun receiveContentMimeIsImage(
+    resolvedMime: String,
+    clipDeclaresImage: Boolean,
+): Boolean =
+    resolvedMime.startsWith("image/", ignoreCase = true) ||
+        (resolvedMime.isBlank() && clipDeclaresImage)
+
+internal fun receiveContentImageUriOrNull(
+    item: ClipData.Item,
+    clipDescription: ClipDescription?,
+    resolveMime: (Uri) -> String?,
+): Uri? {
+    val uri = item.uri ?: return null
+    val resolvedMime = coerceResolvedMime { resolveMime(uri) }
+    val clipDeclaresImage = clipDescription?.hasMimeType("image/*") == true
+    return uri.takeIf { receiveContentMimeIsImage(resolvedMime, clipDeclaresImage) }
+}

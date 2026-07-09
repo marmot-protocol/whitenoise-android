@@ -2307,6 +2307,16 @@ internal fun ConversationScreen(
                                         // without restricting by MIME. Bytes upload as-is.
                                         documentPickerLauncher.launch(arrayOf("*/*"))
                                     },
+                                    onPasteImageUris = { uris ->
+                                        // Paste uses the same staging shelf as the photo
+                                        // picker/camera path so preview, compression,
+                                        // upload, album capping, and send behavior all
+                                        // stay identical.
+                                        pendingMediaUris =
+                                            (pendingMediaUris + uris)
+                                                .distinct()
+                                                .take(MEDIA_PICKER_MAX_ITEMS)
+                                    },
                                     voiceRecordingController = voiceRecordingController,
                                     appState = appState,
                                     mentionCandidates = mentionPicker.candidates,
