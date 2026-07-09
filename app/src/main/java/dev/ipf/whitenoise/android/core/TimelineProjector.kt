@@ -113,10 +113,24 @@ object TimelineProjector {
             kind = kind,
             mediaJson = mediaJson,
             agentTextStreamJson = agentTextStreamJson,
-            fallback = { plaintext },
+            fallback = { MessageProjector.displayBody(toAppMessageRecord(), copy) },
             copy = copy,
         )
     }
+
+    private fun TimelineReplyPreviewFfi.toAppMessageRecord(): AppMessageRecordFfi =
+        AppMessageRecordFfi(
+            messageIdHex = messageIdHex,
+            direction = "received",
+            groupIdHex = "",
+            sender = sender,
+            plaintext = plaintext,
+            contentTokens = contentTokens,
+            kind = kind,
+            tags = emptyList(),
+            recordedAt = 0uL,
+            receivedAt = 0uL,
+        )
 
     private fun projectedBody(
         plaintext: String,
