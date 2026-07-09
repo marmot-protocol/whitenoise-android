@@ -60,8 +60,7 @@ internal object ContactNicknamePreferences {
         if (keys.isEmpty()) return false
         val edit = preferences.edit()
         keys.forEach { edit.remove(it) }
-        edit.apply()
-        return true
+        return edit.commit()
     }
 
     private fun normalizedAccountRef(accountRef: String?): String? =

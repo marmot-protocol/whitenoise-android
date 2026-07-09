@@ -119,10 +119,11 @@ class WhiteNoiseAppStatePreferencesTest {
         ContactNicknamePreferences.writeNickname(preferences, "a", "contact-a", "short")
         ContactNicknamePreferences.writeNickname(preferences, "a:long", "contact-a", "long")
 
-        ContactNicknamePreferences.clearAllForAccount(preferences, "a")
+        assertTrue(ContactNicknamePreferences.clearAllForAccount(preferences, "a"))
 
         assertEquals(null, ContactNicknamePreferences.readNickname(preferences, "a", "contact-a"))
         assertEquals("long", ContactNicknamePreferences.readNickname(preferences, "a:long", "contact-a"))
+        assertFalse(ContactNicknamePreferences.clearAllForAccount(preferences, "missing"))
     }
 
     @Test
