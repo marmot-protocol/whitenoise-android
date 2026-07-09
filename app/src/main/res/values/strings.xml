@@ -562,6 +562,7 @@
     <string name="notification_channel_invites_description">Group invites and welcomes</string>
     <string name="notification_group_invite">Group invite</string>
     <string name="notification_new_message">New message</string>
+    <string name="notification_hidden_content">New notification</string>
     <string name="notification_group_renamed">Group renamed</string>
     <string name="notification_group_renamed_body">%1$s renamed “%2$s” → “%3$s”</string>
     <string name="notification_sent_picture">sent a picture</string>

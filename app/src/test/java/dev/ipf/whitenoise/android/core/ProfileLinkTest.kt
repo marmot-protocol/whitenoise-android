@@ -29,6 +29,9 @@ class ProfileLinkTest {
         assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise://$sampleNpub"))
         assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise-staging://profile/$sampleNpub"))
         assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("whitenoise-dev://profile/$sampleNpub"))
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("https://whitenoise.chat/profile/$sampleNpub"))
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("https://www.whitenoise.chat/$sampleNpub?from=share"))
+        assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("https://marmot.app/profile/$sampleNpub"))
         assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("nostr:$sampleNpub"))
         assertEquals(ProfileLink(sampleNpub), ProfileLink.parse("  $sampleNpub  "))
     }
@@ -57,6 +60,7 @@ class ProfileLinkTest {
     @Test
     fun rejectsNonProfilePayloads() {
         assertNull(ProfileLink.parse("https://example.com/$sampleNpub"))
+        assertNull(ProfileLink.parse("https://whitenoise.chat/not-profile/$sampleNpub"))
         assertNull(ProfileLink.parse("whitenoise://profile/not-a-profile"))
         assertNull(ProfileLink.parse(""))
     }
