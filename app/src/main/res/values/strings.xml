@@ -458,7 +458,7 @@
     <string name="wipe_outcome_local_wipe_incomplete">Local data wipe incomplete</string>
     <string name="secret_key_backup">Secret Key Backup</string>
     <string name="secret_key_backup_help">Export your signing key for backup. Anyone with the raw nsec can control your identity. The encrypted export (ncryptsec) requires a passphrase to decrypt.</string>
-    <string name="export_nsec">Export nsec</string>
+    <string name="export_nsec">Export private key</string>
     <string name="export_encrypted_secret">Export encrypted key</string>
     <string name="export_encrypted_secret_title">Encrypt for export</string>
     <string name="export_encrypted_secret_body">Choose a passphrase. You will need it to decrypt the exported ncryptsec key.</string>
@@ -482,7 +482,7 @@
     <string name="encrypted_backup_strength_fair">Fair passphrase</string>
     <string name="encrypted_backup_strength_strong">Strong passphrase</string>
     <string name="encrypted_backup_short_warning">Short passphrases can be brute-forced. Use a long phrase you can store separately from this backup.</string>
-    <string name="encrypted_backup_create">Create backup</string>
+    <string name="encrypted_backup_create">Export encrypted private key</string>
     <string name="encrypted_backup_result_title">Your encrypted backup</string>
     <string name="encrypted_backup_result_help">Copy this ncryptsec1 string now. It auto-hides after 60 seconds or when White Noise leaves the foreground.</string>
     <string name="encrypted_backup_unavailable">Encrypted backup requires a local-signing account on this device.</string>
