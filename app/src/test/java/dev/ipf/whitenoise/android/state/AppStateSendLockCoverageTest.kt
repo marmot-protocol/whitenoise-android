@@ -194,6 +194,7 @@ class AppStateSendLockCoverageTest {
     @Test
     fun readAnchorsArePrunedWithTimelineWindow() {
         val applyTimelinePage = controllerFunctionBody("applyTimelinePage")
+        val applyTimelineChanges = controllerFunctionBody("applyTimelineChanges")
         val trimLiveTimelineWindow = controllerFunctionBody("trimLiveTimelineWindow")
         val removeProjectedRecord = controllerFunctionBody("removeProjectedRecord")
         val pruneReadAnchorsToWindow = controllerFunctionBody("pruneReadAnchorsToWindow")
@@ -201,6 +202,11 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "window replacements must prune read anchors after the authoritative page is applied",
             "pruneReadAnchorsToWindow()" in applyTimelinePage,
+        )
+        assertTrue(
+            "live timeline changes must trim the window even after loadOlder (#1163)",
+            "trimLiveTimelineWindow(LIVE_TIMELINE_WINDOW_CAP)" in applyTimelineChanges &&
+                "!hasLoadedOlderPages" !in applyTimelineChanges,
         )
         assertTrue(
             "live timeline trims must prune read anchors for removed messages",
