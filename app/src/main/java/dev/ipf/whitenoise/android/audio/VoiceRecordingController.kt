@@ -362,8 +362,8 @@ class VoiceRecordingController(
                 .Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
                 .setAudioAttributes(attrs)
                 .build()
-        focusRequest = req
-        return am.requestAudioFocus(req) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        return (am.requestAudioFocus(req) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+            .also { granted -> if (granted) focusRequest = req }
     }
 
     private fun abandonRecordingFocus() {

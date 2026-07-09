@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.nio.file.Files
 
 class VoiceRecordingControllerTest {
@@ -28,5 +29,22 @@ class VoiceRecordingControllerTest {
         } finally {
             dir.deleteRecursively()
         }
+    }
+
+    @Test
+    fun recordingFocusRequestIsStoredOnlyAfterGrant() {
+        val source =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/audio/VoiceRecordingController.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/audio/VoiceRecordingController.kt"),
+            ).firstOrNull { it.exists() }?.readText()
+                ?: error("Missing VoiceRecordingController.kt source file")
+        val body = source.kotlinFunctionBody("requestRecordingFocus")
+
+        assertTrue(
+            "requestRecordingFocus should only retain the focus request after AudioManager grants it",
+            "focusRequest = req" in body &&
+                body.indexOf("requestAudioFocus(req)") < body.indexOf("focusRequest = req"),
+        )
     }
 }

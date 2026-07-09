@@ -17,6 +17,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class MarkdownInlineTextTest {
     private val codeStyle = SpanStyle(fontFamily = FontFamily.Monospace)
@@ -250,6 +251,19 @@ class MarkdownInlineTextTest {
     }
 
     @Test
+    fun schemeAllowlistIsLocaleIndependent() {
+        val previous = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.forLanguageTag("tr-TR"))
+
+            assertTrue(isOpenableMarkdownLink("HTTPS://example.com"))
+            assertTrue(isOpenableMarkdownLink("MAILTO:user@example.com"))
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
+
+    @Test
     fun mailtoLinkCarriesAnnotationButTelStaysInert() {
         val annotated =
             build(
@@ -371,6 +385,19 @@ class MarkdownInlineTextTest {
             )
 
         assertEquals("hello @Alice! next @Alice, ok", resolved)
+    }
+
+    @Test
+    fun plaintextResolverStripsUnsafeUnicodeAroundMentions() {
+        val npub = "npub1" + "q".repeat(58)
+
+        val resolved =
+            resolveMentionsInPlaintext(
+                "pay\u202E $100 nostr:$npub\u200B now",
+                resolver = { bech32 -> "Alice".takeIf { bech32 == npub } },
+            )
+
+        assertEquals("pay $100 @Alice now", resolved)
     }
 
     @Test

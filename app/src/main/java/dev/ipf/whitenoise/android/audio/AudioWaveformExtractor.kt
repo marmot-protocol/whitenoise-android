@@ -61,10 +61,10 @@ object AudioWaveformExtractor {
     private val cache = LruCache<String, FloatArray>(CACHE_MAX_ENTRIES)
 
     suspend fun decode(file: File): FloatArray? {
-        val cacheKey = waveformCacheKey(file)
-        cache.get(cacheKey)?.let { return it.takeIf { cached -> cached.isNotEmpty() } }
         val result =
             withContext(Dispatchers.IO) {
+                val cacheKey = waveformCacheKey(file)
+                cache.get(cacheKey)?.let { return@withContext it.takeIf { cached -> cached.isNotEmpty() } }
                 try {
                     decodeGate
                         .withPermit {
