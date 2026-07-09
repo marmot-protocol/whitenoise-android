@@ -31,6 +31,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -56,6 +57,7 @@ import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.rememberGroupSystemCopy
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
+import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -226,6 +228,8 @@ internal fun GroupSystemRow(
             DropdownMenu(
                 expanded = actionMenuOpen,
                 onDismissRequest = { actionMenuOpen = false },
+                shape = MenuDefaults.shape,
+                border = amoledSurfaceBorderStroke(),
             ) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.delete_for_me)) },

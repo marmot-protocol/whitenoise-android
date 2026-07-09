@@ -9,6 +9,7 @@ import java.util.Locale
  */
 internal object MessageHidePreferences {
     private const val KEY_PREFIX = "hidden_messages:"
+    private const val KEY_SEPARATOR = ":"
 
     fun normalizedAccountRef(accountRef: String?): String? =
         accountRef
@@ -27,18 +28,20 @@ internal object MessageHidePreferences {
             .lowercase(Locale.ROOT)
             .takeIf { it.isNotEmpty() }
 
+    private fun accountKeySegment(account: String): String = "${account.length}$KEY_SEPARATOR$account"
+
     fun preferenceKey(
         accountRef: String?,
         groupIdHex: String,
     ): String? {
         val account = normalizedAccountRef(accountRef) ?: return null
         val group = normalizedGroupId(groupIdHex) ?: return null
-        return "$KEY_PREFIX$account:$group"
+        return "$KEY_PREFIX${accountKeySegment(account)}$KEY_SEPARATOR$group"
     }
 
     fun accountKeyPrefix(accountRef: String?): String? {
         val account = normalizedAccountRef(accountRef) ?: return null
-        return "$KEY_PREFIX$account:"
+        return "$KEY_PREFIX${accountKeySegment(account)}$KEY_SEPARATOR"
     }
 
     fun readHiddenMessageIds(

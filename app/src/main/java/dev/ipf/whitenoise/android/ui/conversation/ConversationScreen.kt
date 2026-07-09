@@ -2479,9 +2479,12 @@ internal fun ConversationScreen(
                                                 record = item.record,
                                                 appState = appState,
                                                 groupSystem = item.projected?.groupSystem,
-                                                onDeleteForMe = {
-                                                    controller.hideMessageForMe(item.record.messageIdHex)
-                                                },
+                                                onDeleteForMe =
+                                                    if (controller.group.pendingConfirmation) {
+                                                        null
+                                                    } else {
+                                                        { controller.hideMessageForMe(item.record.messageIdHex) }
+                                                    },
                                             )
                                             return@Column
                                         }

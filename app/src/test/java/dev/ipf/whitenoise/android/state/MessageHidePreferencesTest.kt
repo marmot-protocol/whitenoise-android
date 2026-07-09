@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -88,13 +89,27 @@ class MessageHidePreferencesTest {
     }
 
     @Test
+    fun preferenceKeyDoesNotTreatAccountDelimiterAsGroupBoundary() {
+        val accountPrefix = MessageHidePreferences.accountKeyPrefix("account")!!
+        val delimitedAccountKey = MessageHidePreferences.preferenceKey("account:with-delimiter", "group-a")!!
+
+        assertFalse(delimitedAccountKey.startsWith(accountPrefix))
+        assertTrue(
+            delimitedAccountKey.startsWith(
+                MessageHidePreferences.accountKeyPrefix("account:with-delimiter")!!,
+            ),
+        )
+    }
+
+    @Test
     fun filterHiddenTimelineMessageIdsRemovesOnlyMatchingIds() {
-        val ids = listOf("msg-1", "msg-2", "msg-3", "", "  ")
+        val ids = listOf("msg-1", "MSG-2", "msg-3", "", "  ")
 
         assertEquals(
             listOf("msg-3", "", "  "),
             filterHiddenTimelineMessageIds(ids, setOf("msg-1", "msg-2")),
         )
+        assertFalse(isTimelineMessageVisible("MSG-1", setOf("msg-1")))
     }
 
     @Test
