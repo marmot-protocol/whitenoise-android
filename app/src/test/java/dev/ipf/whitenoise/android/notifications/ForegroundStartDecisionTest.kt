@@ -208,6 +208,14 @@ class ForegroundStartDecisionTest {
     }
 
     @Test
+    fun onlyRejectedPushWakeRecordsDurableCatchUpRetry() {
+        assertEquals(true, shouldRecordPendingPushWakeCatchUp(ForegroundStartTrigger.PushWake, foregroundStartAccepted = false))
+        assertEquals(false, shouldRecordPendingPushWakeCatchUp(ForegroundStartTrigger.PushWake, foregroundStartAccepted = true))
+        assertEquals(false, shouldRecordPendingPushWakeCatchUp(ForegroundStartTrigger.UserToggle, foregroundStartAccepted = false))
+        assertEquals(false, shouldRecordPendingPushWakeCatchUp(ForegroundStartTrigger.SystemWake, foregroundStartAccepted = false))
+    }
+
+    @Test
     fun stickySystemWakeRestartStopsWhenKeepConnectedIsDisabled() {
         assertEquals(
             true,
