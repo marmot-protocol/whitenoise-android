@@ -1,8 +1,16 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.net.Uri
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.content.MediaType
+import androidx.compose.foundation.content.ReceiveContentListener
+import androidx.compose.foundation.content.TransferableContent
+import androidx.compose.foundation.content.consume
+import androidx.compose.foundation.content.contentReceiver
+import androidx.compose.foundation.content.hasMediaType
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +57,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.SpanStyle
@@ -65,12 +75,15 @@ import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
+import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
+import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.flow.first
 
 // BasicTextField (not Material3 TextField) so the pill height isn't pinned
 // to the 56dp filled-textfield minimum.
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ComposerPill(
     textFieldValue: TextFieldValue,
@@ -89,10 +102,37 @@ internal fun ComposerPill(
     mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
     onImeSend: () -> Unit = {},
+    onPasteImageUris: ((List<Uri>) -> Unit)? = null,
     // #589: report the BasicTextField's focus edge up so the conversation
     // screen can record whether the keyboard was up when the app was paused.
     onComposerFocusChanged: (Boolean) -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val latestOnPasteImageUris by rememberUpdatedState(onPasteImageUris)
+    val pasteImageReceiver =
+        remember(context) {
+            object : ReceiveContentListener {
+                override fun onReceive(transferableContent: TransferableContent): TransferableContent? {
+                    val onPaste = latestOnPasteImageUris ?: return transferableContent
+                    if (!transferableContent.hasMediaType(MediaType.Image)) return transferableContent
+
+                    val imageUris = mutableListOf<Uri>()
+                    val remaining =
+                        transferableContent.consume { item ->
+                            val imageUri =
+                                receiveContentImageUriOrNull(
+                                    item = item,
+                                    clipDescription = transferableContent.clipMetadata.clipDescription,
+                                    resolveMime = { uri -> safeGetType(context.contentResolver, uri) },
+                                )
+                            if (imageUri != null) imageUris += imageUri
+                            imageUri != null
+                        }
+                    if (imageUris.isNotEmpty()) onPaste(imageUris.distinct())
+                    return remaining
+                }
+            }
+        }
     // #414/#442: paint stored `@npub1…` chip runs as friendly visible labels
     // (`@alice` when the profile is resolved, short `@npub1…` otherwise)
     // while keeping the backing TextFieldValue canonical for send/markdown.
@@ -195,6 +235,7 @@ internal fun ComposerPill(
                     modifier =
                         Modifier
                             .fillMaxWidth()
+                            .contentReceiver(pasteImageReceiver)
                             .focusRequester(composerFocus)
                             // #589: track focus so the conversation screen's
                             // resume observer knows whether the keyboard was up

@@ -2173,10 +2173,10 @@ class WhiteNoiseAppState(
     /**
      * Wipe the device-side decrypted-media footprint that outlives the
      * in-memory caches: the L2 disk cache (cacheDir/decrypted-media) and the
-     * decrypted voice/video plaintext the conversation UI materializes under
-     * cacheDir. Used at sign-out, when we treat that footprint as ending with
-     * the session. Re-opening a chat after the next sign-in re-downloads from
-     * Blossom.
+     * decrypted voice/video plaintext and unsent pasted media that the
+     * conversation UI materializes under cacheDir. Used at sign-out, when we
+     * treat that footprint as ending with the session. Re-opening a chat after
+     * the next sign-in re-downloads from Blossom.
      *
      * Suspends so the sign-out flow can await completion rather than racing a
      * fast re-sign-in against an unfinished wipe. `shared_media` is left to its
@@ -2203,6 +2203,11 @@ class WhiteNoiseAppState(
                 .onFailure {
                     rethrowIfCancellation(it)
                     appStateDebug { "video attachment wipe failed: ${it.readableMessage()}" }
+                }
+            runCatching { java.io.File(appContext.cacheDir, dev.ipf.whitenoise.android.media.MediaCacheDirs.COMPOSER_PASTE).deleteRecursively() }
+                .onFailure {
+                    rethrowIfCancellation(it)
+                    appStateDebug { "composer paste media wipe failed: ${it.readableMessage()}" }
                 }
         }
     }
