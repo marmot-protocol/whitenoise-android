@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.amber
 
 import org.json.JSONArray
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -200,6 +201,32 @@ class Nip55SignerParsingTest {
                 eventColumn = null,
             )
         assertEquals(ContentRowOutcome.Unavailable, outcome)
+    }
+
+    @Test
+    fun contentWithinIntentFallbackBudgetPasses() {
+        assertTrue(Nip55.contentFitsIntentFallbackBudget("a".repeat(1_000)))
+    }
+
+    @Test
+    fun contentAtIntentFallbackBudgetLimitPasses() {
+        val content = ByteArray(Nip55.MAX_INTENT_FALLBACK_CONTENT_UTF8_BYTES) { 'a'.code.toByte() }
+        assertTrue(Nip55.contentFitsIntentFallbackBudget(String(content, Charsets.UTF_8)))
+    }
+
+    @Test
+    fun contentExceedingIntentFallbackBudgetFails() {
+        val content = ByteArray(Nip55.MAX_INTENT_FALLBACK_CONTENT_UTF8_BYTES + 1) { 'a'.code.toByte() }
+        assertFalse(Nip55.contentFitsIntentFallbackBudget(String(content, Charsets.UTF_8)))
+    }
+
+    @Test
+    fun multiByteUtf8ContentMeasuredByBytesNotChars() {
+        val content = "漢".repeat(90_000)
+
+        assertTrue(content.length < Nip55.MAX_INTENT_FALLBACK_CONTENT_UTF8_BYTES)
+        assertTrue(content.toByteArray(Charsets.UTF_8).size > Nip55.MAX_INTENT_FALLBACK_CONTENT_UTF8_BYTES)
+        assertFalse(Nip55.contentFitsIntentFallbackBudget(content))
     }
 
     @Test
