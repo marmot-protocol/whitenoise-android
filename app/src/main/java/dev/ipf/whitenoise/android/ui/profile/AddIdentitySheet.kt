@@ -44,17 +44,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.SecureFlagPolicy
+import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
+import dev.ipf.whitenoise.android.ui.common.clearSensitivePrimaryClip
 import dev.ipf.whitenoise.android.ui.onboarding.IdentityEntryForm
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
+import dev.ipf.whitenoise.android.ui.onboarding.importIdentityAndClearClipboardOnSuccess
 import dev.ipf.whitenoise.android.ui.onboarding.importIdentityErrorRes
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
@@ -69,6 +73,11 @@ internal fun AddIdentitySheet(
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
     val amberSignerAvailable = remember { appState.isAmberSignerInstalled() }
+    val context = LocalContext.current
+    val clipboardManager =
+        remember(context) {
+            ContextCompat.getSystemService(context, android.content.ClipboardManager::class.java)
+        }
 
     // Every add path (create / import / external signer) ends by switching the
     // active account, so the switch is the success signal that closes the sheet.
@@ -85,7 +94,13 @@ internal fun AddIdentitySheet(
         importErrorRes = null
         appState.launchMutation {
             try {
-                if (!appState.importIdentity(identity)) {
+                val imported =
+                    importIdentityAndClearClipboardOnSuccess(
+                        identity = identity,
+                        importIdentity = appState::importIdentity,
+                        clearClipboard = { clipboardManager?.clearSensitivePrimaryClip() },
+                    )
+                if (!imported) {
                     importErrorRes = importIdentityErrorRes(identity)
                 }
             } finally {

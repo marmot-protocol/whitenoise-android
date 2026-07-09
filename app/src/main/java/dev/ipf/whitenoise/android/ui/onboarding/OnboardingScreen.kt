@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -52,9 +53,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.clearSensitivePrimaryClip
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -75,6 +78,11 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val clipboardManager =
+        remember(context) {
+            ContextCompat.getSystemService(context, android.content.ClipboardManager::class.java)
+        }
     // Signer availability can't change while onboarding is on screen, so read it
     // once (the query hits the PackageManager).
     val amberSignerAvailable = remember { appState.isAmberSignerInstalled() }
@@ -104,7 +112,13 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
             importErrorRes = null
             scope.launch {
                 try {
-                    if (!appState.importIdentity(value)) {
+                    val imported =
+                        importIdentityAndClearClipboardOnSuccess(
+                            identity = value,
+                            importIdentity = appState::importIdentity,
+                            clearClipboard = { clipboardManager?.clearSensitivePrimaryClip() },
+                        )
+                    if (!imported) {
                         importErrorRes = importIdentityErrorRes(value)
                     }
                 } finally {
@@ -125,6 +139,17 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
             }
         },
     )
+}
+
+internal suspend fun importIdentityAndClearClipboardOnSuccess(
+    identity: String,
+    importIdentity: suspend (String) -> Boolean,
+    clearClipboard: () -> Unit,
+): Boolean {
+    val clearsSensitiveSecret = IdentityEntryInput.classify(identity) == IdentityEntryInput.Kind.SecretKey
+    val imported = importIdentity(identity)
+    if (imported && clearsSensitiveSecret) clearClipboard()
+    return imported
 }
 
 /**
