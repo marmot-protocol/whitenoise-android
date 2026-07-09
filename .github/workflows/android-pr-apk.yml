@@ -49,10 +49,12 @@ jobs:
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
       GITHUB_RUN_NUMBER: ${{ github.run_number }}
-      # #1172: throwaway *preview* upload key (NOT the release/Zapstore key).
-      # Job-level so the step `if` can gate on it. Absent on fork PRs and until
-      # the maintainer adds the secret, so the Blossom step is a safe no-op.
-      BLOSSOM_UPLOAD_NSEC: ${{ secrets.BLOSSOM_UPLOAD_NSEC }}
+      # #1172: only a non-secret boolean at job scope — whether the preview
+      # upload key is configured — so the step `if` can gate on it WITHOUT
+      # exposing the secret to the PR-controlled Gradle build. The nsec itself is
+      # injected only into the upload step below. False on fork PRs / until the
+      # maintainer adds the secret, so the Blossom step stays a safe no-op.
+      HAS_BLOSSOM_UPLOAD_NSEC: ${{ secrets.BLOSSOM_UPLOAD_NSEC != '' }}
 
     steps:
       - name: Checkout
@@ -134,7 +136,7 @@ jobs:
         id: blossom
         if: >-
           github.event.pull_request.head.repo.full_name == github.repository &&
-          env.BLOSSOM_UPLOAD_NSEC != ''
+          env.HAS_BLOSSOM_UPLOAD_NSEC == 'true'
         env:
           # nostr.download: permissionless, non-Cloudflare Blossom that accepts
           # ~50 MB APK blobs with anonymous GET and native blob expiry — verified
@@ -142,25 +144,32 @@ jobs:
           # cap request bodies at 100 MB and WAF-block programmatic uploads.
           BLOSSOM_SERVER: https://nostr.download
           APK_PATH: ${{ steps.locate.outputs.apk_path }}
+          # Secret injected ONLY into this step (not job scope), so the
+          # PR-controlled Gradle build step never sees it (#1172 CR).
+          BLOSSOM_UPLOAD_NSEC: ${{ secrets.BLOSSOM_UPLOAD_NSEC }}
         shell: bash
         run: |
           set -euo pipefail
-          # nak performs the Blossom kind-24242 signed PUT. Pinned to a verified
-          # release; ubuntu-latest ships Go.
-          go install github.com/fiatjaf/nak@v0.20.0
+          # nak performs the Blossom kind-24242 signed PUT. Pinned to an
+          # immutable commit (v0.20.0) so an upstream release can't change the
+          # uploader while it holds the secret (#1172 CR). ubuntu-latest ships Go.
+          go install github.com/fiatjaf/nak@62fa610a063b708743456e49f9befaef4a441a37
           nak="$(go env GOPATH)/bin/nak"
-          sha=$("$nak" blossom upload "$APK_PATH" \
-                  --server "$BLOSSOM_SERVER" \
-                  --sec "$BLOSSOM_UPLOAD_NSEC" | jq -r '.sha256 // empty')
-          if [[ -z "$sha" ]]; then
-            echo "Blossom upload returned no sha256" >&2
+          # Content-address the APK locally so the published URL provably points
+          # at our bytes regardless of what the server returns (#1172 CR).
+          apk_sha256=$(sha256sum "$APK_PATH" | awk '{print $1}')
+          returned=$("$nak" blossom upload "$APK_PATH" \
+                       --server "$BLOSSOM_SERVER" \
+                       --sec "$BLOSSOM_UPLOAD_NSEC" | jq -r '.sha256 // empty')
+          if [[ "$returned" != "$apk_sha256" ]]; then
+            echo "Blossom upload sha mismatch: local=$apk_sha256 returned=$returned" >&2
             exit 1
           fi
           # Blossom serves by hash — the extension is cosmetic — so request it as
-          # .apk: the browser/Android then names the download <sha>.apk and offers
-          # a one-tap install. The blob is stored as application/zip (an APK is a
+          # .apk so the browser/Android names the download <sha>.apk and offers a
+          # one-tap install. The blob is stored as application/zip (an APK is a
           # ZIP), but the URL extension drives the installer. Verified (#1172).
-          url="${BLOSSOM_SERVER}/${sha}.apk"
+          url="${BLOSSOM_SERVER}/${apk_sha256}.apk"
           printf 'url=%s\n' "$url" >> "$GITHUB_OUTPUT"
           printf '::notice::Blossom install URL: %s\n' "$url"
 
@@ -186,15 +195,15 @@ jobs:
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
             const marker = '<!-- pr-apk-preview -->';
             const download = blossomUrl
-              ? `**[Install directly](${blossomUrl})** — one tap, no GitHub sign-in (content-addressed \`.apk\`). Fallback: the APK zip from the [workflow run](${runUrl}).`
-              : `Download the APK zip from the [workflow run](${runUrl}) (GitHub sign-in required).`;
+              ? `**[Install directly](${blossomUrl})** — one tap, no GitHub sign-in (public, content-addressed \`.apk\`). Fallback: the APK zip from the [workflow run](${runUrl}) (sign-in required, 14-day retention).`
+              : `Download the APK zip from the [workflow run](${runUrl}) (GitHub sign-in required, 14-day retention).`;
             const body = [
               marker,
               `### Preview APK for PR #${prNumber}`,
               '',
               `Home-screen label: **${prNumber} White Noise** with the blueprint launcher icon — installs side-by-side with the production and staging apps.`,
               '',
-              `${download} ARM64 only; retention 14 days.`,
+              `${download} ARM64 only.`,
               '',
               'Every push to this PR rebuilds and updates this comment.',
             ].join('\n');
