@@ -62,7 +62,21 @@ class Nip55SignerParsingTest {
                 eventExtra = signed,
                 packageExtra = null,
             )
-        assertEquals(ActivityResultOutcome.Value(signed), outcome)
+        assertEquals(ActivityResultOutcome.Value(signed, null), outcome)
+    }
+
+    @Test
+    fun signEventResultCarriesPackageEchoForValidation() {
+        val signed = """{"pubkey":"abc","id":"deadbeef","sig":"abc"}"""
+        val outcome =
+            parseActivityResult(
+                SignerOp.SignEvent,
+                resultOk = true,
+                resultExtra = "abc",
+                eventExtra = signed,
+                packageExtra = "com.example.signer",
+            )
+        assertEquals(ActivityResultOutcome.Value(signed, "com.example.signer"), outcome)
     }
 
     @Test
@@ -88,7 +102,28 @@ class Nip55SignerParsingTest {
                 eventExtra = null,
                 packageExtra = null,
             )
-        assertEquals(ActivityResultOutcome.Value("plaintext"), outcome)
+        assertEquals(ActivityResultOutcome.Value("plaintext", null), outcome)
+    }
+
+    @Test
+    fun signedEventPubkeyReadsPubkeyOnlyFromValidEventJson() {
+        assertEquals("abc", signedEventPubkey("""{"pubkey":"abc","content":"hello"}"""))
+        assertEquals(null, signedEventPubkey("""{"content":"hello"}"""))
+        assertEquals(null, signedEventPubkey("not-json"))
+    }
+
+    @Test
+    fun signedEventPubkeyValidationRejectsMissingOrMismatchedPubkey() {
+        assertEquals(null, signedEventPubkeyMismatchReason("""{"pubkey":"ABC"}""", "abc"))
+        assertEquals("signed event missing pubkey", signedEventPubkeyMismatchReason("""{"content":"hello"}""", "abc"))
+        assertEquals("signed event pubkey mismatch", signedEventPubkeyMismatchReason("""{"pubkey":"def"}""", "abc"))
+    }
+
+    @Test
+    fun packageEchoValidationRejectsMismatchedSignerPackage() {
+        assertEquals(null, signerPackageEchoMismatchReason(null, "com.example.signer"))
+        assertEquals(null, signerPackageEchoMismatchReason("com.example.signer", "com.example.signer"))
+        assertEquals("signer package mismatch", signerPackageEchoMismatchReason("com.evil.signer", "com.example.signer"))
     }
 
     @Test

@@ -53,6 +53,7 @@ sealed interface ActivityResultOutcome {
 
     data class Value(
         val value: String,
+        val packageName: String?,
     ) : ActivityResultOutcome
 
     /** RESULT != OK / cancelled — the user declined the prompt. */
@@ -272,13 +273,34 @@ fun parseActivityResult(
             val event =
                 eventExtra?.takeIf { it.isNotBlank() }
                     ?: return ActivityResultOutcome.Malformed("missing signed event")
-            ActivityResultOutcome.Value(event)
+            ActivityResultOutcome.Value(event, packageExtra?.takeIf { it.isNotBlank() })
         }
         else -> {
             val value =
                 resultExtra?.takeIf { it.isNotBlank() }
                     ?: return ActivityResultOutcome.Malformed("missing result")
-            ActivityResultOutcome.Value(value)
+            ActivityResultOutcome.Value(value, packageExtra?.takeIf { it.isNotBlank() })
         }
     }
+}
+
+internal fun signedEventPubkey(eventJson: String): String? =
+    runCatching {
+        JSONObject(eventJson).optString("pubkey").takeIf { it.isNotBlank() }
+    }.getOrNull()
+
+internal fun signedEventPubkeyMismatchReason(
+    eventJson: String,
+    expectedPubkey: String,
+): String? {
+    val pubkey = signedEventPubkey(eventJson) ?: return "signed event missing pubkey"
+    return if (pubkey.equals(expectedPubkey, ignoreCase = true)) null else "signed event pubkey mismatch"
+}
+
+internal fun signerPackageEchoMismatchReason(
+    packageName: String?,
+    expectedPackageName: String,
+): String? {
+    if (packageName.isNullOrBlank()) return null
+    return if (packageName == expectedPackageName) null else "signer package mismatch"
 }
