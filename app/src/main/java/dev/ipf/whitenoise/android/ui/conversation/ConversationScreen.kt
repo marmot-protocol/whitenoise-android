@@ -142,6 +142,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.createImageCaptureFile
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
+import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
@@ -2308,12 +2309,23 @@ internal fun ConversationScreen(
                                         documentPickerLauncher.launch(arrayOf("*/*"))
                                     },
                                     onPasteImageUris = { uris ->
-                                        // Paste uses the same staging shelf as the photo
-                                        // picker/camera path so preview, compression,
-                                        // upload, album capping, and send behavior all
-                                        // stay identical.
+                                        // Receive-content URI grants are scoped to the
+                                        // paste callback. Copy the bytes into app-owned
+                                        // cache before returning, then stage those local
+                                        // FileProvider URIs through the same shelf as the
+                                        // photo picker/camera path.
+                                        val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaUris.size).coerceAtLeast(0)
+                                        val pasteCandidates = uris.distinct().take(openSlots)
+                                        val localUris =
+                                            pasteCandidates.mapNotNull { uri ->
+                                                materializeReceiveContentImageUri(context, uri)
+                                            }
+                                        if (localUris.size < pasteCandidates.size) {
+                                            appState.present(R.string.toast_couldnt_decode_image, copyable = true)
+                                        }
+                                        if (localUris.isEmpty()) return@ComposerBar
                                         pendingMediaUris =
-                                            (pendingMediaUris + uris)
+                                            (pendingMediaUris + localUris)
                                                 .distinct()
                                                 .take(MEDIA_PICKER_MAX_ITEMS)
                                     },

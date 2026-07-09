@@ -13,6 +13,7 @@ import androidx.compose.ui.input.key.type
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.state.ConversationController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -256,6 +257,51 @@ internal fun createImageCaptureFile(context: android.content.Context): java.io.F
         null
     }
 
+/**
+ * Copy a receive-content image into app-owned cache while the platform's
+ * transient URI read grant is still active.
+ *
+ * Clipboard/IME providers may revoke the grant as soon as the receive-content
+ * callback returns. The composer staging shelf previews and sends later, so it
+ * must hold a local FileProvider URI rather than the provider's raw URI.
+ */
+internal fun materializeReceiveContentImageUri(
+    context: android.content.Context,
+    uri: android.net.Uri,
+    maxBytes: Long = ConversationController.MEDIA_RETAINED_MAX_BYTES,
+): android.net.Uri? =
+    runCatching {
+        val resolver = context.contentResolver
+        val suffix = receiveContentImageCacheSuffix(safeGetType(resolver, uri))
+        val dir = java.io.File(context.cacheDir, MediaCacheDirs.COMPOSER_PASTE).apply { mkdirs() }
+        val file = java.io.File.createTempFile("paste_", suffix, dir)
+        val copied =
+            resolver.openInputStream(uri)?.use { input ->
+                MediaPipeline.copyStreamToFileWithinCap(input, file, maxBytes)
+            } == true
+        if (!copied || file.length() <= 0L) {
+            runCatching { file.delete() }
+            null
+        } else {
+            fileProviderUri(context, file)
+        }
+    }.getOrNull()
+
+internal fun receiveContentImageCacheSuffix(resolvedMime: String): String {
+    val extension =
+        when {
+            resolvedMime.equals("image/jpeg", ignoreCase = true) -> "jpg"
+            resolvedMime.startsWith("image/", ignoreCase = true) ->
+                android.webkit.MimeTypeMap
+                    .getSingleton()
+                    .getExtensionFromMimeType(resolvedMime.lowercase())
+            else -> null
+        }?.takeIf { candidate ->
+            candidate.length in 1..8 && candidate.all { it.isLetterOrDigit() }
+        } ?: "img"
+    return ".$extension"
+}
+
 internal fun fileProviderUri(
     context: android.content.Context,
     file: java.io.File,
@@ -276,6 +322,7 @@ internal fun fileProviderUri(
  */
 internal fun clearMediaTempFiles(context: android.content.Context) {
     runCatching { java.io.File(context.cacheDir, "camera").deleteRecursively() }
+    runCatching { java.io.File(context.cacheDir, MediaCacheDirs.COMPOSER_PASTE).deleteRecursively() }
 }
 
 /**
@@ -293,7 +340,13 @@ internal fun sweepStaleSharedMedia(
         // Same age-based reaper covers the decrypted voice cache too —
         // those bytes are plaintext E2EE-decrypted audio and shouldn't
         // linger past the last MediaPlayer that opened them.
-        listOf(MediaCacheDirs.SHARED, ConversationTranscriptExport.CacheDirName, MediaCacheDirs.VOICE, MediaCacheDirs.VIDEO).forEach { name ->
+        listOf(
+            MediaCacheDirs.SHARED,
+            ConversationTranscriptExport.CacheDirName,
+            MediaCacheDirs.VOICE,
+            MediaCacheDirs.VIDEO,
+            MediaCacheDirs.COMPOSER_PASTE,
+        ).forEach { name ->
             val dir = java.io.File(context.cacheDir, name)
             if (!dir.isDirectory) return@forEach
             dir.listFiles()?.forEach { entry ->
@@ -403,8 +456,16 @@ internal fun receiveContentImageUriOrNull(
     clipDescription: ClipDescription?,
     resolveMime: (Uri) -> String?,
 ): Uri? {
-    val uri = item.uri ?: return null
-    val resolvedMime = coerceResolvedMime { resolveMime(uri) }
     val clipDeclaresImage = clipDescription?.hasMimeType("image/*") == true
-    return uri.takeIf { receiveContentMimeIsImage(resolvedMime, clipDeclaresImage) }
+    return receiveContentImageValueOrNull(item.uri, clipDeclaresImage, resolveMime)
+}
+
+internal fun <T> receiveContentImageValueOrNull(
+    value: T?,
+    clipDeclaresImage: Boolean,
+    resolveMime: (T) -> String?,
+): T? {
+    val nonNullValue = value ?: return null
+    val resolvedMime = coerceResolvedMime { resolveMime(nonNullValue) }
+    return nonNullValue.takeIf { receiveContentMimeIsImage(resolvedMime, clipDeclaresImage) }
 }

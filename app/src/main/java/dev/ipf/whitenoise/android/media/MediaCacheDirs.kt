@@ -12,4 +12,5 @@ object MediaCacheDirs {
     const val VOICE = "voice_attachments"
     const val VIDEO = "video_attachments"
     const val SHARED = "shared_media"
+    const val COMPOSER_PASTE = "composer_paste"
 }
