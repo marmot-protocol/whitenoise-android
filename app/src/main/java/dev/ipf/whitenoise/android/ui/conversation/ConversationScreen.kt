@@ -377,13 +377,13 @@ internal fun ConversationScreen(
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         }
     val renderedSize = renderedTimeline.size
-    val nearBottom by remember {
-        derivedStateOf {
-            // Match the rendered list size, otherwise bottomTimelineIndex
-            // overshoots and nearBottom stays false at the physical bottom.
-            isNearBottom(listState, renderedSize, controller.hasMoreBefore || controller.isLoadingOlder)
-        }
-    }
+    val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
+    val nearBottom =
+        rememberConversationNearBottom(
+            listState = listState,
+            renderedTimelineSize = renderedSize,
+            hasOlderHeader = hasOlderHeader,
+        )
     // Read anchor stored as the message id of the deepest row the user has
     // settled on. Looked up live each time so load-older prepends shift both
     // the candidate and the anchor by the same offset — position comparisons
@@ -391,11 +391,11 @@ internal fun ConversationScreen(
     // collisions: send() stamps with nowSeconds(), so multiple messages can
     // share a recordedAt and a strict-`>` filter would under-count.
     var readAnchorMessageId by remember(chat.id) { mutableStateOf<String?>(null) }
-    val currentHighestVisibleTimelineIndex by remember {
+    val currentHighestVisibleTimelineIndex by remember(renderedSize, hasOlderHeader) {
         derivedStateOf {
             val visible = listState.layoutInfo.visibleItemsInfo
             if (visible.isEmpty()) return@derivedStateOf -1
-            val olderHeader = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
+            val olderHeader = if (hasOlderHeader) 1 else 0
             // LazyColumn layout: [Spacer][maybe older-loading][timeline items][Spacer]
             val firstTimelineListIndex = 1 + olderHeader
             // Visible rows index into the rendered (edit-filtered) list, so clamp
