@@ -571,6 +571,15 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Ausgewählt</string>
+    <string name="select">Auswählen</string>
+    <string name="batch_delete_own">%1$d deiner Nachrichten für alle löschen?</string>
+    <string name="batch_delete_others">%1$d Nachrichten lokal ausblenden?</string>
+    <string name="batch_delete_mixed">%1$d deiner Nachrichten für alle löschen und %2$d weitere lokal ausblenden?</string>
+    <string name="batch_delete_complete">Ausgewählte Nachrichten gelöscht</string>
+    <string name="batch_delete_partial">Einige ausgewählte Nachrichten wurden gelöscht; einige sind fehlgeschlagen</string>
+    <string name="batch_delete_failed">Ausgewählte Nachrichten konnten nicht gelöscht werden</string>
+    <string name="toast_forwarded_batch_partial">Einige ausgewählte Nachrichten wurden weitergeleitet; einige sind fehlgeschlagen</string>
+    <string name="toast_forward_batch_failed">Ausgewählte Nachrichten konnten nicht weitergeleitet werden</string>
     <plurals name="unread_messages_count">
         <item quantity="one">%1$d ungelesene Nachricht</item>
         <item quantity="other">%1$d ungelesene Nachrichten</item>

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
@@ -65,6 +67,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -138,6 +141,10 @@ internal fun MessageBubble(
     // stays in sync with the main composer instead of holding a divergent field.
     composerTextState: ComposerTextState,
     highlighted: Boolean,
+    selectionMode: Boolean,
+    batchSelectable: Boolean,
+    selected: Boolean,
+    onToggleSelection: () -> Unit,
     quickReactionEmojis: List<String>,
     isActionMenuOpen: Boolean,
     onActionMenuOpenChange: (Boolean) -> Unit,
@@ -303,6 +310,14 @@ internal fun MessageBubble(
     LaunchedEffect(canDeleteForEveryone) {
         if (!canDeleteForEveryone) moderatorDeleteConfirmationOpen = false
     }
+    LaunchedEffect(selectionMode) {
+        if (selectionMode) {
+            onActionMenuOpenChange(false)
+            forwardSheetOpen = false
+            infoSheetOpen = false
+            moderatorDeleteConfirmationOpen = false
+        }
+    }
 
     fun beginReply() {
         if (readOnly) return
@@ -375,9 +390,9 @@ internal fun MessageBubble(
                 Modifier
                     .fillMaxWidth()
                     .then(
-                        // A deleted message has no actionable content, so
-                        // disable swipe-to-reply entirely: no drag, no trigger.
-                        if (deleted || readOnly) {
+                        // A deleted or selection-mode message has no actionable
+                        // reply gesture; taps are owned by the selection overlay.
+                        if (deleted || readOnly || selectionMode) {
                             Modifier
                         } else {
                             Modifier.pointerInput(record.messageIdHex, replySwipeThresholdPx, maxSwipeOffsetPx) {
@@ -413,8 +428,9 @@ internal fun MessageBubble(
                         // the gesture and opens the actions menu. It self-cancels
                         // on movement beyond touch slop, so swipe-to-reply above
                         // is unaffected.
-                        if (deleted) {
-                            // A deleted message has no actions menu.
+                        if (deleted || selectionMode) {
+                            // A deleted message has no actions menu; selection mode
+                            // routes the entire row through its overlay instead.
                             Modifier
                         } else {
                             Modifier.pointerInput(record.messageIdHex) {
@@ -444,9 +460,9 @@ internal fun MessageBubble(
                         // onLongClick semantic action for the whole row (#262).
                         // Re-publish that action via Modifier.semantics so the
                         // reply/copy/delete/reaction entry point stays reachable
-                        // without a hold gesture. Guarded by `!deleted` to match
-                        // the pointer detector (a deleted message has no menu).
-                        if (deleted) {
+                        // without a hold gesture. Guarded by `!deleted` and
+                        // disabled while the row's selection overlay owns taps.
+                        if (deleted || selectionMode) {
                             Modifier
                         } else {
                             Modifier.semantics {
@@ -1267,6 +1283,7 @@ internal fun MessageBubble(
                     canDeleteForEveryone = canDeleteForEveryone,
                     canEdit = !readOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
                     canForward = !readOnly && forwardBody != null,
+                    canSelect = !readOnly && batchSelectable,
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
@@ -1288,6 +1305,10 @@ internal fun MessageBubble(
                     },
                     onCopyText = ::copyMessageText,
                     onForward = ::beginForward,
+                    onSelect = {
+                        onActionMenuOpenChange(false)
+                        onToggleSelection()
+                    },
                     onInfo = ::openInfoSheet,
                     onDeleteForMe = {
                         onActionMenuOpenChange(false)
@@ -1531,6 +1552,33 @@ internal fun MessageBubble(
                             onDismissRequest = { reactionSheetOpen = false },
                         )
                     }
+                }
+            }
+        }
+        if (selectionMode) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        } else {
+                            Color.Transparent
+                        },
+                    ).semantics { this.selected = selected }
+                    .clickable(enabled = batchSelectable, onClick = onToggleSelection),
+            ) {
+                if (selected) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = stringResource(R.string.selected),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier =
+                            Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 8.dp)
+                                .size(24.dp),
+                    )
                 }
             }
         }

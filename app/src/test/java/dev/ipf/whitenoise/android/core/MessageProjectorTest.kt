@@ -295,6 +295,13 @@ class MessageProjectorTest {
                 kind = 9uL,
                 tags = listOf(MessageTagFfi(listOf("imeta", "filename scan.png"))),
             )
+        val pendingMedia =
+            message(
+                id = "pending-media",
+                plaintext = "📎 scan.png",
+                kind = 9uL,
+                tags = listOf(MessageTagFfi(listOf("_media_pending", "scan.png", "image/png", "placeholder"))),
+            )
         // Agent-stream final (kind-9 + stream tag) is not a plain text message.
         val stream =
             message(
@@ -311,6 +318,7 @@ class MessageProjectorTest {
 
         assertTrue(MessageProjector.isForwardableText(text))
         assertFalse(MessageProjector.isForwardableText(media))
+        assertFalse(MessageProjector.isForwardableText(pendingMedia))
         assertFalse(MessageProjector.isForwardableText(stream))
         assertFalse(MessageProjector.isForwardableText(reaction))
         assertFalse(MessageProjector.isForwardableText(deleted))
@@ -346,6 +354,57 @@ class MessageProjectorTest {
         // even when an edit string is supplied.
         assertNull(MessageProjector.forwardableText(media, editedText = "ignored"))
         assertNull(MessageProjector.forwardableText(blank))
+    }
+
+    @Test
+    fun copyableTextKeepsPlainTextAndMediaCaptionsButSkipsNonText() {
+        val text = message(id = "text", plaintext = "original")
+        val captionedMedia =
+            message(
+                id = "media",
+                plaintext = "caption",
+                tags = listOf(MessageTagFfi(listOf("imeta", "m image/png"))),
+            )
+        val captionlessMedia =
+            message(
+                id = "blank-media",
+                plaintext = "",
+                tags = listOf(MessageTagFfi(listOf("imeta", "m image/png", "filename image.png"))),
+            )
+        val pendingCaptionlessMedia =
+            message(
+                id = "pending-blank-media",
+                plaintext = "📎 image.png",
+                tags = listOf(MessageTagFfi(listOf("_media_pending", "image.png", "image/png", "placeholder"))),
+            )
+        val pendingCaptionedMedia =
+            message(
+                id = "pending-captioned-media",
+                plaintext = "caption while uploading",
+                tags = listOf(MessageTagFfi(listOf("_media_pending", "image.png", "image/png", "caption"))),
+            )
+        val pendingCaptionMatchingPlaceholder =
+            message(
+                id = "pending-caption-collision",
+                plaintext = "📎 image.png",
+                tags = listOf(MessageTagFfi(listOf("_media_pending", "image.png", "image/png", "caption"))),
+            )
+        val stream =
+            message(
+                id = "stream",
+                plaintext = "generated",
+                tags = listOf(MessageProjector.streamTag("stream-id")),
+            )
+        val reaction = reaction(id = "reaction", sender = "alice", target = "text", emoji = "👍", at = 2u)
+
+        assertEquals("edited", MessageProjector.copyableText(text, editedText = "edited"))
+        assertEquals("caption", MessageProjector.copyableText(captionedMedia))
+        assertNull(MessageProjector.copyableText(captionlessMedia))
+        assertNull(MessageProjector.copyableText(pendingCaptionlessMedia))
+        assertEquals("caption while uploading", MessageProjector.copyableText(pendingCaptionedMedia))
+        assertEquals("📎 image.png", MessageProjector.copyableText(pendingCaptionMatchingPlaceholder))
+        assertNull(MessageProjector.copyableText(stream))
+        assertNull(MessageProjector.copyableText(reaction))
     }
 
     @Test

@@ -728,6 +728,15 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Selected</string>
+    <string name="select">Select</string>
+    <string name="batch_delete_own">Delete %1$d of your messages for everyone?</string>
+    <string name="batch_delete_others">Hide %1$d messages locally?</string>
+    <string name="batch_delete_mixed">Delete %1$d of your messages for everyone and hide %2$d others locally?</string>
+    <string name="batch_delete_complete">Selected messages deleted</string>
+    <string name="batch_delete_partial">Some selected messages were deleted; some failed</string>
+    <string name="batch_delete_failed">Couldn\'t delete selected messages</string>
+    <string name="toast_forwarded_batch_partial">Some selected messages were forwarded; some failed</string>
+    <string name="toast_forward_batch_failed">Couldn\'t forward selected messages</string>
     <plurals name="unread_messages_count">
         <item quantity="one">%1$d unread message</item>
         <item quantity="other">%1$d unread messages</item>

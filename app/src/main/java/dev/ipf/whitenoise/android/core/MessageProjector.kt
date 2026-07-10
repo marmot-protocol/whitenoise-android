@@ -84,6 +84,7 @@ object MessageProjector {
     private const val EventRefTag = "e"
     private const val QuoteRefTag = "q"
     private const val ImetaTag = "imeta"
+    private const val PendingMediaTag = "_media_pending"
     private const val StreamTag = "stream"
     private const val StreamStartTag = "stream-start"
     private const val StreamHashTag = "stream-hash"
@@ -289,9 +290,9 @@ object MessageProjector {
      * as misleading fallback copy (e.g. a filename, "Reacted 👍", or a generated
      * summary) even though those kinds are out of v1 scope.
      *
-     * Forwardable iff the record is a kind-9 chat message that is NOT media
-     * (no `imeta` attachment), NOT an agent-stream message (no `stream` tag),
-     * and carries non-blank text. Reactions (kind-7), deletes (kind-5),
+     * Forwardable iff the record is a kind-9 chat message that is NOT confirmed
+     * or pending media, NOT an agent-stream message (no `stream` tag), and carries
+     * non-blank text. Reactions (kind-7), deletes (kind-5),
      * agent-stream starts (kind-1200), group-system events (kind-1210) and edit
      * records (kind-1009) are all non-kind-9 and therefore excluded by the
      * kind check; the tag checks then strip the kind-9 media/stream variants.
@@ -299,6 +300,7 @@ object MessageProjector {
     fun isForwardableText(message: AppMessageRecordFfi): Boolean =
         message.kind == KindChat &&
             !isMedia(message) &&
+            !isPendingMedia(message) &&
             streamId(message) == null &&
             message.plaintext.isNotBlank()
 
@@ -325,6 +327,32 @@ object MessageProjector {
         return body.takeIf { it.isNotBlank() }
     }
 
+    /**
+     * Plain text copied by multi-select. Unlike forwarding, media records are
+     * accepted when they carry a user-authored caption; filename and media-type
+     * fallbacks are never copied. Reactions, system events, and agent streams
+     * are not user-authored chat text and are skipped.
+     */
+    fun copyableText(
+        message: AppMessageRecordFfi,
+        editedText: String? = null,
+    ): String? {
+        if (message.kind != KindChat || streamId(message) != null) return null
+        val body = editedText?.takeIf { it.isNotBlank() } ?: message.plaintext
+        if (body.isBlank()) return null
+        if (!isPendingMedia(message)) return body
+        val pendingContent =
+            message.tags
+                .firstOrNull { it.values.firstOrNull() == PendingMediaTag }
+                ?.values
+                ?.getOrNull(3)
+        return when (pendingContent) {
+            "caption" -> body
+            "placeholder" -> null
+            else -> body.takeUnless { it == pendingMediaPlaceholder(message) }
+        }
+    }
+
     fun replyTargetMessageId(message: AppMessageRecordFfi): String? = tagValue(message, QuoteRefTag)
 
     /** Kind-7 reaction events reference the reacted-to message via an `e` tag. */
@@ -342,6 +370,21 @@ object MessageProjector {
     fun streamTag(streamId: String): MessageTagFfi = MessageTagFfi(listOf(StreamTag, streamId))
 
     private fun isMedia(message: AppMessageRecordFfi): Boolean = message.kind == KindChat && message.tags.any { it.values.firstOrNull() == ImetaTag }
+
+    private fun isPendingMedia(message: AppMessageRecordFfi): Boolean =
+        message.kind == KindChat && message.tags.any { it.values.firstOrNull() == PendingMediaTag }
+
+    private fun pendingMediaPlaceholder(message: AppMessageRecordFfi): String? {
+        val pendingTags = message.tags.filter { it.values.firstOrNull() == PendingMediaTag }
+        if (pendingTags.isEmpty()) return null
+        val name =
+            if (pendingTags.size == 1) {
+                pendingTags.first().values.getOrNull(1) ?: return null
+            } else {
+                "${pendingTags.size} attachments"
+            }
+        return "📎 $name"
+    }
 
     private fun mediaBodyText(
         message: AppMessageRecordFfi,

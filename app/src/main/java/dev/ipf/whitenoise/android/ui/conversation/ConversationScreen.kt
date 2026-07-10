@@ -78,6 +78,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -86,6 +87,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -107,6 +109,7 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -147,6 +150,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachme
 import dev.ipf.whitenoise.android.ui.conversation.media.queryContentSize
 import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
+import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessageSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
 import dev.ipf.whitenoise.android.ui.design.conversationMenuItemPadding
@@ -323,6 +327,16 @@ internal fun ConversationScreen(
     // stack several popovers; deriving each bubble's open state from this one id
     // makes opening one close any other.
     var openActionMenuId by remember(chat.id) { mutableStateOf<String?>(null) }
+    // Selection is conversation-owned because the contextual top bar, back
+    // handling, forwarding sheet, and rows all consume the same stable ids.
+    val selectedMessageIds =
+        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateMapOf<String, Boolean>()
+        }
+    var batchForwardSheetOpen by
+        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+    var showBatchDeleteConfirm by
+        remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var initialTimelineAnchored by remember(chat.id) { mutableStateOf(false) }
     // Id of the newest row the bottom-follow has reacted to. A real append
     // gives a new last id while the previous one stays in the list; an
@@ -375,6 +389,51 @@ internal fun ConversationScreen(
     val renderedTimeline =
         remember(controller.timeline) {
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+        }
+    val selectableMessageIds =
+        renderedTimeline
+            .mapNotNull { item ->
+                item.record.messageIdHex.takeIf { id ->
+                    isBatchSelectableMessage(
+                        messageId = id,
+                        userVisibleMessage = MessageProjector.isChatKind(item.record.kind),
+                        committedMessage = item.status == MessageStatus.Received || item.status == MessageStatus.Sent,
+                        projectedDeleted = item.projected?.deleted == true,
+                        deletedMessageIds = controller.deletedMessageIds,
+                    )
+                }
+            }.toSet()
+    LaunchedEffect(selectableMessageIds) {
+        selectedMessageIds.keys
+            .toList()
+            .filterNot(selectableMessageIds::contains)
+            .forEach(selectedMessageIds::remove)
+        if (selectedMessageIds.isEmpty()) {
+            batchForwardSheetOpen = false
+            showBatchDeleteConfirm = false
+        }
+    }
+    val selectionMode = selectedMessageIds.isNotEmpty()
+    // renderedTimeline is oldest-first. Project selected rows in that same order
+    // instead of the order in which the user tapped them.
+    val selectedActionItems =
+        renderedTimeline.mapNotNull { item ->
+            val record = item.record
+            val messageId = record.messageIdHex
+            if (!selectedMessageIds.containsKey(messageId) || messageId !in selectableMessageIds) return@mapNotNull null
+            val invalidated = item.projected?.invalidationStatus != null
+            val editedText =
+                controller.editsByTarget[messageId]
+                    ?.latestText
+                    ?.takeIf { record.kind == 9uL }
+            BatchMessageActionItem(
+                messageId = messageId,
+                senderId = record.sender,
+                senderDisplayName = appState.displayName(record.sender),
+                copyableText = if (invalidated) null else MessageProjector.copyableText(record, editedText),
+                forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText),
+                mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex),
+            )
         }
     val renderedSize = renderedTimeline.size
     val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
@@ -496,6 +555,7 @@ internal fun ConversationScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     val groupTitleCopy = rememberGroupTitleCopy()
     val messageTextCopy = rememberMessageTextCopy()
     // Seeded empty and populated off the Main thread: the first access to a
@@ -1521,10 +1581,16 @@ internal fun ConversationScreen(
         preSearchScrollAnchor = null
     }
 
-    // Back closes an open search first (restoring the normal bar) before it
-    // leaves the conversation — matching the chat-list search affordance.
+    // Back exits selection first, then search, before leaving the conversation.
     BackHandler {
-        if (searchOpen) closeSearch() else onBack()
+        when {
+            selectionMode -> {
+                openActionMenuId = null
+                selectedMessageIds.clear()
+            }
+            searchOpen -> closeSearch()
+            else -> onBack()
+        }
     }
 
     // Auto-focus the field on open; clear transient highlight on close.
@@ -1963,13 +2029,41 @@ internal fun ConversationScreen(
         )
 
     val openDetailsDescription = stringResource(R.string.details)
+    val selectedCopyText = batchCopyText(selectedActionItems)
+    val selectedForwardBodies = batchForwardBodies(selectedActionItems)
+    val selectedDeleteBreakdown = batchDeleteBreakdown(selectedActionItems)
+    LaunchedEffect(selectedForwardBodies.isEmpty()) {
+        batchForwardSheetOpen =
+            batchForwardSheetOpenForBodies(
+                currentlyOpen = batchForwardSheetOpen,
+                forwardBodies = selectedForwardBodies,
+            )
+    }
     Scaffold(
         // The transcript consumes IME insets; the composer bottom bar is the sole
         // owner of keyboard padding so the reply-preview chip and input row move
         // as one cluster (#895, #1109).
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
-            if (searchOpen) {
+            if (selectionMode) {
+                MessageSelectionBar(
+                    count = selectedActionItems.size,
+                    canCopy = selectedCopyText.isNotBlank(),
+                    canForward = selectedForwardBodies.isNotEmpty(),
+                    onClose = { selectedMessageIds.clear() },
+                    onCopy = {
+                        if (selectedCopyText.isNotBlank()) {
+                            clipboard.setText(AnnotatedString(selectedCopyText))
+                            appState.present(R.string.copied)
+                            selectedMessageIds.clear()
+                        }
+                    },
+                    onForward = {
+                        if (selectedForwardBodies.isNotEmpty()) batchForwardSheetOpen = true
+                    },
+                    onDelete = { showBatchDeleteConfirm = true },
+                )
+            } else if (searchOpen) {
                 ConversationSearchTopBar(
                     query = searchQuery,
                     onQueryChange = {
@@ -2206,6 +2300,9 @@ internal fun ConversationScreen(
                     },
             ) {
                 when {
+                    // Selection owns the screen chrome; hide search navigation,
+                    // invite controls, and the composer until it exits.
+                    selectionMode -> Unit
                     // While search is open the composer steps aside for the match
                     // navigation bar pinned above the keyboard.
                     searchOpen ->
@@ -2503,6 +2600,17 @@ internal fun ConversationScreen(
                                         appState = appState,
                                         composerTextState = composerTextState,
                                         highlighted = item.record.messageIdHex == highlightedMessageId,
+                                        selectionMode = selectionMode,
+                                        batchSelectable = item.record.messageIdHex in selectableMessageIds,
+                                        selected = selectedMessageIds.containsKey(item.record.messageIdHex),
+                                        onToggleSelection = {
+                                            val messageId = item.record.messageIdHex
+                                            if (selectedMessageIds.containsKey(messageId)) {
+                                                selectedMessageIds.remove(messageId)
+                                            } else if (messageId in selectableMessageIds) {
+                                                selectedMessageIds[messageId] = true
+                                            }
+                                        },
                                         quickReactionEmojis = quickReactionEmojis,
                                         isActionMenuOpen = openActionMenuId == item.record.messageIdHex,
                                         onActionMenuOpenChange = { open ->
@@ -2554,7 +2662,7 @@ internal fun ConversationScreen(
                         if (!initialTimelineAnchored) {
                             LoadingScreen()
                         }
-                        if (initialTimelineAnchored) {
+                        if (initialTimelineAnchored && !selectionMode) {
                             Column(
                                 modifier =
                                     Modifier
@@ -2647,6 +2755,69 @@ internal fun ConversationScreen(
                     }
             }
         }
+    }
+
+    if (batchForwardSheetOpen && selectedForwardBodies.isNotEmpty()) {
+        ForwardMessageSheet(
+            appState = appState,
+            body = selectedForwardBodies.joinToString("\n"),
+            originGroupIdHex = controller.group.groupIdHex,
+            onDismiss = { batchForwardSheetOpen = false },
+            onForward = { targetGroupIds ->
+                appState.forwardTexts(targetGroupIds, selectedForwardBodies)
+                selectedMessageIds.clear()
+            },
+        )
+    }
+
+    if (showBatchDeleteConfirm && selectedActionItems.isNotEmpty()) {
+        val deleteMessage =
+            when {
+                selectedDeleteBreakdown.deleteForEveryone == 0 ->
+                    stringResource(R.string.batch_delete_others, selectedDeleteBreakdown.hideLocally)
+                selectedDeleteBreakdown.hideLocally == 0 ->
+                    stringResource(R.string.batch_delete_own, selectedDeleteBreakdown.deleteForEveryone)
+                else ->
+                    stringResource(
+                        R.string.batch_delete_mixed,
+                        selectedDeleteBreakdown.deleteForEveryone,
+                        selectedDeleteBreakdown.hideLocally,
+                    )
+            }
+        ConfirmDialog(
+            title = stringResource(R.string.delete),
+            message = deleteMessage,
+            confirmLabel = stringResource(R.string.delete),
+            onConfirm = {
+                val selectedById = selectedActionItems.associateBy(BatchMessageActionItem::messageId)
+                val selectedRecords =
+                    renderedTimeline.mapNotNull { item ->
+                        selectedById[item.record.messageIdHex]?.let { action -> action to item.record }
+                    }
+                showBatchDeleteConfirm = false
+                selectedMessageIds.clear()
+                appState.launchMutation {
+                    var successes = 0
+                    for ((action, record) in selectedRecords) {
+                        val deleted =
+                            if (action.mine) {
+                                controller.canSendMessages &&
+                                    controller.deleteMessage(record, presentFailure = false)
+                            } else {
+                                runCatching { controller.hideMessageForMe(record.messageIdHex) }.isSuccess
+                            }
+                        if (deleted) successes += 1
+                    }
+                    when (successes) {
+                        selectedRecords.size -> appState.present(R.string.batch_delete_complete)
+                        0 -> appState.present(R.string.batch_delete_failed, copyable = true)
+                        else -> appState.present(R.string.batch_delete_partial, copyable = true)
+                    }
+                }
+            },
+            onDismiss = { showBatchDeleteConfirm = false },
+            destructive = true,
+        )
     }
 
     pendingTopBarLeaveAction?.let { leaveAction ->

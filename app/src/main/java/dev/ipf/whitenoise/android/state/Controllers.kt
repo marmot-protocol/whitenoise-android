@@ -4286,7 +4286,14 @@ class ConversationController(
                 kind = 9uL,
                 tags =
                     attachments.map {
-                        MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
+                        MessageTagFfi(
+                            listOf(
+                                "_media_pending",
+                                it.fileName,
+                                it.mediaType,
+                                if (trimmedCaption == null) "placeholder" else "caption",
+                            ),
+                        )
                     },
                 recordedAt = now,
                 receivedAt = now,
@@ -4652,8 +4659,11 @@ class ConversationController(
         }
     }
 
-    suspend fun deleteMessage(message: AppMessageRecordFfi) {
-        val account = conversationAccountRef ?: return
+    suspend fun deleteMessage(
+        message: AppMessageRecordFfi,
+        presentFailure: Boolean = true,
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
         if (
             !canDeleteMessageForEveryone(
                 actionsEnabled = canSendMessages,
@@ -4663,18 +4673,26 @@ class ConversationController(
                 deleted = message.messageIdHex in deletedMessageIds,
             )
         ) {
-            return
+            return false
         }
         val target = message.messageIdHex
         deletedMessageIds = deletedMessageIds + target
-        try {
+        return try {
             appState.withGroupCommitLock(account, group.groupIdHex) {
                 appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
             }
+            true
         } catch (throwable: Throwable) {
             throwable.rethrowIfCancellation()
             deletedMessageIds = deletedMessageIds - target
-            appState.present(R.string.toast_couldnt_delete_message, AppText.Plain(throwable.message ?: throwable.javaClass.simpleName), copyable = true)
+            if (presentFailure) {
+                appState.present(
+                    R.string.toast_couldnt_delete_message,
+                    AppText.Plain(throwable.message ?: throwable.javaClass.simpleName),
+                    copyable = true,
+                )
+            }
+            false
         }
     }
 

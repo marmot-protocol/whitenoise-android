@@ -570,6 +570,15 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">已选择</string>
+    <string name="select">选择</string>
+    <string name="batch_delete_own">为所有人删除您的 %1$d 条消息？</string>
+    <string name="batch_delete_others">在本地隐藏 %1$d 条消息？</string>
+    <string name="batch_delete_mixed">为所有人删除您的 %1$d 条消息，并在本地隐藏另外 %2$d 条？</string>
+    <string name="batch_delete_complete">已删除所选消息</string>
+    <string name="batch_delete_partial">已删除部分所选消息；另一些删除失败</string>
+    <string name="batch_delete_failed">无法删除所选消息</string>
+    <string name="toast_forwarded_batch_partial">已转发部分所选消息；另一些转发失败</string>
+    <string name="toast_forward_batch_failed">无法转发所选消息</string>
     <plurals name="unread_messages_count">
         <item quantity="other">%1$d 条未读消息</item>
     </plurals>
