@@ -52,6 +52,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.AttachmentCacheIo
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -660,7 +661,7 @@ private suspend fun materializeVideoAttachmentOnce(
 ): java.io.File {
     if (file.isFile && file.length() > 0L) return file
     val bytes = resolveBytes()
-    withContext(Dispatchers.IO) { file.writeBytes(bytes) }
+    withContext(Dispatchers.IO) { AttachmentCacheIo.writeBytesAtomically(file, bytes) }
     return file
 }
 

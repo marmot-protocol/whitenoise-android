@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.media.AttachmentCacheIo
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -513,7 +514,7 @@ private suspend fun materializeVoiceAttachmentOnce(
 ): java.io.File {
     if (file.isFile && file.length() > 0L) return file
     val bytes = resolveBytes()
-    withContext(Dispatchers.IO) { file.writeBytes(bytes) }
+    withContext(Dispatchers.IO) { AttachmentCacheIo.writeBytesAtomically(file, bytes) }
     return file
 }
 
