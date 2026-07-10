@@ -25,15 +25,115 @@ class MarkReadChatListRowMergeTest {
 
     @Test
     fun rejectsSupersededReadWatermark() {
-        val current = row(lastMessageAt = 100uL, unreadCount = 0uL, lastReadTimelineAt = 200uL)
+        val current =
+            row(
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 200uL,
+                lastReadMessageIdHex = "read-200",
+            )
         val incoming =
             row(
                 lastMessageAt = 100uL,
                 unreadCount = 3uL,
                 lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = "read-100",
             )
 
         assertNull(mergeMarkReadChatListRow(current, incoming))
+    }
+
+    @Test
+    fun preservesCompleteReadWatermarkWhenIncomingIdMissing() {
+        val current =
+            row(
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idB,
+            )
+        val incoming =
+            row(
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = null,
+            )
+
+        val merged = requireNotNull(mergeMarkReadChatListRow(current, incoming))
+        assertEquals(100uL, merged.lastReadTimelineAt)
+        assertEquals(idB, merged.lastReadMessageIdHex)
+    }
+
+    @Test
+    fun preservesCurrentLastMessageWhenIncomingLastMessageNull() {
+        val current =
+            row(
+                messageId = idB,
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 50uL,
+                lastReadMessageIdHex = "read-50",
+            )
+        val incoming =
+            row(
+                messageId = idB,
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idB,
+                includeLastMessage = false,
+            )
+
+        val merged = requireNotNull(mergeMarkReadChatListRow(current, incoming))
+        assertEquals(idB, merged.lastMessage?.messageIdHex)
+        assertEquals(idB, merged.lastReadMessageIdHex)
+        assertEquals(100uL, merged.lastReadTimelineAt)
+    }
+
+    @Test
+    fun rejectsEqualTimestampLowerReadMessageIdWatermark() {
+        val current =
+            row(
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idB,
+            )
+        val incoming =
+            row(
+                lastMessageAt = 100uL,
+                unreadCount = 3uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idA,
+            )
+
+        assertNull(mergeMarkReadChatListRow(current, incoming))
+    }
+
+    @Test
+    fun preservesEqualTimestampHigherLastMessageWhileAdvancingReadPointer() {
+        val current =
+            row(
+                messageId = idB,
+                lastMessageAt = 100uL,
+                unreadCount = 1uL,
+                lastReadTimelineAt = 50uL,
+            )
+        val incoming =
+            row(
+                messageId = idA,
+                lastMessageAt = 100uL,
+                unreadCount = 0uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = idB,
+            )
+
+        val merged = requireNotNull(mergeMarkReadChatListRow(current, incoming))
+        assertEquals(idB, merged.lastMessage?.messageIdHex)
+        assertEquals(1uL, merged.unreadCount)
+        assertEquals(idB, merged.lastReadMessageIdHex)
+        assertEquals(100uL, merged.lastReadTimelineAt)
     }
 
     @Test
@@ -61,12 +161,16 @@ class MarkReadChatListRowMergeTest {
         assertEquals(150uL, merged.lastReadTimelineAt)
     }
 
+    private val idA = "a".repeat(64)
+    private val idB = "b".repeat(64)
+
     private fun row(
         messageId: String = "msg",
         lastMessageAt: ULong,
         unreadCount: ULong,
         lastReadTimelineAt: ULong? = null,
         lastReadMessageIdHex: String? = null,
+        includeLastMessage: Boolean = true,
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
         unreadMentionCount = 0uL,
@@ -79,16 +183,20 @@ class MarkReadChatListRowMergeTest {
         avatarUrl = null,
         avatar = null,
         lastMessage =
-            ChatListMessagePreviewFfi(
-                messageIdHex = messageId,
-                sender = "sender",
-                senderDisplayName = "Sender",
-                plaintext = "hello",
-                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
-                kind = 9uL,
-                timelineAt = lastMessageAt,
-                deleted = false,
-            ),
+            if (includeLastMessage) {
+                ChatListMessagePreviewFfi(
+                    messageIdHex = messageId,
+                    sender = "sender",
+                    senderDisplayName = "Sender",
+                    plaintext = "hello",
+                    contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                    kind = 9uL,
+                    timelineAt = lastMessageAt,
+                    deleted = false,
+                )
+            } else {
+                null
+            },
         unreadCount = unreadCount,
         hasUnread = unreadCount > 0uL,
         firstUnreadMessageIdHex = messageId,

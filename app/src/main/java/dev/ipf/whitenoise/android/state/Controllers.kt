@@ -344,6 +344,49 @@ internal fun rollbackOptimisticChatListPreview(
         current
     }
 
+internal fun compareTimelineAtMessageIdHex(
+    leftAt: ULong,
+    leftId: String,
+    rightAt: ULong,
+    rightId: String,
+): Int {
+    val atCompare = leftAt.compareTo(rightAt)
+    if (atCompare != 0) return atCompare
+    return leftId.compareTo(rightId)
+}
+
+private fun compareOptionalTimelineAtMessageIdHex(
+    leftAt: ULong?,
+    leftId: String?,
+    rightAt: ULong?,
+    rightId: String?,
+): Int? {
+    if (leftAt == null || rightAt == null) return null
+    if (leftId == null || rightId == null) return null
+    return compareTimelineAtMessageIdHex(leftAt, leftId, rightAt, rightId)
+}
+
+private fun monotonicMaxTimelineAt(
+    current: ULong?,
+    incoming: ULong?,
+): ULong? {
+    if (incoming == null) return current
+    if (current == null) return incoming
+    return maxOf(current, incoming)
+}
+
+private fun mergeMarkReadReadWatermark(
+    current: ChatListRowFfi,
+    incoming: ChatListRowFfi,
+): Pair<ULong?, String?> {
+    val incomingAt = incoming.lastReadTimelineAt
+    val incomingId = incoming.lastReadMessageIdHex
+    if (incomingAt == null || incomingId == null) {
+        return current.lastReadTimelineAt to current.lastReadMessageIdHex
+    }
+    return incomingAt to incomingId
+}
+
 /**
  * Reconcile a chat-list row returned from [markTimelineMessageRead] with the
  * in-memory row the subscription may have updated while the FFI call was
@@ -354,20 +397,55 @@ internal fun mergeMarkReadChatListRow(
     current: ChatListRowFfi,
     incoming: ChatListRowFfi,
 ): ChatListRowFfi? {
-    val incomingReadAt = incoming.lastReadTimelineAt
-    val currentReadAt = current.lastReadTimelineAt
-    if (incomingReadAt != null && currentReadAt != null && incomingReadAt < currentReadAt) {
+    val readCompare =
+        compareOptionalTimelineAtMessageIdHex(
+            incoming.lastReadTimelineAt,
+            incoming.lastReadMessageIdHex,
+            current.lastReadTimelineAt,
+            current.lastReadMessageIdHex,
+        )
+    if (readCompare != null && readCompare < 0) {
         return null
     }
-    val incomingLastAt = incoming.lastMessage?.timelineAt
-    val currentLastAt = current.lastMessage?.timelineAt
-    if (currentLastAt != null && incomingLastAt != null && incomingLastAt < currentLastAt) {
-        return current.copy(
-            lastReadMessageIdHex = incoming.lastReadMessageIdHex,
-            lastReadTimelineAt = incoming.lastReadTimelineAt,
-        )
+    val incomingLast = incoming.lastMessage
+    val currentLast = current.lastMessage
+    if (currentLast != null && incomingLast != null) {
+        val lastCompare =
+            compareTimelineAtMessageIdHex(
+                incomingLast.timelineAt,
+                incomingLast.messageIdHex,
+                currentLast.timelineAt,
+                currentLast.messageIdHex,
+            )
+        if (lastCompare < 0) {
+            val (readTimelineAt, readMessageIdHex) = mergeMarkReadReadWatermark(current, incoming)
+            return current.copy(
+                lastReadMessageIdHex = readMessageIdHex,
+                lastReadTimelineAt = readTimelineAt,
+            )
+        }
     }
-    return incoming
+    val (readTimelineAt, readMessageIdHex) = mergeMarkReadReadWatermark(current, incoming)
+    return incoming.copy(
+        lastMessage = incoming.lastMessage ?: current.lastMessage,
+        lastReadMessageIdHex = readMessageIdHex,
+        lastReadTimelineAt = readTimelineAt,
+    )
+}
+
+/**
+ * Fold a successful [markTimelineMessageRead] row into the active chat list.
+ * Does not gate on [ConversationController.lastReadMessageId]: concurrent
+ * mark-read calls can complete out of order, and monotonic tuple merge rejects
+ * rows that are already superseded.
+ */
+internal fun foldMarkReadReturnedRow(
+    row: ChatListRowFfi,
+    persistedLastReadTimelineAt: ULong?,
+    applyChatListRow: (ChatListRowFfi) -> Unit,
+): ULong? {
+    applyChatListRow(row)
+    return monotonicMaxTimelineAt(persistedLastReadTimelineAt, row.lastReadTimelineAt)
 }
 
 /**
@@ -6132,9 +6210,12 @@ class ConversationController(
             return
         }
         markReadResult.getOrNull()?.let { row ->
-            if (trimmed != lastReadMessageId) return@let
-            row.lastReadTimelineAt?.let { persistedLastReadTimelineAt = it }
-            appState.applyChatListRowFromMarkRead(account, row)
+            persistedLastReadTimelineAt =
+                foldMarkReadReturnedRow(
+                    row = row,
+                    persistedLastReadTimelineAt = persistedLastReadTimelineAt,
+                    applyChatListRow = { appState.applyChatListRowFromMarkRead(account, it) },
+                )
         }
         val anchoredAtSeconds = (System.currentTimeMillis() / 1_000L).toULong()
         anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)

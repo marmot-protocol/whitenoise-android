@@ -1,6 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.ChatListMessagePreviewFfi
+import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,16 +24,114 @@ class MarkReadChatListProjectionTest {
 
         assertTrue(
             "markReadUpTo must apply markTimelineMessageRead's returned ChatListRowFfi to the chat list",
-            "applyChatListRowFromMarkRead" in body,
-        )
-        assertTrue(
-            "markReadUpTo must ignore superseded mark-read completions",
-            "trimmed != lastReadMessageId" in body,
+            "applyChatListRowFromMarkRead" in body || "foldMarkReadReturnedRow" in body,
         )
         assertFalse(
             "mark-read projection refresh must not depend on mute state",
             "isMuted" in body || "chatMutePreferences" in body,
         )
+    }
+
+    @Test
+    fun markReadUpTo_successPathDoesNotGateRowFoldOnLastReadMessageId() {
+        val body = controllersSource().readText().kotlinFunctionBody("markReadUpTo")
+
+        assertFalse(
+            "success path must not gate row fold on trimmed != lastReadMessageId",
+            Regex("""trimmed\s*!=\s*lastReadMessageId""").containsMatchIn(body),
+        )
+    }
+
+    @Test
+    fun deferredEarlierMarkReadSuccessStillFoldsAuthoritativeRow() {
+        val m1 = "a".repeat(64)
+        val m2 = "b".repeat(64)
+        var lastReadMessageId: String? = m1
+        var persistedLastReadTimelineAt: ULong? = 50uL
+        var currentChatRow = unreadChatRow(lastMessageId = m2)
+        val folded = mutableListOf<ChatListRowFfi>()
+
+        fun applyFromMarkRead(row: ChatListRowFfi) {
+            mergeMarkReadChatListRow(currentChatRow, row)?.let { merged ->
+                folded += merged
+                currentChatRow = merged
+            }
+        }
+
+        // B starts after A: dedupe advances to M2 while A's FFI is still in flight.
+        val previousBeforeB = lastReadMessageId
+        lastReadMessageId = m2
+        assertEquals(m1, previousBeforeB)
+
+        val authoritativeA = readChatRow(lastMessageId = m2, readThroughId = m1)
+        persistedLastReadTimelineAt =
+            foldMarkReadReturnedRow(
+                row = authoritativeA,
+                persistedLastReadTimelineAt = persistedLastReadTimelineAt,
+                applyChatListRow = ::applyFromMarkRead,
+            )
+
+        // B fails: dedupe rolls back to M1; A's folded projection must remain.
+        if (lastReadMessageId == m2) lastReadMessageId = previousBeforeB
+
+        assertEquals(m1, lastReadMessageId)
+        assertEquals(1, folded.size)
+        assertEquals(0uL, folded.single().unreadCount)
+        assertEquals(m1, folded.single().lastReadMessageIdHex)
+        assertEquals(100uL, persistedLastReadTimelineAt)
+    }
+
+    @Test
+    fun outOfOrderMarkReadSuccessesKeepPersistedTimelineMonotonic() {
+        var persistedLastReadTimelineAt: ULong? = 50uL
+        var currentChatRow =
+            chatRow(
+                lastMessageId = "tail",
+                unreadCount = 0uL,
+                lastReadTimelineAt = 50uL,
+                lastReadMessageIdHex = "read-50",
+            )
+        val appliedRows = mutableListOf<ChatListRowFfi>()
+
+        fun applyFromMarkRead(row: ChatListRowFfi) {
+            appliedRows += row
+            mergeMarkReadChatListRow(currentChatRow, row)?.let { merged ->
+                currentChatRow = merged
+            }
+        }
+
+        val newerSuccess =
+            chatRow(
+                lastMessageId = "tail",
+                unreadCount = 0uL,
+                lastReadTimelineAt = 200uL,
+                lastReadMessageIdHex = "read-200",
+            )
+        persistedLastReadTimelineAt =
+            foldMarkReadReturnedRow(
+                row = newerSuccess,
+                persistedLastReadTimelineAt = persistedLastReadTimelineAt,
+                applyChatListRow = ::applyFromMarkRead,
+            )
+
+        val olderSuccess =
+            chatRow(
+                lastMessageId = "tail",
+                unreadCount = 3uL,
+                lastReadTimelineAt = 100uL,
+                lastReadMessageIdHex = "read-100",
+            )
+        persistedLastReadTimelineAt =
+            foldMarkReadReturnedRow(
+                row = olderSuccess,
+                persistedLastReadTimelineAt = persistedLastReadTimelineAt,
+                applyChatListRow = ::applyFromMarkRead,
+            )
+
+        assertEquals(2, appliedRows.size)
+        assertEquals(200uL, persistedLastReadTimelineAt)
+        assertEquals(200uL, currentChatRow.lastReadTimelineAt)
+        assertEquals("read-200", currentChatRow.lastReadMessageIdHex)
     }
 
     @Test
@@ -50,6 +153,59 @@ class MarkReadChatListProjectionTest {
             "applyChatListRowFromMarkRead" in body,
         )
     }
+
+    private fun unreadChatRow(lastMessageId: String) =
+        chatRow(
+            lastMessageId = lastMessageId,
+            unreadCount = 2uL,
+            lastReadTimelineAt = 50uL,
+            lastReadMessageIdHex = "read-50",
+        )
+
+    private fun readChatRow(
+        lastMessageId: String,
+        readThroughId: String,
+    ) = chatRow(
+        lastMessageId = lastMessageId,
+        unreadCount = 0uL,
+        lastReadTimelineAt = 100uL,
+        lastReadMessageIdHex = readThroughId,
+    )
+
+    private fun chatRow(
+        lastMessageId: String,
+        unreadCount: ULong,
+        lastReadTimelineAt: ULong?,
+        lastReadMessageIdHex: String?,
+    ) = ChatListRowFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
+        unreadMentionCount = 0uL,
+        unreadMention = false,
+        groupIdHex = "group",
+        archived = false,
+        pendingConfirmation = false,
+        title = "Chat",
+        groupName = "",
+        avatarUrl = null,
+        avatar = null,
+        lastMessage =
+            ChatListMessagePreviewFfi(
+                messageIdHex = lastMessageId,
+                sender = "sender",
+                senderDisplayName = "Sender",
+                plaintext = "hello",
+                contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList()),
+                kind = 9uL,
+                timelineAt = 100uL,
+                deleted = false,
+            ),
+        unreadCount = unreadCount,
+        hasUnread = unreadCount > 0uL,
+        firstUnreadMessageIdHex = lastMessageId,
+        lastReadMessageIdHex = lastReadMessageIdHex,
+        lastReadTimelineAt = lastReadTimelineAt,
+        updatedAt = 100uL,
+    )
 
     private fun controllersSource(): File =
         listOf(
