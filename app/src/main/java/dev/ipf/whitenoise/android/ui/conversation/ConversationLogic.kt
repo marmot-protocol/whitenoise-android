@@ -1,6 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.PendingAttachment
@@ -129,7 +133,7 @@ internal const val OLDER_PAGE_PREFETCH_ROWS = 4
  * so they can't disagree on the threshold.
  */
 internal fun isNearBottom(
-    listState: androidx.compose.foundation.lazy.LazyListState,
+    listState: LazyListState,
     timelineSize: Int,
     hasOlderHeader: Boolean,
 ): Boolean {
@@ -145,4 +149,23 @@ internal fun isNearBottom(
             .lastOrNull()
             ?.index ?: return false
     return lastVisible >= bottomTimelineIndex - 1
+}
+
+/**
+ * Scroll-backed near-bottom flag for the conversation timeline. Keyed on the
+ * rendered timeline size so async hydration cannot capture an initial zero in
+ * the derived-state closure (issue #1253).
+ */
+@Composable
+internal fun rememberConversationNearBottom(
+    listState: LazyListState,
+    renderedTimelineSize: Int,
+    hasOlderHeader: Boolean,
+): Boolean {
+    val nearBottom by remember(listState, renderedTimelineSize, hasOlderHeader) {
+        derivedStateOf {
+            isNearBottom(listState, renderedTimelineSize, hasOlderHeader)
+        }
+    }
+    return nearBottom
 }
