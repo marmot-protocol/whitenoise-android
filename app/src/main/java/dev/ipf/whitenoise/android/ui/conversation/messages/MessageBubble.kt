@@ -315,7 +315,7 @@ internal fun MessageBubble(
         infoSheetOpen = true
     }
 
-    fun deleteForEveryone() {
+    fun launchConfirmedDeleteForEveryone() {
         appState.launchMutation { controller.deleteMessage(record) }
     }
 
@@ -324,7 +324,7 @@ internal fun MessageBubble(
         if (requiresModeratorDeleteConfirmation(mine = mine, selfIsAdmin = controller.isSelfAdmin)) {
             moderatorDeleteConfirmationOpen = true
         } else {
-            deleteForEveryone()
+            launchConfirmedDeleteForEveryone()
         }
     }
 
@@ -1471,7 +1471,7 @@ internal fun MessageBubble(
                                 canDeleteForEveryone &&
                                 requiresModeratorDeleteConfirmation(mine = mine, selfIsAdmin = controller.isSelfAdmin)
                             ) {
-                                deleteForEveryone()
+                                launchConfirmedDeleteForEveryone()
                             }
                         },
                         onDismiss = { moderatorDeleteConfirmationOpen = false },
