@@ -577,11 +577,21 @@
     <string name="selected">Выбрано</string>
     <string name="select">Выбрать</string>
     <string name="batch_delete_own">Удалить %1$d ваших сообщений для всех?</string>
-    <string name="batch_delete_others">Скрыть %1$d сообщений только на этом устройстве?</string>
-    <string name="batch_delete_mixed">Удалить %1$d ваших сообщений для всех и скрыть ещё %2$d только на этом устройстве?</string>
-    <string name="batch_delete_complete">Выбранные сообщения удалены</string>
-    <string name="batch_delete_partial">Некоторые выбранные сообщения удалены, другие удалить не удалось</string>
-    <string name="batch_delete_failed">Не удалось удалить выбранные сообщения</string>
+    <plurals name="batch_delete_others">
+        <item quantity="one">Скрыть %1$d сообщение только на этом устройстве?</item>
+        <item quantity="few">Скрыть %1$d сообщения только на этом устройстве?</item>
+        <item quantity="many">Скрыть %1$d сообщений только на этом устройстве?</item>
+        <item quantity="other">Скрыть %1$d сообщений только на этом устройстве?</item>
+    </plurals>
+    <plurals name="batch_delete_mixed">
+        <item quantity="one">Удалить %1$d ваших сообщений для всех и скрыть ещё %2$d сообщение только на этом устройстве?</item>
+        <item quantity="few">Удалить %1$d ваших сообщений для всех и скрыть ещё %2$d сообщения только на этом устройстве?</item>
+        <item quantity="many">Удалить %1$d ваших сообщений для всех и скрыть ещё %2$d сообщений только на этом устройстве?</item>
+        <item quantity="other">Удалить %1$d ваших сообщений для всех и скрыть ещё %2$d сообщений только на этом устройстве?</item>
+    </plurals>
+    <string name="batch_delete_complete">Выбранные сообщения убраны</string>
+    <string name="batch_delete_partial">Некоторые выбранные сообщения убраны, другие обработать не удалось</string>
+    <string name="batch_delete_failed">Не удалось убрать выбранные сообщения</string>
     <string name="toast_forwarded_batch_partial">Некоторые выбранные сообщения пересланы, другие отправить не удалось</string>
     <string name="toast_forward_batch_failed">Не удалось переслать выбранные сообщения</string>
     <plurals name="unread_messages_count">

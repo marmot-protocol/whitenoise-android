@@ -18,7 +18,7 @@ class MessageMultiSelectCoverageTest {
     fun conversationOwnsSelectionActionsAndHidesBottomChrome() {
         val source = source("ConversationScreen.kt")
 
-        assertTrue(source.contains("selectedMessageIds"))
+        assertTrue(source.contains("selectedMessages"))
         assertTrue(source.contains("MessageSelectionBar("))
         assertTrue(source.contains("batchCopyText(selectedActionItems)"))
         assertTrue(source.contains("batchForwardBodies(selectedActionItems)"))
@@ -31,7 +31,7 @@ class MessageMultiSelectCoverageTest {
         val source = source("ConversationScreen.kt").replace(Regex("\\s+"), " ")
         val controllerIdentity = "chat.id, appState.activeAccountRef, appState.runtimeGeneration"
 
-        assertTrue(source.contains("val selectedMessageIds = remember($controllerIdentity)"))
+        assertTrue(source.contains("val selectedMessages = remember($controllerIdentity)"))
         assertTrue(source.contains("var batchForwardSheetOpen by remember($controllerIdentity)"))
         assertTrue(source.contains("var showBatchDeleteConfirm by remember($controllerIdentity)"))
     }
@@ -47,6 +47,15 @@ class MessageMultiSelectCoverageTest {
         assertTrue(source.contains(".matchParentSize()"))
         assertTrue(source.contains("Icons.Default.CheckCircle"))
         assertTrue(source.contains("canSelect = !readOnly && batchSelectable"))
+    }
+
+    @Test
+    fun selectionModeBlocksEveryMessageActionMenuEntryPoint() {
+        val source = source("messages/MessageBubble.kt").replace(Regex("\\s+"), " ")
+
+        assertTrue(source.contains("expanded = isActionMenuOpen && !deleted && !selectionMode"))
+        assertTrue(source.contains("val onMediaLongPress: () -> Unit = { if (!selectionMode)"))
+        assertTrue(source.contains("if (!deleted && !selectionMode) { longPressWindowY = null onActionMenuOpenChange(true)"))
     }
 
     private fun source(relativePath: String): String =

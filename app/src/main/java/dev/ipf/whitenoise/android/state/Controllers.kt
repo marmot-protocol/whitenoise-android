@@ -3225,6 +3225,12 @@ class ConversationController(
     // so indexes and messageById cannot grow without bound (#1163).
     private val protectedTimelineMessageIds = mutableSetOf<String>()
 
+    // IDs removed specifically by the live-window memory cap. Selection may
+    // retain only these off-screen records; authoritative Remove/expiry paths
+    // must not leave stale message snapshots actionable.
+    var timelineCapEvictedMessageIds: Set<String> by mutableStateOf(emptySet())
+        private set
+
     // Last message id we successfully marked as read on the Rust side.
     // Dedupes scroll-driven [markReadUpTo] calls so settling on the same row
     // doesn't issue redundant FFI hops. Compose-observable so UI (the
@@ -4286,14 +4292,7 @@ class ConversationController(
                 kind = 9uL,
                 tags =
                     attachments.map {
-                        MessageTagFfi(
-                            listOf(
-                                "_media_pending",
-                                it.fileName,
-                                it.mediaType,
-                                if (trimmedCaption == null) "placeholder" else "caption",
-                            ),
-                        )
+                        MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
                     },
                 recordedAt = now,
                 receivedAt = now,
@@ -4683,8 +4682,8 @@ class ConversationController(
             }
             true
         } catch (throwable: Throwable) {
-            throwable.rethrowIfCancellation()
             deletedMessageIds = deletedMessageIds - target
+            throwable.rethrowIfCancellation()
             if (presentFailure) {
                 appState.present(
                     R.string.toast_couldnt_delete_message,
@@ -6022,6 +6021,7 @@ class ConversationController(
             timelineItemsById.clear()
             timelineOrder.clear()
             projectedMessageIds.clear()
+            timelineCapEvictedMessageIds = emptySet()
             // Drop stale projected records so messageById doesn't grow unbounded
             // as older pages are loaded; keep in-flight optimistic records so a
             // pending send still reconciles across a window replacement. See #68.
@@ -6146,6 +6146,7 @@ class ConversationController(
                             optimisticMessages.remove("stream:$streamId")
                         }
                     removeProjectedRecord(change.messageIdHex)
+                    timelineCapEvictedMessageIds = timelineCapEvictedMessageIds - change.messageIdHex
                     messageById.remove(change.messageIdHex)
                     reactionTargets.add(change.messageIdHex)
                     deletedMessageIds = deletedMessageIds - change.messageIdHex
@@ -6315,6 +6316,7 @@ class ConversationController(
         reconcileOptimistic: Boolean = false,
         allowDelayedProjection: Boolean = false,
     ): AppMessageRecordFfi {
+        timelineCapEvictedMessageIds = timelineCapEvictedMessageIds - record.messageIdHex
         // Defensive guard against the Rust core re-emitting an identical
         // record (own-publish + own-relay-echo both fire
         // `timeline_changes_for_event` for the same kind-9). Without this,
@@ -6464,11 +6466,25 @@ class ConversationController(
     // loaded, [protectedTimelineMessageIds] is excluded from the trim.
     private fun trimLiveTimelineWindow(maxItems: Int) {
         val protectedIds = if (hasLoadedOlderPages) protectedTimelineMessageIds else emptySet()
-        timelineMessageIdsExceedingLiveCap(
-            items = timelineItemsById.values,
-            protectedIds = protectedIds,
-            maxLiveItems = maxItems,
-        ).forEach(::removeProjectedRecord)
+        val evictedIds =
+            timelineMessageIdsExceedingLiveCap(
+                items = timelineItemsById.values,
+                protectedIds = protectedIds,
+                maxLiveItems = maxItems,
+            )
+        if (evictedIds.isNotEmpty()) {
+            val retainedEvictions = LinkedHashSet(timelineCapEvictedMessageIds)
+            evictedIds.forEach { messageId ->
+                retainedEvictions.remove(messageId)
+                retainedEvictions.add(messageId)
+            }
+            timelineCapEvictedMessageIds =
+                retainedEvictions
+                    .toList()
+                    .takeLast(maxItems.coerceAtLeast(0))
+                    .toSet()
+            evictedIds.forEach(::removeProjectedRecord)
+        }
         pruneReadAnchorsToWindow()
     }
 

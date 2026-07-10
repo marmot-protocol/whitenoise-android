@@ -730,11 +730,17 @@
     <string name="selected">Selected</string>
     <string name="select">Select</string>
     <string name="batch_delete_own">Delete %1$d of your messages for everyone?</string>
-    <string name="batch_delete_others">Hide %1$d messages locally?</string>
-    <string name="batch_delete_mixed">Delete %1$d of your messages for everyone and hide %2$d others locally?</string>
-    <string name="batch_delete_complete">Selected messages deleted</string>
-    <string name="batch_delete_partial">Some selected messages were deleted; some failed</string>
-    <string name="batch_delete_failed">Couldn\'t delete selected messages</string>
+    <plurals name="batch_delete_others">
+        <item quantity="one">Hide %1$d message locally?</item>
+        <item quantity="other">Hide %1$d messages locally?</item>
+    </plurals>
+    <plurals name="batch_delete_mixed">
+        <item quantity="one">Delete %1$d of your messages for everyone and hide %2$d other locally?</item>
+        <item quantity="other">Delete %1$d of your messages for everyone and hide %2$d others locally?</item>
+    </plurals>
+    <string name="batch_delete_complete">Selected messages removed</string>
+    <string name="batch_delete_partial">Some selected messages were removed; some failed</string>
+    <string name="batch_delete_failed">Couldn\'t remove selected messages</string>
     <string name="toast_forwarded_batch_partial">Some selected messages were forwarded; some failed</string>
     <string name="toast_forward_batch_failed">Couldn\'t forward selected messages</string>
     <plurals name="unread_messages_count">

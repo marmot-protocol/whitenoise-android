@@ -300,7 +300,7 @@ class MessageProjectorTest {
                 id = "pending-media",
                 plaintext = "📎 scan.png",
                 kind = 9uL,
-                tags = listOf(MessageTagFfi(listOf("_media_pending", "scan.png", "image/png", "placeholder"))),
+                tags = listOf(MessageTagFfi(listOf("_media_pending", "scan.png", "image/png"))),
             )
         // Agent-stream final (kind-9 + stream tag) is not a plain text message.
         val stream =
@@ -340,6 +340,24 @@ class MessageProjectorTest {
     }
 
     @Test
+    fun validatedForwardTextBodiesPreserveVerbatimContentAndRejectMixedBatches() {
+        assertEquals(
+            listOf("  leading", "trailing  ", "duplicate", "duplicate"),
+            MessageProjector.validatedForwardTextBodies(
+                listOf("  leading", "trailing  ", "duplicate", "duplicate"),
+            ),
+        )
+        assertEquals(
+            emptyList<String>(),
+            MessageProjector.validatedForwardTextBodies(listOf("valid", "   ")),
+        )
+        assertEquals(
+            emptyList<String>(),
+            MessageProjector.validatedForwardTextBodies(listOf("valid", null)),
+        )
+    }
+
+    @Test
     fun forwardableTextIsNullForNonTextAndBlankRecords() {
         val media =
             message(
@@ -371,24 +389,6 @@ class MessageProjectorTest {
                 plaintext = "",
                 tags = listOf(MessageTagFfi(listOf("imeta", "m image/png", "filename image.png"))),
             )
-        val pendingCaptionlessMedia =
-            message(
-                id = "pending-blank-media",
-                plaintext = "📎 image.png",
-                tags = listOf(MessageTagFfi(listOf("_media_pending", "image.png", "image/png", "placeholder"))),
-            )
-        val pendingCaptionedMedia =
-            message(
-                id = "pending-captioned-media",
-                plaintext = "caption while uploading",
-                tags = listOf(MessageTagFfi(listOf("_media_pending", "image.png", "image/png", "caption"))),
-            )
-        val pendingCaptionMatchingPlaceholder =
-            message(
-                id = "pending-caption-collision",
-                plaintext = "📎 image.png",
-                tags = listOf(MessageTagFfi(listOf("_media_pending", "image.png", "image/png", "caption"))),
-            )
         val stream =
             message(
                 id = "stream",
@@ -400,9 +400,6 @@ class MessageProjectorTest {
         assertEquals("edited", MessageProjector.copyableText(text, editedText = "edited"))
         assertEquals("caption", MessageProjector.copyableText(captionedMedia))
         assertNull(MessageProjector.copyableText(captionlessMedia))
-        assertNull(MessageProjector.copyableText(pendingCaptionlessMedia))
-        assertEquals("caption while uploading", MessageProjector.copyableText(pendingCaptionedMedia))
-        assertEquals("📎 image.png", MessageProjector.copyableText(pendingCaptionMatchingPlaceholder))
         assertNull(MessageProjector.copyableText(stream))
         assertNull(MessageProjector.copyableText(reaction))
     }

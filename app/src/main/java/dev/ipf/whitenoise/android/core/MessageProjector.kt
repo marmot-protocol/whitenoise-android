@@ -328,6 +328,18 @@ object MessageProjector {
     }
 
     /**
+     * Validates a forwarded text batch without rewriting user-authored content.
+     * A mixed valid/invalid batch is rejected atomically so no selected message
+     * is silently omitted downstream.
+     */
+    fun validatedForwardTextBodies(texts: List<String?>): List<String> {
+        if (texts.isEmpty()) return emptyList()
+        return texts.map { text ->
+            text?.takeIf(String::isNotBlank) ?: return emptyList()
+        }
+    }
+
+    /**
      * Plain text copied by multi-select. Unlike forwarding, media records are
      * accepted when they carry a user-authored caption; filename and media-type
      * fallbacks are never copied. Reactions, system events, and agent streams
@@ -339,18 +351,7 @@ object MessageProjector {
     ): String? {
         if (message.kind != KindChat || streamId(message) != null) return null
         val body = editedText?.takeIf { it.isNotBlank() } ?: message.plaintext
-        if (body.isBlank()) return null
-        if (!isPendingMedia(message)) return body
-        val pendingContent =
-            message.tags
-                .firstOrNull { it.values.firstOrNull() == PendingMediaTag }
-                ?.values
-                ?.getOrNull(3)
-        return when (pendingContent) {
-            "caption" -> body
-            "placeholder" -> null
-            else -> body.takeUnless { it == pendingMediaPlaceholder(message) }
-        }
+        return body.takeIf { it.isNotBlank() }
     }
 
     fun replyTargetMessageId(message: AppMessageRecordFfi): String? = tagValue(message, QuoteRefTag)
@@ -373,18 +374,6 @@ object MessageProjector {
 
     private fun isPendingMedia(message: AppMessageRecordFfi): Boolean =
         message.kind == KindChat && message.tags.any { it.values.firstOrNull() == PendingMediaTag }
-
-    private fun pendingMediaPlaceholder(message: AppMessageRecordFfi): String? {
-        val pendingTags = message.tags.filter { it.values.firstOrNull() == PendingMediaTag }
-        if (pendingTags.isEmpty()) return null
-        val name =
-            if (pendingTags.size == 1) {
-                pendingTags.first().values.getOrNull(1) ?: return null
-            } else {
-                "${pendingTags.size} attachments"
-            }
-        return "📎 $name"
-    }
 
     private fun mediaBodyText(
         message: AppMessageRecordFfi,

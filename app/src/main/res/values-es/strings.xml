@@ -573,11 +573,17 @@
     <string name="selected">Seleccionado</string>
     <string name="select">Seleccionar</string>
     <string name="batch_delete_own">¿Eliminar %1$d de tus mensajes para todos?</string>
-    <string name="batch_delete_others">¿Ocultar %1$d mensajes localmente?</string>
-    <string name="batch_delete_mixed">¿Eliminar %1$d de tus mensajes para todos y ocultar otros %2$d localmente?</string>
-    <string name="batch_delete_complete">Mensajes seleccionados eliminados</string>
-    <string name="batch_delete_partial">Se eliminaron algunos mensajes seleccionados; otros fallaron</string>
-    <string name="batch_delete_failed">No se pudieron eliminar los mensajes seleccionados</string>
+    <plurals name="batch_delete_others">
+        <item quantity="one">¿Ocultar %1$d mensaje localmente?</item>
+        <item quantity="other">¿Ocultar %1$d mensajes localmente?</item>
+    </plurals>
+    <plurals name="batch_delete_mixed">
+        <item quantity="one">¿Eliminar %1$d de tus mensajes para todos y ocultar %2$d más localmente?</item>
+        <item quantity="other">¿Eliminar %1$d de tus mensajes para todos y ocultar %2$d más localmente?</item>
+    </plurals>
+    <string name="batch_delete_complete">Mensajes seleccionados retirados</string>
+    <string name="batch_delete_partial">Se retiraron algunos mensajes seleccionados; otros fallaron</string>
+    <string name="batch_delete_failed">No se pudieron retirar los mensajes seleccionados</string>
     <string name="toast_forwarded_batch_partial">Se reenviaron algunos mensajes seleccionados; otros fallaron</string>
     <string name="toast_forward_batch_failed">No se pudieron reenviar los mensajes seleccionados</string>
     <plurals name="unread_messages_count">

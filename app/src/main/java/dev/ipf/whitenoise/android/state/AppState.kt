@@ -1582,7 +1582,7 @@ class WhiteNoiseAppState(
         targetGroupIds: List<String>,
         texts: List<String>,
     ) {
-        val bodies = texts.map(String::trim).filter(String::isNotEmpty)
+        val bodies = MessageProjector.validatedForwardTextBodies(texts)
         val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
         if (bodies.isEmpty() || targets.isEmpty()) return
         val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return

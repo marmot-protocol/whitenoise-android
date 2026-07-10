@@ -721,8 +721,10 @@ internal fun MessageBubble(
                 // long-click path. Hoisted so every media call site shares one
                 // definition.
                 val onMediaLongPress: () -> Unit = {
-                    longPressWindowY = null
-                    onActionMenuOpenChange(true)
+                    if (!selectionMode) {
+                        longPressWindowY = null
+                        onActionMenuOpenChange(true)
+                    }
                 }
                 val mediaBlocks: @Composable ColumnScope.() -> Unit = {
                     if (!deleted && !invalidated && visualAttachments.isNotEmpty()) {
@@ -1169,7 +1171,7 @@ internal fun MessageBubble(
                                 Modifier.combinedClickable(
                                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
                                     onLongClick = {
-                                        if (!deleted) {
+                                        if (!deleted && !selectionMode) {
                                             longPressWindowY = null
                                             onActionMenuOpenChange(true)
                                         }
@@ -1272,9 +1274,9 @@ internal fun MessageBubble(
                     }
                 }
                 MessageActionMenu(
-                    // Never render the menu for a deleted message, even
-                    // if it was open when the delete landed.
-                    expanded = isActionMenuOpen && !deleted,
+                    // Never render the menu for a deleted message or while the
+                    // selection overlay owns every row interaction.
+                    expanded = isActionMenuOpen && !deleted && !selectionMode,
                     anchorWindowYPx = longPressWindowY,
                     alignEnd = mine,
                     canReply = !readOnly,

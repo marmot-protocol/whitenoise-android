@@ -84,6 +84,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -329,9 +330,11 @@ internal fun ConversationScreen(
     var openActionMenuId by remember(chat.id) { mutableStateOf<String?>(null) }
     // Selection is conversation-owned because the contextual top bar, back
     // handling, forwarding sheet, and rows all consume the same stable ids.
-    val selectedMessageIds =
+    // Each value snapshots the record/action projection so cap-trimmed rows stay
+    // selected while the user scrolls deeper into history.
+    val selectedMessages =
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
-            mutableStateMapOf<String, Boolean>()
+            mutableStateMapOf<String, BatchMessageSelection>()
         }
     var batchForwardSheetOpen by
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
@@ -390,51 +393,64 @@ internal fun ConversationScreen(
         remember(controller.timeline) {
             controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
         }
-    val selectableMessageIds =
+    val selectableMessages =
         renderedTimeline
             .mapNotNull { item ->
-                item.record.messageIdHex.takeIf { id ->
-                    isBatchSelectableMessage(
-                        messageId = id,
-                        userVisibleMessage = MessageProjector.isChatKind(item.record.kind),
+                val record = item.record
+                val messageId = record.messageIdHex
+                if (
+                    !isBatchSelectableMessage(
+                        messageId = messageId,
+                        userVisibleMessage = MessageProjector.isChatKind(record.kind),
                         committedMessage = item.status == MessageStatus.Received || item.status == MessageStatus.Sent,
                         projectedDeleted = item.projected?.deleted == true,
                         deletedMessageIds = controller.deletedMessageIds,
                     )
+                ) {
+                    return@mapNotNull null
                 }
-            }.toSet()
-    LaunchedEffect(selectableMessageIds) {
-        selectedMessageIds.keys
+                val invalidated = item.projected?.invalidationStatus != null
+                val editedText =
+                    controller.editsByTarget[messageId]
+                        ?.latestText
+                        ?.takeIf { record.kind == 9uL }
+                BatchMessageSelection(
+                    action =
+                        BatchMessageActionItem(
+                            messageId = messageId,
+                            senderId = record.sender,
+                            senderDisplayName = appState.displayName(record.sender),
+                            copyableText = if (invalidated) null else MessageProjector.copyableText(record, editedText),
+                            forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText),
+                            mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex),
+                        ),
+                    record = record,
+                    timelineOrder = item.timelineOrder,
+                )
+            }.associateBy { it.action.messageId }
+    LaunchedEffect(selectableMessages, controller.timelineCapEvictedMessageIds, controller.deletedMessageIds) {
+        val reconciled =
+            reconcileBatchSelections(
+                selected = selectedMessages,
+                selectableVisible = selectableMessages,
+                capEvictedMessageIds = controller.timelineCapEvictedMessageIds,
+                deletedMessageIds = controller.deletedMessageIds,
+            )
+        selectedMessages.keys
             .toList()
-            .filterNot(selectableMessageIds::contains)
-            .forEach(selectedMessageIds::remove)
-        if (selectedMessageIds.isEmpty()) {
+            .filterNot(reconciled::containsKey)
+            .forEach(selectedMessages::remove)
+        reconciled.forEach { (messageId, selection) ->
+            if (selectedMessages[messageId] != selection) selectedMessages[messageId] = selection
+        }
+        if (selectedMessages.isEmpty()) {
             batchForwardSheetOpen = false
             showBatchDeleteConfirm = false
         }
     }
-    val selectionMode = selectedMessageIds.isNotEmpty()
-    // renderedTimeline is oldest-first. Project selected rows in that same order
-    // instead of the order in which the user tapped them.
-    val selectedActionItems =
-        renderedTimeline.mapNotNull { item ->
-            val record = item.record
-            val messageId = record.messageIdHex
-            if (!selectedMessageIds.containsKey(messageId) || messageId !in selectableMessageIds) return@mapNotNull null
-            val invalidated = item.projected?.invalidationStatus != null
-            val editedText =
-                controller.editsByTarget[messageId]
-                    ?.latestText
-                    ?.takeIf { record.kind == 9uL }
-            BatchMessageActionItem(
-                messageId = messageId,
-                senderId = record.sender,
-                senderDisplayName = appState.displayName(record.sender),
-                copyableText = if (invalidated) null else MessageProjector.copyableText(record, editedText),
-                forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText),
-                mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex),
-            )
-        }
+    val selectionMode = selectedMessages.isNotEmpty()
+    val selectedSelections = orderedBatchSelections(selectedMessages.values)
+    val selectedActionItems = selectedSelections.map(BatchMessageSelection::action)
     val renderedSize = renderedTimeline.size
     val hasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
     val nearBottom =
@@ -1586,7 +1602,7 @@ internal fun ConversationScreen(
         when {
             selectionMode -> {
                 openActionMenuId = null
-                selectedMessageIds.clear()
+                selectedMessages.clear()
             }
             searchOpen -> closeSearch()
             else -> onBack()
@@ -2050,12 +2066,12 @@ internal fun ConversationScreen(
                     count = selectedActionItems.size,
                     canCopy = selectedCopyText.isNotBlank(),
                     canForward = selectedForwardBodies.isNotEmpty(),
-                    onClose = { selectedMessageIds.clear() },
+                    onClose = { selectedMessages.clear() },
                     onCopy = {
                         if (selectedCopyText.isNotBlank()) {
                             clipboard.setText(AnnotatedString(selectedCopyText))
                             appState.present(R.string.copied)
-                            selectedMessageIds.clear()
+                            selectedMessages.clear()
                         }
                     },
                     onForward = {
@@ -2601,14 +2617,14 @@ internal fun ConversationScreen(
                                         composerTextState = composerTextState,
                                         highlighted = item.record.messageIdHex == highlightedMessageId,
                                         selectionMode = selectionMode,
-                                        batchSelectable = item.record.messageIdHex in selectableMessageIds,
-                                        selected = selectedMessageIds.containsKey(item.record.messageIdHex),
+                                        batchSelectable = item.record.messageIdHex in selectableMessages,
+                                        selected = selectedMessages.containsKey(item.record.messageIdHex),
                                         onToggleSelection = {
                                             val messageId = item.record.messageIdHex
-                                            if (selectedMessageIds.containsKey(messageId)) {
-                                                selectedMessageIds.remove(messageId)
-                                            } else if (messageId in selectableMessageIds) {
-                                                selectedMessageIds[messageId] = true
+                                            if (selectedMessages.containsKey(messageId)) {
+                                                selectedMessages.remove(messageId)
+                                            } else {
+                                                selectableMessages[messageId]?.let { selectedMessages[messageId] = it }
                                             }
                                         },
                                         quickReactionEmojis = quickReactionEmojis,
@@ -2765,7 +2781,7 @@ internal fun ConversationScreen(
             onDismiss = { batchForwardSheetOpen = false },
             onForward = { targetGroupIds ->
                 appState.forwardTexts(targetGroupIds, selectedForwardBodies)
-                selectedMessageIds.clear()
+                selectedMessages.clear()
             },
         )
     }
@@ -2774,28 +2790,30 @@ internal fun ConversationScreen(
         val deleteMessage =
             when {
                 selectedDeleteBreakdown.deleteForEveryone == 0 ->
-                    stringResource(R.string.batch_delete_others, selectedDeleteBreakdown.hideLocally)
+                    pluralStringResource(
+                        R.plurals.batch_delete_others,
+                        selectedDeleteBreakdown.hideLocally,
+                        selectedDeleteBreakdown.hideLocally,
+                    )
                 selectedDeleteBreakdown.hideLocally == 0 ->
                     stringResource(R.string.batch_delete_own, selectedDeleteBreakdown.deleteForEveryone)
                 else ->
-                    stringResource(
-                        R.string.batch_delete_mixed,
+                    pluralStringResource(
+                        R.plurals.batch_delete_mixed,
+                        selectedDeleteBreakdown.hideLocally,
                         selectedDeleteBreakdown.deleteForEveryone,
                         selectedDeleteBreakdown.hideLocally,
                     )
             }
+        val hideOnly = selectedDeleteBreakdown.deleteForEveryone == 0
         ConfirmDialog(
-            title = stringResource(R.string.delete),
+            title = stringResource(if (hideOnly) R.string.hide else R.string.delete),
             message = deleteMessage,
-            confirmLabel = stringResource(R.string.delete),
+            confirmLabel = stringResource(if (hideOnly) R.string.hide else R.string.delete),
             onConfirm = {
-                val selectedById = selectedActionItems.associateBy(BatchMessageActionItem::messageId)
-                val selectedRecords =
-                    renderedTimeline.mapNotNull { item ->
-                        selectedById[item.record.messageIdHex]?.let { action -> action to item.record }
-                    }
+                val selectedRecords = selectedSelections.map { selection -> selection.action to selection.record }
                 showBatchDeleteConfirm = false
-                selectedMessageIds.clear()
+                selectedMessages.clear()
                 appState.launchMutation {
                     var successes = 0
                     for ((action, record) in selectedRecords) {

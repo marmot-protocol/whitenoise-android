@@ -29,6 +29,11 @@ class AppStateSendLockCoverageTest {
             ).containsMatchIn(body),
         )
         assertTrue(
+            "forwardTexts must validate bodies without trimming user-authored text",
+            "MessageProjector.validatedForwardTextBodies(texts)" in body &&
+                "String::trim" !in body,
+        )
+        assertTrue(
             "forwardTexts must continue after an individual send failure and report partial batches accurately",
             "successfulSends += 1" in body &&
                 "targetComplete = false" in body &&
@@ -155,6 +160,10 @@ class AppStateSendLockCoverageTest {
             "deleteMessage must report true after the locked commit and false after rollback",
             body.indexOf("appState.withGroupCommitLock") < body.indexOf("true") &&
                 body.indexOf("deletedMessageIds = deletedMessageIds - target") < body.lastIndexOf("false"),
+        )
+        assertTrue(
+            "deleteMessage must roll back optimistic deletion before propagating cancellation",
+            body.indexOf("deletedMessageIds = deletedMessageIds - target") < body.indexOf("throwable.rethrowIfCancellation()"),
         )
         assertTrue(
             "batch deletion must aggregate commit results without emitting one snackbar per failure",
