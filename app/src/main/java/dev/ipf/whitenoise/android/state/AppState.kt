@@ -1980,10 +1980,7 @@ class WhiteNoiseAppState(
      */
     suspend fun importIdentity(identity: String): Boolean {
         val trimmed = identity.trim()
-        if (trimmed.isEmpty()) return false
-        // Direct secret-key import is nsec-only: reject a bare public key before
-        // the engine would create a read-only account (mirrors SignInContent).
-        if (IdentityEntryInput.classify(trimmed) == IdentityEntryInput.Kind.PublicKey) return false
+        if (!permitsDirectIdentityImport(trimmed)) return false
         return try {
             val summary = marmotIo { login(trimmed, MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
             refreshAccounts()
@@ -5050,5 +5047,8 @@ private inline fun appStateDebug(
 }
 
 private fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
+
+/** Whether [WhiteNoiseAppState.importIdentity] may call the engine — direct import is nsec-only. */
+internal fun permitsDirectIdentityImport(trimmed: String): Boolean = IdentityEntryInput.classify(trimmed) == IdentityEntryInput.Kind.SecretKey
 
 internal fun notificationActionsAllowed(appLockScreenVisible: Boolean): Boolean = !appLockScreenVisible
