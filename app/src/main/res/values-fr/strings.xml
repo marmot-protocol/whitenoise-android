@@ -116,6 +116,15 @@
     <string name="profile_add_to_groups_confirm_message">%1$s sera ajouté à %2$s. Cela sera visible par tous les membres.</string>
     <string name="profile_add_to_groups_confirm_label">Ajouter aux groupes</string>
     <string name="profile_view_picture">Voir la photo de profil</string>
+    <string name="profile_private_nickname">Pseudo privé</string>
+    <string name="profile_name_from_profile">Nom (du profil) : %1$s</string>
+    <string name="profile_your_nickname">Votre pseudo : %1$s</string>
+    <string name="profile_nickname_not_set">Non défini</string>
+    <string name="profile_set_nickname">Définir un pseudo</string>
+    <string name="profile_edit_nickname">Modifier le pseudo</string>
+    <string name="profile_nickname_dialog_title">Définir un pseudo</string>
+    <string name="profile_nickname_hint">Pseudo</string>
+    <string name="profile_nickname_private_hint">Vous seul le voyez sur cet appareil. L’effacer rétablit son nom de profil. Les surnoms enregistrés sont nettoyés et limités à 80 caractères.</string>
     <string name="dismiss">Fermer</string>
     <string name="edit">Modifier</string>
     <string name="save_group">Enregistrer le groupe</string>

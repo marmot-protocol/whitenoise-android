@@ -24,9 +24,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,7 +39,9 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -158,7 +162,12 @@ internal fun ProfileSheet(
     }
 
     val profile = hex?.let { appState.userProfile(it) }
-    val title = hex?.let { appState.displayName(it) } ?: IdentityFormatter.short(npub)
+    val title = hex?.let { appState.networkDisplayName(it) } ?: IdentityFormatter.short(npub)
+    val contactNickname = hex?.let { appState.contactNickname(it) }
+    // #1226: the header + identity surfaces show the nickname when one is set;
+    // the "name from profile" section and the nickname dialog deliberately keep
+    // the real profile name (`title`) so the user sees what they're renaming.
+    val displayTitle = contactNickname ?: title
     val pictureUrl = hex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
     val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl)
     val about = ProfileSanitizer.about(profile?.about)
@@ -201,6 +210,7 @@ internal fun ProfileSheet(
     var creatingChat by remember(npub) { mutableStateOf(false) }
     var showStartGroup by remember(npub) { mutableStateOf(false) }
     var showAddToGroups by remember(npub) { mutableStateOf(false) }
+    var showNicknameDialog by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
     val activeAccountHex = appState.activeAccount?.accountIdHex
     // UI guard covers both profile actions, including "Start new group". The
@@ -219,7 +229,7 @@ internal fun ProfileSheet(
                 listOf(
                     RecipientSearch.Candidate(
                         accountIdHex = hex!!,
-                        displayName = title,
+                        displayName = displayTitle,
                         npub = npub,
                     ),
                 ),
@@ -232,7 +242,7 @@ internal fun ProfileSheet(
     if (showAddToGroups && hex != null) {
         ProfileAddToGroupsSheet(
             appState = appState,
-            targetName = title,
+            targetName = displayTitle,
             groups = addableGroups,
             busy = addingToGroups,
             onDismiss = { if (!addingToGroups) showAddToGroups = false },
@@ -254,6 +264,18 @@ internal fun ProfileSheet(
             },
         )
         return
+    }
+
+    if (showNicknameDialog && hex != null && !targetIsSelf) {
+        ContactNicknameDialog(
+            profileName = title,
+            initialNickname = contactNickname.orEmpty(),
+            onDismiss = { showNicknameDialog = false },
+            onSave = { nickname ->
+                appState.setContactNickname(hex!!, nickname)
+                showNicknameDialog = false
+            },
+        )
     }
 
     ModalBottomSheet(
@@ -278,14 +300,14 @@ internal fun ProfileSheet(
                         ) { fullPictureOpen = true },
             ) {
                 Avatar(
-                    title = title,
+                    title = displayTitle,
                     seed = hex ?: npub,
                     size = 96.dp,
                     pictureUrl = pictureUrl,
                 )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                Text(displayTitle, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 if (nip05 != null) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Icon(
@@ -347,6 +369,30 @@ internal fun ProfileSheet(
                     clipboard = clipboard,
                     appState = appState,
                 )
+                if (hex != null && !targetIsSelf) {
+                    SectionCard(title = stringResource(R.string.profile_private_nickname)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                stringResource(R.string.profile_name_from_profile, title),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Text(
+                                stringResource(
+                                    R.string.profile_your_nickname,
+                                    contactNickname ?: stringResource(R.string.profile_nickname_not_set),
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Text(
+                                stringResource(R.string.profile_nickname_private_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
                 SectionCard(title = stringResource(R.string.about)) {
                     Text(
                         about ?: stringResource(R.string.profile_no_bio),
@@ -378,8 +424,22 @@ internal fun ProfileSheet(
             if (hex != null && !targetIsSelf) {
                 Column(Modifier.fillMaxWidth()) {
                     SettingsActionRow(
+                        icon = Icons.Default.Edit,
+                        title =
+                            stringResource(
+                                if (contactNickname == null) {
+                                    R.string.profile_set_nickname
+                                } else {
+                                    R.string.profile_edit_nickname
+                                },
+                            ),
+                        value = contactNickname,
+                        enabled = !creatingChat,
+                        onClick = { showNicknameDialog = true },
+                    )
+                    SettingsActionRow(
                         icon = Icons.Default.Group,
-                        title = stringResource(R.string.profile_start_new_group_with, title),
+                        title = stringResource(R.string.profile_start_new_group_with, displayTitle),
                         enabled = !creatingChat,
                         onClick = { showStartGroup = true },
                     )
@@ -412,13 +472,58 @@ internal fun ProfileSheet(
 
     if (fullPictureOpen && pictureUrl != null && avatarImageAvailable) {
         AvatarFullScreenViewer(
-            title = title,
+            title = displayTitle,
             seed = hex ?: npub,
             pictureUrl = pictureUrl,
             onDismiss = { fullPictureOpen = false },
             securePolicy = securePolicy,
         )
     }
+}
+
+@Composable
+private fun ContactNicknameDialog(
+    profileName: String,
+    initialNickname: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var nickname by remember(initialNickname) { mutableStateOf(initialNickname) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.profile_nickname_dialog_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    stringResource(R.string.profile_name_from_profile, profileName),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = nickname,
+                    onValueChange = { nickname = it },
+                    label = { Text(stringResource(R.string.profile_nickname_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    stringResource(R.string.profile_nickname_private_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(nickname) }) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

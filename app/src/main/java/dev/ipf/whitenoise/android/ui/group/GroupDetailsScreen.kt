@@ -756,27 +756,28 @@ internal fun GroupDetailsScreen(
             // ordering consistent across device locales (e.g. Turkish I).
             val activeAccountIdHex = appState.activeAccount?.accountIdHex
             // Prefetch member profiles here so the title map below can stay a
-            // pure read (chatMemberTitleCached); the profile-revision key
-            // recomposes the sort once names land.
+            // pure read (contactDisplayNameCached); the profile/nickname
+            // revision key recomposes the sort once names or local aliases land.
             LaunchedEffect(controller.members) {
                 appState.requestProfiles(controller.members.map { it.memberIdHex })
             }
+            val memberTitlesByHex =
+                remember(controller.members, appState.profileRevisionForCompose) {
+                    controller.members.associate {
+                        it.memberIdHex to appState.contactDisplayNameCached(it.memberIdHex)
+                    }
+                }
             val displayedMembers =
                 remember(
                     controller.members,
                     activeAccountIdHex,
-                    appState.profileRevisionForCompose,
+                    memberTitlesByHex,
                 ) {
-                    val titlesByHex =
-                        controller.members.associate {
-                            it.memberIdHex to
-                                appState.chatMemberTitleCached(it.memberIdHex).lowercase(Locale.ROOT)
-                        }
                     controller.members.sortedWith(
                         compareBy(
                             { !GroupProjector.isActiveAccountMember(it, activeAccountIdHex) },
                             { !controller.isAdmin(it) },
-                            { titlesByHex[it.memberIdHex].orEmpty() },
+                            { memberTitlesByHex[it.memberIdHex]?.lowercase(Locale.ROOT).orEmpty() },
                             { it.memberIdHex.lowercase(Locale.ROOT) },
                         ),
                     )
@@ -786,7 +787,7 @@ internal fun GroupDetailsScreen(
                 when {
                     memberNeedle.isNotEmpty() ->
                         displayedMembers.filter {
-                            appState.chatMemberTitleCached(it.memberIdHex).contains(memberNeedle, ignoreCase = true)
+                            memberTitlesByHex[it.memberIdHex].orEmpty().contains(memberNeedle, ignoreCase = true)
                         }
                     membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT -> displayedMembers
                     else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)

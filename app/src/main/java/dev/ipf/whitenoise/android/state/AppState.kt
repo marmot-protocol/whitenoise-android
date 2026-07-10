@@ -777,6 +777,26 @@ internal class ConversationStateRetention(
     }
 }
 
+internal data class ProfilePresentationRevision(
+    val profiles: Int,
+    val contactNicknames: Int,
+)
+
+internal fun contactNicknameAccountRefForAccess(
+    accountRef: String?,
+    accounts: List<AccountSummaryFfi>,
+    contactPubkeyHex: String,
+): String? {
+    val account = accountRef ?: return null
+    if (isLocalContactAccount(accounts, contactPubkeyHex)) return null
+    return account
+}
+
+internal fun isLocalContactAccount(
+    accounts: List<AccountSummaryFfi>,
+    accountIdHex: String,
+): Boolean = accounts.any { it.accountIdHex.equals(accountIdHex, ignoreCase = true) }
+
 class WhiteNoiseAppState(
     context: Context,
 ) {
@@ -1032,17 +1052,17 @@ class WhiteNoiseAppState(
 
     private val npubs = BoundedNpubCache()
     private var profileRevision by mutableStateOf(0)
+    private var contactNicknameRevision by mutableStateOf(0)
 
     /**
-     * Read-only Compose-tracked snapshot of [profileRevision] so callers
-     * outside this file can subscribe to profile-cache invalidations
-     * without exposing the mutable backing field. Includes this in a
-     * `remember(...)` key list to re-fire a derivation when a profile
-     * update lands (e.g. the chat-list search filter must re-evaluate
-     * its title projection when a DM peer's display name resolves).
+     * Read-only Compose-tracked snapshot of profile-presentation invalidations
+     * so callers outside this file can subscribe without exposing the mutable
+     * backing fields. Includes this in a `remember(...)` key list to re-fire a
+     * derivation when a profile update or private contact nickname edit lands
+     * (e.g. the chat-list search filter must re-evaluate its visible title).
      */
-    val profileRevisionForCompose: Int
-        get() = profileRevision
+    internal val profileRevisionForCompose: ProfilePresentationRevision
+        get() = ProfilePresentationRevision(profileRevision, contactNicknameRevision)
     private val profilePresentations = BoundedEntryCache<String, ProfilePresentation>(MAX_PROFILE_PRESENTATION_CACHE_ENTRIES)
 
     // Materialized profile metadata, populated off-main by [refreshProfile].
@@ -2227,6 +2247,12 @@ class WhiteNoiseAppState(
         }
     }
 
+    private fun clearContactNicknamesForAccount(accountRef: String) {
+        if (ContactNicknamePreferences.clearAllForAccount(preferences, accountRef)) {
+            contactNicknameRevision += 1
+        }
+    }
+
     /**
      * Drop per-account identity/metadata caches so account A's data isn't
      * reachable after switching to B, and so they don't grow unbounded across
@@ -2303,6 +2329,7 @@ class WhiteNoiseAppState(
                 // KeyPackage cleanup is the engine's to retry on next sign-in.
                 pushTokenStore.recordPendingDisable(signedOutRef)
             }.getOrNull()
+        clearContactNicknamesForAccount(signedOutRef)
         refreshAccounts()
         val outcome = signOutOutcome(accounts.map { it.label }, signedOutRef)
         val next = outcome.nextActiveRef
@@ -2371,6 +2398,7 @@ class WhiteNoiseAppState(
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                 return null
             }
+        clearContactNicknamesForAccount(wipedRef)
         wipeDecryptedMediaFromDisk()
         clearHiddenMessagesForAccount(wipedRef)
         val refreshedAccounts = runCatching { marmotIo { listAccounts() } }.getOrDefault(emptyList())
@@ -3764,7 +3792,9 @@ class WhiteNoiseAppState(
         return settings.localNotificationsEnabled
     }
 
-    fun displayName(accountIdHex: String): String {
+    fun displayName(accountIdHex: String): String = displayNameForAccount(activeAccountRef, accountIdHex)
+
+    fun networkDisplayName(accountIdHex: String): String {
         profileDisplayName(accountIdHex)?.let { return it }
         requestProfile(accountIdHex)
         accounts.firstOrNull { it.accountIdHex == accountIdHex }?.let {
@@ -3774,10 +3804,45 @@ class WhiteNoiseAppState(
     }
 
     fun chatMemberTitle(accountIdHex: String): String {
+        contactNicknameFor(activeAccountRef, accountIdHex)?.let { return it }
         profileDisplayName(accountIdHex)?.let { return it }
         requestProfile(accountIdHex)
         return shortNpub(accountIdHex)
     }
+
+    fun contactNickname(accountIdHex: String): String? = contactNicknameFor(activeAccountRef, accountIdHex)
+
+    fun setContactNickname(
+        accountIdHex: String,
+        nickname: String,
+    ) {
+        val account = contactNicknameAccountRefForAccess(activeAccountRef, accounts, accountIdHex) ?: return
+        if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
+            contactNicknameRevision += 1
+        }
+    }
+
+    private fun displayNameForAccount(
+        accountRef: String?,
+        accountIdHex: String,
+    ): String {
+        contactNicknameFor(accountRef, accountIdHex)?.let { return it }
+        return networkDisplayName(accountIdHex)
+    }
+
+    private fun contactNicknameFor(
+        accountRef: String?,
+        accountIdHex: String,
+    ): String? {
+        // Intentional Compose snapshot read: cached title helpers are often
+        // called from remember{} blocks that otherwise wouldn't observe local
+        // nickname edits.
+        contactNicknameRevision
+        val account = contactNicknameAccountRefForAccess(accountRef, accounts, accountIdHex) ?: return null
+        return ContactNicknamePreferences.readNickname(preferences, account, accountIdHex)
+    }
+
+    private fun isLocalAccount(accountIdHex: String): Boolean = isLocalContactAccount(accounts, accountIdHex)
 
     // Pure read for use inside remember{}: returns the cached display name or the
     // short npub. Reads the presentation map directly (not profilePresentation(),
@@ -3788,6 +3853,11 @@ class WhiteNoiseAppState(
         profileRevision
         val cachedName = synchronized(profilePresentationLock) { profilePresentations[accountIdHex]?.displayName }
         return cachedName ?: shortNpub(accountIdHex)
+    }
+
+    fun contactDisplayNameCached(accountIdHex: String): String {
+        contactNicknameFor(activeAccountRef, accountIdHex)?.let { return it }
+        return chatMemberTitleCached(accountIdHex)
     }
 
     private fun profileDisplayName(accountIdHex: String): String? = profilePresentation(accountIdHex).displayName
@@ -4242,6 +4312,7 @@ class WhiteNoiseAppState(
     private suspend fun notificationSenderName(update: NotificationUpdateFfi): String? {
         val senderIdHex = update.sender.accountIdHex
         if (senderIdHex.isBlank()) return null
+        contactNicknameFor(update.accountRef, senderIdHex)?.let { return it }
         val resolvedName =
             runCatching {
                 marmotIo { runCatching { marmot().displayName(senderIdHex) }.getOrNull() }
@@ -4320,7 +4391,7 @@ class WhiteNoiseAppState(
             when {
                 GroupSystemEvents.isSelf(update.accountIdHex, actorHex) -> appContext.getString(R.string.you)
                 !senderName.isNullOrBlank() -> senderName
-                !actorHex.isNullOrBlank() -> runCatching { chatMemberTitle(actorHex) }.getOrNull()
+                !actorHex.isNullOrBlank() -> runCatching { displayNameForAccount(update.accountRef, actorHex) }.getOrNull()
                 else -> null
             } ?: appContext.getString(R.string.group_system_someone)
         return NotificationSystemText(
@@ -4358,7 +4429,7 @@ class WhiteNoiseAppState(
             groupIdHex = update.groupIdHex,
             otherMemberAccount = GroupProjector.otherMemberAccount(members, update.accountIdHex),
             memberCount = members.size,
-            memberTitle = { chatMemberTitle(it) },
+            memberTitle = { displayNameForAccount(update.accountRef, it) },
             copy = notificationGroupTitleCopy(),
         )
     }
