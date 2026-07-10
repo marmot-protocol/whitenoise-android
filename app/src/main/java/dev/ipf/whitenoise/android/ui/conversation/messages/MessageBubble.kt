@@ -1212,7 +1212,7 @@ internal fun MessageBubble(
                             // because the widest child is then small (#208 preserved).
                             fillWidth = true,
                             mentionDisplayName =
-                                remember(appState) {
+                                remember(appState, appState.profileRevisionForCompose) {
                                     { bech32: String -> appState.mentionDisplayName(bech32) }
                                 },
                         )

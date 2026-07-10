@@ -8,7 +8,7 @@ import java.io.File
 
 class MessageBubbleReplyPreviewMentionResolverCoverageTest {
     @Test
-    fun timelineReplyPreviewMentionResolverIsStableAcrossRecomposition() {
+    fun timelineReplyPreviewMentionResolverIsStableUntilProfilePresentationChanges() {
         val body = messageBubbleSource().readText().functionBody("MessageBubble")
         val replyPreviewCall =
             body
@@ -21,9 +21,9 @@ class MessageBubbleReplyPreviewMentionResolverCoverageTest {
                 .containsMatchIn(replyPreviewCall),
         )
         assertTrue(
-            "timeline reply preview mentionDisplayName must be remembered against appState",
+            "timeline reply preview mentionDisplayName must invalidate when profile presentation changes",
             Regex(
-                """mentionDisplayName\s*=\s*remember\(appState\)\s*\{\s*\{\s*bech32:\s*String\s*->\s*appState\.mentionDisplayName\(bech32\)\s*}\s*}""",
+                """mentionDisplayName\s*=\s*remember\(appState,\s*appState\.profileRevisionForCompose\)\s*\{\s*\{\s*bech32:\s*String\s*->\s*appState\.mentionDisplayName\(bech32\)\s*}\s*}""",
                 RegexOption.DOT_MATCHES_ALL,
             ).containsMatchIn(replyPreviewCall),
         )
