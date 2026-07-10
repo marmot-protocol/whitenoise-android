@@ -111,6 +111,9 @@ class VideoAttachmentCacheStateTest {
                 ?: error("Missing MediaVideo.kt source file")
         val bubbleStart = source.indexOf("internal fun MediaVideoBubble(")
         val bubbleEnd = source.indexOf("@VisibleForTesting", bubbleStart)
+        check(bubbleStart >= 0 && bubbleEnd > bubbleStart) {
+            "Could not locate MediaVideoBubble boundaries in MediaVideo.kt; update this regression test"
+        }
         val bubble = source.substring(bubbleStart, bubbleEnd)
 
         assertTrue(
