@@ -22,6 +22,7 @@ import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.GroupDetailsFfi
+import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -5643,6 +5644,20 @@ class ConversationController(
         }.onFailure {
             if (it is CancellationException) throw it
             appState.present(R.string.toast_couldnt_load_mls_state, AppText.Plain(it.message ?: it.javaClass.simpleName), copyable = true)
+        }.getOrNull()
+    }
+
+    suspend fun groupPushDebugInfo(): GroupPushDebugInfoFfi? {
+        val account = conversationAccountRef ?: return null
+        return runCatching {
+            appState.marmotIo { groupPushDebugInfo(account, group.groupIdHex) }
+        }.onFailure {
+            if (it is CancellationException) throw it
+            appState.present(
+                R.string.toast_couldnt_load_push_debug_info,
+                AppText.Plain(it.message ?: it.javaClass.simpleName),
+                copyable = true,
+            )
         }.getOrNull()
     }
 
