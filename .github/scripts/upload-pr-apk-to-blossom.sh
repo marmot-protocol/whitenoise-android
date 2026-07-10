@@ -30,18 +30,24 @@ trap 'rm -rf "$tmp"' EXIT
 for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
   stdout="$tmp/stdout"
   stderr="$tmp/stderr"
+  timeout_stderr="$tmp/timeout-stderr"
 
   set +e
-  timeout --signal=TERM --kill-after=10s "${attempt_timeout_seconds}s" \
-    "$nak_bin" blossom upload \
-      --server "$BLOSSOM_SERVER" \
-      --sec "$BLOSSOM_UPLOAD_NSEC" \
-      < "$APK_PATH" > "$stdout" 2> "$stderr"
+  # The single-quoted command expands only inside the isolated child shell.
+  # shellcheck disable=SC2016
+  NAK_BIN_VALUE="$nak_bin" LC_ALL=C \
+    timeout --verbose --signal=TERM --kill-after=10s "${attempt_timeout_seconds}s" \
+      bash -c 'exec "$NAK_BIN_VALUE" blossom upload --server "$BLOSSOM_SERVER" --sec "$BLOSSOM_UPLOAD_NSEC" 2>&3' \
+      < "$APK_PATH" > "$stdout" 2> "$timeout_stderr" 3> "$stderr"
   status=$?
   set -e
 
   if (( status == 0 )); then
-    returned=$(jq -r '.sha256 // empty' < "$stdout")
+    if ! returned=$(jq -er '.sha256 | select(type == "string")' < "$stdout" 2>/dev/null) || \
+      [[ -z "$returned" ]]; then
+      printf 'Blossom upload returned an invalid response\n' >&2
+      exit 1
+    fi
     if [[ "$returned" != "$apk_sha256" ]]; then
       printf 'Blossom upload sha mismatch: local=%s returned=%s\n' \
         "$apk_sha256" "$returned" >&2
@@ -52,12 +58,19 @@ for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
   fi
 
   error=$(<"$stderr")
+  timeout_error=$(<"$timeout_stderr")
   if [[ -n "$error" ]]; then
     printf '%s\n' "$error" >&2
   fi
+  if [[ -n "$timeout_error" ]]; then
+    printf '%s\n' "$timeout_error" >&2
+  fi
 
   transient=false
-  if (( status == 124 || status == 137 )); then
+  if (( status == 124 )); then
+    transient=true
+  elif (( status == 137 )) && \
+    [[ "$timeout_error" == *'timeout: sending signal KILL to command '* ]]; then
     transient=true
   elif [[ "$error" =~ upload\ returned\ an\ error\ \(([0-9]{3})\) ]]; then
     if [[ "${BASH_REMATCH[1]}" =~ ^5 ]]; then

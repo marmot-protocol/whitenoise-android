@@ -39,6 +39,14 @@ case "$FAKE_SCENARIO:$attempt" in
   timeout:1)
     sleep 2
     ;;
+  forced-timeout:1)
+    trap '' TERM
+    sleep 12
+    ;;
+  self-sigkill:*)
+    printf 'timeout: sending signal KILL to command fake-nak\n' >&2
+    kill -KILL "$$"
+    ;;
   http-401:*)
     printf "failed to upload to 'https://example.test': failed to upload: upload returned an error (401): unauthorized\n" >&2
     exit 123
@@ -49,6 +57,13 @@ case "$FAKE_SCENARIO:$attempt" in
     ;;
   hash-mismatch:*)
     printf '{"sha256":"%064d"}\n' 0
+    exit 0
+    ;;
+  empty-output:*)
+    exit 0
+    ;;
+  malformed-output:*)
+    printf 'not-json\n'
     exit 0
     ;;
   nxdomain:*)
@@ -107,6 +122,16 @@ printf 'ok - retries a transient broken pipe\n'
 assert_success_after_retry timeout
 printf 'ok - retries a bounded upload timeout\n'
 
+assert_success_after_retry forced-timeout
+printf 'ok - retries a timeout that requires SIGKILL escalation\n'
+
+run_uploader self-sigkill
+[[ "$status" == '137' ]]
+[[ "$(<"$state")" == '1' ]]
+[[ "$(<"$stderr")" != *'Transient Blossom upload failure'* ]]
+[[ "$(<"$stderr")" != *'test-secret-must-not-leak'* ]]
+printf 'ok - does not retry an unrelated SIGKILL\n'
+
 run_uploader http-401
 [[ "$status" != '0' ]]
 [[ "$(<"$state")" == '1' ]]
@@ -130,3 +155,12 @@ run_uploader hash-mismatch
 [[ "$(<"$stderr")" == *'Blossom upload sha mismatch'* ]]
 [[ "$(<"$stderr")" != *'test-secret-must-not-leak'* ]]
 printf 'ok - fails closed on a returned SHA-256 mismatch\n'
+
+for scenario in empty-output malformed-output; do
+  run_uploader "$scenario"
+  [[ "$status" != '0' ]]
+  [[ "$(<"$state")" == '1' ]]
+  [[ "$(<"$stderr")" == *'Blossom upload returned an invalid response'* ]]
+  [[ "$(<"$stderr")" != *'test-secret-must-not-leak'* ]]
+done
+printf 'ok - fails closed on empty or malformed success output\n'
