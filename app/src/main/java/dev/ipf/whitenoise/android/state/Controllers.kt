@@ -345,6 +345,32 @@ internal fun rollbackOptimisticChatListPreview(
     }
 
 /**
+ * Reconcile a chat-list row returned from [markTimelineMessageRead] with the
+ * in-memory row the subscription may have updated while the FFI call was
+ * suspended. Returns null when the mark-read projection is strictly older than
+ * what is already folded (a superseded concurrent mark-read).
+ */
+internal fun mergeMarkReadChatListRow(
+    current: ChatListRowFfi,
+    incoming: ChatListRowFfi,
+): ChatListRowFfi? {
+    val incomingReadAt = incoming.lastReadTimelineAt
+    val currentReadAt = current.lastReadTimelineAt
+    if (incomingReadAt != null && currentReadAt != null && incomingReadAt < currentReadAt) {
+        return null
+    }
+    val incomingLastAt = incoming.lastMessage?.timelineAt
+    val currentLastAt = current.lastMessage?.timelineAt
+    if (currentLastAt != null && incomingLastAt != null && incomingLastAt < currentLastAt) {
+        return current.copy(
+            lastReadMessageIdHex = incoming.lastReadMessageIdHex,
+            lastReadTimelineAt = incoming.lastReadTimelineAt,
+        )
+    }
+    return incoming
+}
+
+/**
  * The last-message text a chat row should run through the markdown parser,
  * or null when the row's preview line will show fallback copy instead of
  * the message body. Mirrors [ChatListItem.projectedPreviewText]'s generic
@@ -1918,6 +1944,25 @@ class ChatsController(
         scheduleRecompute()
     }
 
+    /**
+     * Fold a chat-list row returned synchronously from a mark-read FFI call.
+     * The chat-list subscription normally carries unread deltas, but
+     * [markTimelineMessageRead]'s authoritative projection is its return value;
+     * applying it here keeps badges and reopen dividers current even when no
+     * OS notification was posted (issue #1251).
+     */
+    fun applyChatListRow(row: ChatListRowFfi) {
+        if (accountRef == null) return
+        val key = chatRowKey(row.groupIdHex)
+        val current = chatRowsByGroup[key]
+        if (current == null) {
+            foldChatRow(row)
+            return
+        }
+        val merged = mergeMarkReadChatListRow(current, row) ?: return
+        foldChatRow(merged)
+    }
+
     private fun replaceChatRows(rows: List<ChatListRowFfi>) {
         chatRowsByGroup.clear()
         rows.forEach { row -> chatRowsByGroup[chatRowKey(row.groupIdHex)] = row }
@@ -2364,7 +2409,8 @@ class ChatsController(
                 ?.messageIdHex
                 ?.takeIf { it.isNotBlank() } ?: return false
         return runCatching {
-            appState.marmotIo { markTimelineMessageRead(account, item.group.groupIdHex, lastId) }
+            val row = appState.marmotIo { markTimelineMessageRead(account, item.group.groupIdHex, lastId) }
+            row?.let(::applyChatListRow)
             appState.dismissConversationNotifications(account, item.group.groupIdHex)
             true
         }.onFailure {
@@ -6085,7 +6131,11 @@ class ConversationController(
             )
             return
         }
-        markReadResult.getOrNull()?.lastReadTimelineAt?.let { persistedLastReadTimelineAt = it }
+        markReadResult.getOrNull()?.let { row ->
+            if (trimmed != lastReadMessageId) return@let
+            row.lastReadTimelineAt?.let { persistedLastReadTimelineAt = it }
+            appState.applyChatListRowFromMarkRead(account, row)
+        }
         val anchoredAtSeconds = (System.currentTimeMillis() / 1_000L).toULong()
         anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)
         runCatching {
