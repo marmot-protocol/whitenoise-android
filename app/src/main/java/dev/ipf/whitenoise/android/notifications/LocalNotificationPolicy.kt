@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import dev.ipf.marmotkit.NotificationUpdateFfi
+import dev.ipf.whitenoise.android.state.ChatNotifyMode
 
 object LocalNotificationPolicy {
     fun shouldPost(
@@ -9,10 +10,14 @@ object LocalNotificationPolicy {
         activeConversationGroupIdHex: String?,
         activeConversationAccountRef: String?,
         appLockScreenVisible: Boolean,
-        isConversationMuted: (accountRef: String, groupIdHex: String) -> Boolean = { _, _ -> false },
+        conversationNotifyMode: (accountRef: String, groupIdHex: String) -> ChatNotifyMode = { _, _ -> ChatNotifyMode.ALL },
     ): Boolean {
         if (appLockScreenVisible) return false
-        if (isConversationMuted(update.accountRef, update.groupIdHex)) return false
+        when (conversationNotifyMode(update.accountRef, update.groupIdHex)) {
+            ChatNotifyMode.ALL -> Unit
+            ChatNotifyMode.MENTIONS_ONLY -> if (!update.isMention) return false
+            ChatNotifyMode.NONE -> return false
+        }
 
         // Suppress only the conversation the user is actively viewing — and only
         // for the account that is viewing it. A group is shared by every local

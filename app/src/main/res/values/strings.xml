@@ -997,8 +997,11 @@
     <string name="chat_lock">Chat lock</string>
     <string name="collapse_long_messages">Collapse long messages</string>
     <string name="collapse_long_messages_subtitle">Show a Read More shortcut for long messages in this chat</string>
-    <string name="mute_notifications">Mute notifications</string>
-    <string name="mute_notifications_subtitle">Stop OS notifications for this chat</string>
+    <string name="notify">Notify</string>
+    <string name="notify_all_messages">All messages</string>
+    <string name="notify_only_mentions">Only mentions</string>
+    <string name="notify_nothing">Nothing</string>
+    <string name="customize_sound_vibration">Customize sound &amp; vibration</string>
     <string name="chat_muted_badge">Muted</string>
     <string name="toast_disappearing_not_applied">The group was created, but disappearing messages could not be turned on</string>
     <string name="search_members">Search members</string>

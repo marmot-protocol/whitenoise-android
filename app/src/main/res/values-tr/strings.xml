@@ -966,8 +966,11 @@
     <string name="see_all_members">%1$d üyenin tümünü gör</string>
     <string name="chat_lock">Sohbet kilidi</string>
     <string name="collapse_long_messages">Uzun mesajları daralt</string>
-    <string name="mute_notifications">Bildirimleri sessize al</string>
-    <string name="mute_notifications_subtitle">Bu sohbet için işletim sistemi bildirimlerini durdur</string>
+    <string name="notify">Bildirimler</string>
+    <string name="notify_all_messages">Tüm mesajlar</string>
+    <string name="notify_only_mentions">Yalnızca bahsetmeler</string>
+    <string name="notify_nothing">Hiçbiri</string>
+    <string name="customize_sound_vibration">Ses ve titreşimi özelleştir</string>
     <string name="chat_muted_badge">Sessize alındı</string>
     <string name="collapse_long_messages_subtitle">Bu sohbette uzun mesajlar için “Devamını oku” kısayolu göster</string>
     <string name="toast_disappearing_not_applied">Grup oluşturuldu ancak kaybolan mesajlar açılamadı</string>

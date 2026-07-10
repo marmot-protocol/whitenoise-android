@@ -28,7 +28,6 @@ import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
@@ -253,7 +252,7 @@ class LocalNotificationPresenter(
                         }
                     }
                 if (!redactContent) {
-                    conversationShortcutId(update)?.let { shortcutId ->
+                    conversationShortcutId(update.accountRef, update.groupIdHex)?.let { shortcutId ->
                         val locusId = LocusIdCompat(shortcutId)
                         builder
                             .setShortcutId(shortcutId)
@@ -448,11 +447,6 @@ class LocalNotificationPresenter(
         return NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(existing.notification)
     }
 
-    private fun conversationShortcutId(update: NotificationUpdateFfi): String? {
-        if (update.accountRef.isBlank() || update.groupIdHex.isBlank()) return null
-        return "conversation-" + sha256Hex("${update.accountRef}\u0000${update.groupIdHex}").take(32)
-    }
-
     private fun publishConversationShortcut(
         update: NotificationUpdateFfi,
         content: LocalNotificationContent,
@@ -530,12 +524,6 @@ class LocalNotificationPresenter(
             .setName(content.senderName)
             .setKey(content.senderKey)
             .build()
-
-    private fun sha256Hex(value: String): String =
-        MessageDigest
-            .getInstance("SHA-256")
-            .digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString(separator = "") { "%02x".format(it) }
 
     private fun replyNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action {
         val remoteInput =

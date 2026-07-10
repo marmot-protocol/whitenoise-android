@@ -994,8 +994,11 @@
     <string name="see_all_members">Показать всех участников (%1$d)</string>
     <string name="chat_lock">Блокировка чата</string>
     <string name="collapse_long_messages">Сворачивать длинные сообщения</string>
-    <string name="mute_notifications">Отключить уведомления</string>
-    <string name="mute_notifications_subtitle">Не показывать системные уведомления для этого чата</string>
+    <string name="notify">Уведомлять</string>
+    <string name="notify_all_messages">Все сообщения</string>
+    <string name="notify_only_mentions">Только упоминания</string>
+    <string name="notify_nothing">Ничего</string>
+    <string name="customize_sound_vibration">Настроить звук и вибрацию</string>
     <string name="chat_muted_badge">Без звука</string>
     <string name="collapse_long_messages_subtitle">Показывать кнопку «Читать дальше» для длинных сообщений в этом чате</string>
     <string name="toast_disappearing_not_applied">Группа создана, но исчезающие сообщения включить не удалось</string>

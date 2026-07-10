@@ -966,8 +966,11 @@
     <string name="see_all_members">Alle %1$d Mitglieder anzeigen</string>
     <string name="chat_lock">Chatsperre</string>
     <string name="collapse_long_messages">Lange Nachrichten einklappen</string>
-    <string name="mute_notifications">Benachrichtigungen stummschalten</string>
-    <string name="mute_notifications_subtitle">OS-Benachrichtigungen für diesen Chat stoppen</string>
+    <string name="notify">Benachrichtigen</string>
+    <string name="notify_all_messages">Alle Nachrichten</string>
+    <string name="notify_only_mentions">Nur Erwähnungen</string>
+    <string name="notify_nothing">Nichts</string>
+    <string name="customize_sound_vibration">Ton und Vibration anpassen</string>
     <string name="chat_muted_badge">Stummgeschaltet</string>
     <string name="collapse_long_messages_subtitle">Für lange Nachrichten in diesem Chat eine „Mehr lesen“-Verknüpfung anzeigen</string>
     <string name="toast_disappearing_not_applied">Die Gruppe wurde erstellt, aber verschwindende Nachrichten konnten nicht aktiviert werden</string>

@@ -2887,6 +2887,19 @@ class WhiteNoiseAppState(
         return chatMutePreferences.isMuted(accountRef, groupIdHex)
     }
 
+    fun conversationNotifyMode(groupIdHex: String): ChatNotifyMode {
+        val accountRef = activeAccountRef ?: return ChatNotifyMode.ALL
+        return chatMutePreferences.mode(accountRef, groupIdHex)
+    }
+
+    fun setConversationNotifyMode(
+        groupIdHex: String,
+        mode: ChatNotifyMode,
+    ) {
+        val accountRef = activeAccountRef ?: return
+        chatMutePreferences.setMode(accountRef, groupIdHex, mode)
+    }
+
     fun setConversationMuted(
         groupIdHex: String,
         muted: Boolean,
@@ -4678,7 +4691,7 @@ class WhiteNoiseAppState(
                 activeConversationGroupIdHex = activeConversation,
                 activeConversationAccountRef = activeConversationAccountRef,
                 appLockScreenVisible = appLockScreenVisible,
-                isConversationMuted = chatMutePreferences::isMuted,
+                conversationNotifyMode = chatMutePreferences::mode,
             )
         appStateDebug {
             "notification update key=${update.notificationKey.take(16)} trigger=${update.trigger} " +
