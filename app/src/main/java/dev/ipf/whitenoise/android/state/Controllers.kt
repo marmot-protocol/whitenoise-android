@@ -6046,6 +6046,7 @@ class ConversationController(
         runCatching {
             appState.marmotIo { initializeChatReadState(account, group.groupIdHex) }
         }.onFailure {
+            it.rethrowIfCancellation()
             Log.w("DMConversation", "initialize read state failed for ${group.groupIdHex.take(8)}", it)
         }
     }
