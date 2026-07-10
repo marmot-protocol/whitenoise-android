@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.core.GroupSystemCopy
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.HostSafety
+import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -1980,6 +1981,9 @@ class WhiteNoiseAppState(
     suspend fun importIdentity(identity: String): Boolean {
         val trimmed = identity.trim()
         if (trimmed.isEmpty()) return false
+        // Direct secret-key import is nsec-only: reject a bare public key before
+        // the engine would create a read-only account (mirrors SignInContent).
+        if (IdentityEntryInput.classify(trimmed) == IdentityEntryInput.Kind.PublicKey) return false
         return try {
             val summary = marmotIo { login(trimmed, MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays) }
             refreshAccounts()

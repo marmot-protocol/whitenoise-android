@@ -139,10 +139,10 @@ internal fun OnboardingScreen(appState: WhiteNoiseAppState) {
  * sign-in failure.
  */
 internal fun importIdentityErrorRes(identity: String): Int =
-    if (IdentityEntryInput.classify(identity) == IdentityEntryInput.Kind.Invalid) {
-        R.string.identity_entry_error_invalid_key
-    } else {
-        R.string.identity_entry_error_import_failed
+    when (IdentityEntryInput.classify(identity)) {
+        IdentityEntryInput.Kind.Invalid -> R.string.identity_entry_error_invalid_key
+        IdentityEntryInput.Kind.PublicKey -> R.string.sign_in_error_public_key
+        IdentityEntryInput.Kind.SecretKey -> R.string.identity_entry_error_import_failed
     }
 
 @Composable
