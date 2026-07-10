@@ -62,17 +62,14 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withLink
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -891,15 +888,22 @@ internal fun MessageBubble(
                 }
                 // Last-line geometry of the body so the footer can sit on
                 // that line when it fits, not merely when the widest line does.
-                var lastLineLayout by remember(record.messageIdHex) { mutableStateOf<TextLayoutResult?>(null) }
+                var lastLineLayout by remember(record.messageIdHex, bodyTextToRender) {
+                    mutableStateOf<TextLayoutResult?>(null)
+                }
                 // Overflow decision is derived from a measurement of the FULL
                 // body only. Keeping it separate from lastLineLayout (which
                 // the currently-rendered text updates) avoids a recompose
                 // loop: once we clip, the clipped text no longer overflows,
                 // which would otherwise flip the decision back and forth.
-                var bodyFullLayout by remember(record.messageIdHex) { mutableStateOf<TextLayoutResult?>(null) }
+                // Key it on the rendered text too: edit overlays can swap in a
+                // shorter body before the next Text measurement, and an old
+                // layout's line end must not index into the new string.
+                var bodyFullLayout by remember(record.messageIdHex, bodyTextToRender) {
+                    mutableStateOf<TextLayoutResult?>(null)
+                }
                 // A long body collapses to MESSAGE_COLLAPSE_LINE_LIMIT lines
-                // with an inline Read More that opens the full-screen view;
+                // with Read More in the bottom footer row opening the full-screen view;
                 // tombstones, edit/info copy, and groups with the local collapse
                 // setting disabled never collapse (#325, #1180).
                 val collapsible = collapseLongMessages && !deleted && !invalidated
@@ -914,166 +918,163 @@ internal fun MessageBubble(
                 // before.
                 val bodyFooterAndRetry: @Composable ColumnScope.() -> Unit = {
                     if (bodyTextToRender != null) {
-                        BubbleFooterLayout(
-                            footer = inlineFooter,
-                            // Body text is always start-aligned inside the
-                            // bubble, regardless of which side the bubble sits
-                            // on or how wide a sibling (reply quote, media)
-                            // makes the content column. End-aligning own
-                            // messages left a short reply drifting to the right
-                            // of a wide bubble (#439). The footer still places
-                            // itself at the block's trailing edge internally.
-                            modifier = Modifier.align(Alignment.Start),
-                            lastLineWidth =
-                                lastLineLayout?.let { layout ->
-                                    if (layout.lineCount > 0) ceil(layout.getLineRight(layout.lineCount - 1)).toInt() else null
-                                },
-                        ) {
-                            // Markdown only when the tokens describe exactly
-                            // the text we're about to show: tombstone copy,
-                            // imeta-filename fallbacks, etc. all diverge from
-                            // record.plaintext and must stay plain. An empty
-                            // document (legacy record, parse failure) falls
-                            // through to the unchanged plain-text path.
-                            val markdownDocument = record.contentTokens
-                            if (!deleted &&
+                        // Markdown only when the tokens describe exactly
+                        // the text we're about to show: tombstone copy,
+                        // imeta-filename fallbacks, etc. all diverge from
+                        // record.plaintext and must stay plain. An empty
+                        // document (legacy record, parse failure) falls
+                        // through to the unchanged plain-text path.
+                        val markdownDocument = record.contentTokens
+                        val renderMarkdownBody =
+                            !deleted &&
                                 !invalidated &&
                                 markdownDocument.blocks.isNotEmpty() &&
                                 bodyTextToRender == record.plaintext
-                            ) {
-                                // Markdown can't be cleanly truncated to a line
-                                // count mid-document, so clip to the height of
-                                // MESSAGE_COLLAPSE_LINE_LIMIT body-large lines
-                                // and drop a Read More beneath when the natural
-                                // content is taller. The natural height is
-                                // measured on the inner content (clipToBounds is
-                                // visual only and doesn't constrain it); the
-                                // overflow flag latches true so applying the cap
-                                // can't shrink the measurement and flip it back.
-                                val lineHeightPx =
-                                    with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
-                                val maxBodyHeightPx = lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT
-                                val maxBodyHeightDp = with(density) { maxBodyHeightPx.toDp() }
-                                var markdownOverflows by remember(record.messageIdHex) { mutableStateOf(false) }
-                                val collapseMarkdown = collapsible && markdownOverflows
-                                Column {
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .onSizeChanged {
-                                                    if (collapsible && it.height > maxBodyHeightPx) {
-                                                        markdownOverflows = true
-                                                    }
-                                                }.then(
-                                                    if (collapseMarkdown) {
-                                                        Modifier
-                                                            .heightIn(max = maxBodyHeightDp)
-                                                            .clipToBounds()
-                                                    } else {
-                                                        Modifier
-                                                    },
-                                                ),
-                                    ) {
-                                        // Mention names resolve through the profile
-                                        // cache; npub/nprofile taps stay in-app via
-                                        // the profile sheet (never an external nostr:
-                                        // intent). The "@" mention treatment is
-                                        // reserved for an account in the roster
-                                        // snapshot captured for this bubble (#1017),
-                                        // so later roster updates do not rewrite old
-                                        // rendered message semantics. If the roster
-                                        // has not loaded yet, leave membership unknown
-                                        // and keep pre-#1017 rendering until it does.
-                                        val mentionMemberSnapshot =
-                                            remember(record.messageIdHex, controller.membersLoaded) {
-                                                if (controller.membersLoaded) controller.members else null
-                                            }
-                                        val mentionMembershipResolver =
-                                            remember(appState, mentionMemberSnapshot) {
-                                                mentionMemberSnapshot?.let { members ->
-                                                    { bech32: String -> appState.isRosterMember(bech32, members) }
+                        // Markdown can't be cleanly truncated to a line
+                        // count mid-document, so clip to the height of
+                        // MESSAGE_COLLAPSE_LINE_LIMIT body-large lines.
+                        // The natural height is measured on the inner
+                        // content (clipToBounds is visual only and doesn't
+                        // constrain it); the overflow flag latches true so
+                        // applying the cap can't shrink the measurement and
+                        // flip it back.
+                        val lineHeightPx =
+                            with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
+                        val maxBodyHeightPx = lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT
+                        val maxBodyHeightDp = with(density) { maxBodyHeightPx.toDp() }
+                        var markdownOverflows by remember(record.messageIdHex) { mutableStateOf(false) }
+                        val collapseMarkdown = renderMarkdownBody && collapsible && markdownOverflows
+                        val plainTextOverflows =
+                            !renderMarkdownBody &&
+                                collapsible &&
+                                bodyFullLayout?.let {
+                                    it.hasVisualOverflow && it.lineCount > MESSAGE_COLLAPSE_LINE_LIMIT
+                                } == true
+                        val collapsedBody = collapseMarkdown || plainTextOverflows
+                        val messageBody: @Composable () -> Unit = {
+                            if (renderMarkdownBody) {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .onSizeChanged {
+                                                if (collapsible && it.height > maxBodyHeightPx) {
+                                                    markdownOverflows = true
                                                 }
+                                            }.then(
+                                                if (collapseMarkdown) {
+                                                    Modifier
+                                                        .heightIn(max = maxBodyHeightDp)
+                                                        .clipToBounds()
+                                                } else {
+                                                    Modifier
+                                                },
+                                            ),
+                                ) {
+                                    // Mention names resolve through the profile
+                                    // cache; npub/nprofile taps stay in-app via
+                                    // the profile sheet (never an external nostr:
+                                    // intent). The "@" mention treatment is
+                                    // reserved for an account in the roster
+                                    // snapshot captured for this bubble (#1017),
+                                    // so later roster updates do not rewrite old
+                                    // rendered message semantics. If the roster
+                                    // has not loaded yet, leave membership unknown
+                                    // and keep pre-#1017 rendering until it does.
+                                    val mentionMemberSnapshot =
+                                        remember(record.messageIdHex, controller.membersLoaded) {
+                                            if (controller.membersLoaded) controller.members else null
+                                        }
+                                    val mentionMembershipResolver =
+                                        remember(appState, mentionMemberSnapshot) {
+                                            mentionMemberSnapshot?.let { members ->
+                                                { bech32: String -> appState.isRosterMember(bech32, members) }
                                             }
-                                        MarkdownMessageBody(
-                                            markdownDocument,
-                                            mentionDisplayName =
-                                                remember(appState) {
-                                                    { bech32: String -> appState.mentionDisplayName(bech32) }
-                                                },
-                                            isGroupMember = mentionMembershipResolver,
-                                            onNostrProfileTap =
-                                                remember(appState) {
-                                                    { bech32: String -> appState.presentNostrProfile(bech32) }
-                                                },
-                                            onLastTextLayout = { lastLineLayout = it },
-                                        )
-                                    }
-                                    if (collapseMarkdown) {
-                                        Text(
-                                            readMoreLabel,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.clickable { expandedFullView = true },
-                                        )
-                                    }
+                                        }
+                                    MarkdownMessageBody(
+                                        markdownDocument,
+                                        mentionDisplayName =
+                                            remember(appState) {
+                                                { bech32: String -> appState.mentionDisplayName(bech32) }
+                                            },
+                                        isGroupMember = mentionMembershipResolver,
+                                        onNostrProfileTap =
+                                            remember(appState) {
+                                                { bech32: String -> appState.presentNostrProfile(bech32) }
+                                            },
+                                        onLastTextLayout = { lastLineLayout = it },
+                                    )
                                 }
+                            } else if (plainTextOverflows) {
+                                val layout = bodyFullLayout!!
+                                // Cut at the last fully-visible line and trim trailing
+                                // whitespace. Read More now lives in the bottom footer
+                                // row, so the body text has no inline link or tap span;
+                                // long-press anywhere on the bubble still falls through
+                                // to the action menu rather than expanding the bubble.
+                                val clippedText =
+                                    remember(bodyTextToRender, layout) {
+                                        clippedMessageBodyText(
+                                            bodyText = bodyTextToRender,
+                                            lineEnd = layout.getLineEnd(MESSAGE_COLLAPSE_LINE_LIMIT - 1, visibleEnd = true),
+                                        )
+                                    }
+                                Text(
+                                    clippedText,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    // Footer geometry follows the clipped text's
+                                    // real last line, not the full measurement.
+                                    onTextLayout = { lastLineLayout = it },
+                                )
                             } else {
-                                // Plain text truncates inline: render up to the
-                                // line limit, and if that overflows rebuild the
-                                // clipped text ending with "… Read More" (bold,
-                                // onSurface — reads as dark emphasis, not a link).
-                                // Measured with maxLines = limit + 1, so visual
-                                // overflow means the body needs more than one
-                                // extra line past the limit — clip it.
-                                val overflows =
-                                    collapsible &&
-                                        bodyFullLayout?.let {
-                                            it.hasVisualOverflow && it.lineCount > MESSAGE_COLLAPSE_LINE_LIMIT
-                                        } == true
-                                if (overflows) {
-                                    val layout = bodyFullLayout!!
-                                    // Cut at the last fully-visible line, trim trailing
-                                    // whitespace, then append the ellipsis + a Read More
-                                    // link. Only the Read More span is clickable, so a
-                                    // long-press anywhere on the bubble still falls through
-                                    // to the action menu rather than expanding the bubble.
-                                    val cut =
-                                        remember(bodyTextToRender, layout) {
-                                            bodyTextToRender
-                                                .substring(0, layout.getLineEnd(MESSAGE_COLLAPSE_LINE_LIMIT - 1, visibleEnd = true))
-                                                .trimEnd()
-                                        }
-                                    val clippedText =
-                                        remember(cut, readMoreLabel, readMoreStyle) {
-                                            buildAnnotatedString {
-                                                append(cut)
-                                                append("… ")
-                                                withLink(
-                                                    LinkAnnotation.Clickable("read_more") { expandedFullView = true },
-                                                ) {
-                                                    withStyle(readMoreStyle) { append(readMoreLabel) }
-                                                }
-                                            }
-                                        }
-                                    Text(
-                                        clippedText,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        // Footer geometry follows the clipped text's
-                                        // real last line, not the full measurement.
-                                        onTextLayout = { lastLineLayout = it },
-                                    )
-                                } else {
-                                    Text(
-                                        bodyTextToRender,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        maxLines = if (collapsible) MESSAGE_COLLAPSE_LINE_LIMIT + 1 else Int.MAX_VALUE,
-                                        onTextLayout = {
-                                            lastLineLayout = it
-                                            bodyFullLayout = it
-                                        },
-                                    )
-                                }
+                                Text(
+                                    bodyTextToRender,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    maxLines = if (collapsible) MESSAGE_COLLAPSE_LINE_LIMIT + 1 else Int.MAX_VALUE,
+                                    onTextLayout = {
+                                        lastLineLayout = it
+                                        bodyFullLayout = it
+                                    },
+                                )
+                            }
+                        }
+                        val readMoreFooter: @Composable () -> Unit = {
+                            Text(
+                                readMoreLabel,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = readMoreStyle.color,
+                                fontWeight = readMoreStyle.fontWeight,
+                                modifier =
+                                    Modifier.clickable(
+                                        onClickLabel = readMoreLabel,
+                                        role = Role.Button,
+                                    ) { expandedFullView = true },
+                            )
+                        }
+                        // Body text is always start-aligned inside the bubble,
+                        // regardless of which side the bubble sits on or how wide
+                        // a sibling (reply quote, media) makes the content column.
+                        // End-aligning own messages left a short reply drifting to
+                        // the right of a wide bubble (#439). The footer still places
+                        // itself at the block's trailing edge internally.
+                        val bodyModifier = Modifier.align(Alignment.Start)
+                        if (collapsedBody) {
+                            BubbleCollapsedFooterLayout(
+                                readMore = readMoreFooter,
+                                footer = inlineFooter,
+                                modifier = bodyModifier,
+                            ) {
+                                messageBody()
+                            }
+                        } else {
+                            BubbleFooterLayout(
+                                footer = inlineFooter,
+                                modifier = bodyModifier,
+                                lastLineWidth =
+                                    lastLineLayout?.let { layout ->
+                                        if (layout.lineCount > 0) ceil(layout.getLineRight(layout.lineCount - 1)).toInt() else null
+                                    },
+                            ) {
+                                messageBody()
                             }
                         }
                     } else if (!footerOnVisualMedia && !footerOnPendingVisual) {
@@ -1489,6 +1490,11 @@ internal fun MessageBubble(
         }
     }
 }
+
+internal fun clippedMessageBodyText(
+    bodyText: String,
+    lineEnd: Int,
+): String = bodyText.substring(0, lineEnd.coerceIn(0, bodyText.length)).trimEnd()
 
 // A body longer than this many rendered lines collapses to a Read More that
 // opens the full-screen view rather than spilling down the transcript (#325).
