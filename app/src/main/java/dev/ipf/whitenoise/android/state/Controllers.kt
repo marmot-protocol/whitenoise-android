@@ -198,12 +198,12 @@ data class ChatListItem(
      */
     fun removedFromGroup(activeAccountIdHex: String?): Boolean {
         val active = activeAccountIdHex?.trim()?.takeIf { it.isNotEmpty() } ?: return false
-        // Authoritative: the engine now reports the local account's own
-        // membership directly on the row. REMOVED (evicted) and LEFT (voluntary)
+        // Authoritative: the reconciled group and source row both carry the
+        // local account's own membership. REMOVED (evicted) and LEFT (voluntary)
         // both mean non-member, and take precedence over the roster heuristic
         // below (which stays as a fallback for the optimistic self-leave window
         // and rows whose projection hasn't landed yet).
-        if (projection?.selfMembership?.isNonMember() == true) return true
+        if (group.selfMembership.isNonMember() || projection?.selfMembership?.isNonMember() == true) return true
         if (removed) return true
         val snapshot = memberSnapshot?.takeIf { it.members.isNotEmpty() } ?: return false
         return !snapshot.containsAccount(active)
@@ -292,16 +292,16 @@ internal fun chatListItemFromProjection(
     removed: Boolean = false,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
-    // The row and group record come from independent live snapshots. Preserve a
-    // terminal membership from either one: LEFT/REMOVED cannot regress to MEMBER,
-    // and either makes a pending Welcome unactionable (#1248).
-    val selfMembership = row.selfMembership.takeIf { it.isNonMember() } ?: baseGroup.selfMembership
     val displayGroup =
-        baseGroup.copy(
-            name = row.groupName.ifBlank { baseGroup.name },
-            archived = row.archived,
-            pendingConfirmation = row.pendingConfirmation && !selfMembership.isNonMember(),
-            selfMembership = selfMembership,
+        reconcileTerminalSelfMembership(
+            update =
+                baseGroup.copy(
+                    name = row.groupName.ifBlank { baseGroup.name },
+                    archived = row.archived,
+                    pendingConfirmation = row.pendingConfirmation,
+                    selfMembership = row.selfMembership,
+                ),
+            previousSelfMembership = baseGroup.selfMembership,
         )
     val otherMember =
         members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) }
@@ -1359,6 +1359,25 @@ internal fun duplicateSignatureKeyDisplayName(
  * states; [SelfMembershipFfi.MEMBER] is the only membership-preserving value.
  */
 internal fun SelfMembershipFfi.isNonMember(): Boolean = this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.LEFT
+
+/**
+ * Reconcile independently delivered group snapshots without allowing a known
+ * terminal self-membership to regress to MEMBER. A stale Welcome is no longer
+ * actionable once either snapshot reports LEFT or REMOVED (#1248).
+ */
+internal fun reconcileTerminalSelfMembership(
+    update: AppGroupRecordFfi,
+    previousSelfMembership: SelfMembershipFfi,
+): AppGroupRecordFfi {
+    val selfMembership =
+        update.selfMembership.takeIf { it.isNonMember() }
+            ?: previousSelfMembership.takeIf { it.isNonMember() }
+            ?: update.selfMembership
+    return update.copy(
+        selfMembership = selfMembership,
+        pendingConfirmation = update.pendingConfirmation && !selfMembership.isNonMember(),
+    )
+}
 
 internal data class ConversationMembershipSeed(
     val members: List<AppGroupMemberRecordFfi>,
@@ -3675,7 +3694,12 @@ class ConversationController(
     // the next 60s sweep, flashing expired messages for up to a minute (#674).
     private fun applyGroupState(update: AppGroupRecordFfi) {
         val previousRetention = group.disappearingMessageSecs
-        group = update
+        group =
+            reconcileTerminalSelfMembership(
+                update = update,
+                previousSelfMembership = group.selfMembership,
+            )
+        if (group.selfMembership.isNonMember()) recordSelfLeft()
         if (previousRetention != update.disappearingMessageSecs) {
             publishTimelineFromIndexes()
         }
@@ -6156,12 +6180,19 @@ class ConversationController(
             ChatListUpdateTriggerFfi.MEMBERSHIP_CHANGED,
             ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH,
             -> {
+                val previousSelfMembership = group.selfMembership
                 group =
-                    group.copy(
-                        name = projected.groupName.ifBlank { group.name },
-                        archived = projected.archived,
-                        pendingConfirmation = projected.pendingConfirmation,
+                    reconcileTerminalSelfMembership(
+                        update =
+                            group.copy(
+                                name = projected.groupName.ifBlank { group.name },
+                                archived = projected.archived,
+                                pendingConfirmation = projected.pendingConfirmation,
+                                selfMembership = projected.selfMembership,
+                            ),
+                        previousSelfMembership = previousSelfMembership,
                     )
+                if (group.selfMembership.isNonMember()) recordSelfLeft()
             }
             ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE,
             ChatListUpdateTriggerFfi.LAST_MESSAGE_DELETED,
@@ -6923,17 +6954,22 @@ class ConversationController(
         details: GroupDetailsFfi,
     ): AppliedGroupDetails {
         val previousRetention = group.disappearingMessageSecs
+        val previousSelfMembership = group.selfMembership
         val applied = applyAuthoritativeGroupDetails(details)
-        group = applied.group
+        group =
+            reconcileTerminalSelfMembership(
+                update = applied.group,
+                previousSelfMembership = previousSelfMembership,
+            )
         if (previousRetention != group.disappearingMessageSecs) {
             publishTimelineFromIndexes()
         }
-        // Authoritative engine signal: the group record now carries the local
-        // account's own membership. When it reports a non-member (evicted or
+        // The reconciled group record carries the newest terminal self-membership
+        // observed by any snapshot. When it reports a non-member (evicted or
         // voluntarily left), latch the self-left marker so the composer goes
         // read-only and the roster line below drops self — no longer relying
         // solely on the UseAfterEviction string-match round-trip.
-        if (applied.group.selfMembership.isNonMember()) {
+        if (group.selfMembership.isNonMember()) {
             recordSelfLeft()
         }
         // Once a self-leave has been recorded locally, refuse to re-add self
