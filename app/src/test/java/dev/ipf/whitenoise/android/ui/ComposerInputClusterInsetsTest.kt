@@ -14,12 +14,32 @@ import org.junit.Test
 class ComposerInputClusterInsetsTest {
     @Test
     fun keyboardOpenClusterAppliesImePadding() {
-        assertTrue(composerBottomClusterAppliesImePadding(showEmojiPane = false))
+        assertTrue(
+            composerBottomClusterAppliesImePadding(
+                showEmojiPane = false,
+                composerEmojiSearchActive = false,
+            ),
+        )
     }
 
     @Test
     fun emojiPaneOpenClusterSkipsImePadding() {
-        assertFalse(composerBottomClusterAppliesImePadding(showEmojiPane = true))
+        assertFalse(
+            composerBottomClusterAppliesImePadding(
+                showEmojiPane = true,
+                composerEmojiSearchActive = false,
+            ),
+        )
+    }
+
+    @Test
+    fun emojiPaneSearchReappliesImePadding() {
+        assertTrue(
+            composerBottomClusterAppliesImePadding(
+                showEmojiPane = true,
+                composerEmojiSearchActive = true,
+            ),
+        )
     }
 
     @Test
