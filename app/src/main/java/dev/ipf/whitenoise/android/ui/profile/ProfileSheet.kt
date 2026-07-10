@@ -164,6 +164,10 @@ internal fun ProfileSheet(
     val profile = hex?.let { appState.userProfile(it) }
     val title = hex?.let { appState.networkDisplayName(it) } ?: IdentityFormatter.short(npub)
     val contactNickname = hex?.let { appState.contactNickname(it) }
+    // #1226: the header + identity surfaces show the nickname when one is set;
+    // the "name from profile" section and the nickname dialog deliberately keep
+    // the real profile name (`title`) so the user sees what they're renaming.
+    val displayTitle = contactNickname ?: title
     val pictureUrl = hex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.imageUrl(profile?.picture)
     val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl)
     val about = ProfileSanitizer.about(profile?.about)
@@ -225,7 +229,7 @@ internal fun ProfileSheet(
                 listOf(
                     RecipientSearch.Candidate(
                         accountIdHex = hex!!,
-                        displayName = title,
+                        displayName = displayTitle,
                         npub = npub,
                     ),
                 ),
@@ -238,7 +242,7 @@ internal fun ProfileSheet(
     if (showAddToGroups && hex != null) {
         ProfileAddToGroupsSheet(
             appState = appState,
-            targetName = title,
+            targetName = displayTitle,
             groups = addableGroups,
             busy = addingToGroups,
             onDismiss = { if (!addingToGroups) showAddToGroups = false },
@@ -296,14 +300,14 @@ internal fun ProfileSheet(
                         ) { fullPictureOpen = true },
             ) {
                 Avatar(
-                    title = title,
+                    title = displayTitle,
                     seed = hex ?: npub,
                     size = 96.dp,
                     pictureUrl = pictureUrl,
                 )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                Text(displayTitle, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 if (nip05 != null) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Icon(
@@ -435,7 +439,7 @@ internal fun ProfileSheet(
                     )
                     SettingsActionRow(
                         icon = Icons.Default.Group,
-                        title = stringResource(R.string.profile_start_new_group_with, title),
+                        title = stringResource(R.string.profile_start_new_group_with, displayTitle),
                         enabled = !creatingChat,
                         onClick = { showStartGroup = true },
                     )
@@ -468,7 +472,7 @@ internal fun ProfileSheet(
 
     if (fullPictureOpen && pictureUrl != null && avatarImageAvailable) {
         AvatarFullScreenViewer(
-            title = title,
+            title = displayTitle,
             seed = hex ?: npub,
             pictureUrl = pictureUrl,
             onDismiss = { fullPictureOpen = false },
