@@ -81,10 +81,9 @@ class NotificationStreamForegroundService : Service() {
                 if (shouldReconcileBackgroundConnectionRejection(trigger)) {
                     (application as? WhiteNoiseApplication)?.appState?.onBackgroundConnectionStartRejected()
                 }
+                stopSelf(startId)
                 if (recordPendingPushWakeCatchUp) {
-                    stopAfterRecordingPendingPushWakeCatchUp(startId)
-                } else {
-                    stopSelf(startId)
+                    schedulePendingPushWakeCatchUpRecording(applicationContext)
                 }
                 return START_NOT_STICKY
             }
@@ -200,13 +199,6 @@ class NotificationStreamForegroundService : Service() {
         // token to the MIP-05 server, so sync explicitly here. Idempotent: a
         // no-op when the token/server/relay fingerprint is unchanged.
         appState.syncNativePushRegistrationIfEnabled()
-    }
-
-    private fun stopAfterRecordingPendingPushWakeCatchUp(startId: Int) {
-        serviceScope.launch(Dispatchers.Default) {
-            recordPendingPushWakeCatchUp(applicationContext)
-            withContext(Dispatchers.Main.immediate) { stopSelf(startId) }
-        }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -430,6 +422,20 @@ internal fun pushWakeLockTimeoutMs(
 private const val PUSH_WAKE_DRAIN_TIMEOUT_MS = 10_000L
 private const val PUSH_WAKE_BOOTSTRAP_BUDGET_MS = 5_000L
 private const val PUSH_WAKE_NATIVE_PUSH_SYNC_BUDGET_MS = 15_000L
+
+private fun schedulePendingPushWakeCatchUpRecording(context: Context) {
+    val appContext = context.applicationContext
+    // Independent scope: onDestroy cancels the service coroutine scope before
+    // an EncryptedSharedPreferences commit finishes (#1245).
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    scope.launch {
+        try {
+            recordPendingPushWakeCatchUp(appContext)
+        } finally {
+            scope.cancel()
+        }
+    }
+}
 
 private fun recordPendingPushWakeCatchUp(context: Context) {
     runCatching {

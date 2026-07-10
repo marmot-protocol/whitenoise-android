@@ -59,21 +59,30 @@ class NotificationPushWakeDrainCoverageTest {
     }
 
     @Test
-    fun rejectedForegroundServicePushWakeRecordRunsOffMainBeforeStopping() {
+    fun rejectedForegroundServicePushWakeStopsSynchronouslyAndRecordsOffMain() {
         val onStart = serviceFunctionBody("onStartCommand")
-        val stopAfterRecord = serviceFunctionBody("stopAfterRecordingPendingPushWakeCatchUp")
+        val source = serviceSource().readText()
+        val scheduleRecording = serviceFunctionBody("schedulePendingPushWakeCatchUpRecording")
+        val stopCall = onStart.indexOf("stopSelf(startId)")
+        val scheduleCall = onStart.indexOf("schedulePendingPushWakeCatchUpRecording(applicationContext)")
 
         assertTrue(
+            "reject path must stop synchronously before scheduling the catch-up commit (#1245 FGS deadline)",
+            "ForegroundStartDecision.RejectBackgroundConnectionStartAndStop" in onStart &&
+                stopCall >= 0 &&
+                scheduleCall > stopCall &&
+                "stopAfterRecordingPendingPushWakeCatchUp" !in source,
+        )
+        assertTrue(
             "onStartCommand must not run PushTokenStore.create/commit inline on the main thread",
-            "stopAfterRecordingPendingPushWakeCatchUp(startId)" in onStart &&
+            "schedulePendingPushWakeCatchUpRecording(applicationContext)" in onStart &&
                 "recordPendingPushWakeCatchUp(applicationContext)" !in onStart,
         )
         assertTrue(
-            "rejected push-wake starts must persist the marker off-main before stopSelf cancels the service scope",
-            "serviceScope.launch(Dispatchers.Default)" in stopAfterRecord &&
-                "recordPendingPushWakeCatchUp(applicationContext)" in stopAfterRecord &&
-                "withContext(Dispatchers.Main.immediate)" in stopAfterRecord &&
-                "stopSelf(startId)" in stopAfterRecord,
+            "durable marker must use the IO dispatcher in a scope independent of serviceScope",
+            "CoroutineScope(SupervisorJob() + Dispatchers.IO)" in scheduleRecording &&
+                "serviceScope" !in scheduleRecording &&
+                "recordPendingPushWakeCatchUp" in scheduleRecording,
         )
     }
 
