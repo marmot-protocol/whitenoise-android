@@ -448,9 +448,22 @@ internal fun signOutOutcome(
 }
 
 /**
- * Signed-in accounts other than [activeLabel], for the chat-list top bar's
- * one-tap switcher row. Signed-out, read-only, and blank-label entries are
- * excluded (they are not one-tap switch targets from the chat-list chrome).
+ * Persisted account entries that can sign through either local key material or
+ * an external signer such as Amber. This is identity/signing-method inventory,
+ * not a liveness or signer-reachability check: a non-running external signer is
+ * still a signed-in signing account for account switchers, background sweeps,
+ * and notification/account-count projections.
+ */
+internal fun AccountSummaryFfi.isSignedInSigningAccount(): Boolean =
+    !signedOut &&
+        label.isNotBlank() &&
+        (localSigning || externalSigning)
+
+/**
+ * Signed-in signing accounts other than [activeLabel], for the chat-list top
+ * bar's one-tap switcher row. Signed-out, read-only (neither local nor
+ * external signer), and blank-label entries are excluded (they are not one-tap
+ * switch targets from the chat-list chrome).
  *
  * Returns empty when [activeLabel] is null. A destructive Sign Out & Wipe
  * transiently nulls the active account while it drains the wiped account's
@@ -462,15 +475,14 @@ internal fun signOutOutcome(
  * undefined with no active account, so it must present nothing across that
  * transition.
  */
+
 internal fun otherAccountAvatars(
     accounts: List<AccountSummaryFfi>,
     activeLabel: String?,
 ): List<AccountSummaryFfi> {
     if (activeLabel == null) return emptyList()
     return accounts.filter { account ->
-        account.localSigning &&
-            !account.signedOut &&
-            account.label.isNotBlank() &&
+        account.isSignedInSigningAccount() &&
             account.label != activeLabel
     }
 }
@@ -1976,8 +1988,8 @@ class WhiteNoiseAppState(
     }
 
     private suspend fun refreshAccountUnreadCounts(accountSummaries: List<AccountSummaryFfi> = accounts) {
-        val localSigning = accountSummaries.filter { it.localSigning && it.label.isNotBlank() }
-        if (localSigning.isEmpty()) {
+        val signingAccounts = accountSummaries.filter { it.isSignedInSigningAccount() }
+        if (signingAccounts.isEmpty()) {
             accountUnreadCounts = emptyMap()
             return
         }
@@ -1995,7 +2007,7 @@ class WhiteNoiseAppState(
         val memberGate = Semaphore(ACCOUNT_UNREAD_MEMBER_FANOUT)
         val refreshedPairs =
             coroutineScope {
-                localSigning
+                signingAccounts
                     .map { summary ->
                         async {
                             accountGate.withPermit {
@@ -2078,9 +2090,10 @@ class WhiteNoiseAppState(
      */
     private suspend fun refreshAccountUnreadCount(accountRef: String) {
         val ref = accountRef.takeIf { it.isNotBlank() } ?: return
-        // Only local-signing accounts are tracked in accountUnreadCounts; skip
-        // refs we don't know about (matches refreshAccountUnreadCounts' filter).
-        val summary = accounts.firstOrNull { it.localSigning && it.label == ref } ?: return
+        // Only signed-in signing accounts are tracked in accountUnreadCounts;
+        // skip refs we don't know about (matches refreshAccountUnreadCounts'
+        // filter).
+        val summary = accounts.firstOrNull { it.isSignedInSigningAccount() && it.label == ref } ?: return
         val unreadCount = refreshEffectiveAccountUnreadCount(summary) ?: return
         accountUnreadCounts = accountUnreadCounts + (ref to unreadCount)
     }
@@ -3104,7 +3117,7 @@ class WhiteNoiseAppState(
     suspend fun sweepExpiredDisappearingMessages() {
         ensureNotificationRuntimeStarted()
         if (client == null) return
-        val signedInAccounts = accounts.filter { it.localSigning && !it.signedOut && it.label.isNotBlank() }
+        val signedInAccounts = accounts.filter { it.isSignedInSigningAccount() }
         for (account in signedInAccounts) {
             currentCoroutineContext().ensureActive()
             sweepExpiredForAccount(account.label)
@@ -4420,7 +4433,7 @@ class WhiteNoiseAppState(
                         null
                     } else {
                         LocalNotificationFormatter.recipientAccountSubtext(
-                            signedInAccountCount = accounts.count { it.localSigning && !it.signedOut && it.label.isNotBlank() },
+                            signedInAccountCount = accounts.count { it.isSignedInSigningAccount() },
                             recipientLabel = notificationRecipientName(update.accountRef),
                         )
                     },
