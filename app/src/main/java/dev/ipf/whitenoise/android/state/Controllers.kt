@@ -601,6 +601,14 @@ internal fun profileAddableGroupItems(
         }.distinctBy { it.group.groupIdHex.lowercase() }
 }
 
+internal fun canDeleteMessageForEveryone(
+    actionsEnabled: Boolean,
+    mine: Boolean,
+    selfIsAdmin: Boolean,
+    messageIdHex: String,
+    deleted: Boolean,
+): Boolean = actionsEnabled && (mine || selfIsAdmin) && messageIdHex.isNotBlank() && !deleted
+
 enum class MessageStatus {
     Received,
     Pending,
@@ -3302,6 +3310,8 @@ class ConversationController(
     val isSelfAdmin: Boolean
         get() = GroupProjector.isAdminRef(group, conversationAccountIdHex)
 
+    fun isMessageMine(message: AppMessageRecordFfi): Boolean = MessageProjector.isMine(message, conversationAccountIdHex)
+
     val isSelfMember: Boolean
         get() = selfMembership.isSelfMember(members, conversationAccountIdHex)
 
@@ -4644,8 +4654,18 @@ class ConversationController(
 
     suspend fun deleteMessage(message: AppMessageRecordFfi) {
         val account = conversationAccountRef ?: return
-        if (!canSendMessages) return
-        val target = message.messageIdHex.takeIf { it.isNotBlank() } ?: return
+        if (
+            !canDeleteMessageForEveryone(
+                actionsEnabled = canSendMessages,
+                mine = isMessageMine(message),
+                selfIsAdmin = isSelfAdmin,
+                messageIdHex = message.messageIdHex,
+                deleted = message.messageIdHex in deletedMessageIds,
+            )
+        ) {
+            return
+        }
+        val target = message.messageIdHex
         deletedMessageIds = deletedMessageIds + target
         try {
             appState.withGroupCommitLock(account, group.groupIdHex) {
