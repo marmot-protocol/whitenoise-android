@@ -1469,6 +1469,21 @@ class WhiteNoiseAppState(
         preview: ChatListMessagePreviewFfi,
     ): ChatListRowFfi? = chatsController?.applyOptimisticSentPreview(groupIdHex, preview)
 
+    /**
+     * Apply the authoritative chat-list row returned by [markTimelineMessageRead].
+     * Scoped to the bound [ChatsController] account so a mark-read on one
+     * account cannot fold onto another after a switch.
+     */
+    fun applyChatListRowFromMarkRead(
+        accountRef: String,
+        row: ChatListRowFfi?,
+    ) {
+        val projected = row ?: return
+        chatsController
+            ?.takeIf { it.boundAccountRef == accountRef }
+            ?.applyChatListRow(projected)
+    }
+
     fun rollbackOptimisticSentPreview(
         groupIdHex: String,
         optimisticMessageIdHex: String,
@@ -3383,7 +3398,8 @@ class WhiteNoiseAppState(
         return runCatching {
             // markTimelineMessageRead advances the persisted cursor monotonically;
             // an old notification tap must not move the read marker backwards.
-            marmotIo { markTimelineMessageRead(account, group, message) }
+            val row = marmotIo { markTimelineMessageRead(account, group, message) }
+            applyChatListRowFromMarkRead(account, row)
             true
         }.onFailure {
             rethrowIfCancellation(it)
