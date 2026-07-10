@@ -331,7 +331,9 @@ internal fun ConversationScreen(
     // Selection is conversation-owned because the contextual top bar, back
     // handling, forwarding sheet, and rows all consume the same stable ids.
     // Each value snapshots the record/action projection so cap-trimmed rows stay
-    // selected while the user scrolls deeper into history.
+    // selected while the user scrolls deeper into history. This remains transient
+    // composition state deliberately: serializing decrypted message snapshots into
+    // Android saved state would extend their lifetime and privacy footprint.
     val selectedMessages =
         remember(chat.id, appState.activeAccountRef, appState.runtimeGeneration) {
             mutableStateMapOf<String, BatchMessageSelection>()
@@ -428,13 +430,25 @@ internal fun ConversationScreen(
                     timelineOrder = item.timelineOrder,
                 )
             }.associateBy { it.action.messageId }
-    LaunchedEffect(selectableMessages, controller.timelineCapEvictedMessageIds, controller.deletedMessageIds) {
+    val invalidVisibleMessageIds =
+        renderedTimeline
+            .asSequence()
+            .map { it.record.messageIdHex }
+            .filter { it.isNotBlank() && it !in selectableMessages }
+            .toSet()
+    LaunchedEffect(
+        selectableMessages,
+        invalidVisibleMessageIds,
+        controller.deletedMessageIds,
+        controller.pendingTimelineRemovedMessageIds,
+    ) {
+        val pendingTimelineRemovals = controller.pendingTimelineRemovedMessageIds
         val reconciled =
             reconcileBatchSelections(
                 selected = selectedMessages,
                 selectableVisible = selectableMessages,
-                capEvictedMessageIds = controller.timelineCapEvictedMessageIds,
-                deletedMessageIds = controller.deletedMessageIds,
+                deletedMessageIds = controller.deletedMessageIds + pendingTimelineRemovals,
+                invalidVisibleMessageIds = invalidVisibleMessageIds,
             )
         selectedMessages.keys
             .toList()
@@ -443,6 +457,7 @@ internal fun ConversationScreen(
         reconciled.forEach { (messageId, selection) ->
             if (selectedMessages[messageId] != selection) selectedMessages[messageId] = selection
         }
+        controller.acknowledgeTimelineRemovals(pendingTimelineRemovals)
         if (selectedMessages.isEmpty()) {
             batchForwardSheetOpen = false
             showBatchDeleteConfirm = false
@@ -2811,23 +2826,22 @@ internal fun ConversationScreen(
             message = deleteMessage,
             confirmLabel = stringResource(if (hideOnly) R.string.hide else R.string.delete),
             onConfirm = {
-                val selectedRecords = selectedSelections.map { selection -> selection.action to selection.record }
                 showBatchDeleteConfirm = false
                 selectedMessages.clear()
                 appState.launchMutation {
-                    var successes = 0
-                    for ((action, record) in selectedRecords) {
-                        val deleted =
-                            if (action.mine) {
+                    val result =
+                        executeBatchDelete(
+                            selections = selectedSelections,
+                            deleteForEveryone = { record ->
                                 controller.canSendMessages &&
                                     controller.deleteMessage(record, presentFailure = false)
-                            } else {
-                                runCatching { controller.hideMessageForMe(record.messageIdHex) }.isSuccess
-                            }
-                        if (deleted) successes += 1
-                    }
-                    when (successes) {
-                        selectedRecords.size -> appState.present(R.string.batch_delete_complete)
+                            },
+                            hideLocally = { messageId ->
+                                runCatching { controller.hideMessageForMe(messageId) }.isSuccess
+                            },
+                        )
+                    when (result.succeeded) {
+                        result.attempted -> appState.present(R.string.batch_delete_complete)
                         0 -> appState.present(R.string.batch_delete_failed, copyable = true)
                         else -> appState.present(R.string.batch_delete_partial, copyable = true)
                     }

@@ -25,6 +25,11 @@ internal data class BatchDeleteBreakdown(
     val hideLocally: Int,
 )
 
+internal data class BatchDeleteResult(
+    val attempted: Int,
+    val succeeded: Int,
+)
+
 internal fun isBatchSelectableMessage(
     messageId: String,
     userVisibleMessage: Boolean,
@@ -46,15 +51,15 @@ internal fun batchForwardSheetOpenForBodies(
 internal fun reconcileBatchSelections(
     selected: Map<String, BatchMessageSelection>,
     selectableVisible: Map<String, BatchMessageSelection>,
-    capEvictedMessageIds: Set<String>,
     deletedMessageIds: Set<String>,
+    invalidVisibleMessageIds: Set<String>,
 ): Map<String, BatchMessageSelection> =
     buildMap {
         selected.forEach { (messageId, snapshot) ->
             when {
-                messageId in deletedMessageIds -> Unit
+                messageId in deletedMessageIds || messageId in invalidVisibleMessageIds -> Unit
                 messageId in selectableVisible -> put(messageId, selectableVisible.getValue(messageId))
-                messageId in capEvictedMessageIds -> put(messageId, snapshot)
+                else -> put(messageId, snapshot)
             }
         }
     }
@@ -87,6 +92,24 @@ internal fun batchForwardBodies(items: List<BatchMessageActionItem>): List<Strin
 
 internal fun batchDeleteBreakdown(items: List<BatchMessageActionItem>): BatchDeleteBreakdown =
     BatchDeleteBreakdown(
-        deleteForEveryone = items.count { it.mine },
+        deleteForEveryone = items.count(BatchMessageActionItem::mine),
         hideLocally = items.count { !it.mine },
     )
+
+internal suspend fun executeBatchDelete(
+    selections: List<BatchMessageSelection>,
+    deleteForEveryone: suspend (AppMessageRecordFfi) -> Boolean,
+    hideLocally: suspend (String) -> Boolean,
+): BatchDeleteResult {
+    var succeeded = 0
+    selections.forEach { selection ->
+        val removed =
+            if (selection.action.mine) {
+                deleteForEveryone(selection.record)
+            } else {
+                hideLocally(selection.action.messageId)
+            }
+        if (removed) succeeded += 1
+    }
+    return BatchDeleteResult(attempted = selections.size, succeeded = succeeded)
+}

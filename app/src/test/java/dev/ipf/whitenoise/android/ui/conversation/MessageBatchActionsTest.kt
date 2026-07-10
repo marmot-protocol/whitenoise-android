@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -145,8 +146,8 @@ class MessageBatchActionsTest {
             reconcileBatchSelections(
                 selected = mapOf(recent.action.messageId to recent),
                 selectableVisible = mapOf(older.action.messageId to older),
-                capEvictedMessageIds = setOf(recent.action.messageId),
                 deletedMessageIds = emptySet(),
+                invalidVisibleMessageIds = emptySet(),
             )
 
         assertEquals(setOf("recent"), retained.keys)
@@ -169,26 +170,26 @@ class MessageBatchActionsTest {
                         deletedOffscreen.action.messageId to deletedOffscreen,
                     ),
                 selectableVisible = emptyMap(),
-                capEvictedMessageIds = setOf(deletedOffscreen.action.messageId),
                 deletedMessageIds = setOf(deletedOffscreen.action.messageId),
+                invalidVisibleMessageIds = setOf(invalidVisible.action.messageId),
             )
 
         assertTrue(retained.isEmpty())
     }
 
     @Test
-    fun reconciliationPrunesOffscreenSelectionsNotEvictedByTheTimelineCap() {
-        val removed = selection("removed", recordedAt = 100uL, timelineOrder = 1uL)
+    fun reconciliationRetainsOffscreenSelectionsWithoutCapEvictionBookkeeping() {
+        val offscreen = selection("offscreen", recordedAt = 100uL, timelineOrder = 1uL)
 
         val retained =
             reconcileBatchSelections(
-                selected = mapOf(removed.action.messageId to removed),
+                selected = mapOf(offscreen.action.messageId to offscreen),
                 selectableVisible = emptyMap(),
-                capEvictedMessageIds = emptySet(),
                 deletedMessageIds = emptySet(),
+                invalidVisibleMessageIds = emptySet(),
             )
 
-        assertTrue(retained.isEmpty())
+        assertEquals(mapOf(offscreen.action.messageId to offscreen), retained)
     }
 
     @Test
@@ -206,13 +207,44 @@ class MessageBatchActionsTest {
         )
     }
 
+    @Test
+    fun executeBatchDeleteRoutesOwnAndOtherMessagesAndAggregatesFailures() =
+        runBlocking {
+            val selections =
+                listOf(
+                    selection("own-ok", recordedAt = 100uL, timelineOrder = 1uL, mine = true),
+                    selection("other", recordedAt = 200uL, timelineOrder = 2uL),
+                    selection("own-fail", recordedAt = 300uL, timelineOrder = 3uL, mine = true),
+                )
+            val protocolDeletes = mutableListOf<String>()
+            val localHides = mutableListOf<String>()
+
+            val result =
+                executeBatchDelete(
+                    selections = selections,
+                    deleteForEveryone = { record ->
+                        protocolDeletes += record.messageIdHex
+                        record.messageIdHex != "own-fail"
+                    },
+                    hideLocally = { messageId ->
+                        localHides += messageId
+                        true
+                    },
+                )
+
+            assertEquals(BatchDeleteResult(attempted = 3, succeeded = 2), result)
+            assertEquals(listOf("own-ok", "own-fail"), protocolDeletes)
+            assertEquals(listOf("other"), localHides)
+        }
+
     private fun selection(
         id: String,
         recordedAt: ULong,
         timelineOrder: ULong,
+        mine: Boolean = false,
     ): BatchMessageSelection =
         BatchMessageSelection(
-            action = BatchMessageActionItem(id, "alice", "Alice", id, id, mine = false),
+            action = BatchMessageActionItem(id, "alice", "Alice", id, id, mine = mine),
             record =
                 AppMessageRecordFfi(
                     messageIdHex = id,
