@@ -227,6 +227,8 @@
     <string name="delete">刪除</string>
     <string name="delete_for_me">僅為我刪除</string>
     <string name="delete_for_everyone">為所有人刪除</string>
+    <string name="confirm_delete_member_message_title">刪除 %1$s 的訊息？</string>
+    <string name="confirm_delete_member_message_message">此操作會為群組中的所有人刪除該訊息，且無法復原。</string>
     <string name="sent">已傳送</string>
     <string name="send_failed">訊息傳送失敗。請再試一次。</string>
     <string name="sending">正在傳送</string>

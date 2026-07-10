@@ -228,6 +228,8 @@
     <string name="delete">Eliminar</string>
     <string name="delete_for_me">Eliminar para mí</string>
     <string name="delete_for_everyone">Eliminar para todos</string>
+    <string name="confirm_delete_member_message_title">¿Eliminar el mensaje de %1$s?</string>
+    <string name="confirm_delete_member_message_message">Esto eliminará el mensaje para todos en el grupo. Esta acción no se puede deshacer.</string>
     <string name="sent">Enviado</string>
     <string name="send_failed">Error al enviar el mensaje. Por favor, inténtalo de nuevo.</string>
     <string name="sending">Enviando</string>

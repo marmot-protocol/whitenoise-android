@@ -84,8 +84,10 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.canDeleteMessageForEveryone
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
 import dev.ipf.whitenoise.android.ui.conversation.InvitePreviewActionBar
@@ -154,8 +156,16 @@ internal fun MessageBubble(
 ) {
     val amoledSurfaceTheme = isAmoledSurfaceTheme()
     val record = item.record
-    val mine = MessageProjector.isMine(record, appState.activeAccount?.accountIdHex)
+    val mine = controller.isMessageMine(record)
     val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
+    val canDeleteForEveryone =
+        canDeleteMessageForEveryone(
+            actionsEnabled = !readOnly,
+            mine = mine,
+            selfIsAdmin = controller.isSelfAdmin,
+            messageIdHex = record.messageIdHex,
+            deleted = deleted,
+        )
     // Convergence dropped this message onto a losing branch: it never reached
     // the group. The record survives as a tombstone, so flag it (an explicit
     // delete takes precedence over an invalidation tombstone).
@@ -280,6 +290,7 @@ internal fun MessageBubble(
     var reactionSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var customizeReactionsOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var restoreReactionPickerExpanded by remember(record.messageIdHex) { mutableStateOf(false) }
+    var moderatorDeleteConfirmationOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     // A deleted message is inert: tear down any open action/reaction surface if
     // the message is deleted out from under it (optimistic or remote delete).
     LaunchedEffect(deleted) {
@@ -288,6 +299,9 @@ internal fun MessageBubble(
             emojiPickerOpen = false
             reactionSheetOpen = false
         }
+    }
+    LaunchedEffect(canDeleteForEveryone) {
+        if (!canDeleteForEveryone) moderatorDeleteConfirmationOpen = false
     }
 
     fun beginReply() {
@@ -299,6 +313,19 @@ internal fun MessageBubble(
     fun openInfoSheet() {
         onActionMenuOpenChange(false)
         infoSheetOpen = true
+    }
+
+    fun deleteForEveryone() {
+        appState.launchMutation { controller.deleteMessage(record) }
+    }
+
+    fun requestDeleteForEveryone() {
+        if (!canDeleteForEveryone) return
+        if (requiresModeratorDeleteConfirmation(mine = mine, selfIsAdmin = controller.isSelfAdmin)) {
+            moderatorDeleteConfirmationOpen = true
+        } else {
+            deleteForEveryone()
+        }
     }
 
     fun reactWithEmoji(emoji: String) {
@@ -1237,7 +1264,7 @@ internal fun MessageBubble(
                     canReply = !readOnly,
                     canReact = !readOnly,
                     canDeleteForMe = !readOnly && record.messageIdHex.isNotBlank() && !deleted,
-                    canDeleteForEveryone = !readOnly && mine && record.messageIdHex.isNotBlank() && !deleted,
+                    canDeleteForEveryone = canDeleteForEveryone,
                     canEdit = !readOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
                     canForward = !readOnly && forwardBody != null,
                     quickReactionEmojis = quickReactionEmojis,
@@ -1273,8 +1300,9 @@ internal fun MessageBubble(
                         // the optimistic tombstone is already set in the
                         // controller's state and the FFI write needs to
                         // complete regardless of whether this bubble is
-                        // still in composition.
-                        appState.launchMutation { controller.deleteMessage(record) }
+                        // still in composition. Moderator deletes first require an
+                        // explicit confirmation because they target another member.
+                        requestDeleteForEveryone()
                     },
                 )
                 if (expandedFullView) {
@@ -1295,7 +1323,7 @@ internal fun MessageBubble(
                         canReply = canUseExpandedComposer,
                         canReact = canUseExpandedComposer,
                         canDeleteForMe = !readOnly && record.messageIdHex.isNotBlank() && !deleted,
-                        canDeleteForEveryone = canUseExpandedComposer && mine && record.messageIdHex.isNotBlank() && !deleted,
+                        canDeleteForEveryone = canUseExpandedComposer && canDeleteForEveryone,
                         onReply = {
                             if (canUseExpandedComposer) {
                                 beginReply()
@@ -1315,9 +1343,9 @@ internal fun MessageBubble(
                             }
                         },
                         onDeleteForEveryone = {
-                            if (canUseExpandedComposer) {
+                            if (canUseExpandedComposer && canDeleteForEveryone) {
                                 expandedFullView = false
-                                appState.launchMutation { controller.deleteMessage(record) }
+                                requestDeleteForEveryone()
                             }
                         },
                         onDismiss = { expandedFullView = false },
@@ -1432,6 +1460,24 @@ internal fun MessageBubble(
                         },
                     )
                 }
+                if (moderatorDeleteConfirmationOpen) {
+                    ConfirmDialog(
+                        title = stringResource(R.string.confirm_delete_member_message_title, appState.displayName(record.sender)),
+                        message = stringResource(R.string.confirm_delete_member_message_message),
+                        confirmLabel = stringResource(R.string.delete_for_everyone),
+                        onConfirm = {
+                            moderatorDeleteConfirmationOpen = false
+                            if (
+                                canDeleteForEveryone &&
+                                requiresModeratorDeleteConfirmation(mine = mine, selfIsAdmin = controller.isSelfAdmin)
+                            ) {
+                                deleteForEveryone()
+                            }
+                        },
+                        onDismiss = { moderatorDeleteConfirmationOpen = false },
+                        destructive = true,
+                    )
+                }
                 val tallies = controller.reactions[record.messageIdHex].orEmpty()
                 // Hide reaction tallies on a deleted message — nothing to show.
                 if (tallies.isNotEmpty() && !deleted) {
@@ -1490,6 +1536,11 @@ internal fun MessageBubble(
         }
     }
 }
+
+internal fun requiresModeratorDeleteConfirmation(
+    mine: Boolean,
+    selfIsAdmin: Boolean,
+): Boolean = !mine && selfIsAdmin
 
 internal fun clippedMessageBodyText(
     bodyText: String,

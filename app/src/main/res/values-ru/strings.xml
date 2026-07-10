@@ -232,6 +232,8 @@
     <string name="delete">Удалить</string>
     <string name="delete_for_me">Удалить у меня</string>
     <string name="delete_for_everyone">Удалить для всех</string>
+    <string name="confirm_delete_member_message_title">Удалить сообщение от %1$s?</string>
+    <string name="confirm_delete_member_message_message">Сообщение будет удалено для всех участников группы. Это действие нельзя отменить.</string>
     <string name="sent">Отправлено</string>
     <string name="send_failed">Не удалось отправить сообщение. Попробуйте снова.</string>
     <string name="sending">Отправка</string>
