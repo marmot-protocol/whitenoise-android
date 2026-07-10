@@ -71,7 +71,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 private enum class NewChatStep { NewMessage, NewGroup }
 
-private data class StartChatErrorUiState(
+internal data class StartChatErrorUiState(
     val npub: String,
     val progressHex: String,
     val detail: AppText,
@@ -81,6 +81,40 @@ private data class StartChatErrorUiState(
     val title: AppText = AppText.Resource(R.string.toast_couldnt_start_chat),
     val retryGroupIdHex: String? = null,
 )
+
+internal fun startChatErrorUiState(
+    npub: String,
+    progressHex: String,
+    error: Throwable,
+    recipientName: String?,
+    displayName: (String) -> String,
+): StartChatErrorUiState {
+    val invitation = startProfileChatFailureIsMissingSetup(error)
+    return StartChatErrorUiState(
+        npub = npub,
+        progressHex = progressHex,
+        detail =
+            if (invitation) {
+                startProfileChatInviteDetail(recipientName)
+            } else {
+                startProfileChatFailureDetail(error, displayName)
+            },
+        copyable = startProfileChatFailureCopyable(error),
+        recipientName = recipientName,
+        invitation = invitation,
+        title =
+            if (invitation) {
+                AppText.Resource(R.string.invite_to_white_noise)
+            } else {
+                AppText.Resource(R.string.toast_couldnt_start_chat)
+            },
+    )
+}
+
+internal fun inviteShareIntent(message: String): Intent =
+    Intent(Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(Intent.EXTRA_TEXT, message)
 
 /**
  * Full-screen New Message flow: pick a person to open/start a direct chat, or
@@ -226,26 +260,13 @@ private fun NewMessageScreen(
                     }
                 }.onFailure { error ->
                     rethrowIfCancellation(error)
-                    val invitation = startProfileChatFailureIsMissingSetup(error)
                     startChatError =
-                        StartChatErrorUiState(
+                        startChatErrorUiState(
                             npub = npub,
                             progressHex = hexForProgress,
-                            detail =
-                                if (invitation) {
-                                    startProfileChatInviteDetail(recipientName)
-                                } else {
-                                    startProfileChatFailureDetail(error, appState::displayName)
-                                },
-                            copyable = startProfileChatFailureCopyable(error),
+                            error = error,
                             recipientName = recipientName,
-                            invitation = invitation,
-                            title =
-                                if (invitation) {
-                                    AppText.Resource(R.string.invite_to_white_noise)
-                                } else {
-                                    AppText.Resource(R.string.toast_couldnt_start_chat)
-                                },
+                            displayName = appState::displayName,
                         )
                 }
             } finally {
@@ -324,11 +345,7 @@ private fun NewMessageScreen(
                                 )
                             },
                             onInvite = {
-                                val sendIntent =
-                                    Intent(Intent.ACTION_SEND)
-                                        .setType("text/plain")
-                                        .putExtra(Intent.EXTRA_TEXT, inviteMessage)
-                                context.startActivity(Intent.createChooser(sendIntent, inviteTitle))
+                                context.startActivity(Intent.createChooser(inviteShareIntent(inviteMessage), inviteTitle))
                             },
                             onCopy = { detail ->
                                 clipboard.setText(AnnotatedString(detail))
@@ -534,7 +551,7 @@ private fun AppText.resolveForCompose(): String =
     }
 
 @Composable
-private fun StartChatErrorCard(
+internal fun StartChatErrorCard(
     error: StartChatErrorUiState,
     onRetry: () -> Unit,
     onInvite: () -> Unit,
