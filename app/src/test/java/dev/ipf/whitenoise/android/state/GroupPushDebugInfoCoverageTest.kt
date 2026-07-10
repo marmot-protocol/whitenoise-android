@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.kotlinBlockFrom
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -26,18 +28,43 @@ class GroupPushDebugInfoCoverageTest {
     @Test
     fun groupDetailsSurfacesPushDeliveryInDeveloperMode() {
         val source = groupDetailsScreenSource().readText()
+        val refreshBody = source.functionBody("refreshMlsDetails")
+        val developerModeStart = source.indexOf("if (appState.developerMode) {")
+        check(developerModeStart >= 0) { "Missing GroupDetailsScreen developer-mode block" }
+        val developerModeBrace = source.indexOf('{', developerModeStart)
+        check(developerModeBrace >= 0) { "Missing body for GroupDetailsScreen developer-mode block" }
+        val developerModeBody =
+            source.kotlinBlockFrom(
+                developerModeBrace,
+                "GroupDetailsScreen developer-mode block",
+            )
+        val tokenDetailsBody = source.functionBody("GroupPushTokenDebugDetails")
 
         assertTrue(
             "group details must gate push delivery on developer mode",
-            "appState.developerMode" in source && "R.string.push_delivery" in source,
+            "R.string.push_delivery" in developerModeBody,
         )
         assertTrue(
-            "group details must render token fingerprints for diagnosis",
-            "tokenFingerprint" in source && "DiagnosticRow" in source,
+            "push debug refresh must remain developer-only",
+            "if (!appState.developerMode) return" in refreshBody,
         )
         assertTrue(
             "group details must load push debug through the controller",
-            "groupPushDebugInfo()" in source,
+            "groupPushDebugInfo()" in refreshBody,
+        )
+        assertTrue(
+            "member token fingerprints must display abbreviated values while copying the full fingerprint",
+            Regex(
+                """R\.string\.push_debug_token_fingerprint.*IdentityFormatter\.short\(token\.tokenFingerprint\).*copyValue\s*=\s*token\.tokenFingerprint""",
+                RegexOption.DOT_MATCHES_ALL,
+            ).containsMatchIn(tokenDetailsBody),
+        )
+        assertTrue(
+            "member diagnostics must render relay-hint presence",
+            Regex(
+                """R\.string\.push_debug_relay_hint.*token\.hasRelayHint""",
+                RegexOption.DOT_MATCHES_ALL,
+            ).containsMatchIn(tokenDetailsBody),
         )
     }
 
@@ -52,21 +79,4 @@ class GroupPushDebugInfoCoverageTest {
             File("src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt"),
         ).first { it.exists() }
-
-    private fun String.functionBody(functionName: String): String {
-        val start = indexOf("fun $functionName")
-        check(start >= 0) { "function $functionName not found" }
-        val braceStart = indexOf('{', start)
-        var depth = 0
-        for (index in braceStart until length) {
-            when (this[index]) {
-                '{' -> depth++
-                '}' -> {
-                    depth--
-                    if (depth == 0) return substring(start, index + 1)
-                }
-            }
-        }
-        error("unterminated body for $functionName")
-    }
 }
