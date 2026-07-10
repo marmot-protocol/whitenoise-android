@@ -238,6 +238,18 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    @Test
+    fun initializeReadStateRethrowsCancellationBeforeLogging() {
+        val body = controllerFunctionBody("initializeReadState")
+        val rethrowIndex = body.indexOf("it.rethrowIfCancellation()")
+        val logIndex = body.indexOf("Log.w(")
+
+        assertTrue(
+            "initializeReadState must rethrow cancellation before logging other failures",
+            rethrowIndex >= 0 && rethrowIndex < logIndex,
+        )
+    }
+
     private fun appStateFunctionBody(functionName: String): String {
         val source = appStateSource().readText()
         val start =
