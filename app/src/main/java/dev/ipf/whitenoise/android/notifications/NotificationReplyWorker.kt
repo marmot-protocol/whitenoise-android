@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
 import android.util.Log
+import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
@@ -17,6 +18,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 
 class NotificationReplyWorker(
     appContext: Context,
@@ -66,13 +68,13 @@ class NotificationReplyWorker(
             } else {
                 notificationReplyActionHandled(sent = false)
                 if (BuildConfig.DEBUG) Log.w(TAG, "reply send returned false group=${action.target.groupIdHex.take(8)}")
-                Result.retry()
+                replyFailureResult(action)
             }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (throwable: Throwable) {
             if (BuildConfig.DEBUG) Log.w(TAG, "reply worker failed group=${action.target.groupIdHex.take(8)}", throwable)
-            Result.retry()
+            replyFailureResult(action)
         }
     }
 
@@ -89,6 +91,12 @@ class NotificationReplyWorker(
                 text = reply,
             )
         }
+
+    private fun replyFailureResult(action: NotificationAction): Result {
+        if (shouldRetryAfterFailure(runAttemptCount)) return Result.retry()
+        Log.w(TAG, "reply retry limit reached group=${action.target.groupIdHex.take(8)} attempts=${runAttemptCount + 1}")
+        return Result.failure()
+    }
 
     private suspend fun markReadAfterReply(
         application: WhiteNoiseApplication,
@@ -147,6 +155,8 @@ class NotificationReplyWorker(
         private const val KEY_NOTIFICATION_ID = "notification_id"
         private const val KEY_REPLY = "reply"
         private const val UNIQUE_WORK_PREFIX = "notification_reply_"
+        private const val MAX_SEND_ATTEMPTS = 3
+        private const val REPLY_BACKOFF_DELAY_SECONDS = 30L
 
         fun enqueue(
             context: Context,
@@ -154,19 +164,28 @@ class NotificationReplyWorker(
             reply: String,
         ) {
             runCatching {
-                val request =
-                    OneTimeWorkRequestBuilder<NotificationReplyWorker>()
-                        .setInputData(notificationReplyInputData(action, reply))
-                        .build()
                 WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
                     notificationReplyWorkName(action, reply),
                     ExistingWorkPolicy.KEEP,
-                    request,
+                    notificationReplyRequest(action, reply),
                 )
             }.onFailure {
                 if (BuildConfig.DEBUG) Log.w(TAG, "failed to enqueue reply worker", it)
             }
         }
+
+        internal fun shouldRetryAfterFailure(runAttemptCount: Int): Boolean = runAttemptCount < MAX_SEND_ATTEMPTS - 1
+
+        internal fun notificationReplyRequest(
+            action: NotificationAction,
+            reply: String,
+        ) = OneTimeWorkRequestBuilder<NotificationReplyWorker>()
+            .setInputData(notificationReplyInputData(action, reply))
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                REPLY_BACKOFF_DELAY_SECONDS,
+                TimeUnit.SECONDS,
+            ).build()
 
         internal fun notificationReplyInputData(
             action: NotificationAction,
