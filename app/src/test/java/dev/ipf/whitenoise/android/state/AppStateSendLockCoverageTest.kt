@@ -99,6 +99,24 @@ class AppStateSendLockCoverageTest {
     }
 
     @Test
+    fun deleteMessageAuthorizationGuardPrecedesOptimisticAndFfiMutation() {
+        val body = controllerFunctionBody("deleteMessage")
+        val authorizationGate = body.indexOf("!canDeleteMessageForEveryone(")
+        val earlyReturn = body.indexOf("return", startIndex = authorizationGate)
+        val optimisticMutation = body.indexOf("deletedMessageIds = deletedMessageIds + target")
+        val ffiDelete = body.indexOf("appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }")
+
+        assertTrue(
+            "unauthorized deletes must return before mutating deletedMessageIds",
+            authorizationGate >= 0 && earlyReturn > authorizationGate && optimisticMutation > earlyReturn,
+        )
+        assertTrue(
+            "unauthorized deletes must return before reaching the FFI delete call",
+            ffiDelete > earlyReturn,
+        )
+    }
+
+    @Test
     fun failedSendDiscardTracksPendingOnlyWhenRetryStillExists() {
         val body = controllerFunctionBody("discardFailedSend")
 
