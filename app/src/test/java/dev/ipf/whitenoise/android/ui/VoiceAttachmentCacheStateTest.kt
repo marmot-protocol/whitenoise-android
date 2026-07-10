@@ -39,7 +39,7 @@ class VoiceAttachmentCacheStateTest {
         val messageId = "voice-cache-hit"
         val reference = mediaReference(mediaType = "audio/mp4")
         val expected =
-            File(File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }, "$messageId-1.m4a")
+            File(File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }, "$messageId-1-1.m4a")
         expected.writeBytes(byteArrayOf(1, 2, 3))
 
         assertEquals(expected, cachedVoiceAttachmentFile(context, messageId, 1, reference))
@@ -58,7 +58,7 @@ class VoiceAttachmentCacheStateTest {
         val context = RuntimeEnvironment.getApplication()
         val messageId = "voice-empty-cache"
         val reference = mediaReference(mediaType = "audio/aac")
-        File(File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }, "$messageId-2.aac")
+        File(File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }, "$messageId-2-1.aac")
             .writeBytes(byteArrayOf())
 
         assertNull(cachedVoiceAttachmentFile(context, messageId, 2, reference))
@@ -94,7 +94,7 @@ class VoiceAttachmentCacheStateTest {
         val messageId = "voice-corrupt-cache"
         val reference = mediaReference(mediaType = "audio/mp4")
         val cached =
-            File(File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }, "$messageId-3.m4a")
+            File(File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }, "$messageId-3-1.m4a")
         cached.writeBytes(byteArrayOf(1, 2, 3))
 
         assertEquals(cached, cachedVoiceAttachmentFile(context, messageId, 3, reference))
@@ -117,6 +117,20 @@ class VoiceAttachmentCacheStateTest {
     }
 
     @Test
+    fun sourceEpochIsPartOfVoiceCacheDestinationIdentity() {
+        val context = RuntimeEnvironment.getApplication()
+        val messageId = "voice-epoch-identity"
+        val epochOne = mediaReference(mediaType = "audio/mp4", sourceEpoch = 1uL)
+        val epochTwo = mediaReference(mediaType = "audio/mp4", sourceEpoch = 2uL)
+        val epochOneFile =
+            File(File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }, "$messageId-1-1.m4a")
+        epochOneFile.writeBytes(byteArrayOf(1, 2, 3))
+
+        assertEquals(epochOneFile, cachedVoiceAttachmentFile(context, messageId, 1, epochOne))
+        assertNull(cachedVoiceAttachmentFile(context, messageId, 1, epochTwo))
+    }
+
+    @Test
     fun samePathWaiterAwaitsActiveMaterializationDespitePartialCacheFile() {
         runBlocking {
             withTimeout(TEST_HANG_GUARD_MS) {
@@ -125,7 +139,10 @@ class VoiceAttachmentCacheStateTest {
                 val attachmentIndex = 1
                 val reference = mediaReference(mediaType = "audio/mp4")
                 val cacheFile =
-                    File(File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() }, "$messageId-$attachmentIndex.m4a")
+                    File(
+                        File(context.cacheDir, MediaCacheDirs.VOICE).apply { mkdirs() },
+                        "$messageId-$attachmentIndex-${reference.sourceEpoch}.m4a",
+                    )
                 cacheFile.delete()
 
                 val fullBytes = ByteArray(128) { (it + 1).toByte() }
@@ -188,7 +205,10 @@ class VoiceAttachmentCacheStateTest {
         }
     }
 
-    private fun mediaReference(mediaType: String): MediaAttachmentReferenceFfi =
+    private fun mediaReference(
+        mediaType: String,
+        sourceEpoch: ULong = 1uL,
+    ): MediaAttachmentReferenceFfi =
         MediaAttachmentReferenceFfi(
             locators = emptyList(),
             ciphertextSha256 = "",
@@ -197,7 +217,7 @@ class VoiceAttachmentCacheStateTest {
             fileName = "voice",
             mediaType = mediaType,
             version = "1",
-            sourceEpoch = 1uL,
+            sourceEpoch = sourceEpoch,
             dim = null,
             thumbhash = null,
         )

@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.core.NostrProfileReference
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
@@ -2306,6 +2307,7 @@ class WhiteNoiseAppState(
      */
     private suspend fun wipeDecryptedMediaFromDisk() {
         withContext(Dispatchers.IO) {
+            AttachmentCachePublication.onWipeStarted()
             // Each target holds decrypted plaintext, so wipe them independently
             // and best-effort: a failure in one (IO error, locked file) must not
             // skip the others, and a swallowed failure should still be visible.

@@ -2,13 +2,18 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.ui.conversation.media.cachedVideoAttachmentFile
+import dev.ipf.whitenoise.android.ui.conversation.media.invalidateVideoAttachmentCacheAfterPlaybackFailure
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVideoAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartVideoAttachmentDownload
+import dev.ipf.whitenoise.android.ui.conversation.media.videoAttachmentCacheFileForTests
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertArrayEquals
@@ -22,6 +27,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.io.File
+import java.io.IOException
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -36,7 +42,7 @@ class VideoAttachmentCacheStateTest {
         val messageId = "video-cache-hit"
         val reference = mediaReference(mediaType = "video/mp4")
         val expected =
-            File(File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }, "$messageId-1.mp4")
+            File(File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }, "$messageId-1-1.mp4")
         expected.writeBytes(byteArrayOf(1, 2, 3))
 
         assertEquals(expected, cachedVideoAttachmentFile(context, messageId, 1, reference))
@@ -55,7 +61,7 @@ class VideoAttachmentCacheStateTest {
         val context = RuntimeEnvironment.getApplication()
         val messageId = "video-empty-cache"
         val reference = mediaReference(mediaType = "video/webm")
-        File(File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }, "$messageId-2.webm")
+        File(File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }, "$messageId-2-1.webm")
             .writeBytes(byteArrayOf())
 
         assertNull(cachedVideoAttachmentFile(context, messageId, 2, reference))
@@ -86,15 +92,145 @@ class VideoAttachmentCacheStateTest {
     }
 
     @Test
+    fun invalidateVideoAttachmentCacheAfterPlaybackFailure_deletesDiskBeforeEvictingPlaintext() {
+        val context = RuntimeEnvironment.getApplication()
+        val messageId = "video-invalidate-success"
+        val reference = mediaReference(mediaType = "video/mp4")
+        val cached =
+            File(File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }, "$messageId-6-1.mp4")
+        cached.writeBytes(byteArrayOf(1, 2, 3))
+        var evictCalled = false
+        var diskGoneBeforeEvict = false
+
+        runBlocking {
+            invalidateVideoAttachmentCacheAfterPlaybackFailure(
+                attachmentKey = AttachmentCachePublication.attachmentKey(messageId, 6, reference.sourceEpoch),
+                file = cached,
+            ) {
+                diskGoneBeforeEvict = cachedVideoAttachmentFile(context, messageId, 6, reference) == null
+                evictCalled = true
+            }
+        }
+
+        assertTrue(evictCalled)
+        assertTrue(diskGoneBeforeEvict)
+        assertNull(cachedVideoAttachmentFile(context, messageId, 6, reference))
+    }
+
+    @Test
+    fun invalidateVideoAttachmentCacheAfterPlaybackFailure_failsClosedWhenDeleteFails() {
+        val context = RuntimeEnvironment.getApplication()
+        val messageId = "video-invalidate-delete-fail"
+        val reference = mediaReference(mediaType = "video/mp4")
+        val blocked =
+            File(File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }, "$messageId-7-1.mp4")
+        blocked.mkdirs()
+        File(blocked, "child").writeBytes(byteArrayOf(1))
+        var evictCalled = false
+
+        val failed =
+            runBlocking {
+                runCatching {
+                    invalidateVideoAttachmentCacheAfterPlaybackFailure(
+                        attachmentKey = AttachmentCachePublication.attachmentKey(messageId, 7, reference.sourceEpoch),
+                        file = blocked,
+                    ) {
+                        evictCalled = true
+                    }
+                }
+            }
+
+        assertTrue(failed.isFailure)
+        assertTrue(failed.exceptionOrNull() is IOException)
+        assertFalse(evictCalled)
+        assertTrue(blocked.exists())
+    }
+
+    @Test
+    fun invalidateVideoAttachmentCacheAfterPlaybackFailure_completesEvictionWhenParentCoroutineCancelled() {
+        val context = RuntimeEnvironment.getApplication()
+        val messageId = "video-invalidate-noncancellable"
+        val reference = mediaReference(mediaType = "video/mp4")
+        val cached =
+            File(File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }, "$messageId-8-1.mp4")
+        cached.writeBytes(byteArrayOf(1, 2))
+        val evictStarted = CompletableDeferred<Unit>()
+        val evictContinue = CompletableDeferred<Unit>()
+        var evictFinished = false
+
+        runBlocking {
+            val job =
+                launch {
+                    invalidateVideoAttachmentCacheAfterPlaybackFailure(
+                        attachmentKey = AttachmentCachePublication.attachmentKey(messageId, 8, reference.sourceEpoch),
+                        file = cached,
+                    ) {
+                        evictStarted.complete(Unit)
+                        evictContinue.await()
+                        evictFinished = true
+                    }
+                }
+            evictStarted.await()
+            job.cancel(CancellationException("composer disposed"))
+            evictContinue.complete(Unit)
+            job.join()
+        }
+
+        assertTrue(evictFinished)
+        assertNull(cachedVideoAttachmentFile(context, messageId, 8, reference))
+    }
+
+    @Test
     fun quicktimeVideoUsesStableMovCacheSlot() {
         val context = RuntimeEnvironment.getApplication()
         val messageId = "video-quicktime-cache"
         val reference = mediaReference(mediaType = "video/quicktime")
         val expected =
-            File(File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }, "$messageId-3.mov")
+            File(File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }, "$messageId-3-1.mov")
         expected.writeBytes(byteArrayOf(1, 2, 3))
 
         assertEquals(expected, cachedVideoAttachmentFile(context, messageId, 3, reference))
+    }
+
+    @Test
+    fun sourceEpochIsPartOfVideoCacheDestinationIdentity() {
+        val context = RuntimeEnvironment.getApplication()
+        val messageId = "video-epoch-identity"
+        val epochOne = mediaReference(mediaType = "video/mp4", sourceEpoch = 1uL)
+        val epochTwo = mediaReference(mediaType = "video/mp4", sourceEpoch = 2uL)
+        val epochOneFile =
+            videoAttachmentCacheFileForTests(context, messageId, 1, epochOne)
+        epochOneFile.parentFile?.mkdirs()
+        epochOneFile.writeBytes(byteArrayOf(1, 2, 3))
+
+        assertEquals(epochOneFile, cachedVideoAttachmentFile(context, messageId, 1, epochOne))
+        assertNull(cachedVideoAttachmentFile(context, messageId, 1, epochTwo))
+        assertEquals(
+            File(epochOneFile.parentFile, "$messageId-1-2.mp4"),
+            videoAttachmentCacheFileForTests(context, messageId, 1, epochTwo),
+        )
+    }
+
+    @Test
+    fun staleEpochInvalidationDoesNotDeleteNewerEpochCacheFile() {
+        val context = RuntimeEnvironment.getApplication()
+        val messageId = "video-stale-epoch-callback"
+        val oldEpoch = mediaReference(mediaType = "video/mp4", sourceEpoch = 1uL)
+        val newEpoch = mediaReference(mediaType = "video/mp4", sourceEpoch = 2uL)
+        val staleFile = videoAttachmentCacheFileForTests(context, messageId, 4, oldEpoch)
+        val currentFile = videoAttachmentCacheFileForTests(context, messageId, 4, newEpoch)
+        staleFile.parentFile?.mkdirs()
+        currentFile.writeBytes(byteArrayOf(4, 5, 6))
+
+        runBlocking {
+            invalidateVideoAttachmentCacheAfterPlaybackFailure(
+                attachmentKey = AttachmentCachePublication.attachmentKey(messageId, 4, oldEpoch.sourceEpoch),
+                file = staleFile,
+            ) {}
+        }
+
+        assertFalse(staleFile.exists())
+        assertEquals(currentFile, cachedVideoAttachmentFile(context, messageId, 4, newEpoch))
     }
 
     @Test
@@ -121,7 +257,8 @@ class VideoAttachmentCacheStateTest {
                 val attachmentIndex = 1
                 val reference = mediaReference(mediaType = "video/mp4")
                 val cacheFile =
-                    File(File(context.cacheDir, MediaCacheDirs.VIDEO).apply { mkdirs() }, "$messageId-$attachmentIndex.mp4")
+                    videoAttachmentCacheFileForTests(context, messageId, attachmentIndex, reference)
+                cacheFile.parentFile?.mkdirs()
                 cacheFile.delete()
 
                 val fullBytes = ByteArray(128) { (it + 1).toByte() }
@@ -207,7 +344,10 @@ class VideoAttachmentCacheStateTest {
         )
     }
 
-    private fun mediaReference(mediaType: String): MediaAttachmentReferenceFfi =
+    private fun mediaReference(
+        mediaType: String,
+        sourceEpoch: ULong = 1uL,
+    ): MediaAttachmentReferenceFfi =
         MediaAttachmentReferenceFfi(
             locators = emptyList(),
             ciphertextSha256 = "",
@@ -216,7 +356,7 @@ class VideoAttachmentCacheStateTest {
             fileName = "video",
             mediaType = mediaType,
             version = "1",
-            sourceEpoch = 1uL,
+            sourceEpoch = sourceEpoch,
             dim = null,
             thumbhash = null,
         )
