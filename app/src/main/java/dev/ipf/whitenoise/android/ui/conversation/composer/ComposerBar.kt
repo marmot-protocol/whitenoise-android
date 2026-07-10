@@ -75,18 +75,23 @@ import kotlinx.coroutines.flow.filter
 
 /**
  * Whether the composer bottom cluster (reply preview, edit banner, mention
- * picker, and input row) should apply [imePadding]. Suppressed while the emoji
- * pane owns the bottom region so the keyboard/emoji swap does not double-count
- * insets (#808, #895, #1109).
+ * picker, input row, and inline emoji pane) should apply [imePadding]. Suppressed
+ * while the emoji pane owns the bottom region so the keyboard/emoji swap does not
+ * double-count insets (#808, #895, #1109), but restored while the emoji search
+ * field is active so the IME cannot cover the filtered results grid (#1222).
  */
-internal fun composerBottomClusterAppliesImePadding(showEmojiPane: Boolean): Boolean = !showEmojiPane
+internal fun composerBottomClusterAppliesImePadding(
+    showEmojiPane: Boolean,
+    composerEmojiSearchActive: Boolean,
+): Boolean = !showEmojiPane || composerEmojiSearchActive
 
 internal fun composerBottomClusterModifier(
     showEmojiPane: Boolean,
+    composerEmojiSearchActive: Boolean,
     base: Modifier = Modifier,
 ): Modifier {
     val withNav = base.navigationBarsPadding()
-    return if (composerBottomClusterAppliesImePadding(showEmojiPane)) {
+    return if (composerBottomClusterAppliesImePadding(showEmojiPane, composerEmojiSearchActive)) {
         withNav.imePadding()
     } else {
         withNav
@@ -455,7 +460,7 @@ internal fun ComposerBar(
         restoreKeyboardFromEmojiPane()
     }
     Column(
-        composerBottomClusterModifier(showEmojiPane, modifier.fillMaxWidth()),
+        composerBottomClusterModifier(showEmojiPane, composerEmojiSearchActive, modifier.fillMaxWidth()),
     ) {
         Column(
             Modifier
