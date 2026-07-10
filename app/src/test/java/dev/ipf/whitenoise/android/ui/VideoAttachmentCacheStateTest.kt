@@ -101,6 +101,30 @@ class VideoAttachmentCacheStateTest {
         )
     }
 
+    @Test
+    fun cachedPosterSkipsPosterFrameExtraction() {
+        val source =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
+            ).firstOrNull { it.exists() }?.readText()
+                ?: error("Missing MediaVideo.kt source file")
+        val bubbleStart = source.indexOf("internal fun MediaVideoBubble(")
+        val bubbleEnd = source.indexOf("@VisibleForTesting", bubbleStart)
+        val bubble = source.substring(bubbleStart, bubbleEnd)
+
+        assertTrue(
+            "MediaVideoBubble must decide whether it needs a poster before leaving the Compose thread",
+            bubble.indexOf("val needsPoster = posterBitmap == null") in 0 until bubble.indexOf("withContext(Dispatchers.IO)"),
+        )
+        assertTrue(
+            "a cached poster must bypass getScaledFrameAtTime while duration metadata is still read",
+            Regex(
+                """val frame\s*=\s*if \(needsPoster\) \{[\s\S]*?mmr\.getScaledFrameAtTime\([\s\S]*?\}\s*else\s*(?:\{\s*null\s*\}|null)""",
+            ).containsMatchIn(bubble),
+        )
+    }
+
     private fun mediaReference(mediaType: String): MediaAttachmentReferenceFfi =
         MediaAttachmentReferenceFfi(
             locators = emptyList(),

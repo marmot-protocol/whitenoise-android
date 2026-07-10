@@ -392,23 +392,28 @@ internal fun MediaVideoBubble(
     LaunchedEffect(localFile) {
         val f = localFile ?: return@LaunchedEffect
         // Poster may already be seeded from cache after a sourceEpoch upgrade;
-        // still recompute when the duration is missing so the label survives.
+        // still read duration so the label survives, but do not decode another frame.
         if (posterBitmap != null && durationMs > 0L) return@LaunchedEffect
+        val needsPoster = posterBitmap == null
         val (bm, dur) =
             withContext(Dispatchers.IO) {
                 val mmr = android.media.MediaMetadataRetriever()
                 try {
                     mmr.setDataSource(f.absolutePath)
-                    // Scale down to bubble preview size so a 4K source doesn't
-                    // hold a ~33 MB ARGB bitmap per visible video bubble.
-                    val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
                     val frame =
-                        mmr.getScaledFrameAtTime(
-                            0L,
-                            android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                            edge,
-                            edge,
-                        )
+                        if (needsPoster) {
+                            // Scale down to bubble preview size so a 4K source doesn't
+                            // hold a ~33 MB ARGB bitmap per visible video bubble.
+                            val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
+                            mmr.getScaledFrameAtTime(
+                                0L,
+                                android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                                edge,
+                                edge,
+                            )
+                        } else {
+                            null
+                        }
                     val d =
                         mmr
                             .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
