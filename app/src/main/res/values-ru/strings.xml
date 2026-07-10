@@ -118,6 +118,15 @@
     <string name="profile_add_to_groups_confirm_message">%1$s будет добавлен в %2$s. Это будет видно всем участникам.</string>
     <string name="profile_add_to_groups_confirm_label">Добавить в группы</string>
     <string name="profile_view_picture">Посмотреть фото профиля</string>
+    <string name="profile_private_nickname">Локальный псевдоним</string>
+    <string name="profile_name_from_profile">Имя (из профиля): %1$s</string>
+    <string name="profile_your_nickname">Ваш псевдоним: %1$s</string>
+    <string name="profile_nickname_not_set">Не задан</string>
+    <string name="profile_set_nickname">Задать псевдоним</string>
+    <string name="profile_edit_nickname">Изменить псевдоним</string>
+    <string name="profile_nickname_dialog_title">Задать псевдоним</string>
+    <string name="profile_nickname_hint">Псевдоним</string>
+    <string name="profile_nickname_private_hint">Это видно только вам на этом устройстве. Очистка вернёт имя из профиля. Сохранённые псевдонимы очищаются и ограничиваются 80 символами.</string>
     <string name="dismiss">Закрыть</string>
     <string name="edit">Изменить</string>
     <string name="save_group">Сохранить группу</string>
