@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -138,6 +139,44 @@ class ChatListProjectionReducerTest {
 
         assertTrue(item.group.archived)
         assertTrue(item.group.pendingConfirmation)
+    }
+
+    @Test
+    fun terminalSelfMembershipInEitherSnapshotVoidsAStalePendingInvite() {
+        val snapshotMemberships =
+            listOf(
+                SelfMembershipFfi.REMOVED to SelfMembershipFfi.MEMBER,
+                SelfMembershipFfi.MEMBER to SelfMembershipFfi.REMOVED,
+            )
+
+        snapshotMemberships.forEach { (rowMembership, groupMembership) ->
+            val item =
+                chatListItemFromProjection(
+                    row =
+                        row(
+                            groupId = "removed-before-open",
+                            rawTitle = "Stale invite",
+                            pendingConfirmation = true,
+                        ).copy(selfMembership = rowMembership),
+                    group =
+                        group(
+                            groupId = "removed-before-open",
+                            name = "Stale invite",
+                            pendingConfirmation = true,
+                        ).copy(selfMembership = groupMembership),
+                )
+
+            assertFalse(item.group.pendingConfirmation)
+            assertEquals(SelfMembershipFfi.REMOVED, item.group.selfMembership)
+            val seed =
+                conversationMembershipSeed(
+                    item.group,
+                    initialMemberSnapshot = null,
+                    activeAccountIdHex = "self",
+                )
+            assertTrue(seed.membersVerified)
+            assertFalse(seed.seededSelfMember)
+        }
     }
 
     // ---- members snapshot derivation ----------------------------------------

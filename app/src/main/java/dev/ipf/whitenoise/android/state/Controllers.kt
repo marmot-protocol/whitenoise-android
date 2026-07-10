@@ -292,11 +292,16 @@ internal fun chatListItemFromProjection(
     removed: Boolean = false,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
+    // The row and group record come from independent live snapshots. Preserve a
+    // terminal membership from either one: LEFT/REMOVED cannot regress to MEMBER,
+    // and either makes a pending Welcome unactionable (#1248).
+    val selfMembership = row.selfMembership.takeIf { it.isNonMember() } ?: baseGroup.selfMembership
     val displayGroup =
         baseGroup.copy(
             name = row.groupName.ifBlank { baseGroup.name },
             archived = row.archived,
-            pendingConfirmation = row.pendingConfirmation,
+            pendingConfirmation = row.pendingConfirmation && !selfMembership.isNonMember(),
+            selfMembership = selfMembership,
         )
     val otherMember =
         members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) }
