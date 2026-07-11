@@ -169,6 +169,108 @@ class AppSelfUpdateDownloaderTest {
             assertFalse(File(tempDir, "${destination.name}.part").exists())
         }
 
+    @Test
+    fun signedSizeAboveCapRejectsBeforeNetwork() =
+        runBlocking {
+            val destination = File(tempDir, "darkmatter.apk")
+            val asset =
+                assetForBody(
+                    hash = "a".repeat(64),
+                    sizeBytes = AppSelfUpdateLimits.MAX_APK_BYTES + 1L,
+                )
+            val result =
+                AppSelfUpdateDownloader(httpClient).downloadVerifiedApk(
+                    asset = asset,
+                    destination = destination,
+                    onProgress = { _, _ -> },
+                )
+
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull() is AppSelfUpdateDownloader.DownloadSizeLimitExceededException)
+            assertEquals(0, server.requestCount)
+            assertFalse(destination.exists())
+        }
+
+    @Test
+    fun oversizedContentLengthRejectsBeforeStreaming() =
+        runBlocking {
+            val body = byteArrayOf(0x01)
+            server.enqueue(MockResponse().setBody(body.toRequestBody()))
+            val oversizedClient =
+                httpClient
+                    .newBuilder()
+                    .addInterceptor(
+                        Interceptor { chain ->
+                            val response = chain.proceed(chain.request())
+                            response
+                                .newBuilder()
+                                .header("Content-Length", (AppSelfUpdateLimits.MAX_APK_BYTES + 1L).toString())
+                                .build()
+                        },
+                    ).build()
+
+            val destination = File(tempDir, "darkmatter.apk")
+            val asset = assetForBody(hash = "b".repeat(64), sizeBytes = null)
+            val result =
+                AppSelfUpdateDownloader(oversizedClient).downloadVerifiedApk(
+                    asset = asset,
+                    destination = destination,
+                    onProgress = { _, _ -> },
+                )
+
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull() is AppSelfUpdateDownloader.DownloadSizeLimitExceededException)
+            assertFalse(destination.exists())
+            assertFalse(File(tempDir, "${destination.name}.part").exists())
+        }
+
+    @Test
+    fun chunkedResponseOverCapAbortsDuringRead() =
+        runBlocking {
+            val body = ByteArray(2_048) { 0x5a }
+            val hash = sha256(body).toHex()
+            server.enqueue(
+                MockResponse()
+                    .setChunkedBody(body.toRequestBody(), 256),
+            )
+
+            val destination = File(tempDir, "darkmatter.apk")
+            val asset = assetForBody(hash = hash, sizeBytes = null)
+            val downloader = AppSelfUpdateDownloader(httpClient, maxApkBytes = 1_024L)
+            val result =
+                downloader.downloadVerifiedApk(
+                    asset = asset,
+                    destination = destination,
+                    onProgress = { _, _ -> },
+                )
+
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull() is AppSelfUpdateDownloader.DownloadSizeLimitExceededException)
+            assertFalse(destination.exists())
+            assertFalse(File(tempDir, "${destination.name}.part").exists())
+        }
+
+    @Test
+    fun chunkedResponseOverSignedSizeAbortsDuringRead() =
+        runBlocking {
+            val body = ByteArray(2_048) { 0x6b }
+            server.enqueue(MockResponse().setChunkedBody(body.toRequestBody(), 256))
+
+            val destination = File(tempDir, "darkmatter.apk")
+            val asset = assetForBody(hash = sha256(body).toHex(), sizeBytes = 1_024L)
+            val result =
+                AppSelfUpdateDownloader(httpClient).downloadVerifiedApk(
+                    asset = asset,
+                    destination = destination,
+                    onProgress = { _, _ -> },
+                )
+
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull() is AppSelfUpdateDownloader.DownloadSizeLimitExceededException)
+            assertFalse(destination.exists())
+            assertFalse(File(tempDir, "${destination.name}.part").exists())
+        }
+
     private fun rewriteHttpsToLocalHttpInterceptor(): Interceptor =
         Interceptor { chain ->
             val httpsRequest = chain.request()

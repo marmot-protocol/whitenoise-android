@@ -182,6 +182,36 @@ class ZapstoreAssetEventsTest {
     }
 
     @Test
+    fun parseApkAssetTagsRejectsDuplicateOrMalformedUrlTags() {
+        val duplicateUrl =
+            assetEventWithComputedId(
+                baseAssetTags() +
+                    listOf(
+                        listOf("url", "https://cdn.example.com/app.apk"),
+                        listOf("url", "https://mirror.example.com/app.apk"),
+                    ),
+            )
+        val malformedDuplicateUrl =
+            assetEventWithComputedId(
+                baseAssetTags() +
+                    listOf(
+                        listOf("url", "https://cdn.example.com/app.apk"),
+                        listOf("url"),
+                    ),
+            )
+        listOf(duplicateUrl, malformedDuplicateUrl).forEach { event ->
+            assertNull(
+                ZapstoreAssetEvents.parseApkAssetTags(
+                    event = event,
+                    appId = APP_ID,
+                    version = VERSION,
+                    platformId = PLATFORM_ID,
+                ),
+            )
+        }
+    }
+
+    @Test
     fun parseApkAssetTagsRejectsAmbiguousSingletonSecurityTags() {
         val duplicateAppId =
             assetEventWithComputedId(

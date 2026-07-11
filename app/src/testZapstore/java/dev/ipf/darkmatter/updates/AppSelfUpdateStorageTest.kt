@@ -36,9 +36,25 @@ class AppSelfUpdateStorageTest {
     }
 
     @Test
+    fun sweepDoesNotDeleteActiveDownloadFiles() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val apk = AppSelfUpdateStorage.apkFileForOperation(context, "2026.6.99", generation = 2L)
+        val partial = File(apk.parentFile, "${apk.name}.part")
+        AppSelfUpdateStorage.registerActiveDownload(apk)
+        try {
+            partial.writeText("active")
+            AppSelfUpdateStorage.sweepStaleApks(context)
+            assertTrue(partial.exists())
+        } finally {
+            AppSelfUpdateStorage.unregisterActiveDownload(apk)
+            AppSelfUpdateStorage.deleteFile(partial)
+        }
+    }
+
+    @Test
     fun deleteFileRemovesVerifiedAndPartialDownloadsOnFailure() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val apk = AppSelfUpdateStorage.apkFileForVersion(context, "2026.6.99")
+        val apk = AppSelfUpdateStorage.apkFileForOperation(context, "2026.6.99", generation = 1L)
         apk.writeText("apk")
         val partial = File(apk.parentFile, "${apk.name}.part")
         partial.writeText("partial")

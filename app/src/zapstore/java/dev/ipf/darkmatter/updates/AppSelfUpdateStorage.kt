@@ -7,24 +7,33 @@ object AppSelfUpdateStorage {
     const val CACHE_DIR_NAME = "app_updates"
     const val STALE_MAX_AGE_MS: Long = 24L * 60L * 60L * 1000L
 
+    private val activeDownloadLock = Any()
+    private val activeDownloadPaths = mutableSetOf<String>()
+
     fun updatesDirectory(context: Context): File = File(context.cacheDir, CACHE_DIR_NAME).apply { mkdirs() }
 
-    fun apkFileForVersion(
+    fun apkFileForOperation(
         context: Context,
         version: String,
-    ): File = File(updatesDirectory(context), "darkmatter-$version.apk")
+        generation: Long,
+    ): File = File(updatesDirectory(context), "darkmatter-$version-$generation.apk")
 
     fun deleteFile(file: File?) {
         if (file == null) return
         runCatching { file.delete() }
     }
 
-    fun deletePartialDownloads(directory: File) {
-        if (!directory.isDirectory) return
-        directory.listFiles()?.forEach { entry ->
-            if (entry.isFile && entry.name.endsWith(".part")) {
-                deleteFile(entry)
-            }
+    internal fun registerActiveDownload(destination: File) {
+        synchronized(activeDownloadLock) {
+            activeDownloadPaths += destination.absolutePath
+            activeDownloadPaths += partialFile(destination).absolutePath
+        }
+    }
+
+    internal fun unregisterActiveDownload(destination: File) {
+        synchronized(activeDownloadLock) {
+            activeDownloadPaths -= destination.absolutePath
+            activeDownloadPaths -= partialFile(destination).absolutePath
         }
     }
 
@@ -36,11 +45,15 @@ object AppSelfUpdateStorage {
         val directory = updatesDirectory(context)
         if (!directory.isDirectory) return
         val cutoff = nowMillis - maxAgeMillis
-        directory.listFiles()?.forEach { entry ->
-            if (entry.isFile && entry.lastModified() < cutoff) {
-                deleteFile(entry)
+        synchronized(activeDownloadLock) {
+            directory.listFiles()?.forEach { entry ->
+                if (!entry.isFile || entry.absolutePath in activeDownloadPaths) return@forEach
+                if (entry.name.endsWith(".part") || entry.lastModified() < cutoff) {
+                    deleteFile(entry)
+                }
             }
         }
-        deletePartialDownloads(directory)
     }
+
+    private fun partialFile(destination: File): File = File(destination.parentFile, "${destination.name}.part")
 }

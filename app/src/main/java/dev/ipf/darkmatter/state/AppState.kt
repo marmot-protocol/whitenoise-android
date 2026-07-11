@@ -41,13 +41,14 @@ import dev.ipf.darkmatter.ui.markdownDocumentMentionBech32s
 import dev.ipf.darkmatter.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.darkmatter.updates.AppSelfUpdateFlows
 import dev.ipf.darkmatter.updates.AppSelfUpdateState
+import dev.ipf.darkmatter.updates.AppUpdateAction
 import dev.ipf.darkmatter.updates.AppUpdateConstants
 import dev.ipf.darkmatter.updates.AppUpdateForegroundState
 import dev.ipf.darkmatter.updates.AppUpdateInfo
 import dev.ipf.darkmatter.updates.AppUpdateNotifier
 import dev.ipf.darkmatter.updates.AppUpdateRepository
+import dev.ipf.darkmatter.updates.decideAppUpdateAction
 import dev.ipf.darkmatter.updates.shouldPostAppUpdateNotification
-import dev.ipf.darkmatter.updates.shouldStartInAppSelfUpdate
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -1978,8 +1979,10 @@ class DarkMatterAppState(
         AppUpdateForegroundState.isForeground = foreground
         if (foreground) {
             refreshLocalNotificationPermission()
+            appSelfUpdateFlow.sweepStaleApks()
             notificationScope.launch { catchUpAfterForegroundActivation() }
         } else {
+            appSelfUpdateFlow.onBackground { appSelfUpdateState = it }
             notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = true) }
         }
         if (foreground && backgroundConnectionEnabled) startBackgroundConnectionService()
@@ -2072,13 +2075,16 @@ class DarkMatterAppState(
         }
     }
 
-    fun handleAppUpdateAction(context: Context = appContext) {
-        val latest = appUpdateInfo.latestVersion
-        if (shouldStartInAppSelfUpdate(BuildConfig.SELF_UPDATE_ENABLED) && latest != null) {
-            startAppSelfUpdate(latest)
-            return
+    suspend fun handleAppUpdateAction(
+        context: Context = appContext,
+        forceRefresh: Boolean = false,
+    ) {
+        val info = refreshAppUpdate(force = forceRefresh, notifyIfNewer = false)
+        when (val action = decideAppUpdateAction(BuildConfig.SELF_UPDATE_ENABLED, info, appInForeground)) {
+            is AppUpdateAction.StartInAppSelfUpdate -> startAppSelfUpdate(action.version)
+            AppUpdateAction.OpenExternalListing -> openZapstoreListing(context)
+            AppUpdateAction.NoOp -> Unit
         }
-        openZapstoreListing(context)
     }
 
     fun startAppSelfUpdate(version: String? = appUpdateInfo.latestVersion) {
@@ -2118,7 +2124,7 @@ class DarkMatterAppState(
         appSelfUpdateFlow.openInstallPermissionSettings(context)
     }
 
-    fun launchVerifiedAppSelfUpdate(context: Context = appContext): Boolean = appSelfUpdateFlow.launchInstall(context) { appSelfUpdateState = it }
+    suspend fun launchVerifiedAppSelfUpdate(context: Context = appContext): Boolean = appSelfUpdateFlow.launchInstall(context) { appSelfUpdateState = it }
 
     suspend fun refreshLocalNotificationSettings() {
         val account = activeAccountRef

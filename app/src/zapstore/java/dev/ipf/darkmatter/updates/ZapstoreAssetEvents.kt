@@ -101,11 +101,9 @@ internal object ZapstoreAssetEvents {
         if (!platformIds.contains(platformId)) return null
 
         val downloadUrl =
-            event.tags
-                .asSequence()
-                .filter { tag -> tag.firstOrNull() == "url" }
-                .mapNotNull { tag -> tag.getOrNull(1)?.takeIf { it.isTrustedHttpsUrl() } }
-                .firstOrNull()
+            event
+                .requiredUniqueTagValue("url")
+                ?.takeIf { it.isTrustedHttpsUrl() }
                 ?: return null
 
         val sizeBytes =
@@ -154,17 +152,11 @@ internal object ZapstoreAssetEvents {
     }
 }
 
-private fun NostrEvent.uniqueTagValues(name: String): List<String> =
-    tags.mapNotNull { tag ->
-        if (tag.firstOrNull() != name) return@mapNotNull null
-        tag.getOrNull(1)
-    }
-
 private fun NostrEvent.uniqueTagValue(name: String): UniqueTagValue {
-    val values = uniqueTagValues(name)
-    return when {
-        values.isEmpty() -> UniqueTagValue.Absent
-        values.size == 1 -> UniqueTagValue.Present(values[0])
+    val matchingTags = tags.filter { tag -> tag.firstOrNull() == name }
+    return when (matchingTags.size) {
+        0 -> UniqueTagValue.Absent
+        1 -> matchingTags[0].getOrNull(1)?.let(UniqueTagValue::Present) ?: UniqueTagValue.Ambiguous
         else -> UniqueTagValue.Ambiguous
     }
 }

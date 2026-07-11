@@ -31,7 +31,7 @@ interface AppSelfUpdateFlow {
 
     fun refreshInstallPermission(onStateChanged: (AppSelfUpdateState) -> Unit)
 
-    fun launchInstall(
+    suspend fun launchInstall(
         context: Context,
         onStateChanged: (AppSelfUpdateState) -> Unit,
     ): Boolean
@@ -39,4 +39,7 @@ interface AppSelfUpdateFlow {
     fun openInstallPermissionSettings(context: Context)
 
     fun sweepStaleApks()
+
+    /** Cancel active resolve/download when the app leaves the foreground. */
+    fun onBackground(onStateChanged: (AppSelfUpdateState) -> Unit)
 }

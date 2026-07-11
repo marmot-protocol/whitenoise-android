@@ -31,7 +31,7 @@ internal class PlayAppSelfUpdateFlow : AppSelfUpdateFlow {
 
     override fun refreshInstallPermission(onStateChanged: (AppSelfUpdateState) -> Unit) = Unit
 
-    override fun launchInstall(
+    override suspend fun launchInstall(
         context: Context,
         onStateChanged: (AppSelfUpdateState) -> Unit,
     ): Boolean = false
@@ -39,4 +39,6 @@ internal class PlayAppSelfUpdateFlow : AppSelfUpdateFlow {
     override fun openInstallPermissionSettings(context: Context) = Unit
 
     override fun sweepStaleApks() = Unit
+
+    override fun onBackground(onStateChanged: (AppSelfUpdateState) -> Unit) = Unit
 }

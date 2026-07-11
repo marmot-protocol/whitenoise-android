@@ -1849,7 +1849,7 @@ private fun ChatsScreen(
             if (appState.appUpdateInfo.shouldShowBanner) {
                 AppUpdateBanner(
                     info = appState.appUpdateInfo,
-                    onUpdateNow = { appState.handleAppUpdateAction(context) },
+                    onUpdateNow = { scope.launch { appState.handleAppUpdateAction(context) } },
                     onDismiss = { appState.dismissAppUpdateBanner() },
                 )
             }
@@ -15301,10 +15301,12 @@ private fun SettingsHomeScreen(
                     AppUpdateSettingsRow(
                         info = appState.appUpdateInfo,
                         onClick = {
-                            if (appState.appUpdateInfo.latestVersion == null) {
-                                scope.launch { appState.refreshAppUpdate(force = true, notifyIfNewer = false) }
+                            scope.launch {
+                                appState.handleAppUpdateAction(
+                                    context,
+                                    forceRefresh = appState.appUpdateInfo.latestVersion == null,
+                                )
                             }
-                            appState.handleAppUpdateAction(context)
                         },
                     )
                 }

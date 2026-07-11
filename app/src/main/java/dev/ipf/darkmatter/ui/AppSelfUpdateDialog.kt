@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -17,10 +18,12 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.darkmatter.R
 import dev.ipf.darkmatter.state.DarkMatterAppState
 import dev.ipf.darkmatter.updates.AppSelfUpdateState
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppSelfUpdateDialog(appState: DarkMatterAppState) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     when (val state = appState.appSelfUpdateState) {
         AppSelfUpdateState.Idle -> Unit
         AppSelfUpdateState.Resolving ->
@@ -97,7 +100,7 @@ fun AppSelfUpdateDialog(appState: DarkMatterAppState) {
                     )
                 },
                 confirmButton = {
-                    TextButton(onClick = { appState.launchVerifiedAppSelfUpdate(context) }) {
+                    TextButton(onClick = { scope.launch { appState.launchVerifiedAppSelfUpdate(context) } }) {
                         Text(stringResource(R.string.app_self_update_install))
                     }
                 },
