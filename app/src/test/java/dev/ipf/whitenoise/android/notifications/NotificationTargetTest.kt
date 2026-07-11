@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import androidx.work.BackoffPolicy
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
@@ -339,6 +340,30 @@ class NotificationTargetTest {
         assertEquals(sameReply, NotificationReplyWorker.notificationReplyWorkName(action, "hello"))
         assertNotEquals(sameReply, NotificationReplyWorker.notificationReplyWorkName(action, "different"))
         assertNotEquals(sameReply, NotificationReplyWorker.notificationReplyWorkName(laterMessage, "hello"))
+    }
+
+    @Test
+    fun replyWorkerFailureRetries_areBounded() {
+        assertTrue(NotificationReplyWorker.shouldRetryAfterFailure(runAttemptCount = 0))
+        assertTrue(NotificationReplyWorker.shouldRetryAfterFailure(runAttemptCount = 1))
+        assertFalse(NotificationReplyWorker.shouldRetryAfterFailure(runAttemptCount = 2))
+        assertFalse(NotificationReplyWorker.shouldRetryAfterFailure(runAttemptCount = 3))
+    }
+
+    @Test
+    fun replyWorkerRequest_usesExplicitExponentialBackoff() {
+        val action =
+            NotificationAction(
+                kind = NotificationActionKind.REPLY,
+                target = NotificationTarget("acct-a", "group-1", "msg-1", NotificationTargetKind.MESSAGE),
+                notificationTag = "acct-a|group-1",
+                notificationId = 0,
+            )
+
+        val request = NotificationReplyWorker.notificationReplyRequest(action, "hello")
+
+        assertEquals(BackoffPolicy.EXPONENTIAL, request.workSpec.backoffPolicy)
+        assertEquals(30_000L, request.workSpec.backoffDelayDuration)
     }
 
     // ---- resolveNotificationNav (routing FSM) -------------------------------
