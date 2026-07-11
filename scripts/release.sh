@@ -177,12 +177,17 @@ resolve_zapstore_release_apk() {
   return 1
 }
 
-if [[ -n "$TARGET_ABI" && "$TARGET_ABI" != "universal" ]]; then
+if [[ -n "$TARGET_ABI" ]]; then
   echo "==> Assembling Zapstore release APK for $TARGET_ABI"
   rm -f "$APK_DIR"/*.apk
-  ./gradlew :app:assembleZapstoreRelease \
-    -Pandroid.injected.build.abi="$TARGET_ABI" \
-    -Pandroid.injected.testOnly=false
+  if [[ "$TARGET_ABI" == "universal" ]]; then
+    ./gradlew :app:assembleZapstoreRelease \
+      -Pandroid.injected.testOnly=false
+  else
+    ./gradlew :app:assembleZapstoreRelease \
+      -Pandroid.injected.build.abi="$TARGET_ABI" \
+      -Pandroid.injected.testOnly=false
+  fi
 
   built_apk="$(resolve_zapstore_release_apk "$TARGET_ABI")" || {
     echo "error: no APK found for ABI: $TARGET_ABI" >&2
