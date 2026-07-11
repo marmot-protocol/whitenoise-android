@@ -27,15 +27,30 @@ class NotificationReplyWorker(
         val action = notificationReplyActionFromInput(inputData) ?: return Result.success()
         val reply = inputData.getString(KEY_REPLY)?.trim().orEmpty()
         if (reply.isBlank()) return Result.success()
+        val completionStore = NotificationReplyCompletionStore.create(applicationContext)
+        val completionKey = notificationReplyWorkName(action, reply)
         if (!application.appState.notificationActionsAllowed) {
             if (BuildConfig.DEBUG) Log.w(TAG, "reply blocked by app lock group=${action.target.groupIdHex.take(8)}")
             return Result.success()
         }
 
         return try {
+            withContext(Dispatchers.Main.immediate) {
+                application.appState.ensureNotificationRuntimeStarted()
+            }
+            if (
+                completionStore.isCompleted(completionKey) ||
+                (completionStore.hasStarted(completionKey) && alreadyCommitted(application, action, reply))
+            ) {
+                completionStore.markCompleted(completionKey)
+                markReadAfterReply(application, action)
+                dismissSentReplyNotification(applicationContext, action, reply)
+                notificationReplyActionHandled(sent = true)
+                return Result.success()
+            }
+            completionStore.markStarted(completionKey)
             val sent =
                 withContext(Dispatchers.Main.immediate) {
-                    application.appState.ensureNotificationRuntimeStarted()
                     application.appState.sendNotificationReply(
                         accountRef = action.target.accountRef,
                         groupIdHex = action.target.groupIdHex,
@@ -43,6 +58,7 @@ class NotificationReplyWorker(
                     )
                 }
             if (sent) {
+                completionStore.markCompleted(completionKey)
                 markReadAfterReply(application, action)
                 dismissSentReplyNotification(applicationContext, action, reply)
                 notificationReplyActionHandled(sent = true)
@@ -59,6 +75,20 @@ class NotificationReplyWorker(
             Result.retry()
         }
     }
+
+    private suspend fun alreadyCommitted(
+        application: WhiteNoiseApplication,
+        action: NotificationAction,
+        reply: String,
+    ): Boolean =
+        withContext(Dispatchers.Main.immediate) {
+            application.appState.notificationReplyAlreadyCommitted(
+                accountRef = action.target.accountRef,
+                groupIdHex = action.target.groupIdHex,
+                afterMessageIdHex = action.target.messageIdHex.orEmpty(),
+                text = reply,
+            )
+        }
 
     private suspend fun markReadAfterReply(
         application: WhiteNoiseApplication,
@@ -173,6 +203,8 @@ class NotificationReplyWorker(
                     listOf(
                         action.target.accountRef,
                         action.target.groupIdHex,
+                        action.target.messageIdHex.orEmpty(),
+                        action.target.kind.name,
                         action.notificationTag,
                         reply.trim(),
                     ).joinToString(separator = "\u0000"),

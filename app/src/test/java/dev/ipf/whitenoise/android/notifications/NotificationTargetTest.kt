@@ -330,10 +330,15 @@ class NotificationTargetTest {
                 notificationId = 0,
             )
         val sameReply = NotificationReplyWorker.notificationReplyWorkName(action, " hello ")
+        val laterMessage =
+            action.copy(
+                target = action.target.copy(messageIdHex = "msg-2"),
+            )
 
         assertEquals(action, NotificationReplyWorker.notificationReplyActionFromInput(NotificationReplyWorker.notificationReplyInputData(action, "hello")))
         assertEquals(sameReply, NotificationReplyWorker.notificationReplyWorkName(action, "hello"))
         assertNotEquals(sameReply, NotificationReplyWorker.notificationReplyWorkName(action, "different"))
+        assertNotEquals(sameReply, NotificationReplyWorker.notificationReplyWorkName(laterMessage, "hello"))
     }
 
     // ---- resolveNotificationNav (routing FSM) -------------------------------
