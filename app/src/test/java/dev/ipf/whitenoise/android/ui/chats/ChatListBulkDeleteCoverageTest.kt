@@ -14,7 +14,11 @@ class ChatListBulkDeleteCoverageTest {
     @Test
     fun bulkDeleteConfirmUsesPureLocalWipePath() {
         val source = chatsScreenSource().readText()
-        val confirmBlock = source.substringAfter("pendingBulkDelete?.let { items ->")
+        val confirmBlock =
+            source.requiredSection(
+                start = "pendingBulkDelete?.let { items ->",
+                end = "\n}\n\n/**\n * Resolution state for a chat-list search query",
+            )
 
         assertTrue(
             "bulk delete confirm must call the pure local wipe helper",
@@ -26,8 +30,8 @@ class ChatListBulkDeleteCoverageTest {
         )
         assertFalse(
             "bulk local delete must not gate sole admins or route them through transfer-and-leave",
-            "soleAdminTransferCandidates" in source ||
-                "transferAdminThenDeleteFromChatList" in source,
+            "soleAdminTransferCandidates" in confirmBlock ||
+                "transferAdminThenDeleteFromChatList" in confirmBlock,
         )
     }
 
@@ -62,4 +66,15 @@ class ChatListBulkDeleteCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing Controllers.kt source file")
+
+    private fun String.requiredSection(
+        start: String,
+        end: String,
+    ): String {
+        val startIndex = indexOf(start)
+        require(startIndex >= 0) { "Missing section start: $start" }
+        val endIndex = indexOf(end, startIndex + start.length)
+        require(endIndex >= 0) { "Missing section end: $end" }
+        return substring(startIndex, endIndex)
+    }
 }

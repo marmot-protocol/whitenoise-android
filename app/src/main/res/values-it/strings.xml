@@ -54,6 +54,10 @@
     <string name="chat_row_action_leave">Esci dal gruppo</string>
     <string name="chat_list_select_all">Seleziona tutto</string>
     <string name="chat_list_deselect_all">Deseleziona tutto</string>
+    <plurals name="chat_list_selected_count">
+        <item quantity="one">%1$d chat selezionata</item>
+        <item quantity="other">%1$d chat selezionate</item>
+    </plurals>
     <plurals name="chat_list_bulk_delete_confirm">
         <item quantity="one">Eliminare %1$d chat da questo dispositivo?</item>
         <item quantity="other">Eliminare %1$d chat da questo dispositivo?</item>

@@ -24,6 +24,12 @@ class ChatListSelectionBarTest {
 
     private fun string(res: Int): String = ApplicationProvider.getApplicationContext<android.content.Context>().getString(res)
 
+    private fun plural(
+        res: Int,
+        quantity: Int,
+        vararg args: Any,
+    ): String = ApplicationProvider.getApplicationContext<android.content.Context>().resources.getQuantityString(res, quantity, *args)
+
     @Test
     fun showsCountAndRoutesActions() {
         var closes = 0
@@ -52,6 +58,10 @@ class ChatListSelectionBarTest {
         }
 
         composeRule.onNodeWithText("2").assertIsDisplayed()
+        composeRule
+            .onNodeWithContentDescription(
+                plural(R.plurals.chat_list_selected_count, 2, 2),
+            ).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.archive)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.delete)).performClick()

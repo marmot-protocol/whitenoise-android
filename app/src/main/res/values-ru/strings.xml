@@ -54,6 +54,12 @@
     <string name="chat_row_action_leave">Выйти из группы</string>
     <string name="chat_list_select_all">Выбрать все</string>
     <string name="chat_list_deselect_all">Снять выделение</string>
+    <plurals name="chat_list_selected_count">
+        <item quantity="one">%1$d чат выбран</item>
+        <item quantity="few">%1$d чата выбрано</item>
+        <item quantity="many">%1$d чатов выбрано</item>
+        <item quantity="other">%1$d чатов выбрано</item>
+    </plurals>
     <plurals name="chat_list_bulk_delete_confirm">
         <item quantity="one">Удалить %1$d чат с этого устройства?</item>
         <item quantity="few">Удалить %1$d чата с этого устройства?</item>

@@ -376,7 +376,8 @@ internal fun ChatsScreen(
                     archiveAction = bulkArchiveAction,
                     actionsEnabled = selectedChatIds.isNotEmpty(),
                     allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
-                    showMarkRead = singleSelectedItem?.hasUnread == true,
+                    showMarkRead =
+                        singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
                     showMuteToggle = singleSelectedItem != null,
                     muted = singleSelectionMuted,
                     onClose = ::clearSelection,
@@ -410,13 +411,16 @@ internal fun ChatsScreen(
                     },
                     onMarkRead = {
                         val item = singleSelectedItem ?: return@ChatListSelectionBar
+                        clearSelection()
                         appState.launchMutation { controller.markAllRead(item) }
                     },
                     onMuteToggle = {
                         val item = singleSelectedItem ?: return@ChatListSelectionBar
+                        val nextMuted = !singleSelectionMuted
+                        clearSelection()
                         appState.setConversationMuted(
                             item.group.groupIdHex,
-                            !singleSelectionMuted,
+                            nextMuted,
                         )
                     },
                     onSelectAll = { selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds)) },
@@ -546,6 +550,11 @@ internal fun ChatsScreen(
                                 ChatListRow(
                                     item = item,
                                     appState = appState,
+                                    isMuted =
+                                        appState.activeAccountRef?.let { accountRef ->
+                                            ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in
+                                                mutedConversations
+                                        } ?: false,
                                     selectionMode = selectionMode,
                                     selected = item.id in selectedChatIds,
                                     bodyMatch = bodyMatch,

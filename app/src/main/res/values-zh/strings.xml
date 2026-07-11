@@ -54,6 +54,9 @@
     <string name="chat_row_action_leave">退出群组</string>
     <string name="chat_list_select_all">全选</string>
     <string name="chat_list_deselect_all">取消全选</string>
+    <plurals name="chat_list_selected_count">
+        <item quantity="other">已选择 %1$d 个聊天</item>
+    </plurals>
     <plurals name="chat_list_bulk_delete_confirm">
         <item quantity="other">从此设备删除 %1$d 个聊天？</item>
     </plurals>

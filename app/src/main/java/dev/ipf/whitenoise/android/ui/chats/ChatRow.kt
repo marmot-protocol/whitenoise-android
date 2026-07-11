@@ -21,7 +21,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -48,7 +47,6 @@ import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.ChatMutePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
@@ -70,6 +68,7 @@ internal fun Modifier.chatListSelectionRowClickable(onClick: () -> Unit): Modifi
 internal fun ChatListRow(
     item: ChatListItem,
     appState: WhiteNoiseAppState,
+    isMuted: Boolean,
     selectionMode: Boolean,
     selected: Boolean,
     onOpen: () -> Unit,
@@ -79,13 +78,6 @@ internal fun ChatListRow(
     // (issue #290); drives the highlighted snippet line under the row.
     bodyMatch: MessageBodyMatch? = null,
 ) {
-    val mutedKeys by appState.chatMutePreferences.mutedConversations.collectAsState()
-    val accountRef = appState.activeAccountRef
-    val isMuted =
-        remember(accountRef, item.group.groupIdHex, mutedKeys) {
-            accountRef != null &&
-                ChatMutePreferences.compositeKey(accountRef, item.group.groupIdHex) in mutedKeys
-        }
     ChatRow(
         item = item,
         appState = appState,

@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MarkChatRead
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.DropdownMenu
@@ -21,7 +22,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
@@ -54,8 +59,14 @@ internal fun ChatListSelectionBar(
             ChatListBulkArchiveAction.Archive -> Icons.Default.Archive
             ChatListBulkArchiveAction.Unarchive -> Icons.Default.Unarchive
         }
+    val selectedCountDescription = pluralStringResource(R.plurals.chat_list_selected_count, count, count)
     TopAppBar(
-        title = { Text(count.toString()) },
+        title = {
+            Text(
+                count.toString(),
+                modifier = Modifier.semantics { contentDescription = selectedCountDescription },
+            )
+        },
         navigationIcon = {
             IconButton(onClick = onClose) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
@@ -100,7 +111,12 @@ internal fun ChatListSelectionBar(
                                 ),
                             )
                         },
-                        leadingIcon = { Icon(Icons.Default.NotificationsOff, contentDescription = null) },
+                        leadingIcon = {
+                            Icon(
+                                if (muted) Icons.Default.Notifications else Icons.Default.NotificationsOff,
+                                contentDescription = null,
+                            )
+                        },
                         onClick = {
                             overflowOpen = false
                             onMuteToggle()
