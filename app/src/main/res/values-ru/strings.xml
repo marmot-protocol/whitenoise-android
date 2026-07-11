@@ -601,6 +601,25 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Выбрано</string>
+    <string name="select">Выбрать</string>
+    <string name="batch_delete_own">Удалить %1$d ваших сообщений для всех?</string>
+    <plurals name="batch_delete_others">
+        <item quantity="one">Скрыть %1$d сообщение только на этом устройстве?</item>
+        <item quantity="few">Скрыть %1$d сообщения только на этом устройстве?</item>
+        <item quantity="many">Скрыть %1$d сообщений только на этом устройстве?</item>
+        <item quantity="other">Скрыть %1$d сообщений только на этом устройстве?</item>
+    </plurals>
+    <plurals name="batch_delete_mixed">
+        <item quantity="one">Удалить %1$d ваших сообщений для всех и скрыть ещё %2$d сообщение только на этом устройстве?</item>
+        <item quantity="few">Удалить %1$d ваших сообщений для всех и скрыть ещё %2$d сообщения только на этом устройстве?</item>
+        <item quantity="many">Удалить %1$d ваших сообщений для всех и скрыть ещё %2$d сообщений только на этом устройстве?</item>
+        <item quantity="other">Удалить %1$d ваших сообщений для всех и скрыть ещё %2$d сообщений только на этом устройстве?</item>
+    </plurals>
+    <string name="batch_delete_complete">Выбранные сообщения убраны</string>
+    <string name="batch_delete_partial">Некоторые выбранные сообщения убраны, другие обработать не удалось</string>
+    <string name="batch_delete_failed">Не удалось убрать выбранные сообщения</string>
+    <string name="toast_forwarded_batch_partial">Некоторые выбранные сообщения пересланы, другие отправить не удалось</string>
+    <string name="toast_forward_batch_failed">Не удалось переслать выбранные сообщения</string>
     <plurals name="unread_messages_count">
         <item quantity="one">%1$d непрочитанное сообщение</item>
         <item quantity="few">%1$d непрочитанных сообщения</item>

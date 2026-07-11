@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -103,6 +104,7 @@ internal fun MessageActionMenu(
     canDeleteForEveryone: Boolean,
     canEdit: Boolean,
     canForward: Boolean,
+    canSelect: Boolean,
     quickReactionEmojis: List<String>,
     onDismissRequest: () -> Unit,
     onReact: (String) -> Unit,
@@ -110,6 +112,7 @@ internal fun MessageActionMenu(
     onReply: () -> Unit,
     onEdit: () -> Unit,
     onForward: () -> Unit,
+    onSelect: () -> Unit,
     onCopyText: () -> Unit,
     onInfo: () -> Unit,
     onDeleteForMe: () -> Unit,
@@ -203,7 +206,8 @@ internal fun MessageActionMenu(
         //   - a HorizontalDivider (1.dp)
         //   - the action buttons (each 48.dp min) in a spacedBy(2.dp) Column:
         //       Copy and Info always; +Reply when canReply; +Edit when canEdit;
-        //       +Forward when canForward; +Delete for me when canDeleteForMe;
+        //       +Forward when canForward; +Select when canSelect;
+        //       +Delete for me when canDeleteForMe;
         //       +Delete for everyone when canDeleteForEveryone
         //   - the outer Column's 8.dp padding (top + bottom) and its two
         //     spacedBy(8.dp) gaps between the three sections.
@@ -215,6 +219,7 @@ internal fun MessageActionMenu(
                         (if (canReply) 1 else 0) +
                         (if (canEdit) 1 else 0) +
                         (if (canForward) 1 else 0) +
+                        (if (canSelect) 1 else 0) +
                         (if (canDeleteForMe) 1 else 0) +
                         (if (canDeleteForEveryone) 1 else 0)
                 val actionsColumnHeight = (actionButtonCount * 48).dp + ((actionButtonCount - 1).coerceAtLeast(0) * 2).dp
@@ -327,6 +332,13 @@ internal fun MessageActionMenu(
                                 label = stringResource(R.string.edit),
                                 icon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                 onClick = onEdit,
+                            )
+                        }
+                        if (canSelect) {
+                            MessageActionButton(
+                                label = stringResource(R.string.select),
+                                icon = { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                onClick = onSelect,
                             )
                         }
                         MessageActionButton(

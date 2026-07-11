@@ -597,6 +597,21 @@
     <string name="language_chinese_simplified">简体中文</string>
     <string name="language_chinese_traditional">繁體中文</string>
     <string name="selected">Selezionato</string>
+    <string name="select">Seleziona</string>
+    <string name="batch_delete_own">Eliminare %1$d dei tuoi messaggi per tutti?</string>
+    <plurals name="batch_delete_others">
+        <item quantity="one">Nascondere %1$d messaggio localmente?</item>
+        <item quantity="other">Nascondere %1$d messaggi localmente?</item>
+    </plurals>
+    <plurals name="batch_delete_mixed">
+        <item quantity="one">Eliminare %1$d dei tuoi messaggi per tutti e nasconderne %2$d altro localmente?</item>
+        <item quantity="other">Eliminare %1$d dei tuoi messaggi per tutti e nasconderne %2$d altri localmente?</item>
+    </plurals>
+    <string name="batch_delete_complete">Messaggi selezionati rimossi</string>
+    <string name="batch_delete_partial">Alcuni messaggi selezionati sono stati rimossi; altri non sono riusciti</string>
+    <string name="batch_delete_failed">Impossibile rimuovere i messaggi selezionati</string>
+    <string name="toast_forwarded_batch_partial">Alcuni messaggi selezionati sono stati inoltrati; altri non sono riusciti</string>
+    <string name="toast_forward_batch_failed">Impossibile inoltrare i messaggi selezionati</string>
     <plurals name="unread_messages_count">
         <item quantity="one">%1$d messaggio non letto</item>
         <item quantity="other">%1$d messaggi non letti</item>
