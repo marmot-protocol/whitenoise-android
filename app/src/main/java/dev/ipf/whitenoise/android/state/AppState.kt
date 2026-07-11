@@ -3388,6 +3388,42 @@ class WhiteNoiseAppState(
         }.getOrDefault(false)
     }
 
+    suspend fun notificationReplyAlreadyCommitted(
+        accountRef: String,
+        groupIdHex: String,
+        afterMessageIdHex: String,
+        text: String,
+    ): Boolean {
+        val account = accountRef.takeIf { it.isNotBlank() } ?: return false
+        val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
+        val body = text.trim().takeIf { it.isNotEmpty() } ?: return false
+        val afterMessage = afterMessageIdHex.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) } ?: return false
+        return runCatching {
+            val records =
+                marmotIo {
+                    timelineMessages(
+                        account,
+                        TimelineMessageQueryFfi(
+                            groupIdHex = group,
+                            search = null,
+                            before = null,
+                            beforeMessageId = null,
+                            after = null,
+                            afterMessageId = afterMessage,
+                            limit = 50u,
+                        ),
+                    ).messages
+                }
+            records.any { record ->
+                record.direction.equals("sent", ignoreCase = true) &&
+                    record.plaintext.trim() == body
+            }
+        }.onFailure {
+            rethrowIfCancellation(it)
+            Log.w("DMAppState", "notification reply dedupe probe failed for group=${group.take(8)}", it)
+        }.getOrDefault(false)
+    }
+
     suspend fun markNotificationMessageRead(
         accountRef: String,
         groupIdHex: String,
