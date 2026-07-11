@@ -26,6 +26,7 @@ import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupStateSubscription
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaRecordFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MessageTagFfi
@@ -835,6 +836,23 @@ internal fun mediaCacheKey(
     messageIdHex: String,
     attachmentIndex: Int,
 ): String = "$account|$groupIdHex|$messageIdHex|$attachmentIndex"
+
+internal fun mediaCacheKeysForCiphertextTags(
+    account: String,
+    groupIdHex: String,
+    mediaRecords: Iterable<MediaRecordFfi>,
+    ciphertextTags: Set<String>,
+): Set<String> {
+    if (ciphertextTags.isEmpty()) return emptySet()
+    return mediaRecords
+        .mapNotNull { record ->
+            if (record.reference.ciphertextSha256 in ciphertextTags) {
+                mediaCacheKey(account, groupIdHex, record.messageIdHex, record.attachmentIndex.toInt())
+            } else {
+                null
+            }
+        }.toSet()
+}
 
 internal suspend fun removeMediaMemoryCacheKeys(
     cacheKeys: Iterable<String>,

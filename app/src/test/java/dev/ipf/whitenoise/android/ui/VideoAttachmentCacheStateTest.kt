@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.ui.conversation.media.cachedVideoAttachmentFile
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartVideoAttachmentDownload
@@ -85,6 +86,21 @@ class VideoAttachmentCacheStateTest {
         assertEquals(expected, cachedVideoAttachmentFile(context, messageId, 3, reference))
     }
 
+    @Test
+    fun videoMaterializationUsesSingleFlightForSameCacheFile() {
+        val source = mediaVideoSource().readText()
+        val body = source.functionBody("materializeVideoAttachment")
+
+        assertTrue("video materialization should keep an in-flight map", "inFlightVideoMaterializations" in source)
+        assertTrue("same cache file callers should await the owner", "if (!owner) return shared.await()" in body)
+        assertTrue("the owner should survive first-caller UI cancellation", "withContext(NonCancellable)" in body)
+        assertTrue("the owner should publish the materialized file to waiters", "shared.complete(materialized)" in body)
+        assertTrue(
+            "completed or failed materializations should not poison future retries",
+            "inFlightVideoMaterializations.remove(key)" in body,
+        )
+    }
+
     private fun mediaReference(mediaType: String): MediaAttachmentReferenceFfi =
         MediaAttachmentReferenceFfi(
             locators = emptyList(),
@@ -98,4 +114,11 @@ class VideoAttachmentCacheStateTest {
             dim = null,
             thumbhash = null,
         )
+
+    private fun mediaVideoSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing MediaVideo.kt source file")
 }

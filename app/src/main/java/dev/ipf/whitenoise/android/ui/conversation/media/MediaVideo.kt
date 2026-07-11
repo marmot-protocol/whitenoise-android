@@ -58,9 +58,14 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private val videoMaterializationLock = Any()
+private val inFlightVideoMaterializations = mutableMapOf<String, CompletableDeferred<java.io.File>>()
 
 /**
  * Single video tile in an album grid. Auto-materialises on first
@@ -585,13 +590,6 @@ private suspend fun materializeVideoAttachment(
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
 ): java.io.File {
-    cachedVideoAttachmentFile(
-        context = context,
-        messageIdHex = messageIdHex,
-        attachmentIndex = attachmentIndex,
-        reference = reference,
-    )?.let { return it }
-
     val file =
         videoAttachmentCacheFile(
             context = context,
@@ -599,6 +597,55 @@ private suspend fun materializeVideoAttachment(
             attachmentIndex = attachmentIndex,
             reference = reference,
         )
+    cachedVideoAttachmentFile(
+        context = context,
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+    )?.let { return it }
+
+    val key = file.absolutePath
+    var owner = false
+    val shared =
+        synchronized(videoMaterializationLock) {
+            inFlightVideoMaterializations[key]
+                ?.takeIf { it.isActive }
+                ?: CompletableDeferred<java.io.File>()
+                    .also {
+                        inFlightVideoMaterializations[key] = it
+                        owner = true
+                    }
+        }
+    if (!owner) return shared.await()
+
+    return try {
+        val materialized =
+            withContext(NonCancellable) {
+                materializeVideoAttachmentOnce(file, controller, messageIdHex, attachmentIndex, reference, mine)
+            }
+        shared.complete(materialized)
+        materialized
+    } catch (throwable: Throwable) {
+        shared.completeExceptionally(throwable)
+        throw throwable
+    } finally {
+        synchronized(videoMaterializationLock) {
+            if (inFlightVideoMaterializations[key] === shared) {
+                inFlightVideoMaterializations.remove(key)
+            }
+        }
+    }
+}
+
+private suspend fun materializeVideoAttachmentOnce(
+    file: java.io.File,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+): java.io.File {
+    if (file.isFile && file.length() > 0L) return file
     val retained =
         if (mine) {
             controller
