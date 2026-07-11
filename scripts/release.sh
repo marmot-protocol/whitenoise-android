@@ -7,7 +7,8 @@
 #   - Signing creds in local.properties (see scripts/release.sh --help)
 #   - Sibling checkout of marmot at $DARKMATTER_MARMOT_DIR (default: ../darkmatter)
 #
-# Outputs signed per-ABI and universal APKs in app/build/outputs/apk/release/.
+# Outputs signed per-ABI and universal Zapstore release APKs in
+# app/build/outputs/apk/zapstore/release/ (direct-distribution flavor).
 
 set -euo pipefail
 
@@ -156,37 +157,52 @@ fi
 # --- Gradle release build ---
 cd "$REPO_DIR"
 
-APK_DIR="$REPO_DIR/app/build/outputs/apk/release"
-INTERMEDIATE_APK_DIR="$REPO_DIR/app/build/intermediates/apk/release"
+APK_DIR="$REPO_DIR/app/build/outputs/apk/zapstore/release"
+INTERMEDIATE_APK_DIR="$REPO_DIR/app/build/intermediates/apk/zapstore/release"
 mkdir -p "$APK_DIR"
 
+resolve_zapstore_release_apk() {
+  local abi="$1"
+  local candidate dir
+  for dir in "$APK_DIR" "$INTERMEDIATE_APK_DIR"; do
+    for candidate in \
+      "$dir/app-zapstore-${abi}-release.apk" \
+      "$dir/app-zapstore-${abi}-release-unsigned.apk"; do
+      if [[ -f "$candidate" ]]; then
+        echo "$candidate"
+        return 0
+      fi
+    done
+  done
+  return 1
+}
+
 if [[ -n "$TARGET_ABI" && "$TARGET_ABI" != "universal" ]]; then
-  echo "==> Assembling release APK for $TARGET_ABI"
+  echo "==> Assembling Zapstore release APK for $TARGET_ABI"
   rm -f "$APK_DIR"/*.apk
-  ./gradlew :app:assembleRelease \
+  ./gradlew :app:assembleZapstoreRelease \
     -Pandroid.injected.build.abi="$TARGET_ABI" \
     -Pandroid.injected.testOnly=false
 
-  gradle_apk_name="app-${TARGET_ABI}-release.apk"
-  selected_apk="$APK_DIR/$gradle_apk_name"
-  intermediate_apk="$INTERMEDIATE_APK_DIR/$gradle_apk_name"
-  if [[ ! -f "$selected_apk" && -f "$intermediate_apk" ]]; then
-    cp "$intermediate_apk" "$selected_apk"
-  fi
-  if [[ ! -f "$selected_apk" ]]; then
+  built_apk="$(resolve_zapstore_release_apk "$TARGET_ABI")" || {
     echo "error: no APK found for ABI: $TARGET_ABI" >&2
     exit 1
+  }
+  if [[ "$built_apk" != "$APK_DIR/$(basename "$built_apk")" ]]; then
+    cp "$built_apk" "$APK_DIR/$(basename "$built_apk")"
+    built_apk="$APK_DIR/$(basename "$built_apk")"
   fi
+  selected_apk="$built_apk"
 
   if [[ "$TARGET_ABI" == "arm64-v8a" ]]; then
     selected_apk="$APK_DIR/darkmatter-v8a-release-$(date +%F).apk"
-    mv "$APK_DIR/$gradle_apk_name" "$selected_apk"
+    mv "$built_apk" "$selected_apk"
   fi
 
   assert_not_test_only "$selected_apk"
 else
-  echo "==> Assembling release APKs"
-  ./gradlew :app:assembleRelease
+  echo "==> Assembling Zapstore release APKs"
+  ./gradlew :app:assembleZapstoreRelease
 fi
 
 echo ""

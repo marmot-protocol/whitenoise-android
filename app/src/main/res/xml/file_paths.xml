@@ -4,4 +4,6 @@
     <cache-path name="camera" path="camera/" />
     <cache-path name="shared_media" path="shared_media/" />
     <cache-path name="video_attachments" path="video_attachments/" />
+    <!-- Signed APKs downloaded for in-app self-update (Zapstore flavor only). -->
+    <cache-path name="app_updates" path="app_updates/" />
 </paths>

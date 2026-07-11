@@ -39,12 +39,15 @@ import dev.ipf.darkmatter.notifications.PushServerConfig
 import dev.ipf.darkmatter.notifications.PushTokenStore
 import dev.ipf.darkmatter.ui.markdownDocumentMentionBech32s
 import dev.ipf.darkmatter.ui.markdownDocumentToPreviewAnnotatedString
+import dev.ipf.darkmatter.updates.AppSelfUpdateFlows
+import dev.ipf.darkmatter.updates.AppSelfUpdateState
 import dev.ipf.darkmatter.updates.AppUpdateConstants
 import dev.ipf.darkmatter.updates.AppUpdateForegroundState
 import dev.ipf.darkmatter.updates.AppUpdateInfo
 import dev.ipf.darkmatter.updates.AppUpdateNotifier
 import dev.ipf.darkmatter.updates.AppUpdateRepository
 import dev.ipf.darkmatter.updates.shouldPostAppUpdateNotification
+import dev.ipf.darkmatter.updates.shouldStartInAppSelfUpdate
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -445,6 +448,7 @@ class DarkMatterAppState(
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
     private val appUpdateRepository = AppUpdateRepository(appContext)
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
+    private val appSelfUpdateFlow = AppSelfUpdateFlows.create(appContext)
     private val pushTokenStore = PushTokenStore.create(appContext)
 
     // Per-account (platform, token, server-pubkey, relay-hint) fingerprint
@@ -565,6 +569,9 @@ class DarkMatterAppState(
     var appUpdateInfo by mutableStateOf(appUpdateRepository.loadInfo())
         private set
 
+    var appSelfUpdateState by mutableStateOf<AppSelfUpdateState>(AppSelfUpdateState.Idle)
+        private set
+
     private var defaultNotificationsEnableAttempted by mutableStateOf(
         preferences.getBoolean(DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY, false),
     )
@@ -661,6 +668,7 @@ class DarkMatterAppState(
 
     init {
         applyLanguageTag(languageTag)
+        appSelfUpdateFlow.sweepStaleApks()
         notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
     }
 
@@ -1977,6 +1985,7 @@ class DarkMatterAppState(
         if (foreground && backgroundConnectionEnabled) startBackgroundConnectionService()
         if (foreground) notificationScope.launch { syncNativePushRegistrationIfEnabled() }
         if (foreground) notificationScope.launch { refreshAppUpdateIfStale(notifyIfNewer = false) }
+        if (foreground) refreshAppSelfUpdateInstallPermission()
     }
 
     fun setActiveConversation(groupIdHex: String?) {
@@ -2062,6 +2071,54 @@ class DarkMatterAppState(
             present(R.string.toast_zapstore_unavailable)
         }
     }
+
+    fun handleAppUpdateAction(context: Context = appContext) {
+        val latest = appUpdateInfo.latestVersion
+        if (shouldStartInAppSelfUpdate(BuildConfig.SELF_UPDATE_ENABLED) && latest != null) {
+            startAppSelfUpdate(latest)
+            return
+        }
+        openZapstoreListing(context)
+    }
+
+    fun startAppSelfUpdate(version: String? = appUpdateInfo.latestVersion) {
+        val targetVersion = version ?: return
+        appSelfUpdateFlow.start(
+            scope = notificationScope,
+            version = targetVersion,
+            onStateChanged = { appSelfUpdateState = it },
+        )
+    }
+
+    fun confirmAppSelfUpdateDownload() {
+        appSelfUpdateFlow.confirmDownload(
+            scope = notificationScope,
+            onStateChanged = { appSelfUpdateState = it },
+        )
+    }
+
+    fun cancelAppSelfUpdate() {
+        appSelfUpdateFlow.cancel(deleteVerifiedApk = true) { appSelfUpdateState = it }
+    }
+
+    fun retryAppSelfUpdate() {
+        val version = appUpdateInfo.latestVersion ?: return
+        appSelfUpdateFlow.retry(
+            scope = notificationScope,
+            version = version,
+            onStateChanged = { appSelfUpdateState = it },
+        )
+    }
+
+    fun refreshAppSelfUpdateInstallPermission() {
+        appSelfUpdateFlow.refreshInstallPermission { appSelfUpdateState = it }
+    }
+
+    fun openAppSelfUpdateInstallPermissionSettings(context: Context = appContext) {
+        appSelfUpdateFlow.openInstallPermissionSettings(context)
+    }
+
+    fun launchVerifiedAppSelfUpdate(context: Context = appContext): Boolean = appSelfUpdateFlow.launchInstall(context) { appSelfUpdateState = it }
 
     suspend fun refreshLocalNotificationSettings() {
         val account = activeAccountRef

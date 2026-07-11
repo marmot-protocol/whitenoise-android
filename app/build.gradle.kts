@@ -63,6 +63,18 @@ android {
         version = release(37)
     }
 
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("zapstore") {
+            dimension = "distribution"
+            buildConfigField("boolean", "SELF_UPDATE_ENABLED", "true")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "SELF_UPDATE_ENABLED", "false")
+        }
+    }
+
     defaultConfig {
         applicationId = "dev.ipf.darkmatter"
         minSdk = 34
@@ -269,6 +281,8 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.okhttp)
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp)
+    testImplementation(libs.okhttp.mockwebserver)
     // Real org.json for JVM unit tests — the android.jar stubs throw on use.
     testImplementation(libs.org.json)
     // Roborazzi Compose screenshot tests run on the JVM via Robolectric, so the

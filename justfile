@@ -13,19 +13,20 @@ export JAVA_HOME := env_var_or_default("JAVA_HOME", "/Applications/Android Studi
 DEBUG_PKG := "dev.ipf.darkmatter.debug"
 RELEASE_PKG := "dev.ipf.darkmatter"
 MAIN_ACTIVITY := "dev.ipf.darkmatter.MainActivity"
-RELEASE_APK_DIR := "app/build/outputs/apk/release"
+RELEASE_APK_DIR := "app/build/outputs/apk/zapstore/release"
 
 _default:
     @just --list
 
-# Build debug APK (per-ABI splits + universal).
+# Build Zapstore debug APK (per-ABI splits + universal). Zapstore is the
+# direct-distribution flavor with verified self-updates enabled.
 debug:
-    ./gradlew :app:assembleDebug
-    @ls -lh app/build/outputs/apk/debug/*.apk
+    ./gradlew :app:assembleZapstoreDebug
+    @ls -lh app/build/outputs/apk/zapstore/debug/*.apk
 
-# Install the debug APK on the connected device.
+# Install the Zapstore debug APK on the connected device.
 install-debug:
-    ./gradlew :app:installDebug
+    ./gradlew :app:installZapstoreDebug
 
 # Launch the installed debug variant. Uses the activity FQN because
 # applicationId (dev.ipf.darkmatter.debug) no longer matches the namespace
@@ -40,9 +41,9 @@ run-debug: install-debug launch-debug
 uninstall-debug:
     adb uninstall {{DEBUG_PKG}}
 
-# Run unit tests.
+# Run unit tests for both distribution flavors.
 test:
-    ./gradlew :app:testDebugUnitTest
+    ./gradlew :app:testZapstoreDebugUnitTest :app:testPlayDebugUnitTest
 
 # Lint Kotlin sources with ktlint (read-only; fails on violations). Also runs
 # as part of `./gradlew check`.

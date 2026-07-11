@@ -720,6 +720,7 @@ fun DarkMatterApp(
                 snackbarHost = { DarkMatterSnackbarHost(snackbarHostState) },
             ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
+                    AppSelfUpdateDialog(appState = appState)
                     when (val phase = appState.phase) {
                         AppPhase.Bootstrapping -> LoadingScreen()
                         AppPhase.Onboarding -> OnboardingScreen(appState)
@@ -1848,7 +1849,7 @@ private fun ChatsScreen(
             if (appState.appUpdateInfo.shouldShowBanner) {
                 AppUpdateBanner(
                     info = appState.appUpdateInfo,
-                    onUpdateNow = { appState.openZapstoreListing(context) },
+                    onUpdateNow = { appState.handleAppUpdateAction(context) },
                     onDismiss = { appState.dismissAppUpdateBanner() },
                 )
             }
@@ -15303,7 +15304,7 @@ private fun SettingsHomeScreen(
                             if (appState.appUpdateInfo.latestVersion == null) {
                                 scope.launch { appState.refreshAppUpdate(force = true, notifyIfNewer = false) }
                             }
-                            appState.openZapstoreListing(context)
+                            appState.handleAppUpdateAction(context)
                         },
                     )
                 }

@@ -46,36 +46,37 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Compile (Kotlin)
-        run: ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace
+        run: ./gradlew :app:compileZapstoreDebugKotlin :app:compilePlayDebugKotlin --no-daemon --stacktrace
 
       - name: Unit tests
-        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+        run: ./gradlew :app:testZapstoreDebugUnitTest :app:testPlayDebugUnitTest --no-daemon --stacktrace
 
       # Roborazzi Compose screenshot pilot (issue #551). Verifies the committed
       # baselines under app/src/test/snapshots/ against freshly rendered output
       # so visual regressions (e.g. the AMOLED true-black class, #446/#495) fail
       # the build instead of shipping. Runs on the JVM via Robolectric — no
       # emulator, so it adds no device-test runtime. Re-baseline after an
-      # intentional UI change with `./gradlew :app:recordRoborazziDebug` (see
-      # README "Screenshot tests").
+      # intentional UI change with `./gradlew :app:recordRoborazziZapstoreDebug`
+      # or `:app:recordRoborazziPlayDebug` (see README "Screenshot tests").
       - name: Screenshot tests (Roborazzi)
-        run: ./gradlew :app:verifyRoborazziDebug --no-daemon --stacktrace
+        run: ./gradlew :app:verifyRoborazziZapstoreDebug :app:verifyRoborazziPlayDebug --no-daemon --stacktrace
 
       - name: ktlint
         run: ./gradlew :app:ktlintCheck --no-daemon --stacktrace
 
       - name: Android lint
-        run: ./gradlew :app:lintDebug --no-daemon --stacktrace
+        run: ./gradlew :app:lintZapstoreDebug :app:lintPlayDebug --no-daemon --stacktrace
 
       # Coverage visibility only (phase 1): generate the Kover report and publish
       # it as an artifact. No thresholds/gates — non-blocking, never fails the
       # build. Debug variant only: the aggregate kover tasks pull in the release
       # variant, whose packaging trips the unsigned-release guard (no signing in
-      # CI), so the *Debug tasks scope coverage to what the unit tests exercise.
+      # CI), so the flavor-specific *Debug tasks scope coverage to what the unit
+      # tests exercise.
       - name: Coverage report (Kover)
         if: always()
         continue-on-error: true
-        run: ./gradlew :app:koverXmlReportDebug :app:koverHtmlReportDebug --no-daemon --stacktrace
+        run: ./gradlew :app:koverXmlReportZapstoreDebug :app:koverHtmlReportZapstoreDebug :app:koverXmlReportPlayDebug :app:koverHtmlReportPlayDebug --no-daemon --stacktrace
 
       - name: Upload coverage report
         if: always()

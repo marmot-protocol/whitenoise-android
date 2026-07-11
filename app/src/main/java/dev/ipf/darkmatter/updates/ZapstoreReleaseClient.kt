@@ -70,9 +70,9 @@ class ZapstoreReleaseClient(
             .put("#d", JSONArray().put(releaseDTag))
             .put("limit", FETCH_EVENT_LIMIT)
 
-    private suspend fun fetchEvents(
+    internal suspend fun fetchEvents(
         filter: JSONObject,
-        timeoutMillis: Long,
+        timeoutMillis: Long = FETCH_TIMEOUT_MS,
     ): List<NostrEvent> =
         try {
             withTimeout(timeoutMillis) {
