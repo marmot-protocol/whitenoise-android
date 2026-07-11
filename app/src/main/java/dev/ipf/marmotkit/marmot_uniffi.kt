@@ -1057,16 +1057,6 @@ internal open class UniffiVTableCallbackInterfaceExternalAccountSignerFfi(
 
 
 
-
-
-
-
-
-
-
-
-
-
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1191,8 +1181,6 @@ internal interface UniffiLib : Library {
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_delete_message(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`targetMessageId`: RustBuffer.ByValue,
     ): Long
-    fun uniffi_marmot_uniffi_fn_method_marmot_delete_message_draft(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
     fun uniffi_marmot_uniffi_fn_method_marmot_demote_admin(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_demote_admin_detailed(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`memberRef`: RustBuffer.ByValue,
@@ -1236,10 +1224,6 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_login_external_signer(`ptr`: Pointer,`publicKey`: RustBuffer.ByValue,`signer`: Pointer,`defaultRelays`: RustBuffer.ByValue,`bootstrapRelays`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_mark_timeline_message_read(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`messageIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_message_draft(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_message_drafts(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_messages(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`limit`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1296,8 +1280,6 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_retry_hydrate_quarantined_group(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_reveal_nsec(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_save_message_draft(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,`replyToMessageIdHex`: RustBuffer.ByValue,`mediaAttachments`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_secure_delete_expired(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,
     ): Long
@@ -1372,8 +1354,6 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_fn_method_marmot_upsert_push_registration(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`platform`: RustBuffer.ByValue,`rawToken`: RustBuffer.ByValue,`serverPubkeyHex`: RustBuffer.ByValue,`relayHint`: RustBuffer.ByValue,
     ): Long
     fun uniffi_marmot_uniffi_fn_method_marmot_user_profile(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_marmot_uniffi_fn_method_marmot_user_profile_website(`ptr`: Pointer,`accountIdHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_marmot_uniffi_fn_method_marmot_watch_agent_text_stream(`ptr`: Pointer,`accountRef`: RustBuffer.ByValue,`groupIdHex`: RustBuffer.ByValue,`streamIdHex`: RustBuffer.ByValue,`serverCertDer`: RustBuffer.ByValue,`insecureLocal`: Byte,
     ): Long
@@ -1589,8 +1569,6 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_delete_message(
     ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_delete_message_draft(
-    ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_demote_admin(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_demote_admin_detailed(
@@ -1634,10 +1612,6 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_login_external_signer(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_mark_timeline_message_read(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_message_draft(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_message_drafts(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_messages(
     ): Short
@@ -1694,8 +1668,6 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_retry_hydrate_quarantined_group(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_reveal_nsec(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_save_message_draft(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_secure_delete_expired(
     ): Short
@@ -1770,8 +1742,6 @@ internal interface UniffiLib : Library {
     fun uniffi_marmot_uniffi_checksum_method_marmot_upsert_push_registration(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_user_profile(
-    ): Short
-    fun uniffi_marmot_uniffi_checksum_method_marmot_user_profile_website(
     ): Short
     fun uniffi_marmot_uniffi_checksum_method_marmot_watch_agent_text_stream(
     ): Short
@@ -1918,9 +1888,6 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_delete_message() != 13951.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_delete_message_draft() != 15962.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_demote_admin() != 42693.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1985,12 +1952,6 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_mark_timeline_message_read() != 32522.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_message_draft() != 54000.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_message_drafts() != 19334.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_messages() != 45709.toShort()) {
@@ -2075,9 +2036,6 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_reveal_nsec() != 58041.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_save_message_draft() != 6018.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_secure_delete_expired() != 16091.toShort()) {
@@ -2189,9 +2147,6 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_user_profile() != 12217.toShort()) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_marmot_uniffi_checksum_method_marmot_user_profile_website() != 23102.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_marmot_uniffi_checksum_method_marmot_watch_agent_text_stream() != 24253.toShort()) {
@@ -2423,29 +2378,6 @@ public object FfiConverterLong: FfiConverter<Long, Long> {
 
     override fun write(value: Long, buf: ByteBuffer) {
         buf.putLong(value)
-    }
-}
-
-/**
- * @suppress
- */
-public object FfiConverterDouble: FfiConverter<Double, Double> {
-    override fun lift(value: Double): Double {
-        return value
-    }
-
-    override fun read(buf: ByteBuffer): Double {
-        return buf.getDouble()
-    }
-
-    override fun lower(value: Double): Double {
-        return value
-    }
-
-    override fun allocationSize(value: Double) = 8UL
-
-    override fun write(value: Double, buf: ByteBuffer) {
-        buf.putDouble(value)
     }
 }
 
@@ -4654,11 +4586,6 @@ public interface MarmotInterface {
     suspend fun `deleteMessage`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `targetMessageId`: kotlin.String): SendSummaryFfi
     
     /**
-     * Delete a saved composer draft. This is a no-op when no draft exists.
-     */
-    fun `deleteMessageDraft`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String)
-    
-    /**
      * Revoke `member_ref`'s admin rights.
      */
     suspend fun `demoteAdmin`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `memberRef`: kotlin.String): SendSummaryFfi
@@ -4794,19 +4721,6 @@ public interface MarmotInterface {
      * advance the marker too, which clears any earlier unread messages.
      */
     fun `markTimelineMessageRead`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `messageIdHex`: kotlin.String): ChatListRowFfi?
-    
-    /**
-     * The saved composer draft for an account and MLS group, if one exists.
-     */
-    fun `messageDraft`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): MessageDraftFfi?
-    
-    /**
-     * Metadata-only saved composer drafts for an account, newest-updated
-     * first. Attachment plaintext is intentionally omitted from this list;
-     * call `messageDraft` when restoring one selected composer. Hosts must
-     * delete empty or sent drafts; deleting a group also removes its draft.
-     */
-    fun `messageDrafts`(`accountRef`: kotlin.String): List<MessageDraftSummaryFfi>
     
     /**
      * Initial history fetch for a group (or, when `group_id_hex` is None,
@@ -4991,11 +4905,6 @@ public interface MarmotInterface {
      * / cross-account refs via the existing keystore validation.
      */
     fun `revealNsec`(`accountRef`: kotlin.String): kotlin.String
-    
-    /**
-     * Upsert a composer draft into the account's encrypted SQLCipher store.
-     */
-    fun `saveMessageDraft`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `content`: kotlin.String, `replyToMessageIdHex`: kotlin.String?, `mediaAttachments`: List<MessageDraftAttachmentFfi>): MessageDraftFfi
     
     /**
      * Securely scrub and prune expired disappearing-message plaintext for a
@@ -5247,15 +5156,6 @@ public interface MarmotInterface {
      * `refresh_directory`. Returns `None` when nothing is cached yet.
      */
     fun `userProfile`(`accountIdHex`: kotlin.String): UserProfileMetadataFfi?
-    
-    /**
-     * Cached Nostr kind:0 `website` metadata for an account id, when it is a
-     * string. The generic profile record intentionally exposes the fields the
-     * host can publish; this read-only accessor preserves arbitrary kind:0
-     * metadata while still making the standard website field available to
-     * profile presentation surfaces.
-     */
-    fun `userProfileWebsite`(`accountIdHex`: kotlin.String): kotlin.String?
     
     /**
      * Watch a live agent text stream over the brokered QUIC channel. Pass
@@ -5800,21 +5700,6 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
 
     
     /**
-     * Delete a saved composer draft. This is a no-op when no draft exists.
-     */
-    @Throws(MarmotKitException::class)override fun `deleteMessageDraft`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String)
-        = 
-    callWithPointer {
-    uniffiRustCallWithError(MarmotKitException) { _status ->
-    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_delete_message_draft(
-        it, FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),_status)
-}
-    }
-    
-    
-
-    
-    /**
      * Revoke `member_ref`'s admin rights.
      */
     @Throws(MarmotKitException::class)
@@ -6304,41 +6189,6 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     uniffiRustCallWithError(MarmotKitException) { _status ->
     UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_mark_timeline_message_read(
         it, FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterString.lower(`messageIdHex`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * The saved composer draft for an account and MLS group, if one exists.
-     */
-    @Throws(MarmotKitException::class)override fun `messageDraft`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String): MessageDraftFfi? {
-            return FfiConverterOptionalTypeMessageDraftFfi.lift(
-    callWithPointer {
-    uniffiRustCallWithError(MarmotKitException) { _status ->
-    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_message_draft(
-        it, FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * Metadata-only saved composer drafts for an account, newest-updated
-     * first. Attachment plaintext is intentionally omitted from this list;
-     * call `messageDraft` when restoring one selected composer. Hosts must
-     * delete empty or sent drafts; deleting a group also removes its draft.
-     */
-    @Throws(MarmotKitException::class)override fun `messageDrafts`(`accountRef`: kotlin.String): List<MessageDraftSummaryFfi> {
-            return FfiConverterSequenceTypeMessageDraftSummaryFfi.lift(
-    callWithPointer {
-    uniffiRustCallWithError(MarmotKitException) { _status ->
-    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_message_drafts(
-        it, FfiConverterString.lower(`accountRef`),_status)
 }
     }
     )
@@ -6992,22 +6842,6 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     uniffiRustCallWithError(MarmotKitException) { _status ->
     UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_reveal_nsec(
         it, FfiConverterString.lower(`accountRef`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * Upsert a composer draft into the account's encrypted SQLCipher store.
-     */
-    @Throws(MarmotKitException::class)override fun `saveMessageDraft`(`accountRef`: kotlin.String, `groupIdHex`: kotlin.String, `content`: kotlin.String, `replyToMessageIdHex`: kotlin.String?, `mediaAttachments`: List<MessageDraftAttachmentFfi>): MessageDraftFfi {
-            return FfiConverterTypeMessageDraftFfi.lift(
-    callWithPointer {
-    uniffiRustCallWithError(MarmotKitException) { _status ->
-    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_save_message_draft(
-        it, FfiConverterString.lower(`accountRef`),FfiConverterString.lower(`groupIdHex`),FfiConverterString.lower(`content`),FfiConverterOptionalString.lower(`replyToMessageIdHex`),FfiConverterSequenceTypeMessageDraftAttachmentFfi.lower(`mediaAttachments`),_status)
 }
     }
     )
@@ -7914,26 +7748,6 @@ open class Marmot: Disposable, AutoCloseable, MarmotInterface {
     callWithPointer {
     uniffiRustCallWithError(MarmotKitException) { _status ->
     UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_user_profile(
-        it, FfiConverterString.lower(`accountIdHex`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * Cached Nostr kind:0 `website` metadata for an account id, when it is a
-     * string. The generic profile record intentionally exposes the fields the
-     * host can publish; this read-only accessor preserves arbitrary kind:0
-     * metadata while still making the standard website field available to
-     * profile presentation surfaces.
-     */
-    @Throws(MarmotKitException::class)override fun `userProfileWebsite`(`accountIdHex`: kotlin.String): kotlin.String? {
-            return FfiConverterOptionalString.lift(
-    callWithPointer {
-    uniffiRustCallWithError(MarmotKitException) { _status ->
-    UniffiLib.INSTANCE.uniffi_marmot_uniffi_fn_method_marmot_user_profile_website(
         it, FfiConverterString.lower(`accountIdHex`),_status)
 }
     }
@@ -11098,211 +10912,6 @@ public object FfiConverterTypeMemberRefFfi: FfiConverterRustBuffer<MemberRefFfi>
 
 
 /**
- * One fully hydrated draft attachment crossing the host boundary.
- */
-data class MessageDraftAttachmentFfi (
-    var `id`: kotlin.String, 
-    var `fileName`: kotlin.String, 
-    var `mediaType`: kotlin.String, 
-    var `plaintext`: kotlin.ByteArray, 
-    var `dim`: kotlin.String?, 
-    var `thumbhash`: kotlin.String?, 
-    var `durationSeconds`: kotlin.Double?, 
-    var `waveformSamples`: List<kotlin.Double>
-) {
-    
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeMessageDraftAttachmentFfi: FfiConverterRustBuffer<MessageDraftAttachmentFfi> {
-    override fun read(buf: ByteBuffer): MessageDraftAttachmentFfi {
-        return MessageDraftAttachmentFfi(
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterByteArray.read(buf),
-            FfiConverterOptionalString.read(buf),
-            FfiConverterOptionalString.read(buf),
-            FfiConverterOptionalDouble.read(buf),
-            FfiConverterSequenceDouble.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: MessageDraftAttachmentFfi) = (
-            FfiConverterString.allocationSize(value.`id`) +
-            FfiConverterString.allocationSize(value.`fileName`) +
-            FfiConverterString.allocationSize(value.`mediaType`) +
-            FfiConverterByteArray.allocationSize(value.`plaintext`) +
-            FfiConverterOptionalString.allocationSize(value.`dim`) +
-            FfiConverterOptionalString.allocationSize(value.`thumbhash`) +
-            FfiConverterOptionalDouble.allocationSize(value.`durationSeconds`) +
-            FfiConverterSequenceDouble.allocationSize(value.`waveformSamples`)
-    )
-
-    override fun write(value: MessageDraftAttachmentFfi, buf: ByteBuffer) {
-            FfiConverterString.write(value.`id`, buf)
-            FfiConverterString.write(value.`fileName`, buf)
-            FfiConverterString.write(value.`mediaType`, buf)
-            FfiConverterByteArray.write(value.`plaintext`, buf)
-            FfiConverterOptionalString.write(value.`dim`, buf)
-            FfiConverterOptionalString.write(value.`thumbhash`, buf)
-            FfiConverterOptionalDouble.write(value.`durationSeconds`, buf)
-            FfiConverterSequenceDouble.write(value.`waveformSamples`, buf)
-    }
-}
-
-
-
-/**
- * Attachment metadata for a draft-list preview. Plaintext bytes are omitted.
- */
-data class MessageDraftAttachmentSummaryFfi (
-    var `id`: kotlin.String, 
-    var `fileName`: kotlin.String, 
-    var `mediaType`: kotlin.String, 
-    var `plaintextSize`: kotlin.ULong
-) {
-    
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeMessageDraftAttachmentSummaryFfi: FfiConverterRustBuffer<MessageDraftAttachmentSummaryFfi> {
-    override fun read(buf: ByteBuffer): MessageDraftAttachmentSummaryFfi {
-        return MessageDraftAttachmentSummaryFfi(
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterULong.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: MessageDraftAttachmentSummaryFfi) = (
-            FfiConverterString.allocationSize(value.`id`) +
-            FfiConverterString.allocationSize(value.`fileName`) +
-            FfiConverterString.allocationSize(value.`mediaType`) +
-            FfiConverterULong.allocationSize(value.`plaintextSize`)
-    )
-
-    override fun write(value: MessageDraftAttachmentSummaryFfi, buf: ByteBuffer) {
-            FfiConverterString.write(value.`id`, buf)
-            FfiConverterString.write(value.`fileName`, buf)
-            FfiConverterString.write(value.`mediaType`, buf)
-            FfiConverterULong.write(value.`plaintextSize`, buf)
-    }
-}
-
-
-
-/**
- * One fully hydrated composer draft returned for a selected group.
- */
-data class MessageDraftFfi (
-    var `groupIdHex`: kotlin.String, 
-    var `content`: kotlin.String, 
-    var `replyToMessageIdHex`: kotlin.String?, 
-    var `mediaAttachments`: List<MessageDraftAttachmentFfi>, 
-    var `createdAtMs`: kotlin.Long, 
-    var `updatedAtMs`: kotlin.Long
-) {
-    
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeMessageDraftFfi: FfiConverterRustBuffer<MessageDraftFfi> {
-    override fun read(buf: ByteBuffer): MessageDraftFfi {
-        return MessageDraftFfi(
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterOptionalString.read(buf),
-            FfiConverterSequenceTypeMessageDraftAttachmentFfi.read(buf),
-            FfiConverterLong.read(buf),
-            FfiConverterLong.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: MessageDraftFfi) = (
-            FfiConverterString.allocationSize(value.`groupIdHex`) +
-            FfiConverterString.allocationSize(value.`content`) +
-            FfiConverterOptionalString.allocationSize(value.`replyToMessageIdHex`) +
-            FfiConverterSequenceTypeMessageDraftAttachmentFfi.allocationSize(value.`mediaAttachments`) +
-            FfiConverterLong.allocationSize(value.`createdAtMs`) +
-            FfiConverterLong.allocationSize(value.`updatedAtMs`)
-    )
-
-    override fun write(value: MessageDraftFfi, buf: ByteBuffer) {
-            FfiConverterString.write(value.`groupIdHex`, buf)
-            FfiConverterString.write(value.`content`, buf)
-            FfiConverterOptionalString.write(value.`replyToMessageIdHex`, buf)
-            FfiConverterSequenceTypeMessageDraftAttachmentFfi.write(value.`mediaAttachments`, buf)
-            FfiConverterLong.write(value.`createdAtMs`, buf)
-            FfiConverterLong.write(value.`updatedAtMs`, buf)
-    }
-}
-
-
-
-/**
- * Metadata-only draft-list row. Use `messageDraft` to hydrate one selected
- * composer and its attachment plaintext.
- */
-data class MessageDraftSummaryFfi (
-    var `groupIdHex`: kotlin.String, 
-    var `content`: kotlin.String, 
-    var `replyToMessageIdHex`: kotlin.String?, 
-    var `mediaAttachments`: List<MessageDraftAttachmentSummaryFfi>, 
-    var `createdAtMs`: kotlin.Long, 
-    var `updatedAtMs`: kotlin.Long
-) {
-    
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeMessageDraftSummaryFfi: FfiConverterRustBuffer<MessageDraftSummaryFfi> {
-    override fun read(buf: ByteBuffer): MessageDraftSummaryFfi {
-        return MessageDraftSummaryFfi(
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterOptionalString.read(buf),
-            FfiConverterSequenceTypeMessageDraftAttachmentSummaryFfi.read(buf),
-            FfiConverterLong.read(buf),
-            FfiConverterLong.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: MessageDraftSummaryFfi) = (
-            FfiConverterString.allocationSize(value.`groupIdHex`) +
-            FfiConverterString.allocationSize(value.`content`) +
-            FfiConverterOptionalString.allocationSize(value.`replyToMessageIdHex`) +
-            FfiConverterSequenceTypeMessageDraftAttachmentSummaryFfi.allocationSize(value.`mediaAttachments`) +
-            FfiConverterLong.allocationSize(value.`createdAtMs`) +
-            FfiConverterLong.allocationSize(value.`updatedAtMs`)
-    )
-
-    override fun write(value: MessageDraftSummaryFfi, buf: ByteBuffer) {
-            FfiConverterString.write(value.`groupIdHex`, buf)
-            FfiConverterString.write(value.`content`, buf)
-            FfiConverterOptionalString.write(value.`replyToMessageIdHex`, buf)
-            FfiConverterSequenceTypeMessageDraftAttachmentSummaryFfi.write(value.`mediaAttachments`, buf)
-            FfiConverterLong.write(value.`createdAtMs`, buf)
-            FfiConverterLong.write(value.`updatedAtMs`, buf)
-    }
-}
-
-
-
-/**
  * One Nostr tag from an inner Marmot app event, e.g. `["e", "<id>"]` or an
  * `["imeta", …]` media descriptor. Host apps branch on the inner event `kind`
  * plus these tags instead of a fixed payload enum.
@@ -14417,17 +14026,6 @@ sealed class MarmotKitException: kotlin.Exception() {
             get() = "groupIdHex=${ `groupIdHex` }"
     }
     
-    /**
-     * Host-supplied draft attachment metadata is malformed.
-     */
-    class InvalidMessageDraft(
-        
-        val `details`: kotlin.String
-        ) : MarmotKitException() {
-        override val message
-            get() = "details=${ `details` }"
-    }
-    
     class InvalidHex(
         
         val `details`: kotlin.String
@@ -14689,69 +14287,66 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
             3 -> MarmotKitException.UnknownGroup(
                 FfiConverterString.read(buf),
                 )
-            4 -> MarmotKitException.InvalidMessageDraft(
+            4 -> MarmotKitException.InvalidHex(
                 FfiConverterString.read(buf),
                 )
-            5 -> MarmotKitException.InvalidHex(
+            5 -> MarmotKitException.InvalidIdentity(
                 FfiConverterString.read(buf),
                 )
-            6 -> MarmotKitException.InvalidIdentity(
+            6 -> MarmotKitException.InvalidKeyPackageEvent(
                 FfiConverterString.read(buf),
                 )
-            7 -> MarmotKitException.InvalidKeyPackageEvent(
+            7 -> MarmotKitException.MissingKeyPackage(
                 FfiConverterString.read(buf),
                 )
-            8 -> MarmotKitException.MissingKeyPackage(
+            8 -> MarmotKitException.Publish(
                 FfiConverterString.read(buf),
                 )
-            9 -> MarmotKitException.Publish(
+            9 -> MarmotKitException.TransportClosed()
+            10 -> MarmotKitException.RuntimeStopping()
+            11 -> MarmotKitException.NotGroupAdmin(
                 FfiConverterString.read(buf),
                 )
-            10 -> MarmotKitException.TransportClosed()
-            11 -> MarmotKitException.RuntimeStopping()
-            12 -> MarmotKitException.NotGroupAdmin(
+            12 -> MarmotKitException.AdminCannotSelfRemove(
                 FfiConverterString.read(buf),
                 )
-            13 -> MarmotKitException.AdminCannotSelfRemove(
+            13 -> MarmotKitException.WouldRemoveLastAdmin(
                 FfiConverterString.read(buf),
                 )
-            14 -> MarmotKitException.WouldRemoveLastAdmin(
-                FfiConverterString.read(buf),
-                )
-            15 -> MarmotKitException.MemberNotInGroup(
+            14 -> MarmotKitException.MemberNotInGroup(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            16 -> MarmotKitException.AlreadyAdmin(
+            15 -> MarmotKitException.AlreadyAdmin(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            17 -> MarmotKitException.NotAdmin(
+            16 -> MarmotKitException.NotAdmin(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 )
-            18 -> MarmotKitException.StorageBusy(
+            17 -> MarmotKitException.StorageBusy(
                 FfiConverterString.read(buf),
                 )
-            19 -> MarmotKitException.SecretNotFound(
+            18 -> MarmotKitException.SecretNotFound(
                 FfiConverterString.read(buf),
                 )
-            20 -> MarmotKitException.KeystoreUnavailable(
+            19 -> MarmotKitException.KeystoreUnavailable(
                 FfiConverterString.read(buf),
                 )
-            21 -> MarmotKitException.EmptyPassphrase()
-            22 -> MarmotKitException.EncryptionFailed(
+            20 -> MarmotKitException.EmptyPassphrase()
+            21 -> MarmotKitException.EncryptionFailed(
                 FfiConverterString.read(buf),
                 )
-            23 -> MarmotKitException.Io(
+            22 -> MarmotKitException.Io(
                 FfiConverterString.read(buf),
                 )
-            24 -> MarmotKitException.ExternalSignerUnavailable(
+            23 -> MarmotKitException.ExternalSignerUnavailable(
                 FfiConverterString.read(buf),
                 )
-            25 -> MarmotKitException.ExternalSignerMismatch()
-            26 -> MarmotKitException.ExternalSignerRejected()
-            27 -> MarmotKitException.Runtime(
+            24 -> MarmotKitException.ExternalSignerMismatch()
+            25 -> MarmotKitException.ExternalSignerRejected()
+            26 -> MarmotKitException.Runtime(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -14774,11 +14369,6 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
                 + FfiConverterString.allocationSize(value.`groupIdHex`)
-            )
-            is MarmotKitException.InvalidMessageDraft -> (
-                // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4UL
-                + FfiConverterString.allocationSize(value.`details`)
             )
             is MarmotKitException.InvalidHex -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
@@ -14913,121 +14503,116 @@ public object FfiConverterTypeMarmotKitError : FfiConverterRustBuffer<MarmotKitE
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidMessageDraft -> {
+            is MarmotKitException.InvalidHex -> {
                 buf.putInt(4)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidHex -> {
+            is MarmotKitException.InvalidIdentity -> {
                 buf.putInt(5)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidIdentity -> {
+            is MarmotKitException.InvalidKeyPackageEvent -> {
                 buf.putInt(6)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
-            is MarmotKitException.InvalidKeyPackageEvent -> {
-                buf.putInt(7)
-                FfiConverterString.write(value.`details`, buf)
-                Unit
-            }
             is MarmotKitException.MissingKeyPackage -> {
-                buf.putInt(8)
+                buf.putInt(7)
                 FfiConverterString.write(value.`account`, buf)
                 Unit
             }
             is MarmotKitException.Publish -> {
-                buf.putInt(9)
+                buf.putInt(8)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.TransportClosed -> {
-                buf.putInt(10)
+                buf.putInt(9)
                 Unit
             }
             is MarmotKitException.RuntimeStopping -> {
-                buf.putInt(11)
+                buf.putInt(10)
                 Unit
             }
             is MarmotKitException.NotGroupAdmin -> {
-                buf.putInt(12)
+                buf.putInt(11)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.AdminCannotSelfRemove -> {
-                buf.putInt(13)
+                buf.putInt(12)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.WouldRemoveLastAdmin -> {
-                buf.putInt(14)
+                buf.putInt(13)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 Unit
             }
             is MarmotKitException.MemberNotInGroup -> {
-                buf.putInt(15)
+                buf.putInt(14)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
             is MarmotKitException.AlreadyAdmin -> {
-                buf.putInt(16)
+                buf.putInt(15)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
             is MarmotKitException.NotAdmin -> {
-                buf.putInt(17)
+                buf.putInt(16)
                 FfiConverterString.write(value.`groupIdHex`, buf)
                 FfiConverterString.write(value.`memberIdHex`, buf)
                 Unit
             }
             is MarmotKitException.StorageBusy -> {
-                buf.putInt(18)
+                buf.putInt(17)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.SecretNotFound -> {
-                buf.putInt(19)
+                buf.putInt(18)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.KeystoreUnavailable -> {
-                buf.putInt(20)
+                buf.putInt(19)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.EmptyPassphrase -> {
-                buf.putInt(21)
+                buf.putInt(20)
                 Unit
             }
             is MarmotKitException.EncryptionFailed -> {
-                buf.putInt(22)
+                buf.putInt(21)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.Io -> {
-                buf.putInt(23)
+                buf.putInt(22)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
             is MarmotKitException.ExternalSignerUnavailable -> {
-                buf.putInt(24)
+                buf.putInt(23)
                 FfiConverterString.write(value.`account`, buf)
                 Unit
             }
             is MarmotKitException.ExternalSignerMismatch -> {
-                buf.putInt(25)
+                buf.putInt(24)
                 Unit
             }
             is MarmotKitException.ExternalSignerRejected -> {
-                buf.putInt(26)
+                buf.putInt(25)
                 Unit
             }
             is MarmotKitException.Runtime -> {
-                buf.putInt(27)
+                buf.putInt(26)
                 FfiConverterString.write(value.`details`, buf)
                 Unit
             }
@@ -15661,38 +15246,6 @@ public object FfiConverterOptionalLong: FfiConverterRustBuffer<kotlin.Long?> {
 /**
  * @suppress
  */
-public object FfiConverterOptionalDouble: FfiConverterRustBuffer<kotlin.Double?> {
-    override fun read(buf: ByteBuffer): kotlin.Double? {
-        if (buf.get().toInt() == 0) {
-            return null
-        }
-        return FfiConverterDouble.read(buf)
-    }
-
-    override fun allocationSize(value: kotlin.Double?): ULong {
-        if (value == null) {
-            return 1UL
-        } else {
-            return 1UL + FfiConverterDouble.allocationSize(value)
-        }
-    }
-
-    override fun write(value: kotlin.Double?, buf: ByteBuffer) {
-        if (value == null) {
-            buf.put(0)
-        } else {
-            buf.put(1)
-            FfiConverterDouble.write(value, buf)
-        }
-    }
-}
-
-
-
-
-/**
- * @suppress
- */
 public object FfiConverterOptionalBoolean: FfiConverterRustBuffer<kotlin.Boolean?> {
     override fun read(buf: ByteBuffer): kotlin.Boolean? {
         if (buf.get().toInt() == 0) {
@@ -15939,38 +15492,6 @@ public object FfiConverterOptionalTypeGroupSystemEventFfi: FfiConverterRustBuffe
         } else {
             buf.put(1)
             FfiConverterTypeGroupSystemEventFfi.write(value, buf)
-        }
-    }
-}
-
-
-
-
-/**
- * @suppress
- */
-public object FfiConverterOptionalTypeMessageDraftFfi: FfiConverterRustBuffer<MessageDraftFfi?> {
-    override fun read(buf: ByteBuffer): MessageDraftFfi? {
-        if (buf.get().toInt() == 0) {
-            return null
-        }
-        return FfiConverterTypeMessageDraftFfi.read(buf)
-    }
-
-    override fun allocationSize(value: MessageDraftFfi?): ULong {
-        if (value == null) {
-            return 1UL
-        } else {
-            return 1UL + FfiConverterTypeMessageDraftFfi.allocationSize(value)
-        }
-    }
-
-    override fun write(value: MessageDraftFfi?, buf: ByteBuffer) {
-        if (value == null) {
-            buf.put(0)
-        } else {
-            buf.put(1)
-            FfiConverterTypeMessageDraftFfi.write(value, buf)
         }
     }
 }
@@ -16383,34 +15904,6 @@ public object FfiConverterSequenceUShort: FfiConverterRustBuffer<List<kotlin.USh
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterUShort.write(it, buf)
-        }
-    }
-}
-
-
-
-
-/**
- * @suppress
- */
-public object FfiConverterSequenceDouble: FfiConverterRustBuffer<List<kotlin.Double>> {
-    override fun read(buf: ByteBuffer): List<kotlin.Double> {
-        val len = buf.getInt()
-        return List<kotlin.Double>(len) {
-            FfiConverterDouble.read(buf)
-        }
-    }
-
-    override fun allocationSize(value: List<kotlin.Double>): ULong {
-        val sizeForLength = 4UL
-        val sizeForItems = value.map { FfiConverterDouble.allocationSize(it) }.sum()
-        return sizeForLength + sizeForItems
-    }
-
-    override fun write(value: List<kotlin.Double>, buf: ByteBuffer) {
-        buf.putInt(value.size)
-        value.iterator().forEach {
-            FfiConverterDouble.write(it, buf)
         }
     }
 }
@@ -17055,90 +16548,6 @@ public object FfiConverterSequenceTypeMediaUploadAttachmentResultFfi: FfiConvert
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeMediaUploadAttachmentResultFfi.write(it, buf)
-        }
-    }
-}
-
-
-
-
-/**
- * @suppress
- */
-public object FfiConverterSequenceTypeMessageDraftAttachmentFfi: FfiConverterRustBuffer<List<MessageDraftAttachmentFfi>> {
-    override fun read(buf: ByteBuffer): List<MessageDraftAttachmentFfi> {
-        val len = buf.getInt()
-        return List<MessageDraftAttachmentFfi>(len) {
-            FfiConverterTypeMessageDraftAttachmentFfi.read(buf)
-        }
-    }
-
-    override fun allocationSize(value: List<MessageDraftAttachmentFfi>): ULong {
-        val sizeForLength = 4UL
-        val sizeForItems = value.map { FfiConverterTypeMessageDraftAttachmentFfi.allocationSize(it) }.sum()
-        return sizeForLength + sizeForItems
-    }
-
-    override fun write(value: List<MessageDraftAttachmentFfi>, buf: ByteBuffer) {
-        buf.putInt(value.size)
-        value.iterator().forEach {
-            FfiConverterTypeMessageDraftAttachmentFfi.write(it, buf)
-        }
-    }
-}
-
-
-
-
-/**
- * @suppress
- */
-public object FfiConverterSequenceTypeMessageDraftAttachmentSummaryFfi: FfiConverterRustBuffer<List<MessageDraftAttachmentSummaryFfi>> {
-    override fun read(buf: ByteBuffer): List<MessageDraftAttachmentSummaryFfi> {
-        val len = buf.getInt()
-        return List<MessageDraftAttachmentSummaryFfi>(len) {
-            FfiConverterTypeMessageDraftAttachmentSummaryFfi.read(buf)
-        }
-    }
-
-    override fun allocationSize(value: List<MessageDraftAttachmentSummaryFfi>): ULong {
-        val sizeForLength = 4UL
-        val sizeForItems = value.map { FfiConverterTypeMessageDraftAttachmentSummaryFfi.allocationSize(it) }.sum()
-        return sizeForLength + sizeForItems
-    }
-
-    override fun write(value: List<MessageDraftAttachmentSummaryFfi>, buf: ByteBuffer) {
-        buf.putInt(value.size)
-        value.iterator().forEach {
-            FfiConverterTypeMessageDraftAttachmentSummaryFfi.write(it, buf)
-        }
-    }
-}
-
-
-
-
-/**
- * @suppress
- */
-public object FfiConverterSequenceTypeMessageDraftSummaryFfi: FfiConverterRustBuffer<List<MessageDraftSummaryFfi>> {
-    override fun read(buf: ByteBuffer): List<MessageDraftSummaryFfi> {
-        val len = buf.getInt()
-        return List<MessageDraftSummaryFfi>(len) {
-            FfiConverterTypeMessageDraftSummaryFfi.read(buf)
-        }
-    }
-
-    override fun allocationSize(value: List<MessageDraftSummaryFfi>): ULong {
-        val sizeForLength = 4UL
-        val sizeForItems = value.map { FfiConverterTypeMessageDraftSummaryFfi.allocationSize(it) }.sum()
-        return sizeForLength + sizeForItems
-    }
-
-    override fun write(value: List<MessageDraftSummaryFfi>, buf: ByteBuffer) {
-        buf.putInt(value.size)
-        value.iterator().forEach {
-            FfiConverterTypeMessageDraftSummaryFfi.write(it, buf)
         }
     }
 }

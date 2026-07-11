@@ -313,11 +313,7 @@ internal fun startProfileChatInviteDetail(recipientName: String?): AppText =
 internal fun startProfileChatFailureDetail(
     throwable: Throwable,
     displayName: (String) -> String,
-): AppText =
-    when (throwable) {
-        is MarmotKitException.InvalidKeyPackageEvent -> AppText.Resource(R.string.error_missing_key_package)
-        else -> groupCreateFailureDetail(throwable, displayName)
-    }
+): AppText = groupCreateFailureDetail(throwable, displayName)
 
 internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
     when (throwable) {
