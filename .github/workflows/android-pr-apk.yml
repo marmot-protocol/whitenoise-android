@@ -63,6 +63,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
+      - name: Test Blossom upload retry logic
+        run: .github/scripts/test-upload-pr-apk-to-blossom.sh
+
       # AGP 9.x / Gradle 9.4.1 require JDK 17 (matches the other workflows).
       - name: Set up JDK 17
         uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
@@ -133,25 +136,10 @@ jobs:
           # immutable commit (v0.20.0) so an upstream release can't change the
           # uploader while it holds the secret (#1172 CR). ubuntu-latest ships Go.
           go install github.com/fiatjaf/nak@62fa610a063b708743456e49f9befaef4a441a37
-          nak="$(go env GOPATH)/bin/nak"
-          # Content-address the APK locally so the published URL provably points
-          # at our bytes regardless of what the server returns (#1172 CR).
-          apk_sha256=$(sha256sum "$APK_PATH" | awk '{print $1}')
-          # Feed the APK via stdin, not as a positional arg: on CI runners stdin
-          # is not a TTY, and nak treats a piped stdin + file args as a conflict
-          # ("do not pass arguments when piping from stdin"). Verified (#1172).
-          returned=$("$nak" blossom upload \
-                       --server "$BLOSSOM_SERVER" \
-                       --sec "$BLOSSOM_UPLOAD_NSEC" < "$APK_PATH" | jq -r '.sha256 // empty')
-          if [[ "$returned" != "$apk_sha256" ]]; then
-            echo "Blossom upload sha mismatch: local=$apk_sha256 returned=$returned" >&2
-            exit 1
-          fi
-          # Blossom serves by hash — the extension is cosmetic — so request it as
-          # .apk so the browser/Android names the download <sha>.apk and offers a
-          # one-tap install. The blob is stored as application/zip (an APK is a
-          # ZIP), but the URL extension drives the installer. Verified (#1172).
-          url="${BLOSSOM_SERVER}/${apk_sha256}.apk"
+          # The helper feeds the APK via stdin, verifies the returned SHA-256,
+          # and retries only transport/5xx failures. Three four-minute attempts
+          # plus bounded exponential backoff keep a stalled server inside the job cap.
+          url=$(.github/scripts/upload-pr-apk-to-blossom.sh)
           printf 'url=%s\n' "$url" >> "$GITHUB_OUTPUT"
           printf '::notice::Blossom install URL: %s\n' "$url"
 
