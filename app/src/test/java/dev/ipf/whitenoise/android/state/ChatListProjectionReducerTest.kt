@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -140,6 +141,81 @@ class ChatListProjectionReducerTest {
         assertTrue(item.group.pendingConfirmation)
     }
 
+    @Test
+    fun terminalSelfMembershipInEitherSnapshotVoidsAStalePendingInvite() {
+        val snapshotMemberships =
+            listOf(
+                SelfMembershipFfi.REMOVED to SelfMembershipFfi.MEMBER,
+                SelfMembershipFfi.MEMBER to SelfMembershipFfi.REMOVED,
+                SelfMembershipFfi.LEFT to SelfMembershipFfi.MEMBER,
+                SelfMembershipFfi.MEMBER to SelfMembershipFfi.LEFT,
+            )
+
+        snapshotMemberships.forEach { (rowMembership, groupMembership) ->
+            val item =
+                chatListItemFromProjection(
+                    row =
+                        row(
+                            groupId = "removed-before-open",
+                            rawTitle = "Stale invite",
+                            pendingConfirmation = true,
+                        ).copy(selfMembership = rowMembership),
+                    group =
+                        group(
+                            groupId = "removed-before-open",
+                            name = "Stale invite",
+                            pendingConfirmation = true,
+                        ).copy(selfMembership = groupMembership),
+                )
+
+            assertFalse(item.group.pendingConfirmation)
+            assertEquals(
+                rowMembership.takeIf { it.isNonMember() } ?: groupMembership,
+                item.group.selfMembership,
+            )
+            val seed =
+                conversationMembershipSeed(
+                    item.group,
+                    initialMemberSnapshot = null,
+                    activeAccountIdHex = "self",
+                )
+            assertTrue(seed.membersVerified)
+            assertFalse(seed.seededSelfMember)
+        }
+    }
+
+    @Test
+    fun postOpenTerminalUpdatesVoidTheInviteAndCannotBeOverwrittenByStaleSnapshots() {
+        listOf(SelfMembershipFfi.REMOVED, SelfMembershipFfi.LEFT).forEach { terminalMembership ->
+            val staleInvite = group(name = "Stale invite", pendingConfirmation = true)
+            val afterTerminalUpdate =
+                reconcileTerminalSelfMembership(
+                    update =
+                        staleInvite.copy(
+                            selfMembership = terminalMembership,
+                            pendingConfirmation = true,
+                        ),
+                    previousSelfMembership = staleInvite.selfMembership,
+                )
+
+            assertEquals(terminalMembership, afterTerminalUpdate.selfMembership)
+            assertFalse(afterTerminalUpdate.pendingConfirmation)
+
+            val afterLaterStaleUpdate =
+                reconcileTerminalSelfMembership(
+                    update =
+                        afterTerminalUpdate.copy(
+                            selfMembership = SelfMembershipFfi.MEMBER,
+                            pendingConfirmation = true,
+                        ),
+                    previousSelfMembership = afterTerminalUpdate.selfMembership,
+                )
+
+            assertEquals(terminalMembership, afterLaterStaleUpdate.selfMembership)
+            assertFalse(afterLaterStaleUpdate.pendingConfirmation)
+        }
+    }
+
     // ---- members snapshot derivation ----------------------------------------
 
     @Test
@@ -197,6 +273,28 @@ class ChatListProjectionReducerTest {
                 removed = true,
             )
 
+        assertTrue(item.removedFromGroup(me))
+        assertEquals(0uL, item.effectiveUnreadCount(me))
+    }
+
+    @Test
+    fun reconciledGroupMembershipSuppressesUnreadWithAStaleRowAndRoster() {
+        val me = "me-acc"
+        val item =
+            chatListItemFromProjection(
+                row =
+                    row(
+                        groupId = "g1",
+                        rawTitle = "Marmot Lab",
+                        unreadCount = 7uL,
+                        hasUnread = true,
+                    ),
+                group = group(name = "Marmot Lab").copy(selfMembership = SelfMembershipFfi.REMOVED),
+                activeAccountIdHex = me,
+                members = listOf(member(me, local = true), member("peer-acc", local = false)),
+            )
+
+        assertEquals(SelfMembershipFfi.REMOVED, item.group.selfMembership)
         assertTrue(item.removedFromGroup(me))
         assertEquals(0uL, item.effectiveUnreadCount(me))
     }
