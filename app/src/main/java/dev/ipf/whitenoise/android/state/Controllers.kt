@@ -1324,6 +1324,11 @@ internal fun groupStateUpdateNeedsEvictionProbe(
 
 private fun List<String>.normalizedMemberIds(): Set<String> = mapNotNull { it.trim().takeIf(String::isNotEmpty)?.lowercase() }.toSet()
 
+internal fun groupStateUpdateRemovesSelf(
+    previous: AppGroupRecordFfi,
+    update: AppGroupRecordFfi,
+): Boolean = !previous.selfMembership.isNonMember() && update.selfMembership.isNonMember()
+
 internal fun cacheAppliedGroupMembers(
     appState: WhiteNoiseAppState,
     account: String,
@@ -3722,6 +3727,9 @@ class ConversationController(
                 } ?: break
             val previousGroup = group
             applyGroupState(update)
+            if (groupStateUpdateRemovesSelf(previousGroup, update)) {
+                conversationAccountRef?.let(::markActiveAccountRemovedFromMembers)
+            }
             refreshMembers(
                 probeEviction = groupStateUpdateNeedsEvictionProbe(previousGroup, update),
             )
