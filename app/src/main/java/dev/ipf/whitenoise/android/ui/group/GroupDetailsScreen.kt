@@ -92,6 +92,8 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
+import dev.ipf.marmotkit.GroupPushDebugInfoFfi
+import dev.ipf.marmotkit.GroupPushTokenDebugEntryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.GroupProjector
@@ -213,6 +215,8 @@ internal fun GroupDetailsScreen(
     }
     var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
     var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+    var pushDebugInfo by remember(controller.group.groupIdHex) { mutableStateOf<GroupPushDebugInfoFfi?>(null) }
+    var pushDebugLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
     // Scoped to the visible group; the controller mutation continues on appState
     // if the user switches conversations, but this sheet stops tracking it.
     var activeMutation by remember(controller.group.groupIdHex) { mutableStateOf<ActiveGroupMutation?>(null) }
@@ -240,6 +244,16 @@ internal fun GroupDetailsScreen(
             mlsState = controller.groupMlsState()
         } finally {
             mlsLoading = false
+        }
+    }
+
+    suspend fun refreshPushDebugInfo() {
+        if (!appState.developerMode) return
+        pushDebugLoading = true
+        try {
+            pushDebugInfo = controller.groupPushDebugInfo()
+        } finally {
+            pushDebugLoading = false
         }
     }
 
@@ -342,6 +356,7 @@ internal fun GroupDetailsScreen(
         controller.members.map { it.memberIdHex },
     ) {
         refreshMlsDetails()
+        refreshPushDebugInfo()
     }
 
     LaunchedEffect(controller.members.map { it.memberIdHex }, pendingInvites) {
@@ -945,6 +960,12 @@ internal fun GroupDetailsScreen(
                             }
                         }
                     }
+
+                    PushDeliveryDebugSection(
+                        info = pushDebugInfo,
+                        loading = pushDebugLoading,
+                        appState = appState,
+                    )
                 }
             }
 
@@ -1426,6 +1447,127 @@ private sealed class DetailsConfirm {
     data class LeaveSoleMember(
         val groupName: String,
     ) : DetailsConfirm()
+}
+
+@Composable
+private fun PushDeliveryDebugSection(
+    info: GroupPushDebugInfoFfi?,
+    loading: Boolean,
+    appState: WhiteNoiseAppState,
+) {
+    SectionCard(title = stringResource(R.string.push_delivery)) {
+        when {
+            loading ->
+                Text(
+                    stringResource(R.string.loading_push_debug_info),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            info == null ->
+                Text(
+                    stringResource(R.string.push_debug_info_unavailable),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            else -> {
+                val yesText = stringResource(R.string.yes)
+                val noText = stringResource(R.string.no)
+                val yesNo: (Boolean) -> String = { value -> if (value) yesText else noText }
+
+                DiagnosticRow(stringResource(R.string.push_debug_total_tokens), info.totalTokenCount.toString())
+                DiagnosticRow(stringResource(R.string.push_debug_active_tokens), info.activeTokenCount.toString())
+                DiagnosticRow(stringResource(R.string.push_debug_stale_tokens), info.staleTokenCount.toString())
+                DiagnosticRow(stringResource(R.string.push_debug_missing_relay_hints), info.missingRelayHintCount.toString())
+                info.lastTokenListUpdatedAtMs?.let { updatedAtMs ->
+                    val updatedAtText = updatedAtMs.toString()
+                    DiagnosticRow(
+                        stringResource(R.string.push_debug_last_token_list_update),
+                        updatedAtText,
+                        copyValue = updatedAtText,
+                        appState = appState,
+                    )
+                }
+
+                Spacer(Modifier.heightIn(min = 4.dp))
+                Text(
+                    stringResource(R.string.push_debug_local_registration),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val local = info.localRegistration
+                DiagnosticRow(stringResource(R.string.push_debug_registered), yesNo(local.registered))
+                DiagnosticRow(stringResource(R.string.push_debug_shareable), yesNo(local.shareable))
+                DiagnosticRow(stringResource(R.string.push_debug_local_notifications_enabled), yesNo(local.localNotificationsEnabled))
+                DiagnosticRow(stringResource(R.string.native_push), yesNo(local.nativePushEnabled))
+                local.localLeafIndex?.let { leafIndex ->
+                    DiagnosticRow(stringResource(R.string.push_debug_local_leaf_index), leafIndex.toString())
+                }
+                DiagnosticRow(stringResource(R.string.push_debug_local_token_cached), yesNo(local.localTokenCached))
+
+                if (info.tokens.isNotEmpty()) {
+                    Spacer(Modifier.heightIn(min = 4.dp))
+                    Text(
+                        stringResource(R.string.push_debug_member_tokens),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    info.tokens.forEachIndexed { index, token ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            )
+                        }
+                        PushTokenDebugRows(token, appState, yesNo)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PushTokenDebugRows(
+    token: GroupPushTokenDebugEntryFfi,
+    appState: WhiteNoiseAppState,
+    yesNo: (Boolean) -> String,
+) {
+    val memberName = appState.chatMemberTitle(token.memberIdHex)
+    Text(
+        memberName,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    DiagnosticRow(
+        stringResource(R.string.push_debug_member),
+        IdentityFormatter.short(token.memberIdHex),
+        copyValue = token.memberIdHex,
+        appState = appState,
+    )
+    DiagnosticRow(stringResource(R.string.push_debug_leaf_index), token.leafIndex.toString())
+    DiagnosticRow(stringResource(R.string.push_debug_platform), token.platform.name)
+    DiagnosticRow(
+        stringResource(R.string.push_debug_token_fingerprint),
+        IdentityFormatter.short(token.tokenFingerprint),
+        copyValue = token.tokenFingerprint,
+        appState = appState,
+    )
+    DiagnosticRow(
+        stringResource(R.string.push_debug_push_server_pubkey),
+        IdentityFormatter.short(token.serverPubkeyHex),
+        copyValue = token.serverPubkeyHex,
+        appState = appState,
+    )
+    DiagnosticRow(stringResource(R.string.push_debug_relay_hint), yesNo(token.hasRelayHint))
+    DiagnosticRow(stringResource(R.string.push_debug_active_leaf), yesNo(token.activeLeaf))
+    DiagnosticRow(stringResource(R.string.push_debug_member_matches_active_leaf), yesNo(token.memberMatchesActiveLeaf))
+    DiagnosticRow(stringResource(R.string.push_debug_is_local_member), yesNo(token.isLocalMember))
+    val updatedAtText = token.updatedAtMs.toString()
+    DiagnosticRow(
+        stringResource(R.string.push_debug_updated_at),
+        updatedAtText,
+        copyValue = updatedAtText,
+        appState = appState,
+    )
 }
 
 private enum class GroupMutationAction {
