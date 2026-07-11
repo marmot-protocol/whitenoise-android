@@ -2,7 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
@@ -32,7 +32,7 @@ class AttachmentDownloadGateTest {
 
                 val jobs =
                     List(3) {
-                        async(Dispatchers.Default) {
+                        async(start = CoroutineStart.UNDISPATCHED) {
                             gate.withPermit {
                                 val now = active.incrementAndGet()
                                 maxActive.updateAndGet { previous -> max(previous, now) }
@@ -67,7 +67,7 @@ class AttachmentDownloadGateTest {
 
                 val jobs =
                     List(3) {
-                        async(Dispatchers.Default) {
+                        async(start = CoroutineStart.UNDISPATCHED) {
                             gate.withPermit {
                                 val now = active.incrementAndGet()
                                 val totalStarted = started.incrementAndGet()

@@ -1112,6 +1112,7 @@ class WhiteNoiseAppState(
     val draftStore: DraftStore = DraftStore.forContext(appContext)
 
     private val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val profileRefreshFanoutGate = Semaphore(PROFILE_REFRESH_FANOUT)
     private val mutationsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -3933,7 +3934,9 @@ class WhiteNoiseAppState(
         // not whatever it has become by the time the body runs.
         val requestEpoch = profileCacheEpoch.get()
         profileScope.launch {
-            refreshProfile(id, requestEpoch)
+            profileRefreshFanoutGate.withPermit {
+                refreshProfile(id, requestEpoch)
+            }
         }
     }
 
@@ -4750,6 +4753,7 @@ class WhiteNoiseAppState(
         private const val LANGUAGE_TAG_KEY = "language_tag"
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
         private const val PROFILE_PRESENTATION_WARM_FANOUT = 6
+        private const val PROFILE_REFRESH_FANOUT = 6
 
         // Bulk account-unread refresh runs on cold start/account switch. Bound
         // both dimensions of the FFI fan-out: accounts and per-account rosters.

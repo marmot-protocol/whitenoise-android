@@ -59,21 +59,21 @@ class NotificationPushWakeDrainCoverageTest {
     }
 
     @Test
-    fun rejectedForegroundServicePushWakeRecordRunsOffMainBeforeStopping() {
+    fun rejectedForegroundServicePushWakeStopsBeforeRecordingOffMain() {
         val onStart = serviceFunctionBody("onStartCommand")
-        val stopAfterRecord = serviceFunctionBody("stopAfterRecordingPendingPushWakeCatchUp")
+        val recordAfterStop = serviceFunctionBody("recordPendingPushWakeCatchUpAfterStop")
 
         assertTrue(
-            "onStartCommand must not run PushTokenStore.create/commit inline on the main thread",
-            "stopAfterRecordingPendingPushWakeCatchUp(startId)" in onStart &&
+            "onStartCommand must stop synchronously before scheduling the durable catch-up marker",
+            "stopSelf(startId)" in onStart &&
+                "recordPendingPushWakeCatchUpAfterStop()" in onStart &&
                 "recordPendingPushWakeCatchUp(applicationContext)" !in onStart,
         )
         assertTrue(
-            "rejected push-wake starts must persist the marker off-main before stopSelf cancels the service scope",
-            "serviceScope.launch(Dispatchers.Default)" in stopAfterRecord &&
-                "recordPendingPushWakeCatchUp(applicationContext)" in stopAfterRecord &&
-                "withContext(Dispatchers.Main.immediate)" in stopAfterRecord &&
-                "stopSelf(startId)" in stopAfterRecord,
+            "rejected push-wake starts must persist the marker off-main without gating stopSelf on disk fsync",
+            "CoroutineScope(SupervisorJob() + Dispatchers.Default).launch" in recordAfterStop &&
+                "recordPendingPushWakeCatchUp(applicationContext)" in recordAfterStop &&
+                "stopSelf(startId)" !in recordAfterStop,
         )
     }
 

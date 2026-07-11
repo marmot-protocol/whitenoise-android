@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.lang.reflect.Proxy
 import java.net.InetAddress
 import java.net.Socket
@@ -77,6 +78,23 @@ class SafeHttpsGetTest {
     fun deadlineExceededTreatsPastDeadlineAsExpired() {
         assertTrue(SafeHttpsGet.deadlineExceeded(System.nanoTime() - 1_000_000L))
         assertFalse(SafeHttpsGet.deadlineExceeded(System.nanoTime() + 60_000_000_000L))
+    }
+
+    @Test
+    fun pinnedAddressLoopObservesRequestDeadlineBetweenConnectAttempts() {
+        val source = safeHttpsGetSource().readText()
+        val openPinnedConnection = source.kotlinFunctionBody("openPinnedConnection")
+
+        assertTrue(
+            "request deadline must be passed into the pinned-address loop",
+            "requestDeadlineNanos = requestDeadlineNanos" in source &&
+                "requestDeadlineNanos: Long" in source,
+        )
+        assertTrue(
+            "pinned-address loop must stop once the request deadline is spent",
+            Regex("""for\s*\(\s*address\s+in\s+addresses\s*\)\s*\{\s*if\s*\(\s*deadlineExceeded\(requestDeadlineNanos\)\s*\)\s*return\s+null""")
+                .containsMatchIn(openPinnedConnection),
+        )
     }
 
     // ---- DNS-rebinding pin (#982): the connection dials the vetted IP while
@@ -193,6 +211,35 @@ class SafeHttpsGetTest {
         assertEquals(listOf<String?>("cdn.example.com"), layeredHosts)
         // …and wrapped so later stack-applied parameters can't re-label it.
         assertTrue(socket is SniPinnedSslSocket)
+    }
+
+    private fun safeHttpsGetSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/core/SafeHttpsGet.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/core/SafeHttpsGet.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing SafeHttpsGet.kt source file")
+
+    private fun String.kotlinFunctionBody(functionName: String): String {
+        val start =
+            Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
+                .find(this)
+                ?.range
+                ?.first
+                ?: error("Missing function $functionName")
+        val braceStart = indexOf('{', start)
+        require(braceStart >= 0) { "Missing body for $functionName" }
+        var depth = 0
+        for (index in braceStart until length) {
+            when (this[index]) {
+                '{' -> depth += 1
+                '}' -> {
+                    depth -= 1
+                    if (depth == 0) return substring(braceStart + 1, index)
+                }
+            }
+        }
+        error("Unterminated body for $functionName")
     }
 
     @Test

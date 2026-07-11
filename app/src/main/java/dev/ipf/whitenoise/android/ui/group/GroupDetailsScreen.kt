@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
@@ -1004,6 +1005,14 @@ internal fun GroupDetailsScreen(
                     inProgress = activeMutation?.action == GroupMutationAction.Leave,
                     onClick = { requestLeave(controller.title(groupTitleCopy)) },
                 )
+            } else if (!readOnlyInvite && controller.membersVerified) {
+                DangerActionRow(
+                    icon = Icons.Default.Delete,
+                    title = stringResource(R.string.chat_row_action_delete_group),
+                    enabled = !mutationsBlocked,
+                    inProgress = activeMutation?.action == GroupMutationAction.Delete,
+                    onClick = { pendingConfirm = DetailsConfirm.Delete },
+                )
             }
         }
     }
@@ -1151,6 +1160,22 @@ internal fun GroupDetailsScreen(
                             onSuccess = {
                                 onLeft()
                             },
+                        )
+                    },
+                    onDismiss = { pendingConfirm = null },
+                    destructive = true,
+                )
+            DetailsConfirm.Delete ->
+                ConfirmDialog(
+                    title = stringResource(R.string.delete_group_dialog_title),
+                    message = stringResource(R.string.delete_group_dialog_message),
+                    confirmLabel = stringResource(R.string.delete_group_confirm),
+                    onConfirm = {
+                        pendingConfirm = null
+                        runGroupMutation(
+                            action = GroupMutationAction.Delete,
+                            mutation = { controller.deleteGroupLocal() },
+                            onSuccess = { onLeft() },
                         )
                     },
                     onDismiss = { pendingConfirm = null },
@@ -1426,6 +1451,8 @@ private sealed class DetailsConfirm {
     data class LeaveSoleMember(
         val groupName: String,
     ) : DetailsConfirm()
+
+    data object Delete : DetailsConfirm()
 }
 
 private enum class GroupMutationAction {
@@ -1438,6 +1465,7 @@ private enum class GroupMutationAction {
     TransferAdmin,
     DisappearingMessages,
     Archive,
+    Delete,
     Leave,
 }
 
