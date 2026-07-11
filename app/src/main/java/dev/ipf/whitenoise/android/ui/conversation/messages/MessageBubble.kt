@@ -943,8 +943,10 @@ internal fun MessageBubble(
                 // which would otherwise flip the decision back and forth.
                 // Key it on the rendered text too: edit overlays can swap in a
                 // shorter body before the next Text measurement, and an old
-                // layout's line end must not index into the new string.
-                var bodyFullLayout by remember(record.messageIdHex, bodyTextToRender) {
+                // layout's line end must not index into the new string. Width is
+                // also part of the measurement: a body that overflows in portrait
+                // can fit after the same composition is resized to landscape.
+                var bodyFullLayout by remember(record.messageIdHex, bodyTextToRender, bubbleColumnMaxWidth) {
                     mutableStateOf<TextLayoutResult?>(null)
                 }
                 // A long body collapses to MESSAGE_COLLAPSE_LINE_LIMIT lines
@@ -987,7 +989,13 @@ internal fun MessageBubble(
                             with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
                         val maxBodyHeightPx = lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT
                         val maxBodyHeightDp = with(density) { maxBodyHeightPx.toDp() }
-                        var markdownOverflows by remember(record.messageIdHex) { mutableStateOf(false) }
+                        // Reset the one-way latch whenever the rendered body or its
+                        // available width changes, then measure the natural height
+                        // again before deciding whether to apply the cap.
+                        var markdownOverflows by
+                            remember(record.messageIdHex, bodyTextToRender, bubbleColumnMaxWidth) {
+                                mutableStateOf(false)
+                            }
                         val collapseMarkdown = renderMarkdownBody && collapsible && markdownOverflows
                         val plainTextOverflows =
                             !renderMarkdownBody &&
