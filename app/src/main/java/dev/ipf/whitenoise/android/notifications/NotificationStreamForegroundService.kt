@@ -82,7 +82,8 @@ class NotificationStreamForegroundService : Service() {
                     (application as? WhiteNoiseApplication)?.appState?.onBackgroundConnectionStartRejected()
                 }
                 if (recordPendingPushWakeCatchUp) {
-                    stopAfterRecordingPendingPushWakeCatchUp(startId)
+                    stopSelf(startId)
+                    recordPendingPushWakeCatchUpAfterStop()
                 } else {
                     stopSelf(startId)
                 }
@@ -202,10 +203,9 @@ class NotificationStreamForegroundService : Service() {
         appState.syncNativePushRegistrationIfEnabled()
     }
 
-    private fun stopAfterRecordingPendingPushWakeCatchUp(startId: Int) {
-        serviceScope.launch(Dispatchers.Default) {
+    private fun recordPendingPushWakeCatchUpAfterStop() {
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             recordPendingPushWakeCatchUp(applicationContext)
-            withContext(Dispatchers.Main.immediate) { stopSelf(startId) }
         }
     }
 

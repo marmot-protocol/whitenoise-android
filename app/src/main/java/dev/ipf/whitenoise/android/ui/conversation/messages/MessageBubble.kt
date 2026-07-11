@@ -545,10 +545,10 @@ internal fun MessageBubble(
                 // parser can't recover (no epoch field in the wire
                 // format). Fall back to the imeta parser for optimistic
                 // bridge records that haven't been projected yet.
+                val perMessageMediaReferences = controller.mediaReferences[record.messageIdHex]
                 val mediaReferences =
-                    remember(record.tags, record.messageIdHex, controller.mediaReferences) {
-                        controller.mediaReferences[record.messageIdHex]
-                            ?: MediaReferenceParser.parseAllImetaTags(record.tags)
+                    remember(record.tags, record.messageIdHex, perMessageMediaReferences) {
+                        perMessageMediaReferences ?: MediaReferenceParser.parseAllImetaTags(record.tags)
                     }
                 // Split media into image refs (rendered as a bubble or
                 // 2-col grid) and file refs (a list of pills). Mixed

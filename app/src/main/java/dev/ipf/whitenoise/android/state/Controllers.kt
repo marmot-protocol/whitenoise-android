@@ -1562,6 +1562,8 @@ class ChatsController(
     // preview plaintext: pending → in flight (here) → cached.
     private val inFlightPreviewParses = mutableSetOf<String>()
     private val inFlightMediaKindResolves = mutableSetOf<String>()
+    private val previewParseGate = Semaphore(PREVIEW_PARSE_FANOUT)
+    private val mediaKindResolveGate = Semaphore(MEDIA_KIND_RESOLVE_FANOUT)
 
     // Monotonically increments on every `bind()`. Captured by each
     // [schedulePendingMemberFetches] job; once a later bind has happened
@@ -2742,8 +2744,11 @@ class ChatsController(
         pending.forEach { text ->
             recomputeScope.launch {
                 try {
-                    if (!isActiveBindEpoch(epoch)) return@launch
-                    val tokens = appState.parseMarkdownOrEmpty(text)
+                    val tokens =
+                        previewParseGate.withPermit {
+                            if (!isActiveBindEpoch(epoch)) return@withPermit null
+                            appState.parseMarkdownOrEmpty(text)
+                        } ?: return@launch
                     if (!isActiveBindEpoch(epoch)) return@launch
                     previewTokensByText = previewTokensByText + (text to tokens)
                     // Coalesce: a burst of preview-parse completions on account
@@ -2788,26 +2793,28 @@ class ChatsController(
             val groupIdHex = row.groupIdHex
             recomputeScope.launch {
                 try {
-                    if (!isActiveBindEpoch(epoch)) return@launch
                     val page =
-                        try {
-                            appState.marmotIo {
-                                timelineMessages(
-                                    account,
-                                    TimelineMessageQueryFfi(
-                                        groupIdHex = groupIdHex,
-                                        search = null,
-                                        before = null,
-                                        beforeMessageId = null,
-                                        after = null,
-                                        afterMessageId = null,
-                                        limit = 1u,
-                                    ),
-                                )
+                        mediaKindResolveGate.withPermit {
+                            if (!isActiveBindEpoch(epoch)) return@withPermit null
+                            try {
+                                appState.marmotIo {
+                                    timelineMessages(
+                                        account,
+                                        TimelineMessageQueryFfi(
+                                            groupIdHex = groupIdHex,
+                                            search = null,
+                                            before = null,
+                                            beforeMessageId = null,
+                                            after = null,
+                                            afterMessageId = null,
+                                            limit = 1u,
+                                        ),
+                                    )
+                                }
+                            } catch (throwable: Throwable) {
+                                rethrowIfCancellation(throwable)
+                                null
                             }
-                        } catch (throwable: Throwable) {
-                            rethrowIfCancellation(throwable)
-                            null
                         }
                     if (!isActiveBindEpoch(epoch)) return@launch
                     val fallback =
@@ -2926,6 +2933,8 @@ private const val SEARCH_MAX_PAGES = 20
 // chat-list projection. Keeps large accounts from flooding IO at startup while
 // still letting shared-group snapshots materialize in the background.
 private const val MEMBER_FETCH_FANOUT = 4
+private const val PREVIEW_PARSE_FANOUT = 4
+private const val MEDIA_KIND_RESOLVE_FANOUT = 4
 
 // Cap on how many subscription updates one coalesced batch can absorb. A
 // runaway producer shouldn't be able to wedge the UI behind an unbounded
@@ -5446,6 +5455,22 @@ class ConversationController(
                 val message = mutationError(it)
                 lastMutationError = message
                 appState.present(R.string.toast_couldnt_update_chat, AppText.Plain(message), copyable = true)
+            }.getOrDefault(false)
+        }
+
+    suspend fun deleteGroupLocal(): Boolean =
+        withMutationLockResult(false) {
+            lastMutationError = null
+            val account = conversationAccountRef ?: return@withMutationLockResult false
+            runCatching {
+                appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
+                appState.present(R.string.toast_chat_deleted_local)
+                true
+            }.onFailure {
+                it.rethrowIfCancellation()
+                val message = mutationError(it)
+                lastMutationError = message
+                appState.present(R.string.toast_couldnt_delete_chat, AppText.Plain(message), copyable = true)
             }.getOrDefault(false)
         }
 
