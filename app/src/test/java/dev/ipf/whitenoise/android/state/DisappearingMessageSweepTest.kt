@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaRecordFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -487,4 +489,70 @@ class DisappearingMessageSweepTest {
             ),
         )
     }
+
+    @Test
+    fun expiredCiphertextMapsToScopedMediaCacheKeys() {
+        val keys =
+            mediaCacheKeysForCiphertextTags(
+                account = "account-a",
+                groupIdHex = "group-a",
+                mediaRecords =
+                    listOf(
+                        mediaRecord(messageIdHex = "message-a", attachmentIndex = 0u, ciphertextSha256 = "expired-a"),
+                        mediaRecord(messageIdHex = "message-a", attachmentIndex = 1u, ciphertextSha256 = "fresh"),
+                        mediaRecord(messageIdHex = "message-b", attachmentIndex = 0u, ciphertextSha256 = "expired-b"),
+                    ),
+                ciphertextTags = setOf("expired-a", "expired-b"),
+            )
+
+        assertEquals(
+            setOf(
+                mediaCacheKey("account-a", "group-a", "message-a", 0),
+                mediaCacheKey("account-a", "group-a", "message-b", 0),
+            ),
+            keys,
+        )
+    }
+
+    @Test
+    fun expiredCiphertextMapperIgnoresEmptyTags() {
+        val keys =
+            mediaCacheKeysForCiphertextTags(
+                account = "account-a",
+                groupIdHex = "group-a",
+                mediaRecords = listOf(mediaRecord(messageIdHex = "message-a", attachmentIndex = 0u, ciphertextSha256 = "expired")),
+                ciphertextTags = emptySet(),
+            )
+
+        assertTrue(keys.isEmpty())
+    }
+
+    private fun mediaRecord(
+        messageIdHex: String,
+        attachmentIndex: UInt,
+        ciphertextSha256: String,
+    ): MediaRecordFfi =
+        MediaRecordFfi(
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            direction = "received",
+            groupIdHex = "group-a",
+            sender = "sender-a",
+            reference =
+                MediaAttachmentReferenceFfi(
+                    locators = emptyList(),
+                    ciphertextSha256 = ciphertextSha256,
+                    plaintextSha256 = "plaintext-$messageIdHex-$attachmentIndex",
+                    nonceHex = "nonce-$messageIdHex-$attachmentIndex",
+                    fileName = "media.bin",
+                    mediaType = "application/octet-stream",
+                    version = "1",
+                    sourceEpoch = 0u,
+                    dim = null,
+                    thumbhash = null,
+                ),
+            caption = null,
+            recordedAt = 0u,
+            receivedAt = 0u,
+        )
 }
