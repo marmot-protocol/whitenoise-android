@@ -52,6 +52,38 @@
     <string name="toast_chat_deleted_local">Чат удалён с этого устройства</string>
     <string name="toast_couldnt_delete_chat">Не удалось удалить чат</string>
     <string name="chat_row_action_leave">Выйти из группы</string>
+    <string name="chat_list_select_all">Выбрать все</string>
+    <string name="chat_list_deselect_all">Снять выделение</string>
+    <plurals name="chat_list_bulk_delete_confirm">
+        <item quantity="one">Удалить %1$d чат с этого устройства?</item>
+        <item quantity="few">Удалить %1$d чата с этого устройства?</item>
+        <item quantity="many">Удалить %1$d чатов с этого устройства?</item>
+        <item quantity="other">Удалить %1$d чата с этого устройства?</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_archived">
+        <item quantity="one">%1$d чат архивирован</item>
+        <item quantity="few">%1$d чата архивировано</item>
+        <item quantity="many">%1$d чатов архивировано</item>
+        <item quantity="other">%1$d чата архивировано</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_restored">
+        <item quantity="one">%1$d чат восстановлен</item>
+        <item quantity="few">%1$d чата восстановлено</item>
+        <item quantity="many">%1$d чатов восстановлено</item>
+        <item quantity="other">%1$d чата восстановлено</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_deleted">
+        <item quantity="one">%1$d чат удалён с этого устройства</item>
+        <item quantity="few">%1$d чата удалено с этого устройства</item>
+        <item quantity="many">%1$d чатов удалено с этого устройства</item>
+        <item quantity="other">%1$d чата удалено с этого устройства</item>
+    </plurals>
+    <plurals name="toast_chat_list_bulk_delete_blocked_sole_admin">
+        <item quantity="one">%1$d выбранный чат требует передачи прав админа перед удалением — удалите его отдельно</item>
+        <item quantity="few">%1$d выбранных чата требуют передачи прав админа перед удалением — удалите их отдельно</item>
+        <item quantity="many">%1$d выбранных чатов требуют передачи прав админа перед удалением — удалите их отдельно</item>
+        <item quantity="other">%1$d выбранного чата требуют передачи прав админа перед удалением — удалите их отдельно</item>
+    </plurals>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d чат</item>
         <item quantity="few">%1$d чата</item>

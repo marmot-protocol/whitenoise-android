@@ -2286,7 +2286,10 @@ class ChatsController(
      * `groupMembers` FFI before evaluating the guard. The fetch is the
      * only added IO vs the conversation path.
      */
-    suspend fun leaveGroup(groupIdHex: String): Boolean {
+    suspend fun leaveGroup(
+        groupIdHex: String,
+        notify: Boolean = true,
+    ): Boolean {
         val account = accountRef ?: return false
         val group = groupRecordsById[groupIdHex] ?: return false
         val activeAccountIdHex = appState.activeAccount?.accountIdHex
@@ -2346,7 +2349,9 @@ class ChatsController(
                 removedGroupIds = removedGroupIds + groupIdHex
                 recompute()
             }
-            appState.present(R.string.toast_left_chat)
+            if (notify) {
+                appState.present(R.string.toast_left_chat)
+            }
             true
         }.onFailure {
             if (it is CancellationException) throw it
@@ -2372,6 +2377,7 @@ class ChatsController(
     suspend fun deleteGroupFromChatList(
         groupIdHex: String,
         leaveFirstHint: Boolean,
+        notify: Boolean = true,
     ): Boolean {
         val account = accountRef ?: return false
         // Hide the row immediately on confirm so it can't be tapped (reopening the
@@ -2399,7 +2405,7 @@ class ChatsController(
                 liveMembers,
                 activeIdHex,
             )
-        if (stillMember && !soleMember && !leaveGroup(groupIdHex)) {
+        if (stillMember && !soleMember && !leaveGroup(groupIdHex, notify = notify)) {
             removedRow?.let { foldChatRow(it) }
             return false
         }
@@ -2412,7 +2418,9 @@ class ChatsController(
         }
         // Wipe succeeded (or found nothing to remove) — the row was already
         // hidden optimistically on entry, so just confirm.
-        appState.present(R.string.toast_chat_deleted_local)
+        if (notify) {
+            appState.present(R.string.toast_chat_deleted_local)
+        }
         return true
     }
 

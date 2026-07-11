@@ -57,6 +57,28 @@
     <string name="toast_chat_deleted_local">Chat deleted from this device</string>
     <string name="toast_couldnt_delete_chat">Couldn\'t delete chat</string>
     <string name="chat_row_action_leave">Leave group</string>
+    <string name="chat_list_select_all">Select all</string>
+    <string name="chat_list_deselect_all">Deselect all</string>
+    <plurals name="chat_list_bulk_delete_confirm">
+        <item quantity="one">Delete %1$d chat from this device?</item>
+        <item quantity="other">Delete %1$d chats from this device?</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_archived">
+        <item quantity="one">%1$d chat archived</item>
+        <item quantity="other">%1$d chats archived</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_restored">
+        <item quantity="one">%1$d chat restored</item>
+        <item quantity="other">%1$d chats restored</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_deleted">
+        <item quantity="one">%1$d chat deleted from this device</item>
+        <item quantity="other">%1$d chats deleted from this device</item>
+    </plurals>
+    <plurals name="toast_chat_list_bulk_delete_blocked_sole_admin">
+        <item quantity="one">%1$d selected chat needs admin transfer before delete — delete it individually</item>
+        <item quantity="other">%1$d selected chats need admin transfer before delete — delete them individually</item>
+    </plurals>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d chat</item>
         <item quantity="other">%1$d chats</item>

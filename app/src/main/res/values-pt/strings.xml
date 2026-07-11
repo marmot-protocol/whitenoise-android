@@ -52,6 +52,28 @@
     <string name="toast_chat_deleted_local">Conversa excluída deste dispositivo</string>
     <string name="toast_couldnt_delete_chat">Não foi possível excluir a conversa</string>
     <string name="chat_row_action_leave">Sair do grupo</string>
+    <string name="chat_list_select_all">Selecionar tudo</string>
+    <string name="chat_list_deselect_all">Desmarcar tudo</string>
+    <plurals name="chat_list_bulk_delete_confirm">
+        <item quantity="one">Excluir %1$d chat deste dispositivo?</item>
+        <item quantity="other">Excluir %1$d chats deste dispositivo?</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_archived">
+        <item quantity="one">%1$d chat arquivado</item>
+        <item quantity="other">%1$d chats arquivados</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_restored">
+        <item quantity="one">%1$d chat restaurado</item>
+        <item quantity="other">%1$d chats restaurados</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_deleted">
+        <item quantity="one">%1$d chat excluído deste dispositivo</item>
+        <item quantity="other">%1$d chats excluídos deste dispositivo</item>
+    </plurals>
+    <plurals name="toast_chat_list_bulk_delete_blocked_sole_admin">
+        <item quantity="one">%1$d chat selecionado precisa de transferência de admin antes de excluir — exclua individualmente</item>
+        <item quantity="other">%1$d chats selecionados precisam de transferência de admin antes de excluir — exclua individualmente</item>
+    </plurals>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d conversa</item>
         <item quantity="other">%1$d conversas</item>

@@ -52,6 +52,28 @@
     <string name="toast_chat_deleted_local">Chat eliminata da questo dispositivo</string>
     <string name="toast_couldnt_delete_chat">Impossibile eliminare la chat</string>
     <string name="chat_row_action_leave">Esci dal gruppo</string>
+    <string name="chat_list_select_all">Seleziona tutto</string>
+    <string name="chat_list_deselect_all">Deseleziona tutto</string>
+    <plurals name="chat_list_bulk_delete_confirm">
+        <item quantity="one">Eliminare %1$d chat da questo dispositivo?</item>
+        <item quantity="other">Eliminare %1$d chat da questo dispositivo?</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_archived">
+        <item quantity="one">%1$d chat archiviata</item>
+        <item quantity="other">%1$d chat archiviate</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_restored">
+        <item quantity="one">%1$d chat ripristinata</item>
+        <item quantity="other">%1$d chat ripristinate</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_deleted">
+        <item quantity="one">%1$d chat eliminata da questo dispositivo</item>
+        <item quantity="other">%1$d chat eliminate da questo dispositivo</item>
+    </plurals>
+    <plurals name="toast_chat_list_bulk_delete_blocked_sole_admin">
+        <item quantity="one">%1$d chat selezionata richiede il trasferimento admin prima dell\'eliminazione — eliminala singolarmente</item>
+        <item quantity="other">%1$d chat selezionate richiedono il trasferimento admin prima dell\'eliminazione — eliminale singolarmente</item>
+    </plurals>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d chat</item>
         <item quantity="other">%1$d chat</item>

@@ -52,6 +52,28 @@
     <string name="toast_chat_deleted_local">Sohbet bu cihazdan silindi</string>
     <string name="toast_couldnt_delete_chat">Sohbet silinemedi</string>
     <string name="chat_row_action_leave">Gruptan ayrıl</string>
+    <string name="chat_list_select_all">Tümünü seç</string>
+    <string name="chat_list_deselect_all">Seçimi kaldır</string>
+    <plurals name="chat_list_bulk_delete_confirm">
+        <item quantity="one">Bu cihazdan %1$d sohbet silinsin mi?</item>
+        <item quantity="other">Bu cihazdan %1$d sohbet silinsin mi?</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_archived">
+        <item quantity="one">%1$d sohbet arşivlendi</item>
+        <item quantity="other">%1$d sohbet arşivlendi</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_restored">
+        <item quantity="one">%1$d sohbet geri yüklendi</item>
+        <item quantity="other">%1$d sohbet geri yüklendi</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_deleted">
+        <item quantity="one">%1$d sohbet bu cihazdan silindi</item>
+        <item quantity="other">%1$d sohbet bu cihazdan silindi</item>
+    </plurals>
+    <plurals name="toast_chat_list_bulk_delete_blocked_sole_admin">
+        <item quantity="one">%1$d seçili sohbet silinmeden önce admin devri gerektiriyor — tek tek silin</item>
+        <item quantity="other">%1$d seçili sohbet silinmeden önce admin devri gerektiriyor — tek tek silin</item>
+    </plurals>
     <plurals name="archived_chats_count">
         <item quantity="one">%1$d sohbet</item>
         <item quantity="other">%1$d sohbet</item>

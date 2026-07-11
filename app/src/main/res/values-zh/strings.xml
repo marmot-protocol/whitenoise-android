@@ -52,6 +52,23 @@
     <string name="toast_chat_deleted_local">已从此设备删除聊天</string>
     <string name="toast_couldnt_delete_chat">无法删除聊天</string>
     <string name="chat_row_action_leave">退出群组</string>
+    <string name="chat_list_select_all">全选</string>
+    <string name="chat_list_deselect_all">取消全选</string>
+    <plurals name="chat_list_bulk_delete_confirm">
+        <item quantity="other">从此设备删除 %1$d 个聊天？</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_archived">
+        <item quantity="other">已归档 %1$d 个聊天</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_restored">
+        <item quantity="other">已恢复 %1$d 个聊天</item>
+    </plurals>
+    <plurals name="toast_chat_list_chats_deleted">
+        <item quantity="other">已从此设备删除 %1$d 个聊天</item>
+    </plurals>
+    <plurals name="toast_chat_list_bulk_delete_blocked_sole_admin">
+        <item quantity="other">%1$d 个所选聊天需要先转移管理员才能删除 — 请单独删除</item>
+    </plurals>
     <plurals name="archived_chats_count">
         <item quantity="other">%1$d 个聊天</item>
     </plurals>
